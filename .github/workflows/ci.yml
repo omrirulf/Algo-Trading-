@@ -1,14 +1,17 @@
 name: CI
 
 on:
+  # Pushes to a branch with an open PR are covered by the pull_request
+  # trigger; listing "**" here as well would run the whole matrix twice for
+  # every commit.
   push:
-    branches: ["**"]
+    branches: [main]
   pull_request:
     branches: [main]
 
-# A newer push to the same branch supersedes an in-flight run.
+# A newer push to the same PR supersedes an in-flight run.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:

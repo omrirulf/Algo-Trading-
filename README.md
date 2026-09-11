@@ -111,7 +111,8 @@ exception, and every outcome is written to the audit log.
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs on every push and pull request:
+`.github/workflows/ci.yml` runs on every pull request against `main`, and
+on pushes to `main` itself:
 
 - **tests** — installs the pinned requirements and runs the full suite on
   Python 3.11 and 3.12, with no credentials and no network, then checks that
