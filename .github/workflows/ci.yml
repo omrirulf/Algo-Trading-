@@ -1,0 +1,120 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+
+# A newer push to the same branch supersedes an in-flight run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: tests (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run test suite
+        # Deliberately run with no credentials and no network: every test uses
+        # the fakes in tests/conftest.py. If a test ever needs a real Alpaca
+        # key or a live quote, that is a bug in the test, not in this workflow.
+        run: pytest tests/ -v
+
+      - name: App imports without credentials
+        # Guards the lazy-construction property: importing app.main must not
+        # reach for Alpaca keys or the network.
+        run: python -c "from app.main import app; app.openapi()"
+
+  guardrails:
+    name: guardrail invariants
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Alpaca SDK is imported only by broker_client.py
+        run: |
+          hits=$(grep -rnE '^[[:space:]]*(import|from)[[:space:]]+alpaca' \
+                   app orchestrator config --include='*.py' \
+                 | grep -v '^app/broker_client.py:' || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::Alpaca SDK imported outside app/broker_client.py"
+            exit 1
+          fi
+          echo "OK: only broker_client.py imports the Alpaca SDK"
+
+      - name: API keys are read only by broker_client.py
+        # config/settings.py declares the fields; only broker_client may read
+        # their values.
+        run: |
+          hits=$(grep -rnE '\.(alpaca_api_key|alpaca_secret_key)\b' \
+                   app orchestrator --include='*.py' \
+                 | grep -v '^app/broker_client.py:' || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::Alpaca credentials read outside app/broker_client.py"
+            exit 1
+          fi
+          echo "OK: only broker_client.py reads the API keys"
+
+      - name: Live trading is not reachable from configuration
+        run: |
+          if ! grep -q 'paper=True,' app/broker_client.py; then
+            echo "::error::paper=True is no longer hard-coded in broker_client.py"
+            exit 1
+          fi
+          hits=$(grep -rnE 'paper[[:space:]]*=' app --include='*.py' \
+                 | grep -vE 'paper=True' || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::found a paper= argument that is not the literal True"
+            exit 1
+          fi
+          echo "OK: paper=True is hard-coded"
+
+      - name: Guardrail thresholds are not environment-overridable
+        # The whole point of config/settings.py is that MAX_POSITION_PCT and
+        # friends are Final constants a bad .env cannot loosen.
+        run: |
+          for const in MAX_POSITION_PCT MIN_CONVICTION MAX_OPEN_POSITIONS ATR_STOP_MULTIPLIER; do
+            if ! grep -qE "^${const}: Final" config/settings.py; then
+              echo "::error::${const} is no longer a Final module constant"
+              exit 1
+            fi
+          done
+          if grep -nE '(os\.environ|getenv)' config/settings.py; then
+            echo "::error::config/settings.py reads the environment directly"
+            exit 1
+          fi
+          echo "OK: guardrail thresholds are Final constants"
+
+      - name: No committed .env
+        run: |
+          if git ls-files --error-unmatch .env >/dev/null 2>&1; then
+            echo "::error::.env is tracked in git"
+            exit 1
+          fi
+          echo "OK: .env is not tracked"

@@ -1,5 +1,7 @@
 # Hybrid LLM/Deterministic Trading System
 
+[![CI](https://github.com/omrirulf/Algo-Trading-/actions/workflows/ci.yml/badge.svg)](https://github.com/omrirulf/Algo-Trading-/actions/workflows/ci.yml)
+
 Qualitative LLM analysis is fully decoupled from trade execution. The LLM
 can only ever emit `{ticker, bias, conviction, rationale}`; a FastAPI
 webhook validates that shape (rejecting anything else with a 422), and a
@@ -12,6 +14,7 @@ paper-trade execution.
 algo-trading-system/
 ├── requirements.txt
 ├── pytest.ini
+├── .github/workflows/ci.yml   # tests on 3.11/3.12 + guardrail invariant checks
 ├── .env.example              # copy to .env and fill in
 ├── config/
 │   └── settings.py           # all guardrail constants (single source of truth)
@@ -105,6 +108,23 @@ Try adding `"quantity": 500` to that payload — it will be rejected with a
 
 Any broker / market-data failure produces an `ERROR` result rather than an
 exception, and every outcome is written to the audit log.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every push and pull request:
+
+- **tests** — installs the pinned requirements and runs the full suite on
+  Python 3.11 and 3.12, with no credentials and no network, then checks that
+  `app.main` imports and builds its OpenAPI schema without any Alpaca keys.
+- **guardrail invariants** — greps that enforce the architecture claims in the
+  table above, so they cannot rot silently:
+  the Alpaca SDK is imported only by `broker_client.py`; the API keys are read
+  only there; `paper=True` is still a hard-coded literal; the risk thresholds
+  are still `Final` constants and `config/settings.py` never reads the
+  environment directly; and no `.env` is tracked in git.
+
+Each invariant check was verified to fail when its invariant is broken, so a
+green run means something.
 
 ## Notes / next steps for production
 
