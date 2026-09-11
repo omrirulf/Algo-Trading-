@@ -4,10 +4,10 @@ This process knows nothing about position sizing, stops, or the broker. It
 has no Alpaca keys. All it can do is send ``{ticker, bias, conviction,
 rationale}`` to the webhook, and the webhook will 422 anything else.
 
-Two integration points are left as stubs (``fetch_news`` and ``call_llm``)
-because they depend on which providers you use. When wiring ``call_llm``,
-use your LLM provider's structured-output / tool-use mode with
-``SIGNAL_JSON_SCHEMA`` so the model is constrained at generation time.
+News comes from Bright Data's SERP API (see ``orchestrator/news.py``).
+``call_llm`` is still a stub because it depends on which LLM provider you
+use; when wiring it, use the provider's structured-output / tool-use mode
+with ``SIGNAL_JSON_SCHEMA`` so the model is constrained at generation time.
 """
 
 from __future__ import annotations
@@ -27,6 +27,7 @@ from pydantic import ValidationError  # noqa: E402
 from app.schemas import LLMSignal  # noqa: E402
 from config import settings as cfg  # noqa: E402
 from config.settings import get_settings  # noqa: E402
+from orchestrator.news import BrightDataNewsProvider, NewsFetchError  # noqa: E402
 
 log = logging.getLogger("heartbeat")
 
@@ -44,16 +45,15 @@ SYSTEM_PROMPT = (
 
 
 # --------------------------------------------------------------------------- #
-# Provider stubs
+# Providers
 # --------------------------------------------------------------------------- #
 
 
 def fetch_news(ticker: str) -> list[str]:
-    """Return recent headlines / snippets for ``ticker``.
-
-    Wire this to your news provider (e.g. an RSS feed, NewsAPI, Alpaca News).
-    """
-    raise NotImplementedError("fetch_news(): connect a news provider")
+    """Return recent headlines / snippets for ``ticker`` from Bright Data."""
+    settings = get_settings()
+    provider = BrightDataNewsProvider(settings.brightdata_api_token, settings.brightdata_serp_zone)
+    return provider.fetch(ticker)
 
 
 def call_llm(system_prompt: str, user_prompt: str, json_schema: dict) -> str:
@@ -99,7 +99,7 @@ def process_ticker(ticker: str) -> None:
         headlines = fetch_news(ticker)
         raw = call_llm(SYSTEM_PROMPT, build_user_prompt(ticker, headlines), SIGNAL_JSON_SCHEMA)
         signal = parse_signal(raw)
-    except NotImplementedError as exc:
+    except (NotImplementedError, NewsFetchError) as exc:
         log.error("%s: %s", ticker, exc)
         return
     except (json.JSONDecodeError, ValidationError) as exc:

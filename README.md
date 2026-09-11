@@ -27,7 +27,8 @@ algo-trading-system/
 │   ├── execution_engine.py    # orchestrates validate -> size -> stop -> submit
 │   └── logger.py              # structured JSON audit log
 ├── orchestrator/
-│   └── heartbeat.py           # hourly job: fetch news -> call LLM -> POST signal
+│   ├── heartbeat.py           # hourly job: fetch news -> call LLM -> POST signal
+│   └── news.py                # Bright Data SERP API (Google News) headline fetch
 ├── tests/
 │   ├── conftest.py            # FakeBroker / FakeMarketData; no network in tests
 │   ├── test_risk_engine.py    # proves the 5% cap and ATR stop math hold
@@ -35,7 +36,8 @@ algo-trading-system/
 │   ├── test_market_data.py    # Wilder ATR against a reference implementation
 │   ├── test_execution_engine.py  # full decision path with fakes
 │   ├── test_webhook.py        # auth + 422 at the HTTP layer
-│   └── test_heartbeat.py      # orchestrator can only send the closed shape
+│   ├── test_heartbeat.py      # orchestrator can only send the closed shape
+│   └── test_news.py           # Bright Data request shape + response parsing
 └── logs/
     └── execution_audit.log    # generated at runtime
 ```
@@ -48,13 +50,29 @@ pip install -r requirements.txt
 cp .env.example .env   # fill in your Alpaca paper keys + a random webhook secret
 ```
 
+### News feed (Bright Data)
+
+The orchestrator pulls the last 24 hours of Google News headlines for each
+watchlist ticker through [Bright Data's SERP API](https://brightdata.com/products/serp-api).
+
+1. In the Bright Data dashboard create a zone of type **SERP API** (the
+   default name is `serp_api`; if you pick another, set `BRIGHTDATA_SERP_ZONE`).
+2. Copy an API token from *Account settings -> API tokens* into
+   `BRIGHTDATA_API_TOKEN`.
+
+Each cycle sends one request per ticker, so the default three-ticker
+watchlist costs 72 SERP requests a day. Bright Data's own free tier /
+pay-as-you-go pricing covers that comfortably; check your zone's usage page
+after the first day. If the token is missing the cycle logs an error for
+each ticker and sends nothing.
+
 ## Run
 
 ```bash
 # Terminal 1: the deterministic execution engine
 uvicorn app.main:app --reload --port 8000
 
-# Terminal 2: the orchestrator (wire up call_llm() and fetch_news() first)
+# Terminal 2: the orchestrator (wire up call_llm() first; news is already wired)
 python orchestrator/heartbeat.py
 ```
 
@@ -130,12 +148,14 @@ green run means something.
 ## Notes / next steps for production
 
 - Swap the webhook's shared-secret header for HMAC request signing.
-- `orchestrator/heartbeat.py` has two `NotImplementedError` stubs
-  (`fetch_news`, `call_llm`) — wire up your news provider and LLM
-  provider's **structured output / tool-use mode** so the model is
-  constrained to `SIGNAL_JSON_SCHEMA` at generation time, not just hoped
-  into shape by a prompt. `SIGNAL_JSON_SCHEMA` is derived from `LLMSignal`
-  so the two cannot drift.
+- `orchestrator/heartbeat.py` still has one `NotImplementedError` stub,
+  `call_llm` — wire up your LLM provider's **structured output / tool-use
+  mode** so the model is constrained to `SIGNAL_JSON_SCHEMA` at generation
+  time, not just hoped into shape by a prompt. `SIGNAL_JSON_SCHEMA` is
+  derived from `LLMSignal` so the two cannot drift.
+- `orchestrator/news.py` searches Google News for `"<TICKER> stock"`. For
+  tickers whose symbol is a common word, or to include the company name,
+  adjust `build_news_search_url()`.
 - Consider persisting `ExecutionResult` rows to a database in addition to
   the log file, for querying trade history.
 - `TradingClient(..., paper=True)` is hard-coded in `broker_client.py` —
