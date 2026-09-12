@@ -1,0 +1,117 @@
+---
+title: "Quickstart"
+description: "Get the execution engine and orchestrator running end to end"
+---
+
+Everything below runs against **Alpaca paper trading**. There is no code
+path to live trading — see [Guardrails](/guardrails) for why that's a hard
+guarantee, not a setting.
+
+## 1. Install dependencies
+
+```bash
+python3 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+```
+
+## 2. Configure credentials
+
+```bash
+cp .env.example .env
+```
+
+Fill in `.env` — see [Configuration](/configuration) for what each value
+does and where to get it. At minimum you need:
+
+<Steps>
+  <Step title="Alpaca paper keys">
+    From the [Alpaca paper dashboard](https://app.alpaca.markets/paper/dashboard/overview).
+  </Step>
+  <Step title="A webhook secret">
+    Any random string. Generate one with:
+    ```bash
+    python -c "import secrets; print(secrets.token_hex(32))"
+    ```
+  </Step>
+  <Step title="A Bright Data SERP API token">
+    Create a **SERP API** zone in the [Bright Data dashboard](https://brightdata.com), then copy a token from *Account settings → API tokens*.
+  </Step>
+  <Step title="An Anthropic API key">
+    From the [Anthropic Console](https://console.anthropic.com).
+  </Step>
+</Steps>
+
+## 3. Start the execution engine
+
+```bash
+uvicorn app.main:app --reload --port 8000
+```
+
+This is the process that owns the broker connection. Importing `app.main`
+never touches Alpaca or the network — the broker client is constructed
+lazily on the first request — so the test suite and this startup step both
+work without live credentials present.
+
+## 4. Start the orchestrator
+
+```bash
+python orchestrator/heartbeat.py
+```
+
+This runs once immediately, then every `HEARTBEAT_INTERVAL_MINUTES`
+(default 60). Each cycle, for every ticker in `WATCHLIST`, it fetches
+headlines, asks Claude for a signal, and POSTs that signal to the webhook
+running in step 3.
+
+## 5. Watch it happen
+
+Every decision — accepted, rejected, or errored — is logged as one JSON line
+in `logs/execution_audit.log`. Tail it during your first live cycle:
+
+```bash
+tail -f logs/execution_audit.log
+```
+
+<Note>
+  Nothing in the 175-test suite exercises the real Bright Data or Anthropic
+  APIs — they're mocked. The first live cycle is the first real test of
+  those two integrations. If every ticker logs an error, check the message:
+  it will name which credential or response shape is the problem.
+</Note>
+
+## Try the webhook directly
+
+You don't need the orchestrator running to test the execution engine. Send
+a signal by hand:
+
+```bash
+curl -X POST http://localhost:8000/webhook/signal \
+  -H "Content-Type: application/json" \
+  -H "x-webhook-secret: <your WEBHOOK_SHARED_SECRET>" \
+  -d '{"ticker": "AAPL", "bias": "BULLISH", "conviction": 0.75, "rationale": "Strong earnings beat"}'
+```
+
+Now try smuggling an order parameter — it never reaches the risk engine:
+
+```bash
+curl -X POST http://localhost:8000/webhook/signal \
+  -H "Content-Type: application/json" \
+  -H "x-webhook-secret: <your WEBHOOK_SHARED_SECRET>" \
+  -d '{"ticker": "AAPL", "bias": "BULLISH", "conviction": 0.75, "rationale": "x", "quantity": 9999}'
+```
+
+<Check>
+  The second request returns **422 Unprocessable Entity**. `quantity` isn't
+  a field `LLMSignal` recognizes, and the model's `extra="forbid"` config
+  rejects it at the validation layer — before `ExecutionEngine.execute()` is
+  ever called.
+</Check>
+
+## Run the test suite
+
+```bash
+pytest tests/ -v
+```
+
+175 tests, no network, no credentials — every broker and market-data call is
+a fake. See [Testing](/testing) for what each file proves.

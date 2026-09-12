@@ -1,0 +1,100 @@
+---
+title: "Architecture"
+description: "Two processes, one narrow contract between them"
+---
+
+<Frame>
+  <img src="/images/architecture-overview.svg" alt="Orchestrator produces a signal; execution engine owns sizing, stops, and the broker" />
+</Frame>
+
+## Two processes, run separately
+
+<CardGroup cols={2}>
+  <Card title="Execution engine" icon="server">
+    `uvicorn app.main:app` — a FastAPI service that owns the Alpaca
+    connection. This is the only process with authority to place an order.
+  </Card>
+  <Card title="Orchestrator" icon="clock">
+    `python orchestrator/heartbeat.py` — an hourly job that has **no broker
+    credentials at all**. It can only ever produce a signal and POST it.
+  </Card>
+</CardGroup>
+
+They communicate over exactly one HTTP endpoint, `POST /webhook/signal`,
+authenticated with a shared secret. That's the entire surface area between
+"LLM-adjacent code" and "code that can move money."
+
+## Directory structure
+
+```
+algo-trading-system/
+├── requirements.txt
+├── .env.example                # copy to .env and fill in
+├── config/
+│   └── settings.py             # guardrails (Final constants) + Settings (env-backed)
+├── app/                        # the execution engine — owns Alpaca
+│   ├── main.py                 # FastAPI app, POST /webhook/signal
+│   ├── schemas.py              # LLMSignal (extra="forbid") + ExecutionResult
+│   ├── risk_engine.py          # pure functions: sizing, stop math, gates
+│   ├── market_data.py          # yfinance price + Wilder ATR
+│   ├── broker_client.py        # ONLY module that imports the Alpaca SDK
+│   ├── execution_engine.py     # validate -> size -> stop -> submit
+│   └── logger.py               # JSON audit log
+├── orchestrator/                # the signal producer — no broker keys
+│   ├── heartbeat.py             # hourly job: news -> LLM -> POST
+│   ├── news.py                  # Bright Data SERP API (Google News)
+│   └── llm.py                   # Claude call, schema-constrained
+└── tests/                       # 175 tests, no network, no credentials
+```
+
+## Module-level isolation, not just convention
+
+Three isolation rules are enforced by CI on every push (see
+[Continuous Integration](/continuous-integration)), not just documented:
+
+<AccordionGroup>
+  <Accordion title="Only broker_client.py imports the Alpaca SDK">
+    A CI step greps `app/`, `orchestrator/`, and `config/` for any
+    `import alpaca` or `from alpaca` outside `app/broker_client.py`, and
+    fails the build if it finds one. No other module — including the
+    orchestrator, which is the code path closest to the LLM — can even
+    construct an Alpaca client.
+  </Accordion>
+  <Accordion title="Only broker_client.py reads the Alpaca keys">
+    Same idea, for `settings.alpaca_api_key` / `settings.alpaca_secret_key`.
+    The orchestrator literally cannot read those values even if a bug tried
+    to pass them somewhere.
+  </Accordion>
+  <Accordion title="Importing app.main never touches credentials or network">
+    `get_engine()` builds the production `ExecutionEngine` lazily, on the
+    first request, via `@lru_cache`. This is what lets the test suite import
+    `app.main` and hit `app.openapi()` with zero environment variables set —
+    CI does exactly that as a check.
+  </Accordion>
+</AccordionGroup>
+
+## Dependency injection for testability
+
+`ExecutionEngine` takes a `broker` and `market_data` provider in its
+constructor rather than importing Alpaca/yfinance directly:
+
+```python
+class ExecutionEngine:
+    def __init__(self, broker: BrokerClient, market_data: MarketDataProvider) -> None:
+        self._broker = broker
+        self._market_data = market_data
+```
+
+Tests construct it with `FakeBroker` and `FakeMarketData` from
+`tests/conftest.py` and exercise the full decision path — including
+rejections and broker errors — without a single network call.
+
+## What each layer is and isn't allowed to know
+
+| Layer | Knows about | Never sees |
+|---|---|---|
+| `orchestrator/llm.py` | Headlines, the `LLMSignal` JSON schema | Alpaca keys, position sizing, stop math |
+| `orchestrator/heartbeat.py` | The webhook URL and shared secret | Alpaca keys |
+| `app/main.py` | `LLMSignal`, the webhook secret | — (delegates immediately to the engine) |
+| `app/execution_engine.py` | Guardrail constants, broker/market-data interfaces | The LLM's rationale (logged only, never parsed) |
+| `app/broker_client.py` | Alpaca keys, `paper=True` | — (the only module that needs to know) |

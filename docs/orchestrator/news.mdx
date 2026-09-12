@@ -1,0 +1,100 @@
+---
+title: "News (Bright Data)"
+description: "How the orchestrator pulls headlines for each ticker"
+---
+
+`orchestrator/news.py` fetches the past 24 hours of Google News results for
+`"<TICKER> stock"` through [Bright Data's SERP API](https://brightdata.com/products/serp-api),
+and returns up to 10 de-duplicated headline lines.
+
+## Setup
+
+<Steps>
+  <Step title="Create a SERP API zone">
+    In the Bright Data dashboard, create a zone of type **SERP API**. The
+    default zone name this codebase expects is `serp_api`; if you name yours
+    differently, set `BRIGHTDATA_SERP_ZONE`.
+  </Step>
+  <Step title="Copy an API token">
+    From *Account settings → API tokens*, into `BRIGHTDATA_API_TOKEN`.
+  </Step>
+</Steps>
+
+<Note>
+  One request per ticker per cycle. The default three-ticker watchlist is
+  72 requests/day at the default hourly cadence — comfortably inside Bright
+  Data's free tier / pay-as-you-go pricing, but check your zone's usage page
+  after the first day if you widen the watchlist.
+</Note>
+
+## The request
+
+```python
+BRIGHTDATA_REQUEST_URL = "https://api.brightdata.com/request"
+
+def build_news_search_url(ticker: str) -> str:
+    params = {
+        "q": f"{ticker} stock", "tbm": "nws", "tbs": f"qdr:{NEWS_LOOKBACK}",  # qdr:d = past 24h
+        "num": MAX_HEADLINES, "hl": "en", "gl": "us", "brd_json": 1,
+    }
+    return f"https://www.google.com/search?{urlencode(params)}"
+```
+
+`brd_json=1` is what tells Bright Data to return parsed JSON instead of raw
+HTML. The request body sent to Bright Data itself is deliberately minimal:
+
+```python
+body = {"zone": self._zone, "url": build_news_search_url(ticker), "format": "raw"}
+headers = {"Authorization": f"Bearer {self._token}", "Content-Type": "application/json"}
+```
+
+This shape — `POST /request` with `{zone, url, format}` and a Bearer token —
+comes from Bright Data's own Python SDK and MCP server, since their public
+docs site wasn't reachable from the environment this was built in.
+
+## Parsing: tolerant on purpose
+
+`parse_news_results()` doesn't assume one fixed response shape. It:
+
+<CardGroup cols={2}>
+  <Card title="Unwraps two response shapes" icon="layer-group">
+    Accepts either the bare parsed JSON, or Bright Data's
+    `{status_code, headers, body}` wrapper — recursing into `body` when
+    present, and surfacing a non-2xx inner status as an error.
+  </Card>
+  <Card title="Falls back across result keys" icon="list-check">
+    Looks for `news`, then `top_stories`, then `organic` — the same query
+    can come back shaped as a news tab result or a regular SERP.
+  </Card>
+  <Card title="De-duplicates by title" icon="copy">
+    Case-insensitive dedup, since the same story often appears from
+    multiple outlets.
+  </Card>
+  <Card title="Caps at 10 headlines" icon="hashtag">
+    `MAX_HEADLINES = 10` — enough signal for the LLM without ballooning the
+    prompt.
+  </Card>
+</CardGroup>
+
+Each surviving headline is formatted as:
+
+```
+<title> — <snippet> (<source>, <when>)
+```
+
+## Failure modes: `NewsFetchError`
+
+Every way this can go wrong — HTML instead of JSON (usually means the zone
+isn't a SERP API zone, or `brd_json=1` didn't take), a non-JSON body, a
+non-2xx response, a transport error, or a missing token/zone at
+construction time — raises `NewsFetchError`. `heartbeat.py` catches this per
+ticker and logs it; one ticker's bad response never stops the cycle.
+
+<Warning>
+  The exact field names inside a Bright Data news result (`title`,
+  `description`/`snippet`, `source`/`source_name`, `date`/`time`) were read
+  tolerantly because Bright Data's documentation site was unreachable while
+  this was built. The parser was verified against a mocked transport only —
+  check the log output on your first real cycle. If every ticker logs empty
+  news, that's the first thing to look at.
+</Warning>

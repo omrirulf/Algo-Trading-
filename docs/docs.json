@@ -1,0 +1,67 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Algo Trading System",
+  "description": "Hybrid LLM/deterministic trading system: an LLM proposes a sentiment signal, a pure-Python risk engine decides everything about the trade.",
+  "colors": {
+    "primary": "#16A34A",
+    "light": "#22C55E",
+    "dark": "#15803D"
+  },
+  "favicon": "/favicon.svg",
+  "navigation": {
+    "pages": [
+      {
+        "group": "Get Started",
+        "pages": [
+          "index",
+          "quickstart",
+          "configuration"
+        ]
+      },
+      {
+        "group": "How It Works",
+        "pages": [
+          "architecture",
+          "guardrails",
+          "decision-path"
+        ]
+      },
+      {
+        "group": "The Orchestrator",
+        "pages": [
+          "orchestrator/overview",
+          "orchestrator/news",
+          "orchestrator/llm"
+        ]
+      },
+      {
+        "group": "Reference",
+        "pages": [
+          "api-reference/webhook",
+          "testing",
+          "continuous-integration"
+        ]
+      },
+      {
+        "group": "Going Further",
+        "pages": [
+          "next-steps"
+        ]
+      }
+    ]
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Repository",
+        "href": "https://github.com/omrirulf/Algo-Trading-"
+      }
+    ]
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/omrirulf/Algo-Trading-"
+    }
+  }
+}

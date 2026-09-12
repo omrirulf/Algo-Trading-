@@ -1,0 +1,132 @@
+---
+title: "LLM Signals (Claude)"
+description: "How headlines become a signal, constrained at generation time"
+---
+
+`orchestrator/llm.py` sends each ticker's headlines to `claude-opus-5` and
+gets back a signal that is structurally incapable of containing anything
+but `ticker`, `bias`, `conviction`, and `rationale`.
+
+## The schema is derived, not hand-written
+
+```python
+def build_output_schema(model_schema: dict[str, Any]) -> dict[str, Any]:
+    """Derive the generation-time schema from a pydantic model's JSON schema."""
+    resolved = _inline_refs(...)   # inline the Bias enum's $ref
+    pruned = _prune(resolved)      # keep only keywords constrained decoding accepts
+    pruned["additionalProperties"] = False
+    return pruned
+```
+
+It starts from `LLMSignal.model_json_schema()` — the exact model the
+webhook validates against — so the fields the model is allowed to emit can
+never drift from the fields the risk engine will accept.
+
+<Warning>
+  **What's deliberately not in the generation-time schema:** value bounds
+  like `pattern`, `minLength`, `minimum`, and `maximum`. Constrained
+  decoding doesn't accept every JSON Schema keyword Pydantic emits, so those
+  are pruned before the request goes out. This does not weaken anything —
+  `LLMSignal` still enforces the conviction range, the ticker pattern, and
+  the rationale length cap on the way back in, in the same place it always
+  did. Only the schema the *model* sees is simplified; the schema the
+  *validator* enforces is untouched.
+</Warning>
+
+## The request
+
+```python
+response = self._client.beta.messages.create(
+    model="claude-opus-5",
+    max_tokens=16000,
+    system=system_prompt,
+    messages=[{"role": "user", "content": user_prompt}],
+    thinking={"type": "adaptive"},
+    output_config={
+        "effort": "medium",
+        "format": {"type": "json_schema", "schema": build_output_schema(json_schema)},
+    },
+    betas=["server-side-fallback-2026-07-01"],
+    fallbacks="default",
+)
+```
+
+Model and effort are module constants, not `.env` settings — see
+[Configuration](/configuration) for why.
+
+## The prompt asks for calibrated conviction
+
+A model that answers 0.9 to everything makes `MIN_CONVICTION` (0.60)
+meaningless as a filter. The system prompt addresses this directly:
+
+> Calibrate conviction honestly: it is the probability you would assign to
+> the move, not your enthusiasm. Most days deserve 0.3–0.6. Reserve 0.8+
+> for a clear, material, ticker-specific catalyst in the news you were
+> given. If the news is stale, generic, or absent, say NEUTRAL with low
+> conviction rather than inventing a view — a NEUTRAL signal is always
+> safe, and downstream the conviction floor will simply drop it.
+
+<Warning>
+  Nothing currently *measures* whether the model follows this instruction.
+  If conviction drifts toward always-high over time, the floor stops
+  filtering anything and this is worth revisiting — see
+  [Next Steps](/next-steps).
+</Warning>
+
+## Refusal fallback
+
+If a safety classifier declines the request, the API re-runs it on another
+model inside the same call and marks the switch with a `fallback` content
+block. `fallbacks="default"` routes by refusal category, so there's no
+model name hard-coded here to go stale as the model lineup changes.
+
+Two non-obvious details `_extract_text()` handles:
+
+<AccordionGroup>
+  <Accordion title="The answer is read from after the last switch point">
+    A model that declines mid-turn can leave partial text behind — "I can't
+    help with that" — ahead of the block where the fallback model actually
+    answers. Reading the *first* text block would return that fragment and
+    the JSON parse would fail. The code finds the last `fallback` block and
+    only looks at text after it.
+  </Accordion>
+  <Accordion title="A rejected fallback beta doesn't kill the cycle">
+    If the fallback preview feature isn't enabled on your account, the
+    first request of each provider's life would otherwise fail outright —
+    and for an unattended hourly job, that means silently producing nothing
+    forever. `_create()` catches a `BadRequestError` on the first attempt,
+    logs a warning, retries once without the fallback parameters, and
+    remembers not to try them again on that provider instance. Worst case:
+    you lose the rescue, not the cycle.
+  </Accordion>
+</AccordionGroup>
+
+## Failure modes: `LLMError`
+
+Every one of these raises `LLMError`, caught per-ticker in `heartbeat.py`:
+
+| Cause | What happened |
+|---|---|
+| Missing API key | Raised at `AnthropicSignalProvider` construction, before any call. |
+| `stop_reason == "refusal"` | The whole chain — including the fallback model — declined. |
+| `stop_reason == "max_tokens"` | Response was truncated; the JSON would be incomplete. |
+| No text block in the response | Nothing to parse. |
+| Non-JSON text | The model didn't produce valid JSON (shouldn't happen under a schema, but checked anyway). |
+| `anthropic.APIError` | Network failure, rate limit, or other API-level error. |
+
+## Three validation layers, not one
+
+<Steps>
+  <Step title="Generation-time schema">
+    Constrains what the model can physically emit.
+  </Step>
+  <Step title="orchestrator/heartbeat.py: parse_signal()">
+    Re-validates locally with `LLMSignal.model_validate()` before sending
+    anything over the network — a clearer error, closer to the source.
+  </Step>
+  <Step title="app/main.py: the webhook">
+    Validates again on receipt. This is the layer that actually matters for
+    security — it doesn't trust that the orchestrator validated correctly,
+    or that the request even came from this orchestrator's code path.
+  </Step>
+</Steps>

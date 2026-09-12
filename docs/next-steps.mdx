@@ -1,0 +1,62 @@
+---
+title: "Next Steps"
+description: "Known scope limits — read before trusting this with real conviction"
+---
+
+This system is complete for what it set out to do: keep an LLM's output
+structurally incapable of controlling a trade. It is not a finished trading
+product. These are the honest gaps.
+
+<CardGroup cols={2}>
+  <Card title="Webhook auth is a shared secret" icon="key">
+    Fine for one orchestrator you control talking to one engine you
+    control. Swap for HMAC request signing before exposing this to anything
+    less trusted.
+  </Card>
+  <Card title="No exit path besides the stop" icon="arrow-right-from-bracket">
+    The engine has no close-or-reduce logic. A position's only exit is the
+    stop-loss attached at entry. A signal opposing an existing position is
+    rejected rather than flipping it — see [Decision Path](/decision-path).
+  </Card>
+  <Card title="Conviction calibration is unmeasured" icon="gauge">
+    The prompt asks Claude to calibrate conviction honestly, but nothing
+    checks that it does. If it drifts toward always-high, the 0.60 floor
+    stops filtering anything. Log a few weeks of paper decisions and check
+    whether high-conviction calls actually did better.
+  </Card>
+  <Card title="No persistence beyond the log file" icon="database">
+    `logs/execution_audit.log` is the only record. Consider a database for
+    querying trade history once you have more than a few days of it.
+  </Card>
+</CardGroup>
+
+## If you want to go further
+
+<Steps>
+  <Step title="Wire up HMAC signing">
+    Replace the `x-webhook-secret` header check in `app/main.py` with a
+    signature over the request body.
+  </Step>
+  <Step title="Add a close/reduce path">
+    A new method on `broker_client.py` and a new decision branch in
+    `execution_engine.py` — deliberately scoped out of the initial build so
+    the guardrail surface stayed small enough to fully test.
+  </Step>
+  <Step title="Measure signal quality">
+    Persist `ExecutionResult` rows with enough context to later ask: did
+    conviction actually correlate with outcome?
+  </Step>
+  <Step title="Widen the watchlist thoughtfully">
+    Each ticker is one Bright Data request and one Claude call per cycle —
+    check both providers' usage pages before scaling `WATCHLIST` up
+    significantly.
+  </Step>
+</Steps>
+
+## Going live (don't, yet — but here's what it takes)
+
+`TradingClient(..., paper=True)` is a hard-coded literal in
+`app/broker_client.py`, and a CI job fails the build if that stops being
+true. Removing that safety is an explicit, reviewable code change — not a
+setting, not an environment variable. See [Guardrails](/guardrails) for why
+that design choice was made deliberately.

@@ -1,0 +1,70 @@
+---
+title: "Introduction"
+description: "An LLM proposes a trading idea. It never touches a broker."
+---
+
+This system splits trading into two halves that are not allowed to talk to
+each other except through one narrow, validated message:
+
+<Steps>
+  <Step title="An LLM reads the news">
+    Claude looks at recent headlines for a ticker and produces exactly one
+    thing: `{ticker, bias, conviction, rationale}`. It has no concept of
+    position size, price, or order type — it cannot have that concept,
+    because the schema it is constrained to doesn't include those fields.
+  </Step>
+  <Step title="A deterministic engine decides everything else">
+    A FastAPI webhook receives that signal, re-validates it, and hands it to
+    a pure-Python risk engine. The risk engine — not the LLM — decides
+    whether to trade, how many shares, and where the stop-loss goes. It then
+    submits one Alpaca paper order with a mandatory stop.
+  </Step>
+</Steps>
+
+<Frame>
+  <img src="/images/architecture-overview.svg" alt="Two isolated halves: orchestrator produces a signal, execution engine owns the trade" />
+</Frame>
+
+## Why split it this way
+
+LLM output is fundamentally untrustworthy as a source of *instructions* —
+it can be wrong, inconsistent, or (if the news feed is ever compromised)
+manipulated by content injected into what it reads. This system treats the
+LLM's output the way you'd treat input from the public internet: parse it
+into a narrow, validated shape and never let it drive execution logic
+directly.
+
+<CardGroup cols={2}>
+  <Card title="The LLM's entire vocabulary" icon="message">
+    `ticker`, `bias` (BULLISH / BEARISH / NEUTRAL), `conviction` (0–1), and a
+    free-text `rationale` that is logged but never parsed for instructions.
+  </Card>
+  <Card title="What the LLM can never say" icon="ban">
+    Quantity, price, order type, stop distance, leverage — any of it. There
+    is no field for it. A payload that tries is rejected with HTTP 422
+    before any execution code runs.
+  </Card>
+</CardGroup>
+
+## What's actually enforced, not just documented
+
+Every guardrail below is backed by a unit test, and the repository's CI runs
+a second, independent check on every push: static greps that fail the build
+if, say, the Alpaca SDK gets imported somewhere other than
+`app/broker_client.py`, or `paper=True` stops being a literal. See
+<a href="/guardrails">Guardrails</a> for the full list.
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get the webhook and orchestrator running against Alpaca paper trading.
+  </Card>
+  <Card title="Architecture" icon="sitemap" href="/architecture">
+    How the pieces fit together and why credentials are isolated per module.
+  </Card>
+  <Card title="Guardrails" icon="shield-check" href="/guardrails">
+    Every hard limit, and exactly which line of code enforces it.
+  </Card>
+  <Card title="Decision path" icon="list-ol" href="/decision-path">
+    The nine checks a signal passes through before an order is submitted.
+  </Card>
+</CardGroup>
