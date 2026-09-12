@@ -12,11 +12,23 @@ an order -- the most it can do is return a JSON string.
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 
 import anthropic
 
+log = logging.getLogger(__name__)
+
 MODEL = "claude-opus-5"
+
+#: Server-side refusal fallback. If a safety classifier declines the request,
+#: the API re-runs it on another model inside the same call and marks the
+#: switch with a ``fallback`` content block. ``"default"`` routes by refusal
+#: category, so there is no model list here to go stale. The beta name and the
+#: mode are a matched pair -- the array form of ``fallbacks`` needs the
+#: ``2026-06-01`` beta instead, and crossing them is rejected.
+FALLBACK_BETA = "server-side-fallback-2026-07-01"
+FALLBACK_MODE = "default"
 
 #: Thinking depth / token spend. This is a short judgement over a handful of
 #: headlines, not a long-horizon task, so it does not need "high" or above.
@@ -85,16 +97,32 @@ def build_output_schema(model_schema: dict[str, Any]) -> dict[str, Any]:
     return pruned
 
 
+def _model_of(info: Any) -> str | None:
+    return getattr(info, "model", None)
+
+
 def _extract_text(response: Any) -> str:
     stop_reason = getattr(response, "stop_reason", None)
     if stop_reason == "refusal":
+        # Every model in the chain declined, fallback included.
         details = getattr(response, "stop_details", None)
         category = getattr(details, "category", None) if details else None
         raise LLMError(f"model declined to answer (category: {category})")
     if stop_reason == "max_tokens":
         raise LLMError("response hit max_tokens; JSON would be truncated")
 
-    for block in getattr(response, "content", []) or []:
+    blocks = list(getattr(response, "content", []) or [])
+    switches = [i for i, b in enumerate(blocks) if getattr(b, "type", None) == "fallback"]
+    for i in switches:
+        log.warning(
+            "%s declined; %s answered instead",
+            _model_of(getattr(blocks[i], "from_", None)),
+            _model_of(getattr(blocks[i], "to", None)),
+        )
+
+    # A model that declines mid-turn can leave partial text behind, so only
+    # what the model that actually answered emitted is eligible.
+    for block in blocks[(switches[-1] + 1) if switches else 0:]:
         if getattr(block, "type", None) == "text":
             text = (block.text or "").strip()
             if text:
@@ -109,10 +137,25 @@ class AnthropicSignalProvider:
         self._client = client or anthropic.Anthropic(
             api_key=api_key, timeout=REQUEST_TIMEOUT_SECONDS
         )
+        self._use_fallback = True
+
+    def _create(self, **kwargs: Any) -> Any:
+        if self._use_fallback:
+            try:
+                return self._client.beta.messages.create(
+                    betas=[FALLBACK_BETA], fallbacks=FALLBACK_MODE, **kwargs
+                )
+            except anthropic.BadRequestError as exc:
+                # The beta may not be enabled for this account. Going without
+                # the rescue costs one skipped ticker on a refusal; letting a
+                # rejected parameter stand would cost every cycle.
+                log.warning("refusal fallback rejected, continuing without it: %s", exc)
+                self._use_fallback = False
+        return self._client.beta.messages.create(**kwargs)
 
     def complete(self, system_prompt: str, user_prompt: str, json_schema: dict) -> str:
         try:
-            response = self._client.messages.create(
+            response = self._create(
                 model=MODEL,
                 max_tokens=MAX_TOKENS,
                 system=system_prompt,

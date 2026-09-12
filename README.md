@@ -90,6 +90,19 @@ changing which model trades your account is a visible code change. A refusal,
 a truncated response, a non-JSON response, or an API error all raise
 `LLMError`, which is logged and skips that ticker for the cycle.
 
+**Refusal fallback.** If a safety classifier declines a request, the API
+re-runs it on another model within the same call and marks the switch with a
+`fallback` content block. The request asks for `fallbacks="default"`, which
+routes by refusal category, so there is no model list in the repo to go
+stale. Two consequences worth knowing:
+
+- The answer is read from *after* the last switch point. A model that
+  declines mid-turn can leave partial text behind, and that text is not the
+  signal.
+- If the fallback beta is not enabled on your account, the first call of each
+  provider is rejected and retried immediately without it, with a warning in
+  the log. You lose the rescue, not the cycle.
+
 ## Run
 
 ```bash
