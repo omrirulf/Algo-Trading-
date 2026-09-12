@@ -4,10 +4,9 @@ This process knows nothing about position sizing, stops, or the broker. It
 has no Alpaca keys. All it can do is send ``{ticker, bias, conviction,
 rationale}`` to the webhook, and the webhook will 422 anything else.
 
-News comes from Bright Data's SERP API (see ``orchestrator/news.py``).
-``call_llm`` is still a stub because it depends on which LLM provider you
-use; when wiring it, use the provider's structured-output / tool-use mode
-with ``SIGNAL_JSON_SCHEMA`` so the model is constrained at generation time.
+News comes from Bright Data's SERP API (``orchestrator/news.py``) and the
+signal from the Claude API (``orchestrator/llm.py``), which is constrained
+at generation time by a schema derived from ``SIGNAL_JSON_SCHEMA``.
 """
 
 from __future__ import annotations
@@ -27,6 +26,7 @@ from pydantic import ValidationError  # noqa: E402
 from app.schemas import LLMSignal  # noqa: E402
 from config import settings as cfg  # noqa: E402
 from config.settings import get_settings  # noqa: E402
+from orchestrator.llm import AnthropicSignalProvider, LLMError  # noqa: E402
 from orchestrator.news import BrightDataNewsProvider, NewsFetchError  # noqa: E402
 
 log = logging.getLogger("heartbeat")
@@ -40,7 +40,13 @@ SYSTEM_PROMPT = (
     "output ONLY a JSON object matching the provided schema with fields "
     "ticker, bias (BULLISH|BEARISH|NEUTRAL), conviction (0.0-1.0) and a short "
     "rationale. Do not include any other fields. You do not decide position "
-    "size, price, or order type; a separate risk system does."
+    "size, price, or order type; a separate risk system does.\n\n"
+    "Calibrate conviction honestly: it is the probability you would assign to "
+    "the move, not your enthusiasm. Most days deserve 0.3-0.6. Reserve 0.8+ "
+    "for a clear, material, ticker-specific catalyst in the news you were "
+    "given. If the news is stale, generic, or absent, say NEUTRAL with low "
+    "conviction rather than inventing a view -- a NEUTRAL signal is always "
+    "safe, and downstream the conviction floor will simply drop it."
 )
 
 
@@ -57,12 +63,9 @@ def fetch_news(ticker: str) -> list[str]:
 
 
 def call_llm(system_prompt: str, user_prompt: str, json_schema: dict) -> str:
-    """Return the LLM's raw JSON string for the given prompts.
-
-    Use your provider's structured-output / tool-use mode and pass
-    ``json_schema`` so the response is constrained to the signal shape.
-    """
-    raise NotImplementedError("call_llm(): connect an LLM provider")
+    """Return Claude's raw JSON string, constrained to the signal shape."""
+    provider = AnthropicSignalProvider(get_settings().anthropic_api_key)
+    return provider.complete(system_prompt, user_prompt, json_schema)
 
 
 # --------------------------------------------------------------------------- #
@@ -99,7 +102,7 @@ def process_ticker(ticker: str) -> None:
         headlines = fetch_news(ticker)
         raw = call_llm(SYSTEM_PROMPT, build_user_prompt(ticker, headlines), SIGNAL_JSON_SCHEMA)
         signal = parse_signal(raw)
-    except (NotImplementedError, NewsFetchError) as exc:
+    except (NotImplementedError, NewsFetchError, LLMError) as exc:
         log.error("%s: %s", ticker, exc)
         return
     except (json.JSONDecodeError, ValidationError) as exc:

@@ -90,6 +90,7 @@ class Settings(BaseSettings):
         default="AAPL,MSFT,NVDA",
         description="Comma-separated tickers the orchestrator evaluates each cycle",
     )
+    anthropic_api_key: str = Field(default="", description="Claude API key (orchestrator only)")
     brightdata_api_token: str = Field(default="", description="Bright Data API token (orchestrator only)")
     brightdata_serp_zone: str = Field(
         default="serp_api", description="Name of the SERP API zone in the Bright Data dashboard"

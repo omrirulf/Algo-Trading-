@@ -23,21 +23,23 @@ def test_parse_signal_rejects_smuggled_fields():
         hb.parse_signal(raw)
 
 
-def test_llm_stub_is_not_implemented():
-    with pytest.raises(NotImplementedError):
-        hb.call_llm("s", "u", {})
-
-
-def test_process_ticker_swallows_not_implemented(monkeypatch, caplog):
+def test_process_ticker_logs_missing_llm_credentials(monkeypatch, caplog):
     monkeypatch.setattr(hb, "fetch_news", lambda t: ["news"])
+    monkeypatch.setattr(hb, "get_settings", lambda: Settings(_env_file=None))
     hb.process_ticker("AAPL")  # must not raise; scheduler would otherwise die
-    assert "call_llm" in caplog.text
+    assert "ANTHROPIC_API_KEY" in caplog.text
 
 
 def test_process_ticker_logs_missing_news_credentials(monkeypatch, caplog):
     monkeypatch.setattr(hb, "get_settings", lambda: Settings(_env_file=None))
     hb.process_ticker("AAPL")  # no Bright Data token configured
     assert "BRIGHTDATA_API_TOKEN" in caplog.text
+
+
+def test_system_prompt_asks_for_calibrated_conviction():
+    # A model that always answers 0.9 makes the conviction floor meaningless.
+    assert "Calibrate conviction" in hb.SYSTEM_PROMPT
+    assert "NEUTRAL" in hb.SYSTEM_PROMPT
 
 
 def test_post_signal_sends_only_signal_fields_with_secret(monkeypatch):

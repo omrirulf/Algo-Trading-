@@ -11,6 +11,9 @@ yfinance==0.2.44
 pandas==2.2.3
 numpy==1.26.4
 
+# --- LLM ---
+anthropic==1.5.0
+
 # --- Orchestration ---
 apscheduler==3.10.4
 

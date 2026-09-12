@@ -28,7 +28,8 @@ algo-trading-system/
 │   └── logger.py              # structured JSON audit log
 ├── orchestrator/
 │   ├── heartbeat.py           # hourly job: fetch news -> call LLM -> POST signal
-│   └── news.py                # Bright Data SERP API (Google News) headline fetch
+│   ├── news.py                # Bright Data SERP API (Google News) headline fetch
+│   └── llm.py                 # Claude call, constrained by the signal schema
 ├── tests/
 │   ├── conftest.py            # FakeBroker / FakeMarketData; no network in tests
 │   ├── test_risk_engine.py    # proves the 5% cap and ATR stop math hold
@@ -37,7 +38,8 @@ algo-trading-system/
 │   ├── test_execution_engine.py  # full decision path with fakes
 │   ├── test_webhook.py        # auth + 422 at the HTTP layer
 │   ├── test_heartbeat.py      # orchestrator can only send the closed shape
-│   └── test_news.py           # Bright Data request shape + response parsing
+│   ├── test_news.py           # Bright Data request shape + response parsing
+│   └── test_llm.py            # schema derivation + every LLM failure mode
 └── logs/
     └── execution_audit.log    # generated at runtime
 ```
@@ -66,13 +68,35 @@ pay-as-you-go pricing covers that comfortably; check your zone's usage page
 after the first day. If the token is missing the cycle logs an error for
 each ticker and sends nothing.
 
+### Analyst (Claude)
+
+Put an API key from [the Anthropic Console](https://console.anthropic.com)
+in `ANTHROPIC_API_KEY`. The orchestrator sends each ticker's headlines to
+`claude-opus-5` and gets back one `{ticker, bias, conviction, rationale}`
+object per ticker.
+
+The call is constrained at generation time: `orchestrator/llm.py` derives a
+JSON schema from `LLMSignal` and passes it as `output_config.format`, so the
+model physically cannot emit a `quantity` field to be rejected later. Value
+bounds (conviction in [0, 1], the ticker pattern, the 2000-character
+rationale cap) are deliberately *not* sent to the model and are enforced by
+`LLMSignal` on the way back instead — the schema the model sees stays inside
+what constrained decoding accepts, and the tight bounds stay where they are
+actually checked.
+
+Model and thinking effort are code constants at the top of
+`orchestrator/llm.py` (`MODEL`, `EFFORT`), not environment variables, so
+changing which model trades your account is a visible code change. A refusal,
+a truncated response, a non-JSON response, or an API error all raise
+`LLMError`, which is logged and skips that ticker for the cycle.
+
 ## Run
 
 ```bash
 # Terminal 1: the deterministic execution engine
 uvicorn app.main:app --reload --port 8000
 
-# Terminal 2: the orchestrator (wire up call_llm() first; news is already wired)
+# Terminal 2: the orchestrator
 python orchestrator/heartbeat.py
 ```
 
@@ -148,14 +172,15 @@ green run means something.
 ## Notes / next steps for production
 
 - Swap the webhook's shared-secret header for HMAC request signing.
-- `orchestrator/heartbeat.py` still has one `NotImplementedError` stub,
-  `call_llm` — wire up your LLM provider's **structured output / tool-use
-  mode** so the model is constrained to `SIGNAL_JSON_SCHEMA` at generation
-  time, not just hoped into shape by a prompt. `SIGNAL_JSON_SCHEMA` is
-  derived from `LLMSignal` so the two cannot drift.
 - `orchestrator/news.py` searches Google News for `"<TICKER> stock"`. For
   tickers whose symbol is a common word, or to include the company name,
   adjust `build_news_search_url()`.
+- Nothing measures whether the signals are any good. Before trusting the
+  conviction numbers, log a few weeks of paper decisions and check whether
+  high-conviction calls actually outperformed low-conviction ones.
+- The prompt asks the model to calibrate conviction, but nothing enforces
+  that. If it drifts toward always answering 0.9, the conviction floor stops
+  filtering anything.
 - Consider persisting `ExecutionResult` rows to a database in addition to
   the log file, for querying trade history.
 - `TradingClient(..., paper=True)` is hard-coded in `broker_client.py` —
