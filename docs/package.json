@@ -1,11 +1,12 @@
 {
   "name": "algo-trading-docs",
   "version": "1.0.0",
-  "description": "Documentation for the Algo-Trading system",
+  "private": true,
+  "description": "Mintlify documentation for the Algo-Trading system",
   "scripts": {
     "dev": "mintlify dev",
-    "build": "mintlify build",
-    "preview": "mintlify preview"
+    "validate": "mintlify validate",
+    "broken-links": "mintlify broken-links"
   },
   "devDependencies": {
     "mintlify": "latest"
