@@ -1,0 +1,98 @@
+---
+title: "Continuous Integration"
+description: "Two jobs: does it work, and are the guardrails still real"
+---
+
+`.github/workflows/ci.yml` runs two independent jobs on every push and pull
+request against `main`.
+
+## `tests`
+
+Matrix over Python 3.11 and 3.12:
+
+<Steps>
+  <Step title="Install pinned requirements">
+    `pip install -r requirements.txt`.
+  </Step>
+  <Step title="Run the full test suite">
+    `pytest tests/ -v` — deliberately with no credentials and no network.
+    If a test ever needs a real Alpaca key or a live quote, that's a bug in
+    the test, not a missing secret in CI.
+  </Step>
+  <Step title="Confirm the app imports cleanly">
+    ```bash
+    python -c "from app.main import app; app.openapi()"
+    ```
+    This guards the lazy-construction property directly: importing
+    `app.main` and building its OpenAPI schema must never reach for Alpaca
+    keys or the network.
+  </Step>
+</Steps>
+
+## `guardrail invariants`
+
+This is the job that keeps the [Guardrails](/guardrails) page honest — it
+statically checks that the properties claimed there are still true in the
+code, not just documented.
+
+<AccordionGroup>
+  <Accordion title="Alpaca SDK is imported only by broker_client.py">
+    ```bash
+    grep -rnE '^\s*(import|from)\s+alpaca' app orchestrator config --include='*.py' \
+      | grep -v '^app/broker_client.py:'
+    ```
+    Any match fails the build. A blunt `grep alpaca` was tried first and
+    rejected during development — it matched docstrings and the intentional
+    lazy import of the project's own wrapper module in `app/main.py`, so the
+    check needed to be import-statement-specific.
+  </Accordion>
+  <Accordion title="API keys are read only by broker_client.py">
+    Same pattern, for `\.(alpaca_api_key|alpaca_secret_key)\b` outside
+    `broker_client.py`.
+  </Accordion>
+  <Accordion title="Live trading is not reachable from configuration">
+    Confirms `paper=True,` is still a literal string in `broker_client.py`,
+    and that no other `paper=` argument anywhere in `app/` is anything but
+    that exact literal.
+  </Accordion>
+  <Accordion title="Guardrail thresholds are not environment-overridable">
+    Confirms `MAX_POSITION_PCT`, `MIN_CONVICTION`, `MAX_OPEN_POSITIONS`, and
+    `ATR_STOP_MULTIPLIER` are still declared `Final` in
+    `config/settings.py`, and that the file never calls `os.environ` or
+    `getenv` directly.
+  </Accordion>
+  <Accordion title="No committed .env">
+    `git ls-files --error-unmatch .env` must fail (the file must not be
+    tracked).
+  </Accordion>
+</AccordionGroup>
+
+<Warning>
+  Every one of these checks was validated against a deliberately broken
+  tree while building this CI job — each invariant was violated on purpose
+  (an Alpaca import added to `orchestrator/`, `paper=True` changed to
+  `paper=False`, a guardrail constant read from the environment) to confirm
+  the corresponding check actually fails, then the tree was restored to
+  confirm it passes again. A green run is only meaningful if red is
+  possible.
+</Warning>
+
+## Trigger scope
+
+```yaml
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+```
+
+Pushing to a branch with an open PR is covered by the `pull_request`
+trigger only — `push` is scoped to `main` specifically so a commit on a PR
+branch doesn't run the whole matrix twice. The concurrency group keys on
+the PR number when one exists, so a new push to the same PR cancels the
+previous run instead of running both to completion.

@@ -1,0 +1,110 @@
+---
+title: "Guardrails"
+description: "Every hard limit, and the exact line of code that enforces it"
+---
+
+Every guardrail here is checked in `config/settings.py` as a `Final`
+constant, tested in `tests/test_risk_engine.py`, and re-checked by a
+separate static CI job that fails the build if the guarantee is quietly
+weakened. See [Continuous Integration](/continuous-integration) for how
+that last part works.
+
+## The guardrail table
+
+| Guardrail | Enforced in |
+|---|---|
+| LLM cannot set qty / price / order params | `app/schemas.py` — `LLMSignal(extra="forbid")`. Structural, not a convention: an unrecognized field is a 422, full stop. |
+| Max 5% of equity per ticker | `risk_engine.calculate_position_size()` — checked twice, pre- and post-rounding. |
+| Mandatory stop-loss on every order | `broker_client.submit_bracket_order()` — no code path submits an entry without a `StopLossRequest`. |
+| Stop distance from real volatility | `market_data.calculate_atr()` — Wilder ATR computed from actual OHLC history, not a fixed percentage. |
+| Conviction floor | `risk_engine.check_conviction_threshold()` — signals below 0.60 are rejected before any market data is even fetched. |
+| Max concurrent positions | `risk_engine.check_position_count_limit()`. |
+| Broker credentials never touch LLM-adjacent code | Only `app/broker_client.py` imports the Alpaca SDK or reads the keys — enforced by CI, not just by file layout. |
+| Paper trading only | `TradingClient(..., paper=True)` is a hard-coded literal in `broker_client.py`. |
+| Full audit trail | `app/logger.py` → `logs/execution_audit.log`, every decision logged as JSON. |
+
+## Position sizing: enforced twice
+
+```python
+def calculate_position_size(
+    equity: float,
+    price: float,
+    max_position_pct: float = cfg.MAX_POSITION_PCT,  # 0.05
+    existing_position_value: float = 0.0,
+) -> int:
+    cap_dollars = equity * max_position_pct
+    budget = cap_dollars - existing_position_value      # check 1: pre-rounding
+    if budget <= 0:
+        return 0
+
+    qty = math.floor(budget / price)                    # never fractional
+    if qty < cfg.MIN_ORDER_QTY:
+        return 0
+
+    notional = qty * price
+    if notional + existing_position_value > cap_dollars + 1e-9:  # check 2: post-rounding
+        raise RiskViolation(...)
+    return qty
+```
+
+Two things worth noticing:
+
+<CardGroup cols={2}>
+  <Card title="Existing exposure counts" icon="chart-pie">
+    If you already hold $3,000 of a $100,000 account in `AAPL`, a new
+    `AAPL` signal only has $2,000 of budget left under the 5% cap — not a
+    fresh 5%.
+  </Card>
+  <Card title="Fractional shares never happen" icon="ban">
+    `math.floor()` guarantees a whole-share quantity. This isn't a
+    preference — Alpaca's stop-loss leg on a bracket order requires whole
+    shares, so a fractional entry would make the mandatory stop impossible
+    to attach.
+  </Card>
+</CardGroup>
+
+The second check is redundant by construction (`floor()` can only reduce
+notional) — it's there so a future edit to the rounding logic can't
+silently break the cap without a test catching it.
+
+## Stop-loss: from real volatility, not a fixed percentage
+
+```python
+def calculate_stop_price(entry_price, atr, side, multiplier=cfg.ATR_STOP_MULTIPLIER):
+    distance = multiplier * atr          # ATR_STOP_MULTIPLIER = 2.0
+    stop = entry_price - distance if side == "buy" else entry_price + distance
+    ...
+```
+
+The Wilder ATR (`market_data.calculate_atr`, Wilder smoothing over
+`ATR_PERIOD` = 14 days) means a volatile ticker gets a wider stop and a
+quiet one gets a tighter stop, instead of every position using the same
+percentage regardless of how that stock actually moves.
+
+`check_atr_sanity()` is the failsafe: if ATR comes back as less than 0.2%
+of price — a sign of bad or illiquid data — the signal is rejected rather
+than placing a stop a few cents from entry.
+
+## Mandatory stop-loss: no other path exists
+
+```python
+order_class=OrderClass.OTO,
+stop_loss=StopLossRequest(stop_price=stop_price),
+```
+
+`submit_bracket_order()` is the *only* method `AlpacaPaperBroker` exposes for
+opening a position, and its signature requires a `stop_price`. There is no
+`submit_market_order()` sitting next to it that a future change could call
+by mistake — a naked entry isn't a method that exists to call.
+
+## Paper trading: a code change, not a setting
+
+```python
+# paper=True is deliberately hard-coded; see module docstring.
+self._client = TradingClient(api_key, secret_key, paper=True)
+```
+
+This is the one guardrail that isn't in `config/settings.py` at all — it's
+inline in `broker_client.py`, specifically so that no environment variable,
+however misconfigured, can flip it. Going live requires editing this line,
+which shows up in a diff.

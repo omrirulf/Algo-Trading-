@@ -1,0 +1,94 @@
+---
+title: "Overview"
+description: "The hourly job that produces signals — and holds no broker keys"
+---
+
+`orchestrator/heartbeat.py` is a `BlockingScheduler` job (APScheduler) that
+runs once immediately on startup, then every `HEARTBEAT_INTERVAL_MINUTES`
+(default 60):
+
+```python
+def run_cycle() -> None:
+    tickers = get_settings().watchlist_tickers
+    for ticker in tickers:
+        process_ticker(ticker)
+```
+
+For each ticker, `process_ticker()` runs a small pipeline:
+
+<Steps>
+  <Step title="Fetch news">
+    `fetch_news(ticker)` — see [News](/orchestrator/news). Up to 10
+    de-duplicated headlines from the past 24 hours.
+  </Step>
+  <Step title="Ask Claude">
+    `call_llm(SYSTEM_PROMPT, user_prompt, SIGNAL_JSON_SCHEMA)` — see
+    [LLM Signals](/orchestrator/llm). Returns a JSON string constrained to
+    the signal shape.
+  </Step>
+  <Step title="Validate locally">
+    `parse_signal(raw)` runs the same `LLMSignal.model_validate()` the
+    webhook will run. This is defense in depth, not the real gate — it just
+    gives a clearer error at the source instead of a 422 from across the
+    network.
+  </Step>
+  <Step title="Sanity-check the ticker">
+    If the model answered about a different ticker than it was asked about,
+    the signal is dropped and logged rather than posted.
+  </Step>
+  <Step title="POST to the webhook">
+    `post_signal()` sends `signal.model_dump(mode="json")` with the
+    `x-webhook-secret` header. Nothing else is in the request body.
+  </Step>
+</Steps>
+
+## No credentials, structurally
+
+```python
+"""This process knows nothing about position sizing, stops, or the broker.
+It has no Alpaca keys. All it can do is send
+{ticker, bias, conviction, rationale} to the webhook..."""
+```
+
+That's not just a comment — CI greps this module (along with everything
+else outside `app/broker_client.py`) for Alpaca imports and key reads, and
+fails the build if it finds either. See
+[Continuous Integration](/continuous-integration).
+
+## Every failure mode is caught per-ticker
+
+`process_ticker()` catches everything that can go wrong with one ticker's
+news, LLM call, or POST, logs it, and moves on to the next ticker — a bad
+Bright Data response or an LLM refusal for `AAPL` never stops `MSFT` and
+`NVDA` from running in the same cycle:
+
+```python
+try:
+    headlines = fetch_news(ticker)
+    raw = call_llm(SYSTEM_PROMPT, build_user_prompt(ticker, headlines), SIGNAL_JSON_SCHEMA)
+    signal = parse_signal(raw)
+except (NotImplementedError, NewsFetchError, LLMError) as exc:
+    log.error("%s: %s", ticker, exc)
+    return
+except (json.JSONDecodeError, ValidationError) as exc:
+    log.error("%s: LLM output rejected before sending: %s", ticker, exc)
+    return
+except Exception:
+    log.exception("%s: failed to produce a signal", ticker)
+    return
+```
+
+## The schema can't drift from the validator
+
+```python
+SIGNAL_JSON_SCHEMA: dict = LLMSignal.model_json_schema()
+```
+
+This is generated from the exact same Pydantic model the webhook validates
+incoming requests against. There's no second, hand-maintained schema
+definition anywhere that could fall out of sync with what the webhook
+actually accepts.
+
+<Card title="Next: how headlines get fetched" icon="newspaper" href="/orchestrator/news">
+  Bright Data's SERP API, request shape, and every failure mode.
+</Card>

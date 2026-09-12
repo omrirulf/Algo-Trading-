@@ -1,0 +1,69 @@
+<svg viewBox="0 0 980 460" xmlns="http://www.w3.org/2000/svg" font-family="ui-sans-serif,system-ui,sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="980" height="460" fill="none"/>
+
+  <!-- Orchestrator group -->
+  <rect x="20" y="20" width="430" height="300" rx="14" fill="#F0FDF4" stroke="#16A34A" stroke-width="2"/>
+  <text x="40" y="50" font-size="16" font-weight="700" fill="#15803D">Orchestrator (no broker keys)</text>
+
+  <rect x="45" y="75" width="170" height="70" rx="10" fill="#ffffff" stroke="#16A34A" stroke-width="1.5"/>
+  <text x="60" y="102" font-size="13" font-weight="600" fill="#0f172a">Bright Data</text>
+  <text x="60" y="120" font-size="12" fill="#475569">news.py</text>
+  <text x="60" y="136" font-size="11" fill="#94a3b8">Google News SERP</text>
+
+  <rect x="255" y="75" width="170" height="70" rx="10" fill="#ffffff" stroke="#16A34A" stroke-width="1.5"/>
+  <text x="270" y="102" font-size="13" font-weight="600" fill="#0f172a">Claude API</text>
+  <text x="270" y="120" font-size="12" fill="#475569">llm.py</text>
+  <text x="270" y="136" font-size="11" fill="#94a3b8">structured output</text>
+
+  <line x1="215" y1="110" x2="255" y2="110" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="218" y="103" font-size="10" fill="#64748b">headlines</text>
+
+  <rect x="150" y="195" width="170" height="90" rx="10" fill="#ffffff" stroke="#16A34A" stroke-width="1.5"/>
+  <text x="165" y="222" font-size="13" font-weight="600" fill="#0f172a">heartbeat.py</text>
+  <text x="165" y="240" font-size="11" fill="#475569">validates locally with</text>
+  <text x="165" y="254" font-size="11" fill="#475569">LLMSignal, then POSTs</text>
+  <text x="165" y="270" font-size="11" fill="#94a3b8">every 60 min</text>
+
+  <line x1="140" y1="145" x2="220" y2="195" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="340" y1="145" x2="260" y2="195" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <text x="40" y="300" font-size="11" fill="#166534" font-style="italic">Only output: {ticker, bias, conviction, rationale}</text>
+
+  <!-- Arrow between the two halves -->
+  <line x1="450" y1="240" x2="530" y2="240" stroke="#0f172a" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <text x="452" y="228" font-size="12" font-weight="600" fill="#0f172a">POST /webhook/signal</text>
+  <text x="452" y="256" font-size="10" fill="#94a3b8">x-webhook-secret header</text>
+
+  <!-- Execution engine group -->
+  <rect x="530" y="20" width="430" height="300" rx="14" fill="#EFF6FF" stroke="#2563EB" stroke-width="2"/>
+  <text x="550" y="50" font-size="16" font-weight="700" fill="#1D4ED8">Execution Engine (owns Alpaca keys)</text>
+
+  <rect x="555" y="75" width="380" height="60" rx="10" fill="#ffffff" stroke="#2563EB" stroke-width="1.5"/>
+  <text x="570" y="100" font-size="13" font-weight="600" fill="#0f172a">FastAPI: main.py</text>
+  <text x="570" y="118" font-size="11" fill="#475569">extra=&quot;forbid&quot; rejects smuggled fields with 422</text>
+
+  <line x1="745" y1="135" x2="745" y2="165" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <rect x="555" y="165" width="380" height="70" rx="10" fill="#ffffff" stroke="#2563EB" stroke-width="1.5"/>
+  <text x="570" y="192" font-size="13" font-weight="600" fill="#0f172a">ExecutionEngine.execute()</text>
+  <text x="570" y="210" font-size="11" fill="#475569">risk_engine.py: sizing, stop-loss, all 9 gates</text>
+  <text x="570" y="224" font-size="11" fill="#475569">market_data.py: price + Wilder ATR (yfinance)</text>
+
+  <line x1="745" y1="235" x2="745" y2="265" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <rect x="555" y="265" width="380" height="55" rx="10" fill="#ffffff" stroke="#2563EB" stroke-width="1.5"/>
+  <text x="570" y="288" font-size="13" font-weight="600" fill="#0f172a">broker_client.py</text>
+  <text x="570" y="306" font-size="11" fill="#475569">Alpaca OTO bracket order, stop-loss mandatory, paper=True</text>
+
+  <!-- Audit log -->
+  <rect x="330" y="360" width="320" height="70" rx="10" fill="#FEFCE8" stroke="#CA8A04" stroke-width="1.5"/>
+  <text x="345" y="386" font-size="13" font-weight="600" fill="#854D0E">logs/execution_audit.log</text>
+  <text x="345" y="404" font-size="11" fill="#a16207">One JSON line per decision: accepted, rejected, or error</text>
+
+  <line x1="745" y1="320" x2="560" y2="360" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+</svg>

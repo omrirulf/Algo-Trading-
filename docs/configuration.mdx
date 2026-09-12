@@ -1,0 +1,74 @@
+---
+title: "Configuration"
+description: "Every value in .env, and why guardrails are deliberately not here"
+---
+
+`config/settings.py` is the single source of truth for the whole system,
+and it draws a hard line between two kinds of values.
+
+<Warning>
+  **Guardrails are not configuration.** `MAX_POSITION_PCT`, `MIN_CONVICTION`,
+  and friends are Python `Final` constants in `config/settings.py`, not
+  environment variables. A misconfigured or compromised `.env` file cannot
+  loosen them — see [Guardrails](/guardrails). Changing a guardrail requires
+  a code change that shows up in a diff and in review.
+</Warning>
+
+## Environment variables (`.env`)
+
+These are secrets and per-deployment wiring — the things that legitimately
+differ between your machine and someone else's, and that have no business
+being hard-coded.
+
+| Variable | Used by | Description |
+|---|---|---|
+| `ALPACA_API_KEY` | `app/broker_client.py` only | Alpaca **paper** API key. |
+| `ALPACA_SECRET_KEY` | `app/broker_client.py` only | Alpaca **paper** API secret. |
+| `WEBHOOK_SHARED_SECRET` | `app/main.py`, `orchestrator/heartbeat.py` | Shared secret required in the `x-webhook-secret` header. Generate with `python -c "import secrets; print(secrets.token_hex(32))"`. |
+| `WEBHOOK_URL` | `orchestrator/heartbeat.py` | Where the orchestrator POSTs signals. Default: `http://localhost:8000/webhook/signal`. |
+| `WATCHLIST` | `orchestrator/heartbeat.py` | Comma-separated tickers evaluated every cycle. Default: `AAPL,MSFT,NVDA`. |
+| `BRIGHTDATA_API_TOKEN` | `orchestrator/news.py` only | Bright Data API token, from *Account settings → API tokens*. |
+| `BRIGHTDATA_SERP_ZONE` | `orchestrator/news.py` only | Name of your Bright Data **SERP API** zone. Default: `serp_api`. |
+| `ANTHROPIC_API_KEY` | `orchestrator/llm.py` only | Claude API key, from the [Anthropic Console](https://console.anthropic.com). |
+
+<Note>
+  Each credential is readable by exactly one module. `app/broker_client.py`
+  is the only place `ALPACA_API_KEY` is read; `orchestrator/news.py` is the
+  only place `BRIGHTDATA_API_TOKEN` is read. This isolation is checked by
+  CI, not just by convention — see [Guardrails](/guardrails).
+</Note>
+
+`Settings` is a `pydantic-settings` `BaseSettings` subclass that reads
+`.env` then the process environment, and is constructed lazily via
+`get_settings()` — importing `config.settings` never touches disk or the
+network by itself.
+
+## Guardrail constants (code, not `.env`)
+
+These live in the same file but are never read from the environment. Full
+detail on what each one prevents is in [Guardrails](/guardrails).
+
+| Constant | Value | Meaning |
+|---|---|---|
+| `MAX_POSITION_PCT` | `0.05` | Max fraction of equity in one ticker, including existing exposure. |
+| `MIN_CONVICTION` | `0.60` | Signals below this are rejected before any market data is fetched. |
+| `MAX_OPEN_POSITIONS` | `10` | Max distinct tickers held at once. |
+| `ATR_PERIOD` | `14` | Wilder ATR lookback, in trading days. |
+| `ATR_STOP_MULTIPLIER` | `2.0` | Stop-loss distance from entry, in multiples of ATR. |
+| `MIN_ATR_PCT_OF_PRICE` | `0.002` | Below this, ATR is treated as degenerate data and the signal is rejected. |
+| `OHLC_LOOKBACK_DAYS` | `90` | Daily history pulled for the ATR calculation. |
+| `MIN_ORDER_QTY` | `1` | Fractional shares are never used. |
+| `HEARTBEAT_INTERVAL_MINUTES` | `60` | Orchestrator cadence. |
+
+## LLM behavior constants (code, not `.env`)
+
+`orchestrator/llm.py` pins the model and effort as module constants rather
+than settings, so changing which model trades your account is a visible
+code diff:
+
+| Constant | Value |
+|---|---|
+| `MODEL` | `claude-opus-5` |
+| `EFFORT` | `medium` |
+| `MAX_TOKENS` | `16000` |
+| `FALLBACK_MODE` | `"default"` (routes by refusal category) |

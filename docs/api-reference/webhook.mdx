@@ -1,0 +1,110 @@
+---
+title: "Webhook API"
+description: "The only endpoint that can trigger a trade"
+---
+
+`app/main.py` exposes two endpoints. `POST /webhook/signal` is the entire
+surface area through which a signal can reach the execution engine.
+
+## POST /webhook/signal
+
+<ParamField header="x-webhook-secret" type="string" required>
+  Must match `WEBHOOK_SHARED_SECRET`. Compared with `hmac.compare_digest`
+  to avoid a timing side-channel.
+</ParamField>
+
+<ParamField body="ticker" type="string" required>
+  1–10 characters, must match `^[A-Za-z][A-Za-z0-9.\-]{0,9}$` (e.g. `AAPL`,
+  `BRK.B`). Normalized to uppercase.
+</ParamField>
+
+<ParamField body="bias" type="string" required>
+  One of `BULLISH`, `BEARISH`, `NEUTRAL`.
+</ParamField>
+
+<ParamField body="conviction" type="number" required>
+  `0.0`–`1.0`.
+</ParamField>
+
+<ParamField body="rationale" type="string" required>
+  1–2000 characters. Logged for the audit trail; never parsed for
+  instructions.
+</ParamField>
+
+<Warning>
+  Any field beyond these four — `quantity`, `price`, `stop_price`,
+  anything — is rejected with **422 Unprocessable Entity** before
+  `ExecutionEngine.execute()` is ever called. This is `LLMSignal`'s
+  `extra="forbid"` config, not application-level filtering.
+</Warning>
+
+### Example request
+
+```bash
+curl -X POST http://localhost:8000/webhook/signal \
+  -H "Content-Type: application/json" \
+  -H "x-webhook-secret: <your WEBHOOK_SHARED_SECRET>" \
+  -d '{
+    "ticker": "AAPL",
+    "bias": "BULLISH",
+    "conviction": 0.75,
+    "rationale": "Strong earnings beat"
+  }'
+```
+
+### Response — `ExecutionResult`
+
+```json
+{
+  "status": "ACCEPTED",
+  "ticker": "AAPL",
+  "bias": "BULLISH",
+  "conviction": 0.75,
+  "reason": "submitted buy 50 AAPL @ ~189.20, stop 185.10",
+  "quantity": 50,
+  "side": "buy",
+  "entry_price": 189.20,
+  "stop_price": 185.10,
+  "atr": 2.05,
+  "order_id": "8b3a...",
+  "timestamp": "2026-09-12T10:15:00Z"
+}
+```
+
+`status` is one of `ACCEPTED`, `REJECTED`, or `ERROR` — see
+[Decision Path](/decision-path) for what determines which, and what each
+field means for a rejection or error (`quantity`/`side`/`order_id` are
+`null` whenever nothing was submitted).
+
+### Status codes
+
+| Code | Meaning |
+|---|---|
+| `200` | Request processed — check `status` in the body for the outcome. A `REJECTED` or `ERROR` result is still a 200; the guardrail worked correctly. |
+| `401` | Missing or incorrect `x-webhook-secret`. |
+| `422` | Payload doesn't match `LLMSignal` — wrong type, out-of-range value, or an unrecognized field. |
+| `503` | `WEBHOOK_SHARED_SECRET` isn't configured on the server at all. |
+
+<Note>
+  A `200` with `"status": "REJECTED"` is the system working as intended —
+  it means a guardrail caught something. Reserve alerting for `ERROR`
+  statuses or non-200 responses.
+</Note>
+
+## GET /health
+
+```bash
+curl http://localhost:8000/health
+```
+
+```json
+{ "status": "ok" }
+```
+
+No auth required. Confirms the process is up; does not confirm Alpaca
+connectivity.
+
+## Interactive docs
+
+FastAPI generates OpenAPI docs automatically at `/docs` (Swagger UI) and
+`/redoc` while the server is running.
