@@ -1,0 +1,13 @@
+{
+  "name": "algo-trading-docs",
+  "version": "1.0.0",
+  "description": "Documentation for the Algo-Trading system",
+  "scripts": {
+    "dev": "mintlify dev",
+    "build": "mintlify build",
+    "preview": "mintlify preview"
+  },
+  "devDependencies": {
+    "mintlify": "latest"
+  }
+}
