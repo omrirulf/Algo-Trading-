@@ -218,12 +218,31 @@ Every one of these raises `LLMError`, caught per-ticker in `heartbeat.py`:
 
 | Cause | What happened |
 |---|---|
-| Missing API key | Raised at `AnthropicSignalProvider` construction, before any call. |
+| No credentials resolvable anywhere | Raised inside `complete()`, at the first call — see below for why construction itself never raises. |
 | `stop_reason == "refusal"` | The whole chain — including the fallback model — declined. |
 | `stop_reason == "max_tokens"` | Response was truncated; the JSON would be incomplete. |
 | No text block in the response | Nothing to parse. |
 | Non-JSON text | The model didn't produce valid JSON (shouldn't happen under a schema, but checked anyway). |
 | `anthropic.APIError` | Network failure, rate limit, or other API-level error. |
+
+<Accordion title="Why the missing-credential check moved out of __init__">
+  `AnthropicSignalProvider` passes `api_key or None` to the SDK, so a blank
+  `ANTHROPIC_API_KEY` doesn't mean "no credentials" — it means "let the SDK
+  try `ANTHROPIC_AUTH_TOKEN`, an `ant auth login` profile, or Workload
+  Identity Federation instead." That is what makes `ant auth login` usable
+  as an alternative to setting a key at all — see
+  [Configuration](/configuration).
+
+  The cost is that `anthropic.Anthropic(...)` never validates eagerly: it
+  constructs successfully even with nothing configured, and only raises when
+  a request is actually built. What it raises there is a bare `TypeError`,
+  not an `anthropic.APIError` — confirmed empirically before relying on it,
+  since it's easy to assume incorrectly. It still happens before any
+  connection opens, so `complete()` catches `TypeError` specifically and
+  re-raises it as `LLMError`, with a message naming both `ANTHROPIC_API_KEY`
+  and `ant auth login`. The end result — a same-cycle, no-network failure
+  with a clear cause — is unchanged; only *where* it's caught moved.
+</Accordion>
 
 ## Three validation layers, not one
 

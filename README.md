@@ -135,6 +135,18 @@ Put an API key from [the Anthropic Console](https://console.anthropic.com)
 in `ANTHROPIC_API_KEY`. The orchestrator sends each ticker's assembled context
 to `claude-opus-5` and gets back one signal per ticker.
 
+**Or use the CLI instead of a key.** If you run `ant auth login` (the
+[Anthropic CLI](https://console.anthropic.com)) on the machine that runs the
+heartbeat, `ANTHROPIC_API_KEY` can be left blank — the SDK falls back to that
+login's profile, then to `ANTHROPIC_AUTH_TOKEN`, then to Workload Identity
+Federation. This is a good fit for running the heartbeat locally under your
+own login; an unattended deployment (a server, a container) should still use
+an explicit key, since a CLI login profile is tied to one person's session.
+Leaving the key blank never fails silently: if nothing is resolvable when a
+cycle runs, that ticker logs `No Claude credentials found: set
+ANTHROPIC_API_KEY, or run ant auth login` and is skipped, the same as any
+other `LLMError`.
+
 The system prompt weights the four inputs differently — news is fast and
 noisy, technicals are about timing rather than business quality, fundamentals
 rarely change a view within an hour, and the analyst view is a prior already

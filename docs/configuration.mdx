@@ -29,7 +29,7 @@ being hard-coded.
 | `WATCHLIST` | `orchestrator/heartbeat.py` | Comma-separated tickers evaluated every cycle. Default: `AAPL,MSFT,NVDA`. |
 | `BRIGHTDATA_API_TOKEN` | `orchestrator/news.py` only | Bright Data API token, from *Account settings → API tokens*. |
 | `BRIGHTDATA_SERP_ZONE` | `orchestrator/news.py` only | Name of your Bright Data **SERP API** zone. Default: `serp_api`. |
-| `ANTHROPIC_API_KEY` | `orchestrator/llm.py` only | Claude API key, from the [Anthropic Console](https://console.anthropic.com). |
+| `ANTHROPIC_API_KEY` | `orchestrator/llm.py` only | Claude API key, from the [Anthropic Console](https://console.anthropic.com). Optional if you use `ant auth login` instead — see below. |
 
 <Note>
   Each credential is readable by exactly one module. `app/broker_client.py`
@@ -37,6 +37,36 @@ being hard-coded.
   only place `BRIGHTDATA_API_TOKEN` is read. This isolation is checked by
   CI, not just by convention — see [Guardrails](/guardrails).
 </Note>
+
+## `ANTHROPIC_API_KEY` is the one credential with a CLI alternative
+
+`ALPACA_API_KEY` and `BRIGHTDATA_API_TOKEN` are dashboard-issued tokens with
+no other way to obtain them — there's no login flow that replaces them.
+Claude is different: `orchestrator/llm.py` passes `api_key or None` to the
+SDK, so a blank `ANTHROPIC_API_KEY` doesn't fail — it defers to whatever the
+SDK can resolve on its own: `ANTHROPIC_AUTH_TOKEN`, an `ant auth login`
+profile, or Workload Identity Federation, in that order.
+
+```bash
+ant auth login          # once, on the machine that runs the heartbeat
+# leave ANTHROPIC_API_KEY blank in .env
+```
+
+<Warning>
+  This is a good fit for **running the heartbeat yourself, locally** — the
+  profile is tied to your own login. An unattended deployment (a server, a
+  container, a scheduled job nobody is watching) should still set an
+  explicit `ANTHROPIC_API_KEY`, since there's no session for it to inherit.
+</Warning>
+
+Nothing fails silently either way: `AnthropicSignalProvider.__init__` never
+raises, because the SDK doesn't validate credentials until the first request
+is built. That check is a synchronous, no-network `TypeError` inside the SDK
+itself — `orchestrator/llm.py` catches it and re-raises as `LLMError` with a
+message naming both `ANTHROPIC_API_KEY` and `ant auth login`, so a ticker
+with nothing resolvable logs a clear reason and is skipped, the same as any
+other `LLMError`. `tests/test_llm.py` proves this happens without opening a
+connection.
 
 <Warning>
   **The market context adds nothing to this table.** Technicals, fundamentals

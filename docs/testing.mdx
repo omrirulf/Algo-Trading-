@@ -1,6 +1,6 @@
 ---
 title: "Testing"
-description: "335 tests, zero network calls, zero credentials"
+description: "337 tests, zero network calls, zero credentials"
 ---
 
 ```bash
@@ -47,7 +47,7 @@ so the suite never writes into the repository's `logs/` directory.
 | `test_webhook.py` | 12 | HTTP auth (401 on a bad secret), 422 on smuggled fields, that importing `app.main` needs no credentials, and correct handling of rejections. |
 | `test_heartbeat.py` | 18 | The orchestrator can only ever send the closed signal shape; news failures skip the ticker while context gaps do not; missing credentials are logged per-ticker without killing the scheduler. |
 | `test_news.py` | 19 | Bright Data request shape, response parsing (including the wrapped and fallback-key shapes), and every `NewsFetchError` condition. |
-| `test_llm.py` | 28 | Schema derivation can't drift from `LLMSignal` — including that `Optional[float]` is collapsed to a concrete type rather than pruned to an unconstrained `{}`, that `description` survives, and that every property comes back required. Also the request shape, every `LLMError` condition, and the refusal fallback. |
+| `test_llm.py` | 30 | Schema derivation can't drift from `LLMSignal` — including that `Optional[float]` is collapsed to a concrete type rather than pruned to an unconstrained `{}`, that `description` survives, and that every property comes back required. Also the request shape, every `LLMError` condition, the refusal fallback, and that a blank API key defers to `ant auth login` rather than failing at construction. |
 | `test_technicals.py` | 16 | SMAs, Wilder RSI, MACD, trailing returns, the 52-week range, ATR% and volume ratio against reference values — and that too few bars yields `None` (rendered `n/a`) instead of raising. |
 | `test_fundamentals.py` | 14 | Every carried field is parsed with the right unit, and the earnings date survives each of the shapes yfinance's calendar has been seen in. |
 | `test_analysts.py` | 10 | Ratings, the breakdown, targets and implied upside, upgrade/downgrade rows and holders — plus that a missing or empty frame degrades to an empty section rather than raising. |
