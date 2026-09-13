@@ -178,10 +178,15 @@ def _extract_text(response: Any) -> str:
 
 class AnthropicSignalProvider:
     def __init__(self, api_key: str, client: Any | None = None) -> None:
-        if client is None and not api_key:
-            raise LLMError("ANTHROPIC_API_KEY is not set")
+        # ``api_key or None`` turns a blank ANTHROPIC_API_KEY into "let the
+        # SDK resolve it": ANTHROPIC_AUTH_TOKEN, an ``ant auth login``
+        # profile, or Workload Identity Federation, in that order. None of
+        # those require anything from this module -- the SDK reads them
+        # itself. Construction never fails even with nothing configured;
+        # see the TypeError handling in ``complete()`` for why the actual
+        # check is deferred to there.
         self._client = client or anthropic.Anthropic(
-            api_key=api_key, timeout=REQUEST_TIMEOUT_SECONDS
+            api_key=api_key or None, timeout=REQUEST_TIMEOUT_SECONDS
         )
         self._use_fallback = True
 
@@ -215,6 +220,15 @@ class AnthropicSignalProvider:
                     },
                 },
             )
+        except TypeError as exc:
+            # Not an APIError: the SDK raises a bare TypeError, before
+            # opening any connection, when it cannot resolve a credential
+            # from any source at all. Still a same-cycle, no-network
+            # failure -- just not the exception type request failures use.
+            raise LLMError(
+                f"No Claude credentials found: set ANTHROPIC_API_KEY, or run "
+                f"`ant auth login` ({exc})"
+            ) from exc
         except anthropic.APIError as exc:
             raise LLMError(f"Claude API call failed: {exc}") from exc
 

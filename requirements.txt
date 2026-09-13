@@ -7,6 +7,10 @@ httpx==0.27.2
 
 # --- Broker & Market Data ---
 alpaca-py==0.33.0
+# Reads the Alpaca CLI's stored profile (~/.config/alpaca/profiles/*.yaml) so
+# `alpaca profile login` works in place of dashboard keys. It was previously
+# present only as a transitive dependency of an unrelated package.
+PyYAML==6.0.2
 yfinance==0.2.44
 pandas==2.2.3
 numpy==1.26.4

@@ -52,8 +52,10 @@ code, not just documented.
   </Accordion>
   <Accordion title="Live trading is not reachable from configuration">
     Confirms `paper=True,` is still a literal string in `broker_client.py`,
-    and that no other `paper=` argument anywhere in `app/` is anything but
-    that exact literal.
+    that no other `paper=` argument anywhere in `app/` is anything but that
+    exact literal, and that the `live_trade` refusal — which rejects an
+    Alpaca CLI profile targeting live trading rather than borrowing its
+    credentials — is still present in `broker_client.py`.
   </Accordion>
   <Accordion title="Guardrail thresholds are not environment-overridable">
     Confirms `MAX_POSITION_PCT`, `MIN_CONVICTION`, `MAX_OPEN_POSITIONS`, and

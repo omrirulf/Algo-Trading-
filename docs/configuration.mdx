@@ -22,21 +22,152 @@ being hard-coded.
 
 | Variable | Used by | Description |
 |---|---|---|
-| `ALPACA_API_KEY` | `app/broker_client.py` only | Alpaca **paper** API key. |
-| `ALPACA_SECRET_KEY` | `app/broker_client.py` only | Alpaca **paper** API secret. |
+| `ALPACA_API_KEY` | `app/broker_client.py` only | Alpaca **paper** API key. Optional if you use `alpaca profile login` instead — see below. |
+| `ALPACA_SECRET_KEY` | `app/broker_client.py` only | Alpaca **paper** API secret. Optional if you use `alpaca profile login` instead — see below. |
+| `ALPACA_PROFILE` | `app/broker_client.py` only | Which Alpaca CLI profile to read. Default: the CLI's own default, else `paper`. |
+| `ALPACA_CONFIG_DIR` | `app/broker_client.py` only | Where the Alpaca CLI keeps its state. Default: `~/.config/alpaca`. |
 | `WEBHOOK_SHARED_SECRET` | `app/main.py`, `orchestrator/heartbeat.py` | Shared secret required in the `x-webhook-secret` header. Generate with `python -c "import secrets; print(secrets.token_hex(32))"`. |
 | `WEBHOOK_URL` | `orchestrator/heartbeat.py` | Where the orchestrator POSTs signals. Default: `http://localhost:8000/webhook/signal`. |
 | `WATCHLIST` | `orchestrator/heartbeat.py` | Comma-separated tickers evaluated every cycle. Default: `AAPL,MSFT,NVDA`. |
-| `BRIGHTDATA_API_TOKEN` | `orchestrator/news.py` only | Bright Data API token, from *Account settings → API tokens*. |
+| `BRIGHTDATA_API_TOKEN` | `orchestrator/news.py` only | Bright Data API token, from *Account settings → API tokens*. Optional if you use `brightdata login` instead — see below. |
 | `BRIGHTDATA_SERP_ZONE` | `orchestrator/news.py` only | Name of your Bright Data **SERP API** zone. Default: `serp_api`. |
-| `ANTHROPIC_API_KEY` | `orchestrator/llm.py` only | Claude API key, from the [Anthropic Console](https://console.anthropic.com). |
+| `BRIGHTDATA_UNLOCKER_ZONE` | `orchestrator/news.py` only | Web Unlocker zone to use when no SERP zone is set — e.g. `cli_unlocker`, which `brightdata login` creates. |
+| `ANTHROPIC_API_KEY` | `orchestrator/llm.py` only | Claude API key, from the [Anthropic Console](https://console.anthropic.com). Optional if you use `ant auth login` instead — see below. |
 
 <Note>
   Each credential is readable by exactly one module. `app/broker_client.py`
   is the only place `ALPACA_API_KEY` is read; `orchestrator/news.py` is the
-  only place `BRIGHTDATA_API_TOKEN` is read. This isolation is checked by
-  CI, not just by convention — see [Guardrails](/guardrails).
+  only place `BRIGHTDATA_API_TOKEN` is read, and `broker_client.py` is
+  likewise the only reader of the Alpaca CLI profile. This isolation is
+  checked by CI, not just by convention — see [Guardrails](/guardrails).
 </Note>
+
+## All three credentials have a CLI alternative
+
+None of them has to be copied out of a web dashboard. Each can be obtained by
+logging in on the command line instead:
+
+| Credential | CLI | What it does |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | `ant auth login` | SDK resolves the stored profile itself. |
+| `BRIGHTDATA_API_TOKEN` | `brightdata login` | OAuth in the browser (`--device` when headless), key stored locally. |
+| `ALPACA_API_KEY` / `ALPACA_SECRET_KEY` | `alpaca profile login` | OAuth in the browser, profile stored in `~/.config/alpaca/profiles/` at `0600`. |
+
+```bash
+ant auth login          # once, on the machine that runs the heartbeat
+brightdata login        # likewise; --device for a machine with no browser
+alpaca profile login    # paper by default; see the warning below
+# leave all three keys blank in .env
+```
+
+### Claude
+
+`orchestrator/llm.py` passes `api_key or None` to the SDK, so a blank
+`ANTHROPIC_API_KEY` doesn't fail — it defers to whatever the SDK can resolve
+on its own: `ANTHROPIC_AUTH_TOKEN`, an `ant auth login` profile, or Workload
+Identity Federation, in that order.
+
+### Bright Data
+
+`orchestrator/news.py` resolves its token in order: `BRIGHTDATA_API_TOKEN`,
+then `BRIGHTDATA_API_KEY` (the variable the CLI itself reads, so a shell
+already set up for the CLI needs no second variable for the same secret),
+then the key `brightdata login` left in `~/.config/brightdata-cli/credentials.json`
+(with the platform-appropriate path on macOS and Windows).
+
+The zone resolves the same way: `BRIGHTDATA_SERP_ZONE`, then
+`BRIGHTDATA_UNLOCKER_ZONE`.
+
+<Note>
+  **A Web Unlocker zone is enough — no dashboard visit required.**
+  `brightdata login` provisions `cli_unlocker`, not a SERP API zone, but
+  Bright Data's own CLI sends search queries through an unlocker zone by
+  preference: its `search` command resolves `BRIGHTDATA_SERP_ZONE` and then
+  falls back to `BRIGHTDATA_UNLOCKER_ZONE`, and its `init` offers the unlocker
+  zone as the SERP default with *yes* preselected. Setting
+  `BRIGHTDATA_UNLOCKER_ZONE=cli_unlocker` after the login is a complete setup.
+  See [News](/orchestrator/news).
+</Note>
+
+<Warning>
+  That was read from the CLI's source, not confirmed against a live call.
+  If an unlocker zone is refused for search on your account, the symptom is a
+  `NewsFetchError` about HTML instead of JSON, and the fix is a SERP API zone
+  in the dashboard with `BRIGHTDATA_SERP_ZONE` set.
+</Warning>
+
+<Note>
+  Reading the CLI's credential file is **best-effort**. Bright Data doesn't
+  document its format, so the lookup tries several plausible field names
+  (`api_key`, `apiKey`, `token`, …), searches a few levels deep in case the
+  file nests them, and treats a missing file, bad JSON, an unrecognised shape
+  or a permissions error as "not configured this way" rather than an error.
+  If it guesses wrong on your machine, set `BRIGHTDATA_API_TOKEN` explicitly
+  and nothing else changes.
+</Note>
+
+### Alpaca
+
+`app/broker_client.py` resolves credentials as an **atomic bundle** — a key
+from one source is never paired with a secret from another, because the
+winning source decides which auth headers get sent. The order is:
+
+1. `ALPACA_API_KEY` + `ALPACA_SECRET_KEY` (both required; setting only one is
+   an error, not a silent fallthrough)
+2. The profile's OAuth `access_token`, sent as `Authorization: Bearer …`
+3. The profile's stored `api_key` + `secret_key`, sent as `APCA-API-KEY-ID` /
+   `APCA-API-SECRET-KEY`
+
+This mirrors the CLI's own resolution order, and both header schemes are
+exactly the ones the CLI sends, so either kind of stored login works with the
+`alpaca-py` SDK this project uses.
+
+<Warning>
+  **A profile that targets live trading is refused, not used.** If the profile
+  carries `live_trade: true`, `resolve_credentials()` raises `BrokerError`
+  naming the profile and the ways out. This system is paper-only; borrowing a
+  live bundle would point real money at a strategy whose entire safety
+  argument is that it cannot reach a live endpoint.
+
+  The refusal is loud rather than silent on purpose. Reporting "no credentials
+  found" on a machine that plainly has some would send you looking for ways to
+  make the profile *more* reachable — the exact opposite of what you want.
+</Warning>
+
+<Note>
+  This is belt-and-braces. `TradingClient(paper=True)` is hard-coded, and the
+  SDK pins its base URL to the paper endpoint from that flag alone — so even a
+  live key that somehow reached the constructor could not trade a funded
+  account. CI checks both the hard-coded `paper=True` and the presence of the
+  `live_trade` refusal.
+</Note>
+
+<Note>
+  Unlike the Bright Data lookup, this one is **verified against the CLI's
+  source** (`alpacahq/cli`, `internal/config/config.go`) rather than guessed:
+  the file is YAML at `<config dir>/profiles/<name>.yaml`, the fields are
+  `api_key`, `secret_key`, `access_token`, `scopes` and `live_trade`, and the
+  config directory is `$ALPACA_CONFIG_DIR` or `~/.config/alpaca` on every
+  platform — the CLI builds that path unconditionally, so there is no
+  macOS/Windows special case. A missing file, bad YAML, an unrecognised shape
+  or a permissions error is treated as "not configured this way".
+</Note>
+
+<Warning>
+  This is a good fit for **running the heartbeat yourself, locally** — the
+  profile is tied to your own login. An unattended deployment (a server, a
+  container, a scheduled job nobody is watching) should still set an
+  explicit `ANTHROPIC_API_KEY`, since there's no session for it to inherit.
+</Warning>
+
+Nothing fails silently either way: `AnthropicSignalProvider.__init__` never
+raises, because the SDK doesn't validate credentials until the first request
+is built. That check is a synchronous, no-network `TypeError` inside the SDK
+itself — `orchestrator/llm.py` catches it and re-raises as `LLMError` with a
+message naming both `ANTHROPIC_API_KEY` and `ant auth login`, so a ticker
+with nothing resolvable logs a clear reason and is skipped, the same as any
+other `LLMError`. `tests/test_llm.py` proves this happens without opening a
+connection.
 
 <Warning>
   **The market context adds nothing to this table.** Technicals, fundamentals

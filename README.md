@@ -88,21 +88,93 @@ pip install -r requirements.txt
 cp .env.example .env   # fill in your Alpaca paper keys + a random webhook secret
 ```
 
+### Broker (Alpaca paper)
+
+Copy a **paper** key pair from the
+[Alpaca paper dashboard](https://app.alpaca.markets/paper/dashboard/overview)
+into `ALPACA_API_KEY` / `ALPACA_SECRET_KEY`.
+
+**Or use the CLI instead of copying keys.** The official
+[Alpaca CLI](https://github.com/alpacahq/cli) authenticates over OAuth and
+stores a profile in `~/.config/alpaca/profiles/` at `0600`:
+
+```bash
+alpaca profile login    # browser OAuth; paper by default
+# leave ALPACA_API_KEY / ALPACA_SECRET_KEY blank in .env
+```
+
+Credentials resolve as an **atomic bundle** — a key from one source is never
+paired with a secret from another — in the order `ALPACA_API_KEY` +
+`ALPACA_SECRET_KEY` → the profile's OAuth `access_token` → the profile's
+stored `api_key` + `secret_key`. Setting only one half of the env pair is an
+error rather than a silent fallthrough. `ALPACA_PROFILE` picks the profile;
+`ALPACA_CONFIG_DIR` moves the directory.
+
+> **A profile marked `live_trade: true` is refused, not used.** This system is
+> paper-only, and borrowing a live bundle would point real money at a strategy
+> whose entire safety argument is that it cannot reach a live endpoint. The
+> refusal names the profile and the ways out, rather than reporting "no
+> credentials found" on a machine that plainly has some. It is belt-and-braces
+> anyway: `paper=True` is hard-coded, and the SDK pins its base URL to the
+> paper endpoint from that flag alone. CI checks for both.
+
+<sub>Unlike the Bright Data lookup, this one is **verified against the CLI's
+source** (`alpacahq/cli`, `internal/config/config.go`), not guessed: YAML at
+`<config dir>/profiles/<name>.yaml`, fields `api_key`, `secret_key`,
+`access_token`, `scopes`, `live_trade`, and a config directory of
+`$ALPACA_CONFIG_DIR` or `~/.config/alpaca` on every platform.</sub>
+
 ### News feed (Bright Data)
 
 The orchestrator pulls the last 24 hours of Google News headlines for each
 watchlist ticker through [Bright Data's SERP API](https://brightdata.com/products/serp-api).
 
-1. In the Bright Data dashboard create a zone of type **SERP API** (the
-   default name is `serp_api`; if you pick another, set `BRIGHTDATA_SERP_ZONE`).
-2. Copy an API token from *Account settings -> API tokens* into
-   `BRIGHTDATA_API_TOKEN`.
+```bash
+brightdata login                               # browser OAuth; --device if headless
+export BRIGHTDATA_UNLOCKER_ZONE=cli_unlocker   # the zone the login just created
+```
+
+That is the whole setup — **no dashboard visit required.** `brightdata login`
+provisions a `cli_unlocker` zone rather than a SERP API zone, but Bright Data's
+own CLI sends search queries through an unlocker zone by preference: its
+`search` command resolves `BRIGHTDATA_SERP_ZONE` and then falls back to
+`BRIGHTDATA_UNLOCKER_ZONE`, and its `init` offers the unlocker zone as the SERP
+default with *yes* preselected. `orchestrator/news.py` mirrors that resolution.
+
+<sub>Read from the CLI's source, not confirmed against a live call — Bright
+Data's API was unreachable from the environment this was built in. If your
+account refuses search on an unlocker zone, the symptom is a `NewsFetchError`
+about HTML instead of JSON; create a **SERP API** zone in the dashboard and set
+`BRIGHTDATA_SERP_ZONE`. Nothing else changes.</sub>
+
+The dashboard route, if you prefer it: create a zone of type **SERP API**
+(default name `serp_api`, else set `BRIGHTDATA_SERP_ZONE`) and copy a token
+from *Account settings -> API tokens* into `BRIGHTDATA_API_TOKEN`.
+
+**Or use the CLI instead of copying a token.** The official
+[Bright Data CLI](https://github.com/brightdata/cli) authenticates over OAuth
+and stores a key locally:
+
+```bash
+brightdata login        # browser OAuth; use --device on a headless machine
+# leave BRIGHTDATA_API_TOKEN blank in .env
+```
+
+The token is resolved in order: `BRIGHTDATA_API_TOKEN` → `BRIGHTDATA_API_KEY`
+(the variable the CLI itself reads, so one secret serves both) → the key
+`brightdata login` stored on disk.
+
+<sub>Reading the CLI's credential file is **best-effort**: its format isn't
+documented, so the lookup tries several field names and treats anything it
+can't parse as "not configured this way" rather than failing. If it guesses
+wrong on your machine, set `BRIGHTDATA_API_TOKEN` explicitly.</sub>
 
 Each cycle sends one request per ticker, so the default three-ticker
 watchlist costs 72 SERP requests a day. Bright Data's own free tier /
 pay-as-you-go pricing covers that comfortably; check your zone's usage page
-after the first day. If the token is missing the cycle logs an error for
-each ticker and sends nothing.
+after the first day. If no token is resolvable the cycle logs
+`No Bright Data credentials found: set BRIGHTDATA_API_TOKEN, or run
+brightdata login` for each ticker and sends nothing.
 
 ### Market context (yfinance — no API key)
 
@@ -146,6 +218,18 @@ for six hours per ticker; price history is refetched every cycle.
 Put an API key from [the Anthropic Console](https://console.anthropic.com)
 in `ANTHROPIC_API_KEY`. The orchestrator sends each ticker's assembled context
 to `claude-opus-5` and gets back one signal per ticker.
+
+**Or use the CLI instead of a key.** If you run `ant auth login` (the
+[Anthropic CLI](https://console.anthropic.com)) on the machine that runs the
+heartbeat, `ANTHROPIC_API_KEY` can be left blank — the SDK falls back to that
+login's profile, then to `ANTHROPIC_AUTH_TOKEN`, then to Workload Identity
+Federation. This is a good fit for running the heartbeat locally under your
+own login; an unattended deployment (a server, a container) should still use
+an explicit key, since a CLI login profile is tied to one person's session.
+Leaving the key blank never fails silently: if nothing is resolvable when a
+cycle runs, that ticker logs `No Claude credentials found: set
+ANTHROPIC_API_KEY, or run ant auth login` and is skipped, the same as any
+other `LLMError`.
 
 The system prompt weights the five inputs differently — news is fast and
 noisy, technicals are about timing rather than business quality, fundamentals
