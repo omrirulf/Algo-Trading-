@@ -5,6 +5,12 @@ Request shape (from Bright Data's own SDK and MCP server): POST
 ``{zone, url, format: "raw"}``. Appending ``brd_json=1`` to a Google URL makes
 Bright Data return the parsed result set as JSON instead of HTML.
 
+The token can come from ``BRIGHTDATA_API_TOKEN``, from the ``BRIGHTDATA_API_KEY``
+env var the official CLI reads, or from the key ``brightdata login`` stores
+after its OAuth flow -- in that order. Reading the CLI's file is best-effort:
+its format is not documented, so the lookup tries several field names and
+treats anything it cannot make sense of as "not configured this way".
+
 This module has no credentials other than the Bright Data token and never
 talks to the broker or the execution engine.
 """
@@ -12,10 +18,16 @@ talks to the broker or the execution engine.
 from __future__ import annotations
 
 import json
-from typing import Any
+import logging
+import os
+import sys
+from pathlib import Path
+from typing import Any, Optional
 from urllib.parse import urlencode
 
 import httpx
+
+log = logging.getLogger(__name__)
 
 BRIGHTDATA_REQUEST_URL = "https://api.brightdata.com/request"
 
@@ -28,6 +40,25 @@ REQUEST_TIMEOUT_SECONDS = 60.0
 #: is the news-tab list; ``organic`` is the fallback if the zone returns a
 #: regular SERP for the same query.
 _RESULT_KEYS = ("news", "top_stories", "organic")
+
+
+#: Env var the official Bright Data CLI reads as an override. Ours is
+#: ``BRIGHTDATA_API_TOKEN``; accepting theirs too means a shell already set up
+#: for the CLI needs no second variable for the same secret.
+CLI_ENV_VAR = "BRIGHTDATA_API_KEY"
+
+#: Where ``brightdata login`` stores the key it obtains over OAuth.
+CLI_CONFIG_DIRNAME = "brightdata-cli"
+CLI_CREDENTIALS_FILENAME = "credentials.json"
+
+#: Field names to look for inside that file. The format is not documented, so
+#: several plausible spellings are tried rather than betting on one. Anything
+#: unrecognised is treated as "no credential here", never as an error.
+CLI_CREDENTIAL_FIELDS = ("api_key", "apiKey", "api_token", "apiToken", "token", "key")
+
+#: How deep to search the JSON for one of those fields. The file may well be
+#: flat, but a wrapper like ``{"default": {...}}`` costs nothing to survive.
+CLI_CREDENTIAL_MAX_DEPTH = 3
 
 
 class NewsFetchError(Exception):
@@ -114,13 +145,78 @@ def parse_news_results(payload: Any, limit: int = MAX_HEADLINES) -> list[str]:
     return lines
 
 
+# --------------------------------------------------------------------------- #
+# Credential resolution
+# --------------------------------------------------------------------------- #
+
+
+def cli_credential_paths() -> list[Path]:
+    """Where the Bright Data CLI may have stored its key, per platform."""
+    home = Path.home()
+    if sys.platform == "darwin":
+        roots = [home / "Library" / "Application Support"]
+    elif os.name == "nt":
+        appdata = os.environ.get("APPDATA")
+        roots = [Path(appdata)] if appdata else []
+    else:
+        xdg = os.environ.get("XDG_CONFIG_HOME")
+        roots = [Path(xdg)] if xdg else [home / ".config"]
+    return [root / CLI_CONFIG_DIRNAME / CLI_CREDENTIALS_FILENAME for root in roots]
+
+
+def _find_credential(node: Any, depth: int = 0) -> Optional[str]:
+    """First credential-shaped string found in a decoded credentials file."""
+    if depth > CLI_CREDENTIAL_MAX_DEPTH or not isinstance(node, dict):
+        return None
+    for field in CLI_CREDENTIAL_FIELDS:
+        value = node.get(field)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    for value in node.values():
+        found = _find_credential(value, depth + 1)
+        if found:
+            return found
+    return None
+
+
+def token_from_cli() -> Optional[str]:
+    """Read the key left behind by ``brightdata login``, if there is one.
+
+    Best-effort by design: the CLI's credential file format is not documented,
+    so a missing file, bad JSON, a shape this does not recognise, or a
+    permissions error all mean "not configured this way" -- never an error of
+    its own. The caller still reports a clear failure if nothing turns up
+    anywhere.
+    """
+    for path in cli_credential_paths():
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        token = _find_credential(payload)
+        if token:
+            # Never log the value itself.
+            log.info("using Bright Data credentials from %s", path)
+            return token
+    return None
+
+
+def resolve_token(api_token: str = "") -> Optional[str]:
+    """Settings first, then the CLI's own env var, then its stored login."""
+    return api_token or os.environ.get(CLI_ENV_VAR, "").strip() or token_from_cli()
+
+
 class BrightDataNewsProvider:
     def __init__(self, api_token: str, zone: str, client: httpx.Client | None = None) -> None:
-        if not api_token:
-            raise NewsFetchError("BRIGHTDATA_API_TOKEN is not set")
+        token = resolve_token(api_token)
+        if not token:
+            raise NewsFetchError(
+                "No Bright Data credentials found: set BRIGHTDATA_API_TOKEN, "
+                "or run `brightdata login`"
+            )
         if not zone:
             raise NewsFetchError("BRIGHTDATA_SERP_ZONE is not set")
-        self._token = api_token
+        self._token = token
         self._zone = zone
         self._client = client
 

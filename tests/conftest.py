@@ -60,6 +60,21 @@ def _offline_market_context(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _no_ambient_credentials(monkeypatch):
+    """No test may pick up a real credential from the machine it runs on.
+
+    A developer who has run `brightdata login` would otherwise have a token on
+    disk that the "missing credentials" tests would silently find, passing
+    locally and failing in CI -- or worse, reaching the network.
+    """
+    from orchestrator import news
+
+    monkeypatch.delenv(news.CLI_ENV_VAR, raising=False)
+    monkeypatch.delenv("BRIGHTDATA_API_TOKEN", raising=False)
+    monkeypatch.setattr(news, "cli_credential_paths", list)
+
+
+@pytest.fixture(autouse=True)
 def _journal_to_tmp(tmp_path, monkeypatch):
     """Redirect the signal journal so tests never write into the repo's logs/ dir."""
     import logging

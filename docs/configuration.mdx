@@ -27,7 +27,7 @@ being hard-coded.
 | `WEBHOOK_SHARED_SECRET` | `app/main.py`, `orchestrator/heartbeat.py` | Shared secret required in the `x-webhook-secret` header. Generate with `python -c "import secrets; print(secrets.token_hex(32))"`. |
 | `WEBHOOK_URL` | `orchestrator/heartbeat.py` | Where the orchestrator POSTs signals. Default: `http://localhost:8000/webhook/signal`. |
 | `WATCHLIST` | `orchestrator/heartbeat.py` | Comma-separated tickers evaluated every cycle. Default: `AAPL,MSFT,NVDA`. |
-| `BRIGHTDATA_API_TOKEN` | `orchestrator/news.py` only | Bright Data API token, from *Account settings → API tokens*. |
+| `BRIGHTDATA_API_TOKEN` | `orchestrator/news.py` only | Bright Data API token, from *Account settings → API tokens*. Optional if you use `brightdata login` instead — see below. |
 | `BRIGHTDATA_SERP_ZONE` | `orchestrator/news.py` only | Name of your Bright Data **SERP API** zone. Default: `serp_api`. |
 | `ANTHROPIC_API_KEY` | `orchestrator/llm.py` only | Claude API key, from the [Anthropic Console](https://console.anthropic.com). Optional if you use `ant auth login` instead — see below. |
 
@@ -38,19 +38,55 @@ being hard-coded.
   CI, not just by convention — see [Guardrails](/guardrails).
 </Note>
 
-## `ANTHROPIC_API_KEY` is the one credential with a CLI alternative
+## Two of the three credentials have a CLI alternative
 
-`ALPACA_API_KEY` and `BRIGHTDATA_API_TOKEN` are dashboard-issued tokens with
-no other way to obtain them — there's no login flow that replaces them.
-Claude is different: `orchestrator/llm.py` passes `api_key or None` to the
-SDK, so a blank `ANTHROPIC_API_KEY` doesn't fail — it defers to whatever the
-SDK can resolve on its own: `ANTHROPIC_AUTH_TOKEN`, an `ant auth login`
-profile, or Workload Identity Federation, in that order.
+Only Alpaca is a dashboard-issued key with no login flow to replace it. Both
+of the others can be obtained by logging in on the command line instead of
+copying a secret out of a web UI:
+
+| Credential | CLI | What it does |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | `ant auth login` | SDK resolves the stored profile itself. |
+| `BRIGHTDATA_API_TOKEN` | `brightdata login` | OAuth in the browser (`--device` when headless), key stored locally. |
+| `ALPACA_API_KEY` / `ALPACA_SECRET_KEY` | — | Dashboard only. |
 
 ```bash
 ant auth login          # once, on the machine that runs the heartbeat
-# leave ANTHROPIC_API_KEY blank in .env
+brightdata login        # likewise; --device for a machine with no browser
+# leave both keys blank in .env
 ```
+
+### Claude
+
+`orchestrator/llm.py` passes `api_key or None` to the SDK, so a blank
+`ANTHROPIC_API_KEY` doesn't fail — it defers to whatever the SDK can resolve
+on its own: `ANTHROPIC_AUTH_TOKEN`, an `ant auth login` profile, or Workload
+Identity Federation, in that order.
+
+### Bright Data
+
+`orchestrator/news.py` resolves its token in order: `BRIGHTDATA_API_TOKEN`,
+then `BRIGHTDATA_API_KEY` (the variable the CLI itself reads, so a shell
+already set up for the CLI needs no second variable for the same secret),
+then the key `brightdata login` left in `~/.config/brightdata-cli/credentials.json`
+(with the platform-appropriate path on macOS and Windows).
+
+<Warning>
+  **The SERP zone is not discovered this way.** `brightdata login` provisions
+  its own `cli_unlocker` and `cli_browser` zones for the CLI's own scraping
+  commands — not a SERP API zone. You still create that in the dashboard and
+  set `BRIGHTDATA_SERP_ZONE`, whichever way you authenticate.
+</Warning>
+
+<Note>
+  Reading the CLI's credential file is **best-effort**. Bright Data doesn't
+  document its format, so the lookup tries several plausible field names
+  (`api_key`, `apiKey`, `token`, …), searches a few levels deep in case the
+  file nests them, and treats a missing file, bad JSON, an unrecognised shape
+  or a permissions error as "not configured this way" rather than an error.
+  If it guesses wrong on your machine, set `BRIGHTDATA_API_TOKEN` explicitly
+  and nothing else changes.
+</Note>
 
 <Warning>
   This is a good fit for **running the heartbeat yourself, locally** — the

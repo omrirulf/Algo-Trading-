@@ -15,10 +15,20 @@ and returns up to 10 de-duplicated headline lines.
     default zone name this codebase expects is `serp_api`; if you name yours
     differently, set `BRIGHTDATA_SERP_ZONE`.
   </Step>
-  <Step title="Copy an API token">
-    From *Account settings → API tokens*, into `BRIGHTDATA_API_TOKEN`.
+  <Step title="Get a token — dashboard or CLI">
+    Either copy one from *Account settings → API tokens* into
+    `BRIGHTDATA_API_TOKEN`, or run `brightdata login` (the official CLI's
+    browser OAuth flow; `--device` when headless) and leave that variable
+    blank. Resolution order is `BRIGHTDATA_API_TOKEN` → `BRIGHTDATA_API_KEY`
+    → the CLI's stored login. See [Configuration](/configuration).
   </Step>
 </Steps>
+
+<Warning>
+  Step 1 is required either way. `brightdata login` creates its own
+  `cli_unlocker`/`cli_browser` zones for the CLI's own commands — it does not
+  create the SERP API zone this pipeline queries.
+</Warning>
 
 <Note>
   One request per ticker per cycle. The default three-ticker watchlist is

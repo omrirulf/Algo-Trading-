@@ -1,6 +1,6 @@
 ---
 title: "Testing"
-description: "337 tests, zero network calls, zero credentials"
+description: "360 tests, zero network calls, zero credentials"
 ---
 
 ```bash
@@ -36,6 +36,25 @@ someone has to remember to write. A test that wants real snapshots injects
 its own provider. A sibling fixture redirects both log files to `tmp_path`,
 so the suite never writes into the repository's `logs/` directory.
 
+## Ambient credentials are removed, not hoped against
+
+A second autouse fixture strips `BRIGHTDATA_API_TOKEN` and `BRIGHTDATA_API_KEY`
+from the environment and neutralises discovery of the Bright Data CLI's
+credential file:
+
+```python
+monkeypatch.delenv(news.CLI_ENV_VAR, raising=False)
+monkeypatch.delenv("BRIGHTDATA_API_TOKEN", raising=False)
+monkeypatch.setattr(news, "cli_credential_paths", list)
+```
+
+Without it, a developer who had run `brightdata login` would have a real token
+sitting on disk that the "missing credentials" tests would quietly find —
+passing locally, failing in CI, or worse, reaching the network. The same
+reasoning applies to `ANTHROPIC_API_KEY` in `test_llm.py`, which clears it per
+test. Tests that need the real path logic capture a reference at import time,
+before the fixture replaces it.
+
 ## What each file proves
 
 | File | Tests | Proves |
@@ -46,7 +65,7 @@ so the suite never writes into the repository's `logs/` directory.
 | `test_execution_engine.py` | 19 | The full nine-step decision path, every guardrail gate, and that broker/market-data errors become `ERROR` results rather than exceptions. |
 | `test_webhook.py` | 12 | HTTP auth (401 on a bad secret), 422 on smuggled fields, that importing `app.main` needs no credentials, and correct handling of rejections. |
 | `test_heartbeat.py` | 18 | The orchestrator can only ever send the closed signal shape; news failures skip the ticker while context gaps do not; missing credentials are logged per-ticker without killing the scheduler. |
-| `test_news.py` | 19 | Bright Data request shape, response parsing (including the wrapped and fallback-key shapes), and every `NewsFetchError` condition. |
+| `test_news.py` | 42 | Bright Data request shape, response parsing (including the wrapped and fallback-key shapes), every `NewsFetchError` condition, and credential resolution: settings before the CLI's env var before its stored login, every credential-file shape tolerated, an unreadable file degrading rather than raising, and the token never reaching the logs. |
 | `test_llm.py` | 30 | Schema derivation can't drift from `LLMSignal` — including that `Optional[float]` is collapsed to a concrete type rather than pruned to an unconstrained `{}`, that `description` survives, and that every property comes back required. Also the request shape, every `LLMError` condition, the refusal fallback, and that a blank API key defers to `ant auth login` rather than failing at construction. |
 | `test_technicals.py` | 16 | SMAs, Wilder RSI, MACD, trailing returns, the 52-week range, ATR% and volume ratio against reference values — and that too few bars yields `None` (rendered `n/a`) instead of raising. |
 | `test_fundamentals.py` | 14 | Every carried field is parsed with the right unit, and the earnings date survives each of the shapes yfinance's calendar has been seen in. |
