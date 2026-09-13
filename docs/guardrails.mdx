@@ -14,6 +14,8 @@ that last part works.
 | Guardrail | Enforced in |
 |---|---|
 | LLM cannot set qty / price / order params | `app/schemas.py` — `LLMSignal(extra="forbid")`. Structural, not a convention: an unrecognized field is a 422, full stop. |
+| Transparency fields never reach the decision path | CI greps `app/execution_engine.py`, `app/risk_engine.py` and `app/broker_client.py` for the four score fields and `key_factors`. Any hit fails the build. |
+| Market-context modules read no credentials | CI greps `context.py`, `technicals.py`, `fundamentals.py` and `analysts.py` for credential reads — a settings lookup, an environment read, or attribute access on a `secret` / `api_key` / `_token` / `password` name. yfinance is unauthenticated; the check keeps it that way. |
 | Max 5% of equity per ticker | `risk_engine.calculate_position_size()` — checked twice, pre- and post-rounding. |
 | Mandatory stop-loss on every order | `broker_client.submit_bracket_order()` — no code path submits an entry without a `StopLossRequest`. |
 | Stop distance from real volatility | `market_data.calculate_atr()` — Wilder ATR computed from actual OHLC history, not a fixed percentage. |
@@ -22,6 +24,34 @@ that last part works.
 | Broker credentials never touch LLM-adjacent code | Only `app/broker_client.py` imports the Alpaca SDK or reads the keys — enforced by CI, not just by file layout. |
 | Paper trading only | `TradingClient(..., paper=True)` is a hard-coded literal in `broker_client.py`. |
 | Full audit trail | `app/logger.py` → `logs/execution_audit.log`, every decision logged as JSON. |
+| The scorer cannot trade | CI greps `analysis/` for any order path (`submit_order`, `ExecutionEngine`, `post_signal`) or file write. It grades past decisions and must never be able to make one — see [Scoring](/scoring). |
+| Full record of what the model saw | `orchestrator/journal.py` → `logs/signal_journal.log`, one JSON line per ticker per cycle — including the cycles that produced no signal. |
+
+## Saying more without being trusted more
+
+`LLMSignal` grew five fields — `news_score`, `technical_score`,
+`fundamental_score`, `analyst_score` and `key_factors` — when the model
+started receiving four kinds of context instead of one. Every one of them is
+**inert**:
+
+<CardGroup cols={2}>
+  <Card title="Nothing downstream reads them" icon="plug-circle-xmark">
+    `bias` and `conviction` are still the only fields that reach a decision.
+    The scores exist so a call can be audited after the fact — which input
+    actually drove it, and were the confident calls the ones that paid.
+  </Card>
+  <Card title="A grep, not a promise" icon="magnifying-glass">
+    A CI step greps the three execution modules for those five names and
+    fails on any hit. Widening what the LLM may *say* is only safe while the
+    extra words stay inert, so the invariant is checked rather than trusted.
+  </Card>
+</CardGroup>
+
+The context modules got the same treatment from the other direction. The
+enrichment is fetched from yfinance, which is unauthenticated, so
+`context.py` and its three parsers have no business reading a credential —
+and CI greps them for credential reads to prove they
+don't. See [Market Context](/orchestrator/market-context).
 
 ## Position sizing: enforced twice
 

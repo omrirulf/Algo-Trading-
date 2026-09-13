@@ -107,5 +107,39 @@ def test_json_schema_forbids_additional_properties():
     """The schema handed to the LLM's structured-output mode says the same thing."""
     schema = LLMSignal.model_json_schema()
     assert schema.get("additionalProperties") is False
-    assert set(schema["properties"]) == {"ticker", "bias", "conviction", "rationale"}
+    assert set(schema["properties"]) == {
+        "ticker",
+        "bias",
+        "conviction",
+        "rationale",
+        "news_score",
+        "technical_score",
+        "fundamental_score",
+        "analyst_score",
+        "key_factors",
+    }
+    # Only the original four are required, so a caller posting the pre-
+    # enrichment payload by hand still validates.
     assert set(schema["required"]) == {"ticker", "bias", "conviction", "rationale"}
+
+
+def test_transparency_fields_default_to_absent():
+    signal = LLMSignal.model_validate(VALID)
+    assert signal.news_score is None
+    assert signal.key_factors == []
+
+
+@pytest.mark.parametrize("field", ["news_score", "technical_score", "fundamental_score", "analyst_score"])
+@pytest.mark.parametrize("value", [-1.01, 1.01])
+def test_scores_are_bounded(field, value):
+    with pytest.raises(ValidationError):
+        LLMSignal.model_validate({**VALID, field: value})
+
+
+def test_key_factors_are_bounded():
+    with pytest.raises(ValidationError):
+        LLMSignal.model_validate({**VALID, "key_factors": ["x"] * 7})
+    with pytest.raises(ValidationError):
+        LLMSignal.model_validate({**VALID, "key_factors": ["x" * 201]})
+    with pytest.raises(ValidationError):
+        LLMSignal.model_validate({**VALID, "key_factors": [""]})

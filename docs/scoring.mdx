@@ -1,0 +1,148 @@
+---
+title: "Scoring the Journal"
+description: "Joining recorded signals to what the market actually did — and refusing to overclaim from it"
+---
+
+The [signal journal](/orchestrator/journal) records what the model saw and what
+it concluded. `analysis/score_journal.py` is the other half: it joins each
+recorded signal to the return that actually followed, and answers the questions
+the journal was built to make answerable.
+
+```bash
+python analysis/score_journal.py
+python analysis/score_journal.py --horizon 5 --entry next
+python analysis/score_journal.py --json > scores.json
+```
+
+It is read-only in every direction — it opens the journal, fetches price
+history, and prints. It holds no broker keys, has no order path, and cannot
+write to the journal it reads. CI greps `analysis/` to keep that true.
+
+## What it answers
+
+<AccordionGroup>
+  <Accordion title="Does conviction predict the outcome?" icon="gauge">
+    A rank correlation between conviction and the *signed* return — the move in
+    the direction the model called, so a BEARISH call on a falling stock is a
+    win — plus a bucket table from the lowest conviction band to the highest.
+
+    The question underneath: is the number the engine gates on actually
+    informative, or is it decoration?
+  </Accordion>
+
+  <Accordion title="Is the conviction floor filtering the right signals?" icon="filter">
+    `MIN_CONVICTION` (0.60) is the gate that decides what gets traded. The
+    report splits scored signals either side of it and reports the *edge* — the
+    difference in mean signed return between what was acted on and what was
+    filtered.
+
+    A negative edge means the floor is discarding the better signals, and the
+    report says so in those words. That is a guardrail failing quietly, and it
+    is exactly the sort of thing nobody notices without measuring.
+  </Accordion>
+
+  <Accordion title="Which dimension actually carried information?" icon="layer-group">
+    Each per-dimension score against the ticker's raw forward return. Scores are
+    themselves directional, so this is a direct test of whether news,
+    technicals, fundamentals or the analyst view had any predictive content —
+    or whether three of them are expensive decoration on a news reader.
+  </Accordion>
+
+  <Accordion title="Does conviction fall when the dimensions disagree?" icon="scale-unbalanced">
+    The system prompt demands it: *"conviction is earned when independent
+    dimensions agree, and it must fall when they conflict."* This compares the
+    model's own scores against the conviction it attached.
+
+    It needs **no price data at all**, so unlike everything else on the page it
+    is answerable from the first cycle onward.
+  </Accordion>
+
+  <Accordion title="Is conviction drifting upward?" icon="chart-line">
+    First half against second half. A model that creeps toward always-confident
+    turns the 0.60 floor into a no-op without anything visibly breaking.
+  </Accordion>
+
+  <Accordion title="Was the context actually there?" icon="heart-pulse">
+    What share of cycles ran with a gap, grouped by which source was missing,
+    plus the bias distribution. If most cycles ran degraded, every other number
+    on the page describes a different system than the intended one — and the
+    report says so rather than leaving you to notice.
+  </Accordion>
+</AccordionGroup>
+
+## Entry timing is the one thing that could make this lie
+
+A scoring tool is only worth running if it cannot flatter the strategy. There
+is exactly one way this one could, and most of `analysis/returns.py` exists to
+prevent it: **entering at a price that was already known when the signal was
+produced.**
+
+A signal generated at 22:00 because of a stock's 6% move that day, "entered" at
+that day's close, scores as a brilliant call. It is not a call at all.
+
+So the entry bar is chosen from the signal's *timestamp*, not its date:
+
+| `--entry` | Behaviour |
+|---|---|
+| `auto` (default) | Same-session close if the signal fired before the close **and** carried an exact UTC timestamp; the next session's close otherwise. |
+| `next` | Always the next session's close. Never wrong, mildly pessimistic — it gives up the same-day move a news signal is trying to capture. |
+| `same` | Always the signal date's close. Only honest if you know the heartbeat runs during the session. |
+
+<Note>
+  The cutoff is 20:00 UTC, which is 16:00 ET under EDT. Under EST the close is
+  actually 21:00 UTC, so in winter a 20:30 signal is misclassified as
+  after-hours and falls back to the next session. That is the deliberate
+  direction to be wrong in: it costs a little realism and cannot manufacture a
+  look-ahead.
+</Note>
+
+Journal lines written before `ts_utc` existed carry a timezone-naive timestamp.
+Those are never trusted with a same-day entry under `auto`.
+
+## It reports sample sizes, and refuses to overclaim
+
+A rank correlation over nine signals is arithmetic, not evidence. Every figure
+is printed with its `n`, and anything below 20 observations is marked
+`too few`:
+
+```
+dimension         n     rank corr
+news             14         +0.61 — too few
+```
+
+Rank correlation is used throughout rather than Pearson. Forward returns have
+fat tails, and with a few weeks of signals one earnings-day move would
+otherwise set the sign of the whole answer.
+
+Two weeks in, the honest output is a coverage table and a row of `too few`.
+That is a useful thing to see, not a bug to work around.
+
+<Warning>
+  **This measures the signal, not the strategy's P&L.** Returns are
+  close-to-close over the horizon and ignore the stop-loss, slippage and
+  commission. A signal that was right about direction can still lose money
+  after being stopped out on the way there.
+</Warning>
+
+## What it deliberately does not do
+
+- **NEUTRAL signals are not scored.** A refusal to call a direction has no
+  direction to be right or wrong about; folding them in as zeroes would drag
+  every average toward the middle.
+- **Signals too recent to have an outcome are `pending`, not flat.** Scoring
+  them as 0% would quietly bias every average toward zero as the journal grows.
+- **A ticker whose history cannot be fetched is reported, not dropped.** Silent
+  exclusion is how a sample becomes unrepresentative without anyone noticing.
+
+Each of those shows up as a row in the coverage table, so the gap between
+"signals produced" and "signals scored" is always visible.
+
+## Machine-readable output
+
+`--json` emits the same figures for a notebook or a dashboard, including
+`min_sample_for_confidence` so a downstream consumer can apply the same
+threshold rather than inventing its own.
+
+<Card title="Where the data comes from" icon="book" href="/orchestrator/journal">
+  The journal format, and what is recorded for cycles that produced no signal.
+</Card>

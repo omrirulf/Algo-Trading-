@@ -32,13 +32,16 @@
         "pages": [
           "orchestrator/overview",
           "orchestrator/news",
-          "orchestrator/llm"
+          "orchestrator/market-context",
+          "orchestrator/llm",
+          "orchestrator/journal"
         ]
       },
       {
         "group": "Reference",
         "pages": [
           "api-reference/webhook",
+          "scoring",
           "testing",
           "continuous-integration"
         ]

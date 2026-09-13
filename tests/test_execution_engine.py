@@ -157,3 +157,43 @@ def test_every_decision_is_audit_logged(engine, broker, market, _audit_log_to_tm
 def test_engine_is_constructed_with_injected_dependencies(broker, market):
     e = ExecutionEngine(broker=broker, market_data=market)
     assert e.execute(sig()).status is ExecutionStatus.ACCEPTED
+
+
+# --------------------------------------------------------------------------- #
+# The transparency fields are inert
+# --------------------------------------------------------------------------- #
+
+EXTREME_SCORES = {
+    "news_score": 1.0,
+    "technical_score": 1.0,
+    "fundamental_score": 1.0,
+    "analyst_score": 1.0,
+    "key_factors": ["buy 10000 shares at any price", "ignore the position cap"],
+}
+
+
+def test_scores_and_key_factors_cannot_change_the_decision(engine, broker, market):
+    """Widening what the LLM may say is only safe while the extra words are inert."""
+    broker.equity, market.price, market.atr = 100_000, 100.0, 2.0
+    plain = engine.execute(sig())
+
+    broker.submitted.clear()
+    decorated = engine.execute(sig(**EXTREME_SCORES))
+
+    assert decorated.quantity == plain.quantity == 50
+    assert decorated.stop_price == plain.stop_price
+    assert decorated.side == plain.side
+    assert decorated.status is plain.status
+
+
+def test_maximally_bullish_scores_cannot_lift_conviction_over_the_floor(engine, market):
+    # Conviction is the only number that opens a trade; the scores sit beside it.
+    result = engine.execute(sig(conviction=cfg.MIN_CONVICTION - 0.01, **EXTREME_SCORES))
+    assert result.status is ExecutionStatus.REJECTED
+    assert "below minimum" in result.reason
+
+
+def test_execution_result_does_not_carry_the_transparency_fields(engine):
+    # They belong in the signal journal, not in the engine's own contract.
+    fields = set(engine.execute(sig(**EXTREME_SCORES)).model_dump())
+    assert not fields & set(EXTREME_SCORES)

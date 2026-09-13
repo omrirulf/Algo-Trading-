@@ -38,6 +38,15 @@ being hard-coded.
   CI, not just by convention — see [Guardrails](/guardrails).
 </Note>
 
+<Warning>
+  **The market context adds nothing to this table.** Technicals, fundamentals
+  and the analyst view all come from yfinance, which is unauthenticated, so
+  `orchestrator/context.py` and its three parsers read no setting, key or
+  token at all — and CI greps them to keep it that way. If a future data
+  source needs a credential, it needs a new module, not a new import in
+  those four. See [Market Context](/orchestrator/market-context).
+</Warning>
+
 `Settings` is a `pydantic-settings` `BaseSettings` subclass that reads
 `.env` then the process environment, and is constructed lazily via
 `get_settings()` — importing `config.settings` never touches disk or the
@@ -59,6 +68,30 @@ detail on what each one prevents is in [Guardrails](/guardrails).
 | `OHLC_LOOKBACK_DAYS` | `90` | Daily history pulled for the ATR calculation. |
 | `MIN_ORDER_QTY` | `1` | Fractional shares are never used. |
 | `HEARTBEAT_INTERVAL_MINUTES` | `60` | Orchestrator cadence. |
+
+## Log paths (code, not `.env`)
+
+Also `Final` constants in `config/settings.py`, both under `LOG_DIR`
+(`<project root>/logs`). They are separate files because they answer separate
+questions:
+
+| Constant | Path | Written by |
+|---|---|---|
+| `AUDIT_LOG_PATH` | `logs/execution_audit.log` | `app/logger.py` — what the *engine* did with each signal. |
+| `SIGNAL_JOURNAL_PATH` | `logs/signal_journal.log` | `orchestrator/journal.py` — what the *model* saw before it produced one. |
+
+See [Signal Journal](/orchestrator/journal) for why the second one exists and
+what it makes answerable.
+
+## Market-context constants (code, not `.env`)
+
+`orchestrator/context.py` pins its fetch behaviour as module constants:
+
+| Constant | Value | Meaning |
+|---|---|---|
+| `HISTORY_PERIOD` | `"2y"` | Daily history per ticker — enough to warm up a 200-day average and cover a 52-week range. |
+| `SLOW_DATA_TTL_SECONDS` | `6 * 60 * 60` | How long fundamentals, ratings and ownership are cached per ticker. Price history is refetched every cycle. |
+| `MAX_GAP_DETAIL` | `120` | Characters of failure text carried into the prompt's `DATA GAPS` section; the full text still reaches the log. |
 
 ## LLM behavior constants (code, not `.env`)
 

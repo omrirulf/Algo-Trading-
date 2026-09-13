@@ -91,6 +91,20 @@ construction time — raises `NewsFetchError`. `heartbeat.py` catches this per
 ticker and logs it; one ticker's bad response never stops the cycle.
 
 <Warning>
+  **A news failure skips that ticker entirely** — no context is assembled, no
+  signal is produced. This is the opposite of how the yfinance enrichment
+  fails, where a dead source becomes a named gap and the cycle continues.
+  News is the input the strategy was designed around, and quietly falling
+  back to technicals alone would be running a different strategy than the one
+  under test. See [Market Context](/orchestrator/market-context).
+</Warning>
+
+Headlines are no longer the only thing in the prompt, either. They now sit
+above three more sections — see
+[Market Context](/orchestrator/market-context) for what else the model is
+given and how it is told to weigh it.
+
+<Warning>
   The exact field names inside a Bright Data news result (`title`,
   `description`/`snippet`, `source`/`source_name`, `date`/`time`) were read
   tolerantly because Bright Data's documentation site was unreachable while

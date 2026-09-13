@@ -112,11 +112,40 @@ def test_schema_inlines_the_bias_enum():
 def test_schema_drops_keywords_constrained_decoding_may_reject():
     schema = llm.build_output_schema(LLMSignal.model_json_schema())
     serialized = json.dumps(schema)
-    for keyword in ("pattern", "minLength", "maxLength", "minimum", "maximum", "title", "description"):
+    for keyword in ("pattern", "minLength", "maxLength", "minimum", "maximum", "title"):
         assert keyword not in serialized
     # The dropped bounds are still enforced on the way back in.
     with pytest.raises(Exception):
         LLMSignal.model_validate({**VALID_SIGNAL, "conviction": 1.5})
+
+
+def test_schema_keeps_descriptions_so_field_meaning_survives():
+    # The score scale lives only in the description; without it the model is
+    # told to emit a number with no idea which end is bullish.
+    schema = llm.build_output_schema(LLMSignal.model_json_schema())
+    assert "maximally bearish" in schema["properties"]["news_score"]["description"]
+
+
+def test_optional_fields_are_not_left_unconstrained():
+    """``Optional[float]`` must reach the model as a number, not an empty schema.
+
+    Pruning an ``anyOf`` without collapsing it first leaves ``{}``, which
+    constrains nothing -- the one hole through which a model could emit an
+    arbitrary value into an otherwise closed schema.
+    """
+    schema = llm.build_output_schema(LLMSignal.model_json_schema())
+    for field in ("news_score", "technical_score", "fundamental_score", "analyst_score"):
+        assert schema["properties"][field]["type"] == "number"
+    assert "anyOf" not in json.dumps(schema)
+
+
+def test_every_property_is_required_of_the_model():
+    # Optional on the way in (old payloads still validate), mandatory on the
+    # way out: a model handed all four kinds of context must score all four.
+    schema = llm.build_output_schema(LLMSignal.model_json_schema())
+    assert set(schema["required"]) == set(schema["properties"])
+    assert "news_score" in schema["required"]
+    assert "news_score" not in LLMSignal.model_json_schema()["required"]
 
 
 def test_schema_rejects_an_unresolvable_reference():

@@ -44,7 +44,19 @@ REQUEST_TIMEOUT_SECONDS = 120.0
 #: constraints (pattern, minLength, minimum, ...) are deliberately dropped:
 #: constrained decoding does not accept every keyword pydantic emits, and the
 #: real enforcement of those bounds is ``LLMSignal`` on the way back.
-_KEEP = ("type", "enum", "properties", "required", "additionalProperties", "items")
+#: ``description`` is kept because it is the only place the *meaning* of a
+#: field travels with the schema -- what the score scale is, what a key factor
+#: should contain -- and a field the model misunderstands is worse than one it
+#: cannot emit.
+_KEEP = (
+    "type",
+    "enum",
+    "properties",
+    "required",
+    "additionalProperties",
+    "items",
+    "description",
+)
 
 
 class LLMError(Exception):
@@ -61,6 +73,33 @@ def _inline_refs(node: Any, defs: dict[str, Any]) -> Any:
         return {k: _inline_refs(v, defs) for k, v in node.items()}
     if isinstance(node, list):
         return [_inline_refs(item, defs) for item in node]
+    return node
+
+
+def _denullify(node: Any) -> Any:
+    """Collapse pydantic's ``Optional[T]`` -- ``anyOf: [T, null]`` -- down to ``T``.
+
+    Without this, ``_prune`` drops the unrecognised ``anyOf`` and leaves ``{}``:
+    an empty schema constrains nothing, so an optional field would silently
+    become the one place the model could emit an arbitrary value. Optionality
+    is a concession to callers posting the older payload shape by hand, not an
+    invitation for the model to answer ``null``.
+    """
+    if isinstance(node, dict):
+        options = node.get("anyOf")
+        if isinstance(options, list):
+            concrete = [
+                option
+                for option in options
+                if not (isinstance(option, dict) and option.get("type") == "null")
+            ]
+            if len(concrete) == 1:
+                merged = {k: v for k, v in node.items() if k != "anyOf"}
+                merged.update(concrete[0])
+                return _denullify(merged)
+        return {k: _denullify(v) for k, v in node.items()}
+    if isinstance(node, list):
+        return [_denullify(item) for item in node]
     return node
 
 
@@ -87,13 +126,20 @@ def build_output_schema(model_schema: dict[str, Any]) -> dict[str, Any]:
 
     Derived rather than hand-written so the fields the model may emit cannot
     drift away from the fields ``LLMSignal`` accepts.
+
+    Every property is marked required, which is stricter than ``LLMSignal``
+    itself: the webhook still accepts a payload without the transparency
+    fields, but a model that has been handed all four kinds of context has no
+    excuse for declining to report its read on any of them.
     """
     resolved = _inline_refs(
         {k: v for k, v in model_schema.items() if k != "$defs"},
         model_schema.get("$defs", {}),
     )
-    pruned = _prune(resolved)
+    pruned = _prune(_denullify(resolved))
     pruned["additionalProperties"] = False
+    if pruned.get("properties"):
+        pruned["required"] = list(pruned["properties"])
     return pruned
 
 

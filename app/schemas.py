@@ -4,15 +4,34 @@
 ``extra="forbid"`` config is the structural guardrail: any attempt to smuggle
 ``quantity``, ``price``, ``stop_price``, ``order_type`` etc. into the payload
 fails validation (HTTP 422) before a single line of execution logic runs.
+
+The per-dimension scores and ``key_factors`` are **inert**. They exist so that
+a decision can be audited after the fact -- which input actually drove the
+call, and were the confident calls the ones that paid? -- and nothing in
+``execution_engine`` or ``risk_engine`` reads them. Only ``bias`` and
+``conviction`` reach the decision path, and a CI invariant check enforces that.
+Widening what the LLM may say is only safe while the extra words stay inert.
 """
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Optional
+from typing import Annotated, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
+
+#: A single driver of the call: one short, standalone, factual phrase.
+KeyFactor = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)
+]
+
+MAX_KEY_FACTORS = 6
+
+_SCORE_SCALE = (
+    "in [-1.0, 1.0], where -1.0 is maximally bearish, 0.0 is neutral or unknown, "
+    "and +1.0 is maximally bullish"
+)
 
 
 class Bias(str, Enum):
@@ -36,6 +55,31 @@ class LLMSignal(BaseModel):
     bias: Bias
     conviction: float = Field(..., ge=0.0, le=1.0)
     rationale: str = Field(..., min_length=1, max_length=2000)
+
+    # --- Transparency only. Never read by the risk engine. --- #
+    news_score: Optional[float] = Field(
+        None, ge=-1.0, le=1.0, description=f"Read on the recent news {_SCORE_SCALE}"
+    )
+    technical_score: Optional[float] = Field(
+        None, ge=-1.0, le=1.0, description=f"Read on trend, momentum and volatility {_SCORE_SCALE}"
+    )
+    fundamental_score: Optional[float] = Field(
+        None, ge=-1.0, le=1.0, description=f"Read on valuation, growth and balance sheet {_SCORE_SCALE}"
+    )
+    analyst_score: Optional[float] = Field(
+        None,
+        ge=-1.0,
+        le=1.0,
+        description=f"Read on analyst consensus, targets and ownership {_SCORE_SCALE}",
+    )
+    key_factors: list[KeyFactor] = Field(
+        default_factory=list,
+        max_length=MAX_KEY_FACTORS,
+        description=(
+            "The specific facts that drove this call, each a short standalone phrase "
+            "citing the datum rather than restating the conclusion"
+        ),
+    )
 
     @field_validator("ticker")
     @classmethod

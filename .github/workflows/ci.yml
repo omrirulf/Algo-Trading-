@@ -60,7 +60,7 @@ jobs:
       - name: Alpaca SDK is imported only by broker_client.py
         run: |
           hits=$(grep -rnE '^[[:space:]]*(import|from)[[:space:]]+alpaca' \
-                   app orchestrator config --include='*.py' \
+                   app orchestrator config analysis --include='*.py' \
                  | grep -v '^app/broker_client.py:' || true)
           if [ -n "$hits" ]; then
             echo "$hits"
@@ -74,7 +74,7 @@ jobs:
         # their values.
         run: |
           hits=$(grep -rnE '\.(alpaca_api_key|alpaca_secret_key)\b' \
-                   app orchestrator --include='*.py' \
+                   app orchestrator analysis --include='*.py' \
                  | grep -v '^app/broker_client.py:' || true)
           if [ -n "$hits" ]; then
             echo "$hits"
@@ -113,6 +113,52 @@ jobs:
             exit 1
           fi
           echo "OK: guardrail thresholds are Final constants"
+
+      - name: LLM transparency fields never reach the decision path
+        # The signal carries per-dimension scores and key_factors so a call can
+        # be audited later. Widening what the LLM may say is only safe while
+        # the extra words stay inert: bias and conviction are the only fields
+        # the engine may act on.
+        run: |
+          hits=$(grep -rnE '\b(news_score|technical_score|fundamental_score|analyst_score|key_factors)\b' \
+                   app/execution_engine.py app/risk_engine.py app/broker_client.py || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::a transparency field is referenced in the execution path"
+            exit 1
+          fi
+          echo "OK: scores and key_factors are inert"
+
+      - name: Market context carries no credentials
+        # yfinance is unauthenticated. If the enrichment modules ever start
+        # reading a secret, they stop being safe to run beside the LLM.
+        # Matches credential *reads* -- a settings lookup, an environment
+        # read, or attribute access on a credential-shaped name -- rather
+        # than any line mentioning the word, so prose about prompt tokens in
+        # a comment is not a build failure.
+        run: |
+          hits=$(grep -rnE '(get_settings|os\.environ|getenv|\bsettings\.|\.[A-Za-z_]*(secret|api_key|_token|password)\b)' \
+                   orchestrator/context.py orchestrator/technicals.py \
+                   orchestrator/fundamentals.py orchestrator/analysts.py || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::market context modules must not read credentials"
+            exit 1
+          fi
+          echo "OK: market context needs no credentials"
+
+      - name: The scorer is read-only
+        # analysis/ grades past decisions. It must never be able to make one:
+        # no order path, and no writing to the journal it is reading.
+        run: |
+          hits=$(grep -rnE '(submit_order|submit_bracket_order|ExecutionEngine|post_signal|\.write_text\(|open\([^)]*["'"'"'][wa])' \
+                   analysis --include='*.py' || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::analysis/ must not place orders or write files"
+            exit 1
+          fi
+          echo "OK: the scorer only reads"
 
       - name: No committed .env
         run: |

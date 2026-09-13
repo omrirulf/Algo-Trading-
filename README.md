@@ -2,11 +2,17 @@
 
 [![CI](https://github.com/omrirulf/Algo-Trading-/actions/workflows/ci.yml/badge.svg)](https://github.com/omrirulf/Algo-Trading-/actions/workflows/ci.yml)
 
-Qualitative LLM analysis is fully decoupled from trade execution. The LLM
-can only ever emit `{ticker, bias, conviction, rationale}`; a FastAPI
+Qualitative LLM analysis is fully decoupled from trade execution. The LLM can
+only ever emit a closed set of fields — a direction, a confidence, and its
+reasoning — and only `bias` and `conviction` are ever acted on. A FastAPI
 webhook validates that shape (rejecting anything else with a 422), and a
 pure-Python risk engine does 100% of the sizing, stop-loss, and Alpaca
 paper-trade execution.
+
+Each hourly cycle gives the model four kinds of context per ticker — recent
+news, technicals, fundamentals, and the analyst/institutional view — and
+records all of it alongside the resulting signal so the signals can be graded
+later.
 
 **Full documentation:** **[algotrade.mintlify.site](https://algotrade.mintlify.site/)**
 — built from the [`docs/`](docs/) directory, auto-deployed on every push to
@@ -33,21 +39,43 @@ algo-trading-system/
 │   ├── execution_engine.py    # orchestrates validate -> size -> stop -> submit
 │   └── logger.py              # structured JSON audit log
 ├── orchestrator/
-│   ├── heartbeat.py           # hourly job: fetch news -> call LLM -> POST signal
+│   ├── heartbeat.py           # hourly job: gather context -> call LLM -> POST signal
 │   ├── news.py                # Bright Data SERP API (Google News) headline fetch
+│   ├── context.py             # the only module that touches yfinance; prompt assembly
+│   ├── technicals.py          # SMA/RSI/MACD/returns/52w/vol (pure, no network)
+│   ├── fundamentals.py        # valuation, margins, growth, balance sheet (pure)
+│   ├── analysts.py            # consensus, targets, rating changes, ownership (pure)
+│   ├── formatting.py          # number formatting; missing values render as "n/a"
+│   ├── journal.py             # per-cycle record of context + signal + outcome
 │   └── llm.py                 # Claude call, constrained by the signal schema
+├── analysis/                  # offline scoring; read-only, no broker path
+│   ├── reader.py              # parse the signal journal (pure)
+│   ├── returns.py             # join signals to realised returns; entry-timing rules
+│   ├── metrics.py             # rank correlations, buckets, drift (pure)
+│   ├── report.py              # text report; owns the "too few to conclude" threshold
+│   └── score_journal.py       # CLI: python analysis/score_journal.py
 ├── tests/
 │   ├── conftest.py            # FakeBroker / FakeMarketData; no network in tests
 │   ├── test_risk_engine.py    # proves the 5% cap and ATR stop math hold
 │   ├── test_schemas.py        # proves the LLM cannot smuggle qty/price fields
 │   ├── test_market_data.py    # Wilder ATR against a reference implementation
-│   ├── test_execution_engine.py  # full decision path with fakes
+│   ├── test_execution_engine.py  # full decision path + the new fields are inert
 │   ├── test_webhook.py        # auth + 422 at the HTTP layer
 │   ├── test_heartbeat.py      # orchestrator can only send the closed shape
 │   ├── test_news.py           # Bright Data request shape + response parsing
+│   ├── test_technicals.py     # indicators vs independent reference implementations
+│   ├── test_fundamentals.py   # info parsing + every earnings-date shape
+│   ├── test_analysts.py       # consensus / ratings / holders parsing
+│   ├── test_context.py        # assembly and every degradation path
+│   ├── test_journal.py        # the journal records context, signal and failures
+│   ├── test_analysis_returns.py   # proves an entry price can never predate its signal
+│   ├── test_analysis_metrics.py   # rank correlation vs hand-computed values
+│   ├── test_analysis_reader.py    # journal parsing, including truncated lines
+│   ├── test_analysis_scoring.py   # scorer end to end + report honesty
 │   └── test_llm.py            # schema derivation + every LLM failure mode
 └── logs/
-    └── execution_audit.log    # generated at runtime
+    ├── execution_audit.log    # what the engine did      (generated at runtime)
+    └── signal_journal.log     # what the model saw       (generated at runtime)
 ```
 
 ## Setup
@@ -74,12 +102,52 @@ pay-as-you-go pricing covers that comfortably; check your zone's usage page
 after the first day. If the token is missing the cycle logs an error for
 each ticker and sends nothing.
 
+### Market context (yfinance — no API key)
+
+Headlines alone say that something happened, not whether it landed on a cheap
+business or an expensive one, on an uptrend or a breakdown, or on a name the
+street already loves. Before building the prompt, `orchestrator/context.py`
+adds three more dimensions, all from yfinance, which is unauthenticated — **no
+new key, no new per-request cost:**
+
+| Source | What goes into the prompt |
+|---|---|
+| `technicals.py` | 20/50/200-day SMAs and distance from each, Wilder RSI(14), MACD(12/26/9), 1d/5d/1m/3m returns, 52-week range position, ATR(14) as % of price, annualised 20-day vol, volume vs its 20-day average |
+| `fundamentals.py` | Sector, market cap, trailing/forward P/E, P/B, PEG, profit and operating margins, ROE, YoY revenue and earnings growth, debt/equity, free cash flow, beta, short interest, next earnings date |
+| `analysts.py` | Consensus rating and 1-to-5 mean, full rating breakdown, mean/high/low price targets and implied upside, recent upgrades and downgrades by firm, institutional ownership and largest holders |
+
+The ATR comes from `app.market_data.calculate_atr` — the same function the
+risk engine will use to place the stop, not a second implementation that could
+drift from it.
+
+**Failures degrade rather than propagate.** Every source is fetched
+independently; a failure records a named gap in the prompt and the model is
+told to score that dimension `0.0` rather than guess. News is the deliberate
+exception: if Bright Data is down the ticker is skipped entirely, because
+trading on technicals alone would quietly be a different strategy.
+
+Slow-moving data (fundamentals, ratings, ownership) is cached for six hours
+per ticker; price history is refetched every cycle.
+
 ### Analyst (Claude)
 
 Put an API key from [the Anthropic Console](https://console.anthropic.com)
-in `ANTHROPIC_API_KEY`. The orchestrator sends each ticker's headlines to
-`claude-opus-5` and gets back one `{ticker, bias, conviction, rationale}`
-object per ticker.
+in `ANTHROPIC_API_KEY`. The orchestrator sends each ticker's assembled context
+to `claude-opus-5` and gets back one signal per ticker.
+
+The system prompt weights the four inputs differently — news is fast and
+noisy, technicals are about timing rather than business quality, fundamentals
+rarely change a view within an hour, and the analyst view is a prior already
+in the price unless it just moved. It is also explicit about the failure mode
+that richer context introduces:
+
+> More context does not mean more conviction. Conviction is earned when
+> independent dimensions agree, and it must fall when they conflict.
+
+Alongside `bias`, `conviction` and `rationale`, the model reports a score in
+`[-1, 1]` for each of the four dimensions plus up to six `key_factors`. These
+are **inert**: they are journalled for later evaluation and nothing in the
+execution or risk engine reads them. A CI invariant check enforces that.
 
 The call is constrained at generation time: `orchestrator/llm.py` derives a
 JSON schema from `LLMSignal` and passes it as `output_config.format`, so the
@@ -119,6 +187,33 @@ uvicorn app.main:app --reload --port 8000
 python orchestrator/heartbeat.py
 ```
 
+## Score the signals
+
+```bash
+python analysis/score_journal.py              # text report
+python analysis/score_journal.py --json       # same figures, machine-readable
+```
+
+Joins every journalled signal to the return that actually followed and reports
+whether conviction predicted the outcome, whether the 0.60 floor filtered the
+*right* signals, which of the four dimension scores carried any information,
+whether conviction fell when dimensions disagreed (the prompt demands it), and
+whether conviction is drifting upward over time.
+
+Two properties matter more than the numbers:
+
+- **It cannot enter at a price that predates the signal.** A signal fired after
+  the close is never scored against that day's close — that is the one bug that
+  would make the report flatter the strategy and be believed. `--entry` selects
+  the rule; the default reads the signal's UTC timestamp to decide.
+- **It reports sample sizes and refuses to overclaim.** Anything under 20
+  observations is marked `too few`. Two weeks in, the honest output is a
+  coverage table and a row of `too few`.
+
+Returns are close-to-close and ignore the stop-loss, slippage and commission:
+this measures the *signal*, not the strategy's P&L. The agreement check needs no
+price data at all, so it works from the first cycle.
+
 ## Test the guardrails directly
 
 ```bash
@@ -142,6 +237,10 @@ Try adding `"quantity": 500` to that payload — it will be rejected with a
 | Guardrail | Enforced in |
 |---|---|
 | LLM cannot set qty/price/order params | `schemas.py` (`extra="forbid"`) — structural, not a convention |
+| Scores and `key_factors` cannot influence a trade | Only `bias` and `conviction` are read by `execution_engine.py`; CI greps the execution path for the transparency fields |
+| Enriched context can't reach for a credential | CI greps `context.py` / `technicals.py` / `fundamentals.py` / `analysts.py` for settings and key reads |
+| The scorer cannot trade | CI greps `analysis/` for any order path or file write — it grades past decisions and must never be able to make one |
+| Prompt injection has a bounded blast radius | Headlines and firm names are third-party text. The system prompt marks the whole context block untrusted, and even a successful injection can only move `bias`/`conviction` — still subject to the conviction floor, the 5% cap, and a mandatory stop |
 | Max 5% of equity per ticker | `risk_engine.calculate_position_size()` (checked twice: pre- and post-rounding; existing exposure in the ticker counts toward the cap) |
 | Mandatory stop-loss on every order | `broker_client.submit_bracket_order()` — no code path submits without `StopLossRequest` (Alpaca OTO: market entry + attached stop) |
 | Stop distance from real volatility | `market_data.calculate_atr()` (Wilder ATR from yfinance OHLC), rejected if ATR is degenerate |
@@ -183,7 +282,9 @@ on pushes to `main` itself:
   the Alpaca SDK is imported only by `broker_client.py`; the API keys are read
   only there; `paper=True` is still a hard-coded literal; the risk thresholds
   are still `Final` constants and `config/settings.py` never reads the
-  environment directly; and no `.env` is tracked in git.
+  environment directly; the LLM's transparency fields never appear in the
+  execution path; the market-context modules read no credentials; and no
+  `.env` is tracked in git.
 
 Each invariant check was verified to fail when its invariant is broken, so a
 green run means something.
@@ -194,12 +295,21 @@ green run means something.
 - `orchestrator/news.py` searches Google News for `"<TICKER> stock"`. For
   tickers whose symbol is a common word, or to include the company name,
   adjust `build_news_search_url()`.
-- Nothing measures whether the signals are any good. Before trusting the
-  conviction numbers, log a few weeks of paper decisions and check whether
-  high-conviction calls actually outperformed low-conviction ones.
-- The prompt asks the model to calibrate conviction, but nothing enforces
-  that. If it drifts toward always answering 0.9, the conviction floor stops
-  filtering anything.
+- The journal is recorded *and* scored, but nothing acts on the result. If
+  `score_journal.py` says a dimension carries no information, or that the
+  conviction floor is filtering the wrong way, changing the prompt or the
+  threshold is still a manual decision — as it should be, until there are
+  months rather than weeks of data behind it.
+- Scoring measures the signal, not the strategy. Close-to-close returns ignore
+  the stop-loss, so a signal that was right about direction but stopped out on
+  the way there still scores as a win. Joining the scorer to
+  `logs/execution_audit.log` would close that gap.
+- Insider transactions (Form 4 buying and selling) are the obvious next
+  context source. yfinance exposes some of it, but a dedicated provider is
+  more reliable — that one would need a new API key.
+- `context.py` fetches each ticker's sources serially. With a longer watchlist
+  that becomes the slowest part of a cycle; the fetches are independent and
+  could run concurrently.
 - Consider persisting `ExecutionResult` rows to a database in addition to
   the log file, for querying trade history.
 - `TradingClient(..., paper=True)` is hard-coded in `broker_client.py` —

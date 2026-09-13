@@ -61,6 +61,46 @@ code, not just documented.
     `config/settings.py`, and that the file never calls `os.environ` or
     `getenv` directly.
   </Accordion>
+  <Accordion title="LLM transparency fields never reach the decision path">
+    ```bash
+    grep -rnE '\b(news_score|technical_score|fundamental_score|analyst_score|key_factors)\b' \
+      app/execution_engine.py app/risk_engine.py app/broker_client.py
+    ```
+    Any match fails the build. The signal carries per-dimension scores and
+    `key_factors` so a call can be audited later, and widening what the LLM
+    may *say* is only safe while the extra words stay inert — `bias` and
+    `conviction` remain the only fields the engine may act on. A test can
+    assert the engine ignores a score today; this asserts nobody can start
+    reading one tomorrow without the diff going red.
+  </Accordion>
+  <Accordion title="Market context carries no credentials">
+    ```bash
+    grep -rnE '(get_settings|os\.environ|getenv|\bsettings\.|\.[A-Za-z_]*(secret|api_key|_token|password)\b)' \
+      orchestrator/context.py orchestrator/technicals.py \
+      orchestrator/fundamentals.py orchestrator/analysts.py
+    ```
+    yfinance is unauthenticated, which is the whole reason the enriched
+    context costs no new API key. If these modules ever start reading a
+    secret they stop being safe to run beside the LLM.
+
+    The pattern matches credential *reads* — a settings lookup, an
+    environment read, or attribute access on a name ending in `secret`,
+    `api_key`, `_token` or `password` — rather than any line containing one
+    of those words. The first version of this check grepped for the bare word
+    `token` and failed the build on a comment about prompt tokens; a check
+    that cries wolf gets deleted, which is worse than not having it.
+  </Accordion>
+  <Accordion title="The scorer is read-only">
+    ```bash
+    grep -rnE '(submit_order|submit_bracket_order|ExecutionEngine|post_signal|\.write_text\(|open\([^)]*["'][wa])' \
+      analysis --include='*.py'
+    ```
+    `analysis/` exists to grade decisions that have already been made. A
+    scoring tool that can place an order, or that can write to the journal it
+    is reading, is no longer measuring an independent record — so the ability
+    is removed by CI rather than by convention. The Alpaca-import and
+    credential greps above cover `analysis/` too.
+  </Accordion>
   <Accordion title="No committed .env">
     `git ls-files --error-unmatch .env` must fail (the file must not be
     tracked).

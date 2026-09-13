@@ -41,6 +41,13 @@ does and where to get it. At minimum you need:
   </Step>
 </Steps>
 
+<Note>
+  That's the whole list. The technicals, fundamentals and analyst view the
+  model is given come from yfinance, which is unauthenticated — the enriched
+  context needs **no extra key and no extra per-request cost**. See
+  [Market Context](/orchestrator/market-context).
+</Note>
+
 ## 3. Start the execution engine
 
 ```bash
@@ -60,23 +67,36 @@ python orchestrator/heartbeat.py
 
 This runs once immediately, then every `HEARTBEAT_INTERVAL_MINUTES`
 (default 60). Each cycle, for every ticker in `WATCHLIST`, it fetches
-headlines, asks Claude for a signal, and POSTs that signal to the webhook
-running in step 3.
+headlines, gathers technicals, fundamentals and the analyst view from
+yfinance, asks Claude for a signal, POSTs that signal to the webhook running
+in step 3, and journals the whole thing.
+
+If a yfinance source is unreachable the cycle continues with that section
+named as a gap in the prompt; if **Bright Data** is unreachable the ticker is
+skipped instead. The asymmetry is deliberate — see
+[Market Context](/orchestrator/market-context).
 
 ## 5. Watch it happen
 
-Every decision — accepted, rejected, or errored — is logged as one JSON line
-in `logs/execution_audit.log`. Tail it during your first live cycle:
+Two logs, answering different questions. Tail both during your first live
+cycle:
 
 ```bash
-tail -f logs/execution_audit.log
+tail -f logs/execution_audit.log   # what the engine did: accepted / rejected / error
+tail -f logs/signal_journal.log    # what the model saw, and what it concluded
 ```
 
+Every decision the engine makes is one JSON line in the first file; every
+ticker the orchestrator processes — including the ones that produced no
+signal at all — is one JSON line in the second. See
+[Signal Journal](/orchestrator/journal).
+
 <Note>
-  Nothing in the 175-test suite exercises the real Bright Data or Anthropic
-  APIs — they're mocked. The first live cycle is the first real test of
-  those two integrations. If every ticker logs an error, check the message:
-  it will name which credential or response shape is the problem.
+  Nothing in the 261-test suite exercises the real Bright Data, yfinance or
+  Anthropic APIs — they're mocked, and an autouse fixture makes the offline,
+  degraded context the default everywhere. The first live cycle is the first
+  real test of those integrations. If every ticker logs an error, check the
+  message: it will name which credential or response shape is the problem.
 </Note>
 
 ## Try the webhook directly
@@ -90,6 +110,10 @@ curl -X POST http://localhost:8000/webhook/signal \
   -H "x-webhook-secret: <your WEBHOOK_SHARED_SECRET>" \
   -d '{"ticker": "AAPL", "bias": "BULLISH", "conviction": 0.75, "rationale": "Strong earnings beat"}'
 ```
+
+Those four fields are still the only *required* ones, so this exact request
+validates unchanged. The per-dimension scores and `key_factors` a real signal
+carries are optional — see [Webhook API](/api-reference/webhook).
 
 Now try smuggling an order parameter — it never reaches the risk engine:
 
@@ -113,5 +137,5 @@ curl -X POST http://localhost:8000/webhook/signal \
 pytest tests/ -v
 ```
 
-175 tests, no network, no credentials — every broker and market-data call is
-a fake. See [Testing](/testing) for what each file proves.
+261 tests, no network, no credentials — every broker, news and market-data
+call is a fake. See [Testing](/testing) for what each file proves.
