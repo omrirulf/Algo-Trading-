@@ -33,6 +33,7 @@
           "orchestrator/overview",
           "orchestrator/news",
           "orchestrator/market-context",
+          "orchestrator/insiders",
           "orchestrator/llm",
           "orchestrator/journal"
         ]

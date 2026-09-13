@@ -41,7 +41,7 @@ being hard-coded.
 <Warning>
   **The market context adds nothing to this table.** Technicals, fundamentals
   and the analyst view all come from yfinance, which is unauthenticated, so
-  `orchestrator/context.py` and its three parsers read no setting, key or
+  `orchestrator/context.py` and its parsers read no setting, key or
   token at all — and CI greps them to keep it that way. If a future data
   source needs a credential, it needs a new module, not a new import in
   those four. See [Market Context](/orchestrator/market-context).

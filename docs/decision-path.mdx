@@ -30,7 +30,7 @@ Neither path ever raises out of `execute()` — see
     `signal.conviction >= MIN_CONVICTION` (0.60). This is also why the
     orchestrator's system prompt asks Claude to calibrate conviction
     honestly — a model that always answers 0.9 makes this gate meaningless,
-    and a model handed four kinds of context instead of one has more ways to
+    and a model handed five kinds of context instead of one has more ways to
     talk itself into a high number. The prompt is explicit that conviction
     must *fall* when dimensions disagree; see
     [Market Context](/orchestrator/market-context).

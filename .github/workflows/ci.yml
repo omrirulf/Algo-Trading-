@@ -120,7 +120,7 @@ jobs:
         # the extra words stay inert: bias and conviction are the only fields
         # the engine may act on.
         run: |
-          hits=$(grep -rnE '\b(news_score|technical_score|fundamental_score|analyst_score|key_factors)\b' \
+          hits=$(grep -rnE '\b([a-z_]+_score|key_factors)\b' \
                    app/execution_engine.py app/risk_engine.py app/broker_client.py || true)
           if [ -n "$hits" ]; then
             echo "$hits"
@@ -132,14 +132,22 @@ jobs:
       - name: Market context carries no credentials
         # yfinance is unauthenticated. If the enrichment modules ever start
         # reading a secret, they stop being safe to run beside the LLM.
+        #
+        # Stated as an exclusion rather than a file list: only heartbeat.py
+        # (webhook + watchlist), news.py (Bright Data) and llm.py (Anthropic)
+        # may read a credential, and every other orchestrator module is
+        # checked. A list would have to be extended by hand for each new
+        # context source, which is a check that fails open -- exactly how
+        # insiders.py went uncovered when it was added.
+        #
         # Matches credential *reads* -- a settings lookup, an environment
         # read, or attribute access on a credential-shaped name -- rather
         # than any line mentioning the word, so prose about prompt tokens in
         # a comment is not a build failure.
         run: |
           hits=$(grep -rnE '(get_settings|os\.environ|getenv|\bsettings\.|\.[A-Za-z_]*(secret|api_key|_token|password)\b)' \
-                   orchestrator/context.py orchestrator/technicals.py \
-                   orchestrator/fundamentals.py orchestrator/analysts.py || true)
+                   orchestrator --include='*.py' \
+                 | grep -vE '^orchestrator/(heartbeat|news|llm)\.py:' || true)
           if [ -n "$hits" ]; then
             echo "$hits"
             echo "::error::market context modules must not read credentials"
