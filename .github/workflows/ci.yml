@@ -132,8 +132,12 @@ jobs:
       - name: Market context carries no credentials
         # yfinance is unauthenticated. If the enrichment modules ever start
         # reading a secret, they stop being safe to run beside the LLM.
+        # Matches credential *reads* -- a settings lookup, an environment
+        # read, or attribute access on a credential-shaped name -- rather
+        # than any line mentioning the word, so prose about prompt tokens in
+        # a comment is not a build failure.
         run: |
-          hits=$(grep -rnE '(get_settings|api_key|secret|token)' \
+          hits=$(grep -rnE '(get_settings|os\.environ|getenv|\bsettings\.|\.[A-Za-z_]*(secret|api_key|_token|password)\b)' \
                    orchestrator/context.py orchestrator/technicals.py \
                    orchestrator/fundamentals.py orchestrator/analysts.py || true)
           if [ -n "$hits" ]; then
