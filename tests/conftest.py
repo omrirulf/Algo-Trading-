@@ -74,6 +74,7 @@ def _no_ambient_credentials(monkeypatch):
 
     monkeypatch.delenv(news.CLI_ENV_VAR, raising=False)
     monkeypatch.delenv("BRIGHTDATA_API_TOKEN", raising=False)
+    monkeypatch.delenv(news.CLI_UNLOCKER_ENV_VAR, raising=False)
     monkeypatch.setattr(news, "cli_credential_paths", list)
 
     # Point the Alpaca CLI lookup at a directory that cannot exist, so the

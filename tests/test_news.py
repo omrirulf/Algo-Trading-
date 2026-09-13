@@ -283,3 +283,63 @@ def test_news_module_has_no_broker_or_engine_imports():
     src = (news.__file__ and open(news.__file__).read()) or ""
     assert "alpaca" not in src.lower()
     assert "from app" not in src and "import app" not in src
+
+
+# --- zone resolution: SERP zone, else the CLI's unlocker zone ---------------
+
+
+def test_the_serp_zone_wins_when_both_are_set(monkeypatch):
+    monkeypatch.setenv(news.CLI_UNLOCKER_ENV_VAR, "cli_unlocker")
+    assert news.resolve_zone("serp_api") == "serp_api"
+
+
+def test_the_unlocker_zone_is_used_when_no_serp_zone_is_set(monkeypatch):
+    """`brightdata login` creates cli_unlocker and no SERP zone.
+
+    Bright Data's own CLI resolves BRIGHTDATA_SERP_ZONE then
+    BRIGHTDATA_UNLOCKER_ZONE for its `search` command, so an unlocker zone
+    serves brd_json=1 search URLs. Mirroring that is what lets the login
+    alone be enough.
+    """
+    monkeypatch.setenv(news.CLI_UNLOCKER_ENV_VAR, "cli_unlocker")
+    assert news.resolve_zone("") == "cli_unlocker"
+
+
+def test_no_zone_anywhere_resolves_to_empty(monkeypatch):
+    assert news.resolve_zone("") == ""
+
+
+def test_whitespace_is_not_a_zone(monkeypatch):
+    monkeypatch.setenv(news.CLI_UNLOCKER_ENV_VAR, "   ")
+    assert news.resolve_zone("   ") == ""
+
+
+def test_the_unlocker_zone_reaches_the_request_body(monkeypatch):
+    """The fallback has to arrive at Bright Data, not just resolve."""
+    monkeypatch.setenv(news.CLI_UNLOCKER_ENV_VAR, "cli_unlocker")
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(200, json={"news": []})
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        provider = news.BrightDataNewsProvider("tok-123", "", client=client)
+        provider.fetch("AAPL")
+
+    assert captured["body"]["zone"] == "cli_unlocker"
+
+
+def test_missing_zone_error_names_both_variables(monkeypatch):
+    with pytest.raises(news.NewsFetchError) as excinfo:
+        news.BrightDataNewsProvider("tok-123", "")
+    message = str(excinfo.value)
+    assert "BRIGHTDATA_SERP_ZONE" in message
+    assert news.CLI_UNLOCKER_ENV_VAR in message
+
+
+def test_the_html_error_no_longer_claims_only_serp_zones_work():
+    """The old wording sent people to the dashboard unnecessarily."""
+    with pytest.raises(news.NewsFetchError) as excinfo:
+        news.parse_news_results("<html><body>blocked</body></html>")
+    assert "Web Unlocker" in str(excinfo.value)

@@ -47,6 +47,15 @@ _RESULT_KEYS = ("news", "top_stories", "organic")
 #: for the CLI needs no second variable for the same secret.
 CLI_ENV_VAR = "BRIGHTDATA_API_KEY"
 
+#: The zone env var Bright Data's own CLI falls back to when no SERP zone is
+#: configured. Their ``search`` command resolves BRIGHTDATA_SERP_ZONE first and
+#: then BRIGHTDATA_UNLOCKER_ZONE (brightdata/cli, src/commands/search.ts), and
+#: its ``init`` offers the unlocker zone as the SERP default with "yes"
+#: preselected. A Web Unlocker zone therefore serves ``brd_json=1`` search
+#: URLs -- which is what makes `brightdata login` alone enough, since it
+#: provisions ``cli_unlocker`` and no SERP zone.
+CLI_UNLOCKER_ENV_VAR = "BRIGHTDATA_UNLOCKER_ZONE"
+
 #: Where ``brightdata login`` stores the key it obtains over OAuth.
 CLI_CONFIG_DIRNAME = "brightdata-cli"
 CLI_CREDENTIALS_FILENAME = "credentials.json"
@@ -92,8 +101,9 @@ def _unwrap(payload: Any) -> dict[str, Any]:
         stripped = payload.strip()
         if stripped.startswith("<"):
             raise NewsFetchError(
-                "Bright Data returned HTML, not parsed JSON; check that the zone is a "
-                "SERP API zone and brd_json=1 is on the URL"
+                "Bright Data returned HTML, not parsed JSON; check that the zone "
+                "can serve search results (a SERP API or Web Unlocker zone) and "
+                "that brd_json=1 is on the URL"
             )
         try:
             payload = json.loads(stripped)
@@ -201,6 +211,19 @@ def token_from_cli() -> Optional[str]:
     return None
 
 
+def resolve_zone(serp_zone: str = "") -> str:
+    """The zone to send requests through: the SERP zone, else the unlocker one.
+
+    Mirrors Bright Data's own CLI so a machine set up for it needs nothing
+    extra here. Returns "" when neither is configured, which the provider
+    turns into a NewsFetchError naming both.
+    """
+    return (
+        serp_zone.strip()
+        or os.environ.get(CLI_UNLOCKER_ENV_VAR, "").strip()
+    )
+
+
 def resolve_token(api_token: str = "") -> Optional[str]:
     """Settings first, then the CLI's own env var, then its stored login."""
     return api_token or os.environ.get(CLI_ENV_VAR, "").strip() or token_from_cli()
@@ -214,10 +237,15 @@ class BrightDataNewsProvider:
                 "No Bright Data credentials found: set BRIGHTDATA_API_TOKEN, "
                 "or run `brightdata login`"
             )
-        if not zone:
-            raise NewsFetchError("BRIGHTDATA_SERP_ZONE is not set")
+        resolved_zone = resolve_zone(zone)
+        if not resolved_zone:
+            raise NewsFetchError(
+                "No Bright Data zone configured: set BRIGHTDATA_SERP_ZONE, or "
+                f"{CLI_UNLOCKER_ENV_VAR} if you are using the zone "
+                "`brightdata login` created (cli_unlocker)"
+            )
         self._token = token
-        self._zone = zone
+        self._zone = resolved_zone
         self._client = client
 
     def _post(self, body: dict[str, Any]) -> httpx.Response:

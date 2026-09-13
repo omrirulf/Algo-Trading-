@@ -127,10 +127,27 @@ source** (`alpacahq/cli`, `internal/config/config.go`), not guessed: YAML at
 The orchestrator pulls the last 24 hours of Google News headlines for each
 watchlist ticker through [Bright Data's SERP API](https://brightdata.com/products/serp-api).
 
-1. In the Bright Data dashboard create a zone of type **SERP API** (the
-   default name is `serp_api`; if you pick another, set `BRIGHTDATA_SERP_ZONE`).
-2. Copy an API token from *Account settings -> API tokens* into
-   `BRIGHTDATA_API_TOKEN`.
+```bash
+brightdata login                               # browser OAuth; --device if headless
+export BRIGHTDATA_UNLOCKER_ZONE=cli_unlocker   # the zone the login just created
+```
+
+That is the whole setup — **no dashboard visit required.** `brightdata login`
+provisions a `cli_unlocker` zone rather than a SERP API zone, but Bright Data's
+own CLI sends search queries through an unlocker zone by preference: its
+`search` command resolves `BRIGHTDATA_SERP_ZONE` and then falls back to
+`BRIGHTDATA_UNLOCKER_ZONE`, and its `init` offers the unlocker zone as the SERP
+default with *yes* preselected. `orchestrator/news.py` mirrors that resolution.
+
+<sub>Read from the CLI's source, not confirmed against a live call — Bright
+Data's API was unreachable from the environment this was built in. If your
+account refuses search on an unlocker zone, the symptom is a `NewsFetchError`
+about HTML instead of JSON; create a **SERP API** zone in the dashboard and set
+`BRIGHTDATA_SERP_ZONE`. Nothing else changes.</sub>
+
+The dashboard route, if you prefer it: create a zone of type **SERP API**
+(default name `serp_api`, else set `BRIGHTDATA_SERP_ZONE`) and copy a token
+from *Account settings -> API tokens* into `BRIGHTDATA_API_TOKEN`.
 
 **Or use the CLI instead of copying a token.** The official
 [Bright Data CLI](https://github.com/brightdata/cli) authenticates over OAuth
@@ -145,12 +162,10 @@ The token is resolved in order: `BRIGHTDATA_API_TOKEN` → `BRIGHTDATA_API_KEY`
 (the variable the CLI itself reads, so one secret serves both) → the key
 `brightdata login` stored on disk.
 
-<sub>Two caveats. **The zone is not discovered this way** — `brightdata login`
-provisions its own `cli_unlocker`/`cli_browser` zones, not a SERP API zone, so
-you still create that one in the dashboard and set `BRIGHTDATA_SERP_ZONE`.
-And reading the CLI's credential file is **best-effort**: its format isn't
+<sub>Reading the CLI's credential file is **best-effort**: its format isn't
 documented, so the lookup tries several field names and treats anything it
-can't parse as "not configured this way" rather than failing.</sub>
+can't parse as "not configured this way" rather than failing. If it guesses
+wrong on your machine, set `BRIGHTDATA_API_TOKEN` explicitly.</sub>
 
 Each cycle sends one request per ticker, so the default three-ticker
 watchlist costs 72 SERP requests a day. Bright Data's own free tier /
