@@ -40,6 +40,13 @@ to settle: **are the signals any good?**
 }
 ```
 
+<Note>
+  `ts_utc` is an explicit ISO-8601 UTC timestamp, separate from the formatter's
+  own `ts`. The latter is local time with no offset, which is not enough to
+  tell whether a signal fired before or after the session close — and that
+  decides which bar [the scorer](/scoring) may honestly use as an entry price.
+</Note>
+
 ## Why the whole context is stored
 
 The per-dimension scores are only useful next to the data that produced them.
@@ -67,6 +74,7 @@ invisible in the execution audit log — the engine never saw them.
 you a record; it does not cost you the signal that was already on its way to
 the engine.
 
-<Card title="Next: the guardrails" icon="shield" href="/guardrails">
-  Where each guardrail is enforced, and why the new signal fields are inert.
+<Card title="Next: scoring the journal" icon="gauge" href="/scoring">
+  Joining these lines to what the market actually did — and the entry-timing
+  rule that stops the answer from flattering the strategy.
 </Card>

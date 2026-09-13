@@ -13,6 +13,7 @@ the cycle that produced it.
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
@@ -58,6 +59,11 @@ def record(
         get_journal_logger().info(
             "signal_generated",
             extra={
+                # The formatter's own ``ts`` is local time with no offset, which
+                # is not enough to tell whether a signal fired before or after
+                # the session close -- and that decides which bar a scorer may
+                # honestly use as the entry price.
+                "ts_utc": datetime.now(timezone.utc).isoformat(),
                 "ticker": context.ticker,
                 "context": context.as_dict(),
                 "signal": signal.model_dump(mode="json") if signal else None,

@@ -41,6 +41,7 @@
         "group": "Reference",
         "pages": [
           "api-reference/webhook",
+          "scoring",
           "testing",
           "continuous-integration"
         ]

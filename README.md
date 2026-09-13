@@ -48,6 +48,12 @@ algo-trading-system/
 │   ├── formatting.py          # number formatting; missing values render as "n/a"
 │   ├── journal.py             # per-cycle record of context + signal + outcome
 │   └── llm.py                 # Claude call, constrained by the signal schema
+├── analysis/                  # offline scoring; read-only, no broker path
+│   ├── reader.py              # parse the signal journal (pure)
+│   ├── returns.py             # join signals to realised returns; entry-timing rules
+│   ├── metrics.py             # rank correlations, buckets, drift (pure)
+│   ├── report.py              # text report; owns the "too few to conclude" threshold
+│   └── score_journal.py       # CLI: python analysis/score_journal.py
 ├── tests/
 │   ├── conftest.py            # FakeBroker / FakeMarketData; no network in tests
 │   ├── test_risk_engine.py    # proves the 5% cap and ATR stop math hold
@@ -62,6 +68,10 @@ algo-trading-system/
 │   ├── test_analysts.py       # consensus / ratings / holders parsing
 │   ├── test_context.py        # assembly and every degradation path
 │   ├── test_journal.py        # the journal records context, signal and failures
+│   ├── test_analysis_returns.py   # proves an entry price can never predate its signal
+│   ├── test_analysis_metrics.py   # rank correlation vs hand-computed values
+│   ├── test_analysis_reader.py    # journal parsing, including truncated lines
+│   ├── test_analysis_scoring.py   # scorer end to end + report honesty
 │   └── test_llm.py            # schema derivation + every LLM failure mode
 └── logs/
     ├── execution_audit.log    # what the engine did      (generated at runtime)
@@ -177,6 +187,33 @@ uvicorn app.main:app --reload --port 8000
 python orchestrator/heartbeat.py
 ```
 
+## Score the signals
+
+```bash
+python analysis/score_journal.py              # text report
+python analysis/score_journal.py --json       # same figures, machine-readable
+```
+
+Joins every journalled signal to the return that actually followed and reports
+whether conviction predicted the outcome, whether the 0.60 floor filtered the
+*right* signals, which of the four dimension scores carried any information,
+whether conviction fell when dimensions disagreed (the prompt demands it), and
+whether conviction is drifting upward over time.
+
+Two properties matter more than the numbers:
+
+- **It cannot enter at a price that predates the signal.** A signal fired after
+  the close is never scored against that day's close — that is the one bug that
+  would make the report flatter the strategy and be believed. `--entry` selects
+  the rule; the default reads the signal's UTC timestamp to decide.
+- **It reports sample sizes and refuses to overclaim.** Anything under 20
+  observations is marked `too few`. Two weeks in, the honest output is a
+  coverage table and a row of `too few`.
+
+Returns are close-to-close and ignore the stop-loss, slippage and commission:
+this measures the *signal*, not the strategy's P&L. The agreement check needs no
+price data at all, so it works from the first cycle.
+
 ## Test the guardrails directly
 
 ```bash
@@ -202,6 +239,7 @@ Try adding `"quantity": 500` to that payload — it will be rejected with a
 | LLM cannot set qty/price/order params | `schemas.py` (`extra="forbid"`) — structural, not a convention |
 | Scores and `key_factors` cannot influence a trade | Only `bias` and `conviction` are read by `execution_engine.py`; CI greps the execution path for the transparency fields |
 | Enriched context can't reach for a credential | CI greps `context.py` / `technicals.py` / `fundamentals.py` / `analysts.py` for settings and key reads |
+| The scorer cannot trade | CI greps `analysis/` for any order path or file write — it grades past decisions and must never be able to make one |
 | Prompt injection has a bounded blast radius | Headlines and firm names are third-party text. The system prompt marks the whole context block untrusted, and even a successful injection can only move `bias`/`conviction` — still subject to the conviction floor, the 5% cap, and a mandatory stop |
 | Max 5% of equity per ticker | `risk_engine.calculate_position_size()` (checked twice: pre- and post-rounding; existing exposure in the ticker counts toward the cap) |
 | Mandatory stop-loss on every order | `broker_client.submit_bracket_order()` — no code path submits without `StopLossRequest` (Alpaca OTO: market entry + attached stop) |
@@ -257,15 +295,15 @@ green run means something.
 - `orchestrator/news.py` searches Google News for `"<TICKER> stock"`. For
   tickers whose symbol is a common word, or to include the company name,
   adjust `build_news_search_url()`.
-- `logs/signal_journal.log` now records the full context behind every signal,
-  but **nothing reads it back yet**. The next real step is a scoring script:
-  join each journalled signal to the realised forward return and check whether
-  high-conviction calls actually outperformed low-conviction ones, and which
-  of the four dimension scores carries any information at all.
-- The prompt asks the model to calibrate conviction and not to inflate it as
-  context grows, but nothing enforces that. Watch the journalled conviction
-  distribution: if it drifts toward always answering 0.9, the conviction floor
-  stops filtering anything.
+- The journal is recorded *and* scored, but nothing acts on the result. If
+  `score_journal.py` says a dimension carries no information, or that the
+  conviction floor is filtering the wrong way, changing the prompt or the
+  threshold is still a manual decision — as it should be, until there are
+  months rather than weeks of data behind it.
+- Scoring measures the signal, not the strategy. Close-to-close returns ignore
+  the stop-loss, so a signal that was right about direction but stopped out on
+  the way there still scores as a win. Joining the scorer to
+  `logs/execution_audit.log` would close that gap.
 - Insider transactions (Form 4 buying and selling) are the obvious next
   context source. yfinance exposes some of it, but a dedicated provider is
   more reliable — that one would need a new API key.

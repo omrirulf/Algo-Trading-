@@ -1,6 +1,6 @@
 ---
 title: "Testing"
-description: "261 tests, zero network calls, zero credentials"
+description: "335 tests, zero network calls, zero credentials"
 ---
 
 ```bash
@@ -53,6 +53,10 @@ so the suite never writes into the repository's `logs/` directory.
 | `test_analysts.py` | 10 | Ratings, the breakdown, targets and implied upside, upgrade/downgrade rows and holders — plus that a missing or empty frame degrades to an empty section rather than raising. |
 | `test_context.py` | 15 | Each source fails independently into a named gap, `gather()` never raises, the slow-data cache honours its TTL, and the rendered prompt names what is missing. |
 | `test_journal.py` | 5 | One JSON line per ticker per cycle carrying context, signal and outcome; cycles with no signal are recorded with `signal: null`; a write failure never propagates. |
+| `test_analysis_returns.py` | 20 | That an entry price can never predate the signal that predicted it — swept across every entry rule, hour and day — plus after-hours handling, pending outcomes and missing history. |
+| `test_analysis_metrics.py` | 24 | Rank correlation against hand-computed values including ties, that a constant series yields `None` rather than zero, signed-return direction, bucket edges, and the agreement and drift checks. |
+| `test_analysis_reader.py` | 10 | Journal parsing field by field, the tz-naive timestamp fallback being flagged, and that a truncated final line is skipped rather than fatal. |
+| `test_analysis_scoring.py` | 20 | The scorer end to end on a synthetic price series, plus report honesty: small samples flagged, NEUTRAL excluded, an all-pending journal still rendering. |
 
 ## A test suite is only as good as its negative cases
 

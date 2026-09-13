@@ -18,12 +18,19 @@ product. These are the honest gaps.
     stop-loss attached at entry. A signal opposing an existing position is
     rejected rather than flipping it — see [Decision Path](/decision-path).
   </Card>
-  <Card title="Signal quality is recorded, not yet scored" icon="gauge">
-    The [signal journal](/orchestrator/journal) now captures the full context,
-    the per-dimension scores and the conviction behind every call — but
-    nothing reads it back. Until something joins those lines to realised
-    forward returns, "are the signals any good?" is answerable in principle
-    and unanswered in practice.
+  <Card title="Scoring measures the signal, not the P&L" icon="gauge">
+    [Scoring the Journal](/scoring) answers whether conviction predicted the
+    move — but from close-to-close returns that ignore the stop-loss, slippage
+    and commission. A call that was right about direction and stopped out on
+    the way there still scores as a win. Joining the scorer to
+    `logs/execution_audit.log` would close that gap.
+  </Card>
+  <Card title="Nothing acts on the scores" icon="robot">
+    If the report says a dimension carries no information, or that the
+    conviction floor is filtering the wrong way, changing the prompt or the
+    threshold is a manual decision. That is the right default until there are
+    months rather than weeks of data behind it — but it does mean the loop is
+    not closed.
   </Card>
   <Card title="No persistence beyond the log files" icon="database">
     Two append-only JSON-lines files, `logs/execution_audit.log` and
@@ -55,14 +62,12 @@ product. These are the honest gaps.
     `execution_engine.py` — deliberately scoped out of the initial build so
     the guardrail surface stayed small enough to fully test.
   </Step>
-  <Step title="Score the journal against realised returns">
-    The clear next piece of work. Read `logs/signal_journal.log`, join each
-    line to the ticker's forward return over the following few days, and
-    answer the questions the journal was built to make answerable: did
-    high-conviction calls outperform low-conviction ones, which
-    per-dimension score actually correlates with the move, and did
-    conviction fall when the dimensions disagreed the way the prompt
-    demands? The data is already being written; nothing reads it yet.
+  <Step title="Run the scorer for long enough to believe it">
+    [Scoring the Journal](/scoring) already answers the questions the journal
+    was built for, and marks anything under 20 observations as `too few`. The
+    work left is patience: a three-ticker watchlist produces a few signals a
+    day, so the numbers only become evidence after weeks, not days. Resist
+    tuning the prompt against a sample the report is telling you not to trust.
   </Step>
   <Step title="Add insider transactions as a fourth source">
     Form 4 filings are the one obvious dimension the current three miss. Note
