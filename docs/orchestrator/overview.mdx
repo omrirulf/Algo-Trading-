@@ -24,7 +24,8 @@ For each ticker, `process_ticker()` runs a small pipeline:
   <Step title="Gather market context">
     `context.gather(ticker, headlines)` — see
     [Market Context](/orchestrator/market-context). Adds technicals,
-    fundamentals and the analyst/institutional view from yfinance. Never
+    fundamentals, the analyst/institutional view and
+    [insider activity](/orchestrator/insiders) from yfinance. Never
     raises: a source that fails becomes a named gap in the prompt.
   </Step>
   <Step title="Ask Claude">
@@ -118,7 +119,7 @@ actually accepts.
 
 The schema is also *stricter* on the way out than on the way in: every
 property is marked required for the model, while the webhook still accepts a
-payload carrying only the original four fields. A model handed four kinds of
+payload carrying only the original four fields. A model handed five kinds of
 context has no excuse for declining to report its read on any of them; a
 human posting a signal by hand with `curl` should not have to invent scores.
 

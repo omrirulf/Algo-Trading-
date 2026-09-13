@@ -9,10 +9,10 @@ webhook validates that shape (rejecting anything else with a 422), and a
 pure-Python risk engine does 100% of the sizing, stop-loss, and Alpaca
 paper-trade execution.
 
-Each hourly cycle gives the model four kinds of context per ticker — recent
-news, technicals, fundamentals, and the analyst/institutional view — and
-records all of it alongside the resulting signal so the signals can be graded
-later.
+Each hourly cycle gives the model five kinds of context per ticker — recent
+news, technicals, fundamentals, the analyst/institutional view, and insider
+buying and selling — and records all of it alongside the resulting signal so
+the signals can be graded later.
 
 **Full documentation:** **[algotrade.mintlify.site](https://algotrade.mintlify.site/)**
 — built from the [`docs/`](docs/) directory, auto-deployed on every push to
@@ -45,6 +45,7 @@ algo-trading-system/
 │   ├── technicals.py          # SMA/RSI/MACD/returns/52w/vol (pure, no network)
 │   ├── fundamentals.py        # valuation, margins, growth, balance sheet (pure)
 │   ├── analysts.py            # consensus, targets, rating changes, ownership (pure)
+│   ├── insiders.py            # Form 4 buys/sells; grants excluded (pure)
 │   ├── formatting.py          # number formatting; missing values render as "n/a"
 │   ├── journal.py             # per-cycle record of context + signal + outcome
 │   └── llm.py                 # Claude call, constrained by the signal schema
@@ -66,6 +67,7 @@ algo-trading-system/
 │   ├── test_technicals.py     # indicators vs independent reference implementations
 │   ├── test_fundamentals.py   # info parsing + every earnings-date shape
 │   ├── test_analysts.py       # consensus / ratings / holders parsing
+│   ├── test_insiders.py       # proves a grant is never counted as insider buying
 │   ├── test_context.py        # assembly and every degradation path
 │   ├── test_journal.py        # the journal records context, signal and failures
 │   ├── test_analysis_returns.py   # proves an entry price can never predate its signal
@@ -86,28 +88,100 @@ pip install -r requirements.txt
 cp .env.example .env   # fill in your Alpaca paper keys + a random webhook secret
 ```
 
+### Broker (Alpaca paper)
+
+Copy a **paper** key pair from the
+[Alpaca paper dashboard](https://app.alpaca.markets/paper/dashboard/overview)
+into `ALPACA_API_KEY` / `ALPACA_SECRET_KEY`.
+
+**Or use the CLI instead of copying keys.** The official
+[Alpaca CLI](https://github.com/alpacahq/cli) authenticates over OAuth and
+stores a profile in `~/.config/alpaca/profiles/` at `0600`:
+
+```bash
+alpaca profile login    # browser OAuth; paper by default
+# leave ALPACA_API_KEY / ALPACA_SECRET_KEY blank in .env
+```
+
+Credentials resolve as an **atomic bundle** — a key from one source is never
+paired with a secret from another — in the order `ALPACA_API_KEY` +
+`ALPACA_SECRET_KEY` → the profile's OAuth `access_token` → the profile's
+stored `api_key` + `secret_key`. Setting only one half of the env pair is an
+error rather than a silent fallthrough. `ALPACA_PROFILE` picks the profile;
+`ALPACA_CONFIG_DIR` moves the directory.
+
+> **A profile marked `live_trade: true` is refused, not used.** This system is
+> paper-only, and borrowing a live bundle would point real money at a strategy
+> whose entire safety argument is that it cannot reach a live endpoint. The
+> refusal names the profile and the ways out, rather than reporting "no
+> credentials found" on a machine that plainly has some. It is belt-and-braces
+> anyway: `paper=True` is hard-coded, and the SDK pins its base URL to the
+> paper endpoint from that flag alone. CI checks for both.
+
+<sub>Unlike the Bright Data lookup, this one is **verified against the CLI's
+source** (`alpacahq/cli`, `internal/config/config.go`), not guessed: YAML at
+`<config dir>/profiles/<name>.yaml`, fields `api_key`, `secret_key`,
+`access_token`, `scopes`, `live_trade`, and a config directory of
+`$ALPACA_CONFIG_DIR` or `~/.config/alpaca` on every platform.</sub>
+
 ### News feed (Bright Data)
 
 The orchestrator pulls the last 24 hours of Google News headlines for each
 watchlist ticker through [Bright Data's SERP API](https://brightdata.com/products/serp-api).
 
-1. In the Bright Data dashboard create a zone of type **SERP API** (the
-   default name is `serp_api`; if you pick another, set `BRIGHTDATA_SERP_ZONE`).
-2. Copy an API token from *Account settings -> API tokens* into
-   `BRIGHTDATA_API_TOKEN`.
+```bash
+brightdata login                               # browser OAuth; --device if headless
+export BRIGHTDATA_UNLOCKER_ZONE=cli_unlocker   # the zone the login just created
+```
+
+That is the whole setup — **no dashboard visit required.** `brightdata login`
+provisions a `cli_unlocker` zone rather than a SERP API zone, but Bright Data's
+own CLI sends search queries through an unlocker zone by preference: its
+`search` command resolves `BRIGHTDATA_SERP_ZONE` and then falls back to
+`BRIGHTDATA_UNLOCKER_ZONE`, and its `init` offers the unlocker zone as the SERP
+default with *yes* preselected. `orchestrator/news.py` mirrors that resolution.
+
+<sub>Read from the CLI's source, not confirmed against a live call — Bright
+Data's API was unreachable from the environment this was built in. If your
+account refuses search on an unlocker zone, the symptom is a `NewsFetchError`
+about HTML instead of JSON; create a **SERP API** zone in the dashboard and set
+`BRIGHTDATA_SERP_ZONE`. Nothing else changes.</sub>
+
+The dashboard route, if you prefer it: create a zone of type **SERP API**
+(default name `serp_api`, else set `BRIGHTDATA_SERP_ZONE`) and copy a token
+from *Account settings -> API tokens* into `BRIGHTDATA_API_TOKEN`.
+
+**Or use the CLI instead of copying a token.** The official
+[Bright Data CLI](https://github.com/brightdata/cli) authenticates over OAuth
+and stores a key locally:
+
+```bash
+brightdata login        # browser OAuth; use --device on a headless machine
+# leave BRIGHTDATA_API_TOKEN blank in .env
+```
+
+The token is resolved in order: `BRIGHTDATA_API_TOKEN` → `BRIGHTDATA_API_KEY`
+(the variable the CLI itself reads, so one secret serves both) → the key
+`brightdata login` stored on disk.
+
+<sub>Reading the CLI's credential file is **best-effort**: its format isn't
+documented, so the lookup tries several field names and treats anything it
+can't parse as "not configured this way" rather than failing. If it guesses
+wrong on your machine, set `BRIGHTDATA_API_TOKEN` explicitly.</sub>
 
 Each cycle sends one request per ticker, so the default three-ticker
 watchlist costs 72 SERP requests a day. Bright Data's own free tier /
 pay-as-you-go pricing covers that comfortably; check your zone's usage page
-after the first day. If the token is missing the cycle logs an error for
-each ticker and sends nothing.
+after the first day. If no token is resolvable the cycle logs
+`No Bright Data credentials found: set BRIGHTDATA_API_TOKEN, or run
+brightdata login` for each ticker and sends nothing.
 
 ### Market context (yfinance — no API key)
 
 Headlines alone say that something happened, not whether it landed on a cheap
 business or an expensive one, on an uptrend or a breakdown, or on a name the
 street already loves. Before building the prompt, `orchestrator/context.py`
-adds three more dimensions, all from yfinance, which is unauthenticated — **no
+adds four more dimensions, all from yfinance, which is unauthenticated — **no
 new key, no new per-request cost:**
 
 | Source | What goes into the prompt |
@@ -115,6 +189,16 @@ new key, no new per-request cost:**
 | `technicals.py` | 20/50/200-day SMAs and distance from each, Wilder RSI(14), MACD(12/26/9), 1d/5d/1m/3m returns, 52-week range position, ATR(14) as % of price, annualised 20-day vol, volume vs its 20-day average |
 | `fundamentals.py` | Sector, market cap, trailing/forward P/E, P/B, PEG, profit and operating margins, ROE, YoY revenue and earnings growth, debt/equity, free cash flow, beta, short interest, next earnings date |
 | `analysts.py` | Consensus rating and 1-to-5 mean, full rating breakdown, mean/high/low price targets and implied upside, recent upgrades and downgrades by firm, institutional ownership and largest holders |
+| `insiders.py` | Six-month insider buy/sell rollup, net shares, distinct buyers vs sellers, and recent open-market purchases and sales by name and role |
+
+Insider data is the one source where the naive reading is usually wrong, so
+it gets special handling: **buys and sells are not symmetric.** An insider
+buying on the open market is spending their own money on a view; a sale is
+weak evidence, since insiders sell on schedules, for tax on vesting shares,
+and to diversify. Stock grants and option exercises are excluded entirely —
+counting compensation as "insider buying" would make the dimension noise. The
+prompt states all of this, and `orchestrator/insiders.py` reports the
+exclusions rather than hiding them.
 
 The ATR comes from `app.market_data.calculate_atr` — the same function the
 risk engine will use to place the stop, not a second implementation that could
@@ -126,8 +210,8 @@ told to score that dimension `0.0` rather than guess. News is the deliberate
 exception: if Bright Data is down the ticker is skipped entirely, because
 trading on technicals alone would quietly be a different strategy.
 
-Slow-moving data (fundamentals, ratings, ownership) is cached for six hours
-per ticker; price history is refetched every cycle.
+Slow-moving data (fundamentals, ratings, ownership, insider filings) is cached
+for six hours per ticker; price history is refetched every cycle.
 
 ### Analyst (Claude)
 
@@ -135,7 +219,19 @@ Put an API key from [the Anthropic Console](https://console.anthropic.com)
 in `ANTHROPIC_API_KEY`. The orchestrator sends each ticker's assembled context
 to `claude-opus-5` and gets back one signal per ticker.
 
-The system prompt weights the four inputs differently — news is fast and
+**Or use the CLI instead of a key.** If you run `ant auth login` (the
+[Anthropic CLI](https://console.anthropic.com)) on the machine that runs the
+heartbeat, `ANTHROPIC_API_KEY` can be left blank — the SDK falls back to that
+login's profile, then to `ANTHROPIC_AUTH_TOKEN`, then to Workload Identity
+Federation. This is a good fit for running the heartbeat locally under your
+own login; an unattended deployment (a server, a container) should still use
+an explicit key, since a CLI login profile is tied to one person's session.
+Leaving the key blank never fails silently: if nothing is resolvable when a
+cycle runs, that ticker logs `No Claude credentials found: set
+ANTHROPIC_API_KEY, or run ant auth login` and is skipped, the same as any
+other `LLMError`.
+
+The system prompt weights the five inputs differently — news is fast and
 noisy, technicals are about timing rather than business quality, fundamentals
 rarely change a view within an hour, and the analyst view is a prior already
 in the price unless it just moved. It is also explicit about the failure mode
@@ -145,7 +241,7 @@ that richer context introduces:
 > independent dimensions agree, and it must fall when they conflict.
 
 Alongside `bias`, `conviction` and `rationale`, the model reports a score in
-`[-1, 1]` for each of the four dimensions plus up to six `key_factors`. These
+`[-1, 1]` for each of the five dimensions plus up to six `key_factors`. These
 are **inert**: they are journalled for later evaluation and nothing in the
 execution or risk engine reads them. A CI invariant check enforces that.
 
@@ -196,7 +292,7 @@ python analysis/score_journal.py --json       # same figures, machine-readable
 
 Joins every journalled signal to the return that actually followed and reports
 whether conviction predicted the outcome, whether the 0.60 floor filtered the
-*right* signals, which of the four dimension scores carried any information,
+*right* signals, which of the five dimension scores carried any information,
 whether conviction fell when dimensions disagreed (the prompt demands it), and
 whether conviction is drifting upward over time.
 

@@ -14,6 +14,7 @@ import pytest
 from orchestrator import context
 from tests.test_analysts import HOLDERS, INFO as ANALYST_INFO, RECOMMENDATIONS, UPGRADES
 from tests.test_fundamentals import INFO as FUNDAMENTAL_INFO
+from tests.test_insiders import PURCHASES, TRANSACTIONS
 from tests.test_technicals import make_frame
 
 HEADLINES = ["Chipmaker raises guidance — revenue seen up 20% (Reuters, 2h ago)"]
@@ -42,6 +43,8 @@ def full_provider() -> FakeProvider:
         recommendations=RECOMMENDATIONS,
         upgrades_downgrades=UPGRADES,
         institutional_holders=HOLDERS,
+        insider_purchases=PURCHASES,
+        insider_transactions=TRANSACTIONS,
     )
 
 
@@ -97,6 +100,38 @@ def test_missing_price_history_leaves_the_other_sections_intact():
     assert ctx.analysts.target_upside is None  # nothing to compare the target with
 
 
+def test_insider_activity_reaches_the_prompt():
+    prompt = context.gather("NVDA", HEADLINES, provider=full_provider()).as_prompt()
+    assert "INSIDER ACTIVITY" in prompt
+    assert "Open-market purchases" in prompt
+    assert "Jane Roe" in prompt
+
+
+def test_insiders_do_not_depend_on_the_info_dict():
+    """Unlike fundamentals and the analyst view, insider data is its own source."""
+    provider = FakeProvider(insider_purchases=PURCHASES, insider_transactions=TRANSACTIONS)
+    ctx = context.gather("NVDA", HEADLINES, provider=provider)
+
+    assert ctx.fundamentals is None and ctx.analysts is None
+    assert ctx.insiders is not None and ctx.insiders.has_activity
+
+
+def test_no_insider_trading_is_distinguished_from_no_insider_data():
+    """An empty frame is a fact; a failed fetch is a gap. They must not look alike."""
+    import pandas as pd
+
+    quiet = context.gather(
+        "NVDA", HEADLINES,
+        provider=FakeProvider(insider_purchases=pd.DataFrame(), insider_transactions=pd.DataFrame()),
+    )
+    assert quiet.insiders is not None
+    assert "No insider transactions reported" in quiet.as_prompt()
+
+    absent = context.gather("NVDA", HEADLINES, provider=FakeProvider())
+    assert absent.insiders is None
+    assert "INSIDER ACTIVITY\n- unavailable this cycle" in absent.as_prompt()
+
+
 def test_missing_info_leaves_technicals_intact():
     provider = FakeProvider(history=make_frame([100.0 + i for i in range(60)]))
     ctx = context.gather("NVDA", HEADLINES, provider=provider)
@@ -138,7 +173,8 @@ def test_total_blackout_still_produces_a_usable_context():
     prompt = ctx.as_prompt()
 
     assert "Chipmaker raises guidance" in prompt
-    assert prompt.count("unavailable this cycle") == 3
+    # Every enrichment section says so rather than silently rendering empty.
+    assert prompt.count("unavailable this cycle") == len(context.ENRICHMENT_SECTIONS)
 
 
 def test_absent_news_is_stated_rather_than_omitted():

@@ -27,7 +27,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from orchestrator import analysts, fundamentals, technicals
+from orchestrator import analysts, fundamentals, insiders, technicals
 from orchestrator.technicals import TechnicalSnapshot
 
 log = logging.getLogger(__name__)
@@ -57,6 +57,8 @@ class RawMarketData:
     recommendations: Any = None
     upgrades_downgrades: Any = None
     institutional_holders: Any = None
+    insider_purchases: Any = None
+    insider_transactions: Any = None
     gaps: list[str] = field(default_factory=list)
 
 
@@ -67,6 +69,8 @@ class _SlowData:
     recommendations: Any
     upgrades_downgrades: Any
     institutional_holders: Any
+    insider_purchases: Any
+    insider_transactions: Any
     gaps: list[str]
 
 
@@ -102,6 +106,8 @@ class YFinanceContextProvider:
             recommendations=slow.recommendations,
             upgrades_downgrades=slow.upgrades_downgrades,
             institutional_holders=slow.institutional_holders,
+            insider_purchases=slow.insider_purchases,
+            insider_transactions=slow.insider_transactions,
             gaps=history_gaps + slow.gaps,
         )
 
@@ -132,6 +138,12 @@ class YFinanceContextProvider:
             ),
             institutional_holders=_attempt(
                 lambda: handle.institutional_holders, "institutional holders", gaps
+            ),
+            insider_purchases=_attempt(
+                lambda: handle.insider_purchases, "insider buy/sell summary", gaps
+            ),
+            insider_transactions=_attempt(
+                lambda: handle.insider_transactions, "insider transactions", gaps
             ),
             gaps=gaps,
         )
@@ -176,6 +188,16 @@ def get_provider() -> YFinanceContextProvider:
 # --------------------------------------------------------------------------- #
 
 
+#: Prompt heading -> ``TickerContext`` attribute, in the order they are shown.
+#: News is handled separately: it is never "unavailable", only empty.
+ENRICHMENT_SECTIONS = (
+    ("TECHNICALS (daily bars)", "technicals"),
+    ("FUNDAMENTALS", "fundamentals"),
+    ("ANALYST & INSTITUTIONAL VIEW", "analysts"),
+    ("INSIDER ACTIVITY", "insiders"),
+)
+
+
 @dataclass(frozen=True)
 class TickerContext:
     """Everything the model sees, and an honest list of what is missing."""
@@ -185,6 +207,7 @@ class TickerContext:
     technicals: Optional[technicals.TechnicalSnapshot] = None
     fundamentals: Optional[fundamentals.FundamentalSnapshot] = None
     analysts: Optional[analysts.AnalystSnapshot] = None
+    insiders: Optional[insiders.InsiderSnapshot] = None
     gaps: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict:
@@ -195,18 +218,15 @@ class TickerContext:
             "technicals": self.technicals.as_dict() if self.technicals else None,
             "fundamentals": self.fundamentals.as_dict() if self.fundamentals else None,
             "analysts": self.analysts.as_dict() if self.analysts else None,
+            "insiders": self.insiders.as_dict() if self.insiders else None,
             "gaps": list(self.gaps),
         }
 
     def as_prompt(self) -> str:
         sections = [f"TICKER: {self.ticker}", self._news_section()]
         sections.extend(
-            self._section(title, snapshot)
-            for title, snapshot in (
-                ("TECHNICALS (daily bars)", self.technicals),
-                ("FUNDAMENTALS", self.fundamentals),
-                ("ANALYST & INSTITUTIONAL VIEW", self.analysts),
-            )
+            self._section(title, getattr(self, attribute))
+            for title, attribute in ENRICHMENT_SECTIONS
         )
         if self.gaps:
             sections.append(
@@ -258,12 +278,28 @@ def gather(
             gaps,
         )
 
+    # Insider data does not come from ``info``, so it is built independently.
+    # A source that failed is None and renders as unavailable; a source that
+    # returned an empty frame is real information -- nobody traded -- and the
+    # snapshot says so.
+    insider_snapshot = None
+    if raw.insider_purchases is not None or raw.insider_transactions is not None:
+        insider_snapshot = _attempt(
+            lambda: insiders.build_snapshot(
+                purchases=raw.insider_purchases,
+                transactions=raw.insider_transactions,
+            ),
+            "insider activity",
+            gaps,
+        )
+
     return TickerContext(
         ticker=ticker,
         headlines=list(headlines),
         technicals=technical_snapshot,
         fundamentals=fundamental_snapshot,
         analysts=analyst_snapshot,
+        insiders=insider_snapshot,
         gaps=gaps,
     )
 

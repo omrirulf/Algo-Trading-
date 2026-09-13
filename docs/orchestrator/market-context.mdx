@@ -1,15 +1,15 @@
 ---
 title: "Market Context"
-description: "Technicals, fundamentals and the analyst view — the three sources that turn a headline reader into an analyst"
+description: "Technicals, fundamentals, the analyst view and insider activity — the four sources that turn a headline reader into an analyst"
 ---
 
 News alone tells the model that something happened. It does not tell it
 whether the thing that happened landed on a cheap business or an expensive
 one, on an uptrend or a breakdown, or on a name the street already loves.
-`orchestrator/context.py` adds those three dimensions before the prompt is
+`orchestrator/context.py` adds four more dimensions before the prompt is
 built.
 
-All three come from [yfinance](https://github.com/ranaroussi/yfinance), which
+All four come from [yfinance](https://github.com/ranaroussi/yfinance), which
 is unauthenticated — **the enriched context needs no new API key and adds no
 per-request cost.**
 
@@ -57,6 +57,16 @@ per-request cost.**
     The prompt states the scale explicitly (`1=strong buy to 5=strong sell`),
     because a bare `2.05` is meaningless without knowing which end is bullish.
   </Accordion>
+
+  <Accordion title="Insider activity — orchestrator/insiders.py" icon="user-secret">
+    The six-month buy/sell rollup, net shares, distinct buyers versus sellers,
+    and recent open-market purchases and sales by name and role.
+
+    Unlike the other three, this one carries a built-in asymmetry: a purchase
+    is someone spending their own money on a view, a sale is weak evidence,
+    and a stock grant is not buying at all. Full treatment in
+    [Insider Activity](/orchestrator/insiders).
+  </Accordion>
 </AccordionGroup>
 
 ## How the model is told to weigh them
@@ -71,8 +81,9 @@ confident. The system prompt is explicit that it must not:
 
 Each source also gets its own weighting instruction — news is fast and noisy,
 technicals are about timing rather than quality, fundamentals rarely change a
-view within an hour, and the analyst view is a prior that is already in the
-price unless it just moved.
+view within an hour, the analyst view is a prior that is already in the price
+unless it just moved, and insider buying counts for far more than insider
+selling.
 
 ## Failures degrade, they don't propagate
 
@@ -98,30 +109,32 @@ errors would otherwise cost more prompt tokens than the news does.
 
 ## Caching
 
-Fundamentals, analyst ratings and ownership change daily at most, but the
-heartbeat runs hourly. Those are cached for six hours per ticker
+Fundamentals, analyst ratings, ownership and insider filings change daily at
+most, but the heartbeat runs hourly. Those are cached for six hours per ticker
 (`SLOW_DATA_TTL_SECONDS`); price history is refetched every cycle. Without
 the cache a three-ticker watchlist would ask an unauthenticated, rate-limited
 source the same question 24 times a day.
 
 ## No credentials, structurally
 
-None of the four context modules reads a setting, a key or a token, and CI
-greps them to keep it that way:
+None of the context modules reads a setting, a key or a token, and CI greps
+them to keep it that way. The check names the three modules that *may* hold a
+credential and tests everything else in `orchestrator/`, so a context source
+added later is covered automatically:
 
 ```bash
 grep -rnE '(get_settings|os\.environ|getenv|\bsettings\.|\.[A-Za-z_]*(secret|api_key|_token|password)\b)' \
-  orchestrator/context.py orchestrator/technicals.py \
-  orchestrator/fundamentals.py orchestrator/analysts.py
+  orchestrator --include='*.py' \
+  | grep -vE '^orchestrator/(heartbeat|news|llm)\.py:'
 ```
 
 ## Everything is testable without the network
 
-`technicals.py`, `fundamentals.py` and `analysts.py` are pure parsing: they
-take a DataFrame or a dict and return plain data. `context.py` is the only
-module that touches yfinance, and it takes an injectable provider, so the
-whole pipeline — including every degradation path — is exercised in tests
-with no network access at all.
+`technicals.py`, `fundamentals.py`, `analysts.py` and `insiders.py` are pure
+parsing: they take a DataFrame or a dict and return plain data. `context.py`
+is the only module that touches yfinance, and it takes an injectable provider,
+so the whole pipeline — including every degradation path — is exercised in
+tests with no network access at all.
 
 <Card title="Next: the signal journal" icon="book" href="/orchestrator/journal">
   What the model saw, what it said, and whether it was any good.

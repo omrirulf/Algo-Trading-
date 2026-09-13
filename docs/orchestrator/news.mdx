@@ -10,15 +10,59 @@ and returns up to 10 de-duplicated headline lines.
 ## Setup
 
 <Steps>
-  <Step title="Create a SERP API zone">
-    In the Bright Data dashboard, create a zone of type **SERP API**. The
-    default zone name this codebase expects is `serp_api`; if you name yours
-    differently, set `BRIGHTDATA_SERP_ZONE`.
+  <Step title="Authenticate — CLI or dashboard">
+    Run `brightdata login` (the official CLI's browser OAuth flow; `--device`
+    when headless) and leave `BRIGHTDATA_API_TOKEN` blank, or copy a token
+    from *Account settings → API tokens* into it. Resolution order is
+    `BRIGHTDATA_API_TOKEN` → `BRIGHTDATA_API_KEY` → the CLI's stored login.
   </Step>
-  <Step title="Copy an API token">
-    From *Account settings → API tokens*, into `BRIGHTDATA_API_TOKEN`.
+  <Step title="Point at a zone">
+    Set `BRIGHTDATA_SERP_ZONE` to a **SERP API** zone if you have one. If you
+    only ran `brightdata login`, set `BRIGHTDATA_UNLOCKER_ZONE=cli_unlocker`
+    instead — the zone the login already created. Either works; see below.
   </Step>
 </Steps>
+
+## A Web Unlocker zone is enough
+
+`brightdata login` provisions `cli_unlocker` and `cli_browser`, not a SERP API
+zone — so the obvious reading is that you must still create one in the
+dashboard. **You don't.** Bright Data's own CLI sends search queries through
+an unlocker zone, and prefers to:
+
+```ts
+// brightdata/cli — src/commands/search.ts
+const zone = resolve(opts.zone, 'BRIGHTDATA_SERP_ZONE', 'default_zone_serp')
+    ?? resolve(opts.zone, 'BRIGHTDATA_UNLOCKER_ZONE', 'default_zone_unlocker');
+...
+const body = {zone, url: search_url, format: 'raw'};   // with brd_json=1
+```
+
+Its `init` command goes further and offers the unlocker zone as the SERP
+default with *yes* preselected, falling back to `cli_unlocker` when nothing
+else is configured. The request body above is byte-for-byte the shape this
+module sends.
+
+`orchestrator/news.py` mirrors that resolution, so a machine set up for the
+CLI needs nothing else:
+
+```python
+def resolve_zone(serp_zone: str = "") -> str:
+    return serp_zone.strip() or os.environ.get(CLI_UNLOCKER_ENV_VAR, "").strip()
+```
+
+<Note>
+  Net effect: **Bright Data needs no dashboard visit at all.** `brightdata
+  login` plus `BRIGHTDATA_UNLOCKER_ZONE=cli_unlocker` is a complete setup.
+</Note>
+
+<Warning>
+  This was read from the CLI's source, not confirmed against a live call —
+  Bright Data's API is unreachable from the environment this was built in. If
+  an unlocker zone turns out to be refused for search on your account, the
+  symptom is the `NewsFetchError` about HTML below, and the fix is a SERP API
+  zone in the dashboard with `BRIGHTDATA_SERP_ZONE` set. Nothing else changes.
+</Warning>
 
 <Note>
   One request per ticker per cycle. The default three-ticker watchlist is
@@ -100,7 +144,7 @@ ticker and logs it; one ticker's bad response never stops the cycle.
 </Warning>
 
 Headlines are no longer the only thing in the prompt, either. They now sit
-above three more sections — see
+above four more sections — see
 [Market Context](/orchestrator/market-context) for what else the model is
 given and how it is told to weigh it.
 

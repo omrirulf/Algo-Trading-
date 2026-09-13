@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass, field
 from types import SimpleNamespace
 from typing import Any
@@ -179,10 +180,39 @@ def test_returned_json_round_trips_through_the_validator():
     assert LLMSignal.model_validate(json.loads(raw)).ticker == "AAPL"
 
 
-def test_missing_api_key_is_reported_before_any_call():
+def test_blank_api_key_defers_to_the_sdks_own_resolution():
+    """A blank key no longer means "fail immediately" -- it means "let the
+    SDK try ANTHROPIC_AUTH_TOKEN, an `ant auth login` profile, or WIF"."""
+    llm.AnthropicSignalProvider(api_key="")  # must not raise
+
+
+def test_missing_credentials_anywhere_are_reported_at_first_call(monkeypatch):
+    # Hermetic: a real key or token in the environment running this test
+    # would otherwise make the "nothing resolvable" case unreachable. (An
+    # ambient `ant auth login` profile or WIF env vars on a dev machine
+    # could still do the same; not defended against here.)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
+
+    provider = llm.AnthropicSignalProvider(api_key="")
     with pytest.raises(llm.LLMError) as exc:
-        llm.AnthropicSignalProvider(api_key="")
+        provider.complete("s", "u", LLMSignal.model_json_schema())
+
     assert "ANTHROPIC_API_KEY" in str(exc.value)
+    assert "ant auth login" in str(exc.value)
+
+
+def test_missing_credentials_are_detected_without_touching_the_network(monkeypatch):
+    """The SDK raises before opening a connection; this proves it stays
+    that way, since the whole point is a fast, offline failure."""
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_AUTH_TOKEN", raising=False)
+    provider = llm.AnthropicSignalProvider(api_key="")
+
+    start = time.monotonic()
+    with pytest.raises(llm.LLMError):
+        provider.complete("s", "u", LLMSignal.model_json_schema())
+    assert time.monotonic() - start < 2.0
 
 
 # --------------------------------------------------------------------------- #
