@@ -31,6 +31,7 @@ _DIMENSION_LABELS = {
     "technical_score": "technical",
     "fundamental_score": "fundamental",
     "analyst_score": "analyst",
+    "insider_score": "insider",
 }
 
 
@@ -177,7 +178,7 @@ def _agreement(run: ScoringRun) -> str:
         f"{_rho(check.dispersion_vs_conviction)} (negative is correct)"
     )
     lines.append(
-        "  With four dimensions, unanimity is rare and 'at least one dissents' is\n"
+        "  Across several dimensions unanimity is rare and 'at least one dissents' is\n"
         "  the common case — read the spread correlation as the finer measure."
     )
     if min(check.aligned_n, check.conflicted_n) < MIN_BUCKET:

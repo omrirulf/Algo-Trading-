@@ -116,6 +116,7 @@ def test_json_schema_forbids_additional_properties():
         "technical_score",
         "fundamental_score",
         "analyst_score",
+        "insider_score",
         "key_factors",
     }
     # Only the original four are required, so a caller posting the pre-
@@ -129,7 +130,15 @@ def test_transparency_fields_default_to_absent():
     assert signal.key_factors == []
 
 
-@pytest.mark.parametrize("field", ["news_score", "technical_score", "fundamental_score", "analyst_score"])
+#: Derived, so a dimension added later is bound-checked without editing this file.
+SCORE_FIELDS = [name for name in LLMSignal.model_fields if name.endswith("_score")]
+
+
+def test_every_dimension_is_a_score_field():
+    assert len(SCORE_FIELDS) >= 5, SCORE_FIELDS
+
+
+@pytest.mark.parametrize("field", SCORE_FIELDS)
 @pytest.mark.parametrize("value", [-1.01, 1.01])
 def test_scores_are_bounded(field, value):
     with pytest.raises(ValidationError):

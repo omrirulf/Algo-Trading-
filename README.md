@@ -9,10 +9,10 @@ webhook validates that shape (rejecting anything else with a 422), and a
 pure-Python risk engine does 100% of the sizing, stop-loss, and Alpaca
 paper-trade execution.
 
-Each hourly cycle gives the model four kinds of context per ticker — recent
-news, technicals, fundamentals, and the analyst/institutional view — and
-records all of it alongside the resulting signal so the signals can be graded
-later.
+Each hourly cycle gives the model five kinds of context per ticker — recent
+news, technicals, fundamentals, the analyst/institutional view, and insider
+buying and selling — and records all of it alongside the resulting signal so
+the signals can be graded later.
 
 **Full documentation:** **[algotrade.mintlify.site](https://algotrade.mintlify.site/)**
 — built from the [`docs/`](docs/) directory, auto-deployed on every push to
@@ -45,6 +45,7 @@ algo-trading-system/
 │   ├── technicals.py          # SMA/RSI/MACD/returns/52w/vol (pure, no network)
 │   ├── fundamentals.py        # valuation, margins, growth, balance sheet (pure)
 │   ├── analysts.py            # consensus, targets, rating changes, ownership (pure)
+│   ├── insiders.py            # Form 4 buys/sells; grants excluded (pure)
 │   ├── formatting.py          # number formatting; missing values render as "n/a"
 │   ├── journal.py             # per-cycle record of context + signal + outcome
 │   └── llm.py                 # Claude call, constrained by the signal schema
@@ -66,6 +67,7 @@ algo-trading-system/
 │   ├── test_technicals.py     # indicators vs independent reference implementations
 │   ├── test_fundamentals.py   # info parsing + every earnings-date shape
 │   ├── test_analysts.py       # consensus / ratings / holders parsing
+│   ├── test_insiders.py       # proves a grant is never counted as insider buying
 │   ├── test_context.py        # assembly and every degradation path
 │   ├── test_journal.py        # the journal records context, signal and failures
 │   ├── test_analysis_returns.py   # proves an entry price can never predate its signal
@@ -179,7 +181,7 @@ brightdata login` for each ticker and sends nothing.
 Headlines alone say that something happened, not whether it landed on a cheap
 business or an expensive one, on an uptrend or a breakdown, or on a name the
 street already loves. Before building the prompt, `orchestrator/context.py`
-adds three more dimensions, all from yfinance, which is unauthenticated — **no
+adds four more dimensions, all from yfinance, which is unauthenticated — **no
 new key, no new per-request cost:**
 
 | Source | What goes into the prompt |
@@ -187,6 +189,16 @@ new key, no new per-request cost:**
 | `technicals.py` | 20/50/200-day SMAs and distance from each, Wilder RSI(14), MACD(12/26/9), 1d/5d/1m/3m returns, 52-week range position, ATR(14) as % of price, annualised 20-day vol, volume vs its 20-day average |
 | `fundamentals.py` | Sector, market cap, trailing/forward P/E, P/B, PEG, profit and operating margins, ROE, YoY revenue and earnings growth, debt/equity, free cash flow, beta, short interest, next earnings date |
 | `analysts.py` | Consensus rating and 1-to-5 mean, full rating breakdown, mean/high/low price targets and implied upside, recent upgrades and downgrades by firm, institutional ownership and largest holders |
+| `insiders.py` | Six-month insider buy/sell rollup, net shares, distinct buyers vs sellers, and recent open-market purchases and sales by name and role |
+
+Insider data is the one source where the naive reading is usually wrong, so
+it gets special handling: **buys and sells are not symmetric.** An insider
+buying on the open market is spending their own money on a view; a sale is
+weak evidence, since insiders sell on schedules, for tax on vesting shares,
+and to diversify. Stock grants and option exercises are excluded entirely —
+counting compensation as "insider buying" would make the dimension noise. The
+prompt states all of this, and `orchestrator/insiders.py` reports the
+exclusions rather than hiding them.
 
 The ATR comes from `app.market_data.calculate_atr` — the same function the
 risk engine will use to place the stop, not a second implementation that could
@@ -198,8 +210,8 @@ told to score that dimension `0.0` rather than guess. News is the deliberate
 exception: if Bright Data is down the ticker is skipped entirely, because
 trading on technicals alone would quietly be a different strategy.
 
-Slow-moving data (fundamentals, ratings, ownership) is cached for six hours
-per ticker; price history is refetched every cycle.
+Slow-moving data (fundamentals, ratings, ownership, insider filings) is cached
+for six hours per ticker; price history is refetched every cycle.
 
 ### Analyst (Claude)
 
@@ -219,7 +231,7 @@ cycle runs, that ticker logs `No Claude credentials found: set
 ANTHROPIC_API_KEY, or run ant auth login` and is skipped, the same as any
 other `LLMError`.
 
-The system prompt weights the four inputs differently — news is fast and
+The system prompt weights the five inputs differently — news is fast and
 noisy, technicals are about timing rather than business quality, fundamentals
 rarely change a view within an hour, and the analyst view is a prior already
 in the price unless it just moved. It is also explicit about the failure mode
@@ -229,7 +241,7 @@ that richer context introduces:
 > independent dimensions agree, and it must fall when they conflict.
 
 Alongside `bias`, `conviction` and `rationale`, the model reports a score in
-`[-1, 1]` for each of the four dimensions plus up to six `key_factors`. These
+`[-1, 1]` for each of the five dimensions plus up to six `key_factors`. These
 are **inert**: they are journalled for later evaluation and nothing in the
 execution or risk engine reads them. A CI invariant check enforces that.
 
@@ -280,7 +292,7 @@ python analysis/score_journal.py --json       # same figures, machine-readable
 
 Joins every journalled signal to the return that actually followed and reports
 whether conviction predicted the outcome, whether the 0.60 floor filtered the
-*right* signals, which of the four dimension scores carried any information,
+*right* signals, which of the five dimension scores carried any information,
 whether conviction fell when dimensions disagreed (the prompt demands it), and
 whether conviction is drifting upward over time.
 

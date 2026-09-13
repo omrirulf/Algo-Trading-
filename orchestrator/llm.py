@@ -129,7 +129,7 @@ def build_output_schema(model_schema: dict[str, Any]) -> dict[str, Any]:
 
     Every property is marked required, which is stricter than ``LLMSignal``
     itself: the webhook still accepts a payload without the transparency
-    fields, but a model that has been handed all four kinds of context has no
+    fields, but a model that has been handed every kind of context has no
     excuse for declining to report its read on any of them.
     """
     resolved = _inline_refs(

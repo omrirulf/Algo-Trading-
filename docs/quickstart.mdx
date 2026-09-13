@@ -67,7 +67,8 @@ python orchestrator/heartbeat.py
 
 This runs once immediately, then every `HEARTBEAT_INTERVAL_MINUTES`
 (default 60). Each cycle, for every ticker in `WATCHLIST`, it fetches
-headlines, gathers technicals, fundamentals and the analyst view from
+headlines, gathers technicals, fundamentals, the analyst view and insider
+activity from
 yfinance, asks Claude for a signal, POSTs that signal to the webhook running
 in step 3, and journals the whole thing.
 

@@ -103,6 +103,7 @@ def test_post_signal_sends_only_signal_fields_with_secret(monkeypatch):
         "technical_score": None,
         "fundamental_score": None,
         "analyst_score": None,
+        "insider_score": None,
         "key_factors": [],
     }
     assert not set(captured["body"]) & set(FORBIDDEN_FIELDS)

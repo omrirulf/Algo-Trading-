@@ -72,6 +72,12 @@ class LLMSignal(BaseModel):
         le=1.0,
         description=f"Read on analyst consensus, targets and ownership {_SCORE_SCALE}",
     )
+    insider_score: Optional[float] = Field(
+        None,
+        ge=-1.0,
+        le=1.0,
+        description=f"Read on insider buying and selling {_SCORE_SCALE}",
+    )
     key_factors: list[KeyFactor] = Field(
         default_factory=list,
         max_length=MAX_KEY_FACTORS,
