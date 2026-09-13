@@ -38,10 +38,12 @@ product. These are the honest gaps.
     pandas one-liner; consider a database once you have more than a few weeks
     of it.
   </Card>
-  <Card title="Only three context sources" icon="layer-group">
-    News, price history and the sell-side/ownership view. Insider activity —
-    Form 4 filings — is the obvious fourth, and unlike the current three it
-    would need a new API key and a new per-request cost.
+  <Card title="Insider data is only as good as yfinance's copy of it" icon="user-secret">
+    [Insider activity](/orchestrator/insiders) comes from Yahoo's rendering of
+    Form 4 filings, not from the filings themselves. It can lag, and it can
+    miss. SEC EDGAR is the authoritative source and needs no API key either —
+    just CIK mapping and XML parsing. Worth building only once
+    [the scorer](/scoring) shows the dimension carries signal.
   </Card>
   <Card title="Context is fetched serially" icon="hourglass">
     `context.py` fetches each source one after another, and the sources are
@@ -69,16 +71,19 @@ product. These are the honest gaps.
     day, so the numbers only become evidence after weeks, not days. Resist
     tuning the prompt against a sample the report is telling you not to trust.
   </Step>
-  <Step title="Add insider transactions as a fourth source">
-    Form 4 filings are the one obvious dimension the current three miss. Note
-    the cost: every existing source is either already paid for or
-    unauthenticated, and this one would introduce a new API key — so it also
-    introduces a module that the "market context carries no credentials" CI
-    grep can no longer cover.
+  <Step title="Go to EDGAR for insider data, if it earns it">
+    [Insider activity](/orchestrator/insiders) ships against yfinance, which
+    needed no API key after all. The authoritative source is SEC EDGAR — the
+    Form 4 filings themselves, free, needing only a User-Agent header — at the
+    cost of CIK mapping and XML parsing.
+
+    Do not build it on principle. Run the current version, then check whether
+    `insider_score` correlates with anything in [the scorer](/scoring). A
+    better feed for a dimension that carries no signal is wasted work.
   </Step>
   <Step title="Fetch the context sources concurrently">
     `context.py` fetches price history, fundamentals, the calendar,
-    recommendations, upgrades and holders one at a time. They are
+    recommendations, upgrades, holders and insider filings one at a time. They are
     independent, and the degradation model already treats each failure
     separately, so a thread pool would shorten a cycle without changing the
     semantics. Worth doing before the watchlist grows, not after.

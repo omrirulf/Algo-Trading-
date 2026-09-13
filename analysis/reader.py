@@ -16,7 +16,13 @@ from pathlib import Path
 from typing import Any, Iterable, Optional
 
 #: Score fields the model reports, in the order they are shown in reports.
-SCORE_FIELDS = ("news_score", "technical_score", "fundamental_score", "analyst_score")
+SCORE_FIELDS = (
+    "news_score",
+    "technical_score",
+    "fundamental_score",
+    "analyst_score",
+    "insider_score",
+)
 
 #: Format of the logging module's ``asctime``, used by journal lines written
 #: before ``ts_utc`` existed. It carries no offset, so it is read as UTC and

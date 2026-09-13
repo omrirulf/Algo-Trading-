@@ -53,6 +53,17 @@ def test_the_naive_timestamp_is_a_fallback_and_is_flagged():
     assert not entry.timestamp_is_exact  # so it never earns a same-day entry
 
 
+def test_a_journal_line_written_before_insider_score_existed_still_parses():
+    """Adding a dimension must not orphan the history the scorer needs."""
+    payload = {**FULL, "signal": {k: v for k, v in FULL["signal"].items()}}
+    assert "insider_score" not in payload["signal"]
+
+    (entry,) = read_lines([line(payload)]).entries
+    assert entry.scores["insider_score"] is None
+    assert entry.scores["news_score"] == 0.8
+    assert "insider_score" not in entry.available_scores()
+
+
 def test_neutral_has_a_signal_but_no_direction():
     payload = {**FULL, "signal": {**FULL["signal"], "bias": "NEUTRAL"}}
     (entry,) = read_lines([line(payload)]).entries

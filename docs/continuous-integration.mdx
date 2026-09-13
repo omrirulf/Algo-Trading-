@@ -38,7 +38,7 @@ code, not just documented.
 <AccordionGroup>
   <Accordion title="Alpaca SDK is imported only by broker_client.py">
     ```bash
-    grep -rnE '^\s*(import|from)\s+alpaca' app orchestrator config --include='*.py' \
+    grep -rnE '^\s*(import|from)\s+alpaca' app orchestrator config analysis --include='*.py' \
       | grep -v '^app/broker_client.py:'
     ```
     Any match fails the build. A blunt `grep alpaca` was tried first and
@@ -63,7 +63,7 @@ code, not just documented.
   </Accordion>
   <Accordion title="LLM transparency fields never reach the decision path">
     ```bash
-    grep -rnE '\b(news_score|technical_score|fundamental_score|analyst_score|key_factors)\b' \
+    grep -rnE '\b([a-z_]+_score|key_factors)\b' \
       app/execution_engine.py app/risk_engine.py app/broker_client.py
     ```
     Any match fails the build. The signal carries per-dimension scores and
@@ -76,8 +76,8 @@ code, not just documented.
   <Accordion title="Market context carries no credentials">
     ```bash
     grep -rnE '(get_settings|os\.environ|getenv|\bsettings\.|\.[A-Za-z_]*(secret|api_key|_token|password)\b)' \
-      orchestrator/context.py orchestrator/technicals.py \
-      orchestrator/fundamentals.py orchestrator/analysts.py
+      orchestrator --include='*.py' \
+      | grep -vE '^orchestrator/(heartbeat|news|llm)\.py:'
     ```
     yfinance is unauthenticated, which is the whole reason the enriched
     context costs no new API key. If these modules ever start reading a
@@ -89,6 +89,12 @@ code, not just documented.
     of those words. The first version of this check grepped for the bare word
     `token` and failed the build on a comment about prompt tokens; a check
     that cries wolf gets deleted, which is worse than not having it.
+
+    It also names the three modules that *may* hold a credential and checks
+    everything else, rather than listing the context modules. That matters:
+    the check used to be a list of four filenames, and `insiders.py` went
+    uncovered the moment it was added. A guardrail that has to be extended by
+    hand for each new module is one that fails open.
   </Accordion>
   <Accordion title="The scorer is read-only">
     ```bash

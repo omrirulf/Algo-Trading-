@@ -14,8 +14,8 @@ that last part works.
 | Guardrail | Enforced in |
 |---|---|
 | LLM cannot set qty / price / order params | `app/schemas.py` — `LLMSignal(extra="forbid")`. Structural, not a convention: an unrecognized field is a 422, full stop. |
-| Transparency fields never reach the decision path | CI greps `app/execution_engine.py`, `app/risk_engine.py` and `app/broker_client.py` for the four score fields and `key_factors`. Any hit fails the build. |
-| Market-context modules read no credentials | CI greps `context.py`, `technicals.py`, `fundamentals.py` and `analysts.py` for credential reads — a settings lookup, an environment read, or attribute access on a `secret` / `api_key` / `_token` / `password` name. yfinance is unauthenticated; the check keeps it that way. |
+| Transparency fields never reach the decision path | CI greps `app/execution_engine.py`, `app/risk_engine.py` and `app/broker_client.py` for `key_factors` and *any* `*_score` field. Any hit fails the build. |
+| Market-context modules read no credentials | CI greps every `orchestrator/` module except `heartbeat.py`, `news.py` and `llm.py` for credential reads — a settings lookup, an environment read, or attribute access on a `secret` / `api_key` / `_token` / `password` name. yfinance is unauthenticated; the check keeps it that way. |
 | Max 5% of equity per ticker | `risk_engine.calculate_position_size()` — checked twice, pre- and post-rounding. |
 | Mandatory stop-loss on every order | `broker_client.submit_bracket_order()` — no code path submits an entry without a `StopLossRequest`. |
 | Stop distance from real volatility | `market_data.calculate_atr()` — Wilder ATR computed from actual OHLC history, not a fixed percentage. |
@@ -29,10 +29,10 @@ that last part works.
 
 ## Saying more without being trusted more
 
-`LLMSignal` grew five fields — `news_score`, `technical_score`,
-`fundamental_score`, `analyst_score` and `key_factors` — when the model
-started receiving four kinds of context instead of one. Every one of them is
-**inert**:
+`LLMSignal` grew one score per context dimension — `news_score`,
+`technical_score`, `fundamental_score`, `analyst_score`, `insider_score` —
+plus `key_factors`, as the model started receiving several kinds of context
+instead of one. Every one of them is **inert**:
 
 <CardGroup cols={2}>
   <Card title="Nothing downstream reads them" icon="plug-circle-xmark">
@@ -41,17 +41,26 @@ started receiving four kinds of context instead of one. Every one of them is
     actually drove it, and were the confident calls the ones that paid.
   </Card>
   <Card title="A grep, not a promise" icon="magnifying-glass">
-    A CI step greps the three execution modules for those five names and
-    fails on any hit. Widening what the LLM may *say* is only safe while the
+    A CI step greps the three execution modules for `key_factors` and any
+    `*_score` field. Widening what the LLM may *say* is only safe while the
     extra words stay inert, so the invariant is checked rather than trusted.
   </Card>
 </CardGroup>
 
-The context modules got the same treatment from the other direction. The
-enrichment is fetched from yfinance, which is unauthenticated, so
-`context.py` and its three parsers have no business reading a credential —
-and CI greps them for credential reads to prove they
-don't. See [Market Context](/orchestrator/market-context).
+Both checks are written to cover dimensions that do not exist yet. The
+inert-fields grep matches any `*_score`, not a hard-coded list, and the
+credential grep names the three modules that *may* hold a secret and checks
+everything else in `orchestrator/`.
+
+<Note>
+  That second one was a list of four filenames until `insiders.py` was added
+  and silently went unchecked. A guardrail that has to be extended by hand for
+  each new module is a guardrail that fails open, which is the one thing a
+  guardrail must never do.
+</Note>
+
+See [Market Context](/orchestrator/market-context) and
+[Insider Activity](/orchestrator/insiders).
 
 ## Position sizing: enforced twice
 

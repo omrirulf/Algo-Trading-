@@ -1,0 +1,106 @@
+---
+title: "Insider Activity"
+description: "Form 4 buying and selling — the one input where someone with better information spent their own money"
+---
+
+The fifth context source, and the one where the naive reading is most often
+wrong. It answers a question none of the others can: has anyone who actually
+runs this company just backed their view with their own cash?
+
+It comes from yfinance, like the other three enrichment sources — **no API key
+and no per-request cost.** Earlier drafts of this project assumed insider data
+would need a paid provider; yfinance 0.2.44 exposes `insider_purchases`,
+`insider_transactions` and `insider_roster_holders` directly.
+
+## Buys and sells are not symmetric
+
+This is the whole design.
+
+<CardGroup cols={2}>
+  <Card title="A purchase is a view" icon="arrow-trend-up">
+    An insider buying on the open market is spending their own money on a
+    company they understand better than you do. Several insiders buying
+    independently, or an operating executive rather than a director, is
+    stronger still.
+  </Card>
+  <Card title="A sale is mostly noise" icon="arrow-trend-down">
+    Insiders sell for reasons that have nothing to do with the business: a
+    scheduled 10b5-1 plan, tax on vesting shares, a house, plain
+    diversification. A large sale often says nothing at all.
+  </Card>
+</CardGroup>
+
+The rendered block says this in the prompt itself, so the model cannot read a
+routine sale as a bearish signal:
+
+```
+INSIDER ACTIVITY
+Last 180 days: bought 120,000 shares in 4 transaction(s) | sold 900,000 shares in 12
+Net: -780,000 shares (-2.1% of insider holdings) | insiders hold 37,000,000 shares
+Distinct insiders: 1 buying, 1 selling
+Open-market purchases — insiders spending their own money:
+  - 2026-08-14 Jane Roe (CFO): 50,000 shares, 6.10M
+  - 2026-07-02 Jane Roe (CFO): 20,000 shares, 2.40M
+Sales — weak evidence on their own; often scheduled 10b5-1 plans, tax on vesting, or diversification:
+  - 2026-09-01 John Doe (Director): 400,000 shares, 52.00M
+(1 grant/option/gift transaction(s) excluded — compensation, not a view on the price)
+```
+
+## A grant is not a purchase
+
+<Warning>
+  Yahoo's transaction list mixes open-market purchases with stock awards,
+  option exercises, gifts and tax withholding. Counting a grant as "insider
+  buying" would turn routine compensation into a bullish signal and make the
+  whole dimension noise.
+</Warning>
+
+Only genuine purchases and sales are counted. Everything else is tallied
+separately and reported as excluded, so the exclusion is visible rather than
+silent. `test_insiders.py` asserts this for stock awards, option exercises,
+gifts and tax-liability payments individually.
+
+## Distinct insiders, not transactions
+
+One executive buying twice is *one* person with a view, not two. The summary
+counts distinct names on each side, because three different insiders buying is
+a materially different fact from one insider buying three times.
+
+## Nothing happening is not nothing available
+
+An empty transaction list and a failed fetch would look identical if both
+rendered as silence, so they are kept apart:
+
+| Situation | What the prompt says |
+|---|---|
+| Source returned no transactions | `No insider transactions reported in the last 180 days.` |
+| Source failed | `INSIDER ACTIVITY` → `unavailable this cycle`, plus a named gap |
+
+The model is told in the system prompt to treat "no transactions" as exactly
+that, rather than as bearish.
+
+## Windowing
+
+Individual transactions are filtered to the last 180 days — matching the six
+months yfinance's own rollup covers — and shown newest first, capped at four
+per side. `WINDOW_DAYS` is a module constant.
+
+## Where it sits in the pipeline
+
+Insider data changes daily at most, so it rides the existing six-hour cache in
+`context.py` alongside fundamentals and the analyst view. Unlike those two it
+does **not** come from the `info` dict, so it is built independently: a ticker
+whose `info` fetch failed can still have an insider section.
+
+<Note>
+  If the scorer shows this dimension carries signal but yfinance's version is
+  too thin or too stale, the upgrade path is SEC EDGAR — Form 4 filings at the
+  source, free and authoritative, needing only a User-Agent header. That is
+  real engineering (CIK mapping, XML parsing), which is why it was not the
+  starting point: [scoring the journal](/scoring) can now decide whether it is
+  worth it.
+</Note>
+
+<Card title="How it gets weighed" icon="scale-balanced" href="/orchestrator/market-context">
+  The other three enrichment sources, and the failure model they share.
+</Card>
