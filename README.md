@@ -8,9 +8,10 @@ webhook validates that shape (rejecting anything else with a 422), and a
 pure-Python risk engine does 100% of the sizing, stop-loss, and Alpaca
 paper-trade execution.
 
-**Full documentation:** the [`docs/`](docs/) directory is a
-[Mintlify](https://mintlify.com) site — run `cd docs && npx mintlify dev` for
-a local preview, or read the `.mdx` files directly on GitHub starting from
+**Full documentation:** **[algotrade.mintlify.site](https://algotrade.mintlify.site/)**
+— built from the [`docs/`](docs/) directory, auto-deployed on every push to
+`main`. For a local preview instead, run `cd docs && npx mintlify dev`, or
+read the `.mdx` files directly on GitHub starting from
 [`docs/index.mdx`](docs/index.mdx).
 
 ## Directory structure
