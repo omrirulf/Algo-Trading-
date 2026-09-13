@@ -96,7 +96,11 @@ jobs:
             echo "::error::found a paper= argument that is not the literal True"
             exit 1
           fi
-          echo "OK: paper=True is hard-coded"
+          if ! grep -q 'live_trade' app/broker_client.py; then
+            echo "::error::the live-profile refusal is gone from broker_client.py"
+            exit 1
+          fi
+          echo "OK: paper=True is hard-coded and live CLI profiles are refused"
 
       - name: Guardrail thresholds are not environment-overridable
         # The whole point of config/settings.py is that MAX_POSITION_PCT and

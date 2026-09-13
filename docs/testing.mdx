@@ -1,6 +1,6 @@
 ---
 title: "Testing"
-description: "360 tests, zero network calls, zero credentials"
+description: "386 tests, zero network calls, zero credentials"
 ---
 
 ```bash
@@ -38,19 +38,28 @@ so the suite never writes into the repository's `logs/` directory.
 
 ## Ambient credentials are removed, not hoped against
 
-A second autouse fixture strips `BRIGHTDATA_API_TOKEN` and `BRIGHTDATA_API_KEY`
-from the environment and neutralises discovery of the Bright Data CLI's
-credential file:
+A second autouse fixture strips every credential that could be sitting on the
+machine running the suite, and neutralises discovery of both CLIs' stored
+logins:
 
 ```python
 monkeypatch.delenv(news.CLI_ENV_VAR, raising=False)
 monkeypatch.delenv("BRIGHTDATA_API_TOKEN", raising=False)
 monkeypatch.setattr(news, "cli_credential_paths", list)
+
+monkeypatch.delenv("ALPACA_API_KEY", raising=False)
+monkeypatch.delenv("ALPACA_SECRET_KEY", raising=False)
+monkeypatch.delenv(broker_client.CLI_PROFILE_ENV, raising=False)
+monkeypatch.setenv(broker_client.CLI_CONFIG_DIR_ENV, "/nonexistent/alpaca-config")
 ```
 
-Without it, a developer who had run `brightdata login` would have a real token
-sitting on disk that the "missing credentials" tests would quietly find —
-passing locally, failing in CI, or worse, reaching the network. The same
+Without it, a developer who had run `brightdata login` or `alpaca profile
+login` would have a real credential on disk that the "missing credentials"
+tests would quietly find — passing locally, failing in CI, or worse, reaching
+the network. The Alpaca case is the one that matters most, since a real profile
+could carry a live-trading bundle. Pointing `ALPACA_CONFIG_DIR` at a path that
+cannot exist is what keeps the lookup off `~/.config/alpaca`; tests that
+exercise the lookup point it at their own `tmp_path` instead. The same
 reasoning applies to `ANTHROPIC_API_KEY` in `test_llm.py`, which clears it per
 test. Tests that need the real path logic capture a reference at import time,
 before the fixture replaces it.
@@ -62,6 +71,7 @@ before the fixture replaces it.
 | `test_risk_engine.py` | 34 | The 5% cap holds pre- and post-rounding, existing exposure is counted, fractional shares are never returned, stop math is correct for both long and short, ATR-sanity rejects degenerate data. |
 | `test_schemas.py` | 65 | `LLMSignal` rejects extra fields, enforces every bound (conviction range, ticker pattern, rationale length, the `[-1, 1]` score ranges, the six-item `key_factors` cap), and normalizes tickers to uppercase. |
 | `test_market_data.py` | 6 | The Wilder ATR implementation matches a reference calculation, including gap and NaN handling. |
+| `test_broker_client.py` | 26 | Alpaca credential resolution: settings before the CLI profile, an OAuth token before stored keys, half a key pair rejected rather than sent, every malformed-profile shape degrading, the credential never reaching the logs, and — proved to fail without the guard — that a profile marked `live_trade: true` is refused instead of borrowed. |
 | `test_execution_engine.py` | 19 | The full nine-step decision path, every guardrail gate, and that broker/market-data errors become `ERROR` results rather than exceptions. |
 | `test_webhook.py` | 12 | HTTP auth (401 on a bad secret), 422 on smuggled fields, that importing `app.main` needs no credentials, and correct handling of rejections. |
 | `test_heartbeat.py` | 18 | The orchestrator can only ever send the closed signal shape; news failures skip the ticker while context gaps do not; missing credentials are logged per-ticker without killing the scheduler. |

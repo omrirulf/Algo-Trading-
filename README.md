@@ -86,6 +86,42 @@ pip install -r requirements.txt
 cp .env.example .env   # fill in your Alpaca paper keys + a random webhook secret
 ```
 
+### Broker (Alpaca paper)
+
+Copy a **paper** key pair from the
+[Alpaca paper dashboard](https://app.alpaca.markets/paper/dashboard/overview)
+into `ALPACA_API_KEY` / `ALPACA_SECRET_KEY`.
+
+**Or use the CLI instead of copying keys.** The official
+[Alpaca CLI](https://github.com/alpacahq/cli) authenticates over OAuth and
+stores a profile in `~/.config/alpaca/profiles/` at `0600`:
+
+```bash
+alpaca profile login    # browser OAuth; paper by default
+# leave ALPACA_API_KEY / ALPACA_SECRET_KEY blank in .env
+```
+
+Credentials resolve as an **atomic bundle** — a key from one source is never
+paired with a secret from another — in the order `ALPACA_API_KEY` +
+`ALPACA_SECRET_KEY` → the profile's OAuth `access_token` → the profile's
+stored `api_key` + `secret_key`. Setting only one half of the env pair is an
+error rather than a silent fallthrough. `ALPACA_PROFILE` picks the profile;
+`ALPACA_CONFIG_DIR` moves the directory.
+
+> **A profile marked `live_trade: true` is refused, not used.** This system is
+> paper-only, and borrowing a live bundle would point real money at a strategy
+> whose entire safety argument is that it cannot reach a live endpoint. The
+> refusal names the profile and the ways out, rather than reporting "no
+> credentials found" on a machine that plainly has some. It is belt-and-braces
+> anyway: `paper=True` is hard-coded, and the SDK pins its base URL to the
+> paper endpoint from that flag alone. CI checks for both.
+
+<sub>Unlike the Bright Data lookup, this one is **verified against the CLI's
+source** (`alpacahq/cli`, `internal/config/config.go`), not guessed: YAML at
+`<config dir>/profiles/<name>.yaml`, fields `api_key`, `secret_key`,
+`access_token`, `scopes`, `live_trade`, and a config directory of
+`$ALPACA_CONFIG_DIR` or `~/.config/alpaca` on every platform.</sub>
+
 ### News feed (Bright Data)
 
 The orchestrator pulls the last 24 hours of Google News headlines for each
