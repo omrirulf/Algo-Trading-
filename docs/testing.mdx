@@ -1,6 +1,6 @@
 ---
 title: "Testing"
-description: "335 tests, zero network calls, zero credentials"
+description: "361 tests, zero network calls, zero credentials"
 ---
 
 ```bash
@@ -44,6 +44,7 @@ so the suite never writes into the repository's `logs/` directory.
 | `test_schemas.py` | 65 | `LLMSignal` rejects extra fields, enforces every bound (conviction range, ticker pattern, rationale length, the `[-1, 1]` score ranges, the six-item `key_factors` cap), and normalizes tickers to uppercase. |
 | `test_market_data.py` | 6 | The Wilder ATR implementation matches a reference calculation, including gap and NaN handling. |
 | `test_execution_engine.py` | 19 | The full nine-step decision path, every guardrail gate, and that broker/market-data errors become `ERROR` results rather than exceptions. |
+| `test_order_idempotency.py` | 26 | That a retried submit cannot become a second position: the id is stable within a heartbeat window and distinct across ticker, side and window; a duplicate rejection is recognised while an ordinary failure is not; and a suppressed duplicate is reported `REJECTED`, never `ERROR`. Both halves were proved load-bearing by removal. |
 | `test_webhook.py` | 12 | HTTP auth (401 on a bad secret), 422 on smuggled fields, that importing `app.main` needs no credentials, and correct handling of rejections. |
 | `test_heartbeat.py` | 18 | The orchestrator can only ever send the closed signal shape; news failures skip the ticker while context gaps do not; missing credentials are logged per-ticker without killing the scheduler. |
 | `test_news.py` | 19 | Bright Data request shape, response parsing (including the wrapped and fallback-key shapes), and every `NewsFetchError` condition. |

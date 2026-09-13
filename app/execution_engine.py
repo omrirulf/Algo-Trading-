@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 
 from app import risk_engine
-from app.broker_client import BrokerClient, BrokerError, OpenPosition
+from app.broker_client import BrokerClient, BrokerError, DuplicateOrderError, OpenPosition
 from app.logger import log_execution
 from app.market_data import MarketDataError, MarketDataProvider
 from app.schemas import Bias, ExecutionResult, ExecutionStatus, LLMSignal
@@ -35,6 +35,14 @@ class ExecutionEngine:
         """Run every guardrail and, if all pass, submit one stop-protected order."""
         try:
             result = self._execute(signal)
+        except DuplicateOrderError as exc:
+            # Deliberately REJECTED, not ERROR. The order exists -- this is the
+            # idempotency key doing its job. Reporting it as an error would
+            # invite exactly the retry the key was added to make harmless, and
+            # would pollute the audit log's error rate with a working guardrail.
+            result = self._result(
+                signal, ExecutionStatus.REJECTED, f"duplicate order suppressed: {exc}"
+            )
         except (BrokerError, MarketDataError, risk_engine.RiskViolation) as exc:
             result = self._result(signal, ExecutionStatus.ERROR, f"{type(exc).__name__}: {exc}")
         except Exception as exc:  # noqa: BLE001 - never let a bug submit an order
