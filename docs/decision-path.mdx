@@ -9,6 +9,16 @@ any broker, market-data, or risk-math exception becomes an `ERROR` result.
 Neither path ever raises out of `execute()` — see
 [the safety net](#nothing-ever-raises) at the bottom of this page.
 
+<Note>
+  **Two fields decide everything: `bias` and `conviction`.** A signal now also
+  carries `news_score`, `technical_score`, `fundamental_score`,
+  `analyst_score` and `key_factors`, but not one of them appears anywhere
+  below — they are recorded for later evaluation and read by nothing in
+  `execution_engine.py` or `risk_engine.py`. A CI grep over those modules
+  fails the build if that stops being true, so the decision path is exactly
+  as wide as it was before the model started explaining itself.
+</Note>
+
 <Steps>
   <Step title="NEUTRAL means do nothing">
     `NEUTRAL` is a valid, honest thing for the LLM to say — it isn't an
@@ -19,7 +29,11 @@ Neither path ever raises out of `execute()` — see
     Checked before any network I/O, because it's free.
     `signal.conviction >= MIN_CONVICTION` (0.60). This is also why the
     orchestrator's system prompt asks Claude to calibrate conviction
-    honestly — a model that always answers 0.9 makes this gate meaningless.
+    honestly — a model that always answers 0.9 makes this gate meaningless,
+    and a model handed four kinds of context instead of one has more ways to
+    talk itself into a high number. The prompt is explicit that conviction
+    must *fall* when dimensions disagree; see
+    [Market Context](/orchestrator/market-context).
   </Step>
   <Step title="Fetch account state">
     `broker.get_equity()` and `broker.get_open_positions()`. First real

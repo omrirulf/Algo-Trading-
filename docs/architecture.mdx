@@ -41,15 +41,27 @@ algo-trading-system/
 │   ├── execution_engine.py     # validate -> size -> stop -> submit
 │   └── logger.py               # JSON audit log
 ├── orchestrator/                # the signal producer — no broker keys
-│   ├── heartbeat.py             # hourly job: news -> LLM -> POST
+│   ├── heartbeat.py             # hourly job: context -> LLM -> POST -> journal
 │   ├── news.py                  # Bright Data SERP API (Google News)
+│   ├── context.py               # the ONLY module that touches yfinance
+│   ├── technicals.py            # pure parsing: trend, momentum, volatility
+│   ├── fundamentals.py          # pure parsing: valuation, growth, balance sheet
+│   ├── analysts.py              # pure parsing: ratings, targets, ownership
+│   ├── formatting.py            # number formatting; missing renders as `n/a`
+│   ├── journal.py               # what the model saw -> logs/signal_journal.log
 │   └── llm.py                   # Claude call, schema-constrained
-└── tests/                       # 175 tests, no network, no credentials
+└── tests/                       # 261 tests, no network, no credentials
 ```
+
+The four market-context modules are split that way on purpose: `context.py`
+does all the fetching and caching, and hands raw payloads to three pure
+parsers that take a DataFrame or a dict and return plain data. That is what
+lets every degradation path be tested offline — see
+[Market Context](/orchestrator/market-context).
 
 ## Module-level isolation, not just convention
 
-Three isolation rules are enforced by CI on every push (see
+Five isolation rules are enforced by CI on every push (see
 [Continuous Integration](/continuous-integration)), not just documented:
 
 <AccordionGroup>
@@ -70,6 +82,21 @@ Three isolation rules are enforced by CI on every push (see
     first request, via `@lru_cache`. This is what lets the test suite import
     `app.main` and hit `app.openapi()` with zero environment variables set —
     CI does exactly that as a check.
+  </Accordion>
+  <Accordion title="The market-context modules read no credentials at all">
+    yfinance is unauthenticated, so `context.py`, `technicals.py`,
+    `fundamentals.py` and `analysts.py` have no reason to touch a setting, a
+    key or a token — and a CI grep for credential reads (a settings lookup,
+    an environment read, or attribute access on a `secret` / `api_key` /
+    `_token` / `password` name) across those four files keeps it that way. The enriched context adds no
+    new secret to the process sitting closest to the LLM.
+  </Accordion>
+  <Accordion title="The LLM's transparency fields never reach the decision path">
+    `LLMSignal` carries four per-dimension scores and `key_factors` so a call
+    can be audited later. A CI grep over `app/execution_engine.py`,
+    `app/risk_engine.py` and `app/broker_client.py` fails the build if any of
+    those five names appears there: only `bias` and `conviction` may move
+    money.
   </Accordion>
 </AccordionGroup>
 
@@ -93,8 +120,10 @@ rejections and broker errors — without a single network call.
 
 | Layer | Knows about | Never sees |
 |---|---|---|
-| `orchestrator/llm.py` | Headlines, the `LLMSignal` JSON schema | Alpaca keys, position sizing, stop math |
+| `orchestrator/context.py` | yfinance, one ticker at a time | Any credential — it reads none |
+| `orchestrator/llm.py` | The assembled prompt, the `LLMSignal` JSON schema | Alpaca keys, position sizing, stop math |
 | `orchestrator/heartbeat.py` | The webhook URL and shared secret | Alpaca keys |
+| `orchestrator/journal.py` | The full context, the signal, the engine's reply | Alpaca keys; anything it writes is a record, never an instruction |
 | `app/main.py` | `LLMSignal`, the webhook secret | — (delegates immediately to the engine) |
-| `app/execution_engine.py` | Guardrail constants, broker/market-data interfaces | The LLM's rationale (logged only, never parsed) |
+| `app/execution_engine.py` | Guardrail constants, broker/market-data interfaces | The rationale, the scores and `key_factors` (logged only, never read) |
 | `app/broker_client.py` | Alpaca keys, `paper=True` | — (the only module that needs to know) |

@@ -7,9 +7,12 @@ This system splits trading into two halves that are not allowed to talk to
 each other except through one narrow, validated message:
 
 <Steps>
-  <Step title="An LLM reads the news">
-    Claude looks at recent headlines for a ticker and produces exactly one
-    thing: `{ticker, bias, conviction, rationale}`. It has no concept of
+  <Step title="An LLM reads the evidence">
+    Claude is handed four kinds of context for a ticker — recent headlines,
+    technicals, fundamentals, and the analyst/institutional view (see
+    [Market Context](/orchestrator/market-context)) — and produces exactly
+    one thing: an `LLMSignal`. Its whole vocabulary is a direction, a
+    confidence, and an explanation of how it got there. It has no concept of
     position size, price, or order type — it cannot have that concept,
     because the schema it is constrained to doesn't include those fields.
   </Step>
@@ -36,8 +39,10 @@ directly.
 
 <CardGroup cols={2}>
   <Card title="The LLM's entire vocabulary" icon="message">
-    `ticker`, `bias` (BULLISH / BEARISH / NEUTRAL), `conviction` (0–1), and a
-    free-text `rationale` that is logged but never parsed for instructions.
+    `ticker`, `bias` (BULLISH / BEARISH / NEUTRAL), `conviction` (0–1), a
+    free-text `rationale` that is logged but never parsed for instructions,
+    and — for transparency only — a per-dimension score for each of the four
+    inputs plus up to six `key_factors`.
   </Card>
   <Card title="What the LLM can never say" icon="ban">
     Quantity, price, order type, stop distance, leverage — any of it. There
@@ -45,6 +50,15 @@ directly.
     before any execution code runs.
   </Card>
 </CardGroup>
+
+<Note>
+  Widening what the model may *say* is only safe while the extra words stay
+  **inert**. `news_score`, `technical_score`, `fundamental_score`,
+  `analyst_score` and `key_factors` are recorded in the
+  [signal journal](/orchestrator/journal) and never read by
+  `execution_engine.py` or `risk_engine.py` — only `bias` and `conviction`
+  reach a decision, and a CI grep fails the build if that ever changes.
+</Note>
 
 ## What's actually enforced, not just documented
 

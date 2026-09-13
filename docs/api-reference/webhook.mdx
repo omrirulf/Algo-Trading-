@@ -31,14 +31,56 @@ surface area through which a signal can reach the execution engine.
   instructions.
 </ParamField>
 
+Those four are the only **required** fields, and they are the only fields
+that existed before the model started receiving
+[market context](/orchestrator/market-context). Five more are now accepted,
+all optional and all inert.
+
+<ParamField body="news_score" type="number">
+  `-1.0`–`1.0`. The model's read on the recent news: −1 maximally bearish,
+  `0.0` neutral **or unknown**, +1 maximally bullish.
+</ParamField>
+
+<ParamField body="technical_score" type="number">
+  `-1.0`–`1.0`. Read on trend, momentum and volatility.
+</ParamField>
+
+<ParamField body="fundamental_score" type="number">
+  `-1.0`–`1.0`. Read on valuation, growth and the balance sheet.
+</ParamField>
+
+<ParamField body="analyst_score" type="number">
+  `-1.0`–`1.0`. Read on analyst consensus, price targets and ownership.
+</ParamField>
+
+<ParamField body="key_factors" type="string[]">
+  Up to 6 entries, each 1–200 characters: the specific facts that drove the
+  call, as short standalone phrases. Defaults to `[]`.
+</ParamField>
+
+<Note>
+  **Optional, and inert.** A payload carrying only the original four fields
+  validates exactly as it always did — the `curl` below is unchanged. And a
+  payload carrying all nine changes nothing about what happens next: neither
+  `execution_engine.py` nor `risk_engine.py` reads any of the five, so only
+  `bias` and `conviction` reach a decision. They are recorded, in the
+  [signal journal](/orchestrator/journal) and the audit log, for evaluating
+  the model after the fact.
+
+  The orchestrator is held to a stricter standard than the webhook is:
+  `orchestrator/llm.py` marks *every* property required in the schema it
+  hands the model, so Claude must answer on all four dimensions. See
+  [LLM Signals](/orchestrator/llm).
+</Note>
+
 <Warning>
-  Any field beyond these four — `quantity`, `price`, `stop_price`,
+  Any field beyond these nine — `quantity`, `price`, `stop_price`,
   anything — is rejected with **422 Unprocessable Entity** before
   `ExecutionEngine.execute()` is ever called. This is `LLMSignal`'s
   `extra="forbid"` config, not application-level filtering.
 </Warning>
 
-### Example request
+### Example request — the minimum that validates
 
 ```bash
 curl -X POST http://localhost:8000/webhook/signal \
@@ -51,6 +93,28 @@ curl -X POST http://localhost:8000/webhook/signal \
     "rationale": "Strong earnings beat"
   }'
 ```
+
+### Example request — what the orchestrator actually sends
+
+```bash
+curl -X POST http://localhost:8000/webhook/signal \
+  -H "Content-Type: application/json" \
+  -H "x-webhook-secret: <your WEBHOOK_SHARED_SECRET>" \
+  -d '{
+    "ticker": "AAPL",
+    "bias": "BULLISH",
+    "conviction": 0.72,
+    "rationale": "Guidance raise corroborated by an uptrend and a fresh upgrade.",
+    "news_score": 0.8,
+    "technical_score": 0.5,
+    "fundamental_score": 0.1,
+    "analyst_score": 0.6,
+    "key_factors": ["Guidance raised 20%", "Price above the 200-day average"]
+  }'
+```
+
+Both produce the same `ExecutionResult` shape, and both are subject to the
+same nine gates.
 
 ### Response — `ExecutionResult`
 

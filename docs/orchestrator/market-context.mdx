@@ -110,7 +110,7 @@ None of the four context modules reads a setting, a key or a token, and CI
 greps them to keep it that way:
 
 ```bash
-grep -rnE '(get_settings|api_key|secret|token)' \
+grep -rnE '(get_settings|os\.environ|getenv|\bsettings\.|\.[A-Za-z_]*(secret|api_key|_token|password)\b)' \
   orchestrator/context.py orchestrator/technicals.py \
   orchestrator/fundamentals.py orchestrator/analysts.py
 ```

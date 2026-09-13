@@ -18,15 +18,28 @@ product. These are the honest gaps.
     stop-loss attached at entry. A signal opposing an existing position is
     rejected rather than flipping it — see [Decision Path](/decision-path).
   </Card>
-  <Card title="Conviction calibration is unmeasured" icon="gauge">
-    The prompt asks Claude to calibrate conviction honestly, but nothing
-    checks that it does. If it drifts toward always-high, the 0.60 floor
-    stops filtering anything. Log a few weeks of paper decisions and check
-    whether high-conviction calls actually did better.
+  <Card title="Signal quality is recorded, not yet scored" icon="gauge">
+    The [signal journal](/orchestrator/journal) now captures the full context,
+    the per-dimension scores and the conviction behind every call — but
+    nothing reads it back. Until something joins those lines to realised
+    forward returns, "are the signals any good?" is answerable in principle
+    and unanswered in practice.
   </Card>
-  <Card title="No persistence beyond the log file" icon="database">
-    `logs/execution_audit.log` is the only record. Consider a database for
-    querying trade history once you have more than a few days of it.
+  <Card title="No persistence beyond the log files" icon="database">
+    Two append-only JSON-lines files, `logs/execution_audit.log` and
+    `logs/signal_journal.log`, are the whole record. Fine for `grep` and a
+    pandas one-liner; consider a database once you have more than a few weeks
+    of it.
+  </Card>
+  <Card title="Only three context sources" icon="layer-group">
+    News, price history and the sell-side/ownership view. Insider activity —
+    Form 4 filings — is the obvious fourth, and unlike the current three it
+    would need a new API key and a new per-request cost.
+  </Card>
+  <Card title="Context is fetched serially" icon="hourglass">
+    `context.py` fetches each source one after another, and the sources are
+    independent. On the default three-ticker watchlist nobody notices; on a
+    longer one this becomes the slowest part of a cycle.
   </Card>
 </CardGroup>
 
@@ -42,14 +55,35 @@ product. These are the honest gaps.
     `execution_engine.py` — deliberately scoped out of the initial build so
     the guardrail surface stayed small enough to fully test.
   </Step>
-  <Step title="Measure signal quality">
-    Persist `ExecutionResult` rows with enough context to later ask: did
-    conviction actually correlate with outcome?
+  <Step title="Score the journal against realised returns">
+    The clear next piece of work. Read `logs/signal_journal.log`, join each
+    line to the ticker's forward return over the following few days, and
+    answer the questions the journal was built to make answerable: did
+    high-conviction calls outperform low-conviction ones, which
+    per-dimension score actually correlates with the move, and did
+    conviction fall when the dimensions disagreed the way the prompt
+    demands? The data is already being written; nothing reads it yet.
+  </Step>
+  <Step title="Add insider transactions as a fourth source">
+    Form 4 filings are the one obvious dimension the current three miss. Note
+    the cost: every existing source is either already paid for or
+    unauthenticated, and this one would introduce a new API key — so it also
+    introduces a module that the "market context carries no credentials" CI
+    grep can no longer cover.
+  </Step>
+  <Step title="Fetch the context sources concurrently">
+    `context.py` fetches price history, fundamentals, the calendar,
+    recommendations, upgrades and holders one at a time. They are
+    independent, and the degradation model already treats each failure
+    separately, so a thread pool would shorten a cycle without changing the
+    semantics. Worth doing before the watchlist grows, not after.
   </Step>
   <Step title="Widen the watchlist thoughtfully">
     Each ticker is one Bright Data request and one Claude call per cycle —
     check both providers' usage pages before scaling `WATCHLIST` up
-    significantly.
+    significantly. The yfinance enrichment costs nothing per request, but it
+    is rate-limited and unauthenticated, which is why the slow-moving parts
+    are cached for six hours.
   </Step>
 </Steps>
 
