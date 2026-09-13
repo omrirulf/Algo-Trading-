@@ -1,0 +1,69 @@
+"""Per-cycle record of what the analyst saw and what it concluded.
+
+The execution audit log (``app/logger.py``) answers "what did the engine do
+with this signal". This answers the question you actually need in order to
+tell whether the signals are any good: *what was in front of the model when it
+said that*, and did the confident calls turn out better than the timid ones.
+
+One JSON object per ticker per cycle, written from the orchestrator side.
+Journalling is best-effort -- a failure to write a line must never take down
+the cycle that produced it.
+"""
+
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+from typing import Any, Optional
+
+from pythonjsonlogger import jsonlogger
+
+from app.schemas import LLMSignal
+from config import settings as cfg
+from orchestrator.context import TickerContext
+
+log = logging.getLogger(__name__)
+
+_JOURNAL_LOGGER_NAME = "signal_journal"
+
+
+def get_journal_logger(path: Path = cfg.SIGNAL_JOURNAL_PATH) -> logging.Logger:
+    """Return the journal logger, creating the file handler on first use."""
+    logger = logging.getLogger(_JOURNAL_LOGGER_NAME)
+    if logger.handlers:
+        return logger
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    handler = logging.FileHandler(path, encoding="utf-8")
+    handler.setFormatter(
+        jsonlogger.JsonFormatter(
+            "%(asctime)s %(levelname)s %(message)s",
+            rename_fields={"asctime": "ts", "levelname": "level", "message": "event"},
+        )
+    )
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+    return logger
+
+
+def record(
+    context: TickerContext,
+    signal: Optional[LLMSignal] = None,
+    outcome: Optional[dict[str, Any]] = None,
+    error: Optional[str] = None,
+) -> None:
+    """Write one journal line. Swallows its own failures by design."""
+    try:
+        get_journal_logger().info(
+            "signal_generated",
+            extra={
+                "ticker": context.ticker,
+                "context": context.as_dict(),
+                "signal": signal.model_dump(mode="json") if signal else None,
+                "outcome": outcome,
+                "error": error,
+            },
+        )
+    except Exception:  # noqa: BLE001 - journalling must not break the cycle
+        log.exception("failed to journal %s", context.ticker)

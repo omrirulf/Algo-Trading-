@@ -114,6 +114,35 @@ jobs:
           fi
           echo "OK: guardrail thresholds are Final constants"
 
+      - name: LLM transparency fields never reach the decision path
+        # The signal carries per-dimension scores and key_factors so a call can
+        # be audited later. Widening what the LLM may say is only safe while
+        # the extra words stay inert: bias and conviction are the only fields
+        # the engine may act on.
+        run: |
+          hits=$(grep -rnE '\b(news_score|technical_score|fundamental_score|analyst_score|key_factors)\b' \
+                   app/execution_engine.py app/risk_engine.py app/broker_client.py || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::a transparency field is referenced in the execution path"
+            exit 1
+          fi
+          echo "OK: scores and key_factors are inert"
+
+      - name: Market context carries no credentials
+        # yfinance is unauthenticated. If the enrichment modules ever start
+        # reading a secret, they stop being safe to run beside the LLM.
+        run: |
+          hits=$(grep -rnE '(get_settings|api_key|secret|token)' \
+                   orchestrator/context.py orchestrator/technicals.py \
+                   orchestrator/fundamentals.py orchestrator/analysts.py || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::market context modules must not read credentials"
+            exit 1
+          fi
+          echo "OK: market context needs no credentials"
+
       - name: No committed .env
         run: |
           if git ls-files --error-unmatch .env >/dev/null 2>&1; then

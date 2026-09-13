@@ -32,7 +32,9 @@
         "pages": [
           "orchestrator/overview",
           "orchestrator/news",
-          "orchestrator/llm"
+          "orchestrator/market-context",
+          "orchestrator/llm",
+          "orchestrator/journal"
         ]
       },
       {

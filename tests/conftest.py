@@ -40,6 +40,43 @@ class FakeMarketData:
 
 
 @pytest.fixture(autouse=True)
+def _offline_market_context(monkeypatch):
+    """No test may reach yfinance.
+
+    Enrichment returns an empty context with a stated gap, which is also the
+    shape a real outage produces -- so the default in every test is the
+    degraded path, and a test that wants real snapshots injects its own
+    provider.
+    """
+    from orchestrator import context as ctx
+
+    class OfflineProvider:
+        def fetch(self, ticker: str) -> ctx.RawMarketData:
+            return ctx.RawMarketData(gaps=["market context disabled in tests"])
+
+    # Replace the cached singleton rather than get_provider itself, so the
+    # lookup path stays the real one.
+    monkeypatch.setattr(ctx, "_provider", OfflineProvider())
+
+
+@pytest.fixture(autouse=True)
+def _journal_to_tmp(tmp_path, monkeypatch):
+    """Redirect the signal journal so tests never write into the repo's logs/ dir."""
+    import logging
+
+    from orchestrator import journal
+
+    path = tmp_path / "signal_journal.log"
+    monkeypatch.setattr(journal.cfg, "SIGNAL_JOURNAL_PATH", path, raising=True)
+    monkeypatch.setattr(journal, "get_journal_logger", lambda p=path: _fresh_logger(p, "signal_journal"))
+    yield path
+    lg = logging.getLogger("signal_journal")
+    for h in list(lg.handlers):
+        h.close()
+        lg.removeHandler(h)
+
+
+@pytest.fixture(autouse=True)
 def _audit_log_to_tmp(tmp_path, monkeypatch):
     """Redirect the audit log so tests never write into the repo's logs/ dir."""
     import logging
@@ -56,12 +93,12 @@ def _audit_log_to_tmp(tmp_path, monkeypatch):
         lg.removeHandler(h)
 
 
-def _fresh_logger(path):
+def _fresh_logger(path, name: str = "execution_audit"):
     import logging
 
     from pythonjsonlogger import jsonlogger
 
-    lg = logging.getLogger("execution_audit")
+    lg = logging.getLogger(name)
     if not any(getattr(h, "baseFilename", None) == str(path) for h in lg.handlers):
         for h in list(lg.handlers):
             h.close()

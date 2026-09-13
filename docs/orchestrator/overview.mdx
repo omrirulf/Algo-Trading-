@@ -21,6 +21,12 @@ For each ticker, `process_ticker()` runs a small pipeline:
     `fetch_news(ticker)` — see [News](/orchestrator/news). Up to 10
     de-duplicated headlines from the past 24 hours.
   </Step>
+  <Step title="Gather market context">
+    `context.gather(ticker, headlines)` — see
+    [Market Context](/orchestrator/market-context). Adds technicals,
+    fundamentals and the analyst/institutional view from yfinance. Never
+    raises: a source that fails becomes a named gap in the prompt.
+  </Step>
   <Step title="Ask Claude">
     `call_llm(SYSTEM_PROMPT, user_prompt, SIGNAL_JSON_SCHEMA)` — see
     [LLM Signals](/orchestrator/llm). Returns a JSON string constrained to
@@ -40,14 +46,20 @@ For each ticker, `process_ticker()` runs a small pipeline:
     `post_signal()` sends `signal.model_dump(mode="json")` with the
     `x-webhook-secret` header. Nothing else is in the request body.
   </Step>
+  <Step title="Journal the cycle">
+    `journal.record()` writes the full context, the signal and the engine's
+    response to `logs/signal_journal.log` — see
+    [Signal Journal](/orchestrator/journal). Cycles that produced *no* signal
+    are recorded too, with the reason.
+  </Step>
 </Steps>
 
 ## No credentials, structurally
 
 ```python
-"""This process knows nothing about position sizing, stops, or the broker.
-It has no Alpaca keys. All it can do is send
-{ticker, bias, conviction, rationale} to the webhook..."""
+"""This process knows nothing about position sizing, stops, or the broker. It
+has no Alpaca keys. All it can do is send a signal to the webhook, and the
+webhook will 422 anything outside LLMSignal."""
 ```
 
 That's not just a comment — CI greps this module (along with everything
@@ -58,25 +70,40 @@ fails the build if it finds either. See
 ## Every failure mode is caught per-ticker
 
 `process_ticker()` catches everything that can go wrong with one ticker's
-news, LLM call, or POST, logs it, and moves on to the next ticker — a bad
-Bright Data response or an LLM refusal for `AAPL` never stops `MSFT` and
-`NVDA` from running in the same cycle:
+news, market data, LLM call, or POST, logs it, and moves on to the next
+ticker — a bad Bright Data response or an LLM refusal for `AAPL` never stops
+`MSFT` and `NVDA` from running in the same cycle.
+
+Within that, the two data sources fail **differently**, and the difference is
+deliberate:
+
+<CardGroup cols={2}>
+  <Card title="Enrichment down → degrade" icon="triangle-exclamation">
+    A yfinance outage costs the extra context, not the cycle. The gaps are
+    named in the prompt, the model is told to score those dimensions `0.0`,
+    and a warning is logged.
+  </Card>
+  <Card title="News down → skip the ticker" icon="ban">
+    News is the input the strategy was designed around. Continuing on
+    technicals alone would quietly be running a different strategy than the
+    one under test, so the ticker is skipped instead.
+  </Card>
+</CardGroup>
 
 ```python
 try:
-    headlines = fetch_news(ticker)
-    raw = call_llm(SYSTEM_PROMPT, build_user_prompt(ticker, headlines), SIGNAL_JSON_SCHEMA)
-    signal = parse_signal(raw)
-except (NotImplementedError, NewsFetchError, LLMError) as exc:
+    ticker_context = build_context(ticker)      # news (fatal) + enrichment (degrades)
+except (NotImplementedError, NewsFetchError) as exc:
     log.error("%s: %s", ticker, exc)
     return
-except (json.JSONDecodeError, ValidationError) as exc:
-    log.error("%s: LLM output rejected before sending: %s", ticker, exc)
-    return
-except Exception:
-    log.exception("%s: failed to produce a signal", ticker)
-    return
+
+if ticker_context.gaps:
+    log.warning("%s: context gaps: %s", ticker, "; ".join(ticker_context.gaps))
 ```
+
+Everything after that point — an LLM refusal, malformed JSON, an answer about
+the wrong ticker, an unreachable webhook — is caught, logged, **and
+journalled** with the context that produced it.
 
 ## The schema can't drift from the validator
 
@@ -88,6 +115,12 @@ This is generated from the exact same Pydantic model the webhook validates
 incoming requests against. There's no second, hand-maintained schema
 definition anywhere that could fall out of sync with what the webhook
 actually accepts.
+
+The schema is also *stricter* on the way out than on the way in: every
+property is marked required for the model, while the webhook still accepts a
+payload carrying only the original four fields. A model handed four kinds of
+context has no excuse for declining to report its read on any of them; a
+human posting a signal by hand with `curl` should not have to invent scores.
 
 <Card title="Next: how headlines get fetched" icon="newspaper" href="/orchestrator/news">
   Bright Data's SERP API, request shape, and every failure mode.

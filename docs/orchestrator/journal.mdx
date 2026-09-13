@@ -1,0 +1,72 @@
+---
+title: "Signal Journal"
+description: "What the model saw, what it concluded, and what the engine did about it"
+---
+
+There are two logs, and they answer different questions.
+
+| Log | Written by | Answers |
+|---|---|---|
+| `logs/execution_audit.log` | `app/logger.py` | What did the engine *do* with this signal? |
+| `logs/signal_journal.log` | `orchestrator/journal.py` | What was in front of the model when it said that? |
+
+The audit log is the compliance record. The journal is the one you need in
+order to answer the question the README has always raised and never been able
+to settle: **are the signals any good?**
+
+## One JSON object per ticker per cycle
+
+```json
+{
+  "ts": "2026-09-13 14:00:02,331",
+  "event": "signal_generated",
+  "ticker": "NVDA",
+  "context": {
+    "headlines": ["Chipmaker raises guidance — revenue seen up 20% (Reuters, 2h ago)"],
+    "technicals": { "rsi14": 61.2, "distance_sma200": 0.128, "...": "..." },
+    "fundamentals": { "trailing_pe": 34.2, "revenue_growth": 0.061, "...": "..." },
+    "analysts": { "recommendation": "buy", "target_upside": 0.13, "...": "..." },
+    "gaps": []
+  },
+  "signal": {
+    "ticker": "NVDA", "bias": "BULLISH", "conviction": 0.72,
+    "rationale": "Guidance raise corroborated by an uptrend and a fresh upgrade.",
+    "news_score": 0.8, "technical_score": 0.5,
+    "fundamental_score": 0.1, "analyst_score": 0.6,
+    "key_factors": ["Guidance raised 20%", "Price above the 200-day average"]
+  },
+  "outcome": { "http_status": 200, "status": "ACCEPTED", "quantity": 50, "order_id": "..." },
+  "error": null
+}
+```
+
+## Why the whole context is stored
+
+The per-dimension scores are only useful next to the data that produced them.
+With both, questions that were previously unanswerable become a query over a
+log file:
+
+- Did high-conviction calls actually outperform low-conviction ones?
+- Is `conviction` drifting upward over time, until the floor stops filtering
+  anything?
+- Which dimension's score correlates with the realised move — and which is
+  just noise the model likes to quote?
+- When `news_score` and `technical_score` disagreed, did conviction actually
+  fall, the way the prompt demands?
+
+## Cycles that produced no signal are journalled too
+
+A refusal, a malformed response, an unreachable webhook, or an answer about
+the wrong ticker all write a line with `signal: null` and the reason in
+`error`. Those are exactly the cycles worth reviewing, and they would be
+invisible in the execution audit log — the engine never saw them.
+
+## Journalling never breaks a cycle
+
+`journal.record()` catches its own failures and logs them. A full disk costs
+you a record; it does not cost you the signal that was already on its way to
+the engine.
+
+<Card title="Next: the guardrails" icon="shield" href="/guardrails">
+  Where each guardrail is enforced, and why the new signal fields are inert.
+</Card>

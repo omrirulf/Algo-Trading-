@@ -62,6 +62,11 @@ PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parent.parent
 LOG_DIR: Final[Path] = PROJECT_ROOT / "logs"
 AUDIT_LOG_PATH: Final[Path] = LOG_DIR / "execution_audit.log"
 
+#: Orchestrator-side record of the context each signal was produced from, for
+#: judging signal quality after the fact. Separate from the execution audit:
+#: that one records what the engine did, this one records what the model saw.
+SIGNAL_JOURNAL_PATH: Final[Path] = LOG_DIR / "signal_journal.log"
+
 # --------------------------------------------------------------------------- #
 # Environment-backed settings (secrets & wiring only)
 # --------------------------------------------------------------------------- #
