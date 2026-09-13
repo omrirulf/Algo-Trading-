@@ -23,6 +23,7 @@ that last part works.
 | Max concurrent positions | `risk_engine.check_position_count_limit()`. |
 | Broker credentials never touch LLM-adjacent code | Only `app/broker_client.py` imports the Alpaca SDK or reads the keys — enforced by CI, not just by file layout. |
 | Paper trading only | `TradingClient(..., paper=True)` is a hard-coded literal in `broker_client.py`, and an Alpaca CLI profile marked `live_trade: true` is refused rather than used. |
+| A retried order cannot double a position | `broker_client.build_client_order_id()` — one stable `client_order_id` per ticker, side and heartbeat window, so a submit Alpaca already accepted is refused rather than repeated. |
 | Full audit trail | `app/logger.py` → `logs/execution_audit.log`, every decision logged as JSON. |
 | The scorer cannot trade | CI greps `analysis/` for any order path (`submit_order`, `ExecutionEngine`, `post_signal`) or file write. It grades past decisions and must never be able to make one — see [Scoring](/scoring). |
 | Full record of what the model saw | `orchestrator/journal.py` → `logs/signal_journal.log`, one JSON line per ticker per cycle — including the cycles that produced no signal. |

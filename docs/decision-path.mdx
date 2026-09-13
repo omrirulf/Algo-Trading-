@@ -69,9 +69,59 @@ Neither path ever raises out of `execute()` — see
   <Step title="Submit">
     `broker.submit_bracket_order()`. This is the only step with side
     effects on the broker; every prior step is pure computation or a
-    read-only fetch.
+    read-only fetch. It carries a `client_order_id` that is stable for this
+    ticker, side and heartbeat window, so re-running the step cannot open a
+    second position — see below.
   </Step>
 </Steps>
+
+## The one step that can happen twice
+
+Every step before the submit is a pure computation or a read-only fetch, so
+re-running it is free. The submit is not: if Alpaca accepts the order and the
+response is lost in transit, the caller sees a failure for an order that
+actually exists. The next cycle would then produce the same signal and open a
+second position — one that was never sized against the 5% cap, because the cap
+was checked against the first order alone.
+
+`build_client_order_id()` closes that by deriving the id from the decision
+rather than from chance:
+
+```python
+window = int(moment.timestamp()) // IDEMPOTENCY_WINDOW_SECONDS
+return f"{ticker.upper()}-{side.lower()}-{window}"
+```
+
+A random id per call would give no protection at all — the retry would simply
+carry a different one. Because this id is stable, the second submission is a
+duplicate Alpaca refuses.
+
+<Note>
+  The window is `HEARTBEAT_INTERVAL_MINUTES`, not a hard-coded hour, so
+  changing the cadence moves the suppression window with it.
+</Note>
+
+<Warning>
+  **The trade-off, stated plainly:** a genuine second entry for the same ticker
+  and side inside one window is also refused. At the default hourly cadence the
+  pipeline produces at most one signal per ticker per cycle, so it should not
+  arise — and when the alternative is doubling a position, refusing a real
+  order is the safe direction to fail.
+</Warning>
+
+A refused duplicate raises `DuplicateOrderError`, and the engine reports it as
+**`REJECTED`, not `ERROR`**. The order exists; the guardrail worked. Calling it
+an error would invite exactly the retry the id was added to defuse, and would
+inflate the audit log's error rate with a mechanism doing its job.
+
+<Note>
+  Alpaca's exact wording for a duplicate `client_order_id` could not be
+  verified from the environment this was built in, so the match on its error
+  message is deliberately broad and **fails toward a plain `BrokerError`** — an
+  unrecognised message is reported as an ordinary submit failure rather than
+  being swallowed as a benign duplicate. Check the first live duplicate in
+  `logs/execution_audit.log` to confirm it is classified as `REJECTED`.
+</Note>
 
 ## Reading the code directly
 
