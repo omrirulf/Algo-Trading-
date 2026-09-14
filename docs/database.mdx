@@ -130,9 +130,9 @@ exactly why it has a boundary drawn around it. Four CI invariants hold it:
 `store/query.py` inherits the last one: an `UPDATE` typed into `--sql` comes
 back as `attempt to write a readonly database`.
 
-## When this stops being enough
+## The remote archive
 
-Honestly: when the journal outgrows git rather than when it outgrows `grep`.
+SQLite makes the logs queryable. It does not stop them having to live in git.
 
 The heartbeat commits the journal back to the repository after every cycle,
 because a discarded runner would otherwise lose it. At 35 tickers and roughly
@@ -140,15 +140,95 @@ seven cycles a session that is a few hundred lines a day, and journal lines
 carrying a full context run to several kilobytes each — order of tens of
 megabytes a month, permanently, because git history does not forget.
 
-SQLite does not fix that; it is an index over the same files. What fixes it is
-moving the *record* off git to a remote Postgres, at the cost of a credential
-in the cycle and a network call that must be allowed to fail without taking the
-cycle down. The schema here transfers essentially unchanged — two tables, a
-content-hash key, a JSON column — so that is a backend swap rather than a
-redesign.
+`store/push_remote.py` copies both logs to a Postgres database (Supabase), over
+PostgREST:
 
-Not yet. It is a real cost to add a network dependency to the thing that
-decides trades, and the files are readable from a phone today.
+```bash
+python store/push_remote.py --print-schema   # run this in the SQL editor once
+python store/push_remote.py                  # send what the remote is missing
+python store/push_remote.py --all            # backfill everything
+python store/push_remote.py --dry-run        # count, send nothing
+```
+
+Set `SUPABASE_URL` and `SUPABASE_SERVICE_KEY` to switch it on. Leave them unset
+and the push prints that there is no remote and exits 0 — not having one is a
+state, not a failure, so a repository that never configures this does not have
+a permanently red heartbeat.
+
+### It is never in the trading path
+
+The push is a workflow step *after* the journal is written and committed, not a
+call inside the cycle.
+
+<Note>
+  This is the property that makes a network dependency acceptable at all. A
+  failed push cannot cost a signal: the line is already on disk and already in
+  git, and the next push catches up on its own.
+</Note>
+
+Two CI invariants hold it there. `orchestrator/` may not import `store/` at
+all — checked by walking the AST, so the push cannot be called from a cycle by
+accident — and the Supabase key has exactly one reader, `store/remote.py`, the
+same rule the broker credential lives under.
+
+That is also why the push step in `heartbeat.yml` is allowed to fail loudly
+rather than being marked advisory. This repository has been bitten before by a
+check made non-blocking "just in case"; here the ordering means there is
+nothing to protect.
+
+### Catching up without a bookmark
+
+The runner is discarded after every cycle, so any local record of where the
+push left off would be wrong on the next one. Instead the push asks the remote
+for its newest `ts_utc` and sends everything at or after it.
+
+Inclusive at the boundary, deliberately: several rows share a timestamp, and an
+exclusive comparison would drop the siblings of whichever one happened to be
+newest. The overlap costs nothing, because `line_hash` is the remote primary
+key and the insert is `on conflict do nothing` — the same content hash that
+makes the local load idempotent.
+
+Rows with no timestamp are always sent. There is no honest way to place them
+against a watermark, and dropping them would quietly lose exactly the
+malformed cycles most worth reading.
+
+### Verbatim, and queryable
+
+`raw` is `text` remotely too, byte-for-byte as written. Storing it as `jsonb`
+would silently reformat the line — key order, whitespace, number rendering —
+and the archive's whole claim is that it kept what was written. A generated
+column carries the parsed form alongside:
+
+```sql
+select ticker, raw_json -> 'context' -> 'technicals' ->> 'rsi14' as rsi
+from signals order by ts_utc desc limit 20;
+```
+
+### Nobody can read it but you
+
+The tables run with row-level security **enabled and no policies**. That
+combination denies every request carrying the publishable key — the key that is
+safe to leak precisely because it should be able to do nothing here. The push
+uses the service-role key, which bypasses RLS and lives only in a GitHub
+Actions secret.
+
+The alternative — an insert-only policy for anon — would let anyone who read
+the publishable key append rows to the record of what this system decided. A
+journal that strangers can write to is not a journal.
+
+<Warning>
+  A Postgres view runs with the permissions of whoever **created** it unless
+  told otherwise. The first version of this schema created `decisions` without
+  `security_invoker`, and an anon-role probe read 0 rows from `signals` and 1
+  row from `decisions` — the tables closed, the view over them wide open. The
+  shipped schema sets `security_invoker = on`, and a test pins it.
+</Warning>
+
+## What is still true
+
+The local files remain the record. The remote is where the record goes to stop
+being git's problem; it is not a reason to stop writing the logs, and the
+scorer still reads them.
 
 <Card title="Next: scoring the journal" icon="gauge" href="/scoring">
   What the archive is for: whether conviction actually predicted the move.

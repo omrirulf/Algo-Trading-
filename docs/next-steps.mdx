@@ -35,14 +35,13 @@ product. These are the honest gaps.
     months rather than weeks of data behind it — but it does mean the loop is
     not closed.
   </Card>
-  <Card title="The record still lives in git" icon="database">
-    [The Archive](/database) indexes both log files into SQLite, so the
-    questions worth asking are a query rather than a parse. But the index is
-    *derived* — the JSON-lines files are still the record, and the heartbeat
-    still commits them back to the repository after every cycle. At 35 tickers
-    that is order of tens of megabytes a month that git will never forget.
-    Moving the record to a remote Postgres is the fix, at the cost of a
-    credential and a network call inside the cycle.
+  <Card title="Git still carries the journal" icon="database">
+    [The Archive](/database) now indexes both logs into SQLite *and* pushes
+    them to Postgres — but the heartbeat still commits the JSON-lines files
+    back to the repository, because they remain the record and the runner is
+    discarded. Once the remote has run long enough to be trusted, the commit
+    step could rotate or stop, and that is the change that actually stops git
+    growing. Not before: a remote you have never restored from is not a backup.
   </Card>
   <Card title="Insider data is only as good as yfinance's copy of it" icon="user-secret">
     [Insider activity](/orchestrator/insiders) comes from Yahoo's rendering of

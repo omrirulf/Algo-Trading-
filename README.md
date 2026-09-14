@@ -405,6 +405,29 @@ invariants hold `store/` to writing its own database, and every SQLite
 connection opened from `analysis/` uses the read-only URI. See
 [`docs/database.mdx`](docs/database.mdx).
 
+### Push it somewhere that isn't git
+
+```bash
+python store/push_remote.py --print-schema   # run once in the Supabase SQL editor
+python store/push_remote.py                  # send what the remote is missing
+python store/push_remote.py --all            # backfill everything
+```
+
+Set `SUPABASE_URL` and `SUPABASE_SERVICE_KEY` to switch it on; leave them unset
+and the push says there is no remote and exits 0. The heartbeat runs it as a
+step **after** the journal is committed — so a failed push cannot cost a
+signal, and the next one catches up on its own, because rows are keyed on the
+same content hash and conflicts are ignored on arrival.
+
+Two CI invariants keep it out of the trading path: `orchestrator/` may not
+import `store/` (checked by walking the AST), and the Supabase key has exactly
+one reader, `store/remote.py`.
+
+The remote tables run with row-level security **on and no policies**, so the
+publishable key can do nothing at all — not even read. The service-role key
+bypasses RLS and belongs in a GitHub Actions secret. The `decisions` view is
+`security_invoker`, without which it would read straight through that RLS.
+
 ## Score the signals
 
 ```bash
@@ -528,12 +551,11 @@ green run means something.
   `decisions` view carries the size, entry and stop the engine chose — but
   `analysis/returns.py` does not yet walk a filled trade forward bar by bar to
   ask whether the stop was hit first.
-- The record still lives in git. The heartbeat commits the journal back to the
-  repository after every cycle, because a discarded runner would lose it. At 35
-  tickers that is order of tens of megabytes a month that git never forgets.
-  SQLite does not fix that — it indexes the same files. Moving the record to a
-  remote Postgres does, at the cost of a credential and a network call inside
-  the cycle; the schema transfers essentially unchanged.
+- Git still carries the journal. The remote push exists, but the heartbeat
+  still commits the JSON-lines files, because they remain the record and the
+  runner is discarded. Once the remote has run long enough to be trusted, the
+  commit step can rotate or stop — that is the change that actually stops git
+  growing, and a remote you have never restored from is not yet a backup.
 - Insider transactions (Form 4 buying and selling) are the obvious next
   context source. yfinance exposes some of it, but a dedicated provider is
   more reliable — that one would need a new API key.

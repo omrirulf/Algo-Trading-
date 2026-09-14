@@ -427,6 +427,63 @@ jobs:
           print("OK: the scorer cannot create or write a database")
           PY
 
+      - name: The Supabase key has exactly one reader
+        # Same rule the broker credential lives under: a secret with one reader
+        # is one whose blast radius can be reasoned about. config/settings.py
+        # DECLARES the fields; only store/remote.py may read their values, and
+        # everything else goes through RemoteArchive.from_settings().
+        #
+        # This key bypasses row-level security by design -- that is what lets
+        # the remote tables keep RLS on with no policies, so the publishable
+        # key can do nothing at all. The cost of that design is that this key
+        # must not spread.
+        #
+        # Matches attribute ACCESS (`settings.supabase_service_key`) rather
+        # than the bare word, so the help text in push_remote.py naming the
+        # environment variables is not a build failure. The first version of
+        # this check did fail on exactly that.
+        run: |
+          hits=$(grep -rnE '\.(supabase_url|supabase_service_key)\b' \
+                   app orchestrator analysis store backtest replay config --include='*.py' \
+                 | grep -vE '^(store/remote\.py|config/settings\.py):' || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::the Supabase key may only be read by store/remote.py"
+            exit 1
+          fi
+          echo "OK: one reader for the Supabase key"
+
+      - name: The remote push is unreachable from the trading cycle
+        # The journal must not be able to fail a cycle -- that is why
+        # journal.py catches its own exceptions, and why a CI check already
+        # forbids orchestrator/ from reading a credential. A network call is a
+        # thing that fails, so the push lives outside the cycle entirely: the
+        # heartbeat writes its lines, and a LATER workflow step copies them up.
+        #
+        # Checked structurally rather than by intent: if orchestrator/ cannot
+        # import store/, the push cannot be called from the cycle by accident.
+        run: |
+          python3 - <<'PY'
+          import ast, pathlib, sys
+          bad = []
+          for path in sorted(pathlib.Path("orchestrator").rglob("*.py")):
+              tree = ast.parse(path.read_text())
+              for node in ast.walk(tree):
+                  if isinstance(node, ast.Import):
+                      names = [a.name for a in node.names]
+                  elif isinstance(node, ast.ImportFrom):
+                      names = [node.module or ""]
+                  else:
+                      continue
+                  for name in names:
+                      if name == "store" or name.startswith("store."):
+                          bad.append(f"{path}:{node.lineno}: imports {name}")
+          if bad:
+              print("\n".join(bad))
+              sys.exit("::error::orchestrator/ must not import store/ -- the push stays outside the cycle")
+          print("OK: the trading cycle cannot reach the remote push")
+          PY
+
       - name: A piped script cannot report a false green
         # `python foo.py | tee out.txt` exits with tee's status, not the
         # script's, so a script that exited 1 still shows a green step. The

@@ -219,6 +219,22 @@ class Settings(BaseSettings):
             "not have"
         ),
     )
+    supabase_url: str = Field(
+        default="",
+        description=(
+            "Supabase project URL, e.g. https://abc.supabase.co. Blank keeps "
+            "the archive local: the remote push is skipped, not failed"
+        ),
+    )
+    supabase_service_key: str = Field(
+        default="",
+        description=(
+            "Supabase service-role key, used only by store/remote.py to push "
+            "the archive. It bypasses row-level security, which is what lets "
+            "the tables keep RLS on with no policies -- so the publishable "
+            "key can do nothing at all. Never put this in client code"
+        ),
+    )
     brightdata_unlocker_zone: str = Field(
         default="cli_unlocker",
         description=(

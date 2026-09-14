@@ -66,3 +66,23 @@ jobs:
           # Another cycle may have landed while this one ran.
           git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
           git push origin "HEAD:${GITHUB_REF_NAME}"
+
+      - name: Push the archive to Supabase
+        # Deliberately AFTER the commit above, and deliberately not guarded by
+        # an `if:`. Two separate decisions:
+        #
+        # After, because the journal must already be safe in git before this
+        # touches the network. If this step fails the run goes red, but no line
+        # is lost -- and the next cycle's push catches up on its own, since
+        # rows are keyed on a content hash and conflicts are ignored on
+        # arrival. That ordering is what lets this step be allowed to fail
+        # loudly instead of being made advisory.
+        #
+        # No `if:`, because the script already exits 0 saying "no remote
+        # configured" when the secrets are unset. Putting that decision in
+        # tested Python rather than in a YAML expression means it is covered by
+        # the test suite instead of only by a green run.
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: python store/push_remote.py
