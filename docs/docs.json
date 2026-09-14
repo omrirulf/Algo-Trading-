@@ -26,7 +26,8 @@
         "pages": [
           "architecture",
           "guardrails",
-          "decision-path"
+          "decision-path",
+          "currency-risk"
         ]
       },
       {

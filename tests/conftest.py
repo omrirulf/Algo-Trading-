@@ -64,6 +64,17 @@ def _offline_market_context(monkeypatch):
     # lookup path stays the real one.
     monkeypatch.setattr(ctx, "_provider", OfflineProvider())
 
+    # The FX rate is a second yfinance caller, reached from run_cycle rather
+    # than from the context provider, so patching the provider alone left it
+    # hitting the network. It degrades to a gap rather than raising, which is
+    # exactly why it could slip through green.
+    from orchestrator import fx as fx_module
+    from orchestrator import heartbeat as hb
+
+    offline_rate = fx_module.FxRate(gap="FX disabled in tests")
+    monkeypatch.setattr(fx_module, "fetch_rate", lambda *a, **k: offline_rate)
+    monkeypatch.setattr(hb, "fetch_fx_rate", lambda *a, **k: offline_rate)
+
 
 @pytest.fixture(autouse=True)
 def _no_ambient_credentials(monkeypatch):

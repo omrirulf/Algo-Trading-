@@ -32,6 +32,7 @@ from typing import Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.risk_engine import max_position_pct_for  # noqa: E402
+from orchestrator.fx import fetch_rate as fetch_fx_rate  # noqa: E402
 from config.instruments import (  # noqa: E402
     BROAD_FUNDS,
     COMMODITY_FUNDS,
@@ -223,6 +224,18 @@ def main(argv: list[str] | None = None) -> int:
         check(t, args.period, args.equity)
         for t in SINGLE_NAMES + BROAD_FUNDS + COMMODITY_FUNDS
     ]
+
+    # Not tradeable and not a holding -- but if USD/ILS stops resolving, the
+    # journal silently loses the only record of what a trade was worth in the
+    # currency that matters. Reported separately so it never looks like a
+    # position.
+    fx_rate = fetch_fx_rate()
+    print()
+    print("CURRENCY EXPOSURE (measured, not hedged -- see orchestrator/fx.py)")
+    for line in fx_rate.as_lines():
+        print(f"  {line[2:]}" if line.startswith("- ") else f"  {line}")
+    if not fx_rate.ok:
+        print("  The journal will record a null rate until this resolves.")
     print(json.dumps([r.as_dict() for r in results], indent=2) if args.as_json
           else render(results))
 

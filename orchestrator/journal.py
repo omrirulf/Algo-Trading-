@@ -20,6 +20,7 @@ from typing import Any, Optional
 from pythonjsonlogger import jsonlogger
 
 from app.schemas import LLMSignal
+from orchestrator.fx import FxRate
 from orchestrator.pricing import Usage
 from config import settings as cfg
 from orchestrator.context import TickerContext
@@ -55,6 +56,7 @@ def record(
     outcome: Optional[dict[str, Any]] = None,
     error: Optional[str] = None,
     usage: Optional[Usage] = None,
+    fx: Optional[FxRate] = None,
 ) -> None:
     """Write one journal line. Swallows its own failures by design."""
     try:
@@ -74,6 +76,11 @@ def record(
                 # Measured token counts, so "what does a cycle cost" is
                 # answerable from the archive rather than re-estimated.
                 "usage": usage.as_dict() if usage else None,
+                # USD/ILS at the time of the signal. Recorded because an FX
+                # move does not reduce a dollar return, it redenominates it --
+                # so without the rate as of the entry, no later analysis can
+                # say what a trade was worth in the currency that matters.
+                "fx": fx.as_dict() if fx else None,
             },
         )
     except Exception:  # noqa: BLE001 - journalling must not break the cycle

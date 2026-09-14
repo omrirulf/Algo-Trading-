@@ -37,6 +37,7 @@ from pydantic import ValidationError  # noqa: E402
 from app.schemas import LLMSignal  # noqa: E402
 from config import settings as cfg  # noqa: E402
 from config.instruments import is_fund  # noqa: E402
+from orchestrator.fx import FxRate, fetch_rate as fetch_fx_rate  # noqa: E402
 from config.settings import get_settings  # noqa: E402
 from orchestrator import context, journal  # noqa: E402
 from orchestrator.context import TickerContext  # noqa: E402
@@ -247,7 +248,11 @@ def build_context(ticker: str) -> TickerContext:
     return context.gather(ticker, fetch_news(ticker))
 
 
-def process_ticker(ticker: str, dispatcher: Dispatcher | None = None) -> None:
+def process_ticker(
+    ticker: str,
+    dispatcher: Dispatcher | None = None,
+    fx: FxRate | None = None,
+) -> None:
     try:
         ticker_context = build_context(ticker)
     except (NotImplementedError, NewsFetchError) as exc:
@@ -272,38 +277,38 @@ def process_ticker(ticker: str, dispatcher: Dispatcher | None = None) -> None:
         signal = parse_signal(completion.text)
     except LLMError as exc:
         log.error("%s: %s", ticker, exc)
-        journal.record(ticker_context, error=str(exc))
+        journal.record(ticker_context, fx=fx, error=str(exc))
         return
     except (json.JSONDecodeError, ValidationError) as exc:
         log.error("%s: LLM output rejected before sending: %s", ticker, exc)
-        journal.record(ticker_context, error=f"invalid LLM output: {exc}")
+        journal.record(ticker_context, fx=fx, error=f"invalid LLM output: {exc}")
         return
     except Exception as exc:  # noqa: BLE001
         log.exception("%s: failed to produce a signal", ticker)
-        journal.record(ticker_context, error=f"unexpected {type(exc).__name__}: {exc}")
+        journal.record(ticker_context, fx=fx, error=f"unexpected {type(exc).__name__}: {exc}")
         return
 
     if signal.ticker != ticker:
         log.error("%s: LLM answered for %s instead; dropping", ticker, signal.ticker)
-        journal.record(ticker_context, signal, usage=usage, error=f"answered for {signal.ticker}")
+        journal.record(ticker_context, signal, usage=usage, fx=fx, error=f"answered for {signal.ticker}")
         return
 
     try:
         outcome = post_signal(signal, dispatcher)
     except httpx.HTTPError as exc:
         log.error("%s: webhook unreachable: %s", ticker, exc)
-        journal.record(ticker_context, signal, usage=usage, error=f"webhook unreachable: {exc}")
+        journal.record(ticker_context, signal, usage=usage, fx=fx, error=f"webhook unreachable: {exc}")
         return
     except BrokerError as exc:
         # Direct mode only: the engine could not be built or reached at all.
         # Same shape of failure as an unreachable webhook, so it is logged and
         # journalled the same way rather than killing the cycle.
         log.error("%s: engine unavailable: %s", ticker, exc)
-        journal.record(ticker_context, signal, usage=usage, error=f"engine unavailable: {exc}")
+        journal.record(ticker_context, signal, usage=usage, fx=fx, error=f"engine unavailable: {exc}")
         return
 
     log.info("%s -> %s %s", ticker, outcome.get("status"), outcome.get("reason", ""))
-    journal.record(ticker_context, signal, outcome=outcome, usage=usage)
+    journal.record(ticker_context, signal, outcome=outcome, usage=usage, fx=fx)
 
 
 def run_cycle(dispatcher: Dispatcher | None = None) -> None:
@@ -325,9 +330,18 @@ def run_cycle(dispatcher: Dispatcher | None = None) -> None:
         # own gate decide, which fails closed if it cannot tell either.
         log.warning("could not read market clock (%s); continuing", exc)
 
+    # Once per cycle, not once per ticker: the rate is the same for all of
+    # them, and a failure here degrades to a named gap rather than costing the
+    # cycle anything.
+    fx = fetch_fx_rate()
+    if fx.ok:
+        log.info("USD/ILS %.4f", fx.rate)
+    else:
+        log.info("USD/ILS unavailable: %s", fx.gap)
+
     log.info("heartbeat cycle start: %s", tickers)
     for ticker in tickers:
-        process_ticker(ticker, dispatcher)
+        process_ticker(ticker, dispatcher, fx)
     log.info("heartbeat cycle end")
 
 
