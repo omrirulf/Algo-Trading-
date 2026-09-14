@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import time
 import logging
+import re
 from dataclasses import dataclass
 from typing import Any, Optional
 
@@ -209,6 +210,28 @@ def _extract_text(response: Any) -> str:
     raise LLMError(f"no text block in response (stop_reason: {stop_reason})")
 
 
+#: What the Batches API accepts as a ``custom_id``. Anything else is rejected
+#: for the whole batch with a 400 -- after the prompts were built, the news
+#: fetched and the OHLC pulled, which is the expensive end of a replay to
+#: find out at. Checked here, at construction, instead.
+CUSTOM_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
+
+
+def batch_custom_id(*parts: object) -> str:
+    """Join ``parts`` into an id the Batches API accepts.
+
+    Each part is stringified; any character outside ``[a-zA-Z0-9_-]`` becomes
+    ``-`` and the parts are joined with ``_``, so ``("BRK.B", date(2025, 3,
+    14))`` becomes ``BRK-B_2025-03-14``. Callers that need the parts back
+    should keep them rather than parse the id.
+    """
+    joined = "_".join(str(p) for p in parts)
+    safe = re.sub(r"[^a-zA-Z0-9_-]", "-", joined)
+    if not safe:
+        raise ValueError("a batch custom_id cannot be empty")
+    return safe[:64]
+
+
 @dataclass(frozen=True)
 class BatchRequest:
     """One prompt for the Message Batches API, keyed for reassembly.
@@ -223,6 +246,14 @@ class BatchRequest:
     json_schema: dict
     model: Optional[str] = None
     effort: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        if not CUSTOM_ID_PATTERN.match(self.custom_id):
+            raise ValueError(
+                f"custom_id {self.custom_id!r} is not accepted by the Batches API "
+                f"(must match {CUSTOM_ID_PATTERN.pattern}); build it with "
+                f"batch_custom_id()"
+            )
 
 
 #: How long to wait on a batch before giving up and handing back the id.

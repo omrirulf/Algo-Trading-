@@ -63,7 +63,7 @@ from config.instruments import is_fund  # noqa: E402
 from config.watchlist import DEFAULT_WATCHLIST  # noqa: E402
 from orchestrator import technicals  # noqa: E402
 from orchestrator.context import TickerContext  # noqa: E402
-from orchestrator.llm import BatchRequest, Completion, LLMError  # noqa: E402
+from orchestrator.llm import BatchRequest, Completion, LLMError, batch_custom_id  # noqa: E402
 from orchestrator.pricing import Usage  # noqa: E402
 
 #: Bars of history a sample must have behind it. The 52-week range and the
@@ -100,7 +100,7 @@ class Sample:
 
     @property
     def custom_id(self) -> str:
-        return f"{self.ticker}:{self.day}"
+        return batch_custom_id(self.ticker, self.day)
 
 
 # --------------------------------------------------------------------------- #

@@ -194,7 +194,7 @@ def test_the_report_renders_the_base_rate_beside_the_hit_rate():
 def test_apply_results_returns_the_failures():
     s_ok, s_bad = _sample("A", 1), _sample("B", 2)
     good = llm.Completion(text=_sig("A", Bias.BULLISH).model_dump_json(), usage=None)
-    failed = h.apply_results([s_ok, s_bad], {"A:2024-01-01": good, "B:2024-01-01": llm.LLMError("x")},
+    failed = h.apply_results([s_ok, s_bad], {"A_2024-01-01": good, "B_2024-01-01": llm.LLMError("x")},
                              LLMSignal.model_validate_json)
     assert s_ok.signal is not None and s_bad.signal is None
     assert failed == [s_bad]

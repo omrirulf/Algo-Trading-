@@ -281,8 +281,8 @@ def test_report_renders_and_serialises():
 def test_apply_results_routes_errors_to_the_failed_list():
     trials = [ss.Trial("A", ss.REAL, "S", "U"), ss.Trial("B", ss.REAL, "S", "U")]
     good = llm.Completion(text=_sig("A", B).model_dump_json(), usage=None)
-    ss.apply_results(trials, {"A:real": good, "B:real": llm.LLMError("nope")},
+    ss.apply_results(trials, {"A_real": good, "B_real": llm.LLMError("nope")},
                      LLMSignal.model_validate_json)
     r = ss.assemble(trials, 2)
     assert "A" in r.real and "B" not in r.real
-    assert [t.custom_id for t in r.failed] == ["B:real"]
+    assert [t.custom_id for t in r.failed] == ["B_real"]
