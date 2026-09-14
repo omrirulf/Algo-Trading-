@@ -74,7 +74,13 @@ invisible in the execution audit log — the engine never saw them.
 you a record; it does not cost you the signal that was already on its way to
 the engine.
 
-<Card title="Next: scoring the journal" icon="gauge" href="/scoring">
-  Joining these lines to what the market actually did — and the entry-timing
-  rule that stops the answer from flattering the strategy.
-</Card>
+<CardGroup cols={2}>
+  <Card title="Next: scoring the journal" icon="gauge" href="/scoring">
+    Joining these lines to what the market actually did — and the entry-timing
+    rule that stops the answer from flattering the strategy.
+  </Card>
+  <Card title="Querying the archive" icon="database" href="/database">
+    Both logs indexed into SQLite, so drift, cost and rejection rates are one
+    query rather than a parse of every line ever written.
+  </Card>
+</CardGroup>

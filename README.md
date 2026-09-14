@@ -55,6 +55,12 @@ algo-trading-system/
 │   ├── metrics.py             # rank correlations, buckets, drift (pure)
 │   ├── report.py              # text report; owns the "too few to conclude" threshold
 │   └── score_journal.py       # CLI: python analysis/score_journal.py
+├── store/                     # queryable index over the logs; writes only its own db
+│   ├── schema.py              # the DDL, in one place
+│   ├── database.py            # connect_rw / connect_ro (the read-only boundary)
+│   ├── loader.py              # idempotent JSONL -> rows; keeps each line verbatim
+│   ├── build_db.py            # CLI: python store/build_db.py
+│   └── query.py               # CLI: python store/query.py daily
 ├── tests/
 │   ├── conftest.py            # FakeBroker / FakeMarketData; no network in tests
 │   ├── test_risk_engine.py    # proves the 5% cap and ATR stop math hold
@@ -74,10 +80,15 @@ algo-trading-system/
 │   ├── test_analysis_metrics.py   # rank correlation vs hand-computed values
 │   ├── test_analysis_reader.py    # journal parsing, including truncated lines
 │   ├── test_analysis_scoring.py   # scorer end to end + report honesty
+│   ├── test_store_loader.py       # idempotence, tolerance, file/db agreement
+│   ├── test_store_database.py     # proves the scorer's connection cannot write
+│   ├── test_store_query.py        # every canned query parses against the schema
+│   ├── test_store_build_db.py     # the build CLI, including --rebuild
 │   └── test_llm.py            # schema derivation + every LLM failure mode
 └── logs/
     ├── execution_audit.log    # what the engine did      (generated at runtime)
-    └── signal_journal.log     # what the model saw       (generated at runtime)
+    ├── signal_journal.log     # what the model saw       (generated at runtime)
+    └── trading.db             # index over both  (derived; gitignored, rebuildable)
 ```
 
 ## Setup
@@ -359,11 +370,70 @@ identical recorded context. Output is ~84% of the bill at this prompt shape, so
 `EFFORT` moves more money than the model tier does -- and a stronger model
 thinking less can undercut a weaker model thinking more.
 
+## Query the archive
+
+The two log files are the record. They are good at being a record and poor at
+being asked questions, so `store/` indexes them into SQLite:
+
+```bash
+python store/build_db.py           # load both logs (idempotent; run it after a cycle)
+python store/query.py daily        # signals, bias split, conviction and cost per day
+python store/query.py rejections   # which guardrail bites, and at what conviction
+python store/query.py trades       # signals that became real orders, with size and stop
+python store/query.py --sql "SELECT ..."
+```
+
+**The database is derived, not authoritative.** The JSON-lines files stay the
+system of record; `--rebuild` throws the index away and reloads from them in
+seconds. That is what makes it safe to add to a system that trades — a corrupt
+index costs a rebuild, never a cycle and never a record.
+
+Two things follow. Every row keeps its source line verbatim, so a field nobody
+columnised is a query away rather than a migration away:
+
+```sql
+SELECT ticker, ROUND(AVG(json_extract(raw, '$.context.technicals.rsi14')), 1) AS mean_rsi
+FROM signals GROUP BY ticker;
+```
+
+And loading is keyed on a content hash of each line, so re-loading a journal
+that grew by one line inserts one row.
+
+The `decisions` view joins each signal to the order it became, on the order id
+the journal already records. Nothing here can trade or edit the logs: four CI
+invariants hold `store/` to writing its own database, and every SQLite
+connection opened from `analysis/` uses the read-only URI. See
+[`docs/database.mdx`](docs/database.mdx).
+
+### Push it somewhere that isn't git
+
+```bash
+python store/push_remote.py --print-schema   # run once in the Supabase SQL editor
+python store/push_remote.py                  # send what the remote is missing
+python store/push_remote.py --all            # backfill everything
+```
+
+Set `SUPABASE_URL` and `SUPABASE_SERVICE_KEY` to switch it on; leave them unset
+and the push says there is no remote and exits 0. The heartbeat runs it as a
+step **after** the journal is committed — so a failed push cannot cost a
+signal, and the next one catches up on its own, because rows are keyed on the
+same content hash and conflicts are ignored on arrival.
+
+Two CI invariants keep it out of the trading path: `orchestrator/` may not
+import `store/` (checked by walking the AST), and the Supabase key has exactly
+one reader, `store/remote.py`.
+
+The remote tables run with row-level security **on and no policies**, so the
+publishable key can do nothing at all — not even read. The service-role key
+bypasses RLS and belongs in a GitHub Actions secret. The `decisions` view is
+`security_invoker`, without which it would read straight through that RLS.
+
 ## Score the signals
 
 ```bash
 python analysis/score_journal.py              # text report
 python analysis/score_journal.py --json       # same figures, machine-readable
+python analysis/score_journal.py --db --since 2026-10-01   # from the index
 ```
 
 Joins every journalled signal to the return that actually followed and reports
@@ -477,8 +547,15 @@ green run means something.
   months rather than weeks of data behind it.
 - Scoring measures the signal, not the strategy. Close-to-close returns ignore
   the stop-loss, so a signal that was right about direction but stopped out on
-  the way there still scores as a win. Joining the scorer to
-  `logs/execution_audit.log` would close that gap.
+  the way there still scores as a win. The join it needs now exists — the
+  `decisions` view carries the size, entry and stop the engine chose — but
+  `analysis/returns.py` does not yet walk a filled trade forward bar by bar to
+  ask whether the stop was hit first.
+- Git still carries the journal. The remote push exists, but the heartbeat
+  still commits the JSON-lines files, because they remain the record and the
+  runner is discarded. Once the remote has run long enough to be trusted, the
+  commit step can rotate or stop — that is the change that actually stops git
+  growing, and a remote you have never restored from is not yet a backup.
 - Insider transactions (Form 4 buying and selling) are the obvious next
   context source. yfinance exposes some of it, but a dedicated provider is
   more reliable — that one would need a new API key.

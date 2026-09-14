@@ -159,6 +159,13 @@ AUDIT_LOG_PATH: Final[Path] = LOG_DIR / "execution_audit.log"
 #: that one records what the engine did, this one records what the model saw.
 SIGNAL_JOURNAL_PATH: Final[Path] = LOG_DIR / "signal_journal.log"
 
+#: Queryable index over both logs above, built by ``store/build_db.py``.
+#:
+#: Derived data, and gitignored for that reason: the JSON-lines files are the
+#: system of record, this is a rebuild away from them, and committing a binary
+#: that changes every cycle would bloat the repository for nothing.
+DATABASE_PATH: Final[Path] = LOG_DIR / "trading.db"
+
 from config.watchlist import default_watchlist_csv
 
 # --------------------------------------------------------------------------- #
@@ -210,6 +217,22 @@ class Settings(BaseSettings):
             "unlocker-zone fallback below could never fire and anyone who had "
             "only run `brightdata login` sent a zone name their account did "
             "not have"
+        ),
+    )
+    supabase_url: str = Field(
+        default="",
+        description=(
+            "Supabase project URL, e.g. https://abc.supabase.co. Blank keeps "
+            "the archive local: the remote push is skipped, not failed"
+        ),
+    )
+    supabase_service_key: str = Field(
+        default="",
+        description=(
+            "Supabase service-role key, used only by store/remote.py to push "
+            "the archive. It bypasses row-level security, which is what lets "
+            "the tables keep RLS on with no policies -- so the publishable "
+            "key can do nothing at all. Never put this in client code"
         ),
     )
     brightdata_unlocker_zone: str = Field(
