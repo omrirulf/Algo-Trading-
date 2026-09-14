@@ -275,18 +275,18 @@ class AnthropicSignalProvider:
             },
         )
 
-    def submit_batch(self, requests: list[BatchRequest]) -> str:
+    def submit_batch(self, prompts: list[BatchRequest]) -> str:
         """Create a batch and return its id without waiting."""
-        if not requests:
+        if not prompts:
             raise LLMError("cannot submit an empty batch")
-        ids = [r.custom_id for r in requests]
+        ids = [r.custom_id for r in prompts]
         if len(set(ids)) != len(ids):
             raise LLMError("batch custom_ids must be unique")
         try:
             batch = self._client.messages.batches.create(
                 requests=[
                     {"custom_id": r.custom_id, "params": self._batch_params(r)}
-                    for r in requests
+                    for r in prompts
                 ]
             )
         except TypeError as exc:
@@ -349,10 +349,10 @@ class AnthropicSignalProvider:
         return out
 
     def complete_batch(
-        self, requests: list[BatchRequest], model: Optional[str] = None, **kw
+        self, prompts: list[BatchRequest], model: Optional[str] = None, **kw
     ) -> dict[str, "Completion | LLMError"]:
         """Submit, wait, collect. Half price, and no latency to care about."""
-        return self.collect_batch(self.submit_batch(requests), model=model, **kw)
+        return self.collect_batch(self.submit_batch(prompts), model=model, **kw)
 
     def complete(self, system_prompt: str, user_prompt: str, json_schema: dict) -> str:
         """The model's JSON, for callers that do not care what it cost."""

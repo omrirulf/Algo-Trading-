@@ -33,7 +33,10 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
 
-      - name: Null test + self-consistency
+      - name: Plan, submit, collect
+        # Three stages over stdout, because nothing under replay/ may write a
+        # file. The plan is saved here so a batch that outlives this job can
+        # be collected by a later run with the `resume` input.
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           BRIGHTDATA_API_TOKEN: ${{ secrets.BRIGHTDATA_API_TOKEN }}
@@ -41,10 +44,15 @@ jobs:
         run: |
           set -o pipefail
           if [ -n "${{ inputs.resume }}" ]; then
-            python replay/signal_sanity.py --resume "${{ inputs.resume }}" | tee sanity.txt
+            echo "${{ inputs.resume }}" > batch_id
+            test -s sanity_trials.json || { echo "::error::resume needs sanity_trials.json from the original run's artifact"; exit 1; }
           else
-            python replay/signal_sanity.py --tickers "${{ inputs.tickers }}" | tee sanity.txt
+            python replay/signal_sanity.py plan --tickers "${{ inputs.tickers }}" > sanity_trials.json
+            python replay/signal_sanity.py submit --trials sanity_trials.json > batch_id
           fi
+          echo "batch: $(cat batch_id)"
+          python replay/signal_sanity.py collect --trials sanity_trials.json --batch "$(cat batch_id)" | tee sanity.txt
+          python replay/signal_sanity.py collect --trials sanity_trials.json --batch "$(cat batch_id)" --json > sanity.json || true
 
       - name: Publish to the run summary
         if: always()
@@ -63,6 +71,6 @@ jobs:
           name: signal-sanity
           path: |
             sanity.txt
-            sanity_report.txt
-            sanity_report.json
+            sanity.json
             sanity_trials.json
+            batch_id

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Two tests that need no market outcomes, and could make the live run moot.
 
-    python replay/signal_sanity.py                 # ~3 calls per ticker
-    python replay/signal_sanity.py --tickers 12    # cheaper sample
-    python replay/signal_sanity.py --resume BATCH_ID
+    python replay/signal_sanity.py plan > trials.json        # ~3 prompts per ticker
+    python replay/signal_sanity.py submit --trials trials.json > batch_id
+    python replay/signal_sanity.py collect --trials trials.json --batch $(cat batch_id)
 
 The live experiment's bottleneck is calendar time: a signal needs 5-20
 trading days before it can be scored. These two questions need none, and
@@ -398,33 +398,50 @@ def apply_results(
                 t.error = f"unparseable: {exc}"
 
 
+def _trials_to_json(tickers: int, trials: list[Trial]) -> str:
+    return json.dumps({
+        "tickers": tickers,
+        "trials": [{"ticker": t.ticker, "condition": t.condition,
+                    "system_prompt": t.system_prompt, "user_prompt": t.user_prompt,
+                    "donor": t.donor} for t in trials],
+    })
+
+
+def _trials_from_json(text: str) -> tuple[int, list[Trial]]:
+    saved = json.loads(text)
+    return saved["tickers"], [Trial(**row) for row in saved["trials"]]
+
+
 def main(argv: list[str] | None = None) -> int:
+    """Three stages, each a pure function of its inputs to stdout.
+
+    Nothing under replay/ may write a file -- that guardrail is what keeps a
+    replay from ever touching the journal -- so persistence between stages is
+    the caller's job: redirect ``plan`` to a file, pass it to ``submit`` and
+    ``collect``. It also makes resuming a batch that outlived one job trivial.
+    """
     parser = argparse.ArgumentParser(description="Null test + self-consistency, no market needed.")
-    parser.add_argument("--tickers", type=int, default=len(DEFAULT_WATCHLIST),
-                        help="how many of the watchlist to sample (default: all)")
-    parser.add_argument("--resume", metavar="BATCH_ID",
-                        help="collect a batch submitted earlier instead of gathering again")
-    parser.add_argument("--trials-file", type=Path, default=Path("sanity_trials.json"),
-                        help="where submitted trials are saved so --resume can rebuild them")
-    parser.add_argument("--json", action="store_true", dest="as_json")
-    parser.add_argument("--out", type=Path, default=Path("sanity_report"))
+    sub = parser.add_subparsers(dest="stage", required=True)
+
+    plan = sub.add_parser("plan", help="gather live context and print the trials as JSON")
+    plan.add_argument("--tickers", type=int, default=len(DEFAULT_WATCHLIST),
+                      help="how many of the watchlist to sample (default: all)")
+
+    submit = sub.add_parser("submit", help="submit planned trials as a batch; prints the batch id")
+    submit.add_argument("--trials", type=Path, required=True)
+
+    collect = sub.add_parser("collect", help="collect a batch and print the report")
+    collect.add_argument("--trials", type=Path, required=True)
+    collect.add_argument("--batch", required=True, metavar="BATCH_ID")
+    collect.add_argument("--json", action="store_true", dest="as_json")
+
     args = parser.parse_args(argv)
 
-    from config.settings import get_settings
     from orchestrator.heartbeat import (
         SIGNAL_JSON_SCHEMA, build_context, build_user_prompt, parse_signal, system_prompt_for,
     )
-    from orchestrator.llm import AnthropicSignalProvider
 
-    provider = AnthropicSignalProvider(get_settings().anthropic_api_key)
-
-    if args.resume:
-        saved = json.loads(args.trials_file.read_text())
-        trials = [Trial(**row) for row in saved["trials"]]
-        tickers = saved["tickers"]
-        print(f"resuming batch {args.resume} with {len(trials)} trials", file=sys.stderr)
-        results = provider.collect_batch(args.resume)
-    else:
+    if args.stage == "plan":
         chosen = list(DEFAULT_WATCHLIST[: args.tickers])
         contexts: dict[str, TickerContext] = {}
         for ticker in chosen:
@@ -435,31 +452,31 @@ def main(argv: list[str] | None = None) -> int:
         if not contexts:
             print("no ticker produced a context; nothing to test", file=sys.stderr)
             return 2
-        tickers = len(contexts)
         trials = build_trials(contexts, system_prompt_for, build_user_prompt)
+        print(_trials_to_json(len(contexts), trials))
+        print(f"planned {len(trials)} trials over {len(contexts)} tickers", file=sys.stderr)
+        return 0
 
-        requests = [
+    from config.settings import get_settings
+    from orchestrator.llm import AnthropicSignalProvider
+
+    provider = AnthropicSignalProvider(get_settings().anthropic_api_key)
+    tickers, trials = _trials_from_json(args.trials.read_text())
+
+    if args.stage == "submit":
+        prompts = [
             BatchRequest(t.custom_id, t.system_prompt, t.user_prompt, SIGNAL_JSON_SCHEMA)
             for t in trials
         ]
-        batch_id = provider.submit_batch(requests)
-        args.trials_file.write_text(json.dumps({
-            "batch_id": batch_id, "tickers": tickers,
-            "trials": [{"ticker": t.ticker, "condition": t.condition,
-                        "system_prompt": t.system_prompt, "user_prompt": t.user_prompt,
-                        "donor": t.donor} for t in trials],
-        }))
-        print(f"submitted batch {batch_id} ({len(requests)} requests); "
-              f"trials saved to {args.trials_file}", file=sys.stderr)
-        results = provider.collect_batch(batch_id)
+        batch_id = provider.submit_batch(prompts)
+        print(batch_id)
+        print(f"submitted {len(prompts)} requests as {batch_id}", file=sys.stderr)
+        return 0
 
+    results = provider.collect_batch(args.batch)
     apply_results(trials, results, parse_signal)
     report = assemble(trials, tickers)
-
-    text = render(report)
-    args.out.with_suffix(".txt").write_text(text + "\n")
-    args.out.with_suffix(".json").write_text(json.dumps(report.as_dict(), indent=2))
-    print(json.dumps(report.as_dict(), indent=2) if args.as_json else text)
+    print(json.dumps(report.as_dict(), indent=2) if args.as_json else render(report))
     return 0 if report.verdicts.passed else 1
 
 
