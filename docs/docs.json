@@ -27,7 +27,8 @@
           "architecture",
           "guardrails",
           "decision-path",
-          "currency-risk"
+          "currency-risk",
+          "broker-evaluation"
         ]
       },
       {
