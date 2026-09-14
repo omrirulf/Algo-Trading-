@@ -138,6 +138,30 @@ def default_completer() -> Completer:
     return complete
 
 
+def measured_completer(model: Optional[str] = None, effort: Optional[str] = None):
+    """A completer that also reports what each call cost.
+
+    Returns ``(complete, usages)`` -- the list fills as calls are made, so a
+    config comparison prices itself from measured tokens rather than an
+    assumed output length.
+    """
+    from config.settings import get_settings
+    from orchestrator.llm import AnthropicSignalProvider
+    from orchestrator.pricing import Usage
+
+    provider = AnthropicSignalProvider(get_settings().anthropic_api_key)
+    usages: list[Usage] = []
+
+    def complete(system_prompt: str, user_prompt: str, schema: dict[str, Any]) -> str:
+        result = provider.complete_detailed(
+            system_prompt, user_prompt, schema, model=model, effort=effort
+        )
+        usages.append(result.usage)
+        return result.text
+
+    return complete, usages
+
+
 __all__ = [
     "SYSTEM_PROMPT",
     "Completer",
@@ -148,4 +172,5 @@ __all__ = [
     "replay_all",
     "summarise",
     "default_completer",
+    "measured_completer",
 ]

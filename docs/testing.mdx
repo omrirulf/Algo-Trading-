@@ -1,6 +1,6 @@
 ---
 title: "Testing"
-description: "545 tests, zero network calls, zero credentials"
+description: "579 tests, zero network calls, zero credentials"
 ---
 
 ```bash
@@ -91,6 +91,8 @@ before the fixture replaces it.
 | `test_analysis_reader.py` | 11 | Journal parsing field by field, the tz-naive timestamp fallback being flagged, and that a truncated final line is skipped rather than fatal. |
 | `test_backtest_simulate.py` | 19 | The three ways a backtest flatters itself, each proved load-bearing by removal: ATR sized only from bars before the signal, stops hit on the intraday Low rather than the Close, and a gap through the stop filling at the open rather than the stop price. |
 | `test_backtest_sweep.py` | 14 | That a tighter stop is hit more often and risks less per trade, that the cap changes size but not stop-hit rate, and that the report states its returns are not an edge and names what it does not model. |
+| `test_pricing.py` | 14 | That cost is read from the API's own token counts, that an unknown model prices as `None` rather than free, that output dominates this prompt shape — and, as arithmetic, that a stronger model thinking less can undercut a weaker model thinking more. |
+| `test_compare_configs.py` | 20 | That agreement is measured against the incumbent and never reported as correctness, that an unjudgeable cell reports unknown rather than passing, that trade-agreement is stricter than bias agreement, and that the report states its own limits. |
 | `test_replay_rebuild.py` | 17 | That a replayed prompt is byte-identical to the one the model was shown — including the nested `InsiderTrade` objects `asdict()` flattens, which was proved load-bearing by removal — plus schema drift tolerated in both directions and a context without a ticker refused rather than invented. |
 | `test_replay_runner.py` | 24 | Loading (a truncated line skipped, a no-signal cycle still replayable), every model failure reported rather than raised, and change graded by consequence: a bias flip and a floor crossing count, a 0.05 conviction move does not. |
 | `test_analysis_scoring.py` | 20 | The scorer end to end on a synthetic price series, plus report honesty: small samples flagged, NEUTRAL excluded, an all-pending journal still rendering. |

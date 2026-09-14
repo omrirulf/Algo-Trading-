@@ -13,9 +13,12 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Optional
 
 import anthropic
+
+from orchestrator.pricing import Usage, usage_from_response
 
 log = logging.getLogger(__name__)
 
@@ -57,6 +60,14 @@ _KEEP = (
     "items",
     "description",
 )
+
+
+@dataclass(frozen=True)
+class Completion:
+    """What the model said, and what saying it cost."""
+
+    text: str
+    usage: Usage
 
 
 class LLMError(Exception):
@@ -205,15 +216,40 @@ class AnthropicSignalProvider:
         return self._client.beta.messages.create(**kwargs)
 
     def complete(self, system_prompt: str, user_prompt: str, json_schema: dict) -> str:
+        """The model's JSON, for callers that do not care what it cost."""
+        return self.complete_detailed(system_prompt, user_prompt, json_schema).text
+
+    def complete_detailed(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        json_schema: dict,
+        model: Optional[str] = None,
+        effort: Optional[str] = None,
+    ) -> Completion:
+        """The model's JSON plus what the call actually cost.
+
+        ``model`` and ``effort`` exist so the replay harness can price one
+        configuration against another on identical recorded context. The
+        production path passes neither and gets the module constants, so
+        changing what trades the account is still a visible diff.
+        """
         try:
             response = self._create(
-                model=MODEL,
+                model=model or MODEL,
                 max_tokens=MAX_TOKENS,
+                # Caches the last cacheable block -- here the system prompt,
+                # which is byte-identical across every ticker in a cycle. Whether
+                # it actually caches depends on the model's minimum cacheable
+                # prefix, so the journal records cache_read_input_tokens rather
+                # than assuming a saving: zero reads across a cycle means the
+                # prompt is under the threshold and this line is doing nothing.
+                cache_control={"type": "ephemeral"},
                 system=system_prompt,
                 messages=[{"role": "user", "content": user_prompt}],
                 thinking={"type": "adaptive"},
                 output_config={
-                    "effort": EFFORT,
+                    "effort": effort or EFFORT,
                     "format": {
                         "type": "json_schema",
                         "schema": build_output_schema(json_schema),
@@ -237,4 +273,4 @@ class AnthropicSignalProvider:
             json.loads(text)
         except json.JSONDecodeError as exc:
             raise LLMError(f"model returned non-JSON output: {exc}") from exc
-        return text
+        return Completion(text=text, usage=usage_from_response(response, model or MODEL))

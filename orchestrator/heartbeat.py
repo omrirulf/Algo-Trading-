@@ -39,7 +39,7 @@ from config import settings as cfg  # noqa: E402
 from config.settings import get_settings  # noqa: E402
 from orchestrator import context, journal  # noqa: E402
 from orchestrator.context import TickerContext  # noqa: E402
-from orchestrator.llm import AnthropicSignalProvider, LLMError  # noqa: E402
+from orchestrator.llm import AnthropicSignalProvider, Completion, LLMError  # noqa: E402
 from app.broker_client import BrokerError  # noqa: E402
 from orchestrator.dispatch import Dispatcher, build_dispatcher  # noqa: E402
 from orchestrator.news import BrightDataNewsProvider, NewsFetchError  # noqa: E402
@@ -127,10 +127,16 @@ def fetch_news(ticker: str) -> list[str]:
     return provider.fetch(ticker)
 
 
-def call_llm(system_prompt: str, user_prompt: str, json_schema: dict) -> str:
-    """Return Claude's raw JSON string, constrained to the signal shape."""
+def call_llm(system_prompt: str, user_prompt: str, json_schema: dict) -> Completion:
+    """Claude's raw JSON, plus what the call cost.
+
+    Returns the whole ``Completion`` rather than just the text so the journal
+    can record measured token counts. Cost used to be an estimate multiplied
+    by a guessed output length, which is a poor basis for deciding how many
+    tickers to watch.
+    """
     provider = AnthropicSignalProvider(get_settings().anthropic_api_key)
-    return provider.complete(system_prompt, user_prompt, json_schema)
+    return provider.complete_detailed(system_prompt, user_prompt, json_schema)
 
 
 # --------------------------------------------------------------------------- #
@@ -178,8 +184,9 @@ def process_ticker(ticker: str, dispatcher: Dispatcher | None = None) -> None:
         log.warning("%s: context gaps: %s", ticker, "; ".join(ticker_context.gaps))
 
     try:
-        raw = call_llm(SYSTEM_PROMPT, build_user_prompt(ticker_context), SIGNAL_JSON_SCHEMA)
-        signal = parse_signal(raw)
+        completion = call_llm(SYSTEM_PROMPT, build_user_prompt(ticker_context), SIGNAL_JSON_SCHEMA)
+        usage = completion.usage
+        signal = parse_signal(completion.text)
     except LLMError as exc:
         log.error("%s: %s", ticker, exc)
         journal.record(ticker_context, error=str(exc))
@@ -195,25 +202,25 @@ def process_ticker(ticker: str, dispatcher: Dispatcher | None = None) -> None:
 
     if signal.ticker != ticker:
         log.error("%s: LLM answered for %s instead; dropping", ticker, signal.ticker)
-        journal.record(ticker_context, signal, error=f"answered for {signal.ticker}")
+        journal.record(ticker_context, signal, usage=usage, error=f"answered for {signal.ticker}")
         return
 
     try:
         outcome = post_signal(signal, dispatcher)
     except httpx.HTTPError as exc:
         log.error("%s: webhook unreachable: %s", ticker, exc)
-        journal.record(ticker_context, signal, error=f"webhook unreachable: {exc}")
+        journal.record(ticker_context, signal, usage=usage, error=f"webhook unreachable: {exc}")
         return
     except BrokerError as exc:
         # Direct mode only: the engine could not be built or reached at all.
         # Same shape of failure as an unreachable webhook, so it is logged and
         # journalled the same way rather than killing the cycle.
         log.error("%s: engine unavailable: %s", ticker, exc)
-        journal.record(ticker_context, signal, error=f"engine unavailable: {exc}")
+        journal.record(ticker_context, signal, usage=usage, error=f"engine unavailable: {exc}")
         return
 
     log.info("%s -> %s %s", ticker, outcome.get("status"), outcome.get("reason", ""))
-    journal.record(ticker_context, signal, outcome=outcome)
+    journal.record(ticker_context, signal, outcome=outcome, usage=usage)
 
 
 def run_cycle(dispatcher: Dispatcher | None = None) -> None:

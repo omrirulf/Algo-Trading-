@@ -9,6 +9,18 @@ and a model call per ticker.
 
 from __future__ import annotations
 
+
+def completion(payload: dict | str, model: str = "claude-opus-5"):
+    """A Completion the way call_llm now returns one, with plausible usage."""
+    from orchestrator.llm import Completion
+    from orchestrator.pricing import Usage
+
+    text = payload if isinstance(payload, str) else json.dumps(payload)
+    return Completion(
+        text=text,
+        usage=Usage(model=model, input_tokens=1420, output_tokens=1500),
+    )
+
 import json
 
 import pytest
@@ -82,7 +94,7 @@ def test_a_closed_market_skips_the_cycle_entirely(monkeypatch):
     """
     news_calls, llm_calls = [], []
     monkeypatch.setattr(hb, "fetch_news", lambda t: news_calls.append(t) or ["news"])
-    monkeypatch.setattr(hb, "call_llm", lambda *a: llm_calls.append(a) or "{}")
+    monkeypatch.setattr(hb, "call_llm", lambda *a: llm_calls.append(a) or completion("{}"))
     monkeypatch.setattr(hb, "get_settings", lambda: _settings_with_watchlist("AAPL"))
 
     engine = ExecutionEngine(broker=FakeBroker(market_open=False), market_data=FakeMarketData())
@@ -97,7 +109,7 @@ def test_an_open_market_runs_the_cycle(monkeypatch, _journal_to_tmp):
     monkeypatch.setattr(hb, "fetch_news", lambda t: calls.append(t) or ["news"])
     monkeypatch.setattr(
         hb, "call_llm",
-        lambda s, u, j: json.dumps({"ticker": "AAPL", "bias": "BULLISH", "conviction": 0.9, "rationale": "r"}),
+        lambda s, u, j: completion({"ticker": "AAPL", "bias": "BULLISH", "conviction": 0.9, "rationale": "r"}),
     )
     monkeypatch.setattr(hb, "get_settings", lambda: _settings_with_watchlist("AAPL"))
 
@@ -127,7 +139,7 @@ def test_an_unreadable_clock_does_not_halt_trading(monkeypatch, caplog):
     monkeypatch.setattr(hb, "fetch_news", lambda t: ["news"])
     monkeypatch.setattr(
         hb, "call_llm",
-        lambda s, u, j: json.dumps({"ticker": "AAPL", "bias": "NEUTRAL", "conviction": 0.1, "rationale": "r"}),
+        lambda s, u, j: completion({"ticker": "AAPL", "bias": "NEUTRAL", "conviction": 0.1, "rationale": "r"}),
     )
     monkeypatch.setattr(hb, "get_settings", lambda: _settings_with_watchlist("AAPL"))
 

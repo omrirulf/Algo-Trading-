@@ -2,6 +2,18 @@
 
 from __future__ import annotations
 
+
+def completion(payload: dict | str, model: str = "claude-opus-5"):
+    """A Completion the way call_llm now returns one, with plausible usage."""
+    from orchestrator.llm import Completion
+    from orchestrator.pricing import Usage
+
+    text = payload if isinstance(payload, str) else json.dumps(payload)
+    return Completion(
+        text=text,
+        usage=Usage(model=model, input_tokens=1420, output_tokens=1500),
+    )
+
 import json
 
 import httpx
@@ -117,7 +129,7 @@ def test_post_signal_sends_only_signal_fields_with_secret(monkeypatch):
 
 def test_process_ticker_drops_signal_for_wrong_ticker(monkeypatch, caplog):
     monkeypatch.setattr(hb, "fetch_news", lambda t: ["news"])
-    monkeypatch.setattr(hb, "call_llm", lambda s, u, j: json.dumps({"ticker": "MSFT", "bias": "BULLISH", "conviction": 0.9, "rationale": "r"}))
+    monkeypatch.setattr(hb, "call_llm", lambda s, u, j: completion({"ticker": "MSFT", "bias": "BULLISH", "conviction": 0.9, "rationale": "r"}))
     posted = []
     monkeypatch.setattr(hb, "post_signal", lambda s, dispatcher=None: posted.append(s) or {"status": "ACCEPTED"})
     hb.process_ticker("AAPL")
@@ -127,7 +139,7 @@ def test_process_ticker_drops_signal_for_wrong_ticker(monkeypatch, caplog):
 
 def test_process_ticker_posts_valid_signal(monkeypatch):
     monkeypatch.setattr(hb, "fetch_news", lambda t: ["news"])
-    monkeypatch.setattr(hb, "call_llm", lambda s, u, j: json.dumps({"ticker": "AAPL", "bias": "BULLISH", "conviction": 0.9, "rationale": "r"}))
+    monkeypatch.setattr(hb, "call_llm", lambda s, u, j: completion({"ticker": "AAPL", "bias": "BULLISH", "conviction": 0.9, "rationale": "r"}))
     posted = []
     monkeypatch.setattr(hb, "post_signal", lambda s, dispatcher=None: (posted.append(s), {"status": "ACCEPTED"})[1])
     hb.process_ticker("AAPL")
@@ -192,7 +204,7 @@ def test_successful_cycle_is_journalled(monkeypatch, _journal_to_tmp):
     monkeypatch.setattr(hb, "fetch_news", lambda t: ["news"])
     monkeypatch.setattr(
         hb, "call_llm",
-        lambda s, u, j: json.dumps(
+        lambda s, u, j: completion(
             {"ticker": "AAPL", "bias": "BULLISH", "conviction": 0.9, "rationale": "r",
              "news_score": 0.7, "key_factors": ["guidance raised"]}
         ),
@@ -229,7 +241,7 @@ def test_a_refused_signal_is_journalled_with_its_context(monkeypatch, _journal_t
 def test_outcome_survives_a_non_json_error_body(monkeypatch, _journal_to_tmp):
     """A gateway error page must not stop the cycle being journalled."""
     monkeypatch.setattr(hb, "fetch_news", lambda t: ["news"])
-    monkeypatch.setattr(hb, "call_llm", lambda s, u, j: json.dumps({"ticker": "AAPL", "bias": "BULLISH", "conviction": 0.9, "rationale": "r"}))
+    monkeypatch.setattr(hb, "call_llm", lambda s, u, j: completion({"ticker": "AAPL", "bias": "BULLISH", "conviction": 0.9, "rationale": "r"}))
     monkeypatch.setattr(
         hb, "post_signal",
         lambda s, dispatcher=None: _webhook_outcome(httpx.Response(502, text="bad gateway")),
