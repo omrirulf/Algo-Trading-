@@ -156,6 +156,104 @@ jobs:
           fi
           echo "OK: scores and key_factors are inert"
 
+      - name: Instrument kind is never taken from the signal
+        # An ETF's position cap is four times a single name's. That makes the
+        # classification a privilege boundary: if a model could assert its own
+        # instrument kind, it could quadruple its position by claiming one.
+        #
+        # Two halves. First, the schema stays closed to anything kind-shaped,
+        # so there is no field to smuggle it through -- extra="forbid" already
+        # rejects unknown keys, and this stops one being *added*. Second, the
+        # cap constant is readable only where it is defined and applied, so a
+        # future caller cannot select it from signal content.
+        run: |
+          schema=$(grep -nE '^\s+(instrument|asset_class|kind|is_etf|security_type)\b' \
+                     app/schemas.py || true)
+          if [ -n "$schema" ]; then
+            echo "$schema"
+            echo "::error::LLMSignal must not carry an instrument-kind field"
+            exit 1
+          fi
+          hits=$(grep -rn 'MAX_ETF_POSITION_PCT' --include='*.py' app orchestrator config \
+                 | grep -vE '^(config/settings\.py|app/risk_engine\.py):' || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::the ETF cap may only be read by risk_engine.max_position_pct_for"
+            exit 1
+          fi
+          # Stdlib only: this job installs no dependencies, so a check that
+          # imports the app cannot run here. Reading the source is the
+          # stronger check anyway -- it holds even when the app does not
+          # import.
+          python3 - <<'PY'
+          import ast, sys
+          BANNED = {"instrument", "instrument_kind", "asset_class", "kind",
+                    "is_etf", "security_type"}
+          tree = ast.parse(open("app/schemas.py").read())
+          signal = next((n for n in ast.walk(tree)
+                         if isinstance(n, ast.ClassDef) and n.name == "LLMSignal"), None)
+          if signal is None:
+              sys.exit("::error::LLMSignal not found in app/schemas.py")
+          fields = {t.target.id for t in signal.body
+                    if isinstance(t, ast.AnnAssign) and isinstance(t.target, ast.Name)}
+          leaked = sorted(fields & BANNED)
+          if leaked:
+              sys.exit(f"::error::LLMSignal carries an instrument-kind field: {', '.join(leaked)}")
+          # extra="forbid" is what makes the field set closed. Without it an
+          # invented key would be ignored rather than rejected, and the list
+          # above would only be as good as our imagination.
+          config = next((a.value for a in signal.body
+                         if isinstance(a, ast.Assign)
+                         and any(getattr(t, "id", "") == "model_config" for t in a.targets)), None)
+          forbids = isinstance(config, ast.Call) and any(
+              kw.arg == "extra" and getattr(kw.value, "value", None) == "forbid"
+              for kw in config.keywords)
+          if not forbids:
+              sys.exit('::error::LLMSignal must set extra="forbid" to stay a closed field set')
+          print("OK: no signal field can declare an instrument kind")
+          PY
+
+      - name: Total exposure is bounded by the gross cap
+        # The per-ticker caps do not bound the portfolio: ten positions at the
+        # ETF cap would be 200% of equity. The gross check is the only one
+        # that sees every holding at once, so it is what actually guarantees
+        # the cash floor -- and it must run on the execution path, not merely
+        # exist in risk_engine.
+        run: |
+          for symbol in gross_exposure_headroom MAX_GROSS_EXPOSURE_PCT; do
+            grep -q "$symbol" app/execution_engine.py || {
+              echo "::error::execution engine does not enforce $symbol"
+              exit 1
+            }
+          done
+          # Stdlib only, and reading the literals rather than importing:
+          # config/settings.py imports pydantic, which this job does not have.
+          python3 - <<'PY'
+          import ast, sys
+          WANTED = ("MAX_POSITION_PCT", "MAX_ETF_POSITION_PCT", "MAX_GROSS_EXPOSURE_PCT")
+          tree = ast.parse(open("config/settings.py").read())
+          caps = {n.target.id: n.value.value for n in tree.body
+                  if isinstance(n, ast.AnnAssign) and isinstance(n.target, ast.Name)
+                  and n.target.id in WANTED and isinstance(n.value, ast.Constant)}
+          missing = [name for name in WANTED if name not in caps]
+          if missing:
+              sys.exit(f"::error::cap constants not found as literals: {', '.join(missing)}")
+          single, etf, gross = (caps[n] for n in WANTED)
+          if not 0 < gross < 1:
+              sys.exit(f"::error::gross cap {gross} must leave a cash floor")
+          if etf > gross or single > gross:
+              sys.exit("::error::one position could consume the whole portfolio cap")
+          if etf <= single:
+              sys.exit("::error::the ETF cap must exceed the single-name cap or it is pointless")
+          # Risk per trade scales as cap/volatility. A fund is typically
+          # 1.5-2x quieter than a single name, so a cap ratio far above that
+          # is leverage rather than diversification -- the measurement lives
+          # in backtest/compare_sleeves.py.
+          if etf / single > 2.5:
+              sys.exit(f"::error::ETF cap is {etf / single:g}x the single-name cap; not justified by volatility")
+          print(f"OK: {single:.0%} / {etf:.0%} per position, {gross:.0%} gross")
+          PY
+
       - name: Market context carries no credentials
         # yfinance is unauthenticated. If the enrichment modules ever start
         # reading a secret, they stop being safe to run beside the LLM.

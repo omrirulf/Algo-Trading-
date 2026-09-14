@@ -190,7 +190,9 @@ detail on what each one prevents is in [Guardrails](/guardrails).
 
 | Constant | Value | Meaning |
 |---|---|---|
-| `MAX_POSITION_PCT` | `0.05` | Max fraction of equity in one ticker, including existing exposure. |
+| `MAX_POSITION_PCT` | `0.05` | Max fraction of equity in one **single name**, including existing exposure. |
+| `MAX_ETF_POSITION_PCT` | `0.12` | The same cap for an **index fund**. Sized against volatility, not picked round — see [Guardrails](/guardrails). |
+| `MAX_GROSS_EXPOSURE_PCT` | `0.6` | Ceiling on total deployed capital across every position. Leaves a 40% cash floor. |
 | `MIN_CONVICTION` | `0.60` | Signals below this are rejected before any market data is fetched. |
 | `MAX_OPEN_POSITIONS` | `10` | Max distinct tickers held at once. |
 | `ATR_PERIOD` | `14` | Wilder ATR lookback, in trading days. |

@@ -33,7 +33,7 @@ algo-trading-system/
 ├── app/
 │   ├── main.py                # FastAPI app + /webhook/signal endpoint
 │   ├── schemas.py             # LLMSignal (extra="forbid") + ExecutionResult
-│   ├── risk_engine.py         # position sizing (5% cap) + ATR stop-loss math
+│   ├── risk_engine.py         # position sizing (per-instrument caps) + ATR stops
 │   ├── market_data.py         # yfinance-based ATR / price fetch
 │   ├── broker_client.py       # Alpaca paper trading client (only module with keys)
 │   ├── execution_engine.py    # orchestrates validate -> size -> stop -> submit
@@ -328,8 +328,13 @@ loops in the meantime:
 python replay/replay_journal.py --dry-run --limit 3
 python replay/replay_journal.py --system-prompt v2.txt --limit 20
 
-# What a 2x ATR stop and a 5% cap actually do, over two years of real bars.
+# What a 2x ATR stop and the position caps actually do, over two years of real bars.
 python backtest/run_backtest.py AAPL
+
+# Do index funds and single names behave differently under the risk engine?
+# Each sleeve is replayed under its own cap. Needs no credentials; the
+# "compare sleeves" Actions workflow runs it where Yahoo is reachable.
+python backtest/compare_sleeves.py
 
 # What a cycle actually costs, and whether a cheaper model would behave the same.
 python replay/compare_models.py --dry-run
@@ -404,8 +409,9 @@ Try adding `"quantity": 500` to that payload — it will be rejected with a
 | Scores and `key_factors` cannot influence a trade | Only `bias` and `conviction` are read by `execution_engine.py`; CI greps the execution path for the transparency fields |
 | Enriched context can't reach for a credential | CI greps `context.py` / `technicals.py` / `fundamentals.py` / `analysts.py` for settings and key reads |
 | The scorer cannot trade | CI greps `analysis/` for any order path or file write — it grades past decisions and must never be able to make one |
-| Prompt injection has a bounded blast radius | Headlines and firm names are third-party text. The system prompt marks the whole context block untrusted, and even a successful injection can only move `bias`/`conviction` — still subject to the conviction floor, the 5% cap, and a mandatory stop |
-| Max 5% of equity per ticker | `risk_engine.calculate_position_size()` (checked twice: pre- and post-rounding; existing exposure in the ticker counts toward the cap) |
+| Prompt injection has a bounded blast radius | Headlines and firm names are third-party text. The system prompt marks the whole context block untrusted, and even a successful injection can only move `bias`/`conviction` — still subject to the conviction floor, the per-instrument cap, the gross exposure cap, and a mandatory stop |
+| Max 5% of equity per single name, 12% per index fund | `risk_engine.calculate_position_size()` (checked twice: pre- and post-rounding; existing exposure counts). The cap comes from `config/instruments.py` via `max_position_pct_for()` — never from the signal, which has no field that could carry an instrument kind |
+| Max 60% of equity deployed in total | `risk_engine.check_gross_exposure_limit()` — the only check that sees every holding at once, so it is what guarantees the 40% cash floor |
 | Mandatory stop-loss on every order | `broker_client.submit_bracket_order()` — no code path submits without `StopLossRequest` (Alpaca OTO: market entry + attached stop) |
 | Stop distance from real volatility | `market_data.calculate_atr()` (Wilder ATR from yfinance OHLC), rejected if ATR is degenerate |
 | Conviction floor | `risk_engine.check_conviction_threshold()` |
@@ -427,7 +433,7 @@ Try adding `"quantity": 500` to that payload — it will be rejected with a
 5. Open position in the opposite direction → `REJECTED`.
 6. Fetch latest close and 14-day ATR; ATR below `MIN_ATR_PCT_OF_PRICE` → `REJECTED`.
 7. Stop = entry ∓ `ATR_STOP_MULTIPLIER` × ATR (long / short).
-8. Size = floor((5% × equity − existing exposure) / price); 0 shares → `REJECTED`.
+8. Size = floor((cap × equity − existing exposure) / price), further bounded by remaining gross-exposure headroom; 0 shares → `REJECTED`. The cap is 5% for a single name and 12% for an index fund, resolved from the ticker.
 9. Submit market entry with attached stop → `ACCEPTED`.
 
 Any broker / market-data failure produces an `ERROR` result rather than an

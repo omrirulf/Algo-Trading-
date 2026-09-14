@@ -27,6 +27,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+from config.instruments import is_index_fund
 from orchestrator import analysts, fundamentals, insiders, technicals
 from orchestrator.technicals import TechnicalSnapshot
 
@@ -197,6 +198,14 @@ ENRICHMENT_SECTIONS = (
     ("INSIDER ACTIVITY", "insiders"),
 )
 
+#: Sections that only exist for a company. A fund has no analysts publishing
+#: targets on it and no insiders filing Form 4 -- so for an index these are
+#: omitted outright rather than rendered as "unavailable this cycle". The
+#: difference is not cosmetic: "we tried and failed" invites the model to
+#: wonder what it missed, while a section that was never there is simply not
+#: part of the question.
+SINGLE_NAME_ONLY_SECTIONS = frozenset({"analysts", "insiders"})
+
 
 @dataclass(frozen=True)
 class TickerContext:
@@ -223,10 +232,12 @@ class TickerContext:
         }
 
     def as_prompt(self) -> str:
+        fund = is_index_fund(self.ticker)
         sections = [f"TICKER: {self.ticker}", self._news_section()]
         sections.extend(
             self._section(title, getattr(self, attribute))
             for title, attribute in ENRICHMENT_SECTIONS
+            if not (fund and attribute in SINGLE_NAME_ONLY_SECTIONS)
         )
         if self.gaps:
             sections.append(
@@ -258,6 +269,11 @@ def gather(
     technical_snapshot = _build_technicals(raw, gaps)
     last_close = technical_snapshot.last_close if technical_snapshot else None
 
+    # A fund has no analyst coverage and no Form 4 filings. Skipping the two
+    # builds keeps their failures from being recorded as "gaps", which would
+    # tell the model to score as 0.0 something that was never on offer.
+    company = not is_index_fund(ticker)
+
     fundamental_snapshot = None
     analyst_snapshot = None
     if raw.info:
@@ -266,6 +282,7 @@ def gather(
             "fundamentals",
             gaps,
         )
+    if raw.info and company:
         analyst_snapshot = _attempt(
             lambda: analysts.build_snapshot(
                 info=raw.info,
@@ -283,7 +300,9 @@ def gather(
     # returned an empty frame is real information -- nobody traded -- and the
     # snapshot says so.
     insider_snapshot = None
-    if raw.insider_purchases is not None or raw.insider_transactions is not None:
+    if company and (
+        raw.insider_purchases is not None or raw.insider_transactions is not None
+    ):
         insider_snapshot = _attempt(
             lambda: insiders.build_snapshot(
                 purchases=raw.insider_purchases,

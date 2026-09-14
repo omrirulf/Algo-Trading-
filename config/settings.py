@@ -25,6 +25,40 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 #: including any position already held in that ticker.
 MAX_POSITION_PCT: Final[float] = 0.05
 
+#: The same cap for an index fund, which is a different kind of bet. A broad
+#: fund is already hundreds of positions, so holding one at the single-name
+#: cap buys 5% of equity exposure and leaves the account in cash -- the
+#: diversification argument for indices and a 5% cap cancel each other out.
+#: Sized against volatility rather than picked for roundness. Risk per trade
+#: is roughly ``cap / volatility``, so a cap N times larger on an instrument
+#: only M times quieter multiplies the risk the stop actually carries by N/M.
+#: A first pass at 20% measured ~1.9x the planned risk per trade of a single
+#: name -- bigger, not safer. 12% keeps it near parity while still buying
+#: enough exposure for an index position to matter.
+#:
+#: This is a starting point, not a finding: ``backtest/compare_sleeves.py``
+#: on real bars is what should set it, and the 'risk/trade' column is the one
+#: to tune against.
+#:
+#: Still above the single-name cap, because a fund's tail is truncated in a
+#: way a company's is not -- an index does not go to zero on a fraud or a
+#: failed trial.
+#:
+#: The kind is resolved from ``config.instruments``, never from the signal:
+#: this constant is exactly the reason a model must not be able to assert its
+#: own instrument type.
+MAX_ETF_POSITION_PCT: Final[float] = 0.12
+
+#: Ceiling on total deployed capital, as a fraction of equity, across every
+#: open position. Without it the two caps above multiply out to leverage: ten
+#: positions at the ETF cap would be 200% of the account.
+#:
+#: This is the one guardrail that got *looser* when the index sleeve landed.
+#: It used to be implicit at 50% (``MAX_OPEN_POSITIONS * MAX_POSITION_PCT``)
+#: and is now an explicit 60%, so the account keeps a 40% cash floor at all
+#: times.
+MAX_GROSS_EXPOSURE_PCT: Final[float] = 0.60
+
 #: Signals with conviction below this are rejected before any market data is
 #: fetched.
 MIN_CONVICTION: Final[float] = 0.60
