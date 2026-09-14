@@ -1,6 +1,6 @@
 ---
 title: "Testing"
-description: "545 tests, zero network calls, zero credentials"
+description: "561 tests, zero network calls, zero credentials"
 ---
 
 ```bash
@@ -78,6 +78,7 @@ before the fixture replaces it.
 | `test_order_idempotency.py` | 26 | That a retried submit cannot become a second position: the id is stable within a heartbeat window and distinct across ticker, side and window; a duplicate rejection is recognised while an ordinary failure is not; and a suppressed duplicate is reported `REJECTED`, never `ERROR`. Both halves were proved load-bearing by removal. |
 | `test_webhook.py` | 12 | HTTP auth (401 on a bad secret), 422 on smuggled fields, that importing `app.main` needs no credentials, and correct handling of rejections. |
 | `test_heartbeat.py` | 18 | The orchestrator can only ever send the closed signal shape; news failures skip the ticker while context gaps do not; missing credentials are logged per-ticker without killing the scheduler. |
+| `test_watchlist.py` | 16 | That the curated list is the default, has no duplicates and no malformed tickers, that every bucket is reachable, that cost scales with length — and, as a regression test, that `BRIGHTDATA_SERP_ZONE` no longer defaults to a name, which had made the Web Unlocker fallback unreachable. |
 | `test_news.py` | 49 | Bright Data request shape, response parsing (including the wrapped and fallback-key shapes), every `NewsFetchError` condition, and credential resolution: settings before the CLI's env var before its stored login, every credential-file shape tolerated, an unreadable file degrading rather than raising, and the token never reaching the logs. Also zone resolution: the SERP zone before the CLI's unlocker zone, the unlocker zone actually reaching the request body, and the missing-zone error naming both variables. |
 | `test_llm.py` | 30 | Schema derivation can't drift from `LLMSignal` — including that `Optional[float]` is collapsed to a concrete type rather than pruned to an unconstrained `{}`, that `description` survives, and that every property comes back required. Also the request shape, every `LLMError` condition, the refusal fallback, and that a blank API key defers to `ant auth login` rather than failing at construction. |
 | `test_technicals.py` | 16 | SMAs, Wilder RSI, MACD, trailing returns, the 52-week range, ATR% and volume ratio against reference values — and that too few bars yields `None` (rendered `n/a`) instead of raising. |

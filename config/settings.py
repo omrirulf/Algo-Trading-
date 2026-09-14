@@ -67,6 +67,8 @@ AUDIT_LOG_PATH: Final[Path] = LOG_DIR / "execution_audit.log"
 #: that one records what the engine did, this one records what the model saw.
 SIGNAL_JOURNAL_PATH: Final[Path] = LOG_DIR / "signal_journal.log"
 
+from config.watchlist import default_watchlist_csv
+
 # --------------------------------------------------------------------------- #
 # Environment-backed settings (secrets & wiring only)
 # --------------------------------------------------------------------------- #
@@ -99,13 +101,31 @@ class Settings(BaseSettings):
         description="Where the orchestrator POSTs validated signals",
     )
     watchlist: str = Field(
-        default="AAPL,MSFT,NVDA",
-        description="Comma-separated tickers the orchestrator evaluates each cycle",
+        default_factory=default_watchlist_csv,
+        description=(
+            "Comma-separated tickers evaluated each cycle. Defaults to the "
+            "curated list in config/watchlist.py, which is version-controlled "
+            "so a change to what gets traded shows up in a diff"
+        ),
     )
     anthropic_api_key: str = Field(default="", description="Claude API key (orchestrator only)")
     brightdata_api_token: str = Field(default="", description="Bright Data API token (orchestrator only)")
     brightdata_serp_zone: str = Field(
-        default="serp_api", description="Name of the SERP API zone in the Bright Data dashboard"
+        default="",
+        description=(
+            "Name of your Bright Data SERP API zone. Deliberately empty by "
+            "default: it used to default to 'serp_api', which meant the "
+            "unlocker-zone fallback below could never fire and anyone who had "
+            "only run `brightdata login` sent a zone name their account did "
+            "not have"
+        ),
+    )
+    brightdata_unlocker_zone: str = Field(
+        default="cli_unlocker",
+        description=(
+            "Web Unlocker zone, used when no SERP zone exists. Defaults to the "
+            "zone `brightdata login` creates, so the CLI path needs no config"
+        ),
     )
 
     @property
