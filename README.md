@@ -311,6 +311,30 @@ readable from the GitHub mobile app. Add `ALPACA_API_KEY`, `ALPACA_SECRET_KEY`,
 once by hand from the Actions tab as a smoke test. Full setup and caveats in
 [Deployment](docs/deployment.mdx).
 
+## Iterate without waiting
+
+The scorer needs ~20 signals before it says anything. Two tools close faster
+loops in the meantime:
+
+```bash
+# Change the prompt, see how the model would have answered context it was
+# already shown. --dry-run costs nothing.
+python replay/replay_journal.py --dry-run --limit 3
+python replay/replay_journal.py --system-prompt v2.txt --limit 20
+
+# What a 2x ATR stop and a 5% cap actually do, over two years of real bars.
+python backtest/run_backtest.py AAPL
+```
+
+[Replay](docs/replay.mdx) is honest because the context was captured live;
+a backtest of the *strategy* would not be, since fundamentals and analyst
+ratings are current-snapshot only and a SERP query cannot be time-travelled.
+[The risk-engine backtest](docs/backtest.mdx) sidesteps that by testing only
+the deterministic half -- and reports that its own returns are not an edge.
+
+The backtest needs no credentials and no live cycles, so it is the one piece
+of evidence available before the first cycle ever runs.
+
 ## Score the signals
 
 ```bash

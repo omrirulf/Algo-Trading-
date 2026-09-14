@@ -1,0 +1,118 @@
+---
+title: "Replay"
+description: "Change the prompt, see how the model would have answered the same real inputs"
+---
+
+The scorer tells you whether signals were any good, but it needs about twenty
+of them before it will say anything — weeks of live cycles. The replay harness
+closes a different loop, immediately: **change the prompt and see what the
+model would have said about the context it has already been shown.**
+
+```bash
+python replay/replay_journal.py --dry-run --limit 3          # costs nothing
+python replay/replay_journal.py --system-prompt v2.txt --limit 20
+```
+
+## Why this is honest when a backtest would not be
+
+A backtest of this strategy is not possible without lying. Fundamentals and
+analyst ratings are current-snapshot only — today's P/E is not March's — and a
+SERP query cannot be time-travelled. Replaying those against a past date is
+look-ahead bias, and it produces a beautiful, meaningless result.
+
+Replay has no such problem. **The context was captured live**, at the moment
+the decision was made, and the journal recorded all of it. Nothing here
+reconstructs a past the model never saw.
+
+## The one thing that could make it dishonest
+
+The journal stores `TickerContext.as_dict()`, but the prompt is rendered by
+`as_prompt()` from the snapshot *objects*. Rebuilding is where a replay can
+quietly stop measuring what it claims to.
+
+`asdict()` recurses, so `InsiderSnapshot.buys` — a list of `InsiderTrade` —
+comes back as a list of plain dicts, and `as_lines()` raises on the first one:
+
+```python
+InsiderSnapshot(**asdict(snapshot))   # AttributeError: 'dict' object has no attribute 'render'
+```
+
+So the guarantee is pinned by a test rather than assumed:
+
+```python
+def test_a_rebuilt_context_renders_an_identical_prompt():
+    original = full_context()
+    assert prompt_from_dict(original.as_dict()) == original.as_prompt()
+```
+
+<Note>
+  That test was verified to fail when the nested-trade handling is removed —
+  three tests go red. A guarantee nobody has watched break is not a guarantee.
+</Note>
+
+Schema drift is tolerated on purpose, the same way the journal reader tolerates
+it: a line written before `insiders` existed rebuilds with that dimension
+absent, and a field a newer schema added is ignored rather than fatal. The
+archive is only valuable if old lines stay readable.
+
+## What the report shows
+
+Changes are graded by **consequence**, not by how many fields moved. A
+conviction shift from 0.90 to 0.85 changes nothing the engine will ever act on;
+a shift across `MIN_CONVICTION` changes whether a trade happens at all.
+
+| Change | Consequential |
+|---|---|
+| Bias flip | Yes — a different trade, or none |
+| Crossed the 0.60 floor | Yes — the only threshold the engine measures against |
+| A cycle that failed now produces a signal | Yes |
+| Conviction 0.90 → 0.85 | No |
+| A dimension score moved | No — scores are inert by design |
+
+```
+WHAT WOULD CHANGE
+Consequential changes : 1 of 3
+  bias flips          : 1
+  floor crossings     : 1   (the 0.60 threshold the engine actually uses)
+
+Mean conviction change: +0.163 -- the new prompt is systematically bolder
+  A uniform shift is not better calibration; it just moves
+  signals across the 0.60 floor.
+```
+
+<Warning>
+  **A prompt that changes more signals is not thereby a better prompt.** The
+  comparison is against that cycle's answer, not against the market. Replay
+  tells you what a prompt edit *does*; only [Scoring](/scoring) — against
+  realised returns — can tell you whether it helped.
+</Warning>
+
+## It cannot trade, and cannot corrupt the archive
+
+This is a tool you run repeatedly and casually while iterating, so its blast
+radius is checked by CI rather than by care:
+
+```bash
+grep -rnE '(submit_order|ExecutionEngine|post_signal|AlpacaPaperBroker|\.write_text\()' replay/
+```
+
+No order path, and no writing the journal it reads — appending replayed signals
+would corrupt the only record of what the model actually said at the time. Same
+guarantee the scorer carries, for the same reason.
+
+## Options
+
+| Flag | Effect |
+|---|---|
+| `--dry-run` | Rebuild and print the prompts. No model calls, no cost. |
+| `--limit N` | Replay the newest N entries (default 10). Each entry is one model call. |
+| `--ticker` | Only that ticker. |
+| `--system-prompt FILE` | The prompt to try. Defaults to the live one, which makes the run a consistency check. |
+| `--json` | Machine-readable. |
+| `--verbose` | Every entry, not only the consequential ones. |
+
+<Note>
+  `--dry-run` is the right first move after any prompt edit: it shows exactly
+  what the model was given, costs nothing, and catches a rebuild problem before
+  you spend a single call.
+</Note>

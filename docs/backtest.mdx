@@ -1,0 +1,107 @@
+---
+title: "Risk-engine backtest"
+description: "What a 2× ATR stop and a 5% cap actually do, without waiting for live trades"
+---
+
+The model's judgement cannot be reconstructed from price history, so the
+*strategy* cannot be backtested. The deterministic half can: the ATR stop and
+the position cap are pure functions of price and volatility, and two years of
+real bars answer questions that otherwise need months of live trading.
+
+```bash
+python backtest/run_backtest.py AAPL
+python backtest/run_backtest.py AAPL --csv bars.csv    # offline, reproducible
+```
+
+## What it tells you
+
+```
+STOP MULTIPLIER  (currently ATR_STOP_MULTIPLIER = 2)
+setting          n   stopped   gapped  risk/trade  median ret    worst
+1x ATR          98     73.5%     2.8%       0.14%      -2.54%   -0.18%
+2x ATR          98     41.8%     4.9%       0.27%      -2.46%   -0.32%  <- current
+4x ATR          98     10.2%     0.0%       0.54%      -2.20%   -0.56%
+```
+
+Two things worth knowing before you tune anything:
+
+**A 5% position cap does not put 5% at risk.** What you actually risk is
+quantity × stop distance. At a 2× ATR stop that is around **0.27%** of equity
+per trade — twenty times smaller than the cap suggests. `risk/trade` is the
+number the two settings jointly decide, and the one worth reasoning about.
+
+**A tighter stop is not a safer one.** At 1× ATR nearly three quarters of
+trades stop out, which is noise rather than protection, and the share that
+*gaps through* the stop — filling worse than it — rises as the stop tightens.
+That is the part a stop cannot protect you from at all.
+
+## Three things that decide whether the output means anything
+
+Each is a way a backtest quietly flatters itself, and each is pinned by a test
+that was verified to fail when the guard is removed.
+
+<AccordionGroup>
+  <Accordion title="No look-ahead">
+    ATR comes from bars up to and including the signal bar; entry is the
+    *next* bar's open. A stop sized with volatility the trader could not yet
+    have seen would understate stop-outs.
+
+    Tested by running the same signal against two futures — one calm, one with
+    a volatility explosion — and asserting the ATR and stop are identical.
+  </Accordion>
+  <Accordion title="Stops are intraday, not at the close">
+    A stop is hit when the bar's **Low** crosses it. Checking closes would
+    understate stop-outs dramatically, because most stops are hit and
+    recovered within a session.
+
+    Tested with a bar that dips far below the stop and closes above it.
+  </Accordion>
+  <Accordion title="Gaps fill worse than the stop">
+    If a bar opens through the stop, the fill is the **open**, not the stop
+    price. Assuming you always get your stop is the most common way a backtest
+    invents money it would never have had.
+
+    Tested with an overnight gap far below the stop, asserting the fill is the
+    open and is worse than the stop.
+  </Accordion>
+</AccordionGroup>
+
+<Note>
+  The stop and size come from `app.risk_engine` itself, not a reimplementation.
+  Measuring a copy would measure the wrong code — and a copy would be free to
+  drift from the thing that actually trades.
+</Note>
+
+## What it does not measure
+
+<Warning>
+  **There is no signal here.** Trades are opened at fixed intervals with no
+  view attached, so the returns column describes the price series, not an edge.
+  A multiplier that looks best by median return is telling you about those
+  particular bars.
+
+  Read `stopped`, `gapped` and `risk/trade` — those are mechanical and do not
+  depend on signal quality. For whether the *signals* are any good, the only
+  honest answer is [Scoring](/scoring) against realised returns.
+</Warning>
+
+Also not modelled: slippage, commission, and the interaction between positions
+that `MAX_OPEN_POSITIONS` governs. Rows with fewer than 20 trades are marked
+`(thin)`, the same threshold the signal scorer uses.
+
+## Options
+
+| Flag | Effect |
+|---|---|
+| `--csv FILE` | Read bars from disk instead of yfinance — reproducible and offline. |
+| `--period` | yfinance period (default `2y`). |
+| `--side` | `buy` or `sell`. |
+| `--horizon N` | Days held if never stopped (default 10). |
+| `--every N` | Open a trade every N bars (default 5), so trades overlap less. |
+| `--json` | Machine-readable. |
+
+<Note>
+  Overlapping trades share the same price moves, which would make any hit rate
+  look more precise than it is. `--every` is what keeps the samples closer to
+  independent.
+</Note>
