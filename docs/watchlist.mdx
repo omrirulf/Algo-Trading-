@@ -1,0 +1,112 @@
+---
+title: "Watchlist"
+description: "What gets evaluated each cycle, why it is individual equities, and what it costs"
+---
+
+The watchlist lives in `config/watchlist.py`, not in an environment variable, so
+a change to what gets traded shows up in a diff — the same reasoning that keeps
+the guardrail thresholds in code.
+
+```python
+from config.watchlist import DEFAULT_WATCHLIST, BUCKETS
+```
+
+| Bucket | Count | Tickers |
+|---|---|---|
+| US sectors | 10 | MSFT, NVDA, GOOGL, JPM, UNH, LLY, PG, COST, CAT, NEE |
+| Europe (ADR) | 6 | ASML, SAP, NVO, SHEL, AZN, UL |
+| Israel | 6 | TEVA, CHKP, NICE, CYBR, MNDY, ESLT |
+| Emerging (ADR) | 4 | TSM, INFY, HDB, VALE |
+| Commodity producers | 4 | XOM, NEM, FCX, NTR |
+
+## Why not AAPL, MSFT, NVDA
+
+That was the default from the first commit, and it was a placeholder rather than
+a choice. Three US mega-cap technology names move together closely enough that
+they are nearer **one position than three** — the opposite of what a watchlist
+is for. Breadth across sector, geography and asset driver is the point.
+
+## Why individual equities, not ETFs
+
+The obvious way to reach Europe or gold is `VGK` and `GLD`. It does not work
+here, and the reason is structural rather than taste.
+
+This pipeline builds a **five-dimension** prompt: news, technicals,
+fundamentals, the analyst view, and insider filings. An ETF has no earnings, no
+margins, no price targets and no Form 4 filings, and a Google News query for its
+ticker returns almost nothing.
+
+<Warning>
+  **Four of the five dimensions come back empty for an ETF.** The prompt names
+  them as gaps and the model is told to score them `0.0`, so what actually runs
+  is a technicals-only strategy that nothing here has tested — exactly the
+  failure mode the [news-skip rule](/orchestrator/news) exists to prevent.
+</Warning>
+
+So geography and commodity exposure come through *companies* that happen to be
+US-listed: ADRs for Europe and Asia, US-listed Israeli issuers, and **producers**
+rather than the commodity itself. A gold miner has earnings, analysts and
+insiders; `GLD` has none of them. The exposure is less pure — a miner carries
+company risk the metal does not — and that is the price of keeping the strategy
+the one that was actually built.
+
+<Note>
+  One partial exception: insiders at foreign private issuers generally do not
+  file Form 4, so the insider dimension will usually be an honest gap for the
+  ADRs. That degrades one dimension of five, not four — and it shows up as a
+  named gap rather than a silent zero.
+</Note>
+
+## What this cannot reach
+
+Alpaca trades `us_equity`, `us_option` and `crypto` only — confirmed from the
+SDK's own `AssetClass` enum. There is **no path** to the Frankfurt, Paris,
+London or Tel Aviv order books, and none to futures, so physical oil and gold
+are out of reach whatever the watchlist says. Everything above is US-listed.
+
+## Cost scales with length
+
+One Bright Data request and one Claude call per ticker per cycle. Input is
+measured from the real prompt (~1,400 tokens); output is **assumed** at ~1,600
+tokens, priced at Opus 5's list rate:
+
+| Watchlist size | Rough Claude spend / month |
+|---|---|
+| 5 | ~$35 |
+| 15 | ~$104 |
+| 30 (default) | ~$207 |
+
+<Warning>
+  **These are estimates, and the assumed output length is the whole
+  uncertainty in them.** Output dominates the bill, so guessing it wrong moves
+  the total proportionally. Once you have run real cycles the journal carries
+  measured `usage` blocks — use those instead of this table, and see
+  [Cost](/cost) for how to read them and how to compare configurations.
+</Warning>
+
+<Note>
+  Assumes ~7 cycles per trading day (what the market-hours guard leaves) over 21
+  trading days, plus Bright Data on top.
+  `config.watchlist.estimated_monthly_cost_usd()` is the same arithmetic if you
+  want to try a different length.
+</Note>
+
+Trimming the list is one lever, but not the first one: **effort is cheaper to
+turn than length**, because thinking bills at the output rate. See
+[Cost](/cost). `HEARTBEAT_INTERVAL_MINUTES` is the third.
+
+<Warning>
+  **A longer list does not mean more positions.** `MAX_OPEN_POSITIONS` still
+  caps holdings at 10 and `MAX_POSITION_PCT` at 5% each. Breadth buys the model
+  more to choose between, not more exposure — see [Guardrails](/guardrails).
+</Warning>
+
+## Overriding it
+
+`WATCHLIST` still works and takes precedence, for a quick experiment:
+
+```bash
+WATCHLIST=MSFT,ASML python -m orchestrator.heartbeat --once
+```
+
+For a lasting change, edit `config/watchlist.py` so it lands in a commit.

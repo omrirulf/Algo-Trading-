@@ -123,7 +123,11 @@ are not read by the risk system."""
 def fetch_news(ticker: str) -> list[str]:
     """Return recent headlines / snippets for ``ticker`` from Bright Data."""
     settings = get_settings()
-    provider = BrightDataNewsProvider(settings.brightdata_api_token, settings.brightdata_serp_zone)
+    provider = BrightDataNewsProvider(
+        settings.brightdata_api_token,
+        settings.brightdata_serp_zone,
+        unlocker_zone=settings.brightdata_unlocker_zone,
+    )
     return provider.fetch(ticker)
 
 
