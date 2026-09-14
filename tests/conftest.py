@@ -15,6 +15,12 @@ class FakeBroker:
     equity: float = 100_000.0
     positions: list[OpenPosition] = field(default_factory=list)
     submitted: list[dict] = field(default_factory=list)
+    # Open by default so existing tests exercise the trading path; set False
+    # to test the closed-market gate.
+    market_open: bool = True
+
+    def is_market_open(self) -> bool:
+        return self.market_open
 
     def get_equity(self) -> float:
         return self.equity

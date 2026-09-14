@@ -275,13 +275,41 @@ stale. Two consequences worth knowing:
 
 ## Run
 
+One process, no webhook — `EXECUTION_MODE` defaults to `direct`:
+
+```bash
+python -m orchestrator.heartbeat --once   # one cycle, then exit
+python -m orchestrator.heartbeat          # schedule every HEARTBEAT_INTERVAL_MINUTES
+```
+
+A cycle exits immediately when Alpaca's clock says the market is shut, so
+running it off-hours costs nothing.
+
+<details>
+<summary>Two-process mode, if you want the engine on a different machine</summary>
+
 ```bash
 # Terminal 1: the deterministic execution engine
 uvicorn app.main:app --reload --port 8000
 
 # Terminal 2: the orchestrator
-python orchestrator/heartbeat.py
+EXECUTION_MODE=webhook python -m orchestrator.heartbeat
 ```
+
+Only this mode reads `WEBHOOK_SHARED_SECRET`. The trade-off either way is in
+[Deployment](docs/deployment.mdx): direct mode is simpler and needs no secret,
+but the orchestrator process then holds the Alpaca credentials.
+</details>
+
+## Run it on a schedule, without a server
+
+`.github/workflows/heartbeat.yml` runs a cycle hourly through US market hours
+and commits the journal back, so there is nothing to host and the logs are
+readable from the GitHub mobile app. Add `ALPACA_API_KEY`, `ALPACA_SECRET_KEY`,
+`ANTHROPIC_API_KEY` and `BRIGHTDATA_API_TOKEN` as Actions *secrets*, and
+`BRIGHTDATA_UNLOCKER_ZONE` plus `WATCHLIST` as Actions *variables*, then run it
+once by hand from the Actions tab as a smoke test. Full setup and caveats in
+[Deployment](docs/deployment.mdx).
 
 ## Iterate without waiting
 
@@ -303,6 +331,9 @@ a backtest of the *strategy* would not be, since fundamentals and analyst
 ratings are current-snapshot only and a SERP query cannot be time-travelled.
 [The risk-engine backtest](docs/backtest.mdx) sidesteps that by testing only
 the deterministic half -- and reports that its own returns are not an edge.
+
+The backtest needs no credentials and no live cycles, so it is the one piece
+of evidence available before the first cycle ever runs.
 
 ## Score the signals
 

@@ -102,6 +102,29 @@ jobs:
           fi
           echo "OK: paper=True is hard-coded and live CLI profiles are refused"
 
+      - name: A closed market cannot be traded into
+        # The engine gate is the safety property, not the scheduler's skip:
+        # a signal replayed by hand or delivered late must not open a
+        # position into a closed session.
+        run: |
+          if ! grep -q 'is_market_open' app/execution_engine.py; then
+            echo "::error::the market-hours gate is gone from execution_engine.py"
+            exit 1
+          fi
+          echo "OK: the engine checks market hours"
+
+      - name: Direct mode keeps the closed signal shape
+        # Removing the webhook removed an HTTP boundary, not the schema one.
+        # The dispatcher must hand the engine an LLMSignal and nothing else.
+        run: |
+          hits=$(grep -rnE '(model_construct|\.__dict__|setattr\()' orchestrator/dispatch.py || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::dispatch.py must not bypass LLMSignal validation"
+            exit 1
+          fi
+          echo "OK: direct mode cannot bypass the signal schema"
+
       - name: Guardrail thresholds are not environment-overridable
         # The whole point of config/settings.py is that MAX_POSITION_PCT and
         # friends are Final constants a bad .env cannot loosen.
@@ -136,6 +159,9 @@ jobs:
       - name: Market context carries no credentials
         # yfinance is unauthenticated. If the enrichment modules ever start
         # reading a secret, they stop being safe to run beside the LLM.
+        # dispatch.py is exempt for the same reason as news/llm: it is a
+        # delivery module that legitimately carries the webhook secret, not
+        # a context source.
         #
         # Stated as an exclusion rather than a file list: only heartbeat.py
         # (webhook + watchlist), news.py (Bright Data) and llm.py (Anthropic)
@@ -151,7 +177,7 @@ jobs:
         run: |
           hits=$(grep -rnE '(get_settings|os\.environ|getenv|\bsettings\.|\.[A-Za-z_]*(secret|api_key|_token|password)\b)' \
                    orchestrator --include='*.py' \
-                 | grep -vE '^orchestrator/(heartbeat|news|llm)\.py:' || true)
+                 | grep -vE '^orchestrator/(heartbeat|news|llm|dispatch)\.py:' || true)
           if [ -n "$hits" ]; then
             echo "$hits"
             echo "::error::market context modules must not read credentials"

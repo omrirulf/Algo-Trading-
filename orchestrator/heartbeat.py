@@ -22,6 +22,7 @@ be running a strategy nobody signed off on.
 from __future__ import annotations
 
 import json
+import argparse
 import logging
 import sys
 from pathlib import Path
@@ -39,6 +40,8 @@ from config.settings import get_settings  # noqa: E402
 from orchestrator import context, journal  # noqa: E402
 from orchestrator.context import TickerContext  # noqa: E402
 from orchestrator.llm import AnthropicSignalProvider, LLMError  # noqa: E402
+from app.broker_client import BrokerError  # noqa: E402
+from orchestrator.dispatch import Dispatcher, build_dispatcher  # noqa: E402
 from orchestrator.news import BrightDataNewsProvider, NewsFetchError  # noqa: E402
 
 log = logging.getLogger("heartbeat")
@@ -149,14 +152,9 @@ def parse_signal(raw_json: str) -> LLMSignal:
     return LLMSignal.model_validate(json.loads(raw_json))
 
 
-def post_signal(signal: LLMSignal, client: httpx.Client | None = None) -> httpx.Response:
-    settings = get_settings()
-    headers = {"x-webhook-secret": settings.webhook_shared_secret}
-    body = signal.model_dump(mode="json")
-    if client is None:
-        with httpx.Client(timeout=30.0) as c:
-            return c.post(settings.webhook_url, json=body, headers=headers)
-    return client.post(settings.webhook_url, json=body, headers=headers)
+def post_signal(signal: LLMSignal, dispatcher: Dispatcher | None = None) -> dict:
+    """Hand the signal to the engine, whichever way this deployment is wired."""
+    return (dispatcher or build_dispatcher()).dispatch(signal)
 
 
 def build_context(ticker: str) -> TickerContext:
@@ -164,7 +162,7 @@ def build_context(ticker: str) -> TickerContext:
     return context.gather(ticker, fetch_news(ticker))
 
 
-def process_ticker(ticker: str) -> None:
+def process_ticker(ticker: str, dispatcher: Dispatcher | None = None) -> None:
     try:
         ticker_context = build_context(ticker)
     except (NotImplementedError, NewsFetchError) as exc:
@@ -201,41 +199,67 @@ def process_ticker(ticker: str) -> None:
         return
 
     try:
-        resp = post_signal(signal)
+        outcome = post_signal(signal, dispatcher)
     except httpx.HTTPError as exc:
         log.error("%s: webhook unreachable: %s", ticker, exc)
         journal.record(ticker_context, signal, error=f"webhook unreachable: {exc}")
         return
+    except BrokerError as exc:
+        # Direct mode only: the engine could not be built or reached at all.
+        # Same shape of failure as an unreachable webhook, so it is logged and
+        # journalled the same way rather than killing the cycle.
+        log.error("%s: engine unavailable: %s", ticker, exc)
+        journal.record(ticker_context, signal, error=f"engine unavailable: {exc}")
+        return
 
-    log.info("%s -> HTTP %s %s", ticker, resp.status_code, resp.text[:300])
-    journal.record(ticker_context, signal, outcome=_outcome(resp))
-
-
-def _outcome(response: httpx.Response) -> dict:
-    """The engine's verdict, for the journal. Body may not be JSON on an error."""
-    outcome: dict = {"http_status": response.status_code}
-    try:
-        body = response.json()
-    except ValueError:
-        outcome["body"] = response.text[:500]
-        return outcome
-    if isinstance(body, dict):
-        outcome.update({key: body.get(key) for key in ("status", "reason", "quantity", "order_id")})
-    else:
-        outcome["body"] = body
-    return outcome
+    log.info("%s -> %s %s", ticker, outcome.get("status"), outcome.get("reason", ""))
+    journal.record(ticker_context, signal, outcome=outcome)
 
 
-def run_cycle() -> None:
+def run_cycle(dispatcher: Dispatcher | None = None) -> None:
     tickers = get_settings().watchlist_tickers
+    dispatcher = dispatcher or build_dispatcher()
+
+    # Asked before any news fetch or model call, because those are what a
+    # closed-market cycle actually wastes: at an hourly cadence only about a
+    # third of cycles fall in a session, so skipping the rest is most of the
+    # running cost. The engine re-checks this itself -- this is the cheap
+    # gate, not the authoritative one.
+    try:
+        if not dispatcher.is_market_open():
+            log.info("market is closed; skipping cycle")
+            return
+    except BrokerError as exc:
+        # Not fatal, and deliberately not a reason to skip: an unreachable
+        # clock must not silently halt trading. Proceed and let the engine's
+        # own gate decide, which fails closed if it cannot tell either.
+        log.warning("could not read market clock (%s); continuing", exc)
+
     log.info("heartbeat cycle start: %s", tickers)
     for ticker in tickers:
-        process_ticker(ticker)
+        process_ticker(ticker, dispatcher)
     log.info("heartbeat cycle end")
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description="Run the trading heartbeat.")
+    parser.add_argument(
+        "--once",
+        action="store_true",
+        help=(
+            "Run a single cycle and exit, instead of scheduling. This is the "
+            "mode for an external scheduler (cron, GitHub Actions): the "
+            "process must terminate or the job never finishes."
+        ),
+    )
+    args = parser.parse_args(argv)
+
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
+    if args.once:
+        run_cycle()
+        return
+
     scheduler = BlockingScheduler()
     scheduler.add_job(
         run_cycle,
