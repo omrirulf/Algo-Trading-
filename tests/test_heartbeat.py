@@ -25,6 +25,8 @@ from pydantic import ValidationError
 
 from app.schemas import LLMSignal
 from orchestrator import heartbeat as hb
+from orchestrator.fx import FxRate
+from orchestrator.news import NewsFetchError
 from config.settings import Settings
 
 
@@ -250,3 +252,267 @@ def test_outcome_survives_a_non_json_error_body(monkeypatch, _journal_to_tmp):
     hb.process_ticker("AAPL")
     entry = json.loads(_journal_to_tmp.read_text().splitlines()[0])
     assert entry["outcome"] == {"mode": "webhook", "http_status": 502, "body": "bad gateway"}
+
+
+# --- a cycle that reaches nothing must not report success -----------------
+#
+# The first scheduled run of the heartbeat workflow failed every one of 35
+# tickers on an unset BRIGHTDATA_API_TOKEN, wrote no journal line, committed
+# nothing, and exited 0. These pin the behaviour that turns that into a red
+# run, and -- just as importantly -- the cases that must stay green.
+
+
+def _watchlist(*tickers: str) -> Settings:
+    return Settings(watchlist=",".join(tickers), _env_file=None)
+
+
+def _result(ticker: str, stage: str, status: str | None = None, gaps: int = 0):
+    return hb.TickerResult(ticker, stage, status=status, gaps=gaps)
+
+
+def test_a_cycle_that_reached_the_engine_is_not_a_failure():
+    report = hb.CycleReport(
+        tickers=("AAPL",), results=(_result("AAPL", hb.COMPLETED, "ACCEPTED"),)
+    )
+    assert report.produced_nothing is False
+
+
+def test_rejecting_every_signal_is_not_a_failure():
+    """The conviction floor filtering everything is the system working.
+
+    This is the distinction the check turns on: "no trade" is a legitimate
+    outcome, "nothing was ever judged" is an outage.
+    """
+    report = hb.CycleReport(
+        tickers=("AAPL", "MSFT"),
+        results=(
+            _result("AAPL", hb.COMPLETED, "REJECTED"),
+            _result("MSFT", hb.COMPLETED, "REJECTED"),
+        ),
+    )
+    assert report.produced_nothing is False
+
+
+def test_every_ticker_failing_is_a_failure():
+    report = hb.CycleReport(
+        tickers=("AAPL", "MSFT"),
+        results=(
+            _result("AAPL", hb.CONTEXT_FAILED),
+            _result("MSFT", hb.CONTEXT_FAILED),
+        ),
+    )
+    assert report.produced_nothing is True
+
+
+def test_a_closed_market_is_not_a_failure():
+    """Nothing was attempted, so there is nothing to be loud about."""
+    report = hb.CycleReport(tickers=("AAPL",), market_closed=True)
+    assert report.produced_nothing is False
+
+
+def test_an_empty_watchlist_is_not_a_failure():
+    """A watchlist of nothing is a configuration choice, not an outage."""
+    assert hb.CycleReport(tickers=()).produced_nothing is False
+
+
+def test_one_survivor_keeps_the_cycle_green():
+    """34 of 35 dead is bad and visible; it is not 'the system did nothing'."""
+    report = hb.CycleReport(
+        tickers=("AAPL", "MSFT"),
+        results=(
+            _result("AAPL", hb.CONTEXT_FAILED),
+            _result("MSFT", hb.COMPLETED, "ACCEPTED"),
+        ),
+    )
+    assert report.produced_nothing is False
+
+
+# --- process_ticker reports where it stopped ------------------------------
+
+
+def test_a_news_outage_reports_a_context_failure(monkeypatch):
+    monkeypatch.setattr(hb, "get_settings", lambda: Settings(_env_file=None))
+    assert hb.process_ticker("AAPL").stage == hb.CONTEXT_FAILED
+
+
+def test_a_missing_llm_key_reports_a_model_failure(monkeypatch):
+    monkeypatch.setattr(hb, "fetch_news", lambda t: ["news"])
+    monkeypatch.setattr(hb, "get_settings", lambda: Settings(_env_file=None))
+    assert hb.process_ticker("AAPL").stage == hb.MODEL_FAILED
+
+
+def test_an_unreachable_webhook_reports_a_dispatch_failure(monkeypatch):
+    monkeypatch.setattr(hb, "fetch_news", lambda t: ["news"])
+    monkeypatch.setattr(
+        hb, "call_llm",
+        lambda s, u, j: completion({"ticker": "AAPL", "bias": "BULLISH", "conviction": 0.9, "rationale": "r"}),
+    )
+
+    def unreachable(signal, dispatcher=None):
+        raise httpx.ConnectError("connection refused")
+
+    monkeypatch.setattr(hb, "post_signal", unreachable)
+    assert hb.process_ticker("AAPL").stage == hb.DISPATCH_FAILED
+
+
+def test_a_completed_ticker_carries_the_engine_verdict(monkeypatch):
+    monkeypatch.setattr(hb, "fetch_news", lambda t: ["news"])
+    monkeypatch.setattr(
+        hb, "call_llm",
+        lambda s, u, j: completion({"ticker": "AAPL", "bias": "BULLISH", "conviction": 0.9, "rationale": "r"}),
+    )
+    monkeypatch.setattr(
+        hb, "post_signal", lambda s, dispatcher=None: {"status": "ACCEPTED", "reason": "ok"}
+    )
+
+    result = hb.process_ticker("AAPL")
+    assert result.stage == hb.COMPLETED
+    assert result.status == "ACCEPTED"
+
+
+# --- the exit code a scheduled job reads ----------------------------------
+
+
+def test_once_exits_non_zero_when_the_whole_cycle_died(monkeypatch):
+    """The regression this was built for: all news fetches fail, run goes red."""
+    monkeypatch.setattr(hb, "get_settings", lambda: _watchlist("AAPL", "MSFT"))
+    monkeypatch.setattr(hb, "build_dispatcher", lambda: _AlwaysOpen())
+    monkeypatch.setattr(hb, "fetch_fx_rate", lambda: FxRate(rate=3.0363))
+
+    def no_credentials(ticker):
+        raise NewsFetchError("No Bright Data credentials found")
+
+    monkeypatch.setattr(hb, "fetch_news", no_credentials)
+
+    with pytest.raises(SystemExit) as excinfo:
+        hb.main(["--once"])
+    assert excinfo.value.code == 1
+
+
+def test_once_exits_zero_when_signals_reached_the_engine(monkeypatch):
+    monkeypatch.setattr(hb, "get_settings", lambda: _watchlist("AAPL"))
+    monkeypatch.setattr(hb, "build_dispatcher", lambda: _AlwaysOpen())
+    monkeypatch.setattr(hb, "fetch_fx_rate", lambda: FxRate(rate=3.0363))
+    monkeypatch.setattr(hb, "fetch_news", lambda t: ["news"])
+    monkeypatch.setattr(
+        hb, "call_llm",
+        lambda s, u, j: completion({"ticker": "AAPL", "bias": "BULLISH", "conviction": 0.9, "rationale": "r"}),
+    )
+    monkeypatch.setattr(
+        hb, "post_signal", lambda s, dispatcher=None: {"status": "REJECTED", "reason": "floor"}
+    )
+
+    hb.main(["--once"])  # must not raise
+
+
+def test_once_exits_zero_when_the_market_is_closed(monkeypatch):
+    """A weekend run is not an outage, and must not page anyone."""
+    monkeypatch.setattr(hb, "get_settings", lambda: _watchlist("AAPL"))
+    monkeypatch.setattr(hb, "build_dispatcher", lambda: _AlwaysShut())
+
+    def unreachable(ticker):
+        raise AssertionError("fetched news for a closed market")
+
+    monkeypatch.setattr(hb, "fetch_news", unreachable)
+    hb.main(["--once"])  # must not raise
+
+
+class _AlwaysOpen:
+    def is_market_open(self) -> bool:
+        return True
+
+    def dispatch(self, signal) -> dict:
+        return {"status": "ACCEPTED", "reason": "ok"}
+
+
+class _AlwaysShut(_AlwaysOpen):
+    def is_market_open(self) -> bool:
+        return False
+
+
+# --- the job summary ------------------------------------------------------
+
+
+def test_summary_names_the_stage_everything_died_at():
+    report = hb.CycleReport(
+        tickers=("AAPL", "MSFT"),
+        results=(
+            _result("AAPL", hb.CONTEXT_FAILED),
+            _result("MSFT", hb.CONTEXT_FAILED),
+        ),
+        fx=FxRate(rate=3.0363),
+    )
+    text = hb.render_summary(report)
+    assert "Nothing reached the engine" in text
+    assert hb.STAGE_LABELS[hb.CONTEXT_FAILED] in text
+    # The hint that turns a red run into a fixed one.
+    assert "BRIGHTDATA_API_TOKEN" in text
+
+
+def test_summary_of_a_working_cycle_counts_the_verdicts():
+    report = hb.CycleReport(
+        tickers=("AAPL", "MSFT"),
+        results=(
+            _result("AAPL", hb.COMPLETED, "ACCEPTED"),
+            _result("MSFT", hb.COMPLETED, "REJECTED"),
+        ),
+        fx=FxRate(rate=3.0363),
+    )
+    text = hb.render_summary(report)
+    assert "2 of 2" in text
+    assert "| ACCEPTED | 1 |" in text
+    assert "| REJECTED | 1 |" in text
+    assert "Nothing reached the engine" not in text
+
+
+def test_summary_reports_a_closed_market_without_alarm():
+    text = hb.render_summary(hb.CycleReport(tickers=("AAPL",), market_closed=True))
+    assert "Market closed" in text
+    assert "Nothing reached the engine" not in text
+
+
+def test_summary_names_unavailable_fx_rather_than_omitting_it():
+    report = hb.CycleReport(
+        tickers=("AAPL",),
+        results=(_result("AAPL", hb.COMPLETED, "ACCEPTED"),),
+        fx=FxRate(gap="USD/ILS lookup failed"),
+    )
+    assert "USD/ILS unavailable" in hb.render_summary(report)
+
+
+def test_summary_counts_degraded_context():
+    report = hb.CycleReport(
+        tickers=("AAPL",),
+        results=(_result("AAPL", hb.COMPLETED, "ACCEPTED", gaps=3),),
+    )
+    assert "named context gaps" in hb.render_summary(report)
+
+
+def test_step_summary_is_written_only_inside_a_job(monkeypatch, tmp_path):
+    report = hb.CycleReport(
+        tickers=("AAPL",), results=(_result("AAPL", hb.COMPLETED, "ACCEPTED"),)
+    )
+
+    monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+    assert hb.write_step_summary(report) is False
+
+    target = tmp_path / "summary.md"
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(target))
+    assert hb.write_step_summary(report) is True
+    assert "Heartbeat cycle" in target.read_text()
+
+
+def test_step_summary_appends_rather_than_truncating(monkeypatch, tmp_path):
+    """Other steps write here too; clobbering their output would be rude."""
+    target = tmp_path / "summary.md"
+    target.write_text("## An earlier step\n")
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(target))
+
+    hb.write_step_summary(hb.CycleReport(tickers=("AAPL",), market_closed=True))
+    assert "An earlier step" in target.read_text()
+
+
+def test_an_unwritable_summary_does_not_fail_the_cycle(monkeypatch, tmp_path):
+    """A summary is a convenience. It must never cost a good cycle."""
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(tmp_path / "nope" / "summary.md"))
+    assert hb.write_step_summary(hb.CycleReport(tickers=())) is False

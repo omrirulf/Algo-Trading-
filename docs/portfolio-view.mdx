@@ -1,0 +1,174 @@
+---
+title: "Do we need a dashboard?"
+description: "Not for monitoring, and not yet — but the group cap stops being enforceable the moment there are two brokers, and that is a correctness problem, not a reporting one"
+---
+
+The question was whether a UI would help with monitoring, debugging, learning,
+process management and operations. The short answer is that four of those are
+better served by something cheaper, and the fifth — operations — turns out to
+hide a real defect rather than a missing view.
+
+<Note>
+  Written 2026-09-14, after the first scheduled run of the heartbeat workflow.
+  The finding in the next section is from that run's logs, not from reasoning.
+</Note>
+
+## The finding that reframed the question
+
+The first scheduled cycle ran on a Monday at 14:33 ET, with the market open. It
+failed all 35 tickers on an unset `BRIGHTDATA_API_TOKEN`, wrote no journal
+line, committed nothing, pushed nothing — and **exited 0**. The job showed a
+green tick.
+
+A dashboard would not have caught that. A dashboard over an empty archive shows
+an empty archive, and only to someone who remembers to open it. What catches it
+is an exit code, because a red run sends mail without being asked.
+
+That distinction runs through the whole answer: **monitoring is a push problem,
+and a UI is a pull surface.** The fix shipped alongside this page is
+[a cycle that reaches nothing failing loudly](/deployment), not a
+screen.
+
+## Where a UI earns its place, and where it does not
+
+| | Verdict |
+|---|---|
+| **Monitoring** | A job summary and a non-zero exit code do this. A screen you must remember to open does not. |
+| **Debugging** | Eventually yes. A journal line carries the whole context blob, and reading that as JSON-lines in a terminal is genuine friction — but [`store/query.py`](/database) covers the common questions, and there is no data yet. |
+| **Learning** | The strongest case, and a notebook wins it. "Does conviction predict returns" is exploratory analysis; it wants scatter plots and calibration curves, not a web app. [The scorer](/scoring) already computes the numbers. |
+| **Process management** | **Do not build this.** See below. |
+| **Operations** | Yes — but for a reason that is not about viewing. See below. |
+
+### Why a control surface would be a regression
+
+`config/watchlist.py` says why, and it is worth quoting rather than
+paraphrasing:
+
+> Version-controlled rather than an environment variable so a change to what
+> gets traded shows up in review — the same reasoning that keeps the guardrail
+> thresholds in code.
+
+[CI enforces that](/guardrails) by walking the AST: guardrail thresholds must
+be `Final` constants, and the instrument kind may never come from a signal. A
+button that edits the position cap moves a reviewed, tested, diffable decision
+into an unreviewed click. The system's best property is that changing what it
+trades requires a pull request. A UI that can place, close or resize a position
+gives up that property in exchange for convenience.
+
+Read-only is not a limitation here. It is the design.
+
+## The real problem: one book, two brokers
+
+[Moving to IBKR](/broker-evaluation) is documented as a *when*, not an *if* —
+Alpaca has no FX, no TASE, no futures, no international order books. The moment
+a second broker exists, something breaks that no vendor dashboard can fix.
+
+The engine asks **one** broker what is open:
+
+```python
+# app/execution_engine.py
+equity = self._broker.get_equity()
+positions = self._broker.get_open_positions()
+```
+
+and hands both to the three exposure checks. With positions split across two
+brokers, `exposure_group_headroom` does not raise — it **silently
+under-counts**. XOM at IBKR plus an oil fund at Alpaca is one energy bet seen as
+two halves, each comfortably inside the 25% group cap.
+
+<Warning>
+  This is a correctness gap in the risk engine, not a reporting gap. The group
+  cap exists precisely because "a diversified watchlist did not produce a
+  diversified portfolio" — and a cap that can only see half the book is the
+  same failure it was written to prevent, wearing a different hat.
+
+  Neither broker's dashboard can ever show this, because neither knows the
+  other exists. Only an aggregated view can.
+</Warning>
+
+## The good news: the seam is already there
+
+This does not need a redesign. Three things are already right:
+
+<CardGroup cols={3}>
+  <Card title="The broker is a Protocol" icon="plug">
+    `BrokerClient` (`app/broker_client.py`) is four methods —
+    `is_market_open`, `get_equity`, `get_open_positions`,
+    `submit_bracket_order`. `AlpacaPaperBroker` is one implementation of it,
+    not the interface itself.
+  </Card>
+  <Card title="The risk engine is broker-agnostic" icon="scale-balanced">
+    `exposure_group_headroom` documents its own input as *"anything with
+    `.ticker` and `.market_value`"*. It has never heard of Alpaca. Feed it a
+    merged position list and it works unchanged.
+  </Card>
+  <Card title="The position model is neutral" icon="cube">
+    `OpenPosition` is a frozen dataclass of `ticker`, `qty`, `market_value`.
+    Nothing in it is Alpaca-shaped.
+  </Card>
+</CardGroup>
+
+So the work is a `Portfolio` that merges `list[OpenPosition]` across brokers and
+presents one equity and one position set. The engine then keeps working
+untouched, because it already consumes exactly that shape. **A dashboard is a
+read-only view over that model, and it gets cheap once the model exists.** Build
+it in that order; building the screen first produces a second, lagging copy of
+state that nothing validates.
+
+It should also be testable offline with fakes, like the rest of the system. The
+test suite reaches no network by design, and an aggregation layer is pure
+arithmetic over two position lists — there is no excuse for it to be the
+exception.
+
+## One thing to settle before building it
+
+`get_equity() -> float` is under-specified the moment an account holds more than
+one currency. Every cap is a percentage *of* that number:
+
+```python
+cap_dollars = equity * max_position_pct
+```
+
+If equity silently means "dollars, plus shekel cash converted at today's rate",
+then **the 5% position cap changes meaning when the exchange rate moves**, with
+nothing in the code saying so. Today every number in the system is a dollar
+number and the question does not arise. With a broker that can hold ILS, it
+does.
+
+[`orchestrator/fx.py`](/currency-risk) already fetches and journals USD/ILS on
+every signal, so the rate is available. What is missing is a stated accounting
+currency and an explicit conversion at the boundary, rather than a bare `float`
+that means whatever the broker happened to return. That is a design decision,
+and it is cheaper to make before the aggregation layer than after.
+
+## When
+
+The trigger is the second broker, not a date — and
+[the IBKR page](/broker-evaluation) already gates that on IDEALPRO's \$25,000
+minimum order and roughly \$50,000 of deployed capital. Until then the single
+`get_open_positions()` call is correct, because there is exactly one book.
+
+<Steps>
+  <Step title="Run the system until there is data">
+    Nothing below this line is worth doing against an empty archive. The
+    scorer needs weeks; see [Next Steps](/next-steps).
+  </Step>
+  <Step title="Reach for a notebook when the learning question gets real">
+    Charts over [the archive](/database) answer "does this dimension carry
+    signal" at a fraction of the cost of a web app, and they are throwaway by
+    design — which is the right property for exploration.
+  </Step>
+  <Step title="Build the Portfolio aggregation with the second broker">
+    Not before. One broker means one book, and an aggregation layer over a
+    single source is indirection with no payer. It becomes load-bearing on the
+    day a position can live somewhere else — and it is load-bearing for
+    *correctness*, so it ships with the broker, not after it.
+  </Step>
+  <Step title="Then the dashboard, read-only">
+    Over the aggregated model, showing exposure by group and sleeve against
+    the caps, and the currency denomination of the book. Those are the views
+    no broker can render for you. Positions and P&L for a single broker are
+    already on that broker's own site, authoritatively; duplicating them buys
+    a staleness bug.
+  </Step>
+</Steps>

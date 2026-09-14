@@ -106,6 +106,61 @@ closed-market cycle actually spends money.
   always-on host instead — the same direct mode works there.
 </Warning>
 
+## A cycle that reaches nothing fails the run
+
+The first scheduled cycle ran with every secret unset. It failed all 35 tickers
+on the missing Bright Data token, wrote no journal line, committed nothing —
+and exited 0. The run showed a green tick, which is the worst possible outcome:
+a system that is not running, reporting that it is.
+
+`--once` now exits **1** when a cycle attempted tickers and none of them reached
+the engine. That is the condition, and the wording matters:
+
+- **Not "no trade was placed."** A cycle where the engine rejected every signal
+  did its job — [the conviction floor](/decision-path) filtering is the system
+  working, not failing.
+- **Not a closed market.** Nothing was attempted, so there is nothing to report.
+- **Not an empty watchlist.** That is a configuration choice.
+
+What it catches is a cycle where nothing the model produced ever got far enough
+to be judged — which leaves no trade, no journal line, and nothing to score
+later.
+
+<Note>
+  Deliberately not configurable. A switch to make this advisory would repeat
+  the mistake the `continue-on-error` on the ticker check made: the one signal
+  whose entire job is to be loud, made quiet for convenience. See
+  [Continuous Integration](/continuous-integration).
+</Note>
+
+Both the commit and the Supabase push run under `if: always()`, so a failed
+cycle still saves whatever it did write. A ticker that reached the model and was
+refused there *is* journalled with its error, and those are exactly the lines
+worth having when a run is red.
+
+### The job summary
+
+Every cycle appends a summary to the GitHub job page — verdict counts when it
+worked, and when it did not, the stage every ticker died at plus which
+credential to suspect:
+
+```
+## Heartbeat cycle
+
+### Nothing reached the engine
+
+All **35** tickers stopped before a signal could be judged.
+
+| Stopped at | Tickers |
+| --- | --- |
+| context never gathered | 35 |
+```
+
+It is rendered in Python (`render_summary`) rather than in workflow YAML, for
+the same reason the Supabase push decides its own no-op in Python: a summary
+that exists only as a shell expression is covered by nothing except a green
+run, and the whole point of it is to be read when the run is not green.
+
 ## Why the journal is committed back
 
 The runner is discarded after each job, so an uncommitted journal is a lost
