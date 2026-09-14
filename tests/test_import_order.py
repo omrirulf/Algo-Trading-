@@ -33,6 +33,7 @@ MODULES = [
     "replay.compare_configs",
     "replay.compare_models",
     "replay.signal_sanity",
+    "replay.historical",
     "replay.runner",
     "backtest.compare_sleeves",
     "backtest.verify_tickers",

@@ -346,3 +346,11 @@ def test_the_html_error_no_longer_claims_only_serp_zones_work():
     with pytest.raises(news.NewsFetchError) as excinfo:
         news.parse_news_results("<html><body>blocked</body></html>")
     assert "Web Unlocker" in str(excinfo.value)
+
+
+def test_a_pasted_token_with_stray_whitespace_is_stripped(monkeypatch):
+    """A trailing newline from a secrets form must not reach the Bearer header."""
+    monkeypatch.delenv(news.CLI_ENV_VAR, raising=False)
+    monkeypatch.setattr(news, "token_from_cli", lambda: None)
+    assert news.resolve_token("  abc123\n") == "abc123"
+    assert news.resolve_token("\n") is None

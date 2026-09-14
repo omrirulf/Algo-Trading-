@@ -30,7 +30,8 @@
           "currency-risk",
           "broker-evaluation",
           "portfolio-view",
-          "signal-sanity"
+          "signal-sanity",
+          "historical-replay"
         ]
       },
       {
