@@ -211,17 +211,23 @@ def token_from_cli() -> Optional[str]:
     return None
 
 
-def resolve_zone(serp_zone: str = "") -> str:
+def resolve_zone(serp_zone: str = "", unlocker_zone: str = "") -> str:
     """The zone to send requests through: the SERP zone, else the unlocker one.
 
     Mirrors Bright Data's own CLI so a machine set up for it needs nothing
     extra here. Returns "" when neither is configured, which the provider
     turns into a NewsFetchError naming both.
+
+    ``unlocker_zone`` falls back to the environment so the CLI's own variable
+    keeps working, then to the configured default. The SERP zone must be
+    genuinely unset for the fallback to fire -- which is why it no longer
+    defaults to a zone name.
     """
-    return (
-        serp_zone.strip()
-        or os.environ.get(CLI_UNLOCKER_ENV_VAR, "").strip()
-    )
+    explicit = serp_zone.strip()
+    if explicit:
+        return explicit
+    from_env = os.environ.get(CLI_UNLOCKER_ENV_VAR, "").strip()
+    return from_env or unlocker_zone.strip()
 
 
 def resolve_token(api_token: str = "") -> Optional[str]:
@@ -230,14 +236,20 @@ def resolve_token(api_token: str = "") -> Optional[str]:
 
 
 class BrightDataNewsProvider:
-    def __init__(self, api_token: str, zone: str, client: httpx.Client | None = None) -> None:
+    def __init__(
+        self,
+        api_token: str,
+        zone: str,
+        client: httpx.Client | None = None,
+        unlocker_zone: str = "",
+    ) -> None:
         token = resolve_token(api_token)
         if not token:
             raise NewsFetchError(
                 "No Bright Data credentials found: set BRIGHTDATA_API_TOKEN, "
                 "or run `brightdata login`"
             )
-        resolved_zone = resolve_zone(zone)
+        resolved_zone = resolve_zone(zone, unlocker_zone)
         if not resolved_zone:
             raise NewsFetchError(
                 "No Bright Data zone configured: set BRIGHTDATA_SERP_ZONE, or "

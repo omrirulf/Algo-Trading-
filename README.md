@@ -305,11 +305,17 @@ but the orchestrator process then holds the Alpaca credentials.
 
 `.github/workflows/heartbeat.yml` runs a cycle hourly through US market hours
 and commits the journal back, so there is nothing to host and the logs are
-readable from the GitHub mobile app. Add `ALPACA_API_KEY`, `ALPACA_SECRET_KEY`,
-`ANTHROPIC_API_KEY` and `BRIGHTDATA_API_TOKEN` as Actions *secrets*, and
-`BRIGHTDATA_UNLOCKER_ZONE` plus `WATCHLIST` as Actions *variables*, then run it
-once by hand from the Actions tab as a smoke test. Full setup and caveats in
-[Deployment](docs/deployment.mdx).
+readable from the GitHub mobile app. Add four Actions *secrets* —
+`ALPACA_API_KEY`, `ALPACA_SECRET_KEY`, `ANTHROPIC_API_KEY`,
+`BRIGHTDATA_API_TOKEN` — then run it once by hand from the Actions tab as a
+smoke test. No variables to set: the watchlist is in `config/watchlist.py` and
+the Bright Data zone defaults to the one `brightdata login` creates. Full setup
+and caveats in [Deployment](docs/deployment.mdx).
+
+<sub>A runner is a fresh container every run, with no home directory and no
+browser, so the CLI logins cannot help there — secrets are the only way to
+authenticate on Actions. The CLI logins are for running the heartbeat on a
+machine you control.</sub>
 
 ## Iterate without waiting
 

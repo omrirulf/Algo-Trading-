@@ -28,9 +28,9 @@ being hard-coded.
 | `ALPACA_CONFIG_DIR` | `app/broker_client.py` only | Where the Alpaca CLI keeps its state. Default: `~/.config/alpaca`. |
 | `WEBHOOK_SHARED_SECRET` | `app/main.py`, `orchestrator/heartbeat.py` | Shared secret required in the `x-webhook-secret` header. Generate with `python -c "import secrets; print(secrets.token_hex(32))"`. |
 | `WEBHOOK_URL` | `orchestrator/heartbeat.py` | Where the orchestrator POSTs signals. Default: `http://localhost:8000/webhook/signal`. |
-| `WATCHLIST` | `orchestrator/heartbeat.py` | Comma-separated tickers evaluated every cycle. Default: `AAPL,MSFT,NVDA`. |
+| `WATCHLIST` | `orchestrator/heartbeat.py` | Comma-separated tickers evaluated every cycle. Defaults to the curated list in `config/watchlist.py` — see [Watchlist](/watchlist). |
 | `BRIGHTDATA_API_TOKEN` | `orchestrator/news.py` only | Bright Data API token, from *Account settings → API tokens*. Optional if you use `brightdata login` instead — see below. |
-| `BRIGHTDATA_SERP_ZONE` | `orchestrator/news.py` only | Name of your Bright Data **SERP API** zone. Default: `serp_api`. |
+| `BRIGHTDATA_SERP_ZONE` | `orchestrator/news.py` only | Name of your Bright Data **SERP API** zone. Empty by default, so the unlocker fallback below can fire. |
 | `BRIGHTDATA_UNLOCKER_ZONE` | `orchestrator/news.py` only | Web Unlocker zone to use when no SERP zone is set — e.g. `cli_unlocker`, which `brightdata login` creates. |
 | `ANTHROPIC_API_KEY` | `orchestrator/llm.py` only | Claude API key, from the [Anthropic Console](https://console.anthropic.com). Optional if you use `ant auth login` instead — see below. |
 

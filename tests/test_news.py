@@ -133,8 +133,9 @@ def test_heartbeat_fetch_news_uses_settings(monkeypatch):
     seen = {}
 
     class FakeProvider:
-        def __init__(self, token, zone, client=None):
+        def __init__(self, token, zone, client=None, unlocker_zone=""):
             seen["token"], seen["zone"] = token, zone
+            seen["unlocker_zone"] = unlocker_zone
 
         def fetch(self, ticker):
             seen["ticker"] = ticker
@@ -146,7 +147,9 @@ def test_heartbeat_fetch_news_uses_settings(monkeypatch):
         lambda: Settings(brightdata_api_token="t", brightdata_serp_zone="z", _env_file=None),
     )
     assert hb.fetch_news("MSFT") == ["headline"]
-    assert seen == {"token": "t", "zone": "z", "ticker": "MSFT"}
+    assert seen == {
+        "token": "t", "zone": "z", "ticker": "MSFT", "unlocker_zone": "cli_unlocker",
+    }
 
 
 # --------------------------------------------------------------------------- #
