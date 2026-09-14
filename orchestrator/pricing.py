@@ -14,7 +14,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Final, Optional
-from config import settings as cfg
 
 #: A cache read bills at roughly a tenth of the input rate, a cache write at
 #: about 1.25x. Documented multipliers rather than separately published
@@ -129,10 +128,28 @@ def usage_from_response(response: object, model: str = "") -> Usage:
     )
 
 
+def cycles_per_trading_day() -> int:
+    """The heartbeat's cadence, read at call time.
+
+    A module-level ``from config import settings`` here forms a cycle --
+    settings imports watchlist, which imports this module for PRICES -- that
+    only fails when *this* module is imported first. Resolving lazily keeps
+    the single source of truth without the import-order landmine.
+    """
+    from config import settings as cfg
+
+    return cfg.CYCLES_PER_TRADING_DAY
+
+
 def monthly_usd(
-    per_call_usd: float, tickers: int, cycles_per_day: int = cfg.CYCLES_PER_TRADING_DAY, trading_days: int = 21
+    per_call_usd: float,
+    tickers: int,
+    cycles_per_day: Optional[int] = None,
+    trading_days: int = 21,
 ) -> float:
     """Scale one measured call up to a monthly bill."""
+    if cycles_per_day is None:
+        cycles_per_day = cycles_per_trading_day()
     return per_call_usd * tickers * cycles_per_day * trading_days
 
 
@@ -145,4 +162,5 @@ __all__ = [
     "cost_usd",
     "usage_from_response",
     "monthly_usd",
+    "cycles_per_trading_day",
 ]

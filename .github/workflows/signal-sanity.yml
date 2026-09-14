@@ -1,0 +1,76 @@
+name: signal sanity
+
+# Two tests that need no market outcomes, and are designed to make the live
+# experiment unnecessary if they fail: does the answer depend on the evidence
+# (own ticker label over another ticker's entire context), and does the model
+# agree with itself on identical input. Thresholds are pre-registered in
+# replay/signal_sanity.py. Exit 1 on any adverse verdict, so this is a gate.
+#
+# Runs through the Message Batches API at half price. No broker credential is
+# needed or provided: nothing here can trade.
+on:
+  workflow_dispatch:
+    inputs:
+      tickers:
+        description: "How many watchlist tickers to sample (default: all)"
+        default: "35"
+      resume:
+        description: "A batch id to collect instead of submitting a new one"
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  sanity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Plan, submit, collect
+        # Three stages over stdout, because nothing under replay/ may write a
+        # file. The plan is saved here so a batch that outlives this job can
+        # be collected by a later run with the `resume` input.
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          BRIGHTDATA_API_TOKEN: ${{ secrets.BRIGHTDATA_API_TOKEN }}
+          BRIGHTDATA_SERP_ZONE: ${{ vars.BRIGHTDATA_SERP_ZONE }}
+        run: |
+          set -o pipefail
+          if [ -n "${{ inputs.resume }}" ]; then
+            echo "${{ inputs.resume }}" > batch_id
+            test -s sanity_trials.json || { echo "::error::resume needs sanity_trials.json from the original run's artifact"; exit 1; }
+          else
+            python replay/signal_sanity.py plan --tickers "${{ inputs.tickers }}" > sanity_trials.json
+            python replay/signal_sanity.py submit --trials sanity_trials.json > batch_id
+          fi
+          echo "batch: $(cat batch_id)"
+          python replay/signal_sanity.py collect --trials sanity_trials.json --batch "$(cat batch_id)" | tee sanity.txt
+          python replay/signal_sanity.py collect --trials sanity_trials.json --batch "$(cat batch_id)" --json > sanity.json || true
+
+      - name: Publish to the run summary
+        if: always()
+        run: |
+          {
+            echo '## Signal sanity'
+            echo
+            echo '```'
+            cat sanity.txt 2>/dev/null || echo "(did not run)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: signal-sanity
+          path: |
+            sanity.txt
+            sanity.json
+            sanity_trials.json
+            batch_id

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 
 def completion(payload: dict | str, model: str = "claude-opus-5"):
     """A Completion the way call_llm now returns one, with plausible usage."""
@@ -400,4 +402,10 @@ def test_llm_module_cannot_reach_the_broker_or_the_engine():
     src = open(llm.__file__).read()
     assert "alpaca" not in src.lower()
     assert "from app.schemas" not in src and "import app" not in src
-    assert "requests" not in src  # SDK only, no hand-rolled HTTP
+    # SDK only, no hand-rolled HTTP. Matched as an import or a call on the
+    # library, not as a bare word: the Batches API's own kwarg is literally
+    # `requests=`, and the earlier substring check failed on that.
+    assert not re.search(
+        r"\bimport requests\b|\bfrom requests\b|\brequests\.(get|post|put|delete|request|Session)\b",
+        src,
+    )

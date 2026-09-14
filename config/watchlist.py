@@ -25,7 +25,7 @@ from the paragraph above.
 
 from __future__ import annotations
 
-from typing import Final
+from typing import Final, Optional
 
 from config.instruments import (
     FUND_ROLES,
@@ -36,7 +36,6 @@ from config.instruments import (
     kind_for,
 )
 from orchestrator import pricing
-from config import settings as cfg
 
 DEFAULT_WATCHLIST: Final[tuple[str, ...]] = SINGLE_NAMES + FUNDS
 
@@ -80,7 +79,7 @@ def default_watchlist_csv() -> str:
 
 
 def estimated_monthly_cost_usd(
-    tickers: int, cycles_per_day: int = cfg.CYCLES_PER_TRADING_DAY, trading_days: int = 21
+    tickers: int, cycles_per_day: Optional[int] = None, trading_days: int = 21
 ) -> float:
     """Rough Claude spend for a watchlist of this size.
 
