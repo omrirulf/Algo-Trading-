@@ -47,13 +47,22 @@ jobs:
         # The watchlist was written without market access, and ETNs get called
         # while small funds delist. A symbol that stopped resolving would fail
         # its ticker every cycle as a silent "no bars" gap.
-        continue-on-error: true
+        #
+        # `set -o pipefail` is load-bearing: without it `python ... | tee`
+        # reports tee's exit status, so a script that exited 1 on 36 broken
+        # tickers still shows a green step. That is exactly what happened on
+        # the first run of this workflow.
+        #
+        # No continue-on-error either. This check exists to fail loudly; making
+        # it advisory turned a total outage into a green tick.
         run: |
+          set -o pipefail
           python backtest/verify_tickers.py | tee tickers.txt
 
       - name: Compare the sleeves
         id: compare
         run: |
+          set -o pipefail
           python backtest/compare_sleeves.py \
             --period "${{ inputs.period }}" \
             --every "${{ inputs.every }}" \

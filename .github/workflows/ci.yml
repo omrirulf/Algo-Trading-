@@ -362,6 +362,59 @@ jobs:
           fi
           echo "OK: the replay harness only reads and asks"
 
+      - name: A piped script cannot report a false green
+        # `python foo.py | tee out.txt` exits with tee's status, not the
+        # script's, so a script that exited 1 still shows a green step. The
+        # market-checks workflow shipped with exactly that bug and reported
+        # success while every one of 36 tickers failed to resolve.
+        #
+        # Any workflow step that pipes into tee must set -o pipefail first.
+        run: |
+          python3 - <<'PY'
+          import pathlib, re, sys
+
+          def sets_pipefail(line):
+              """An actual `set` command, not prose about one.
+
+              The first version of this check searched the whole block for the
+              string "set -o pipefail" -- and passed on a block whose only
+              occurrence was the comment explaining why pipefail matters. A
+              check that its own documentation satisfies is not a check.
+              """
+              stripped = line.strip()
+              if stripped.startswith("#"):
+                  return False
+              return bool(re.match(r"set\s+-[a-z]*o\s+pipefail\b", stripped)
+                          or re.match(r"set\s+-[a-zA-Z]*e?o?\s*pipefail\b", stripped))
+
+          def pipes_to_tee(line):
+              """A real shell pipe into tee, not a mention of one.
+
+              Quoted substrings are stripped first, so this checker's own
+              source -- which contains the pattern as a string literal -- does
+              not flag itself.
+              """
+              stripped = line.strip()
+              if stripped.startswith("#"):
+                  return False
+              unquoted = re.sub(r"""(['"]).*?\1""", "", stripped)
+              return bool(re.search(r"\|\s*tee\b", unquoted))
+
+          bad = []
+          for path in sorted(pathlib.Path(".github/workflows").glob("*.y*ml")):
+              for block in re.split(r"\n\s*- name:", path.read_text()):
+                  lines = block.splitlines()
+                  pipes = [i for i, l in enumerate(lines) if pipes_to_tee(l)]
+                  if not pipes:
+                      continue
+                  if not any(sets_pipefail(l) for l in lines[:max(pipes)]):
+                      bad.append(f"{path.name}: {block.strip().splitlines()[0][:60]}")
+          if bad:
+              print("\n".join(bad))
+              sys.exit("::error::a step pipes into tee without `set -o pipefail`")
+          print("OK: no step can mask a failing script behind tee")
+          PY
+
       - name: No committed .env
         run: |
           if git ls-files --error-unmatch .env >/dev/null 2>&1; then

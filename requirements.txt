@@ -11,7 +11,7 @@ alpaca-py==0.33.0
 # `alpaca profile login` works in place of dashboard keys. It was previously
 # present only as a transitive dependency of an unrelated package.
 PyYAML==6.0.2
-yfinance==0.2.44
+yfinance==1.7.0
 pandas==2.2.3
 numpy==1.26.4
 
