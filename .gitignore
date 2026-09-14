@@ -12,3 +12,11 @@ venv/
 # Runtime output
 logs/*.log
 logs/*.log.*
+
+# The queryable index over those logs. Derived data: rebuilt from the lines
+# above in seconds, so committing a binary that changes every cycle would
+# grow the repository for something reproducible. `-wal` and `-shm` are
+# SQLite's own sidecars.
+logs/*.db
+logs/*.db-wal
+logs/*.db-shm

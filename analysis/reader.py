@@ -1,15 +1,27 @@
-"""Read ``logs/signal_journal.log`` into records the scorer can work with.
+"""Read journalled signals into records the scorer can work with.
 
 Pure parsing: a path in, a list of dataclasses out, no network and no
 statistics. A journal is an append-only file written by a long-running
 process, so it is assumed to be imperfect -- a truncated final line from a
 killed process, or a line from an older schema, is counted and skipped rather
 than allowed to abort a scoring run over months of otherwise good data.
+
+Two sources, one parser. ``read_journal`` reads the log file directly;
+``read_database`` reads the byte-exact lines the index in ``store/`` kept
+beside every row. Both end up in ``read_lines``, so the scorer cannot give
+a different answer depending on where it was pointed -- which is the only
+thing that makes a derived index safe to read from at all.
+
+Read-only in both directions. The database is opened through SQLite's
+``mode=ro`` URI: a plain connect would *create* an empty file when the path
+is wrong, quietly making the scorer a writer and leaving the evidence
+behind. A missing database is an error naming it, not zero rows.
 """
 
 from __future__ import annotations
 
 import json
+import sqlite3
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -83,6 +95,37 @@ def read_journal(path: Path | str) -> JournalRead:
         return read_lines(handle)
 
 
+def read_database(path: Path | str, since: Optional[str] = None) -> JournalRead:
+    """Parse every journal line the database kept, oldest first.
+
+    The index stores each source line verbatim, so this returns exactly what
+    ``read_journal`` would have returned from the file it was built from -- at
+    the speed of an indexed scan, and with ``since`` able to skip months of it.
+
+    ``since`` is an ISO date (``2026-09-15``); rows with no timestamp are
+    excluded when it is given, because a row that cannot be placed in time
+    cannot be said to fall after a date.
+    """
+    path = Path(path)
+    if not path.exists():
+        raise FileNotFoundError(
+            f"no database at {path}. Build one with: python store/build_db.py"
+        )
+    sql = "SELECT raw FROM signals"
+    params: tuple = ()
+    if since:
+        sql += " WHERE trade_date IS NOT NULL AND trade_date >= ?"
+        params = (since,)
+    sql += " ORDER BY ts_utc IS NULL, ts_utc, id"
+
+    connection = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    try:
+        rows = connection.execute(sql, params).fetchall()
+    finally:
+        connection.close()
+    return read_lines(row[0] for row in rows)
+
+
 def read_lines(lines: Iterable[str]) -> JournalRead:
     entries: list[JournalEntry] = []
     skipped = 0
@@ -97,7 +140,7 @@ def read_lines(lines: Iterable[str]) -> JournalRead:
         except json.JSONDecodeError:
             skipped += 1
             continue
-        entry = _entry_from(payload)
+        entry = entry_from(payload)
         if entry is None:
             skipped += 1
             continue
@@ -106,14 +149,21 @@ def read_lines(lines: Iterable[str]) -> JournalRead:
     return JournalRead(entries=entries, skipped=skipped, total_lines=total)
 
 
-def _entry_from(payload: Any) -> Optional[JournalEntry]:
+def entry_from(payload: Any) -> Optional[JournalEntry]:
+    """One parsed journal line, or None if it is not one.
+
+    Public because ``store/loader.py`` builds its database rows from this
+    rather than re-reading the JSON itself. Two parsers over one format
+    would eventually disagree, and the disagreement would show up as a
+    report that does not match the file it was built from.
+    """
     if not isinstance(payload, dict):
         return None
     ticker = payload.get("ticker")
     if not isinstance(ticker, str) or not ticker.strip():
         return None
 
-    timestamp, exact = _parse_timestamp(payload)
+    timestamp, exact = parse_timestamp(payload)
     signal = payload.get("signal") if isinstance(payload.get("signal"), dict) else {}
     context = payload.get("context") if isinstance(payload.get("context"), dict) else {}
     outcome = payload.get("outcome") if isinstance(payload.get("outcome"), dict) else {}
@@ -132,7 +182,7 @@ def _entry_from(payload: Any) -> Optional[JournalEntry]:
     )
 
 
-def _parse_timestamp(payload: dict) -> tuple[Optional[datetime], bool]:
+def parse_timestamp(payload: dict) -> tuple[Optional[datetime], bool]:
     """Prefer the explicit UTC field; fall back to the tz-naive formatter one."""
     raw_utc = payload.get("ts_utc")
     if isinstance(raw_utc, str):

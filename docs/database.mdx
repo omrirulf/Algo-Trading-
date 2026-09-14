@@ -1,0 +1,155 @@
+---
+title: "The Archive"
+description: "A queryable index over the logs — and why the logs are still the record"
+---
+
+Two append-only JSON-lines files hold everything this system has ever seen:
+
+| File | Written by | Answers |
+|---|---|---|
+| `logs/signal_journal.log` | `orchestrator/journal.py` | What was in front of the model when it said that? |
+| `logs/execution_audit.log` | `app/logger.py` | What did the engine *do* with the signal? |
+
+They are excellent at being a record and poor at being asked questions. `grep`
+finds a line; it does not tell you whether conviction has drifted upward over
+six weeks, which rejection reason bites most often, or what the archive cost to
+produce. `store/build_db.py` loads both files into SQLite so those become one
+query each.
+
+```bash
+python store/build_db.py          # load both logs
+python store/query.py daily       # signals, conviction and cost per day
+```
+
+## The database is derived, not authoritative
+
+This is the decision everything else follows from. The log files remain the
+system of record: they are what the orchestrator writes, what git carries
+between runs, and what will still be readable with `grep` in ten years. The
+database is an index over them, and `--rebuild` throws it away and reloads from
+scratch in seconds.
+
+<Note>
+  That single property is what makes this safe to add to a system that trades.
+  A corrupt index costs a rebuild. It never costs a cycle, and it never costs a
+  record.
+</Note>
+
+Two consequences, both deliberate.
+
+**Every row keeps its source line verbatim.** The extracted columns cover the
+queries worth indexing; everything else is reachable through SQLite's built-in
+JSON functions. A field nobody anticipated is a query away rather than a
+migration away:
+
+```sql
+SELECT ticker,
+       ROUND(AVG(json_extract(raw, '$.context.technicals.rsi14')), 1) AS mean_rsi,
+       ROUND(AVG(conviction), 2) AS mean_conviction
+FROM signals GROUP BY ticker ORDER BY mean_rsi DESC;
+```
+
+**Loading is idempotent.** Rows are keyed on a content hash of the source line,
+so re-loading a journal that has grown by one line inserts one row. The natural
+way to run this is after every cycle, over a file that is append-only and
+almost entirely unchanged.
+
+```
+$ python store/build_db.py
+signals: 35 new, 1120 already loaded, 0 unreadable (1155 lines)
+executions: 2 new, 61 already loaded, 0 unreadable (63 lines)
+```
+
+## One parser, two sources
+
+Journal rows are built by `analysis.reader.entry_from` — the same function the
+file-based scorer uses. Two parsers over one format drift, and the drift would
+surface as a report that disagrees with the file it came from.
+
+So the scorer gives the same answer either way, and can now skip months it does
+not need:
+
+```bash
+python analysis/score_journal.py                        # from the file
+python analysis/score_journal.py --db                   # from the index
+python analysis/score_journal.py --db --since 2026-10-01
+```
+
+## Tables
+
+`signals` and `executions` mirror the two log files. The `decisions` view joins
+them on the order id the journal already records:
+
+```sql
+CREATE VIEW decisions AS
+SELECT s.ts_utc, s.ticker, s.bias, s.conviction, ..., e.quantity, e.entry_price, e.stop_price
+FROM signals s
+LEFT JOIN executions e ON e.order_id = s.order_id AND s.order_id IS NOT NULL;
+```
+
+That join is the one [Next Steps](/next-steps) listed as missing. Close-to-close
+returns ignore the stop-loss, so a call that was right about direction and
+stopped out on the way there scores as a win. `decisions` carries the size,
+entry and stop the engine actually chose, which is what it takes to ask about
+filled trades rather than about paper moves.
+
+It is a `LEFT JOIN` on purpose: most signals never become orders, and a
+rejection is data.
+
+## Canned queries
+
+Each is ordinary SQL, printed with `--explain`. They are starting points to
+copy and change, not an API.
+
+| Query | Answers |
+|---|---|
+| `summary` | How much is in here, over what span, and how did the engine rule? |
+| `daily` | Volume, bias split, mean conviction and cost per day — the drift check |
+| `tickers` | Which names get called, how confidently, and which actually trade |
+| `rejections` | Which guardrail bites most often, and at what conviction |
+| `costs` | Tokens and dollars by day and model |
+| `health` | Missing-data and error rates per day |
+| `trades` | Signals that became real orders, with size and stop |
+| `errors` | Cycles that failed, newest first |
+
+## Nothing here can trade, or edit the record
+
+`store/` is the only package in this project that writes anything, which is
+exactly why it has a boundary drawn around it. Four CI invariants hold it:
+
+- `store/` contains no order path and imports no broker SDK.
+- `store/` may write through `sqlite3` and nowhere else — it cannot append to,
+  truncate or delete the logs it reads. An index that can edit its own source
+  is a second, unreviewed way to change the record of what was decided.
+- `build_db.py --rebuild` may delete the database and its WAL sidecars. An
+  `unlink` reaching anything else fails the build.
+- Every SQLite connection opened from `analysis/` uses the `mode=ro` URI. A
+  plain `connect()` *creates* the file it is pointed at, which would quietly
+  make the scorer a writer through a door no grep was watching.
+
+`store/query.py` inherits the last one: an `UPDATE` typed into `--sql` comes
+back as `attempt to write a readonly database`.
+
+## When this stops being enough
+
+Honestly: when the journal outgrows git rather than when it outgrows `grep`.
+
+The heartbeat commits the journal back to the repository after every cycle,
+because a discarded runner would otherwise lose it. At 35 tickers and roughly
+seven cycles a session that is a few hundred lines a day, and journal lines
+carrying a full context run to several kilobytes each — order of tens of
+megabytes a month, permanently, because git history does not forget.
+
+SQLite does not fix that; it is an index over the same files. What fixes it is
+moving the *record* off git to a remote Postgres, at the cost of a credential
+in the cycle and a network call that must be allowed to fail without taking the
+cycle down. The schema here transfers essentially unchanged — two tables, a
+content-hash key, a JSON column — so that is a backend swap rather than a
+redesign.
+
+Not yet. It is a real cost to add a network dependency to the thing that
+decides trades, and the files are readable from a phone today.
+
+<Card title="Next: scoring the journal" icon="gauge" href="/scoring">
+  What the archive is for: whether conviction actually predicted the move.
+</Card>

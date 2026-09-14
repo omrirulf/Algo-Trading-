@@ -4,6 +4,10 @@
     python analysis/score_journal.py --horizon 5 --entry next
     python analysis/score_journal.py --json > scores.json
 
+    # Same answer, read from the index instead of the file. Worth it once the
+    # journal is long enough that --since beats re-parsing all of it.
+    python analysis/score_journal.py --db --since 2026-10-01
+
 Read-only in every direction: it opens the journal, fetches price history, and
 prints. It holds no broker keys, touches no order path, and cannot write to the
 journal it is reading.
@@ -22,7 +26,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from analysis import metrics, report  # noqa: E402
-from analysis.reader import SCORE_FIELDS, read_journal  # noqa: E402
+from analysis.reader import SCORE_FIELDS, read_database, read_journal  # noqa: E402
 from analysis.returns import ENTRY_AUTO, ENTRY_RULES, YFinancePriceSource  # noqa: E402
 from analysis.scoring import build_run  # noqa: E402
 from config import settings as cfg  # noqa: E402
@@ -43,6 +47,22 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=cfg.SIGNAL_JOURNAL_PATH,
         help="path to the signal journal (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--db",
+        nargs="?",
+        const=cfg.DATABASE_PATH,
+        type=Path,
+        default=None,
+        help=(
+            "read from the index built by store/build_db.py rather than the "
+            "journal file (default when given with no value: %(const)s)"
+        ),
+    )
+    parser.add_argument(
+        "--since",
+        metavar="YYYY-MM-DD",
+        help="only score signals from this date on. Requires --db",
     )
     parser.add_argument(
         "--horizon",
@@ -82,18 +102,24 @@ def main(argv: list[str] | None = None) -> int:
         print("--horizon must be at least 1 session", file=sys.stderr)
         return 2
 
+    if args.since and not args.db:
+        print("--since needs --db: the journal file has no index to seek in.", file=sys.stderr)
+        return 2
+
+    source = args.db or args.journal
     try:
-        read = read_journal(args.journal)
-    except FileNotFoundError:
+        read = read_database(args.db, since=args.since) if args.db else read_journal(args.journal)
+    except FileNotFoundError as exc:
         print(
-            f"No journal at {args.journal}.\n"
+            f"{exc}\n"
             "The orchestrator writes one entry per ticker per cycle; run it first.",
             file=sys.stderr,
         )
         return 1
 
     if not read.entries:
-        print(f"{args.journal} has no usable entries.", file=sys.stderr)
+        window = f" from {args.since} on" if args.since else ""
+        print(f"{source} has no usable entries{window}.", file=sys.stderr)
         return 1
 
     run = build_run(

@@ -60,7 +60,7 @@ jobs:
       - name: Alpaca SDK is imported only by broker_client.py
         run: |
           hits=$(grep -rnE '^[[:space:]]*(import|from)[[:space:]]+alpaca' \
-                   app orchestrator config analysis --include='*.py' \
+                   app orchestrator config analysis store --include='*.py' \
                  | grep -v '^app/broker_client.py:' || true)
           if [ -n "$hits" ]; then
             echo "$hits"
@@ -74,7 +74,7 @@ jobs:
         # their values.
         run: |
           hits=$(grep -rnE '\.(alpaca_api_key|alpaca_secret_key)\b' \
-                   app orchestrator analysis --include='*.py' \
+                   app orchestrator analysis store --include='*.py' \
                  | grep -v '^app/broker_client.py:' || true)
           if [ -n "$hits" ]; then
             echo "$hits"
@@ -361,6 +361,71 @@ jobs:
             exit 1
           fi
           echo "OK: the replay harness only reads and asks"
+
+      - name: The index cannot trade, and cannot rewrite what it indexes
+        # store/ is the only package here that writes anything, which is
+        # exactly why it needs a boundary. It builds a derived SQLite index
+        # over the two log files. It must not reach a broker, and it must not
+        # write the logs it reads -- an index that can edit its own source is
+        # not an index, it is a second, unreviewed way to change the record of
+        # what was decided.
+        run: |
+          hits=$(grep -rnE '(submit_order|submit_bracket_order|ExecutionEngine|post_signal|AlpacaPaperBroker)' \
+                   store --include='*.py' || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::store/ must not place orders"
+            exit 1
+          fi
+          # The log paths may be read and opened, but never for writing. The
+          # loader takes an iterable of lines; nothing in it needs a mode.
+          hits=$(grep -rnE "(\.write_text\(|\.unlink\(\)|open\([^)]*['\"][wa])" \
+                   store --include='*.py' \
+                 | grep -vE "^store/build_db\.py:" || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::store/ may only write through sqlite3, not the filesystem"
+            exit 1
+          fi
+          # build_db.py is the one exception, and only for --rebuild, which
+          # deletes the database. Check it cannot delete anything else.
+          python3 - <<'PY'
+          import ast, sys
+          tree = ast.parse(open("store/build_db.py").read())
+          for node in ast.walk(tree):
+              if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
+                  continue
+              if node.func.attr != "unlink":
+                  continue
+              # Every unlink must be reached from args.db, directly or through
+              # one of its WAL sidecars.
+              source = ast.unparse(node.func.value)
+              if not (source.startswith("args.db") or source == "sidecar"):
+                  sys.exit(f"::error::build_db.py unlinks something that is not the database: {source}")
+          print("OK: the index writes only its own database")
+          PY
+
+      - name: The scorer reaches the index read-only
+        # analysis/ may now read from the database as well as the log file, and
+        # a plain sqlite3.connect() CREATES the file it is pointed at. That
+        # would make the scorer a writer through a door the grep above does not
+        # watch, and leave an empty database behind as the evidence. Every
+        # connection opened from analysis/ must use the read-only URI.
+        run: |
+          python3 - <<'PY'
+          import pathlib, re, sys
+          bad = []
+          for path in sorted(pathlib.Path("analysis").rglob("*.py")):
+              for number, line in enumerate(path.read_text().splitlines(), 1):
+                  if "sqlite3.connect(" not in line:
+                      continue
+                  if "mode=ro" not in line:
+                      bad.append(f"{path}:{number}: {line.strip()}")
+          if bad:
+              print("\n".join(bad))
+              sys.exit("::error::analysis/ must open SQLite with mode=ro")
+          print("OK: the scorer cannot create or write a database")
+          PY
 
       - name: A piped script cannot report a false green
         # `python foo.py | tee out.txt` exits with tee's status, not the

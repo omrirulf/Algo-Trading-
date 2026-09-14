@@ -159,6 +159,13 @@ AUDIT_LOG_PATH: Final[Path] = LOG_DIR / "execution_audit.log"
 #: that one records what the engine did, this one records what the model saw.
 SIGNAL_JOURNAL_PATH: Final[Path] = LOG_DIR / "signal_journal.log"
 
+#: Queryable index over both logs above, built by ``store/build_db.py``.
+#:
+#: Derived data, and gitignored for that reason: the JSON-lines files are the
+#: system of record, this is a rebuild away from them, and committing a binary
+#: that changes every cycle would bloat the repository for nothing.
+DATABASE_PATH: Final[Path] = LOG_DIR / "trading.db"
+
 from config.watchlist import default_watchlist_csv
 
 # --------------------------------------------------------------------------- #

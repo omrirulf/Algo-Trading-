@@ -22,8 +22,11 @@ product. These are the honest gaps.
     [Scoring the Journal](/scoring) answers whether conviction predicted the
     move — but from close-to-close returns that ignore the stop-loss, slippage
     and commission. A call that was right about direction and stopped out on
-    the way there still scores as a win. Joining the scorer to
-    `logs/execution_audit.log` would close that gap.
+    the way there still scores as a win. The join it needs now exists: the
+    `decisions` view in [The Archive](/database) carries the size, entry and
+    stop the engine actually chose. What is left is teaching the scorer to use
+    it — walking each filled trade forward bar by bar and asking whether the
+    stop was hit first.
   </Card>
   <Card title="Nothing acts on the scores" icon="robot">
     If the report says a dimension carries no information, or that the
@@ -32,11 +35,14 @@ product. These are the honest gaps.
     months rather than weeks of data behind it — but it does mean the loop is
     not closed.
   </Card>
-  <Card title="No persistence beyond the log files" icon="database">
-    Two append-only JSON-lines files, `logs/execution_audit.log` and
-    `logs/signal_journal.log`, are the whole record. Fine for `grep` and a
-    pandas one-liner; consider a database once you have more than a few weeks
-    of it.
+  <Card title="The record still lives in git" icon="database">
+    [The Archive](/database) indexes both log files into SQLite, so the
+    questions worth asking are a query rather than a parse. But the index is
+    *derived* — the JSON-lines files are still the record, and the heartbeat
+    still commits them back to the repository after every cycle. At 35 tickers
+    that is order of tens of megabytes a month that git will never forget.
+    Moving the record to a remote Postgres is the fix, at the cost of a
+    credential and a network call inside the cycle.
   </Card>
   <Card title="Insider data is only as good as yfinance's copy of it" icon="user-secret">
     [Insider activity](/orchestrator/insiders) comes from Yahoo's rendering of
@@ -70,6 +76,13 @@ product. These are the honest gaps.
     work left is patience: a three-ticker watchlist produces a few signals a
     day, so the numbers only become evidence after weeks, not days. Resist
     tuning the prompt against a sample the report is telling you not to trust.
+  </Step>
+  <Step title="Score filled trades, not just directions">
+    The `decisions` view in [The Archive](/database) joins each signal to the
+    order it became, so `analysis/returns.py` can stop assuming a position is
+    held for the whole horizon and start checking whether the stop was hit
+    first. That is the difference between "was the model right" and "did this
+    make money", and only the second one is the question.
   </Step>
   <Step title="Go to EDGAR for insider data, if it earns it">
     [Insider activity](/orchestrator/insiders) ships against yfinance, which
