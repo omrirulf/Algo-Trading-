@@ -63,9 +63,9 @@ def test_each_sleeve_is_replayed_under_its_own_cap(tmp_path):
     _bars(tmp_path / "MSFT.csv")
     _bars(tmp_path / "IWM.csv")
     single = cs.run_sleeve("single name", ["MSFT"], cfg.MAX_POSITION_PCT, csv_dir=tmp_path)
-    index = cs.run_sleeve("index", ["IWM"], cfg.MAX_ETF_POSITION_PCT, csv_dir=tmp_path)
+    index = cs.run_sleeve("broad fund", ["IWM"], cfg.MAX_BROAD_FUND_PCT, csv_dir=tmp_path)
     assert single.max_position_pct == cfg.MAX_POSITION_PCT
-    assert index.max_position_pct == cfg.MAX_ETF_POSITION_PCT
+    assert index.max_position_pct == cfg.MAX_BROAD_FUND_PCT
 
 
 def test_a_larger_cap_on_the_same_bars_risks_more_per_trade(tmp_path):
@@ -115,7 +115,7 @@ def test_json_output_is_serialisable(tmp_path):
 
 
 def test_the_cli_runs_offline_and_exits_zero(tmp_path, capsys):
-    for ticker in cs.SINGLE_NAMES[:2] + cs.INDEX_SLEEVE[:2]:
+    for ticker in cs.SINGLE_NAMES[:2] + cs.BROAD_FUNDS[:2]:
         _bars(tmp_path / f"{ticker}.csv")
     assert cs.main(["--csv-dir", str(tmp_path)]) == 0
     assert "SLEEVE COMPARISON" in capsys.readouterr().out

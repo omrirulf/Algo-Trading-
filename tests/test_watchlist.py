@@ -48,8 +48,8 @@ def test_it_is_not_three_correlated_megacaps_any_more():
 
 def test_every_sleeve_and_asset_class_is_reachable():
     """The reason the list exists: breadth that single US tech names cannot give."""
-    for bucket in ("Financials", "Energy", "Index: Regions", "Index: Real assets",
-                   "Index: Duration"):
+    for bucket in ("Financials", "Energy", "Fund: International equity",
+                   "Fund: Duration", "Fund: Precious metals", "Fund: Agriculture"):
         assert bucket in wl.BUCKETS
 
 
@@ -66,10 +66,12 @@ def test_no_single_sector_dominates_the_single_name_sleeve():
 
 def test_the_index_sleeve_reaches_what_single_names_cannot():
     """Cap tiers and non-equity asset classes have no affordable single-name route."""
-    assert "IWM" in inst.INDEX_SLEEVE  # small caps
-    assert "VNQ" in inst.INDEX_SLEEVE  # REITs
-    assert "TLT" in inst.INDEX_SLEEVE  # duration -- the only non-equity risk here
-    assert "DBC" in inst.INDEX_SLEEVE  # commodities themselves, not producers
+    assert "IWM" in inst.FUNDS   # small caps
+    assert "VNQ" in inst.FUNDS   # REITs
+    assert "TLT" in inst.FUNDS   # duration -- the only non-equity risk here
+    # The goods themselves, not the companies that mine and drill them.
+    for commodity in ("GLD", "SLV", "CPER", "USO", "CORN", "JO"):
+        assert commodity in inst.COMMODITY_FUNDS
 
 
 def test_tickers_look_like_tickers():

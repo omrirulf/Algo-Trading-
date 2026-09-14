@@ -31,32 +31,55 @@ MAX_POSITION_PCT: Final[float] = 0.05
 #: diversification argument for indices and a 5% cap cancel each other out.
 #: Sized against volatility rather than picked for roundness. Risk per trade
 #: is roughly ``cap / volatility``, so a cap N times larger on an instrument
-#: only M times quieter multiplies the risk the stop actually carries by N/M.
-#: A first pass at 20% measured ~1.9x the planned risk per trade of a single
-#: name -- bigger, not safer. 12% keeps it near parity while still buying
-#: enough exposure for an index position to matter.
+#: only M times quieter multiplies the risk the stop carries by N/M. A first
+#: pass at 20% measured ~1.9x the planned risk per trade of a single name --
+#: bigger, not safer. 12% keeps it near parity while still buying enough
+#: exposure for an index position to matter.
 #:
-#: This is a starting point, not a finding: ``backtest/compare_sleeves.py``
-#: on real bars is what should set it, and the 'risk/trade' column is the one
-#: to tune against.
+#: Above the single-name cap because a broad fund's tail is truncated in a way
+#: a company's is not: an index does not go to zero on a fraud.
 #:
-#: Still above the single-name cap, because a fund's tail is truncated in a
-#: way a company's is not -- an index does not go to zero on a fraud or a
-#: failed trial.
-#:
-#: The kind is resolved from ``config.instruments``, never from the signal:
-#: this constant is exactly the reason a model must not be able to assert its
-#: own instrument type.
-MAX_ETF_POSITION_PCT: Final[float] = 0.12
+#: ``backtest/compare_sleeves.py`` on real bars is what should set this, and
+#: the 'risk/trade' column is the one to tune against.
+MAX_BROAD_FUND_PCT: Final[float] = 0.12
 
-#: Ceiling on total deployed capital, as a fraction of equity, across every
-#: open position. Without it the two caps above multiply out to leverage: ten
-#: positions at the ETF cap would be 200% of the account.
+#: A fund tracking ONE commodity gets the tightest cap of the three, below
+#: even a single name. "Fund" does no diversification work here -- coffee is
+#: one thing -- and three risks pile on top that no equity carries: roll decay
+#: in contango (USO being the notorious case), issuer credit risk on the ETNs,
+#: and thin volume that makes a stop fill badly.
 #:
-#: This is the one guardrail that got *looser* when the index sleeve landed.
-#: It used to be implicit at 50% (``MAX_OPEN_POSITIONS * MAX_POSITION_PCT``)
-#: and is now an explicit 60%, so the account keeps a 40% cash floor at all
-#: times.
+#: Sizing these like a broad fund because both are technically ETFs would
+#: repeat, in a subtler place, the error of picking a cap by label rather than
+#: by risk.
+MAX_COMMODITY_FUND_PCT: Final[float] = 0.04
+
+#: Ceiling on any one exposure group (``instruments.EXPOSURE_GROUPS``).
+#:
+#: A diversified watchlist does not produce a diversified portfolio. Nothing
+#: previously stopped the engine opening MSFT, NVDA, TSM, ASML and GOOGL on
+#: the same morning: five positions, one bet, and every per-ticker cap
+#: satisfied. This is the check that bites, and it spans both sleeves -- XOM
+#: plus an oil fund plus a gas fund is one energy bet made three times.
+MAX_EXPOSURE_GROUP_PCT: Final[float] = 0.25
+
+#: Sleeve budgets. Funds are the core holding and single names the satellite,
+#: which is a deliberate statement about where the confidence is: a broad fund
+#: is diversified by construction, while a stock-picking edge is unproven here
+#: and this budget declines to assume one. Three names at the single-name cap
+#: is the whole equity sleeve.
+#:
+#: They sum to MAX_GROSS_EXPOSURE_PCT, so the gross cap binds only when a
+#: sleeve is under-used rather than being a fourth independent limit.
+MAX_SINGLE_NAME_SLEEVE_PCT: Final[float] = 0.15
+MAX_FUND_SLEEVE_PCT: Final[float] = 0.45
+
+#: Ceiling on total deployed capital across every open position. Without it
+#: the per-ticker caps multiply out to leverage.
+#:
+#: This is the one guardrail that got *looser* when the fund sleeve landed. It
+#: used to be implicit at 50% (``MAX_OPEN_POSITIONS * MAX_POSITION_PCT``) and
+#: is now an explicit 60%, so the account keeps a 40% cash floor at all times.
 MAX_GROSS_EXPOSURE_PCT: Final[float] = 0.60
 
 #: Signals with conviction below this are rejected before any market data is

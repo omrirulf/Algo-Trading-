@@ -28,8 +28,8 @@ from __future__ import annotations
 from typing import Final
 
 from config.instruments import (
-    INDEX_ROLES,
-    INDEX_SLEEVE,
+    FUND_ROLES,
+    FUNDS,
     SINGLE_NAME_SECTORS,
     SINGLE_NAMES,
     InstrumentKind,
@@ -37,12 +37,12 @@ from config.instruments import (
 )
 from orchestrator import pricing
 
-DEFAULT_WATCHLIST: Final[tuple[str, ...]] = SINGLE_NAMES + INDEX_SLEEVE
+DEFAULT_WATCHLIST: Final[tuple[str, ...]] = SINGLE_NAMES + FUNDS
 
 #: Buckets for reporting, and for anyone trimming the list by theme.
 BUCKETS: Final[dict[str, tuple[str, ...]]] = {
     **SINGLE_NAME_SECTORS,
-    **{f"Index: {role}": tickers for role, tickers in INDEX_ROLES.items()},
+    **{f"Fund: {role}": tickers for role, tickers in FUND_ROLES.items()},
 }
 
 #: Input tokens in one ticker's prompt, counted from the rendered system and
@@ -94,15 +94,19 @@ def estimated_monthly_cost_usd(
 
 
 def sleeve_of(ticker: str) -> str:
-    """``"index"`` or ``"single name"``, for reports that group by sleeve."""
-    return "index" if kind_for(ticker) is InstrumentKind.ETF else "single name"
+    """``"fund"`` or ``"single name"``, for reports that group by sleeve.
+
+    Coarser than ``kind_for``: the two fund kinds are sized differently but
+    share one sleeve budget, because they are both "not a company".
+    """
+    return "single name" if kind_for(ticker) is InstrumentKind.EQUITY else "fund"
 
 
 __all__ = [
     "DEFAULT_WATCHLIST",
     "BUCKETS",
     "SINGLE_NAMES",
-    "INDEX_SLEEVE",
+    "FUNDS",
     "ESTIMATED_INPUT_TOKENS",
     "ASSUMED_OUTPUT_TOKENS",
     "COST_PER_TICKER_PER_CYCLE_USD",

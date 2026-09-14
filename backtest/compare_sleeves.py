@@ -6,7 +6,7 @@
     python backtest/compare_sleeves.py --json
 
 Each sleeve is replayed under **its own** position cap -- single names at
-``MAX_POSITION_PCT``, funds at ``MAX_ETF_POSITION_PCT`` -- because that is the
+``MAX_POSITION_PCT``, funds at ``MAX_BROAD_FUND_PCT`` -- because that is the
 configuration that will actually run. Comparing both at the same cap would
 answer a question nobody asked.
 
@@ -40,7 +40,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from backtest.simulate import DEFAULT_HORIZON_DAYS, Trade, simulate_series  # noqa: E402
 from config import settings as cfg  # noqa: E402
-from config.instruments import INDEX_SLEEVE, SINGLE_NAMES  # noqa: E402
+from config.instruments import (  # noqa: E402
+    BROAD_FUNDS,
+    COMMODITY_FUNDS,
+    SINGLE_NAMES,
+)
 
 REQUIRED_COLUMNS = ("Open", "High", "Low", "Close")
 
@@ -266,7 +270,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     results = [
         run_sleeve("single name", SINGLE_NAMES, cfg.MAX_POSITION_PCT, **common),
-        run_sleeve("index", INDEX_SLEEVE, cfg.MAX_ETF_POSITION_PCT, **common),
+        run_sleeve("broad fund", BROAD_FUNDS, cfg.MAX_BROAD_FUND_PCT, **common),
+        run_sleeve("commodity", COMMODITY_FUNDS, cfg.MAX_COMMODITY_FUND_PCT, **common),
     ]
 
     if args.as_json:
