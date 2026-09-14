@@ -1,6 +1,6 @@
 ---
 title: "Testing"
-description: "447 tests, zero network calls, zero credentials"
+description: "488 tests, zero network calls, zero credentials"
 ---
 
 ```bash
@@ -87,6 +87,8 @@ before the fixture replaces it.
 | `test_analysis_returns.py` | 20 | That an entry price can never predate the signal that predicted it — swept across every entry rule, hour and day — plus after-hours handling, pending outcomes and missing history. |
 | `test_analysis_metrics.py` | 24 | Rank correlation against hand-computed values including ties, that a constant series yields `None` rather than zero, signed-return direction, bucket edges, and the agreement and drift checks. |
 | `test_analysis_reader.py` | 11 | Journal parsing field by field, the tz-naive timestamp fallback being flagged, and that a truncated final line is skipped rather than fatal. |
+| `test_replay_rebuild.py` | 17 | That a replayed prompt is byte-identical to the one the model was shown — including the nested `InsiderTrade` objects `asdict()` flattens, which was proved load-bearing by removal — plus schema drift tolerated in both directions and a context without a ticker refused rather than invented. |
+| `test_replay_runner.py` | 24 | Loading (a truncated line skipped, a no-signal cycle still replayable), every model failure reported rather than raised, and change graded by consequence: a bias flip and a floor crossing count, a 0.05 conviction move does not. |
 | `test_analysis_scoring.py` | 20 | The scorer end to end on a synthetic price series, plus report honesty: small samples flagged, NEUTRAL excluded, an all-pending journal still rendering. |
 
 ## A test suite is only as good as its negative cases

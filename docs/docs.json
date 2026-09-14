@@ -43,6 +43,7 @@
         "pages": [
           "api-reference/webhook",
           "scoring",
+          "replay",
           "testing",
           "continuous-integration"
         ]

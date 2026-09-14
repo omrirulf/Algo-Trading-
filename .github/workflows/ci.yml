@@ -172,6 +172,21 @@ jobs:
           fi
           echo "OK: the scorer only reads"
 
+      - name: The replay harness cannot trade
+        # replay/ re-asks the model while iterating on a prompt, so it runs
+        # often and casually. It must not be able to place an order, and it
+        # must not write the journal it reads -- appending replayed signals
+        # would corrupt the only record of what the model actually said.
+        run: |
+          hits=$(grep -rnE '(submit_order|submit_bracket_order|ExecutionEngine|post_signal|AlpacaPaperBroker|\.write_text\(|open\([^)]*["'"'"'][wa])' \
+                   replay --include='*.py' || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::replay/ must not place orders or write files"
+            exit 1
+          fi
+          echo "OK: the replay harness only reads and asks"
+
       - name: No committed .env
         run: |
           if git ls-files --error-unmatch .env >/dev/null 2>&1; then
