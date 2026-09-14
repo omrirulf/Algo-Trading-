@@ -1,6 +1,6 @@
 ---
 title: "Testing"
-description: "447 tests, zero network calls, zero credentials"
+description: "471 tests, zero network calls, zero credentials"
 ---
 
 ```bash
@@ -72,6 +72,8 @@ before the fixture replaces it.
 | `test_schemas.py` | 68 | `LLMSignal` rejects extra fields, enforces every bound (conviction range, ticker pattern, rationale length, the `[-1, 1]` score ranges, the six-item `key_factors` cap), and normalizes tickers to uppercase. |
 | `test_market_data.py` | 6 | The Wilder ATR implementation matches a reference calculation, including gap and NaN handling. |
 | `test_broker_client.py` | 26 | Alpaca credential resolution: settings before the CLI profile, an OAuth token before stored keys, half a key pair rejected rather than sent, every malformed-profile shape degrading, the credential never reaching the logs, and — proved to fail without the guard — that a profile marked `live_trade: true` is refused instead of borrowed. |
+| `test_dispatch.py` | 13 | That direct mode is a transport change, not a safety change: mode selection and its refusal of a typo, the engine called in-process, no webhook secret read, both modes producing one journal shape, and order parameters still impossible. |
+| `test_market_hours.py` | 11 | That a closed market costs nothing and trades nothing — the engine gate rejecting before any quote is fetched, the cycle gate skipping before any news or model call, an unreadable clock continuing rather than halting, and `--once` not starting the scheduler. Both gates proved load-bearing by removal. |
 | `test_execution_engine.py` | 19 | The full nine-step decision path, every guardrail gate, and that broker/market-data errors become `ERROR` results rather than exceptions. |
 | `test_order_idempotency.py` | 26 | That a retried submit cannot become a second position: the id is stable within a heartbeat window and distinct across ticker, side and window; a duplicate rejection is recognised while an ordinary failure is not; and a suppressed duplicate is reported `REJECTED`, never `ERROR`. Both halves were proved load-bearing by removal. |
 | `test_webhook.py` | 12 | HTTP auth (401 on a bad secret), 422 on smuggled fields, that importing `app.main` needs no credentials, and correct handling of rejections. |

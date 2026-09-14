@@ -207,6 +207,10 @@ class DuplicatingBroker:
     equity: float = 100_000.0
     positions: list = field(default_factory=list)
     calls: int = 0
+    market_open: bool = True
+
+    def is_market_open(self) -> bool:
+        return self.market_open
 
     def get_equity(self) -> float:
         return self.equity

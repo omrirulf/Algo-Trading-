@@ -87,6 +87,13 @@ class Settings(BaseSettings):
     webhook_shared_secret: str = Field(
         default="", description="Shared secret required in the x-webhook-secret header"
     )
+    execution_mode: str = Field(
+        default="direct",
+        description=(
+            "How signals reach the engine: 'direct' (in-process, no webhook) "
+            "or 'webhook' (POST to a separately running app)"
+        ),
+    )
     webhook_url: str = Field(
         default="http://localhost:8000/webhook/signal",
         description="Where the orchestrator POSTs validated signals",
