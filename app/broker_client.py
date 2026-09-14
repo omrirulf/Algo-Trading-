@@ -141,6 +141,8 @@ class SubmittedOrder:
 class BrokerClient(Protocol):
     """What the execution engine needs from a broker."""
 
+    def is_market_open(self) -> bool: ...
+
     def get_equity(self) -> float: ...
 
     def get_open_positions(self) -> list[OpenPosition]: ...
@@ -279,6 +281,22 @@ class AlpacaPaperBroker:
             oauth_token=credentials.access_token or None,
             paper=True,
         )
+
+    def is_market_open(self) -> bool:
+        """Whether the US equity market is open right now.
+
+        Alpaca's own clock is the authority rather than a local weekday and
+        time-of-day calculation. A hand-rolled check would have to carry the
+        exchange holiday calendar, the half-day schedule, and the fact that
+        US market hours move against UTC twice a year on a DST schedule that
+        is not the same as Europe's. Getting any of those wrong means either
+        trading into a closed market or skipping a real session.
+        """
+        try:
+            clock = self._client.get_clock()
+        except Exception as exc:  # noqa: BLE001
+            raise BrokerError(f"get_clock failed: {exc}") from exc
+        return bool(clock.is_open)
 
     def get_equity(self) -> float:
         try:

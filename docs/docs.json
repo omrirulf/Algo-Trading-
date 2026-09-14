@@ -16,7 +16,8 @@
         "pages": [
           "index",
           "quickstart",
-          "configuration"
+          "configuration",
+          "deployment"
         ]
       },
       {

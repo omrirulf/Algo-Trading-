@@ -1,0 +1,66 @@
+name: heartbeat
+
+# US equity regular hours are 09:30-16:00 America/New_York, which is
+# 13:30-20:00 UTC in summer and 14:30-21:00 UTC in winter. GitHub cron has no
+# timezone, so the window below spans both and the job itself decides: the
+# orchestrator asks Alpaca's clock and exits immediately when the market is
+# shut, which also covers holidays and half-days that no cron can express.
+on:
+  schedule:
+    - cron: "5 13-21 * * 1-5"
+  workflow_dispatch:        # a manual run, for the first smoke test
+
+# Two runs writing the journal at once would race on the commit below.
+concurrency:
+  group: heartbeat
+  cancel-in-progress: false
+
+permissions:
+  contents: write           # only to push the journal back
+
+jobs:
+  cycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Run one cycle
+        env:
+          EXECUTION_MODE: direct          # no webhook: nothing to host here
+          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          BRIGHTDATA_API_TOKEN: ${{ secrets.BRIGHTDATA_API_TOKEN }}
+          BRIGHTDATA_SERP_ZONE: ${{ vars.BRIGHTDATA_SERP_ZONE }}
+          BRIGHTDATA_UNLOCKER_ZONE: ${{ vars.BRIGHTDATA_UNLOCKER_ZONE }}
+          WATCHLIST: ${{ vars.WATCHLIST }}
+        run: python -m orchestrator.heartbeat --once
+
+      - name: Commit the journal
+        # The runner is discarded, so an uncommitted journal is a lost cycle --
+        # and the journal is the only record of what the model saw. Committed
+        # rather than uploaded as an artifact so the scorer can read the whole
+        # history from a plain clone, and so it is readable on a phone.
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # -f because logs/*.log is gitignored for local development, where
+          # nobody wants their scratch runs committed. Here the journal is
+          # the deliverable, so it is added explicitly by name.
+          git add -f logs/signal_journal.log logs/execution_audit.log || true
+          if git diff --cached --quiet; then
+            echo "no journal changes"
+            exit 0
+          fi
+          git commit -m "Journal: cycle at $(date -u +'%Y-%m-%dT%H:%MZ')"
+          # Another cycle may have landed while this one ran.
+          git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

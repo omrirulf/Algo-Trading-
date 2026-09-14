@@ -27,6 +27,15 @@ class ExecutionEngine:
         self._broker = broker
         self._market_data = market_data
 
+    @property
+    def broker(self) -> BrokerClient:
+        """Read-only access for callers that need the market clock.
+
+        Deliberately not a setter: the engine is constructed with its broker
+        and nothing may swap it afterwards.
+        """
+        return self._broker
+
     # ------------------------------------------------------------------ #
     # Public API
     # ------------------------------------------------------------------ #
@@ -64,30 +73,38 @@ class ExecutionEngine:
         if side is None:
             return reject("bias is NEUTRAL; no trade")
 
-        # 2. Conviction floor (cheap; checked before any network I/O).
+        # 2. Market hours. This lives here, not only in the scheduler, because
+        #    it is a trading decision rather than a scheduling convenience: a
+        #    signal replayed by hand, or delivered late by a webhook retry,
+        #    must not open a position into a closed session. Checked before
+        #    any market-data fetch so a closed market costs no quote either.
+        if not self._broker.is_market_open():
+            return reject("market is closed")
+
+        # 3. Conviction floor (cheap; checked before any network I/O).
         if not risk_engine.check_conviction_threshold(signal.conviction):
             return reject(
                 f"conviction {signal.conviction:.2f} below minimum {cfg.MIN_CONVICTION:.2f}"
             )
 
-        # 3. Account state.
+        # 4. Account state.
         equity = self._broker.get_equity()
         positions = self._broker.get_open_positions()
         existing = next((p for p in positions if p.ticker == signal.ticker), None)
 
-        # 4. Position-count limit only applies when opening a *new* ticker.
+        # 5. Position-count limit only applies when opening a *new* ticker.
         if existing is None and not risk_engine.check_position_count_limit(len(positions)):
             return reject(
                 f"already holding {len(positions)} positions (max {cfg.MAX_OPEN_POSITIONS})"
             )
 
-        # 5. Never flip an existing position via a fresh entry order.
+        # 6. Never flip an existing position via a fresh entry order.
         if existing is not None and existing.side != side:
             return reject(
                 f"conflicting open {existing.side} position of {existing.qty:g} shares"
             )
 
-        # 6. Market data (price + volatility).
+        # 7. Market data (price + volatility).
         price = self._market_data.get_latest_price(signal.ticker)
         atr = self._market_data.get_atr(signal.ticker)
         if not risk_engine.check_atr_sanity(atr, price):
@@ -96,10 +113,10 @@ class ExecutionEngine:
                 entry_price=price, atr=atr,
             )
 
-        # 7. Stop-loss from real volatility.
+        # 8. Stop-loss from real volatility.
         stop_price = risk_engine.calculate_stop_price(price, atr, side)
 
-        # 8. Size under the per-ticker equity cap (existing exposure counts).
+        # 9. Size under the per-ticker equity cap (existing exposure counts).
         existing_value = existing.market_value if existing else 0.0
         qty = risk_engine.calculate_position_size(
             equity=equity, price=price, existing_position_value=existing_value
@@ -111,8 +128,8 @@ class ExecutionEngine:
                 entry_price=price, stop_price=stop_price, atr=atr,
             )
 
-        # 9. Submit. The broker method *requires* a stop price; there is no
-        #    overload that submits a naked entry.
+        # 10. Submit. The broker method *requires* a stop price; there is no
+        #     overload that submits a naked entry.
         order = self._broker.submit_bracket_order(
             ticker=signal.ticker, qty=qty, side=side, stop_price=stop_price
         )

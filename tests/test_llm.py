@@ -374,9 +374,9 @@ def test_full_cycle_posts_the_signal_the_model_returned(monkeypatch):
     monkeypatch.setattr(hb, "call_llm", lambda s, u, j: json.dumps(VALID_SIGNAL))
     posted = []
 
-    def fake_post(signal, client=None):
+    def fake_post(signal, dispatcher=None):
         posted.append(signal)
-        return httpx2.Response(200, text='{"status": "ACCEPTED"}')
+        return {"mode": "direct", "status": "ACCEPTED", "reason": "ok"}
 
     monkeypatch.setattr(hb, "post_signal", fake_post)
     hb.process_ticker("AAPL")

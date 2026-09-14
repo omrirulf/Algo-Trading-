@@ -1,0 +1,125 @@
+---
+title: "Deployment"
+description: "Running the heartbeat without a server, a webhook, or a laptop left open"
+---
+
+The system needs to run a cycle every hour during market hours. That is an
+awkward shape for a phone and overkill for a VM, so the default target is a
+**scheduled GitHub Actions job**: no server, no open port, and the logs are
+readable from the GitHub mobile app.
+
+## Two things had to change first
+
+<Steps>
+  <Step title="The webhook became optional">
+    The orchestrator used to POST signals to a separately running FastAPI app.
+    A scheduled job has nothing to POST *to*, so `EXECUTION_MODE=direct` runs
+    the engine in the same process instead.
+  </Step>
+  <Step title="The cycle learned when the market is shut">
+    The scheduler ran every 60 minutes regardless, so roughly two thirds of
+    cycles spent a Bright Data request and a model call per ticker on a closed
+    market — and submitted orders into it.
+  </Step>
+</Steps>
+
+## Direct mode is a transport change, not a safety change
+
+The boundary that keeps the model away from order parameters is
+`LLMSignal(extra="forbid")` plus the engine owning all sizing and stops. That
+lives in the schema, not in the network hop.
+
+| | Webhook mode | Direct mode |
+|---|---|---|
+| Smuggled `quantity` field | HTTP 422 | `ValidationError` |
+| Who sizes the position | Engine | Engine |
+| Who sets the stop | Engine | Engine |
+| `WEBHOOK_SHARED_SECRET` | Required | **Never read** |
+| Processes to run | 2 | 1 |
+
+<Warning>
+  **The one thing that genuinely weakens.** In direct mode the orchestrator
+  process holds Alpaca credentials, so "broker credentials never share a
+  process with LLM-adjacent code" becomes "never share a *module*" — still
+  enforced by CI, but by module boundary rather than process boundary.
+
+  The practical exposure is unchanged: the model's output is a closed schema
+  and cannot reach code execution. But it is a real difference, and it is why
+  `webhook` mode still exists rather than having been deleted. Keep it if you
+  want the engine on a different machine from the LLM side.
+</Warning>
+
+## Market hours are checked twice, on purpose
+
+```python
+# app/execution_engine.py — step 2, before any market-data fetch
+if not self._broker.is_market_open():
+    return reject("market is closed")
+```
+
+The **engine gate** is the safety property: a signal replayed by hand, or
+delivered late by a webhook retry, must not open a position into a closed
+session. The **cycle gate** in `run_cycle()` is the cost property: it asks the
+same question before any news fetch or model call, which is where a
+closed-market cycle actually spends money.
+
+<Note>
+  The authority is Alpaca's own clock, not a local weekday-and-time
+  calculation. A hand-rolled check would have to carry the exchange holiday
+  calendar, the half-day schedule, and the fact that US market hours move
+  against UTC on a DST schedule that is not Europe's. Getting any of those
+  wrong means trading into a closed market or skipping a real session.
+</Note>
+
+<Warning>
+  An unreadable clock does **not** halt trading. It is logged and the cycle
+  continues, because one flaky API call silently stopping the system is worse
+  than a wasted cycle — and the engine re-checks anyway.
+</Warning>
+
+## Setting up the scheduled job
+
+<Steps>
+  <Step title="Add your secrets">
+    Repository **Settings → Secrets and variables → Actions**. Add as
+    *secrets*: `ALPACA_API_KEY`, `ALPACA_SECRET_KEY`, `ANTHROPIC_API_KEY`,
+    `BRIGHTDATA_API_TOKEN`. Add as *variables*: `BRIGHTDATA_UNLOCKER_ZONE`
+    (`cli_unlocker` if you used `brightdata login`) and `WATCHLIST`.
+  </Step>
+  <Step title="Run it once by hand">
+    **Actions → heartbeat → Run workflow.** This is the smoke test that
+    matters: the yfinance and Bright Data parsers were only ever validated
+    against mocks, so watch this run's log for `context gaps` warnings or
+    empty headlines. See [Testing](/testing).
+  </Step>
+  <Step title="Let the schedule take over">
+    `cron: "5 13-21 * * 1-5"` spans US market hours across both DST offsets;
+    the job itself exits immediately when Alpaca says the market is shut.
+  </Step>
+</Steps>
+
+<Warning>
+  **GitHub Actions cron is best-effort.** Runs can be delayed 5–15 minutes or
+  more under load, and scheduled workflows are disabled automatically after 60
+  days without repository activity. If you want punctual, guaranteed
+  execution, run `python -m orchestrator.heartbeat` (no `--once`) on a small
+  always-on host instead — the same direct mode works there.
+</Warning>
+
+## Why the journal is committed back
+
+The runner is discarded after each job, so an uncommitted journal is a lost
+cycle — and the journal is the only record of what the model saw before it
+decided. Committing it rather than uploading an artifact means the scorer can
+read the whole history from a plain clone, artifacts cannot expire out from
+under you, and you can read your own trading history on a phone.
+
+The cost is roughly seven commits a trading day on `main`. If that becomes
+noisy, point the workflow at a `journal` branch instead.
+
+## Running it locally
+
+```bash
+python -m orchestrator.heartbeat --once   # one cycle, then exit
+python -m orchestrator.heartbeat          # schedule every HEARTBEAT_INTERVAL_MINUTES
+```
