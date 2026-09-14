@@ -194,9 +194,9 @@ detail on what each one prevents is in [Guardrails](/guardrails).
 | `MAX_BROAD_FUND_PCT` | `0.12` | Cap for a diversified **broad fund**. |
 | `MAX_COMMODITY_FUND_PCT` | `0.04` | Cap for a **single-commodity** fund — tighter than a single stock. |
 | `MAX_EXPOSURE_GROUP_PCT` | `0.25` | Cap on any one exposure group, spanning both sleeves. |
-| `MAX_SINGLE_NAME_SLEEVE_PCT` | `0.15` | Budget for the whole single-name sleeve. |
-| `MAX_FUND_SLEEVE_PCT` | `0.45` | Budget for the whole fund sleeve — the core allocation. |
-| `MAX_GROSS_EXPOSURE_PCT` | `0.6` | Ceiling on total deployed capital across every position. Leaves a 40% cash floor. |
+| `MAX_SINGLE_NAME_SLEEVE_PCT` | `0.25` | Budget for the whole single-name sleeve. |
+| `MAX_FUND_SLEEVE_PCT` | `0.7` | Budget for the whole fund sleeve — the core allocation. |
+| `MAX_GROSS_EXPOSURE_PCT` | `0.95` | Ceiling on total deployed capital across every position. Leaves a 5% operational buffer. |
 | `MIN_CONVICTION` | `0.60` | Signals below this are rejected before any market data is fetched. |
 | `MAX_OPEN_POSITIONS` | `10` | Max distinct tickers held at once. |
 | `ATR_PERIOD` | `14` | Wilder ATR lookback, in trading days. |

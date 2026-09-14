@@ -145,9 +145,9 @@ per-ticker cap satisfied.
 | Limit | Value | What it stops |
 |---|---|---|
 | Exposure group | 25% | A one-bet book. Spans both sleeves, so XOM + `USO` + `UNG` is one energy bet made three times. |
-| Single-name sleeve | 15% | Stock picking growing past its budget. |
-| Fund sleeve | 45% | — the core allocation. |
-| Gross exposure | 60% | Leverage. Leaves a 40% cash floor at all times. |
+| Single-name sleeve | 25% | Stock picking growing past its budget. |
+| Fund sleeve | 70% | — the core allocation. |
+| Gross exposure | 95% | Leverage, and nothing else. |
 
 All three run **before any market-data fetch**, so a full book costs no quote,
 and the tightest of them is passed into sizing as a ceiling — a partly-full
@@ -163,10 +163,16 @@ under-used rather than being a fourth independent limit.
 A greedily-filled book, 100k account:
 
 ```
-RSP 12%, IWM 12%, VGK 12%, EWJ 9%, MSFT 5%, LLY 5%, JPM 5%
-funds 45% | names 15% | deployed 60% | cash 40%
-funds are 75% of the portfolio
+12 positions across 6 exposure groups
+funds 74% of the book | names 26% | deployed 95% | cash 5%
+
+International equity  25%    Real estate  12%
+US broad equity       24%    Duration      9%
+Technology            20%    Financials    5%
 ```
+
+No group exceeds 25%, and filling the book **requires** at least four of them:
+being fully invested and being concentrated are now incompatible.
 
 ## The instrument kind is a privilege boundary
 
