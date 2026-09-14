@@ -1,0 +1,77 @@
+name: historical replay
+
+# An early read on the signal from history, on the two dimensions that can be
+# rebuilt honestly at a past date: technicals (exactly, from bars up to the
+# signal date) and news (approximately, from Google's index for that date).
+# Fundamentals, analyst targets and insider filings are withheld as named
+# gaps, because yfinance only has them as they stand today.
+#
+# Scored by the engine's own arithmetic -- next-bar entry, the real ATR stop,
+# the real cap -- and reported beside the unconditional base rate. Runs at
+# half price through the Message Batches API. Nothing here can trade.
+on:
+  workflow_dispatch:
+    inputs:
+      samples:
+        description: "How many (ticker, date) pairs to sample"
+        default: "200"
+      seed:
+        description: "Sampling seed, for a reproducible draw"
+        default: "7"
+      resume:
+        description: "A batch id to collect instead of submitting a new one"
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Plan, submit, collect
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          BRIGHTDATA_API_TOKEN: ${{ secrets.BRIGHTDATA_API_TOKEN }}
+          BRIGHTDATA_SERP_ZONE: ${{ vars.BRIGHTDATA_SERP_ZONE }}
+        run: |
+          set -o pipefail
+          if [ -n "${{ inputs.resume }}" ]; then
+            echo "${{ inputs.resume }}" > batch_id
+            test -s hist_trials.json || { echo "::error::resume needs hist_trials.json from the original run's artifact"; exit 1; }
+          else
+            python replay/historical.py plan --samples "${{ inputs.samples }}" --seed "${{ inputs.seed }}" > hist_trials.json
+            python replay/historical.py submit --trials hist_trials.json > batch_id
+          fi
+          echo "batch: $(cat batch_id)"
+          python replay/historical.py collect --trials hist_trials.json --batch "$(cat batch_id)" | tee replay.txt
+          python replay/historical.py collect --trials hist_trials.json --batch "$(cat batch_id)" --json > replay.json || true
+
+      - name: Publish to the run summary
+        if: always()
+        run: |
+          {
+            echo '## Historical replay'
+            echo
+            echo '```'
+            cat replay.txt 2>/dev/null || echo "(did not run)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: historical-replay
+          path: |
+            replay.txt
+            replay.json
+            hist_trials.json
+            batch_id

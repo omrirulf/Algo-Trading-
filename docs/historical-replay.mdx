@@ -1,0 +1,59 @@
+---
+title: "Historical replay"
+description: "An early read from two years of history, on the two dimensions that are honest there"
+---
+
+The live journal needs weeks to fill. History is already there. This replays
+the model over sampled `(ticker, date)` pairs from the past two years and
+scores each answer against what actually happened next — an afternoon instead
+of a quarter.
+
+```bash
+python replay/historical.py plan --samples 200 --seed 7 > hist_trials.json
+python replay/historical.py submit --trials hist_trials.json > batch_id
+python replay/historical.py collect --trials hist_trials.json --batch $(cat batch_id)
+```
+
+Or the **historical replay** workflow in the Actions tab.
+
+## Only two of five dimensions — deliberately
+
+| Dimension | Rebuilt at the past date? | How |
+|---|---|---|
+| Technicals | **Exactly** | The OHLC frame is sliced at the signal bar and handed to the same `build_snapshot` the live path uses. No later bar can leak in; a test mutates every later bar and asserts the snapshot does not move. |
+| News | **Approximately** | Google's custom date range (`cdr`) asks for stories dated on or just before the signal date. What comes back is what is *still indexed* — sparser and survivor-biased. |
+| Fundamentals | No | |
+| Analyst view | No | yfinance reports these as they stand *today*. Handing today's numbers under a past date would leak the future through the side door. |
+| Insider filings | No | |
+
+The three withheld dimensions are **named as gaps** in the prompt, in the same
+words the live prompt uses for an outage, so the model scores them 0.0 rather
+than guessing.
+
+<Warning>
+  This tests a **weaker** strategy than the live one. A signal that shows
+  something here has something. One that shows nothing here has not been given
+  its full inputs — the live journal is still the arbiter.
+</Warning>
+
+## Scored by the engine, against the base rate
+
+Every sided signal that clears the conviction floor is put through
+`backtest.simulate.simulate_trade` — next-bar entry, the real ATR stop, the
+real position cap. "Hit" means **the trade the system would actually have
+taken made money**, not that a close was higher some days later.
+
+Beside it, the report gives the **unconditional** forward return of every
+sample: the share that went up regardless of any signal. A BULLISH hit rate
+has to beat *that*, not 50%. In a rising two years the base rate may be 55–60%,
+and a model that says BULLISH to everything will look right most of the time
+for reasons that have nothing to do with it.
+
+Each rate carries one standard error. With a few hundred samples, a hit rate
+within about two of them of the base rate is indistinguishable from it.
+
+## What "no headlines" means
+
+Samples whose dated news query returns nothing are kept and counted. They are
+a technicals-only strategy — different from, and weaker than, technicals plus
+news — and the report says how many there were rather than folding them in.

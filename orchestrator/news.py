@@ -23,6 +23,7 @@ import os
 import sys
 from pathlib import Path
 from typing import Any, Optional
+from datetime import date, timedelta
 from urllib.parse import urlencode
 
 from config.instruments import is_fund
@@ -76,7 +77,20 @@ class NewsFetchError(Exception):
     """Bright Data was unreachable, rejected the request, or returned no JSON."""
 
 
-def build_news_search_url(ticker: str) -> str:
+def _date_window(on: date) -> str:
+    """Google's custom date range: the day before the signal through the day.
+
+    ``cdr:1`` switches the ``tbs`` parameter from a rolling window to explicit
+    bounds, in US month/day/year. Two days rather than one because a story
+    filed late the previous evening is what the market opened on, and
+    because a single day of an old index is often empty. Nothing dated after
+    ``on`` can match, which is the whole point.
+    """
+    start = on - timedelta(days=1)
+    return f"cdr:1,cd_min:{start.month}/{start.day}/{start.year},cd_max:{on.month}/{on.day}/{on.year}"
+
+
+def build_news_search_url(ticker: str, on: Optional[date] = None) -> str:
     """Google News URL for one ticker.
 
     The qualifier differs by instrument because the query is what decides
@@ -84,12 +98,15 @@ def build_news_search_url(ticker: str) -> str:
     single-stock coverage that mentions the index in passing; ``"SPY ETF"``
     returns the fund and macro commentary, which is the only frame an index
     signal can honestly be built on.
+
+    ``on`` asks for stories as of a past date instead of the past 24 hours --
+    the historical replay's way of rebuilding what the model would have seen.
     """
     qualifier = "ETF" if is_fund(ticker) else "stock"
     params = {
         "q": f"{ticker} {qualifier}",
         "tbm": "nws",
-        "tbs": f"qdr:{NEWS_LOOKBACK}",
+        "tbs": _date_window(on) if on is not None else f"qdr:{NEWS_LOOKBACK}",
         "num": MAX_HEADLINES,
         "hl": "en",
         "gl": "us",
@@ -279,7 +296,21 @@ class BrightDataNewsProvider:
             return client.post(BRIGHTDATA_REQUEST_URL, json=body, headers=headers)
 
     def fetch(self, ticker: str) -> list[str]:
-        body = {"zone": self._zone, "url": build_news_search_url(ticker), "format": "raw"}
+        """Headlines from the past 24 hours -- the live path."""
+        return self._fetch_url(build_news_search_url(ticker))
+
+    def fetch_on(self, ticker: str, day: date) -> list[str]:
+        """Headlines as of a past date -- the historical replay's path.
+
+        Same request, same parser, same zone; only the date window differs.
+        What comes back is what Google still indexes for that day, which is
+        sparser than the day's real coverage and biased towards stories that
+        lasted. The caller counts empty results rather than hiding them.
+        """
+        return self._fetch_url(build_news_search_url(ticker, on=day))
+
+    def _fetch_url(self, url: str) -> list[str]:
+        body = {"zone": self._zone, "url": url, "format": "raw"}
         try:
             resp = self._post(body)
         except httpx.HTTPError as exc:
