@@ -47,6 +47,13 @@ jobs:
         run: python -m orchestrator.heartbeat --once
 
       - name: Commit the journal
+        # `always()` because a cycle can fail *and* still have written lines:
+        # a ticker that reached the model and was refused there is journalled
+        # with its error, and those are the lines worth having when the run is
+        # red. Skipping this step on failure would discard exactly the record
+        # of the failure being investigated. A failed cycle still fails the
+        # job -- always() changes what runs, not the verdict.
+        if: always()
         # The runner is discarded, so an uncommitted journal is a lost cycle --
         # and the journal is the only record of what the model saw. Committed
         # rather than uploaded as an artifact so the scorer can read the whole
@@ -68,8 +75,11 @@ jobs:
           git push origin "HEAD:${GITHUB_REF_NAME}"
 
       - name: Push the archive to Supabase
-        # Deliberately AFTER the commit above, and deliberately not guarded by
-        # an `if:`. Two separate decisions:
+        # Deliberately AFTER the commit above, and `always()` for the same
+        # reason it is: the lines a failed cycle wrote belong in the archive
+        # too. Note this is not a guard on the secrets -- see below.
+        if: always()
+        # Two more decisions, unchanged:
         #
         # After, because the journal must already be safe in git before this
         # touches the network. If this step fails the run goes red, but no line
@@ -78,10 +88,12 @@ jobs:
         # arrival. That ordering is what lets this step be allowed to fail
         # loudly instead of being made advisory.
         #
-        # No `if:`, because the script already exits 0 saying "no remote
-        # configured" when the secrets are unset. Putting that decision in
-        # tested Python rather than in a YAML expression means it is covered by
-        # the test suite instead of only by a green run.
+        # No `if:` on the *credentials*, because the script already exits 0
+        # saying "no remote configured" when the secrets are unset. Putting
+        # that decision in tested Python rather than in a YAML expression means
+        # it is covered by the test suite instead of only by a green run. The
+        # same reasoning puts the cycle summary in Python: see
+        # orchestrator/heartbeat.py:render_summary.
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}

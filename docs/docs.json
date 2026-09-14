@@ -28,7 +28,8 @@
           "guardrails",
           "decision-path",
           "currency-risk",
-          "broker-evaluation"
+          "broker-evaluation",
+          "portfolio-view"
         ]
       },
       {

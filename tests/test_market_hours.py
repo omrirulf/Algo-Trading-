@@ -187,10 +187,23 @@ def test_a_clock_failure_becomes_a_broker_error():
 # --- the --once entrypoint a scheduled job needs --------------------------
 
 
+def _productive_cycle() -> hb.CycleReport:
+    """A report from a cycle that did reach the engine, so --once exits 0."""
+    return hb.CycleReport(
+        tickers=("AAPL",),
+        results=(hb.TickerResult("AAPL", hb.COMPLETED, status="REJECTED"),),
+    )
+
+
 def test_once_runs_a_single_cycle_and_returns(monkeypatch):
     """A cron job's process must terminate, or the run never finishes."""
     cycles = []
-    monkeypatch.setattr(hb, "run_cycle", lambda *a, **k: cycles.append(1))
+
+    def fake_cycle(*a, **k):
+        cycles.append(1)
+        return _productive_cycle()
+
+    monkeypatch.setattr(hb, "run_cycle", fake_cycle)
     started = []
     monkeypatch.setattr(hb, "BlockingScheduler", lambda *a, **k: started.append(1))
 

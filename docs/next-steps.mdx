@@ -50,6 +50,23 @@ product. These are the honest gaps.
     just CIK mapping and XML parsing. Worth building only once
     [the scorer](/scoring) shows the dimension carries signal.
   </Card>
+  <Card title="The exposure caps see one broker" icon="layer-group">
+    `execution_engine.py` asks a single broker for equity and open positions,
+    so the group and sleeve caps bound one book. That is correct today and
+    breaks the day a position can live at a second broker — not by raising,
+    but by silently under-counting: the same holding split across two accounts
+    passes a cap that the combined position would fail. The seam to fix it is
+    already there, and [The Portfolio View](/portfolio-view) says what to build
+    and when.
+  </Card>
+  <Card title="A total context failure leaves no trace" icon="ghost">
+    When news cannot be fetched, the ticker is skipped before a
+    `TickerContext` exists — and `journal.record` needs one, so nothing is
+    written. Every other failure path journals its error. The cycle summary and
+    the [exit code](/deployment) now make a whole-cycle outage
+    loud, but the journal itself still has no row for "never got started",
+    which is a hole in the claim that it records everything the model saw.
+  </Card>
   <Card title="Context is fetched serially" icon="hourglass">
     `context.py` fetches each source one after another, and the sources are
     independent. On the default three-ticker watchlist nobody notices; on a
@@ -82,6 +99,15 @@ product. These are the honest gaps.
     held for the whole horizon and start checking whether the stop was hit
     first. That is the difference between "was the model right" and "did this
     make money", and only the second one is the question.
+  </Step>
+  <Step title="Aggregate the book before adding a second broker">
+    `BrokerClient` is already a Protocol and the risk engine already takes
+    "anything with `.ticker` and `.market_value`", so this is a merge layer
+    rather than a redesign — but it has to ship *with* the second broker, not
+    after it, because until it exists the exposure caps under-count. Settle the
+    accounting currency at the same time: every cap is a percentage of
+    `get_equity()`, and that number stops being unambiguous once an account can
+    hold shekels. See [The Portfolio View](/portfolio-view).
   </Step>
   <Step title="Go to EDGAR for insider data, if it earns it">
     [Insider activity](/orchestrator/insiders) ships against yfinance, which

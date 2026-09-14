@@ -17,6 +17,12 @@ News and enrichment fail differently on purpose. If the enrichment sources are
 down the cycle continues on what is left, with the gaps named in the prompt; if
 *news* is down the ticker is skipped, because trading on technicals alone would
 be running a strategy nobody signed off on.
+
+One ticker failing must never end the cycle, so every failure inside
+``process_ticker`` is caught and reported rather than raised. The cost of that
+is a cycle where *every* ticker fails looking exactly like a quiet one -- which
+is what ``CycleReport`` exists to tell apart, and what makes ``--once`` exit
+non-zero instead of reporting success for a system that did nothing.
 """
 
 from __future__ import annotations
@@ -24,7 +30,10 @@ from __future__ import annotations
 import json
 import argparse
 import logging
+import os
 import sys
+from collections import Counter
+from dataclasses import dataclass
 from pathlib import Path
 
 # Allow ``python orchestrator/heartbeat.py`` from the repo root.
@@ -220,6 +229,204 @@ def call_llm(system_prompt: str, user_prompt: str, json_schema: dict) -> Complet
 
 
 # --------------------------------------------------------------------------- #
+# What a cycle did
+# --------------------------------------------------------------------------- #
+
+#: How far a ticker got before it stopped. Which stage a cycle dies at is the
+#: difference between a credentials problem, a model problem and an engine
+#: problem, so the summary reports the stage rather than one error count.
+CONTEXT_FAILED = "context"
+MODEL_FAILED = "model"
+DISPATCH_FAILED = "dispatch"
+COMPLETED = "done"
+
+#: Human labels, in the order a ticker would meet them.
+STAGE_LABELS: dict[str, str] = {
+    CONTEXT_FAILED: "context never gathered",
+    MODEL_FAILED: "no usable signal from the model",
+    DISPATCH_FAILED: "signal never reached the engine",
+    COMPLETED: "reached the engine",
+}
+
+#: What to suspect first when every ticker died at the same stage. Names
+#: variables, never values -- this text is rendered into a job summary that
+#: anyone who can see the repository can read.
+STAGE_HINTS: dict[str, str] = {
+    CONTEXT_FAILED: (
+        "`BRIGHTDATA_API_TOKEN` -- news is required, and a ticker whose news "
+        "cannot be fetched is skipped by design"
+    ),
+    MODEL_FAILED: (
+        "`ANTHROPIC_API_KEY`, or the model answering outside the signal schema"
+    ),
+    DISPATCH_FAILED: (
+        "`ALPACA_API_KEY` / `ALPACA_SECRET_KEY` in direct mode, or an "
+        "unreachable webhook"
+    ),
+}
+
+
+@dataclass(frozen=True)
+class TickerResult:
+    """One ticker's pass: how far it got, and what the engine said."""
+
+    ticker: str
+    stage: str
+    #: The engine's verdict (ACCEPTED / REJECTED / ERROR) when ``stage`` is
+    #: ``COMPLETED``; ``None`` anywhere else, because there was no verdict.
+    status: str | None = None
+    #: How many named context gaps the model was asked to judge around.
+    gaps: int = 0
+
+
+@dataclass(frozen=True)
+class CycleReport:
+    """What one cycle did, in the terms an operator asks about it."""
+
+    tickers: tuple[str, ...] = ()
+    results: tuple[TickerResult, ...] = ()
+    #: The cheap gate said the session was shut, so nothing was attempted.
+    market_closed: bool = False
+    #: The clock could not be read and the cycle went ahead regardless.
+    clock_unreadable: bool = False
+    fx: FxRate | None = None
+
+    @property
+    def completed(self) -> tuple[TickerResult, ...]:
+        """Tickers whose signal reached the engine, whatever it then decided."""
+        return tuple(r for r in self.results if r.stage == COMPLETED)
+
+    @property
+    def stages(self) -> Counter:
+        return Counter(r.stage for r in self.results)
+
+    @property
+    def verdicts(self) -> Counter:
+        return Counter(r.status or "unknown" for r in self.completed)
+
+    @property
+    def degraded(self) -> int:
+        """Tickers judged on less context than the strategy assumes it has."""
+        return sum(1 for r in self.results if r.gaps)
+
+    @property
+    def produced_nothing(self) -> bool:
+        """The cycle ran, attempted tickers, and got no signal to the engine.
+
+        This is the state that has to be loud, and it is deliberately *not*
+        "no trade was placed". A cycle where the engine rejected every signal
+        did its job -- a conviction floor that filters is the system working.
+        What is broken is a cycle where nothing the model produced ever got
+        far enough to be judged at all, because that leaves no trade, no
+        journal line, and nothing to score later.
+
+        A closed market is not this. Neither is an empty watchlist, which is a
+        configuration choice rather than an outage.
+        """
+        return bool(self.tickers) and not self.market_closed and not self.completed
+
+
+def render_summary(report: CycleReport) -> str:
+    """The cycle as Markdown, for the GitHub job summary.
+
+    Rendered in Python rather than in workflow YAML so the test suite covers
+    it. A summary that exists only as a shell expression is checked by nothing
+    except a green run, and the whole reason to write one is to be read when
+    the run is not green.
+    """
+    out: list[str] = ["## Heartbeat cycle", ""]
+
+    if report.market_closed:
+        out += ["Market closed; no tickers attempted.", ""]
+        return "\n".join(out)
+
+    attempted = len(report.tickers)
+    reached = len(report.completed)
+
+    if report.produced_nothing:
+        out += [
+            f"### Nothing reached the engine",
+            "",
+            f"All **{attempted}** tickers stopped before a signal could be "
+            "judged. This cycle traded nothing and recorded nothing to score "
+            "later.",
+            "",
+        ]
+    else:
+        out += [f"**{reached} of {attempted}** tickers reached the engine.", ""]
+
+    if report.verdicts:
+        out += ["| Verdict | Tickers |", "| --- | --- |"]
+        out += [f"| {status} | {n} |" for status, n in sorted(report.verdicts.items())]
+        out += [""]
+
+    stopped = {s: n for s, n in report.stages.items() if s != COMPLETED}
+    if stopped:
+        out += ["| Stopped at | Tickers |", "| --- | --- |"]
+        out += [
+            f"| {STAGE_LABELS[stage]} | {stopped[stage]} |"
+            for stage in (CONTEXT_FAILED, MODEL_FAILED, DISPATCH_FAILED)
+            if stage in stopped
+        ]
+        out += [""]
+
+    notes: list[str] = []
+    if report.clock_unreadable:
+        notes.append(
+            "Market clock could not be read; the cycle continued and the "
+            "engine re-checked it."
+        )
+    if report.degraded:
+        notes.append(
+            f"{report.degraded} of {attempted} tickers were judged with named "
+            "context gaps."
+        )
+    if report.fx is not None:
+        notes.append(
+            f"USD/ILS {report.fx.rate:.4f}"
+            if report.fx.ok
+            else f"USD/ILS unavailable: {report.fx.gap}"
+        )
+    if notes:
+        out += [f"- {note}" for note in notes] + [""]
+
+    if report.produced_nothing and stopped:
+        out += ["<details><summary>What to check</summary>", ""]
+        out += [
+            "A whole-cycle failure is almost always credentials or an outage "
+            "rather than the strategy. Where it stopped narrows it:",
+            "",
+        ]
+        out += [
+            f"- **{STAGE_LABELS[stage]}** -- {STAGE_HINTS[stage]}."
+            for stage in (CONTEXT_FAILED, MODEL_FAILED, DISPATCH_FAILED)
+            if stage in stopped
+        ]
+        out += ["", "</details>", ""]
+
+    return "\n".join(out)
+
+
+def write_step_summary(report: CycleReport) -> bool:
+    """Append the cycle summary to the GitHub job summary, when there is one.
+
+    Returns whether anything was written, so a caller outside Actions is not
+    left guessing. A summary is a convenience: failing to write one must never
+    turn a good cycle into a failed job.
+    """
+    path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if not path:
+        return False
+    try:
+        with open(path, "a", encoding="utf-8") as handle:
+            handle.write(render_summary(report) + "\n")
+    except OSError as exc:
+        log.warning("could not write step summary: %s", exc)
+        return False
+    return True
+
+
+# --------------------------------------------------------------------------- #
 # Pipeline
 # --------------------------------------------------------------------------- #
 
@@ -252,16 +459,23 @@ def process_ticker(
     ticker: str,
     dispatcher: Dispatcher | None = None,
     fx: FxRate | None = None,
-) -> None:
+) -> TickerResult:
+    """Run one ticker end to end, and report how far it got.
+
+    Returns rather than raises on every failure, because one broken ticker
+    must not end the cycle for the other thirty-four. The return value is what
+    lets the cycle notice that *all* of them broke.
+    """
     try:
         ticker_context = build_context(ticker)
     except (NotImplementedError, NewsFetchError) as exc:
         log.error("%s: %s", ticker, exc)
-        return
+        return TickerResult(ticker, CONTEXT_FAILED)
     except Exception:  # noqa: BLE001
         log.exception("%s: failed to gather context", ticker)
-        return
+        return TickerResult(ticker, CONTEXT_FAILED)
 
+    gaps = len(ticker_context.gaps)
     if ticker_context.gaps:
         # Worth a warning, not an info: the model is being asked to judge on
         # less than the strategy assumes it has.
@@ -278,42 +492,45 @@ def process_ticker(
     except LLMError as exc:
         log.error("%s: %s", ticker, exc)
         journal.record(ticker_context, fx=fx, error=str(exc))
-        return
+        return TickerResult(ticker, MODEL_FAILED, gaps=gaps)
     except (json.JSONDecodeError, ValidationError) as exc:
         log.error("%s: LLM output rejected before sending: %s", ticker, exc)
         journal.record(ticker_context, fx=fx, error=f"invalid LLM output: {exc}")
-        return
+        return TickerResult(ticker, MODEL_FAILED, gaps=gaps)
     except Exception as exc:  # noqa: BLE001
         log.exception("%s: failed to produce a signal", ticker)
         journal.record(ticker_context, fx=fx, error=f"unexpected {type(exc).__name__}: {exc}")
-        return
+        return TickerResult(ticker, MODEL_FAILED, gaps=gaps)
 
     if signal.ticker != ticker:
         log.error("%s: LLM answered for %s instead; dropping", ticker, signal.ticker)
         journal.record(ticker_context, signal, usage=usage, fx=fx, error=f"answered for {signal.ticker}")
-        return
+        return TickerResult(ticker, MODEL_FAILED, gaps=gaps)
 
     try:
         outcome = post_signal(signal, dispatcher)
     except httpx.HTTPError as exc:
         log.error("%s: webhook unreachable: %s", ticker, exc)
         journal.record(ticker_context, signal, usage=usage, fx=fx, error=f"webhook unreachable: {exc}")
-        return
+        return TickerResult(ticker, DISPATCH_FAILED, gaps=gaps)
     except BrokerError as exc:
         # Direct mode only: the engine could not be built or reached at all.
         # Same shape of failure as an unreachable webhook, so it is logged and
         # journalled the same way rather than killing the cycle.
         log.error("%s: engine unavailable: %s", ticker, exc)
         journal.record(ticker_context, signal, usage=usage, fx=fx, error=f"engine unavailable: {exc}")
-        return
+        return TickerResult(ticker, DISPATCH_FAILED, gaps=gaps)
 
     log.info("%s -> %s %s", ticker, outcome.get("status"), outcome.get("reason", ""))
     journal.record(ticker_context, signal, outcome=outcome, usage=usage, fx=fx)
+    return TickerResult(ticker, COMPLETED, status=outcome.get("status"), gaps=gaps)
 
 
-def run_cycle(dispatcher: Dispatcher | None = None) -> None:
-    tickers = get_settings().watchlist_tickers
+def run_cycle(dispatcher: Dispatcher | None = None) -> CycleReport:
+    """Run every ticker on the watchlist once, and report what came of it."""
+    tickers = tuple(get_settings().watchlist_tickers)
     dispatcher = dispatcher or build_dispatcher()
+    clock_unreadable = False
 
     # Asked before any news fetch or model call, because those are what a
     # closed-market cycle actually wastes: at an hourly cadence only about a
@@ -323,12 +540,13 @@ def run_cycle(dispatcher: Dispatcher | None = None) -> None:
     try:
         if not dispatcher.is_market_open():
             log.info("market is closed; skipping cycle")
-            return
+            return CycleReport(tickers=tickers, market_closed=True)
     except BrokerError as exc:
         # Not fatal, and deliberately not a reason to skip: an unreachable
         # clock must not silently halt trading. Proceed and let the engine's
         # own gate decide, which fails closed if it cannot tell either.
         log.warning("could not read market clock (%s); continuing", exc)
+        clock_unreadable = True
 
     # Once per cycle, not once per ticker: the rate is the same for all of
     # them, and a failure here degrades to a named gap rather than costing the
@@ -339,10 +557,21 @@ def run_cycle(dispatcher: Dispatcher | None = None) -> None:
     else:
         log.info("USD/ILS unavailable: %s", fx.gap)
 
-    log.info("heartbeat cycle start: %s", tickers)
-    for ticker in tickers:
-        process_ticker(ticker, dispatcher, fx)
-    log.info("heartbeat cycle end")
+    log.info("heartbeat cycle start: %s", list(tickers))
+    results = tuple(process_ticker(ticker, dispatcher, fx) for ticker in tickers)
+    report = CycleReport(
+        tickers=tickers,
+        results=results,
+        clock_unreadable=clock_unreadable,
+        fx=fx,
+    )
+    log.info(
+        "heartbeat cycle end: %d/%d reached the engine (%s)",
+        len(report.completed),
+        len(tickers),
+        ", ".join(f"{k}={v}" for k, v in sorted(report.stages.items())) or "nothing attempted",
+    )
+    return report
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -361,9 +590,29 @@ def main(argv: list[str] | None = None) -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
     if args.once:
-        run_cycle()
+        report = run_cycle()
+        write_step_summary(report)
+        if report.produced_nothing:
+            # The whole point of --once mode reporting an exit code. A cycle
+            # that reached nothing wrote no journal line and placed no trade,
+            # and without this it exits 0: a green tick on a system that did
+            # nothing at all. The first scheduled run of this workflow failed
+            # exactly this way -- 35 of 35 tickers dead on a missing
+            # credential -- and reported success.
+            #
+            # Deliberately not configurable. A switch to make this advisory is
+            # the same mistake as the `continue-on-error` that once sat on the
+            # ticker check: the one signal whose entire job is to be loud.
+            log.error(
+                "cycle produced no signals for any of %d tickers; failing the run",
+                len(report.tickers),
+            )
+            raise SystemExit(1)
         return
 
+    # Scheduler mode is a long-running process, so a bad cycle is logged and
+    # the next one is still attempted. Exit codes are a --once concern: there
+    # is no job here to fail.
     scheduler = BlockingScheduler()
     scheduler.add_job(
         run_cycle,
