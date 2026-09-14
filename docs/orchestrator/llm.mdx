@@ -204,7 +204,7 @@ Two non-obvious details `_extract_text()` handles:
   <Accordion title="A rejected fallback beta doesn't kill the cycle">
     If the fallback preview feature isn't enabled on your account, the
     first request of each provider's life would otherwise fail outright —
-    and for an unattended hourly job, that means silently producing nothing
+    and for an unattended daily job, that means silently producing nothing
     forever. `_create()` catches a `BadRequestError` on the first attempt,
     logs a warning, retries once without the fallback parameters, and
     remembers not to try them again on that provider instance. Worst case:

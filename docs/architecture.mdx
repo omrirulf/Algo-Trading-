@@ -15,7 +15,7 @@ description: "Two processes, one narrow contract between them"
     connection. This is the only process with authority to place an order.
   </Card>
   <Card title="Orchestrator" icon="clock">
-    `python orchestrator/heartbeat.py` — an hourly job that has **no broker
+    `python orchestrator/heartbeat.py` — a once-daily job that has **no broker
     credentials at all**. It can only ever produce a signal and POST it.
   </Card>
 </CardGroup>

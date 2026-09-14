@@ -533,10 +533,10 @@ def run_cycle(dispatcher: Dispatcher | None = None) -> CycleReport:
     clock_unreadable = False
 
     # Asked before any news fetch or model call, because those are what a
-    # closed-market cycle actually wastes: at an hourly cadence only about a
-    # third of cycles fall in a session, so skipping the rest is most of the
-    # running cost. The engine re-checks this itself -- this is the cheap
-    # gate, not the authoritative one.
+    # closed-market cycle actually wastes. At a daily cadence the cron lands
+    # after the open, so this mostly catches holidays and half-days that a
+    # cron expression cannot express. The engine re-checks this itself --
+    # this is the cheap gate, not the authoritative one.
     try:
         if not dispatcher.is_market_open():
             log.info("market is closed; skipping cycle")

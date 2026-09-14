@@ -68,8 +68,17 @@ def test_ids_are_normalised_so_case_cannot_split_a_window():
 
 
 def test_one_second_before_the_boundary_is_still_the_same_window():
-    edge = NOON + timedelta(seconds=bc.IDEMPOTENCY_WINDOW_SECONDS - 1)
-    assert bc.build_client_order_id("AAPL", "buy", NOON) == bc.build_client_order_id(
+    """Windows are epoch-aligned buckets, so measure from the bucket's start.
+
+    NOON sits on an hour boundary but not on a day boundary. When the window
+    was an hour that coincidence made NOON a valid window start; at a daily
+    window it is not, and NOON + (window - 1s) crosses midnight. The property
+    under test is about the bucket, so derive the bucket's start explicitly.
+    """
+    window = bc.IDEMPOTENCY_WINDOW_SECONDS
+    start = datetime.fromtimestamp((NOON.timestamp() // window) * window, tz=timezone.utc)
+    edge = start + timedelta(seconds=window - 1)
+    assert bc.build_client_order_id("AAPL", "buy", start) == bc.build_client_order_id(
         "AAPL", "buy", edge
     )
 

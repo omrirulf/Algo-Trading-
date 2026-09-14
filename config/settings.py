@@ -143,8 +143,17 @@ OHLC_LOOKBACK_DAYS: Final[int] = 90
 #: an Alpaca OTO/bracket order requires whole shares.
 MIN_ORDER_QTY: Final[int] = 1
 
-#: Orchestrator cadence.
-HEARTBEAT_INTERVAL_MINUTES: Final[int] = 60
+#: Orchestrator cadence. One cycle per trading day: the slow inputs change
+#: daily at most, so an hourly loop was seven near-identical calls per ticker
+#: at seven times the cost. The order-idempotency window is derived from this,
+#: so at daily cadence the same ticker and side cannot be re-entered twice in
+#: one UTC day -- which is the intended meaning of a daily signal.
+HEARTBEAT_INTERVAL_MINUTES: Final[int] = 24 * 60
+
+#: How many cycles the cost projections assume per trading day. Derived from
+#: the interval so the two cannot disagree: 6.5 market hours at an hourly
+#: interval was 7; at a daily interval it is 1.
+CYCLES_PER_TRADING_DAY: Final[int] = max(1, round(390 / HEARTBEAT_INTERVAL_MINUTES))
 
 # --------------------------------------------------------------------------- #
 # Paths
