@@ -44,6 +44,7 @@
           "api-reference/webhook",
           "scoring",
           "replay",
+          "backtest",
           "testing",
           "continuous-integration"
         ]

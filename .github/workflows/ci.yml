@@ -172,6 +172,21 @@ jobs:
           fi
           echo "OK: the scorer only reads"
 
+      - name: The backtest cannot trade
+        # backtest/ replays the risk engine's arithmetic over historical bars.
+        # It reuses calculate_stop_price and calculate_position_size on
+        # purpose -- measuring a reimplementation would measure the wrong
+        # code -- but it must never reach a broker.
+        run: |
+          hits=$(grep -rnE '(submit_order|submit_bracket_order|ExecutionEngine|post_signal|AlpacaPaperBroker)' \
+                   backtest --include='*.py' || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::backtest/ must not place orders"
+            exit 1
+          fi
+          echo "OK: the backtest only simulates"
+
       - name: The replay harness cannot trade
         # replay/ re-asks the model while iterating on a prompt, so it runs
         # often and casually. It must not be able to place an order, and it
