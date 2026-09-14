@@ -1,0 +1,82 @@
+name: compare sleeves
+
+# Answers the open question behind the two-sleeve watchlist: do index funds
+# and single names actually behave differently under the risk engine, and is
+# the ETF position cap sized right?
+#
+# It lives here rather than being run locally because it needs two years of
+# real OHLC from Yahoo, and a runner has the open internet access for that.
+# Nothing here needs a credential: yfinance is unauthenticated, no LLM is
+# called, and no order is ever placed.
+on:
+  workflow_dispatch:
+    inputs:
+      period:
+        description: "History to replay (yfinance period, e.g. 2y, 5y)"
+        default: "2y"
+      every:
+        description: "Open a trade every N bars"
+        default: "5"
+      side:
+        description: "Direction to test"
+        default: "buy"
+        type: choice
+        options: [buy, sell]
+
+permissions:
+  contents: read            # reads bars, writes nothing back
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Compare the sleeves
+        id: compare
+        run: |
+          python backtest/compare_sleeves.py \
+            --period "${{ inputs.period }}" \
+            --every "${{ inputs.every }}" \
+            --side "${{ inputs.side }}" \
+            | tee comparison.txt
+
+      - name: Machine-readable copy
+        run: |
+          python backtest/compare_sleeves.py \
+            --period "${{ inputs.period }}" \
+            --every "${{ inputs.every }}" \
+            --side "${{ inputs.side }}" \
+            --json > comparison.json
+
+      # The report is the deliverable, so it goes somewhere readable on a
+      # phone rather than only into the job log.
+      - name: Publish to the run summary
+        if: always()
+        run: |
+          {
+            echo '## Sleeve comparison'
+            echo
+            echo '```'
+            cat comparison.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sleeve-comparison
+          path: |
+            comparison.txt
+            comparison.json

@@ -156,6 +156,66 @@ jobs:
           fi
           echo "OK: scores and key_factors are inert"
 
+      - name: Instrument kind is never taken from the signal
+        # An ETF's position cap is four times a single name's. That makes the
+        # classification a privilege boundary: if a model could assert its own
+        # instrument kind, it could quadruple its position by claiming one.
+        #
+        # Two halves. First, the schema stays closed to anything kind-shaped,
+        # so there is no field to smuggle it through -- extra="forbid" already
+        # rejects unknown keys, and this stops one being *added*. Second, the
+        # cap constant is readable only where it is defined and applied, so a
+        # future caller cannot select it from signal content.
+        run: |
+          schema=$(grep -nE '^\s+(instrument|asset_class|kind|is_etf|security_type)\b' \
+                     app/schemas.py || true)
+          if [ -n "$schema" ]; then
+            echo "$schema"
+            echo "::error::LLMSignal must not carry an instrument-kind field"
+            exit 1
+          fi
+          hits=$(grep -rn 'MAX_ETF_POSITION_PCT' --include='*.py' app orchestrator config \
+                 | grep -vE '^(config/settings\.py|app/risk_engine\.py):' || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::the ETF cap may only be read by risk_engine.max_position_pct_for"
+            exit 1
+          fi
+          python - <<'PY'
+          from app.schemas import Bias, LLMSignal
+          import pydantic
+          for field in ("instrument_kind", "asset_class", "is_etf", "kind"):
+              try:
+                  LLMSignal(ticker="MSFT", bias=Bias.BULLISH, conviction=0.9,
+                            rationale="x", **{field: "etf"})
+              except pydantic.ValidationError:
+                  continue
+              raise SystemExit(f"::error::LLMSignal accepted {field!r}")
+          print("OK: no signal field can declare an instrument kind")
+          PY
+
+      - name: Total exposure is bounded by the gross cap
+        # The per-ticker caps do not bound the portfolio: ten positions at the
+        # ETF cap would be 200% of equity. The gross check is the only one
+        # that sees every holding at once, so it is what actually guarantees
+        # the cash floor -- and it must run on the execution path, not merely
+        # exist in risk_engine.
+        run: |
+          for symbol in gross_exposure_headroom MAX_GROSS_EXPOSURE_PCT; do
+            grep -q "$symbol" app/execution_engine.py || {
+              echo "::error::execution engine does not enforce $symbol"
+              exit 1
+            }
+          done
+          python - <<'PY'
+          from config import settings as cfg
+          assert 0 < cfg.MAX_GROSS_EXPOSURE_PCT < 1, "gross cap must leave a cash floor"
+          assert cfg.MAX_ETF_POSITION_PCT <= cfg.MAX_GROSS_EXPOSURE_PCT, (
+              "a single ETF could exceed the whole portfolio cap"
+          )
+          print(f"OK: gross exposure capped at {cfg.MAX_GROSS_EXPOSURE_PCT:.0%}")
+          PY
+
       - name: Market context carries no credentials
         # yfinance is unauthenticated. If the enrichment modules ever start
         # reading a secret, they stop being safe to run beside the LLM.

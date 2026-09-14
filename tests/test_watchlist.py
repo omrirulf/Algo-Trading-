@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import pytest
 
+from config import instruments as inst
 from config import watchlist as wl
 from config.settings import Settings
 from orchestrator import news, pricing
@@ -45,9 +46,30 @@ def test_it_is_not_three_correlated_megacaps_any_more():
     assert len(wl.BUCKETS) >= 4
 
 
-def test_geography_and_commodities_are_reachable():
-    for bucket in ("Europe (ADR)", "Israel", "Commodity producers"):
+def test_every_sleeve_and_asset_class_is_reachable():
+    """The reason the list exists: breadth that single US tech names cannot give."""
+    for bucket in ("Financials", "Energy", "Index: Regions", "Index: Real assets",
+                   "Index: Duration"):
         assert bucket in wl.BUCKETS
+
+
+def test_no_single_sector_dominates_the_single_name_sleeve():
+    """The previous list was 37% technology and called its ADRs diversification.
+
+    ASML, TSM, SAP and INFY are global technology cyclicals: they fall with US
+    technology in a drawdown, whatever exchange they list on. A sector cap is
+    the check that actually bites; a country cap is not.
+    """
+    largest = max(len(b) for b in inst.SINGLE_NAME_SECTORS.values())
+    assert largest / len(inst.SINGLE_NAMES) <= 0.25
+
+
+def test_the_index_sleeve_reaches_what_single_names_cannot():
+    """Cap tiers and non-equity asset classes have no affordable single-name route."""
+    assert "IWM" in inst.INDEX_SLEEVE  # small caps
+    assert "VNQ" in inst.INDEX_SLEEVE  # REITs
+    assert "TLT" in inst.INDEX_SLEEVE  # duration -- the only non-equity risk here
+    assert "DBC" in inst.INDEX_SLEEVE  # commodities themselves, not producers
 
 
 def test_tickers_look_like_tickers():

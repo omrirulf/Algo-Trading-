@@ -25,6 +25,8 @@ from pathlib import Path
 from typing import Any, Optional
 from urllib.parse import urlencode
 
+from config.instruments import is_index_fund
+
 import httpx
 
 log = logging.getLogger(__name__)
@@ -75,8 +77,17 @@ class NewsFetchError(Exception):
 
 
 def build_news_search_url(ticker: str) -> str:
+    """Google News URL for one ticker.
+
+    The qualifier differs by instrument because the query is what decides
+    whether the headlines are about the right thing. ``"SPY stock"`` drags in
+    single-stock coverage that mentions the index in passing; ``"SPY ETF"``
+    returns the fund and macro commentary, which is the only frame an index
+    signal can honestly be built on.
+    """
+    qualifier = "ETF" if is_index_fund(ticker) else "stock"
     params = {
-        "q": f"{ticker} stock",
+        "q": f"{ticker} {qualifier}",
         "tbm": "nws",
         "tbs": f"qdr:{NEWS_LOOKBACK}",
         "num": MAX_HEADLINES,

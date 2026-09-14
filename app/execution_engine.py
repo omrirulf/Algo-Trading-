@@ -98,6 +98,18 @@ class ExecutionEngine:
                 f"already holding {len(positions)} positions (max {cfg.MAX_OPEN_POSITIONS})"
             )
 
+        # 5b. Portfolio-level exposure. The per-ticker caps do not bound the
+        #     account: ten positions at the ETF cap would be 200% of equity.
+        #     This is the only check that sees every holding at once, and it
+        #     runs before any market-data fetch so a full book costs no quote.
+        open_value = sum(p.market_value for p in positions)
+        headroom = risk_engine.gross_exposure_headroom(equity, open_value)
+        if headroom <= 0:
+            return reject(
+                f"gross exposure {open_value / equity:.0%} is at the "
+                f"{cfg.MAX_GROSS_EXPOSURE_PCT:.0%} cap"
+            )
+
         # 6. Never flip an existing position via a fresh entry order.
         if existing is not None and existing.side != side:
             return reject(
@@ -116,15 +128,25 @@ class ExecutionEngine:
         # 8. Stop-loss from real volatility.
         stop_price = risk_engine.calculate_stop_price(price, atr, side)
 
-        # 9. Size under the per-ticker equity cap (existing exposure counts).
+        # 9. Size under whichever per-ticker cap applies, bounded by what the
+        #    portfolio has left. The cap comes from the ticker's instrument
+        #    kind in config.instruments -- never from the signal, which has no
+        #    field that could carry one.
         existing_value = existing.market_value if existing else 0.0
+        max_pct = risk_engine.max_position_pct_for(signal.ticker)
         qty = risk_engine.calculate_position_size(
-            equity=equity, price=price, existing_position_value=existing_value
+            equity=equity,
+            price=price,
+            max_position_pct=max_pct,
+            existing_position_value=existing_value,
+            budget_ceiling=headroom,
         )
         if qty < cfg.MIN_ORDER_QTY:
             return reject(
-                f"no room under {cfg.MAX_POSITION_PCT:.0%} cap: equity {equity:.2f}, "
-                f"price {price:.2f}, existing exposure {existing_value:.2f}",
+                f"no room under the {max_pct:.0%} cap for "
+                f"{risk_engine.kind_for(signal.ticker).value}: equity {equity:.2f}, "
+                f"price {price:.2f}, existing exposure {existing_value:.2f}, "
+                f"gross headroom {headroom:.2f}",
                 entry_price=price, stop_price=stop_price, atr=atr,
             )
 
