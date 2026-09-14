@@ -70,8 +70,19 @@ def test_the_index_sleeve_reaches_what_single_names_cannot():
     assert "VNQ" in inst.FUNDS   # REITs
     assert "TLT" in inst.FUNDS   # duration -- the only non-equity risk here
     # The goods themselves, not the companies that mine and drill them.
-    for commodity in ("GLD", "SLV", "CPER", "USO", "CORN", "JO"):
+    for commodity in ("GLD", "SLV", "CPER", "USO", "UNG", "CORN"):
         assert commodity in inst.COMMODITY_FUNDS
+
+
+def test_a_delisted_ticker_does_not_linger_on_the_watchlist():
+    """JO, the coffee ETN, stopped resolving between being added and verified.
+
+    That is the ETN failure mode arriving in practice: an issuer calls a note
+    and the ticker stops existing. A dead symbol on the watchlist is not
+    harmless -- it fails that ticker every cycle as a silent "no bars" gap.
+    """
+    assert "JO" not in inst.COMMODITY_FUNDS
+    assert "JO" not in wl.DEFAULT_WATCHLIST
 
 
 def test_tickers_look_like_tickers():

@@ -56,7 +56,7 @@ the same market.
 | Precious metals | GLD, SLV |
 | Industrial metals | CPER |
 | Energy commodities | USO, UNG |
-| Agriculture | CORN, WEAT, SOYB, CANE, JO |
+| Agriculture | CORN, WEAT, SOYB, CANE |
 
 Alpaca trades `us_equity`, `us_option` and `crypto` only, so futures are out
 of reach and physical metal is not something a brokerage account can hold.
@@ -79,20 +79,21 @@ companies that mine and drill them.
      the spread is a real cost and a stop can fill badly.
 </Warning>
 
-### Rice is not reachable
+### Rice and coffee have no single-commodity fund
 
-There is no US-listed fund tracking rice. Rough-rice futures exist, but no ETF
-or ETN tracks them, and the broad agriculture baskets (`DBA`) hold grains,
-softs and livestock without it. Coffee is reachable only through `JO`, with
-the ETN caveat above. This is a limit of what trades on a US exchange, not a
-choice.
+**Rice**: no US-listed fund tracks it. Rough-rice futures exist; nothing wraps
+them.
+
+**Coffee**: `JO` was the route, and it stopped resolving. Both now reach the
+portfolio only through `DBA`'s basket, if at all. These are limits of what
+trades on a US exchange, not choices.
 
 <Note>
-  These tickers were selected from knowledge and **have not been verified
-  against live market data** — the sandbox that wrote them cannot reach Yahoo.
-  Run the **verify tickers** workflow in the Actions tab before the first live
-  cycle; it resolves every symbol and reports anything that does not exist or
-  trades too thin.
+  **Verified against live data on 2026-09-14** by the `market checks` workflow.
+  35 of the 36 original tickers resolved. The one that did not was `JO`, the
+  iPath coffee ETN — which is the ETN risk above arriving in practice, between
+  the ticker being added and first being checked. It has been removed; coffee
+  exposure now comes through `DBA`, whose basket includes it.
 </Note>
 
 ## Three kinds, three caps
@@ -107,10 +108,32 @@ The ordering is the point: **the tightest cap belongs to the commodity funds,
 not the stocks.** Sizing a coffee ETN like `RSP` because both are technically
 ETFs would be picking a cap by label rather than by risk.
 
-Risk per trade scales roughly as `cap / volatility`. A first pass gave broad
-funds 20% and measured ~1.9× the per-trade risk of a single name — bigger, not
-safer. 12% keeps it near parity.
-`backtest/compare_sleeves.py` is what measures this.
+### What the real data said about these caps
+
+Risk per trade scales roughly as `cap / volatility`, so the caps are only
+defensible against measured volatility. Three months of real bars, 2026-09-14:
+
+| Kind | Median daily volatility | vs a single name |
+|---|---|---|
+| Single name | 2.26% | — |
+| Broad fund | 0.88% | 0.39× |
+| Single-commodity fund | 1.58% | 0.70× |
+
+**The broad-fund cap checks out.** A single name is 2.57× as volatile as a
+broad fund, so a broad-fund cap up to ~12.8% carries no more risk per trade
+than 5% on a stock. 12% is 2.40× — inside the range, slightly conservative. It
+started as a guess and is now checked.
+
+**The commodity cap is deliberately tighter than the arithmetic allows.**
+Volatility alone would justify ~7%. It stays at 4% for three reasons the
+median hides:
+
+- **The spread inside the sleeve is wide.** `USO` measured 3.29% and `SLV`
+  2.62% — both *above* the median single name. A cap set on the median would
+  be far too loose at the volatile end.
+- **Daily volatility cannot see roll decay.** A futures-backed fund can bleed
+  value with spot flat, and no standard deviation captures that.
+- **Nor issuer risk.** `JO` proved that one.
 
 ## Three portfolio limits
 
@@ -186,7 +209,7 @@ question and sets a higher bar for a non-neutral call.
 |---|---|
 | 12 | ~$83 |
 | 24 | ~$166 |
-| **36 (default)** | **~$249** |
+| **35 (default)** | **~$242** |
 
 <Warning>
   Estimates, and the assumed output length is the whole uncertainty in them.

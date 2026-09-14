@@ -39,8 +39,11 @@ MAX_POSITION_PCT: Final[float] = 0.05
 #: Above the single-name cap because a broad fund's tail is truncated in a way
 #: a company's is not: an index does not go to zero on a fraud.
 #:
-#: ``backtest/compare_sleeves.py`` on real bars is what should set this, and
-#: the 'risk/trade' column is the one to tune against.
+#: MEASURED, 2026-09-14, 3mo of real bars via backtest/verify_tickers.py:
+#: median daily volatility was 2.26% for a single name and 0.88% for a broad
+#: fund -- a ratio of 2.57x, so a broad-fund cap up to ~12.8% carries no more
+#: risk per trade than 5% on a stock. 12% is 2.40x, inside that and slightly
+#: conservative. This number started as a guess and is now checked.
 MAX_BROAD_FUND_PCT: Final[float] = 0.12
 
 #: A fund tracking ONE commodity gets the tightest cap of the three, below
@@ -52,6 +55,19 @@ MAX_BROAD_FUND_PCT: Final[float] = 0.12
 #: Sizing these like a broad fund because both are technically ETFs would
 #: repeat, in a subtler place, the error of picking a cap by label rather than
 #: by risk.
+#:
+#: MEASURED, 2026-09-14: median daily volatility 1.58%, which is 0.70x a single
+#: name -- so volatility *alone* would justify ~7%, and 4% is deliberately
+#: below what the arithmetic allows. Three reasons to stay there:
+#:
+#: - The median hides the spread. USO measured 3.29% and SLV 2.62%, both above
+#:   the median single name. A cap set on the median would be far too loose
+#:   for the volatile end of the sleeve.
+#: - Daily volatility does not see roll decay. A futures-backed fund can bleed
+#:   value with spot flat, and no standard-deviation figure captures that.
+#: - It does not see issuer risk either. The coffee ETN on this list stopped
+#:   resolving between being added and first being verified, which is what
+#:   that risk looks like when it arrives.
 MAX_COMMODITY_FUND_PCT: Final[float] = 0.04
 
 #: Ceiling on any one exposure group (``instruments.EXPOSURE_GROUPS``).

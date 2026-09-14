@@ -63,15 +63,18 @@ def test_an_unknown_ticker_is_treated_as_a_single_name():
 def test_a_single_commodity_fund_is_not_a_broad_fund():
     """The mistake this file exists to prevent.
 
-    Coffee is one thing. A fund holding coffee futures is a concentrated,
-    volatile, single-factor bet -- and an ETN on top, so it carries issuer
-    credit risk a basket never does. Sizing it like RSP because both are
-    technically ETFs would be picking a cap by label rather than by risk.
+    Sugar is one thing. A fund holding sugar futures is a concentrated,
+    volatile, single-factor bet carrying roll decay a basket never does.
+    Sizing it like RSP because both are technically ETFs would be picking a
+    cap by label rather than by risk.
+
+    Measured 2026-09-14: USO 3.29% and SLV 2.62% daily volatility, both above
+    the median single name at 2.26%. "Fund" is not a synonym for "calmer".
     """
-    assert kind_for("JO") is InstrumentKind.COMMODITY_FUND
+    assert kind_for("CANE") is InstrumentKind.COMMODITY_FUND
     assert kind_for("RSP") is InstrumentKind.BROAD_FUND
-    assert risk_engine.max_position_pct_for("JO") < risk_engine.max_position_pct_for("MSFT")
-    assert risk_engine.max_position_pct_for("JO") < risk_engine.max_position_pct_for("RSP")
+    assert risk_engine.max_position_pct_for("CANE") < risk_engine.max_position_pct_for("MSFT")
+    assert risk_engine.max_position_pct_for("CANE") < risk_engine.max_position_pct_for("RSP")
 
 
 def test_a_broad_commodity_basket_is_a_broad_fund():
