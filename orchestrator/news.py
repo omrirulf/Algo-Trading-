@@ -259,8 +259,14 @@ def resolve_zone(serp_zone: str = "", unlocker_zone: str = "") -> str:
 
 
 def resolve_token(api_token: str = "") -> Optional[str]:
-    """Settings first, then the CLI's own env var, then its stored login."""
-    return api_token or os.environ.get(CLI_ENV_VAR, "").strip() or token_from_cli()
+    """Settings first, then the CLI's own env var, then its stored login.
+
+    Stripped, because a token pasted into a secrets form with a trailing
+    newline is sent as ``Bearer abc...\n`` and refused as invalid -- and the
+    401 gives no hint that the value was one character away from right. The
+    first live exercise of this path failed on exactly a 401.
+    """
+    return (api_token or "").strip() or os.environ.get(CLI_ENV_VAR, "").strip() or token_from_cli()
 
 
 class BrightDataNewsProvider:
