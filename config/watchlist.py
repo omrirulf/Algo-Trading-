@@ -47,6 +47,8 @@ from __future__ import annotations
 
 from typing import Final
 
+from orchestrator import pricing
+
 # --- United States, spread across sectors --------------------------------
 # The starting default was AAPL, MSFT, NVDA. Three US mega-cap technology
 # names move together closely enough that they are nearer one position than
@@ -116,10 +118,33 @@ BUCKETS: Final[dict[str, tuple[str, ...]]] = {
     "Commodity producers": COMMODITY_PRODUCERS,
 }
 
-#: Rough Claude cost per ticker per cycle, in dollars. Measured from the real
-#: prompt (~1,400 input tokens) at Opus 5 pricing, with a short answer. An
-#: estimate for sizing the list, not a billing figure.
-COST_PER_TICKER_PER_CYCLE_USD: Final[float] = 0.045
+#: Input tokens in one ticker's prompt, counted from the rendered system and
+#: user blocks. This one is measured.
+ESTIMATED_INPUT_TOKENS: Final[int] = 1_400
+
+#: Output tokens in one answer. This one is **assumed** -- a signal plus its
+#: five rationales, before any thinking. It is the whole uncertainty in the
+#: figures below, and it is named here rather than folded into a single magic
+#: constant so that it can be argued with.
+ASSUMED_OUTPUT_TOKENS: Final[int] = 1_600
+
+
+def _cost_per_call_usd(model: str = "claude-opus-5") -> float:
+    """Estimated dollars for one ticker's call, from the published prices.
+
+    Derived from ``pricing.PRICES`` rather than hard-coded so a price change
+    is a one-line diff in one place. Still an estimate: it rests on
+    ``ASSUMED_OUTPUT_TOKENS``, and it assumes no cache hit and no thinking.
+    """
+    price = pricing.PRICES[model]
+    return (
+        ESTIMATED_INPUT_TOKENS * price.input_per_mtok
+        + ASSUMED_OUTPUT_TOKENS * price.output_per_mtok
+    ) / 1e6
+
+
+#: Rough Claude cost per ticker per cycle, in dollars.
+COST_PER_TICKER_PER_CYCLE_USD: Final[float] = _cost_per_call_usd()
 
 
 def default_watchlist_csv() -> str:
@@ -129,8 +154,16 @@ def default_watchlist_csv() -> str:
 def estimated_monthly_cost_usd(
     tickers: int, cycles_per_day: int = 7, trading_days: int = 21
 ) -> float:
-    """Rough Claude spend for a watchlist of this size."""
-    return tickers * cycles_per_day * trading_days * COST_PER_TICKER_PER_CYCLE_USD
+    """Rough Claude spend for a watchlist of this size.
+
+    Superseded the moment real cycles exist: once the journal carries measured
+    ``usage`` blocks, feed an observed per-call cost to
+    ``pricing.monthly_usd`` instead of trusting this. Sizing a list before the
+    first cycle is the only job this function has.
+    """
+    return pricing.monthly_usd(
+        COST_PER_TICKER_PER_CYCLE_USD, tickers, cycles_per_day, trading_days
+    )
 
 
 __all__ = [
@@ -141,6 +174,8 @@ __all__ = [
     "COMMODITY_PRODUCERS",
     "DEFAULT_WATCHLIST",
     "BUCKETS",
+    "ESTIMATED_INPUT_TOKENS",
+    "ASSUMED_OUTPUT_TOKENS",
     "COST_PER_TICKER_PER_CYCLE_USD",
     "default_watchlist_csv",
     "estimated_monthly_cost_usd",

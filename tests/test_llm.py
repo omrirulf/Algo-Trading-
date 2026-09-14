@@ -2,6 +2,18 @@
 
 from __future__ import annotations
 
+
+def completion(payload: dict | str, model: str = "claude-opus-5"):
+    """A Completion the way call_llm now returns one, with plausible usage."""
+    from orchestrator.llm import Completion
+    from orchestrator.pricing import Usage
+
+    text = payload if isinstance(payload, str) else json.dumps(payload)
+    return Completion(
+        text=text,
+        usage=Usage(model=model, input_tokens=1420, output_tokens=1500),
+    )
+
 import json
 import time
 from dataclasses import dataclass, field
@@ -356,7 +368,7 @@ def test_heartbeat_call_llm_uses_the_configured_key(monkeypatch):
         def __init__(self, api_key, client=None):
             seen["key"] = api_key
 
-        def complete(self, system_prompt, user_prompt, json_schema):
+        def complete_detailed(self, system_prompt, user_prompt, json_schema):
             seen["prompts"] = (system_prompt, user_prompt)
             return json.dumps(VALID_SIGNAL)
 
@@ -371,7 +383,7 @@ def test_heartbeat_call_llm_uses_the_configured_key(monkeypatch):
 
 def test_full_cycle_posts_the_signal_the_model_returned(monkeypatch):
     monkeypatch.setattr(hb, "fetch_news", lambda t: ["Apple beats on earnings"])
-    monkeypatch.setattr(hb, "call_llm", lambda s, u, j: json.dumps(VALID_SIGNAL))
+    monkeypatch.setattr(hb, "call_llm", lambda s, u, j: completion(VALID_SIGNAL))
     posted = []
 
     def fake_post(signal, dispatcher=None):

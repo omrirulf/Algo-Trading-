@@ -13,7 +13,7 @@ import pytest
 
 from config import watchlist as wl
 from config.settings import Settings
-from orchestrator import news
+from orchestrator import news, pricing
 
 
 # --- the list itself ------------------------------------------------------
@@ -114,3 +114,30 @@ def test_a_provider_with_no_zone_anywhere_still_errors(monkeypatch):
     with pytest.raises(news.NewsFetchError) as excinfo:
         news.BrightDataNewsProvider("tok", "", unlocker_zone="")
     assert "BRIGHTDATA_SERP_ZONE" in str(excinfo.value)
+
+
+def test_the_estimate_is_derived_from_the_price_table_not_hard_coded():
+    """A price change should move the estimate without a second edit.
+
+    The figure used to be a single magic float, which meant a repriced model
+    left the sizing table quietly wrong. Pinning the derivation here is what
+    stops it from drifting back.
+    """
+    price = pricing.PRICES["claude-opus-5"]
+    expected = (
+        wl.ESTIMATED_INPUT_TOKENS * price.input_per_mtok
+        + wl.ASSUMED_OUTPUT_TOKENS * price.output_per_mtok
+    ) / 1e6
+    assert wl.COST_PER_TICKER_PER_CYCLE_USD == pytest.approx(expected)
+
+
+def test_output_tokens_dominate_the_estimate():
+    """The reason effort is a bigger lever than list length.
+
+    If this ever flips, the advice in docs/cost.mdx and docs/watchlist.mdx --
+    turn effort down before trimming tickers -- stops being true.
+    """
+    price = pricing.PRICES["claude-opus-5"]
+    input_cost = wl.ESTIMATED_INPUT_TOKENS * price.input_per_mtok
+    output_cost = wl.ASSUMED_OUTPUT_TOKENS * price.output_per_mtok
+    assert output_cost > input_cost * 2

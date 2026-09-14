@@ -1,0 +1,117 @@
+---
+title: "Cost"
+description: "What a cycle actually costs, and how to compare configurations on the same inputs"
+---
+
+Cost used to be an estimate in this project: an assumed output length times a
+list price. That estimate drove a real decision — how many tickers to watch —
+which is the wrong way round. `response.usage` is now recorded on every call,
+so the number in the journal is measured.
+
+```json
+"usage": {
+  "model": "claude-opus-5",
+  "input_tokens": 1420,
+  "output_tokens": 1512,
+  "cache_read_input_tokens": 0,
+  "cost_usd": 0.0449
+}
+```
+
+## Where the money goes
+
+At this prompt shape — ~1,400 input tokens against a thinking response —
+**output is about 84% of the bill**, because thinking tokens bill at the output
+rate and output is 5× input.
+
+That ordering matters: **effort is a bigger lever than model tier.**
+
+| | Lever | Effect |
+|---|---|---|
+| 1 | `EFFORT` | Directly moves the 84% |
+| 2 | Model tier | Multiplies both halves |
+| 3 | Watchlist length | Linear in calls |
+| 4 | `HEARTBEAT_INTERVAL_MINUTES` | Linear in calls |
+| 5 | Prompt caching | Only touches the 16% |
+
+<Note>
+  The system prompt is byte-identical across every ticker in a cycle, so it is
+  marked cacheable. Whether it *is* cached depends on the model's minimum
+  cacheable prefix, which this prompt may sit under — so the journal records
+  `cache_read_input_tokens` rather than assuming a saving. Zero reads across a
+  cycle means the line is doing nothing.
+</Note>
+
+## Comparing configurations
+
+```bash
+python replay/compare_models.py --dry-run                       # plan + call budget
+python replay/compare_models.py --only claude-opus-5:medium     # price the incumbent
+python replay/compare_models.py --limit 20                      # the walk
+```
+
+Every cell replays the **same recorded contexts**, so the only thing that varies
+is the configuration.
+
+```
+configuration                $/call   $/month   agree  trade-agree  out tok
+opus-5 / low                $0.0221       $97    100%         100%      600
+opus-5 / medium             $0.0446      $197    100%         100%     1500
+sonnet-5 / low              $0.0118       $52     95%          95%      900  <- cheapest acceptable
+sonnet-5 / medium           $0.0228      $101    100%         100%     2000
+haiku-4-5 / low             $0.0069       $31     70%          70%     1100  (below floor)
+```
+
+<Note>
+  Note `opus-5 / low` at $97 undercutting `sonnet-5 / medium` at $101. **A
+  stronger model thinking less can be cheaper than a weaker model thinking
+  more** — it spends fewer tokens reaching the same answer. Fixing the model and
+  then tuning effort never finds that cell.
+</Note>
+
+## Walk a staircase, not a grid
+
+Model tier and effort are one surface, and a full grid pays for every expensive
+corner to find the cheap one. Instead:
+
+<Steps>
+  <Step title="Enter top-left">
+    Strongest tier, cheapest effort. Budget-bounded, and unambiguous to step
+    away from — a pass prunes one direction, a fail prunes the other.
+  </Step>
+  <Step title="Pass → step down a tier">
+    Record the cost as the incumbent. Every cell to the right of a pass costs
+    more, so it cannot win regardless of quality.
+  </Step>
+  <Step title="Fail → step right one notch">
+    Presume lower tiers fail at that effort too. Cap the rightward walk at a
+    notch or two: quality in effort is only weakly monotone.
+  </Step>
+  <Step title="Stop when nothing unprobed projects cheaper">
+    The incumbent is the answer.
+  </Step>
+</Steps>
+
+## What the comparison cannot tell you
+
+<Warning>
+  **Agreement is not correctness.** A cell that matches the incumbent 100% of
+  the time is interchangeable *with the incumbent* — which only helps if the
+  incumbent was right, and nothing here knows that.
+
+  There is no ground truth for a trading signal until the market moves. Only
+  [Scoring](/scoring), against realised returns, can say whether any
+  configuration produces signals worth trading.
+</Warning>
+
+Two more limits worth stating:
+
+- **The floor is pre-registered** (default 90% trade-agreement) before any cell
+  runs. A floor read off the results afterwards is a story fitted to them.
+- **Every cell starts with a cold cache** — the cache is per model, and effort
+  is part of its key — so the costs reported are an upper bound on steady state.
+
+`trade-agree` is the column that matters: the share of contexts where both
+configurations agreed on whether to trade *at all*. A signal that matches on
+direction but lands the other side of `MIN_CONVICTION` produces a different
+portfolio.

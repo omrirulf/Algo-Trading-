@@ -20,6 +20,7 @@ from typing import Any, Optional
 from pythonjsonlogger import jsonlogger
 
 from app.schemas import LLMSignal
+from orchestrator.pricing import Usage
 from config import settings as cfg
 from orchestrator.context import TickerContext
 
@@ -53,6 +54,7 @@ def record(
     signal: Optional[LLMSignal] = None,
     outcome: Optional[dict[str, Any]] = None,
     error: Optional[str] = None,
+    usage: Optional[Usage] = None,
 ) -> None:
     """Write one journal line. Swallows its own failures by design."""
     try:
@@ -69,6 +71,9 @@ def record(
                 "signal": signal.model_dump(mode="json") if signal else None,
                 "outcome": outcome,
                 "error": error,
+                # Measured token counts, so "what does a cycle cost" is
+                # answerable from the archive rather than re-estimated.
+                "usage": usage.as_dict() if usage else None,
             },
         )
     except Exception:  # noqa: BLE001 - journalling must not break the cycle

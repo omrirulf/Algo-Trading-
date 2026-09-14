@@ -330,6 +330,10 @@ python replay/replay_journal.py --system-prompt v2.txt --limit 20
 
 # What a 2x ATR stop and a 5% cap actually do, over two years of real bars.
 python backtest/run_backtest.py AAPL
+
+# What a cycle actually costs, and whether a cheaper model would behave the same.
+python replay/compare_models.py --dry-run
+python replay/compare_models.py --limit 20
 ```
 
 [Replay](docs/replay.mdx) is honest because the context was captured live;
@@ -340,6 +344,12 @@ the deterministic half -- and reports that its own returns are not an edge.
 
 The backtest needs no credentials and no live cycles, so it is the one piece
 of evidence available before the first cycle ever runs.
+
+Cost is measured rather than estimated: every call records its own token counts
+in the journal, and [Cost](docs/cost.mdx) compares model and effort settings on
+identical recorded context. Output is ~84% of the bill at this prompt shape, so
+`EFFORT` moves more money than the model tier does -- and a stronger model
+thinking less can undercut a weaker model thinking more.
 
 ## Score the signals
 
