@@ -1,0 +1,128 @@
+---
+title: "Should we move to Interactive Brokers?"
+description: "Researched rather than assumed — what IBKR would fix, what it would cost, and what is genuinely unresolved"
+---
+
+The question came from a real constraint: the account is denominated in dollars,
+the life it funds is denominated in shekels, and [Alpaca cannot reach a
+shekel](/currency-risk). IBKR can. This page is what the research actually
+found, including the parts that argue against moving.
+
+<Note>
+  Researched 2026-09-14 from primary and community sources, because this
+  project has twice been wrong about a broker's capabilities when working from
+  memory. Every claim below is either cited or marked unverified.
+</Note>
+
+## What IBKR would genuinely fix
+
+These are real limitations of Alpaca, not of markets, and they are exactly the
+constraints this system has been designing around:
+
+| Constraint today | IBKR |
+|---|---|
+| No FX at all — `AssetClass` is `us_equity`, `us_option`, `crypto` (re-confirmed against alpaca-py 0.33.0) | ILS is one of ~23 fundable and tradeable currencies |
+| No Israeli listings; "Israel exposure" means US-listed ADRs priced in dollars | **Direct TASE access, for retail as well as institutional**, via an Israeli banking intermediary |
+| Commodities only through ETF wrappers, with roll decay and issuer risk | Actual futures |
+| No European or Asian order books | Broad international access |
+
+So the honest summary is that IBKR would remove **four** documented
+limitations, not one. The FX question is the visible part of a larger ceiling.
+
+## What it would cost
+
+### The automation problem is the real one
+
+IBKR offers two ways in, and both have a catch:
+
+**The Client Portal Gateway** is a Java application that must be running and
+authenticated for the API to answer at all. That is fine on a persistent
+server and fatal on GitHub Actions, where every run is a fresh container. It
+also carries operational friction that tools like IBeam exist specifically to
+paper over:
+
+- a **daily logoff**, and a roughly weekly hard re-authentication;
+- **two-factor authentication that cannot be disabled on paper accounts**,
+  which is precisely the account type this project would use first;
+- credentials injected from environment variables into a login page by an
+  automation tool, which is a meaningfully worse secret-handling story than
+  four GitHub Actions secrets.
+
+**OAuth 1.0a** removes all of that — genuinely headless, no gateway, no daily
+login. It is the right answer if it is available.
+
+<Warning>
+  **Whether retail accounts may use OAuth 1.0a is genuinely unresolved, and the
+  sources contradict each other.** IBKR's own documentation says retail clients
+  are approved for the Web API *only* through the Client Portal Gateway. The
+  most active community library states the opposite from practice: "Despite the
+  website and some IBKR support agents claiming otherwise, indeed it seems to be
+  possible to use OAuth 1.0a on individual accounts."
+
+  Building the system's only trading path on an undocumented-for-retail
+  capability is a real risk: it can be closed without notice, and there is no
+  contract to appeal to.
+</Warning>
+
+Setup, if it is available, is not trivial: four OpenSSL key files, a
+self-chosen consumer key, public keys uploaded to IBKR's portal, and an
+approval that is reported to take **anywhere from 24 hours to two weeks**.
+
+### The hedge has a minimum size
+
+**IDEALPRO's minimum order is 25,000 USD.** That is a hard floor on the hedge
+itself, independent of everything above:
+
+- below roughly \$25,000 of account value the hedge cannot be placed at all;
+- near it, one lot is the entire account and the position is all-or-nothing;
+- it only becomes a proportionate instrument somewhere north of \$50,000.
+
+A broker migration undertaken to enable a hedge that the account is too small
+to place would be pure cost.
+
+## The recommendation
+
+**Not yet — and the reason is sequencing, not capability.**
+
+1. **There is no FX exposure to hedge today.** The account holds no money. What
+   `orchestrator/fx.py` records is what the exposure *would* be. Migrating now
+   hedges a hypothetical.
+2. **The strategy has no measured edge yet.** Nothing has traded, so
+   `analysis/score_journal.py` has nothing to score. A broker migration is a
+   substantial rewrite plus a hosting change, and doing it before knowing
+   whether the signal is worth running risks spending all of it on a strategy
+   that turns out to have none.
+3. **The cheap version of the hedge is available immediately and needs no
+   code.** An FX forward at a bank, sized against the account's dollar value,
+   hedges the same exposure without touching this system at all. It is also the
+   *better* instrument: it hedges the currency without giving up the equity
+   return.
+
+### What would change the answer
+
+Revisit when **any** of these is true:
+
+- real capital is deployed and above roughly \$50,000, so IDEALPRO becomes
+  proportionate;
+- the journal shows measured edge worth protecting;
+- direct TASE or futures access becomes wanted for its own sake — at which
+  point IBKR is the answer regardless of FX, and the migration is justified by
+  four reasons rather than one.
+
+<Note>
+  **An interaction worth noticing.** Holding idle cash in shekels at IBKR would
+  have been a partial natural hedge — and this system just removed its 40% cash
+  floor, which would have been the cash to do it with. That is still the right
+  call: paying ~3-4% a year in foregone equity return to hedge part of the
+  currency risk is a poor trade when a forward hedges all of it and costs
+  nothing in return. The efficient hedge is the forward, not idle cash.
+</Note>
+
+## Sources
+
+- [ibind — OAuth 1.0a documentation](https://github.com/Voyz/ibind/blob/master/docs/oauth/oauth_1a.md) — retail eligibility, setup steps, approval timeline
+- [ibind](https://github.com/Voyz/ibind) — headless OAuth vs. gateway
+- [IBKR Web API documentation](https://ibkrcampus.com/docs/web-api/web-api-v-1-0-documentation/introduction) — supported auth methods
+- [IBeam](https://github.com/Voyz/ibeam) — gateway automation, and what it implies about the gateway path
+- [IBKR forex commissions](https://www.interactivebrokers.com/download/newMark/PDFs/commissionsForex.pdf) — IDEALPRO minimums
+- [IBKR provides access to the Tel Aviv Stock Exchange](https://institutionalassetmanager.co.uk/interactive-brokers-provides-access-tel-aviv-stock-exchange/) — retail TASE access, ILS funding

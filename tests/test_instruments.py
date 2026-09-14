@@ -21,7 +21,9 @@ from app.broker_client import OpenPosition
 from app.execution_engine import ExecutionEngine
 from app.schemas import Bias, ExecutionStatus, LLMSignal
 from config import settings as cfg
-from config.instruments import (
+from config.instruments import (  # noqa: F401
+    COMMUNICATION,
+    TECHNOLOGY,
     BROAD_FUNDS,
     COMMODITY_FUNDS,
     FUNDS,
@@ -63,15 +65,18 @@ def test_an_unknown_ticker_is_treated_as_a_single_name():
 def test_a_single_commodity_fund_is_not_a_broad_fund():
     """The mistake this file exists to prevent.
 
-    Coffee is one thing. A fund holding coffee futures is a concentrated,
-    volatile, single-factor bet -- and an ETN on top, so it carries issuer
-    credit risk a basket never does. Sizing it like RSP because both are
-    technically ETFs would be picking a cap by label rather than by risk.
+    Sugar is one thing. A fund holding sugar futures is a concentrated,
+    volatile, single-factor bet carrying roll decay a basket never does.
+    Sizing it like RSP because both are technically ETFs would be picking a
+    cap by label rather than by risk.
+
+    Measured 2026-09-14: USO 3.29% and SLV 2.62% daily volatility, both above
+    the median single name at 2.26%. "Fund" is not a synonym for "calmer".
     """
-    assert kind_for("JO") is InstrumentKind.COMMODITY_FUND
+    assert kind_for("CANE") is InstrumentKind.COMMODITY_FUND
     assert kind_for("RSP") is InstrumentKind.BROAD_FUND
-    assert risk_engine.max_position_pct_for("JO") < risk_engine.max_position_pct_for("MSFT")
-    assert risk_engine.max_position_pct_for("JO") < risk_engine.max_position_pct_for("RSP")
+    assert risk_engine.max_position_pct_for("CANE") < risk_engine.max_position_pct_for("MSFT")
+    assert risk_engine.max_position_pct_for("CANE") < risk_engine.max_position_pct_for("RSP")
 
 
 def test_a_broad_commodity_basket_is_a_broad_fund():
@@ -150,13 +155,18 @@ def test_one_position_can_never_be_the_whole_portfolio_cap():
 def test_the_book_cannot_concentrate_in_one_group(broker, market):
     """The gap this cap was added to close.
 
-    Before it, MSFT + NVDA + ASML + GOOGL were four accepted positions and one
-    bet, with every per-ticker cap satisfied. A diversified watchlist does not
-    produce a diversified portfolio on its own.
+    Before it, MSFT + NVDA + TSM + ASML + GOOGL were five accepted positions
+    and one bet, with every per-ticker cap satisfied. A diversified watchlist
+    does not produce a diversified portfolio on its own.
+
+    The technology sleeve can no longer reach the cap at all: four names at the
+    single-name cap is 20%, under the 25% group limit. Bounded is the property
+    that matters -- ``test_the_group_cap_binds_where_it_can_be_reached`` is
+    where the rejection itself is pinned.
     """
     engine = ExecutionEngine(broker, market)
     accepted = []
-    for ticker in ("MSFT", "NVDA", "ASML", "GOOGL"):
+    for ticker in TECHNOLOGY + COMMUNICATION:
         result = engine.execute(
             LLMSignal(ticker=ticker, bias=Bias.BULLISH, conviction=0.9, rationale="x")
         )
@@ -168,7 +178,6 @@ def test_the_book_cannot_concentrate_in_one_group(broker, market):
             )
     tech = sum(p.market_value for p in broker.positions) / broker.equity
     assert tech <= cfg.MAX_EXPOSURE_GROUP_PCT + 1e-9
-    assert len(accepted) < 4, "the group cap never bound"
 
 
 def test_the_group_cap_spans_both_sleeves(broker, market):
@@ -207,9 +216,8 @@ def test_the_sleeve_budgets_sum_to_the_gross_cap():
 
 def test_the_single_name_sleeve_is_capped_independently(broker, market):
     """Names cannot grow into the fund sleeve's budget when funds are unused."""
-    broker.positions = [
-        OpenPosition(ticker="JPM", qty=1, market_value=15_000.0)
-    ]
+    full = broker.equity * cfg.MAX_SINGLE_NAME_SLEEVE_PCT
+    broker.positions = [OpenPosition(ticker="JPM", qty=1, market_value=full)]
     engine = ExecutionEngine(broker, market)
     result = engine.execute(
         LLMSignal(ticker="LLY", bias=Bias.BULLISH, conviction=0.9, rationale="x")
@@ -220,7 +228,8 @@ def test_the_single_name_sleeve_is_capped_independently(broker, market):
 
 def test_a_fund_still_fits_when_the_name_sleeve_is_full(broker, market):
     """The budgets are separate, so a full equity sleeve must not block funds."""
-    broker.positions = [OpenPosition(ticker="JPM", qty=1, market_value=15_000.0)]
+    full = broker.equity * cfg.MAX_SINGLE_NAME_SLEEVE_PCT
+    broker.positions = [OpenPosition(ticker="JPM", qty=1, market_value=full)]
     engine = ExecutionEngine(broker, market)
     result = engine.execute(
         LLMSignal(ticker="RSP", bias=Bias.BULLISH, conviction=0.9, rationale="x")
@@ -287,3 +296,61 @@ def test_the_fund_prompt_sets_a_higher_bar_than_the_company_prompt():
     assert "NEUTRAL" in ETF_SYSTEM_PROMPT
     assert "macro timing" in ETF_SYSTEM_PROMPT
     assert "DO NOT EXIST FOR A FUND" in ETF_SYSTEM_PROMPT
+
+
+def test_the_account_is_not_left_sitting_in_cash():
+    """A standing cash allocation is a drag nobody chose.
+
+    The gross cap sat at 60% for one revision, which meant a permanent 40%
+    cash floor. Cash yields close to nothing while equities are the reason the
+    account exists, and the risk work that floor looked like it was doing is
+    already done by the group cap, the per-kind caps and a stop on every
+    position.
+    """
+    assert cfg.MAX_GROSS_EXPOSURE_PCT >= 0.90
+
+
+def test_the_position_limit_cannot_re_impose_a_cash_floor():
+    """The interaction that is invisible until two constants are read together.
+
+    Per-position caps are small by design, so a fully invested book needs many
+    positions. If MAX_OPEN_POSITIONS were low it would cap the account well
+    below the gross limit through the back door.
+    """
+    funds_needed = cfg.MAX_FUND_SLEEVE_PCT / cfg.MAX_BROAD_FUND_PCT
+    names_needed = cfg.MAX_SINGLE_NAME_SLEEVE_PCT / cfg.MAX_POSITION_PCT
+    assert cfg.MAX_OPEN_POSITIONS >= funds_needed + names_needed
+
+
+def test_a_full_book_must_span_several_exposure_groups():
+    """Being fully invested and being concentrated are now incompatible."""
+    groups_needed = cfg.MAX_GROSS_EXPOSURE_PCT / cfg.MAX_EXPOSURE_GROUP_PCT
+    assert groups_needed >= 3
+
+
+def test_the_group_cap_binds_where_it_can_be_reached(broker, market):
+    """Four international funds at 12% would be 48% of the book in one bet.
+
+    This is where the group cap does visible work: unlike the technology
+    names, this group *can* exceed 25%, so something has to stop it.
+    """
+    from config.instruments import INTERNATIONAL
+
+    engine = ExecutionEngine(broker, market)
+    rejected = []
+    for ticker in INTERNATIONAL:
+        result = engine.execute(
+            LLMSignal(ticker=ticker, bias=Bias.BULLISH, conviction=0.9, rationale="x")
+        )
+        if result.status is ExecutionStatus.ACCEPTED:
+            broker.positions.append(
+                OpenPosition(ticker=ticker, qty=result.quantity,
+                             market_value=result.quantity * market.price)
+            )
+        else:
+            rejected.append(result.reason)
+
+    held = sum(p.market_value for p in broker.positions) / broker.equity
+    assert held <= cfg.MAX_EXPOSURE_GROUP_PCT + 1e-9
+    assert rejected, "four funds at the broad cap should not all fit in one group"
+    assert any("International equity" in r for r in rejected)

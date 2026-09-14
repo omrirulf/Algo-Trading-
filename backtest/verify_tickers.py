@@ -31,6 +31,8 @@ from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from app.risk_engine import max_position_pct_for  # noqa: E402
+from orchestrator.fx import fetch_rate as fetch_fx_rate  # noqa: E402
 from config.instruments import (  # noqa: E402
     BROAD_FUNDS,
     COMMODITY_FUNDS,
@@ -39,9 +41,19 @@ from config.instruments import (  # noqa: E402
     kind_for,
 )
 
-#: Below this median dollar volume a stop is likely to fill badly, and the
-#: spread becomes a real cost rather than a rounding error.
-THIN_DOLLAR_VOLUME = 5_000_000.0
+#: A position worth more than this share of a day's dollar volume starts to
+#: move the price it is trying to get. Below it, thin volume is somebody
+#: else's problem.
+#:
+#: An absolute dollar-volume floor was the wrong test and flagged three
+#: holdings that are perfectly tradeable at this account size: what matters is
+#: the position *relative* to the volume, not the volume alone. A $4,000
+#: position in a fund trading $1.6M a day is 0.25% of it.
+MAX_PARTICIPATION = 0.01
+
+#: Account size the participation figure is computed against. The caps are
+#: percentages, so thinness only becomes real at a size worth naming.
+DEFAULT_EQUITY = 100_000.0
 
 
 @dataclass(frozen=True)
@@ -55,12 +67,28 @@ class Check:
     daily_vol_pct: Optional[float] = None
     note: str = ""
 
+    #: Equity the participation figure assumes; carried on the row so the
+    #: report never shows a percentage without saying of what.
+    equity: float = DEFAULT_EQUITY
+
+    @property
+    def position_usd(self) -> Optional[float]:
+        """What one full position in this ticker would be worth."""
+        if not self.resolved:
+            return None
+        return self.equity * max_position_pct_for(self.ticker)
+
+    @property
+    def participation(self) -> Optional[float]:
+        """A full position as a share of one day's dollar volume."""
+        if not self.median_dollar_volume or self.position_usd is None:
+            return None
+        return self.position_usd / self.median_dollar_volume
+
     @property
     def thin(self) -> bool:
-        return (
-            self.median_dollar_volume is not None
-            and self.median_dollar_volume < THIN_DOLLAR_VOLUME
-        )
+        """True when a full position would be a meaningful share of the day."""
+        return self.participation is not None and self.participation > MAX_PARTICIPATION
 
     def as_dict(self) -> dict:
         return {
@@ -68,11 +96,12 @@ class Check:
             "bars": self.bars, "last_close": self.last_close,
             "median_dollar_volume": self.median_dollar_volume,
             "daily_vol_pct": self.daily_vol_pct, "thin": self.thin,
+            "position_usd": self.position_usd, "participation": self.participation,
             "note": self.note,
         }
 
 
-def check(ticker: str, period: str = "3mo") -> Check:
+def check(ticker: str, period: str = "3mo", equity: float = DEFAULT_EQUITY) -> Check:
     """Never raises: one bad symbol must not void the whole report."""
     kind = kind_for(ticker).value
     try:
@@ -80,14 +109,14 @@ def check(ticker: str, period: str = "3mo") -> Check:
 
         bars = yf.Ticker(ticker).history(period=period, interval="1d", auto_adjust=False)
     except Exception as exc:  # noqa: BLE001 - any failure is just "could not check"
-        return Check(ticker, kind, False, note=f"fetch failed: {type(exc).__name__}")
+        return Check(ticker, kind, False, note=f"fetch failed: {type(exc).__name__}", equity=equity)
 
     if bars is None or bars.empty or "Close" not in bars.columns:
-        return Check(ticker, kind, False, note="no bars returned -- delisted or wrong symbol")
+        return Check(ticker, kind, False, note="no bars returned -- delisted or wrong symbol", equity=equity)
 
     closes = [float(c) for c in bars["Close"].dropna()]
     if len(closes) < 2:
-        return Check(ticker, kind, False, bars=len(closes), note="too few bars to judge")
+        return Check(ticker, kind, False, bars=len(closes), note="too few bars to judge", equity=equity)
 
     returns = [closes[i] / closes[i - 1] - 1 for i in range(1, len(closes))]
     dollar_volume = None
@@ -104,6 +133,7 @@ def check(ticker: str, period: str = "3mo") -> Check:
         last_close=round(closes[-1], 2),
         median_dollar_volume=round(dollar_volume) if dollar_volume else None,
         daily_vol_pct=round(statistics.pstdev(returns) * 100, 2),
+        equity=equity,
     )
 
 
@@ -127,15 +157,25 @@ def render(results: list[Check]) -> str:
         lines += ["", "DOES NOT RESOLVE -- these would fail every cycle, silently:"]
         lines += [f"  {r.ticker}: {r.note}" for r in broken]
 
+    equity = results[0].equity if results else DEFAULT_EQUITY
     thin = [r for r in results if r.thin]
     if thin:
         lines += [
             "",
-            f"THIN (under ${THIN_DOLLAR_VOLUME/1e6:.0f}M/day) -- wide spreads, and a stop",
-            "can fill well below where it was placed:",
+            f"TOO BIG FOR THE BOOK at ${equity:,.0f} equity -- a full position would be",
+            f"over {MAX_PARTICIPATION:.0%} of a day's volume, so it moves the price it wants:",
         ]
         lines += [
-            f"  {r.ticker}: ${r.median_dollar_volume/1e6:,.1f}M/day" for r in thin
+            f"  {r.ticker}: ${r.position_usd:,.0f} position vs "
+            f"${r.median_dollar_volume/1e6:,.1f}M/day = {r.participation:.1%}"
+            for r in thin
+        ]
+    else:
+        lines += [
+            "",
+            f"Every full position is under {MAX_PARTICIPATION:.0%} of a day's volume at "
+            f"${equity:,.0f} equity.",
+            "Thin funds are only thin relative to what you are trying to put in them.",
         ]
 
     # The caps are justified by relative volatility, so a holding well outside
@@ -175,12 +215,27 @@ def render(results: list[Check]) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Verify every watchlist ticker resolves.")
     parser.add_argument("--period", default="3mo")
+    parser.add_argument("--equity", type=float, default=DEFAULT_EQUITY,
+                        help="account size the participation figures assume")
     parser.add_argument("--json", action="store_true", dest="as_json")
     args = parser.parse_args(argv)
 
     results = [
-        check(t, args.period) for t in SINGLE_NAMES + BROAD_FUNDS + COMMODITY_FUNDS
+        check(t, args.period, args.equity)
+        for t in SINGLE_NAMES + BROAD_FUNDS + COMMODITY_FUNDS
     ]
+
+    # Not tradeable and not a holding -- but if USD/ILS stops resolving, the
+    # journal silently loses the only record of what a trade was worth in the
+    # currency that matters. Reported separately so it never looks like a
+    # position.
+    fx_rate = fetch_fx_rate()
+    print()
+    print("CURRENCY EXPOSURE (measured, not hedged -- see orchestrator/fx.py)")
+    for line in fx_rate.as_lines():
+        print(f"  {line[2:]}" if line.startswith("- ") else f"  {line}")
+    if not fx_rate.ok:
+        print("  The journal will record a null rate until this resolves.")
     print(json.dumps([r.as_dict() for r in results], indent=2) if args.as_json
           else render(results))
 

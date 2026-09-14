@@ -146,9 +146,16 @@ BROAD_FUNDS: Final[tuple[str, ...]] = tuple(
 PRECIOUS_METALS: Final[tuple[str, ...]] = ("GLD", "SLV")
 INDUSTRIAL_METALS: Final[tuple[str, ...]] = ("CPER",)
 ENERGY_COMMODITY: Final[tuple[str, ...]] = ("USO", "UNG")
-#: CANE is sugar, JO is coffee. There is no US-listed rice fund -- see
-#: docs/watchlist.mdx.
-AGRICULTURE: Final[tuple[str, ...]] = ("CORN", "WEAT", "SOYB", "CANE", "JO")
+#: CANE is sugar. Coffee and rice have no single-commodity fund here:
+#:
+#: - JO, the iPath coffee ETN, was on this list until the first verification
+#:   run returned no bars for it. That is the ETN failure mode described above
+#:   happening in practice -- an issuer can call a note, and then the ticker
+#:   simply stops existing. Coffee exposure now comes through DBA, whose
+#:   basket includes it.
+#: - Rice has never had a US-listed fund. Rough-rice futures exist; nothing
+#:   wraps them.
+AGRICULTURE: Final[tuple[str, ...]] = ("CORN", "WEAT", "SOYB", "CANE")
 
 COMMODITY_ROLES: Final[dict[str, tuple[str, ...]]] = {
     "Precious metals": PRECIOUS_METALS,

@@ -1,0 +1,103 @@
+---
+title: "Currency risk"
+description: "The account is in dollars. Your life is in shekels. That gap is a position."
+---
+
+Every number in this system is a dollar number. The journal, the scorer, the
+backtest and the position caps all count dollars, so a move in USD/ILS does not
+*reduce* a return — it silently **redenominates** one.
+
+<Warning>
+  **A 10% year in dollars, alongside a 10% fall in the dollar, is a −1% year in
+  shekels.** Not break-even: the two compound. And a portfolio that traded
+  nothing at all still moves in shekels, because holding dollars is a position.
+</Warning>
+
+```python
+from orchestrator.fx import shekel_return_pct
+
+shekel_return_pct(10, -10)   # -1.0
+shekel_return_pct(0, -8)     # -8.0   <- the flat year that wasn't
+```
+
+## This cannot be hedged from here
+
+Not "we chose not to" — there is no route from an Alpaca equities account to a
+shekel:
+
+| Instrument | Why it does not work |
+|---|---|
+| Spot FX, forwards, futures | Alpaca trades `us_equity`, `us_option` and `crypto` only — read off the SDK's own `AssetClass` enum. |
+| A shekel currency ETF | **None exists.** US-listed single-currency funds cover the majors — `FXE` euro, `FXY` yen, `FXB` sterling — and the dollar index (`UUP`, `UDN`). The shekel is not among them. |
+| "Currency-hedged" ETFs (`HEFA`, `DBEF`) | These hedge a **foreign** currency back into dollars — removing EUR or JPY exposure *for a dollar-based holder*. That is the opposite direction to what you need. |
+| `UDN` as a proxy | Its basket is 58% euro and contains no shekel. Hedging USD/ILS with it is a bet on the euro wearing a hedge's clothing. |
+
+<Note>
+  **A partial hedge against the wrong index is a second position, not less
+  risk.** A ~60%-correlated instrument with its own drift and its own costs
+  adds a bet while leaving most of the basis risk in place. That is why this
+  module measures instead.
+</Note>
+
+### The one natural offset, and its size
+
+`EIS` holds Israeli equities that are themselves priced in shekels, so it
+carries **embedded ILS exposure**: when the shekel strengthens, its dollar
+value rises, all else equal.
+
+But size it honestly. `EIS` is a broad fund capped at 12%, inside an
+International equity group capped at 25%. Even at a full position that
+is 12% of the book with embedded shekel exposure, against **100%** of
+the account denominated in dollars. It is a rounding error on the problem, not
+a hedge.
+
+Gold (`GLD`) is a partial dollar-debasement hedge for similar reasons and with
+the same caveat: it is not a shekel.
+
+## What this system does instead
+
+`orchestrator/fx.py` fetches USD/ILS once per cycle and **journals it on every
+signal line**:
+
+```json
+"fx": {"symbol": "ILS=X", "rate": 3.7412, "change_3mo_pct": -2.3, "gap": ""}
+```
+
+Recorded at signal time on purpose. Without the rate *as of the entry*, no
+later analysis can redenominate a trade — you would be converting last year's
+P&L at today's rate, which is a different and wrong number.
+
+A failed fetch degrades to a named gap and a `null` rate, never `0.0`. A zero
+would read as "the shekel is worthless" rather than "we don't know".
+
+<Note>
+  The `market checks` workflow reports the current rate and flags it if the
+  pair stops resolving — the journal would otherwise lose the only record of
+  what trades were worth in the currency that matters, and lose it quietly.
+</Note>
+
+## Where the hedge actually belongs
+
+Outside this account, where the instruments exist:
+
+- **An FX forward or option at your bank**, sized against the account's dollar
+  value. This is the direct answer and the only complete one.
+- **Holding fewer dollars.** The account now runs close to fully invested
+  (95%), so there is little idle cash left to be exposed — but that
+  cuts both ways: the 95% that *is* invested is still denominated in
+  dollars. Being fully invested changes what you own, not what currency you
+  own it in.
+- **Shekel-denominated assets held elsewhere**, sized against this account
+  rather than in addition to it.
+
+This page exists so that decision is made against a measured number instead of
+a feeling.
+
+## "Could another broker do this?"
+
+Interactive Brokers can — it supports ILS, offers direct Tel Aviv access, and
+has an FX desk. Whether moving there is worth it is a separate question with a
+researched answer: see [Broker evaluation](/broker-evaluation). The short
+version is that IDEALPRO's **25,000 USD minimum order** puts the hedge out of
+reach of a small account regardless, and there is no exposure to hedge until
+real money is deployed.

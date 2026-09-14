@@ -39,8 +39,11 @@ MAX_POSITION_PCT: Final[float] = 0.05
 #: Above the single-name cap because a broad fund's tail is truncated in a way
 #: a company's is not: an index does not go to zero on a fraud.
 #:
-#: ``backtest/compare_sleeves.py`` on real bars is what should set this, and
-#: the 'risk/trade' column is the one to tune against.
+#: MEASURED, 2026-09-14, 3mo of real bars via backtest/verify_tickers.py:
+#: median daily volatility was 2.26% for a single name and 0.88% for a broad
+#: fund -- a ratio of 2.57x, so a broad-fund cap up to ~12.8% carries no more
+#: risk per trade than 5% on a stock. 12% is 2.40x, inside that and slightly
+#: conservative. This number started as a guess and is now checked.
 MAX_BROAD_FUND_PCT: Final[float] = 0.12
 
 #: A fund tracking ONE commodity gets the tightest cap of the three, below
@@ -52,6 +55,19 @@ MAX_BROAD_FUND_PCT: Final[float] = 0.12
 #: Sizing these like a broad fund because both are technically ETFs would
 #: repeat, in a subtler place, the error of picking a cap by label rather than
 #: by risk.
+#:
+#: MEASURED, 2026-09-14: median daily volatility 1.58%, which is 0.70x a single
+#: name -- so volatility *alone* would justify ~7%, and 4% is deliberately
+#: below what the arithmetic allows. Three reasons to stay there:
+#:
+#: - The median hides the spread. USO measured 3.29% and SLV 2.62%, both above
+#:   the median single name. A cap set on the median would be far too loose
+#:   for the volatile end of the sleeve.
+#: - Daily volatility does not see roll decay. A futures-backed fund can bleed
+#:   value with spot flat, and no standard-deviation figure captures that.
+#: - It does not see issuer risk either. The coffee ETN on this list stopped
+#:   resolving between being added and first being verified, which is what
+#:   that risk looks like when it arrives.
 MAX_COMMODITY_FUND_PCT: Final[float] = 0.04
 
 #: Ceiling on any one exposure group (``instruments.EXPOSURE_GROUPS``).
@@ -66,28 +82,47 @@ MAX_EXPOSURE_GROUP_PCT: Final[float] = 0.25
 #: Sleeve budgets. Funds are the core holding and single names the satellite,
 #: which is a deliberate statement about where the confidence is: a broad fund
 #: is diversified by construction, while a stock-picking edge is unproven here
-#: and this budget declines to assume one. Three names at the single-name cap
-#: is the whole equity sleeve.
+#: and this budget declines to assume one.
 #:
 #: They sum to MAX_GROSS_EXPOSURE_PCT, so the gross cap binds only when a
 #: sleeve is under-used rather than being a fourth independent limit.
-MAX_SINGLE_NAME_SLEEVE_PCT: Final[float] = 0.15
-MAX_FUND_SLEEVE_PCT: Final[float] = 0.45
+MAX_SINGLE_NAME_SLEEVE_PCT: Final[float] = 0.25
+MAX_FUND_SLEEVE_PCT: Final[float] = 0.70
 
-#: Ceiling on total deployed capital across every open position. Without it
-#: the per-ticker caps multiply out to leverage.
+#: Ceiling on total deployed capital across every open position. Its job is to
+#: stop the per-ticker caps multiplying out into leverage -- nothing else.
 #:
-#: This is the one guardrail that got *looser* when the fund sleeve landed. It
-#: used to be implicit at 50% (``MAX_OPEN_POSITIONS * MAX_POSITION_PCT``) and
-#: is now an explicit 60%, so the account keeps a 40% cash floor at all times.
-MAX_GROSS_EXPOSURE_PCT: Final[float] = 0.60
+#: It sat at 60% for one revision, which meant a permanent 40% cash floor. That
+#: was wrong for an investment account and hard to defend: cash yields close to
+#: nothing while equities are the reason the account exists, so a standing 40%
+#: allocation to it is a large, silent drag chosen by no one. The risk work it
+#: looked like it was doing is already done, and done better, by limits that
+#: target the actual hazards: MAX_EXPOSURE_GROUP_PCT bounds concentration,
+#: the per-kind caps bound single-position risk, and every position carries a
+#: stop.
+#:
+#: In a *paper* account the argument is stronger still: there is no capital at
+#: risk, so holding back only produces less information about how the strategy
+#: behaves at full size.
+#:
+#: 95% rather than 100% is operational, not prudential. An order needs buying
+#: power to be accepted, and a market order can fill above the quote -- a book
+#: at exactly 100% would start rejecting its own orders.
+MAX_GROSS_EXPOSURE_PCT: Final[float] = 0.95
 
 #: Signals with conviction below this are rejected before any market data is
 #: fetched.
 MIN_CONVICTION: Final[float] = 0.60
 
 #: Maximum number of distinct tickers that may be held at once.
-MAX_OPEN_POSITIONS: Final[int] = 10
+#:
+#: Raised from 10 with the cash floor. The per-position caps are small by
+#: design -- 12% for a broad fund, 4% for a single commodity -- so reaching a
+#: fully-invested book *requires* many positions: roughly eight funds and five
+#: names. At 10 this limit would have silently capped the account near 60%
+#: again through the back door, which is the sort of interaction that is
+#: invisible until someone reads two constants together.
+MAX_OPEN_POSITIONS: Final[int] = 20
 
 #: Wilder ATR lookback, in trading days.
 ATR_PERIOD: Final[int] = 14

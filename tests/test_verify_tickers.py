@@ -75,15 +75,46 @@ def test_the_kind_comes_from_configuration(install):
     install(_fake_yfinance(_bars()))
     assert vt.check("MSFT").kind == "equity"
     assert vt.check("RSP").kind == "broad fund"
-    assert vt.check("JO").kind == "commodity fund"
+    assert vt.check("GLD").kind == "commodity fund"
 
 
-def test_thin_volume_is_flagged(install):
-    """Wide spreads are a real execution cost, and a stop can fill badly."""
+def test_the_position_size_comes_from_the_instrument_cap(install):
+    """Each kind is checked against the size it would actually be traded at."""
+    install(_fake_yfinance(_bars()))
+    assert vt.check("GLD").position_usd < vt.check("MSFT").position_usd
+    assert vt.check("MSFT").position_usd < vt.check("RSP").position_usd
+
+
+def test_a_position_too_large_for_the_volume_is_flagged(install):
+    """What matters is the position relative to the day, not the day alone."""
     install(_fake_yfinance(_bars(volume=100)))
     result = vt.check("EIS")
     assert result.thin
-    assert "THIN" in vt.render([result])
+    assert "TOO BIG FOR THE BOOK" in vt.render([result])
+
+
+def test_a_thin_fund_is_fine_when_the_position_is_small(install):
+    """The check this replaced cried wolf.
+
+    An absolute dollar-volume floor flagged SOYB at $1.6M/day. But a full
+    position there is $4,000 -- a quarter of one percent of the day. Thinness
+    is only thin relative to what you are trying to put in it.
+    """
+    install(_fake_yfinance(_bars(price=27.5, volume=60_000)))  # ~$1.6M/day
+    result = vt.check("SOYB")
+    assert result.participation < 0.01
+    assert not result.thin
+    assert "under 1% of a day's volume" in vt.render([result])
+
+
+def test_participation_scales_with_the_account(install):
+    """A size that is harmless at 100k is not harmless at 10m."""
+    install(_fake_yfinance(_bars(price=27.5, volume=60_000)))
+    small = vt.check("SOYB", equity=100_000)
+    large = vt.check("SOYB", equity=10_000_000)
+    assert not small.thin
+    assert large.thin
+    assert large.participation == pytest.approx(small.participation * 100)
 
 
 def test_liquid_volume_is_not_flagged(install):

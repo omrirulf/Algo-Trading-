@@ -415,8 +415,8 @@ Try adding `"quantity": 500` to that payload — it will be rejected with a
 | Prompt injection has a bounded blast radius | Headlines and firm names are third-party text. The system prompt marks the whole context block untrusted, and even a successful injection can only move `bias`/`conviction` — still subject to the conviction floor, the per-instrument cap, the group and sleeve limits, the gross exposure cap, and a mandatory stop |
 | Max 5% per single name, 12% per broad fund, 4% per single-commodity fund | `risk_engine.calculate_position_size()` (checked twice: pre- and post-rounding). The cap comes from `config/instruments.py` via `max_position_pct_for()` — never from the signal, which has no field that could carry an instrument kind. A commodity fund is capped *below* a stock: "fund" does no diversification work when it holds one commodity |
 | Max 25% per exposure group | `risk_engine.exposure_group_headroom()` — what stops a diversified watchlist producing a one-bet book. Spans both sleeves, so XOM plus two energy funds is one energy bet made three times |
-| Funds are the core: 45% vs 15% for single names | `risk_engine.sleeve_headroom()` — a deliberate statement that a stock-picking edge is unproven here |
-| Max 60% of equity deployed in total | `risk_engine.check_gross_exposure_limit()` — the 40% cash floor |
+| Funds are the core: 70% vs 25% for single names | `risk_engine.sleeve_headroom()` — a deliberate statement that a stock-picking edge is unproven here |
+| Max 95% of equity deployed in total | `risk_engine.check_gross_exposure_limit()` — the 5% buffer |
 | Mandatory stop-loss on every order | `broker_client.submit_bracket_order()` — no code path submits without `StopLossRequest` (Alpaca OTO: market entry + attached stop) |
 | Stop distance from real volatility | `market_data.calculate_atr()` (Wilder ATR from yfinance OHLC), rejected if ATR is degenerate |
 | Conviction floor | `risk_engine.check_conviction_threshold()` |
