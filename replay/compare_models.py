@@ -88,7 +88,7 @@ def render(cells: list[Cell], floor: float, tickers: int, incumbent: Cell | None
         "=" * 82,
         f"Contexts per cell : {cells[0].n + len(cells[0].errors) if cells else 0}",
         f"Agreement floor   : {floor:.0%} (pre-registered)",
-        f"Projected for     : {tickers} tickers, 7 cycles/day",
+        f"Projected for     : {tickers} tickers, {cfg.CYCLES_PER_TRADING_DAY} cycle(s)/day",
         "",
         f"{'configuration':<26} {'$/call':>8} {'$/month':>9} {'agree':>7} "
         f"{'trade-agree':>12} {'out tok':>8} {'fail':>6}",

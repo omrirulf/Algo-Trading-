@@ -38,7 +38,7 @@ log = logging.getLogger(__name__)
 HISTORY_PERIOD = "2y"
 
 #: Fundamentals, analyst ratings and ownership change daily at most, but the
-#: heartbeat runs hourly. Caching them keeps an unauthenticated, rate-limited
+#: heartbeat runs daily. Caching them keeps an unauthenticated, rate-limited
 #: data source from being asked the same question 24 times a day.
 SLOW_DATA_TTL_SECONDS = 6 * 60 * 60
 

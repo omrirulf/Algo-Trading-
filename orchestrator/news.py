@@ -33,7 +33,7 @@ log = logging.getLogger(__name__)
 
 BRIGHTDATA_REQUEST_URL = "https://api.brightdata.com/request"
 
-#: Google ``tbs=qdr:`` window. ``d`` = past 24 hours, which suits an hourly job.
+#: Google ``tbs=qdr:`` window. ``d`` = past 24 hours, which suits a daily job.
 NEWS_LOOKBACK = "d"
 MAX_HEADLINES = 10
 REQUEST_TIMEOUT_SECONDS = 60.0

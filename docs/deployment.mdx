@@ -3,7 +3,7 @@ title: "Deployment"
 description: "Running the heartbeat without a server, a webhook, or a laptop left open"
 ---
 
-The system needs to run a cycle every hour during market hours. That is an
+The system needs to run one cycle per trading day, after the US open. That is an
 awkward shape for a phone and overkill for a VM, so the default target is a
 **scheduled GitHub Actions job**: no server, no open port, and the logs are
 readable from the GitHub mobile app.

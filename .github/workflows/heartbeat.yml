@@ -1,13 +1,18 @@
 name: heartbeat
 
-# US equity regular hours are 09:30-16:00 America/New_York, which is
-# 13:30-20:00 UTC in summer and 14:30-21:00 UTC in winter. GitHub cron has no
-# timezone, so the window below spans both and the job itself decides: the
-# orchestrator asks Alpaca's clock and exits immediately when the market is
-# shut, which also covers holidays and half-days that no cron can express.
+# One cycle per trading day, not one per hour. Fundamentals, analyst targets
+# and insider filings change daily at most and technicals are on daily bars,
+# so hourly runs were seven near-identical answers to the same question at
+# seven times the cost. The holding horizon is days; one look after the open
+# captures the day.
+#
+# 15:05 UTC is 11:05 New York in summer and 10:05 in winter -- after the
+# 09:30 open in both, and past the first half-hour's noise. GitHub cron has no
+# timezone, so the job itself still asks Alpaca's clock and exits at once when
+# the market is shut, which also covers holidays that no cron can express.
 on:
   schedule:
-    - cron: "5 13-21 * * 1-5"
+    - cron: "5 15 * * 1-5"
   workflow_dispatch:        # a manual run, for the first smoke test
 
 # Two runs writing the journal at once would race on the commit below.

@@ -110,7 +110,7 @@ errors would otherwise cost more prompt tokens than the news does.
 ## Caching
 
 Fundamentals, analyst ratings, ownership and insider filings change daily at
-most, but the heartbeat runs hourly. Those are cached for six hours per ticker
+most, and the heartbeat now runs daily. They are still cached for six hours per ticker
 (`SLOW_DATA_TTL_SECONDS`); price history is refetched every cycle. Without
 the cache a three-ticker watchlist would ask an unauthenticated, rate-limited
 source the same question 24 times a day.

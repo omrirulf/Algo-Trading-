@@ -51,19 +51,20 @@ python replay/compare_models.py --limit 20                      # the walk
 ```
 
 Every cell replays the **same recorded contexts**, so the only thing that varies
-is the configuration.
+is the configuration. The `$/month` column projects at `CYCLES_PER_TRADING_DAY`
+(now 1, derived from the daily heartbeat interval) over 21 trading days.
 
 ```
 configuration                $/call   $/month   agree  trade-agree  out tok
-opus-5 / low                $0.0221       $97    100%         100%      600
-opus-5 / medium             $0.0446      $197    100%         100%     1500
-sonnet-5 / low              $0.0118       $52     95%          95%      900  <- cheapest acceptable
-sonnet-5 / medium           $0.0228      $101    100%         100%     2000
-haiku-4-5 / low             $0.0069       $31     70%          70%     1100  (below floor)
+opus-5 / low                $0.0221     $13.9    100%         100%      600
+opus-5 / medium             $0.0446     $28.0    100%         100%     1500
+sonnet-5 / low              $0.0118      $7.4     95%          95%      900  <- cheapest acceptable
+sonnet-5 / medium           $0.0228     $14.3    100%         100%     2000
+haiku-4-5 / low             $0.0069      $4.3     70%          70%     1100  (below floor)
 ```
 
 <Note>
-  Note `opus-5 / low` at $97 undercutting `sonnet-5 / medium` at $101. **A
+  Note `opus-5 / low` at $13.9 undercutting `sonnet-5 / medium` at $14.3. **A
   stronger model thinking less can be cheaper than a weaker model thinking
   more** — it spends fewer tokens reaching the same answer. Fixing the model and
   then tuning effort never finds that cell.

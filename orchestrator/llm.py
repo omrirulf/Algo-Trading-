@@ -33,9 +33,12 @@ MODEL = "claude-opus-5"
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
 FALLBACK_MODE = "default"
 
-#: Thinking depth / token spend. This is a short judgement over a handful of
-#: headlines, not a long-horizon task, so it does not need "high" or above.
-EFFORT = "medium"
+#: Thinking depth / token spend. Output is ~84% of the bill and thinking bills
+#: at the output rate, so this is the biggest cost lever there is -- larger
+#: than model tier. "low" for a short judgement over a handful of headlines;
+#: replay/compare_configs.py is where a higher notch would have to earn its
+#: place on the same inputs before it is turned back up.
+EFFORT = "low"
 
 #: Generous ceiling, not a target: the signal itself is a few hundred tokens.
 #: Only what the model actually generates is billed.

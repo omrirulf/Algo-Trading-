@@ -9,7 +9,7 @@ webhook validates that shape (rejecting anything else with a 422), and a
 pure-Python risk engine does 100% of the sizing, stop-loss, and Alpaca
 paper-trade execution.
 
-Each hourly cycle gives the model five kinds of context per ticker — recent
+Each daily cycle gives the model five kinds of context per ticker — recent
 news, technicals, fundamentals, the analyst/institutional view, and insider
 buying and selling — and records all of it alongside the resulting signal so
 the signals can be graded later.
@@ -39,7 +39,7 @@ algo-trading-system/
 │   ├── execution_engine.py    # orchestrates validate -> size -> stop -> submit
 │   └── logger.py              # structured JSON audit log
 ├── orchestrator/
-│   ├── heartbeat.py           # hourly job: gather context -> call LLM -> POST signal
+│   ├── heartbeat.py           # daily job: gather context -> call LLM -> POST signal
 │   ├── news.py                # Bright Data SERP API (Google News) headline fetch
 │   ├── context.py             # the only module that touches yfinance; prompt assembly
 │   ├── technicals.py          # SMA/RSI/MACD/returns/52w/vol (pure, no network)
@@ -314,7 +314,7 @@ but the orchestrator process then holds the Alpaca credentials.
 
 ## Run it on a schedule, without a server
 
-`.github/workflows/heartbeat.yml` runs a cycle hourly through US market hours
+`.github/workflows/heartbeat.yml` runs one cycle per trading day, shortly after the US open
 and commits the journal back, so there is nothing to host and the logs are
 readable from the GitHub mobile app. Add four Actions *secrets* —
 `ALPACA_API_KEY`, `ALPACA_SECRET_KEY`, `ANTHROPIC_API_KEY`,

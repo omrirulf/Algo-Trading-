@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Final, Optional
+from config import settings as cfg
 
 #: A cache read bills at roughly a tenth of the input rate, a cache write at
 #: about 1.25x. Documented multipliers rather than separately published
@@ -129,7 +130,7 @@ def usage_from_response(response: object, model: str = "") -> Usage:
 
 
 def monthly_usd(
-    per_call_usd: float, tickers: int, cycles_per_day: int = 7, trading_days: int = 21
+    per_call_usd: float, tickers: int, cycles_per_day: int = cfg.CYCLES_PER_TRADING_DAY, trading_days: int = 21
 ) -> float:
     """Scale one measured call up to a monthly bill."""
     return per_call_usd * tickers * cycles_per_day * trading_days
