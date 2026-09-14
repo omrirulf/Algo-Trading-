@@ -57,6 +57,7 @@ def record(
     error: Optional[str] = None,
     usage: Optional[Usage] = None,
     fx: Optional[FxRate] = None,
+    screen: Optional[dict[str, Any]] = None,
 ) -> None:
     """Write one journal line. Swallows its own failures by design."""
     try:
@@ -81,6 +82,12 @@ def record(
                 # so without the rate as of the entry, no later analysis can
                 # say what a trade was worth in the currency that matters.
                 "fx": fx.as_dict() if fx else None,
+                # The cheap first-stage answer, when the funnel ran. Kept
+                # beside the final signal so what the screen filtered, and
+                # how often the full model disagreed with it on the tickers
+                # it escalated, are numbers the journal answers rather than
+                # assumptions the funnel rests on.
+                "screen": screen,
             },
         )
     except Exception:  # noqa: BLE001 - journalling must not break the cycle

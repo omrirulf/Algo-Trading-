@@ -43,14 +43,20 @@ import httpx  # noqa: E402
 from apscheduler.schedulers.blocking import BlockingScheduler  # noqa: E402
 from pydantic import ValidationError  # noqa: E402
 
-from app.schemas import LLMSignal  # noqa: E402
+from app.schemas import Bias, LLMSignal  # noqa: E402
 from config import settings as cfg  # noqa: E402
 from config.instruments import is_fund  # noqa: E402
 from orchestrator.fx import FxRate, fetch_rate as fetch_fx_rate  # noqa: E402
 from config.settings import get_settings  # noqa: E402
 from orchestrator import context, journal  # noqa: E402
 from orchestrator.context import TickerContext  # noqa: E402
-from orchestrator.llm import AnthropicSignalProvider, Completion, LLMError  # noqa: E402
+from orchestrator.llm import (  # noqa: E402
+    SCREENING_ENABLED,
+    SCREENING_MODEL,
+    AnthropicSignalProvider,
+    Completion,
+    LLMError,
+)
 from app.broker_client import BrokerError  # noqa: E402
 from orchestrator.dispatch import Dispatcher, build_dispatcher  # noqa: E402
 from orchestrator.news import BrightDataNewsProvider, NewsFetchError  # noqa: E402
@@ -216,6 +222,14 @@ def fetch_news(ticker: str) -> list[str]:
     return provider.fetch(ticker)
 
 
+def screen_signal(system_prompt: str, user_prompt: str, json_schema: dict) -> Completion:
+    """The first stage of the funnel: the same prompt, the cheap model, no reasoning."""
+    provider = AnthropicSignalProvider(get_settings().anthropic_api_key)
+    return provider.complete_detailed(
+        system_prompt, user_prompt, json_schema, model=SCREENING_MODEL, reasoning=False
+    )
+
+
 def call_llm(system_prompt: str, user_prompt: str, json_schema: dict) -> Completion:
     """Claude's raw JSON, plus what the call cost.
 
@@ -238,6 +252,9 @@ def call_llm(system_prompt: str, user_prompt: str, json_schema: dict) -> Complet
 CONTEXT_FAILED = "context"
 MODEL_FAILED = "model"
 DISPATCH_FAILED = "dispatch"
+#: The cheap first stage called it NEUTRAL, so the full model was never asked.
+#: A judged outcome, not a failure: the funnel doing its job.
+SCREENED = "screened"
 COMPLETED = "done"
 
 #: Human labels, in the order a ticker would meet them.
@@ -245,8 +262,13 @@ STAGE_LABELS: dict[str, str] = {
     CONTEXT_FAILED: "context never gathered",
     MODEL_FAILED: "no usable signal from the model",
     DISPATCH_FAILED: "signal never reached the engine",
+    SCREENED: "screened NEUTRAL; full model not asked",
     COMPLETED: "reached the engine",
 }
+
+#: The stages that mean something broke, in the order a ticker meets them.
+#: ``SCREENED`` is not among them: it is an answer, not a failure.
+FAILURE_STAGES: tuple[str, ...] = (CONTEXT_FAILED, MODEL_FAILED, DISPATCH_FAILED)
 
 #: What to suspect first when every ticker died at the same stage. Names
 #: variables, never values -- this text is rendered into a job summary that
@@ -297,6 +319,11 @@ class CycleReport:
         return tuple(r for r in self.results if r.stage == COMPLETED)
 
     @property
+    def screened(self) -> tuple[TickerResult, ...]:
+        """Tickers the cheap first stage called NEUTRAL, so the full model was skipped."""
+        return tuple(r for r in self.results if r.stage == SCREENED)
+
+    @property
     def stages(self) -> Counter:
         return Counter(r.stage for r in self.results)
 
@@ -321,9 +348,16 @@ class CycleReport:
         journal line, and nothing to score later.
 
         A closed market is not this. Neither is an empty watchlist, which is a
-        configuration choice rather than an outage.
+        configuration choice rather than an outage. Nor is a cycle the screen
+        ended for every ticker: a first stage that says "nothing today" is a
+        judgement, and one the journal recorded.
         """
-        return bool(self.tickers) and not self.market_closed and not self.completed
+        return (
+            bool(self.tickers)
+            and not self.market_closed
+            and not self.completed
+            and not self.screened
+        )
 
 
 def render_summary(report: CycleReport) -> str:
@@ -342,6 +376,7 @@ def render_summary(report: CycleReport) -> str:
 
     attempted = len(report.tickers)
     reached = len(report.completed)
+    screened = len(report.screened)
 
     if report.produced_nothing:
         out += [
@@ -355,17 +390,27 @@ def render_summary(report: CycleReport) -> str:
     else:
         out += [f"**{reached} of {attempted}** tickers reached the engine.", ""]
 
+    if screened:
+        # Reported apart from the failures: a first stage that says "nothing
+        # here" is the funnel working, and the number is what an operator
+        # watches to see whether the screen is doing any filtering at all.
+        out += [
+            f"**{screened} of {attempted}** screened NEUTRAL by "
+            f"`{SCREENING_MODEL}`; the full model was not asked.",
+            "",
+        ]
+
     if report.verdicts:
         out += ["| Verdict | Tickers |", "| --- | --- |"]
         out += [f"| {status} | {n} |" for status, n in sorted(report.verdicts.items())]
         out += [""]
 
-    stopped = {s: n for s, n in report.stages.items() if s != COMPLETED}
+    stopped = {s: n for s, n in report.stages.items() if s in FAILURE_STAGES}
     if stopped:
         out += ["| Stopped at | Tickers |", "| --- | --- |"]
         out += [
             f"| {STAGE_LABELS[stage]} | {stopped[stage]} |"
-            for stage in (CONTEXT_FAILED, MODEL_FAILED, DISPATCH_FAILED)
+            for stage in FAILURE_STAGES
             if stage in stopped
         ]
         out += [""]
@@ -399,7 +444,7 @@ def render_summary(report: CycleReport) -> str:
         ]
         out += [
             f"- **{STAGE_LABELS[stage]}** -- {STAGE_HINTS[stage]}."
-            for stage in (CONTEXT_FAILED, MODEL_FAILED, DISPATCH_FAILED)
+            for stage in FAILURE_STAGES
             if stage in stopped
         ]
         out += ["", "</details>", ""]
@@ -481,48 +526,71 @@ def process_ticker(
         # less than the strategy assumes it has.
         log.warning("%s: context gaps: %s", ticker, "; ".join(ticker_context.gaps))
 
+    system_prompt = system_prompt_for(ticker_context.ticker)
+    user_prompt = build_user_prompt(ticker_context)
+
+    # Stage one. The cheap model reads the same prompt; NEUTRAL ends the
+    # ticker here, journalled, without the expensive call. Any failure of the
+    # screen itself falls through -- a broken screen must not silence the
+    # system -- and the screen's answer is recorded either way so its
+    # false-negative rate is measurable from the journal.
+    screen: dict | None = None
+    if SCREENING_ENABLED:
+        try:
+            first = screen_signal(system_prompt, user_prompt, SIGNAL_JSON_SCHEMA)
+            first_signal = parse_signal(first.text)
+            screen = {
+                "model": SCREENING_MODEL,
+                "bias": first_signal.bias.value,
+                "conviction": first_signal.conviction,
+                "usage": first.usage.as_dict() if first.usage else None,
+            }
+            if first_signal.bias is Bias.NEUTRAL:
+                log.info("%s: screened NEUTRAL by %s; full model not asked", ticker, SCREENING_MODEL)
+                journal.record(ticker_context, first_signal, usage=first.usage, fx=fx, screen=screen)
+                return TickerResult(ticker, SCREENED, gaps=gaps)
+        except (LLMError, json.JSONDecodeError, ValidationError) as exc:
+            log.warning("%s: screen failed (%s); asking the full model", ticker, exc)
+            screen = {"model": SCREENING_MODEL, "error": str(exc)}
+
     try:
-        completion = call_llm(
-            system_prompt_for(ticker_context.ticker),
-            build_user_prompt(ticker_context),
-            SIGNAL_JSON_SCHEMA,
-        )
+        completion = call_llm(system_prompt, user_prompt, SIGNAL_JSON_SCHEMA)
         usage = completion.usage
         signal = parse_signal(completion.text)
     except LLMError as exc:
         log.error("%s: %s", ticker, exc)
-        journal.record(ticker_context, fx=fx, error=str(exc))
+        journal.record(ticker_context, fx=fx, screen=screen, error=str(exc))
         return TickerResult(ticker, MODEL_FAILED, gaps=gaps)
     except (json.JSONDecodeError, ValidationError) as exc:
         log.error("%s: LLM output rejected before sending: %s", ticker, exc)
-        journal.record(ticker_context, fx=fx, error=f"invalid LLM output: {exc}")
+        journal.record(ticker_context, fx=fx, screen=screen, error=f"invalid LLM output: {exc}")
         return TickerResult(ticker, MODEL_FAILED, gaps=gaps)
     except Exception as exc:  # noqa: BLE001
         log.exception("%s: failed to produce a signal", ticker)
-        journal.record(ticker_context, fx=fx, error=f"unexpected {type(exc).__name__}: {exc}")
+        journal.record(ticker_context, fx=fx, screen=screen, error=f"unexpected {type(exc).__name__}: {exc}")
         return TickerResult(ticker, MODEL_FAILED, gaps=gaps)
 
     if signal.ticker != ticker:
         log.error("%s: LLM answered for %s instead; dropping", ticker, signal.ticker)
-        journal.record(ticker_context, signal, usage=usage, fx=fx, error=f"answered for {signal.ticker}")
+        journal.record(ticker_context, signal, usage=usage, fx=fx, screen=screen, error=f"answered for {signal.ticker}")
         return TickerResult(ticker, MODEL_FAILED, gaps=gaps)
 
     try:
         outcome = post_signal(signal, dispatcher)
     except httpx.HTTPError as exc:
         log.error("%s: webhook unreachable: %s", ticker, exc)
-        journal.record(ticker_context, signal, usage=usage, fx=fx, error=f"webhook unreachable: {exc}")
+        journal.record(ticker_context, signal, usage=usage, fx=fx, screen=screen, error=f"webhook unreachable: {exc}")
         return TickerResult(ticker, DISPATCH_FAILED, gaps=gaps)
     except BrokerError as exc:
         # Direct mode only: the engine could not be built or reached at all.
         # Same shape of failure as an unreachable webhook, so it is logged and
         # journalled the same way rather than killing the cycle.
         log.error("%s: engine unavailable: %s", ticker, exc)
-        journal.record(ticker_context, signal, usage=usage, fx=fx, error=f"engine unavailable: {exc}")
+        journal.record(ticker_context, signal, usage=usage, fx=fx, screen=screen, error=f"engine unavailable: {exc}")
         return TickerResult(ticker, DISPATCH_FAILED, gaps=gaps)
 
     log.info("%s -> %s %s", ticker, outcome.get("status"), outcome.get("reason", ""))
-    journal.record(ticker_context, signal, outcome=outcome, usage=usage, fx=fx)
+    journal.record(ticker_context, signal, outcome=outcome, usage=usage, fx=fx, screen=screen)
     return TickerResult(ticker, COMPLETED, status=outcome.get("status"), gaps=gaps)
 
 

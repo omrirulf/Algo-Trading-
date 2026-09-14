@@ -25,6 +25,24 @@ log = logging.getLogger(__name__)
 
 MODEL = "claude-opus-5"
 
+#: The two-stage funnel. A cheap model reads the same prompt first; only a
+#: ticker it does not call NEUTRAL goes on to MODEL. On a day when most of the
+#: watchlist has nothing happening, most of the expensive calls never happen.
+#:
+#: The risk is a false negative -- the screen saying NEUTRAL where MODEL would
+#: have taken a side. Every screen answer is journalled beside the final one,
+#: which makes the filter rate and the disagreement on escalated tickers a
+#: query over the journal; the false-negative rate itself needs a run with
+#: this off, or a replay of journalled contexts through both models, because
+#: a NEUTRAL screen is precisely the case where MODEL was not asked. A screen
+#: that *fails* (an API error) falls through to MODEL; a broken screen must
+#: never silence the system.
+#:
+#: Haiku 4.5 takes neither adaptive thinking nor ``effort`` -- it is asked
+#: with reasoning off, which is also what makes it the cheap stage.
+SCREENING_ENABLED = True
+SCREENING_MODEL = "claude-haiku-4-5"
+
 #: Server-side refusal fallback. If a safety classifier declines the request,
 #: the API re-runs it on another model inside the same call and marks the
 #: switch with a ``fallback`` content block. ``"default"`` routes by refusal
@@ -365,6 +383,7 @@ class AnthropicSignalProvider:
         json_schema: dict,
         model: Optional[str] = None,
         effort: Optional[str] = None,
+        reasoning: bool = True,
     ) -> Completion:
         """The model's JSON plus what the call actually cost.
 
@@ -372,29 +391,33 @@ class AnthropicSignalProvider:
         configuration against another on identical recorded context. The
         production path passes neither and gets the module constants, so
         changing what trades the account is still a visible diff.
+
+        ``reasoning=False`` omits adaptive thinking and the effort setting.
+        That is the request shape Haiku 4.5 accepts, and it is what makes the
+        screening stage cheap: the same prompt, answered without deliberation.
         """
+        output_config: dict[str, Any] = {
+            "format": {"type": "json_schema", "schema": build_output_schema(json_schema)},
+        }
+        kwargs: dict[str, Any] = dict(
+            model=model or MODEL,
+            max_tokens=MAX_TOKENS,
+            # Caches the last cacheable block -- here the system prompt,
+            # which is byte-identical across every ticker in a cycle. Whether
+            # it actually caches depends on the model's minimum cacheable
+            # prefix, so the journal records cache_read_input_tokens rather
+            # than assuming a saving: zero reads across a cycle means the
+            # prompt is under the threshold and this line is doing nothing.
+            cache_control={"type": "ephemeral"},
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_prompt}],
+            output_config=output_config,
+        )
+        if reasoning:
+            kwargs["thinking"] = {"type": "adaptive"}
+            output_config["effort"] = effort or EFFORT
         try:
-            response = self._create(
-                model=model or MODEL,
-                max_tokens=MAX_TOKENS,
-                # Caches the last cacheable block -- here the system prompt,
-                # which is byte-identical across every ticker in a cycle. Whether
-                # it actually caches depends on the model's minimum cacheable
-                # prefix, so the journal records cache_read_input_tokens rather
-                # than assuming a saving: zero reads across a cycle means the
-                # prompt is under the threshold and this line is doing nothing.
-                cache_control={"type": "ephemeral"},
-                system=system_prompt,
-                messages=[{"role": "user", "content": user_prompt}],
-                thinking={"type": "adaptive"},
-                output_config={
-                    "effort": effort or EFFORT,
-                    "format": {
-                        "type": "json_schema",
-                        "schema": build_output_schema(json_schema),
-                    },
-                },
-            )
+            response = self._create(**kwargs)
         except TypeError as exc:
             # Not an APIError: the SDK raises a bare TypeError, before
             # opening any connection, when it cannot resolve a credential
