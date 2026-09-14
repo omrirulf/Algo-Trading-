@@ -174,11 +174,12 @@ jobs:
             echo "::error::LLMSignal must not carry an instrument-kind field"
             exit 1
           fi
-          hits=$(grep -rn 'MAX_ETF_POSITION_PCT' --include='*.py' app orchestrator config \
+          hits=$(grep -rnE 'MAX_(BROAD_FUND|COMMODITY_FUND)_PCT' --include='*.py' \
+                   app orchestrator config \
                  | grep -vE '^(config/settings\.py|app/risk_engine\.py):' || true)
           if [ -n "$hits" ]; then
             echo "$hits"
-            echo "::error::the ETF cap may only be read by risk_engine.max_position_pct_for"
+            echo "::error::a fund cap may only be read by risk_engine.max_position_pct_for"
             exit 1
           fi
           # Stdlib only: this job installs no dependencies, so a check that
@@ -213,24 +214,45 @@ jobs:
           print("OK: no signal field can declare an instrument kind")
           PY
 
-      - name: Total exposure is bounded by the gross cap
-        # The per-ticker caps do not bound the portfolio: ten positions at the
-        # ETF cap would be 200% of equity. The gross check is the only one
-        # that sees every holding at once, so it is what actually guarantees
-        # the cash floor -- and it must run on the execution path, not merely
-        # exist in risk_engine.
+      - name: Portfolio exposure is bounded on three axes
+        # The per-ticker caps do not bound the portfolio, and the gross cap
+        # alone does not bound *concentration*: five technology names were
+        # five accepted positions and one bet, with every per-ticker cap
+        # satisfied. Three checks span every holding -- gross, exposure group,
+        # and sleeve budget -- and all three must run on the execution path,
+        # not merely exist in risk_engine.
         run: |
-          for symbol in gross_exposure_headroom MAX_GROSS_EXPOSURE_PCT; do
-            grep -q "$symbol" app/execution_engine.py || {
-              echo "::error::execution engine does not enforce $symbol"
-              exit 1
-            }
-          done
+          grep -q 'budget_ceiling_for' app/execution_engine.py || {
+            echo "::error::execution engine does not call budget_ceiling_for"
+            exit 1
+          }
+          # Follow the chain rather than grepping for a constant: the three
+          # limits are applied through budget_ceiling_for, so checking that
+          # execution_engine mentions MAX_GROSS_EXPOSURE_PCT would only test
+          # where the symbol happens to live today.
+          python3 - <<'PY'
+          import ast, sys
+          src = open("app/risk_engine.py").read()
+          tree = ast.parse(src)
+          fn = next((n for n in tree.body
+                     if isinstance(n, ast.FunctionDef) and n.name == "budget_ceiling_for"), None)
+          if fn is None:
+              sys.exit("::error::risk_engine.budget_ceiling_for is missing")
+          called = {n.func.id for n in ast.walk(fn)
+                    if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)}
+          for required in ("gross_exposure_headroom", "exposure_group_headroom",
+                           "sleeve_headroom"):
+              if required not in called:
+                  sys.exit(f"::error::budget_ceiling_for does not apply {required}")
+          print("OK: all three exposure limits reach the execution path")
+          PY
           # Stdlib only, and reading the literals rather than importing:
           # config/settings.py imports pydantic, which this job does not have.
           python3 - <<'PY'
           import ast, sys
-          WANTED = ("MAX_POSITION_PCT", "MAX_ETF_POSITION_PCT", "MAX_GROSS_EXPOSURE_PCT")
+          WANTED = ("MAX_POSITION_PCT", "MAX_BROAD_FUND_PCT", "MAX_COMMODITY_FUND_PCT",
+                    "MAX_EXPOSURE_GROUP_PCT", "MAX_SINGLE_NAME_SLEEVE_PCT",
+                    "MAX_FUND_SLEEVE_PCT", "MAX_GROSS_EXPOSURE_PCT")
           tree = ast.parse(open("config/settings.py").read())
           caps = {n.target.id: n.value.value for n in tree.body
                   if isinstance(n, ast.AnnAssign) and isinstance(n.target, ast.Name)
@@ -238,20 +260,34 @@ jobs:
           missing = [name for name in WANTED if name not in caps]
           if missing:
               sys.exit(f"::error::cap constants not found as literals: {', '.join(missing)}")
-          single, etf, gross = (caps[n] for n in WANTED)
+          single, broad, commodity, group, name_sleeve, fund_sleeve, gross = (
+              caps[n] for n in WANTED)
           if not 0 < gross < 1:
               sys.exit(f"::error::gross cap {gross} must leave a cash floor")
-          if etf > gross or single > gross:
-              sys.exit("::error::one position could consume the whole portfolio cap")
-          if etf <= single:
-              sys.exit("::error::the ETF cap must exceed the single-name cap or it is pointless")
-          # Risk per trade scales as cap/volatility. A fund is typically
-          # 1.5-2x quieter than a single name, so a cap ratio far above that
-          # is leverage rather than diversification -- the measurement lives
-          # in backtest/compare_sleeves.py.
-          if etf / single > 2.5:
-              sys.exit(f"::error::ETF cap is {etf / single:g}x the single-name cap; not justified by volatility")
-          print(f"OK: {single:.0%} / {etf:.0%} per position, {gross:.0%} gross")
+          if max(single, broad, commodity) > group:
+              sys.exit("::error::one position could consume a whole exposure group")
+          if group > gross:
+              sys.exit("::error::a single group could consume the whole portfolio")
+          # A fund tracking one commodity is not diversified: coffee is one
+          # thing. Sizing it like a broad basket would be picking a cap by
+          # label rather than by risk.
+          if commodity >= broad:
+              sys.exit("::error::a single-commodity fund must be capped below a broad fund")
+          if commodity >= single:
+              sys.exit("::error::a single-commodity fund must be capped below a single name")
+          # Risk per trade scales as cap/volatility. A broad fund is typically
+          # 1.5-2x quieter than a single name, so a ratio far above that is
+          # leverage rather than diversification.
+          if broad / single > 2.5:
+              sys.exit(f"::error::broad-fund cap is {broad / single:g}x the single-name cap")
+          # Funds are the core holding; names are the satellite.
+          if fund_sleeve <= name_sleeve:
+              sys.exit("::error::the fund sleeve must be the larger budget")
+          if abs((name_sleeve + fund_sleeve) - gross) > 1e-9:
+              sys.exit("::error::sleeve budgets must sum to the gross cap")
+          print(f"OK: {single:.0%}/{broad:.0%}/{commodity:.0%} per position, "
+                f"{group:.0%} per group, {name_sleeve:.0%}+{fund_sleeve:.0%} sleeves, "
+                f"{gross:.0%} gross")
           PY
 
       - name: Market context carries no credentials

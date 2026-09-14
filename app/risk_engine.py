@@ -7,9 +7,10 @@ can be proven with unit tests (see ``tests/test_risk_engine.py``).
 from __future__ import annotations
 
 import math
+from typing import Any, Sequence
 
 from config import settings as cfg
-from config.instruments import InstrumentKind, kind_for
+from config.instruments import InstrumentKind, group_for, kind_for
 
 
 class RiskViolation(ValueError):
@@ -35,12 +36,90 @@ def max_position_pct_for(ticker: str) -> float:
 
     Resolved from ``config.instruments`` and nothing else. The signal has no
     say: ``LLMSignal`` carries no instrument field, and if it did, a model
-    could quadruple its own position cap by claiming a name was a fund.
-    An unrecognised ticker gets the tighter single-name cap.
+    could enlarge its own position cap by claiming a name was a fund. An
+    unrecognised ticker gets the single-name cap, which is never the largest
+    of the three.
     """
-    if kind_for(ticker) is InstrumentKind.ETF:
-        return cfg.MAX_ETF_POSITION_PCT
+    kind = kind_for(ticker)
+    if kind is InstrumentKind.BROAD_FUND:
+        return cfg.MAX_BROAD_FUND_PCT
+    if kind is InstrumentKind.COMMODITY_FUND:
+        return cfg.MAX_COMMODITY_FUND_PCT
     return cfg.MAX_POSITION_PCT
+
+
+def _headroom(equity: float, used: float, cap_pct: float, label: str) -> float:
+    if equity <= 0:
+        raise RiskViolation(f"equity must be positive, got {equity}")
+    if used < 0:
+        raise RiskViolation(f"{label} exposure cannot be negative, got {used}")
+    if not 0 < cap_pct <= 1:
+        raise RiskViolation(f"{label} cap must be in (0, 1], got {cap_pct}")
+    return max(0.0, equity * cap_pct - used)
+
+
+def exposure_group_headroom(
+    equity: float,
+    ticker: str,
+    positions: Sequence[Any],
+    max_group_pct: float = cfg.MAX_EXPOSURE_GROUP_PCT,
+) -> float:
+    """Dollars still deployable into this ticker's exposure group.
+
+    The check that makes a diversified watchlist produce a diversified book.
+    Per-ticker caps never noticed five technology names opened on one morning;
+    this does, and it spans both sleeves, so an oil driller and two energy
+    funds count against the same group.
+
+    ``positions`` is anything with ``.ticker`` and ``.market_value``.
+    """
+    group = group_for(ticker)
+    used = sum(
+        p.market_value for p in positions if group_for(p.ticker) == group
+    )
+    return _headroom(equity, used, max_group_pct, f"group {group!r}")
+
+
+def sleeve_headroom(
+    equity: float,
+    ticker: str,
+    positions: Sequence[Any],
+    single_name_pct: float = cfg.MAX_SINGLE_NAME_SLEEVE_PCT,
+    fund_pct: float = cfg.MAX_FUND_SLEEVE_PCT,
+) -> float:
+    """Dollars still deployable into this ticker's sleeve.
+
+    Funds are the core and single names the satellite. That ordering is the
+    point of these budgets rather than a side effect: a broad fund is
+    diversified by construction, and a stock-picking edge is unproven here.
+    """
+    wants_equity = kind_for(ticker) is InstrumentKind.EQUITY
+    used = sum(
+        p.market_value
+        for p in positions
+        if (kind_for(p.ticker) is InstrumentKind.EQUITY) == wants_equity
+    )
+    cap = single_name_pct if wants_equity else fund_pct
+    return _headroom(equity, used, cap, "single name" if wants_equity else "fund")
+
+
+def budget_ceiling_for(
+    equity: float, ticker: str, positions: Sequence[Any]
+) -> tuple[float, str]:
+    """The tightest of the three portfolio limits, and which one it was.
+
+    Returned together so a rejection can name the limit that actually bound,
+    rather than reporting the gross cap when it was really the energy group.
+    """
+    candidates = (
+        ("gross exposure", gross_exposure_headroom(
+            equity, sum(p.market_value for p in positions))),
+        (f"{group_for(ticker)!r} group", exposure_group_headroom(
+            equity, ticker, positions)),
+        ("sleeve budget", sleeve_headroom(equity, ticker, positions)),
+    )
+    label, room = min(candidates, key=lambda pair: pair[1])
+    return room, label
 
 
 def check_gross_exposure_limit(

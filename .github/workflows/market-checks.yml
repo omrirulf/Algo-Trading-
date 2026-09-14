@@ -1,4 +1,4 @@
-name: compare sleeves
+name: market checks
 
 # Answers the open question behind the two-sleeve watchlist: do index funds
 # and single names actually behave differently under the risk engine, and is
@@ -43,6 +43,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Verify every ticker resolves
+        # The watchlist was written without market access, and ETNs get called
+        # while small funds delist. A symbol that stopped resolving would fail
+        # its ticker every cycle as a silent "no bars" gap.
+        continue-on-error: true
+        run: |
+          python backtest/verify_tickers.py | tee tickers.txt
+
       - name: Compare the sleeves
         id: compare
         run: |
@@ -66,17 +74,23 @@ jobs:
         if: always()
         run: |
           {
+            echo '## Ticker verification'
+            echo
+            echo '```'
+            cat tickers.txt 2>/dev/null || echo "(did not run)"
+            echo '```'
             echo '## Sleeve comparison'
             echo
             echo '```'
-            cat comparison.txt
+            cat comparison.txt 2>/dev/null || echo "(did not run)"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: sleeve-comparison
+          name: market-checks
           path: |
+            tickers.txt
             comparison.txt
             comparison.json

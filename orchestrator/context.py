@@ -27,7 +27,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from config.instruments import is_index_fund
+from config.instruments import is_fund
 from orchestrator import analysts, fundamentals, insiders, technicals
 from orchestrator.technicals import TechnicalSnapshot
 
@@ -232,7 +232,7 @@ class TickerContext:
         }
 
     def as_prompt(self) -> str:
-        fund = is_index_fund(self.ticker)
+        fund = is_fund(self.ticker)
         sections = [f"TICKER: {self.ticker}", self._news_section()]
         sections.extend(
             self._section(title, getattr(self, attribute))
@@ -272,7 +272,7 @@ def gather(
     # A fund has no analyst coverage and no Form 4 filings. Skipping the two
     # builds keeps their failures from being recorded as "gaps", which would
     # tell the model to score as 0.0 something that was never on offer.
-    company = not is_index_fund(ticker)
+    company = not is_fund(ticker)
 
     fundamental_snapshot = None
     analyst_snapshot = None

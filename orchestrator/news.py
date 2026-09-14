@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Any, Optional
 from urllib.parse import urlencode
 
-from config.instruments import is_index_fund
+from config.instruments import is_fund
 
 import httpx
 
@@ -85,7 +85,7 @@ def build_news_search_url(ticker: str) -> str:
     returns the fund and macro commentary, which is the only frame an index
     signal can honestly be built on.
     """
-    qualifier = "ETF" if is_index_fund(ticker) else "stock"
+    qualifier = "ETF" if is_fund(ticker) else "stock"
     params = {
         "q": f"{ticker} {qualifier}",
         "tbm": "nws",

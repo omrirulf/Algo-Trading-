@@ -1,193 +1,207 @@
 ---
 title: "Watchlist"
-description: "Two sleeves, two position caps, and the open question between them"
+description: "Three instrument kinds, three position caps, and three portfolio limits"
 ---
 
-The watchlist lives in `config/instruments.py`, not in an environment variable,
-so a change to what gets traded shows up in a diff — the same reasoning that
-keeps the guardrail thresholds in code.
+What gets traded lives in `config/instruments.py`, version-controlled rather
+than in an environment variable, so a change shows up in a diff — the same
+reasoning that keeps the guardrail thresholds in code.
 
-It is split into two sleeves that are **different bets and get different
-position caps**.
+**Funds are the core holding and single names the satellite.** That ordering
+is deliberate: a broad fund is diversified by construction, while a
+stock-picking edge is unproven here, and the sleeve budgets decline to assume
+one.
 
-```python
-from config.instruments import SINGLE_NAMES, INDEX_SLEEVE, kind_for
-from config.watchlist import DEFAULT_WATCHLIST
-```
+## Sleeve 1 — single names (16)
 
-## Sleeve 1 — single names (22)
+The only holdings where analyst coverage and insider filings exist, so the
+only ones where all five prompt dimensions have content.
 
-Where idiosyncratic information exists. A company has earnings, analyst targets
-and insider filings, so all five prompt dimensions have something to work with.
-
-| Sector | Count | Tickers |
-|---|---|---|
-| Technology | 4 | MSFT, NVDA, TSM, ASML |
-| Communication | 1 | GOOGL |
-| Financials | 3 | JPM, HDB, RY |
-| Health care | 3 | LLY, NVO, TEVA |
-| Industrials | 3 | CAT, CNI, ESLT |
-| Consumer discretionary | 2 | TM, MELI |
-| Consumer staples | 2 | PG, UL |
-| Energy | 2 | XOM, SHEL |
-| Materials | 2 | BHP, NEM |
-
-## Sleeve 2 — index funds (10)
-
-What single names cannot reach affordably: whole cap tiers, whole regions, and
-asset classes that are not equities at all.
-
-| Role | Count | Tickers |
-|---|---|---|
-| Broad equity | 2 | RSP, IWM |
-| Regions | 4 | VGK, EWJ, VWO, EIS |
-| Real assets | 3 | VNQ, GLD, DBC |
-| Duration | 1 | TLT |
-
-## Why both, instead of picking one
-
-Diversification and edge pull in opposite directions here, and neither argument
-settles it:
-
-- **Breadth argues for indices.** One call on `IWM` prices two thousand small
-  caps. Reaching that breadth through single names would cost a hundred times
-  as much and drown in thin news coverage. Small caps, REITs, duration and
-  actual commodities have no affordable single-name route at all.
-- **Edge argues for single names.** Only a specific company has the analyst
-  coverage and insider filings three of the five dimensions are built on. A
-  sentiment read on a broad index is *macro timing* — the hardest call in
-  markets, and the one where a language model reading a day of headlines has
-  least obvious advantage.
+| Sector | Tickers |
+|---|---|
+| Technology | MSFT, NVDA, ASML |
+| Communication | GOOGL |
+| Financials | JPM, RY, HDB |
+| Health care | LLY, NVO, TEVA |
+| Industrials | CAT, ESLT |
+| Consumer discretionary | TM, MELI |
+| Consumer staples | PG |
+| Energy | XOM |
 
 <Note>
-  So both ship, and `backtest/compare_sleeves.py` decides between them from
-  real bars rather than from the paragraph above. Run it from the **compare
-  sleeves** workflow in the Actions tab — it needs no credentials.
+  No materials sector any more. NEM and BHP were standing in for gold and
+  copper, and a miner is a company bet with a commodity attached — company
+  risk, management risk, and a hedging book on top. The metals are now held
+  directly.
 </Note>
 
-### What replaced the old list
+## Sleeve 2a — broad funds (10)
 
-The previous 30 names were **37% technology**, and called their ADRs
-geographic diversification. They were not: ASML, TSM, SAP and INFY are global
-technology cyclicals that fall with US technology in a drawdown, whatever
-exchange they list on. A mega-cap multinational's listing venue tells you
-almost nothing about what it correlates with.
+| Role | Tickers |
+|---|---|
+| US broad equity | RSP, IWM |
+| International equity | VGK, EWJ, VWO, EIS |
+| Real estate | VNQ |
+| Duration | TLT |
+| Broad commodities | DBC, DBA |
 
-Technology is now 18% of the single-name sleeve, no sector exceeds 25%, and the
-cap tiers and asset classes that were missing entirely — small caps, REITs,
-duration, commodities themselves rather than the companies that dig them up —
-arrive through the index sleeve.
+`RSP` rather than `SPY`: a cap-weighted US index is a concentrated technology
+bet wearing a diversified label. Equal weight is the diversified version of
+the same market.
 
-## Two caps, and why the second one is not just bigger
+## Sleeve 2b — the goods themselves (10)
 
-| Instrument | Cap per position | Constant |
-|---|---|---|
-| Single name | 5% | `MAX_POSITION_PCT` |
-| Index fund | 12% | `MAX_ETF_POSITION_PCT` |
-| **Everything, combined** | **60%** | `MAX_GROSS_EXPOSURE_PCT` |
+| Role | Tickers |
+|---|---|
+| Precious metals | GLD, SLV |
+| Industrial metals | CPER |
+| Energy commodities | USO, UNG |
+| Agriculture | CORN, WEAT, SOYB, CANE, JO |
 
-A broad fund is already hundreds of positions, so holding one at the
-single-name cap buys 5% of market exposure and leaves the account in
-cash — the diversification argument for indices and a 5% cap cancel each
-other out.
-
-But a larger cap is not automatically a safer one. **Risk per trade scales as
-`cap / volatility`**, so a cap four times larger on an instrument only twice as
-quiet carries roughly twice the planned risk. A first pass at 20% measured
-~1.9× the per-trade risk of a single name — bigger, not safer. 12% keeps it
-near parity while still buying enough exposure to matter.
+Alpaca trades `us_equity`, `us_option` and `crypto` only, so futures are out
+of reach and physical metal is not something a brokerage account can hold.
+These US-listed funds are the only route to the commodities rather than the
+companies that mine and drill them.
 
 <Warning>
-  **`MAX_GROSS_EXPOSURE_PCT` is the one guardrail that got looser.** It used to
-  be implicit at 50% (`MAX_OPEN_POSITIONS × MAX_POSITION_PCT`) and is now an
-  explicit 60%, leaving a 40% cash floor. Without it the per-ticker caps
-  multiply out to leverage: ten positions at the ETF cap would be twice the
-  account.
+  **A single-commodity fund is not a diversified fund, and is capped below
+  even a single stock.** Three risks pile on that no equity carries:
+
+  1. **Roll decay.** A futures-backed fund rolls contracts monthly. In
+     contango it sells cheap and buys dear every roll, so it can bleed value
+     while spot is flat. `USO` is the notorious case. These are not
+     buy-and-hold instruments.
+  2. **Issuer credit risk.** `JO` is an exchange-traded **note** — unsecured
+     debt of its issuer, not a fund holding anything. If the issuer fails the
+     note can go to zero with coffee trading normally. ETNs can also be called
+     by the issuer.
+  3. **Thinness.** Several trade a small fraction of a broad fund's volume, so
+     the spread is a real cost and a stop can fill badly.
 </Warning>
+
+### Rice is not reachable
+
+There is no US-listed fund tracking rice. Rough-rice futures exist, but no ETF
+or ETN tracks them, and the broad agriculture baskets (`DBA`) hold grains,
+softs and livestock without it. Coffee is reachable only through `JO`, with
+the ETN caveat above. This is a limit of what trades on a US exchange, not a
+choice.
+
+<Note>
+  These tickers were selected from knowledge and **have not been verified
+  against live market data** — the sandbox that wrote them cannot reach Yahoo.
+  Run the **verify tickers** workflow in the Actions tab before the first live
+  cycle; it resolves every symbol and reports anything that does not exist or
+  trades too thin.
+</Note>
+
+## Three kinds, three caps
+
+| Kind | Cap | Why |
+|---|---|---|
+| Single name | 5% | One company, idiosyncratic: it can gap on a fraud or a failed trial. |
+| Broad fund | 12% | Hundreds of positions. Its tail is truncated in a way a company's is not. |
+| Single-commodity fund | 4% | "Fund" does no diversification work — coffee is one thing — plus roll decay, issuer risk and thin volume. |
+
+The ordering is the point: **the tightest cap belongs to the commodity funds,
+not the stocks.** Sizing a coffee ETN like `RSP` because both are technically
+ETFs would be picking a cap by label rather than by risk.
+
+Risk per trade scales roughly as `cap / volatility`. A first pass gave broad
+funds 20% and measured ~1.9× the per-trade risk of a single name — bigger, not
+safer. 12% keeps it near parity.
+`backtest/compare_sleeves.py` is what measures this.
+
+## Three portfolio limits
+
+Per-ticker caps bound one position. They say nothing about the shape of the
+book, and that gap was real: nothing stopped the engine opening MSFT, NVDA,
+TSM, ASML and GOOGL on one morning — five positions, one bet, every
+per-ticker cap satisfied.
+
+| Limit | Value | What it stops |
+|---|---|---|
+| Exposure group | 25% | A one-bet book. Spans both sleeves, so XOM + `USO` + `UNG` is one energy bet made three times. |
+| Single-name sleeve | 15% | Stock picking growing past its budget. |
+| Fund sleeve | 45% | — the core allocation. |
+| Gross exposure | 60% | Leverage. Leaves a 40% cash floor at all times. |
+
+All three run **before any market-data fetch**, so a full book costs no quote,
+and the tightest of them is passed into sizing as a ceiling — a partly-full
+book sizes the next position *down* rather than placing it and rejecting it
+after. A rejection names the limit that actually bound, so "no room under the
+`'Energy'` group limit" is never reported as a gross-exposure problem.
+
+The sleeve budgets sum to the gross cap, so gross binds only when a sleeve is
+under-used rather than being a fourth independent limit.
+
+### The shape this produces
+
+A greedily-filled book, 100k account:
+
+```
+RSP 12%, IWM 12%, VGK 12%, EWJ 9%, MSFT 5%, LLY 5%, JPM 5%
+funds 45% | names 15% | deployed 60% | cash 40%
+funds are 75% of the portfolio
+```
 
 ## The instrument kind is a privilege boundary
 
-The ETF cap is larger than the single-name cap, which makes the classification
-something a model must never control. If a signal could assert *"this is a
-fund"*, it could enlarge its own position by claiming one.
+The caps differ by kind, which makes the classification something a model must
+never control. If a signal could assert *"this is a broad fund"*, it could
+enlarge its own position by claiming one.
 
-So it cannot:
-
-- The kind is resolved from `config/instruments.py`, keyed on the ticker.
-- `LLMSignal` has no field that could carry one, and `extra="forbid"` rejects
-  an invented one as a validation error before any execution logic runs.
-- An unrecognised ticker resolves to `EQUITY` — the **tighter** cap — so a
-  misspelling can only ever size down.
-- Two CI invariants enforce it: the schema stays closed to anything
-  kind-shaped, and `MAX_ETF_POSITION_PCT` is readable only where it is defined
-  and applied.
-
-## What this cannot reach
-
-Alpaca trades `us_equity`, `us_option` and `crypto` only — confirmed from the
-SDK's own `AssetClass` enum. There is **no path** to the Frankfurt, Paris,
-London or Tel Aviv order books, and none to futures. Everything above is
-US-listed, which is why regional exposure comes through US-listed funds and
-ADRs rather than local shares.
-
-<Note>
-  `EIS` (Israel) is the thinnest holding here by volume. Wide spreads are a
-  real execution cost on a fund that size; `MIN_ATR_PCT_OF_PRICE` guards the
-  degenerate case but not the ordinary one.
-</Note>
+- The kind resolves from `config/instruments.py`, keyed on the ticker.
+- `LLMSignal` has no field that could carry one, and `extra="forbid"` turns an
+  invented one into a validation error before any execution logic runs.
+- An unrecognised ticker resolves to `EQUITY` — never the largest cap — so a
+  misspelling can only size down. It also lands in its own exposure group, so
+  it cannot consume another group's room.
+- CI invariants enforce the schema stays closed, the fund caps are readable
+  only where defined and applied, and all three portfolio limits reach the
+  execution path.
 
 ## What the funds give up
 
-Two of the five dimensions are **structurally absent** for a fund, not missing:
-nobody publishes a price target on an index, and a fund has no insiders filing
-Form 4. That distinction is carried through the whole pipeline rather than
-papered over:
+Two of the five dimensions are **structurally absent** for any fund: nobody
+publishes a price target on an index or on copper, and neither has insiders
+filing Form 4. That is carried through rather than papered over —
+`orchestrator/context.py` omits those sections instead of rendering them
+"unavailable this cycle", and a separate `ETF_SYSTEM_PROMPT` asks a macro
+question and sets a higher bar for a non-neutral call.
 
-- `orchestrator/context.py` omits those sections entirely instead of rendering
-  them as "unavailable this cycle" — a section that was never there is not a
-  data gap, and should not invite the model to wonder what it missed.
-- A separate `ETF_SYSTEM_PROMPT` asks a macro question instead of a company
-  one, states that the two dimensions do not exist, and **sets a higher bar for
-  a non-neutral call** because macro timing is harder than stock selection.
-- The news query changes too: `"IWM ETF"` rather than `"IWM stock"`.
+<Warning>
+  **That higher bar interacts with the fund-heavy budget, and the interaction
+  is untested.** The fund prompt defaults to NEUTRAL because a directional
+  call on a broad index is macro timing — the hardest call in markets. With
+  funds holding 75% of the
+  budget, a prompt that rarely takes a side may leave the account mostly in
+  cash. Whether that is prudence or paralysis is a question for the journal,
+  not for this page.
+</Warning>
 
 ## Cost
 
 | Watchlist size | Rough Claude spend / month |
 |---|---|
-| 10 | ~$69 |
-| 20 | ~$138 |
-| **32 (default)** | **~$221** |
+| 12 | ~$83 |
+| 24 | ~$166 |
+| **36 (default)** | **~$249** |
 
 <Warning>
-  **These are estimates, and the assumed output length is the whole uncertainty
-  in them.** Output dominates the bill, so guessing it wrong moves the total
-  proportionally. Once you have run real cycles the journal carries measured
-  `usage` blocks — use those instead, and see [Cost](/cost).
-</Warning>
-
-The index sleeve is the cost-efficient half: one call on `VWO` prices an entire
-emerging-market basket, where the same breadth in single names would be dozens
-of calls. Trimming the list is one lever, but **effort is cheaper to turn than
-length** — see [Cost](/cost).
-
-<Warning>
-  **A longer list does not mean more exposure.** `MAX_OPEN_POSITIONS` caps
-  holdings at 10, the per-ticker caps bound each one, and
-  `MAX_GROSS_EXPOSURE_PCT` bounds all of them together. Breadth buys the model
-  more to choose between, not a larger book — see [Guardrails](/guardrails).
+  Estimates, and the assumed output length is the whole uncertainty in them.
+  Once real cycles exist the journal carries measured `usage` blocks — use
+  those instead, and see [Cost](/cost).
 </Warning>
 
 ## Overriding it
 
-`WATCHLIST` still works and takes precedence, for a quick experiment:
-
 ```bash
-WATCHLIST=IWM,GLD,MSFT python -m orchestrator.heartbeat --once
+WATCHLIST=GLD,RSP,MSFT python -m orchestrator.heartbeat --once
 ```
 
 <Note>
   An override changes *what is evaluated*, never how it is sized. A ticker
   reached this way is still classified by `config/instruments.py`, so anything
-  it does not recognise gets the tighter single-name cap.
+  unrecognised gets the single-name cap and its own exposure group.
 </Note>

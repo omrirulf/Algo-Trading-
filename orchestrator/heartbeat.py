@@ -36,7 +36,7 @@ from pydantic import ValidationError  # noqa: E402
 
 from app.schemas import LLMSignal  # noqa: E402
 from config import settings as cfg  # noqa: E402
-from config.instruments import is_index_fund  # noqa: E402
+from config.instruments import is_fund  # noqa: E402
 from config.settings import get_settings  # noqa: E402
 from orchestrator import context, journal  # noqa: E402
 from orchestrator.context import TickerContext  # noqa: E402
@@ -187,7 +187,7 @@ def system_prompt_for(ticker: str) -> str:
     comes from ``config.instruments`` -- the same source the position cap uses,
     and never from anything the model said.
     """
-    return ETF_SYSTEM_PROMPT if is_index_fund(ticker) else SYSTEM_PROMPT
+    return ETF_SYSTEM_PROMPT if is_fund(ticker) else SYSTEM_PROMPT
 
 
 # --------------------------------------------------------------------------- #
