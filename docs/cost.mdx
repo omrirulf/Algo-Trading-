@@ -30,9 +30,38 @@ That ordering matters: **effort is a bigger lever than model tier.**
 |---|---|---|
 | 1 | `EFFORT` | Directly moves the 84% |
 | 2 | Model tier | Multiplies both halves |
-| 3 | Watchlist length | Linear in calls |
-| 4 | `HEARTBEAT_INTERVAL_MINUTES` | Linear in calls |
-| 5 | Prompt caching | Only touches the 16% |
+| 3 | The funnel (`SCREENING_ENABLED`) | Removes whole calls: the share of the watchlist the screen calls NEUTRAL |
+| 4 | Watchlist length | Linear in calls |
+| 5 | `HEARTBEAT_INTERVAL_MINUTES` | Linear in calls |
+| 6 | Prompt caching | Only touches the 16% |
+
+## The funnel
+
+Every ticker is read first by `claude-haiku-4-5` with reasoning off, on the
+identical prompt. A NEUTRAL there ends the ticker; anything else goes on to the
+full model. The arithmetic, per ticker, at the ~1,400-token prompt:
+
+| Stage | Model | Reasoning | Roughly |
+|---|---|---|---|
+| Screen | `claude-haiku-4-5` | off | $0.002 |
+| Decide | `claude-opus-5` | `low` | $0.022 |
+
+So a screened ticker costs about a tenth of a decided one, and the cycle's
+bill is `35 × $0.002 + (escalated) × $0.022`. On a day the screen escalates
+a third of the list, that is roughly $0.33 against $0.77 before; on a quiet
+day, less. The saving is bounded by how much of the watchlist has nothing
+happening — which, across sixteen single names, ten broad funds and nine
+commodity funds, is usually most of it.
+
+<Warning>
+  The screen cannot make the system trade more, only less. What it *can* do is
+  drop a ticker the full model would have taken a side on, and the live
+  journal cannot see that case by construction — the full model was not asked.
+  Measure the false-negative rate from a run with `SCREENING_ENABLED = False`
+  before trusting the saving; see
+  [the journal](/orchestrator/journal#one-json-object-per-ticker-per-cycle)
+  for what is and is not recorded.
+</Warning>
 
 <Note>
   The system prompt is byte-identical across every ticker in a cycle, so it is

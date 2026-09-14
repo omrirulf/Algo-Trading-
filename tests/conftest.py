@@ -75,6 +75,12 @@ def _offline_market_context(monkeypatch):
     monkeypatch.setattr(fx_module, "fetch_rate", lambda *a, **k: offline_rate)
     monkeypatch.setattr(hb, "fetch_fx_rate", lambda *a, **k: offline_rate)
 
+    # The screening stage is a third network caller, reached before call_llm.
+    # Off by default so every existing test still exercises the one model
+    # call it was written against; tests/test_funnel.py turns it on and
+    # fakes the screen explicitly.
+    monkeypatch.setattr(hb, "SCREENING_ENABLED", False)
+
 
 @pytest.fixture(autouse=True)
 def _no_ambient_credentials(monkeypatch):

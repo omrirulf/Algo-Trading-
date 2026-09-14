@@ -36,9 +36,20 @@ to settle: **are the signals any good?**
     "key_factors": ["Guidance raised 20%", "Price above the 200-day average"]
   },
   "outcome": { "http_status": 200, "status": "ACCEPTED", "quantity": 50, "order_id": "..." },
+  "screen": { "model": "claude-haiku-4-5", "bias": "BULLISH", "conviction": 0.55, "usage": { "...": "..." } },
   "error": null
 }
 ```
+
+`screen` is what the cheap first stage of the
+[funnel](/orchestrator/llm#two-stages-a-cheap-screen-then-the-full-model) said
+about the same prompt, kept beside the final signal on purpose: the share of
+lines where `screen.bias` is `NEUTRAL` but `signal.bias` is not would be the
+screen's false-negative rate, except that a NEUTRAL screen ends the ticker —
+so on those lines `signal` *is* the screen's answer, `outcome` is `null`, and
+the disagreement has to be estimated from a sample run with screening off. A
+screen that failed carries `{"model": ..., "error": ...}` instead; `null`
+means screening was disabled.
 
 <Note>
   `ts_utc` is an explicit ISO-8601 UTC timestamp, separate from the formatter's

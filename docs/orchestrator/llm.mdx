@@ -108,6 +108,43 @@ response = self._client.beta.messages.create(
 Model and effort are module constants, not `.env` settings — see
 [Configuration](/configuration) for why.
 
+## Two stages: a cheap screen, then the full model
+
+The request above is the *second* call a ticker can get. Before it, the same
+system prompt, user prompt and output schema go to `SCREENING_MODEL`
+(`claude-haiku-4-5`) with reasoning off — no `thinking`, no `effort`, just the
+structured-output format. Its answer decides one thing:
+
+| Screen said | What happens |
+|---|---|
+| `NEUTRAL` | The ticker ends here. The screen's signal is journalled and the cycle reports the ticker as **screened**. The full model is never asked. |
+| `BULLISH` / `BEARISH` | The full model is asked exactly as before. Its answer, not the screen's, is what reaches the engine. |
+| Anything else — API error, non-JSON, a field outside the schema | The screen is recorded as failed and the full model is asked exactly as before. |
+
+Three properties hold, and the tests in `tests/test_funnel.py` pin each one:
+
+- **The screen can only ever save a call.** It never dispatches a signal
+  itself, and it never changes what the full model is asked — both stages see
+  byte-identical prompts.
+- **A broken screen is invisible to the strategy.** Any failure of the first
+  stage falls through to the second, so the worst case is the cost profile of
+  the single-stage system, never a silent cycle.
+- **What the screen did is recorded, not assumed.** Every screen answer is
+  journalled in a `screen` block beside the final signal. Two things are then
+  a query over the journal: how much of the watchlist the screen filters, and
+  on the tickers it escalated, how often the full model disagreed with its
+  direction. The one number the live journal *cannot* give is the
+  false-negative rate — how often the screen said NEUTRAL where the full model
+  would have taken a side — because a NEUTRAL screen is exactly the case where
+  the full model was not asked. That has to come from a calibration run with
+  `SCREENING_ENABLED = False`, or from replaying journalled contexts through
+  both models; the same constant turns the stage off if the number is too
+  high.
+
+The saving is proportional to how much of the watchlist has nothing happening
+on a given day, which for a 35-name list across three sleeves is most of it.
+See [Cost](/cost#the-funnel).
+
 ## The prompt weights the five inputs differently
 
 `SYSTEM_PROMPT` lives in `orchestrator/heartbeat.py` and tells the model what
