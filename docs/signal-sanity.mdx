@@ -1,0 +1,75 @@
+---
+title: "Signal sanity"
+description: "Two tests that need no market outcomes — and could make the live run unnecessary"
+---
+
+The live experiment's bottleneck is calendar time: a signal needs 5–20 trading
+days before it can be scored, and most signals are NEUTRAL by design. These two
+questions need **no** market outcomes, cost a few dollars, and bound what any
+later scoring could possibly find.
+
+```bash
+python replay/signal_sanity.py               # ~3 calls per ticker, half price via Batches
+python replay/signal_sanity.py --tickers 12  # a cheaper sample
+python replay/signal_sanity.py --resume BATCH_ID
+```
+
+Or the **signal sanity** workflow in the Actions tab. It needs the Anthropic
+and Bright Data credentials only — nothing here can trade.
+
+## 1. The null test — does the answer depend on the evidence?
+
+Each ticker is asked on **scrambled** context: its own `TICKER:` label above
+another ticker's *entire* evidence block, drawn from the same instrument kind
+so an ETF still gets the ETF prompt. Nothing else changes.
+
+If the answer survives having all of its evidence replaced, the model is
+pattern-completing a plausible analyst rather than reading anything. That is
+theater, and no amount of live trading rescues it.
+
+<Note>
+  Headlines that name the donor are left in on purpose. A model that notices
+  the mismatch and answers NEUTRAL is behaving well — and that shows up as a
+  **higher NEUTRAL rate under scrambling**, which the report tracks.
+</Note>
+
+## 2. Self-consistency — does the model agree with itself?
+
+Identical context, asked twice. Sampling is the model's own (no temperature
+control exists on these models), so whatever agreement comes back is the real
+number. It is a **ceiling** on any edge: a model that disagrees with itself one
+time in three on the same input is one-third noise before a market is
+consulted.
+
+## Chance-corrected, and pre-registered
+
+Raw agreement flatters a model that says NEUTRAL most of the time — it "agrees"
+with anything by base rate alone. Both tests report **Cohen's κ**, which
+subtracts chance agreement. When every answer is identical κ is undefined, and
+that case is reported as its own verdict rather than a false pass.
+
+The thresholds are constants at the top of `replay/signal_sanity.py`, fixed
+before the first call was made, and pinned by a test so that moving one after
+seeing a result is a visible diff:
+
+| Verdict | Trigger | Meaning |
+|---|---|---|
+| `SILENT` | under 10% of real signals clear the conviction floor | the model never takes a side — nothing to test, nothing to trade |
+| `NOISE` | self bias-agreement under 70% | the model argues with itself; that caps any edge |
+| `THEATER` | scramble κ over 0.40 | the answer survives losing all its evidence |
+| `PASS` | none of the above | necessary for edge, **not sufficient** — the live journal decides |
+
+The script exits non-zero on any adverse verdict, so the workflow is a gate.
+
+## What a pass does and does not mean
+
+A pass says the answer changes when the evidence changes and holds when it
+does not. That is what a signal that *could* have edge looks like. It says
+nothing about whether the direction is right — `analysis/score_journal.py`
+answers that, and only after outcomes exist.
+
+<Warning>
+  A pass is not permission to skip the live run. It is permission to
+  *start* it, having ruled out the two failure modes that would have made it a
+  waste of a quarter.
+</Warning>

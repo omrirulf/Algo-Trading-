@@ -12,6 +12,7 @@ an order -- the most it can do is return a JSON string.
 from __future__ import annotations
 
 import json
+import time
 import logging
 from dataclasses import dataclass
 from typing import Any, Optional
@@ -190,6 +191,37 @@ def _extract_text(response: Any) -> str:
     raise LLMError(f"no text block in response (stop_reason: {stop_reason})")
 
 
+@dataclass(frozen=True)
+class BatchRequest:
+    """One prompt for the Message Batches API, keyed for reassembly.
+
+    Results come back in any order, so ``custom_id`` is the only link between
+    a request and its answer -- never rely on position.
+    """
+
+    custom_id: str
+    system_prompt: str
+    user_prompt: str
+    json_schema: dict
+    model: Optional[str] = None
+    effort: Optional[str] = None
+
+
+#: How long to wait on a batch before giving up and handing back the id.
+#: Most small batches finish in minutes, but the API allows up to 24 hours,
+#: and an Actions job cannot outlive its own timeout.
+BATCH_TIMEOUT_SECONDS = 55 * 60
+BATCH_POLL_SECONDS = 30
+
+
+class BatchTimeout(LLMError):
+    """The batch did not finish in time. Carries the id so it can be resumed."""
+
+    def __init__(self, batch_id: str, message: str) -> None:
+        super().__init__(message)
+        self.batch_id = batch_id
+
+
 class AnthropicSignalProvider:
     def __init__(self, api_key: str, client: Any | None = None) -> None:
         # ``api_key or None`` turns a blank ANTHROPIC_API_KEY into "let the
@@ -217,6 +249,110 @@ class AnthropicSignalProvider:
                 log.warning("refusal fallback rejected, continuing without it: %s", exc)
                 self._use_fallback = False
         return self._client.beta.messages.create(**kwargs)
+
+    def _batch_params(self, request: BatchRequest) -> dict:
+        """The same request shape as the live path, minus what Batches rejects.
+
+        Server-side ``fallbacks`` (and their beta header) are refused by the
+        Batches API, so an offline call runs without them. Everything else --
+        cache_control on the shared system prompt, adaptive thinking, effort,
+        the JSON-schema output format -- is identical, so a batch answer is
+        priced and shaped like a live one and can stand in for it.
+        """
+        return dict(
+            model=request.model or MODEL,
+            max_tokens=MAX_TOKENS,
+            cache_control={"type": "ephemeral"},
+            system=request.system_prompt,
+            messages=[{"role": "user", "content": request.user_prompt}],
+            thinking={"type": "adaptive"},
+            output_config={
+                "effort": request.effort or EFFORT,
+                "format": {
+                    "type": "json_schema",
+                    "schema": build_output_schema(request.json_schema),
+                },
+            },
+        )
+
+    def submit_batch(self, requests: list[BatchRequest]) -> str:
+        """Create a batch and return its id without waiting."""
+        if not requests:
+            raise LLMError("cannot submit an empty batch")
+        ids = [r.custom_id for r in requests]
+        if len(set(ids)) != len(ids):
+            raise LLMError("batch custom_ids must be unique")
+        try:
+            batch = self._client.messages.batches.create(
+                requests=[
+                    {"custom_id": r.custom_id, "params": self._batch_params(r)}
+                    for r in requests
+                ]
+            )
+        except TypeError as exc:
+            raise LLMError(
+                f"No Claude credentials found: set ANTHROPIC_API_KEY, or run "
+                f"`ant auth login` ({exc})"
+            ) from exc
+        except anthropic.APIError as exc:
+            raise LLMError(f"batch submission failed: {exc}") from exc
+        return batch.id
+
+    def collect_batch(
+        self,
+        batch_id: str,
+        model: Optional[str] = None,
+        poll_seconds: float = BATCH_POLL_SECONDS,
+        timeout_seconds: float = BATCH_TIMEOUT_SECONDS,
+        sleep=time.sleep,
+    ) -> dict[str, "Completion | LLMError"]:
+        """Wait for a batch and key its results by custom_id.
+
+        A request that errored maps to an ``LLMError`` rather than being
+        dropped, so the caller can count and name the failures instead of
+        discovering a shorter list than it submitted.
+        """
+        deadline = time.monotonic() + timeout_seconds
+        while True:
+            try:
+                batch = self._client.messages.batches.retrieve(batch_id)
+            except anthropic.APIError as exc:
+                raise LLMError(f"could not read batch {batch_id}: {exc}") from exc
+            if batch.processing_status == "ended":
+                break
+            if time.monotonic() >= deadline:
+                raise BatchTimeout(
+                    batch_id,
+                    f"batch {batch_id} still {batch.processing_status} after "
+                    f"{timeout_seconds:.0f}s; resume with --resume {batch_id}",
+                )
+            sleep(poll_seconds)
+
+        out: dict[str, Completion | LLMError] = {}
+        for item in self._client.messages.batches.results(batch_id):
+            kind = item.result.type
+            if kind == "succeeded":
+                message = item.result.message
+                text = _extract_text(message)
+                try:
+                    json.loads(text)
+                except json.JSONDecodeError as exc:
+                    out[item.custom_id] = LLMError(f"model returned non-JSON output: {exc}")
+                    continue
+                out[item.custom_id] = Completion(
+                    text=text, usage=usage_from_response(message, model or MODEL)
+                )
+            elif kind == "errored":
+                out[item.custom_id] = LLMError(f"batch item errored: {item.result.error}")
+            else:
+                out[item.custom_id] = LLMError(f"batch item {kind}")
+        return out
+
+    def complete_batch(
+        self, requests: list[BatchRequest], model: Optional[str] = None, **kw
+    ) -> dict[str, "Completion | LLMError"]:
+        """Submit, wait, collect. Half price, and no latency to care about."""
+        return self.collect_batch(self.submit_batch(requests), model=model, **kw)
 
     def complete(self, system_prompt: str, user_prompt: str, json_schema: dict) -> str:
         """The model's JSON, for callers that do not care what it cost."""

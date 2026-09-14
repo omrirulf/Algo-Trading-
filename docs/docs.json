@@ -29,7 +29,8 @@
           "decision-path",
           "currency-risk",
           "broker-evaluation",
-          "portfolio-view"
+          "portfolio-view",
+          "signal-sanity"
         ]
       },
       {

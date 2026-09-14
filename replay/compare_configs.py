@@ -75,7 +75,7 @@ class Cell:
     def cache_reads(self) -> int:
         return sum(u.cache_read_input_tokens for u in self.usages)
 
-    def monthly_usd(self, tickers: int, cycles_per_day: int = cfg.CYCLES_PER_TRADING_DAY) -> Optional[float]:
+    def monthly_usd(self, tickers: int, cycles_per_day: Optional[int] = None) -> Optional[float]:
         per_call = self.cost_per_call
         return None if per_call is None else monthly_usd(per_call, tickers, cycles_per_day)
 
