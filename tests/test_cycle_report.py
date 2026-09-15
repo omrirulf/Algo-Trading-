@@ -133,3 +133,65 @@ def test_a_price_keeps_its_cents():
     text = "\n".join(cr.render_ticker(line))
     assert "184.55" in text
     assert "37,000,000" in text
+
+
+# --------------------------------------------------------------------------- #
+# The prose the model read, rebuilt from what the journal stored
+# --------------------------------------------------------------------------- #
+
+
+def test_a_stored_section_renders_as_the_lines_the_model_read():
+    """The report shows "50d above 200d", not a table of sma50 and sma200."""
+    from orchestrator import technicals
+
+    snap = technicals.TechnicalSnapshot(
+        last_close=184.55, as_of="2026-09-14", bars=250, sma20=179.1, sma50=171.4, sma200=163.7,
+        macd=2.14, macd_signal=1.82, macd_histogram=0.32,
+        distance_sma20=0.03, distance_sma50=0.077, distance_sma200=0.128,
+        rsi14=61.2, return_1d=0.008, return_5d=0.021, return_21d=0.064, return_63d=0.11,
+        low_52w=121.3, high_52w=190.2, position_in_52w_range=0.92,
+        atr14=4.26, atr_pct_of_price=0.023, annualised_volatility=0.31, relative_volume=1.4,
+    )
+    line = _line()
+    line.raw["context"]["technicals"] = snap.as_dict()
+    text = "\n".join(cr.render_ticker(line))
+    for expected in snap.as_lines():
+        assert expected in text
+    assert "| `rsi14` |" not in text
+
+
+def test_insider_trades_are_rebuilt_from_their_stored_dicts():
+    from orchestrator import insiders
+
+    snap = insiders.build_snapshot()
+    trade = insiders.InsiderTrade(when="2026-08-20", who="J. Smith", role="CFO", shares=50_000.0, value=8.6e6)
+    stored = snap.as_dict()
+    stored.update({"buys": [trade.__dict__], "distinct_buyers": 1, "shares_purchased": 50_000.0})
+    line = _line()
+    line.raw["context"]["insiders"] = stored
+    text = "\n".join(cr.render_ticker(line))
+    assert "J. Smith (CFO): 50,000 shares" in text
+    assert "insiders spending their own money" in text
+
+
+def test_an_unknown_journal_key_is_dropped_not_fatal():
+    """A line from a newer schema must still render."""
+    from orchestrator import fundamentals
+
+    stored = fundamentals.build_snapshot({"sector": "Technology", "marketCap": 4.5e12}).as_dict()
+    stored["field_added_next_year"] = 1
+    lines = cr.prompt_lines("fundamentals", stored)
+    assert lines is not None
+    assert any("Technology" in l for l in lines)
+
+
+def test_a_dict_that_cannot_be_rebuilt_falls_back_to_the_table():
+    """Hiding evidence the report cannot format would be worse than a table."""
+    line = _line()
+    line.raw["context"]["technicals"] = {"bars": "not-a-number", "rsi14": 61.2}
+    text = "\n".join(cr.render_ticker(line))
+    assert "| `rsi14` | 61.2 |" in text
+
+
+def test_an_unknown_section_uses_the_table():
+    assert cr.prompt_lines("weather", {"temp": 1}) is None
