@@ -487,6 +487,7 @@ Try adding `"quantity": 500` to that payload — it will be rejected with a
 | Max 25% per exposure group | `risk_engine.exposure_group_headroom()` — what stops a diversified watchlist producing a one-bet book. Spans every sleeve, so XOM plus `XLE` plus two energy funds is one energy bet made four times |
 | Funds are the core: 70% vs 25% for single names | `risk_engine.sleeve_headroom()` — a deliberate statement that a stock-picking edge is unproven here |
 | Max 95% of equity deployed in total | `risk_engine.check_gross_exposure_limit()` — the 5% buffer |
+| A winner is sold down in thirds and its stop walked up | `app/position_manager.py` — at +1R sell ⅓ and move the stop to breakeven; at +3R sell ⅓ and move it to +1R; the last third runs. The stop only tightens, and exits go through the broker's close-only endpoint, so nothing here can open a position |
 | Mandatory stop-loss on every order | `broker_client.submit_bracket_order()` — no code path submits without `StopLossRequest` (Alpaca OTO: market entry + attached stop) |
 | Stop distance from real volatility | `market_data.calculate_atr()` (Wilder ATR from yfinance OHLC), rejected if ATR is degenerate |
 | Conviction floor | `risk_engine.check_conviction_threshold()` |
@@ -502,7 +503,7 @@ Try adding `"quantity": 500` to that payload — it will be rejected with a
 (422) → `ExecutionEngine.execute()`:
 
 1. `NEUTRAL` bias → `REJECTED` (nothing to do).
-2. Conviction below `MIN_CONVICTION` → `REJECTED`, before any network I/O.
+2. Conviction below `MIN_CONVICTION` (0.30) → `REJECTED`, before any network I/O.
 3. Fetch equity and open positions from Alpaca.
 4. New ticker and already at `MAX_OPEN_POSITIONS` → `REJECTED`.
 5. Open position in the opposite direction → `REJECTED`.

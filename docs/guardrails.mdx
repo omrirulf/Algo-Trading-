@@ -25,7 +25,8 @@ that last part works.
 | Max 95% of equity deployed **in total** | `risk_engine.check_gross_exposure_limit()` — the only check that sees every holding at once. |
 | Mandatory stop-loss on every order | `broker_client.submit_bracket_order()` — no code path submits an entry without a `StopLossRequest`. |
 | Stop distance from real volatility | `market_data.calculate_atr()` — Wilder ATR computed from actual OHLC history, not a fixed percentage. |
-| Conviction floor | `risk_engine.check_conviction_threshold()` — signals below 0.60 are rejected before any market data is even fetched. |
+| Conviction floor | `risk_engine.check_conviction_threshold()` — signals below 0.30 are rejected before any market data is even fetched. Was 0.60; lowered so the ladder and the stop actually get exercised — see [Position management](/position-management). |
+| Profit ladder | `app/position_manager.py` — at +1R a third is sold and the stop moves to breakeven; at +3R another third and the stop to +1R. The stop only tightens. Exits are close-only by construction. |
 | Max concurrent positions | `risk_engine.check_position_count_limit()`. |
 | Broker credentials never touch LLM-adjacent code | Only `app/broker_client.py` imports the Alpaca SDK or reads the keys — enforced by CI, not just by file layout. |
 | Paper trading only | `TradingClient(..., paper=True)` is a hard-coded literal in `broker_client.py`, and an Alpaca CLI profile marked `live_trade: true` is refused rather than used. |

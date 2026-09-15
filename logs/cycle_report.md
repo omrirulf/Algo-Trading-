@@ -15,7 +15,9 @@ Once a day the system looks at every name on the list. For each one it reads fiv
 
 The three sides: **BULLISH** = the model thinks the price will go up; **BEARISH** = the model thinks the price will go down; **NEUTRAL** = the model has no clear view.
 
-Being sure is not enough on its own. A trade only happens when confidence reaches **0.60**. Below that the system writes down what it thought and does nothing. The size of a trade, the stop-loss and every limit are decided by plain code, not by the model.
+Being sure is not enough on its own. A trade only happens when confidence reaches **0.30**. Below that the system writes down what it thought and does nothing. The size of a trade, the stop-loss and every limit are decided by plain code, not by the model.
+
+Open positions are checked first, before any new trade. When a trade has earned back what it risked (+1R), a third of it is sold and the stop-loss moves up to the entry price, so it can no longer lose. At three times that (+3R) another third is sold and the stop moves up again. The last third stays open. The stop only ever moves up.
 
 Under each name you will find the five scores. Click a grey line to open it and see the exact evidence behind that score. The words inside quotation marks are the model's own; nothing there has been rewritten.
 
@@ -5447,7 +5449,8 @@ _Not available today._
 
 Terms that appear above and have no simpler word:
 
-- **Confidence** — How sure the model is, from 0.00 to 1.00. A trade needs 0.60 or more.
+- **Confidence** — How sure the model is, from 0.00 to 1.00. A trade needs 0.30 or more.
+- **R** — The amount one trade risked when it was opened: the distance from the entry price to the stop-loss. +1R means the trade has earned that amount back; +3R means three times it.
 - **Score** — How good or bad one kind of evidence looks, from -1.00 (bad) to +1.00 (good).
 - **Moving average (SMA)** — The average price over the last N days. A price above it usually means an up trend.
 - **RSI** — A 0-100 meter of how fast the price has moved lately. Over 70 means a lot of buying, under 30 a lot of selling.

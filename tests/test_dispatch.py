@@ -159,3 +159,54 @@ def test_webhook_mode_still_sends_the_secret(monkeypatch):
 def test_webhook_mode_reports_open_because_it_cannot_know():
     """No broker on this side, so the engine's own gate has to decide."""
     assert WebhookDispatcher().is_market_open() is True
+
+
+# --- position management rides the same transport --------------------------
+
+
+def test_the_manage_url_sits_beside_the_signal_url():
+    assert dispatch.manage_url("http://engine:8000/webhook/signal") == "http://engine:8000/webhook/positions/manage"
+    assert dispatch.manage_url("http://engine:8000/webhook/signal/") == "http://engine:8000/webhook/positions/manage"
+    # A URL that is not the signal one still gets a sibling, never a guess at a host.
+    assert dispatch.manage_url("http://engine:8000/custom") == "http://engine:8000/custom/positions/manage"
+
+
+def test_direct_mode_manages_positions_in_process(broker, market):
+    from app.execution_engine import ExecutionEngine
+
+    d = DirectDispatcher(engine=ExecutionEngine(broker, market))
+    out = d.manage_positions()
+    assert out["positions_seen"] == 0
+    assert out["tranches"] == 0 and out["errors"] == 0
+    assert out["actions"] == []
+
+
+def test_webhook_mode_posts_to_the_manage_endpoint_with_the_secret(monkeypatch):
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["url"] = str(request.url)
+        seen["secret"] = request.headers.get("x-webhook-secret")
+        seen["body"] = request.content
+        return httpx.Response(200, json={"positions_seen": 2, "tranches": 1, "actions": []})
+
+    monkeypatch.setattr(
+        dispatch, "get_settings",
+        lambda: Settings(webhook_url="http://engine/webhook/signal", webhook_shared_secret="s3", _env_file=None),
+    )
+    d = WebhookDispatcher(client=httpx.Client(transport=httpx.MockTransport(handler)))
+    out = d.manage_positions()
+    assert seen["url"] == "http://engine/webhook/positions/manage"
+    assert seen["secret"] == "s3"
+    assert seen["body"] == b""          # nothing a caller could say should change the ladder
+    assert out["tranches"] == 1
+
+
+def test_webhook_mode_reports_a_refusal_rather_than_raising(monkeypatch):
+    monkeypatch.setattr(
+        dispatch, "get_settings",
+        lambda: Settings(webhook_url="http://engine/webhook/signal", webhook_shared_secret="s3", _env_file=None),
+    )
+    d = WebhookDispatcher(client=httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(401, text="no"))))
+    out = d.manage_positions()
+    assert out["error"] == "HTTP 401"

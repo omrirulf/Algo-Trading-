@@ -259,3 +259,79 @@ def check_atr_sanity(
     if price <= 0 or atr <= 0 or math.isnan(atr):
         return False
     return atr / price >= min_pct
+
+
+# --------------------------------------------------------------------------- #
+# Profit ladder -- pure arithmetic in units of R
+# --------------------------------------------------------------------------- #
+# R is the entry-to-initial-stop distance. Everything below is expressed in
+# it so that one ladder fits every instrument kind, and none of it touches a
+# broker: the position manager decides *what* from these, then acts.
+
+
+def initial_r(entry_price: float, stop_price: float) -> float:
+    """The distance the initial stop sat from the entry -- one R."""
+    r = abs(entry_price - stop_price)
+    if r <= 0:
+        raise RiskViolation(f"R must be positive; entry {entry_price} stop {stop_price}")
+    return r
+
+
+def r_multiple(entry_price: float, current_price: float, r: float, side: str) -> float:
+    """Unrealised gain in units of R, signed so that a winning trade is positive."""
+    if r <= 0:
+        raise RiskViolation(f"R must be positive, got {r}")
+    move = current_price - entry_price
+    return (move if side == "buy" else -move) / r
+
+
+def tranche_size(base_qty: int, fraction: float) -> int:
+    """Whole shares to close at a rung: ``floor(base * fraction)``.
+
+    Floored rather than rounded so that the fractions in the ladder can never
+    add up to the whole position through rounding -- the runner is
+    guaranteed by arithmetic, not by hoping.
+    """
+    if base_qty < 0 or not 0 < fraction < 1:
+        raise RiskViolation(f"bad tranche inputs: base {base_qty}, fraction {fraction}")
+    return int(math.floor(base_qty * fraction))
+
+
+def stop_for_rung(entry_price: float, r: float, side: str, stop_to_r: float) -> float:
+    """Where a rung moves the stop: ``entry +/- stop_to_r * R``, in the money's favour."""
+    if side not in ("buy", "sell"):
+        raise RiskViolation(f"side must be 'buy' or 'sell', got {side!r}")
+    offset = stop_to_r * r
+    price = entry_price + offset if side == "buy" else entry_price - offset
+    if price <= 0:
+        raise RiskViolation(f"ratcheted stop would be non-positive: {price}")
+    return round(price, 2)
+
+
+def tighter_stop(current: float, proposed: float, side: str) -> float:
+    """Whichever of two stops protects more. A ratchet never loosens.
+
+    For a long that is the higher price; for a short, the lower. Calling this
+    on every proposed move is what makes the ladder monotone regardless of
+    the order rungs are evaluated in.
+    """
+    if side == "buy":
+        return max(current, proposed)
+    if side == "sell":
+        return min(current, proposed)
+    raise RiskViolation(f"side must be 'buy' or 'sell', got {side!r}")
+
+
+def rungs_due(gain_r: float, rungs_taken: int, ladder=cfg.PROFIT_LADDER) -> list[int]:
+    """Indices of the rungs a position has reached but not yet taken, in order.
+
+    Contiguous from ``rungs_taken``: a gap that clears two rungs at once
+    returns both, and a rung is never returned out of order.
+    """
+    due: list[int] = []
+    for index in range(rungs_taken, len(ladder)):
+        if gain_r >= ladder[index].take_at_r:
+            due.append(index)
+        else:
+            break
+    return due

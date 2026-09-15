@@ -83,6 +83,35 @@ jobs:
           fi
           echo "OK: only broker_client.py reads the API keys"
 
+      - name: Position exits are close-only, and only the broker client can make them
+        # The profit ladder sells part of a winning position. The only way it
+        # may do so is Alpaca's own close-position endpoint, which reduces a
+        # position and cannot open, add to or reverse one -- so the rule that
+        # every entry is a bracket with a stop is not weakened by exits.
+        # Two things guard that: the close and replace calls exist in exactly
+        # one file, and a market order without a stop_loss is still never
+        # constructed anywhere.
+        run: |
+          hits=$(grep -rnE '\.(close_position|replace_order_by_id|close_all_positions|cancel_orders)\(' \
+                   app orchestrator config analysis store backtest replay --include='*.py' \
+                 | grep -v '^app/broker_client.py:' || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::a position-changing broker call exists outside app/broker_client.py"
+            exit 1
+          fi
+          if grep -rnE 'close_all_positions|cancel_orders' app/broker_client.py; then
+            echo "::error::broker_client.py must not be able to flatten the book or cancel every order"
+            exit 1
+          fi
+          naked=$(grep -rnE 'MarketOrderRequest\(' app --include='*.py' | grep -v 'stop_loss' || true)
+          # The request is built across lines; check the constructor's block carries stop_loss.
+          if ! grep -qE 'stop_loss=StopLossRequest' app/broker_client.py; then
+            echo "::error::the entry order no longer attaches a StopLossRequest"
+            exit 1
+          fi
+          echo "OK: exits are close-only, and only broker_client.py can make them"
+
       - name: Live trading is not reachable from configuration
         run: |
           if ! grep -q 'paper=True,' app/broker_client.py; then

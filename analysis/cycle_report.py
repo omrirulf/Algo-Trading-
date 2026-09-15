@@ -106,7 +106,8 @@ BIAS_MEANINGS = (
 #: Terms with no simpler synonym. A report that uses them without explaining
 #: them is only readable by someone who did not need it.
 GLOSSARY = (
-    ("Confidence", "How sure the model is, from 0.00 to 1.00. A trade needs 0.60 or more."),
+    ("Confidence", "How sure the model is, from 0.00 to 1.00. A trade needs 0.30 or more."),
+    ("R", "The amount one trade risked when it was opened: the distance from the entry price to the stop-loss. +1R means the trade has earned that amount back; +3R means three times it."),
     ("Score", "How good or bad one kind of evidence looks, from -1.00 (bad) to +1.00 (good)."),
     ("Moving average (SMA)", "The average price over the last N days. A price above it usually means an up trend."),
     ("RSI", "A 0-100 meter of how fast the price has moved lately. Over 70 means a lot of buying, under 30 a lot of selling."),
@@ -427,6 +428,101 @@ def render_ticker(line: Line) -> list[str]:
     return out
 
 
+#: What each management action is called in the report. The audit log's
+#: names are for code; these are for a person.
+_POSITION_ACTIONS = {
+    "tranche_taken": "Sold part",
+    "stop_raised": "Stop raised",
+    "held": "Holding",
+    "unmanaged": "Left alone",
+    "error": "Problem",
+}
+
+
+def read_position_actions(audit_path: Path, day: str) -> list[dict]:
+    """Every ``position_managed`` action the audit log recorded on ``day``.
+
+    Matched by calendar day rather than by the journal's timestamps, because
+    the audit log's ``ts`` is the runner's local clock with no offset and a
+    daily cycle manages the book exactly once. A missing or unreadable file
+    is an empty list: the report must never fail because a second log did.
+    """
+    out: list[dict] = []
+    try:
+        text = audit_path.read_text(encoding="utf-8")
+    except OSError:
+        return out
+    for raw in text.splitlines():
+        raw = raw.strip()
+        if not raw:
+            continue
+        try:
+            record = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(record, dict):
+            continue
+        # Production renames message->event and asctime->ts; a plain
+        # JsonFormatter does not. Accept both so the section never goes
+        # quietly blank over a formatter difference.
+        if (record.get("event") or record.get("message")) != "position_managed":
+            continue
+        stamp = str(record.get("ts") or record.get("asctime") or "")
+        if not stamp.startswith(day):
+            continue
+        action = record.get("action")
+        if isinstance(action, dict) and action.get("ticker"):
+            out.append(action)
+    return out
+
+
+def _position_line(a: dict) -> str:
+    """One action as a sentence. Numbers kept, jargon translated."""
+    kind = a.get("action")
+    gain = a.get("gain_r")
+    gain_text = f"{float(gain):+.2f}R" if isinstance(gain, (int, float)) else "n/a"
+    old, new = a.get("old_stop"), a.get("new_stop")
+    stop_move = (
+        f"Stop-loss raised {float(old):.2f} → {float(new):.2f}."
+        if isinstance(old, (int, float)) and isinstance(new, (int, float)) and new != old
+        else (f"Stop-loss {float(old):.2f}." if isinstance(old, (int, float)) else "")
+    )
+    if kind == "tranche_taken":
+        total = int(a.get("qty_closed") or 0) + int(a.get("remaining_qty") or 0)
+        return (f"Sold {a.get('qty_closed')} of {total} shares at {gain_text}, "
+                f"{a.get('remaining_qty')} still held. {stop_move}").strip()
+    if kind == "stop_raised":
+        return f"Reached {gain_text}; too small to split, so only the stop moved. {stop_move}".strip()
+    if kind == "held":
+        return f"{gain_text}, holding {a.get('remaining_qty')} shares. {stop_move}".strip()
+    if kind == "unmanaged":
+        return f"No stop-loss order found, so it was not touched. Worth a look: {a.get('reason', '')}".strip()
+    return f"Could not be managed: {a.get('reason', '')}".strip()
+
+
+def render_positions(actions: list[dict]) -> list[str]:
+    """The open book's day. Nothing when nothing was recorded."""
+    if not actions:
+        return []
+    out = [
+        "## Open positions",
+        "",
+        "Checked before any new trade. R is what the trade risked at entry; "
+        "the ladder sells a third at +1R and another at +3R, and the stop-loss "
+        "only ever moves up.",
+        "",
+        "| Position | What happened |",
+        "| --- | --- |",
+    ]
+    order = ("tranche_taken", "stop_raised", "unmanaged", "error", "held")
+    for a in sorted(actions, key=lambda x: (order.index(x.get("action")) if x.get("action") in order else 9, x.get("ticker", ""))):
+        ticker = str(a.get("ticker"))
+        label = f"{name_for(ticker)} ({ticker}) · {sleeve_label(ticker)}"
+        out.append(f"| {label} | **{_POSITION_ACTIONS.get(a.get('action'), a.get('action'))}.** {_position_line(a)} |")
+    out.append("")
+    return out
+
+
 def _how_to_read() -> list[str]:
     """The framing text. Short sentences, common words, nothing assumed."""
     sides = "; ".join(f"**{name}** = {meaning}" for name, meaning in BIAS_MEANINGS)
@@ -441,9 +537,15 @@ def _how_to_read() -> list[str]:
         f"The three sides: {sides}.",
         "",
         "Being sure is not enough on its own. A trade only happens when "
-        "confidence reaches **0.60**. Below that the system writes down what it "
+        "confidence reaches **0.30**. Below that the system writes down what it "
         "thought and does nothing. The size of a trade, the stop-loss and every "
         "limit are decided by plain code, not by the model.",
+        "",
+        "Open positions are checked first, before any new trade. When a trade "
+        "has earned back what it risked (+1R), a third of it is sold and the "
+        "stop-loss moves up to the entry price, so it can no longer lose. At "
+        "three times that (+3R) another third is sold and the stop moves up "
+        "again. The last third stays open. The stop only ever moves up.",
         "",
         "Under each name you will find the five scores. Click a grey line to "
         "open it and see the exact evidence behind that score. The words inside "
@@ -489,7 +591,7 @@ def _glossary() -> list[str]:
     return out
 
 
-def render(lines: list[Line]) -> str:
+def render(lines: list[Line], position_actions: Optional[list[dict]] = None) -> str:
     """The whole cycle: grouped by what the thing is, loudest signal first."""
     if not lines:
         return "# Daily report\n\n_Nothing in the journal to show._\n"
@@ -508,6 +610,7 @@ def render(lines: list[Line]) -> str:
     ]
     out += _summary_table(lines)
     out.append("")
+    out += render_positions(position_actions or [])
     out += _how_to_read()
 
     for sleeve in SLEEVE_ORDER:
@@ -532,6 +635,10 @@ def main(argv: Optional[list[str]] = None) -> int:
         help="path to the signal journal (default: the configured one)",
     )
     parser.add_argument(
+        "--audit", type=Path, default=cfg.AUDIT_LOG_PATH,
+        help="path to the execution audit log, for the open-positions section",
+    )
+    parser.add_argument(
         "--all", action="store_true",
         help="render every line in the journal rather than the most recent cycle",
     )
@@ -551,7 +658,10 @@ def main(argv: Optional[list[str]] = None) -> int:
         wanted = {t.upper() for t in args.ticker}
         lines = [l for l in lines if l.ticker.upper() in wanted]
 
-    print(render(lines))
+    when = max((l.when for l in lines if l.when), default=None)
+    day = when.astimezone(timezone.utc).strftime("%Y-%m-%d") if when else ""
+    actions = read_position_actions(args.audit, day) if day and not args.all else []
+    print(render(lines, actions))
     return 0
 
 

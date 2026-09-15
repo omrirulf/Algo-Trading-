@@ -82,3 +82,28 @@ def test_rejection_is_200_with_rejected_status(client, broker):
     assert r.status_code == 200
     assert r.json()["status"] == "REJECTED"
     assert broker.submitted == []
+
+
+# --- the management endpoint ----------------------------------------------
+
+
+def test_manage_positions_requires_the_secret(client):
+    assert client.post("/webhook/positions/manage").status_code == 401
+    assert client.post("/webhook/positions/manage", headers={"x-webhook-secret": "wrong"}).status_code == 401
+
+
+def test_manage_positions_runs_the_ladder_over_the_engines_book(client, broker):
+    r = client.post("/webhook/positions/manage", headers={"x-webhook-secret": SECRET})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["positions_seen"] == 0
+    assert body["market_closed"] is False
+    assert body["actions"] == []
+
+
+def test_manage_positions_takes_no_body_that_could_steer_it(client):
+    """A body is ignored, not honoured: there is nothing a caller may tell the ladder."""
+    r = client.post("/webhook/positions/manage", headers={"x-webhook-secret": SECRET},
+                    json={"ticker": "AAPL", "qty": 1000, "sell": True})
+    assert r.status_code == 200
+    assert r.json()["actions"] == []
