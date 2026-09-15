@@ -195,3 +195,14 @@ def test_a_dict_that_cannot_be_rebuilt_falls_back_to_the_table():
 
 def test_an_unknown_section_uses_the_table():
     assert cr.prompt_lines("weather", {"temp": 1}) is None
+
+
+def test_a_link_journalled_before_the_fix_still_opens():
+    """Cycles stored before absolute_url existed carry bare `/goto?url=...`."""
+    line = _line()
+    line.raw["context"]["sources"] = [{
+        "title": "Old story", "snippet": "", "source": "Reuters",
+        "when": "2h ago", "url": "/goto?url=CAESkQEB",
+    }]
+    text = "\n".join(cr.render_ticker(line))
+    assert "[Old story](https://www.google.com/goto?url=CAESkQEB)" in text

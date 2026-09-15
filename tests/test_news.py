@@ -395,3 +395,53 @@ def test_items_are_deduplicated_by_title_like_the_lines():
     items = news.parse_news_items(PARSED_NEWS)
     assert len(items) == len(news.parse_news_results(PARSED_NEWS))
     assert len({i.title.lower() for i in items}) == len(items)
+
+
+# --------------------------------------------------------------------------- #
+# A stored link has to survive leaving google.com
+# --------------------------------------------------------------------------- #
+
+
+def test_a_google_redirect_stub_gets_an_origin():
+    """The first live cycle stored 100 of 176 links as bare `/goto?url=...`,
+    which resolves against whatever page renders them -- so, nowhere."""
+    assert news.absolute_url("/goto?url=CAESkQEB") == "https://www.google.com/goto?url=CAESkQEB"
+
+
+@pytest.mark.parametrize("url", [
+    "https://www.reuters.com/a",
+    "http://example.com/b",
+])
+def test_an_absolute_link_is_left_alone(url):
+    assert news.absolute_url(url) == url
+
+
+def test_a_protocol_relative_link_gets_a_scheme_not_a_host():
+    assert news.absolute_url("//cdn.example.com/a") == "https://cdn.example.com/a"
+
+
+def test_a_bare_relative_link_gets_a_separator():
+    assert news.absolute_url("articles/x") == "https://www.google.com/articles/x"
+
+
+@pytest.mark.parametrize("url", ["", "   ", None])
+def test_a_missing_link_stays_missing(url):
+    assert news.absolute_url(url) == ""
+
+
+def test_parsed_items_carry_links_that_can_be_opened():
+    payload = {"news": [
+        {"title": "Relative", "link": "/goto?url=BLOB"},
+        {"title": "Absolute", "link": "https://www.reuters.com/x"},
+    ]}
+    items = news.parse_news_items(payload)
+    assert items[0].url == "https://www.google.com/goto?url=BLOB"
+    assert items[1].url == "https://www.reuters.com/x"
+    assert all(h.url.startswith("https://") for h in items)
+
+
+def test_the_prompt_line_never_shows_the_link():
+    """Absolutising must not leak a URL into what the model reads."""
+    items = news.parse_news_items({"news": [{"title": "T", "link": "/goto?url=BLOB"}]})
+    assert "goto" not in items[0].as_line()
+    assert items[0].as_line() == "T"

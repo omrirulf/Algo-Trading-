@@ -35,6 +35,13 @@ log = logging.getLogger(__name__)
 
 BRIGHTDATA_REQUEST_URL = "https://api.brightdata.com/request"
 
+#: Where a relative result link is relative *to*. Google's news results often
+#: carry their own redirect stub (``/goto?url=...``) rather than the
+#: publisher's URL, and the parser hands it back with no origin -- which makes
+#: it a dead link anywhere outside a google.com page. The first live cycle
+#: stored 100 of 176 links in that shape.
+GOOGLE_ORIGIN = "https://www.google.com"
+
 #: Google ``tbs=qdr:`` window. ``d`` = past 24 hours, which suits a daily job.
 NEWS_LOOKBACK = "d"
 MAX_HEADLINES = 10
@@ -192,6 +199,26 @@ class Headline:
         }
 
 
+def absolute_url(url: str) -> str:
+    """Give a result link an origin, so it is clickable away from google.com.
+
+    Google's redirect stub carries an encrypted payload -- decoding it locally
+    yields no readable URL -- so the publisher's address cannot be recovered
+    without a round trip per headline, which a 35-ticker cycle cannot afford.
+    Pointing the link back at Google's own resolver is the honest fix: one
+    click still lands on the story, and the journal stops recording links that
+    go nowhere.
+    """
+    url = (url or "").strip()
+    if not url or url.startswith(("http://", "https://")):
+        return url
+    if url.startswith("//"):  # protocol-relative
+        return "https:" + url
+    if url.startswith("/"):
+        return GOOGLE_ORIGIN + url
+    return f"{GOOGLE_ORIGIN}/{url}"
+
+
 def parse_news_items(payload: Any, limit: int = MAX_HEADLINES) -> list[Headline]:
     """Turn a Bright Data parsed-Google payload into ``Headline`` records.
 
@@ -221,7 +248,7 @@ def parse_news_items(payload: Any, limit: int = MAX_HEADLINES) -> list[Headline]
                 snippet=_first(item, "description", "snippet"),
                 source=_first(item, "source", "source_name", "display_link"),
                 when=_first(item, "date", "time", "published", "age"),
-                url=_first(item, "link", "url", "source_link"),
+                url=absolute_url(_first(item, "link", "url", "source_link")),
             )
         )
         if len(out) >= limit:

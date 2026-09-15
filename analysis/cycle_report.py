@@ -29,6 +29,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from config import settings as cfg  # noqa: E402
 from orchestrator import analysts, fundamentals, insiders, technicals  # noqa: E402
+from orchestrator.news import absolute_url  # noqa: E402
 
 #: Lines this far apart belong to different cycles. A daily cycle over 35
 #: tickers takes a few minutes; 20 leaves room for a slow run without
@@ -142,7 +143,11 @@ def _news_block(context: dict) -> list[str]:
             if not isinstance(item, dict):
                 continue
             title = str(item.get("title") or "").strip() or "(untitled)"
-            url = str(item.get("url") or "").strip()
+            # Repaired on the way out, not only on the way in: the cycles
+            # already journalled before this was fixed carry bare
+            # `/goto?url=...` stubs, and a report that renders them as dead
+            # links is worse than one that renders none.
+            url = absolute_url(str(item.get("url") or ""))
             meta = ", ".join(
                 x for x in (str(item.get("source") or ""), str(item.get("when") or "")) if x
             )
