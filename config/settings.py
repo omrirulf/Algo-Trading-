@@ -194,6 +194,11 @@ class LadderRung(NamedTuple):
 #:
 #: A position too small to split (fewer than three shares) takes no tranche
 #: and is managed by its stop alone; the ratchet still applies.
+#:
+#: The rungs are floors, not the whole story: every cycle the position manager
+#: also trails the stop up to ``price - ATR_STOP_MULTIPLIER x ATR`` where that
+#: is tighter, so the runner does not ride a long move back down to +1R. The
+#: stop is the only exit, and it only ever moves in the money's favour.
 PROFIT_LADDER: Final[tuple[LadderRung, ...]] = (
     LadderRung(take_at_r=1.0, take_fraction=1 / 3, stop_to_r=0.0),
     LadderRung(take_at_r=3.0, take_fraction=1 / 3, stop_to_r=1.0),

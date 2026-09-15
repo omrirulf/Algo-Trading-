@@ -42,8 +42,8 @@ PROFIT_LADDER = (
 
 Three properties the manager enforces around that table:
 
-- **The stop only ever tightens.** A rung can raise it; nothing lowers it. A
-  stop someone already moved higher keeps its height.
+- **The stop only ever tightens.** A rung can raise it, the trail can raise
+  it; nothing lowers it. A stop someone already moved higher keeps its height.
 - **A runner always exists.** The fractions sum to less than one and are
   floored to whole shares, so arithmetic — not hope — guarantees the last
   share is never the ladder's to sell.
@@ -52,6 +52,40 @@ Three properties the manager enforces around that table:
 
 A position too small to split (fewer than three shares) takes no tranche and
 is managed by its stop alone; the ratchet still applies.
+
+## The stop trails the price
+
+Independently of the rungs, **every cycle the stop is trailed up** to
+`price − ATR_STOP_MULTIPLIER × ATR` wherever that is tighter than where it
+sits. That is the initial stop's own formula, re-anchored to today's price —
+the same distance the entry was protected by, now measured from wherever the
+trade has got to.
+
+| Day | Price | Rung floor | Trail (price − 2×ATR) | Stop |
+|---|---|---|---|---|
+| entry | 100 | — | — | 96 |
+| +0.5R | 102 | 96 | 98 | **98** |
+| +1R | 104 | 100 (breakeven) | 100 | **100**, a third sold |
+| +3R | 112 | 104 (+1R) | 108 | **108**, another third sold |
+| +6R | 124 | 104 | 120 | **120** |
+
+So the last third does not ride from +6R back to +1R waiting for a rung that
+does not exist: the stop follows, and **the stop is the only exit**. The
+rungs are floors the trail can never fall below; the trail is what keeps
+pace between them.
+
+Three things it will not do:
+
+- **Loosen.** A widening ATR moves the candidate down; the ratchet ignores it.
+- **Count as a rung.** A trailing raise carries no rung index, so the ladder's
+  memory of which tranches are taken is untouched by it.
+- **Fail the position.** An ATR so large the formula goes negative leaves the
+  stop where it is and the position *held*, rather than erroring.
+
+One check a day means the trail lags by up to a day; that is the cadence, not
+a bug. A stop that ratchets daily on a two-ATR distance is a slow trail by
+design — tight enough to keep most of a long run, loose enough not to be
+shaken out by an ordinary pullback.
 
 ## What it cannot do, by construction
 
