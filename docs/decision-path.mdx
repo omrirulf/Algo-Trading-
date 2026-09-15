@@ -41,7 +41,7 @@ Neither path ever raises out of `execute()` — see
   </Step>
   <Step title="Position-count limit">
     Only applies when the signal would open a **new** ticker.
-    `len(positions) < MAX_OPEN_POSITIONS` (10). Adding to an existing
+    `len(positions) < MAX_OPEN_POSITIONS` (40). Adding to an existing
     position never trips this gate.
   </Step>
   <Step title="No flipping an existing position">

@@ -206,13 +206,27 @@ PROFIT_LADDER: Final[tuple[LadderRung, ...]] = (
 
 #: Maximum number of distinct tickers that may be held at once.
 #:
-#: Raised from 10 with the cash floor. The per-position caps are small by
-#: design -- 12% for a broad fund, 4% for a single commodity -- so reaching a
-#: fully-invested book *requires* many positions: roughly eight funds and five
-#: names. At 10 this limit would have silently capped the account near 60%
-#: again through the back door, which is the sort of interaction that is
-#: invisible until someone reads two constants together.
-MAX_OPEN_POSITIONS: Final[int] = 20
+#: Raised from 10 with the cash floor, and from 20 with the profit ladder.
+#: The per-position caps are small by design -- 12% for a broad fund, 4% for
+#: a single commodity -- so reaching a fully-invested book *requires* many
+#: positions, and at 10 this limit silently capped the account near 60%
+#: through the back door.
+#:
+#: 20 was enough for a book of full-size positions: at an average cap of
+#: about 7% across the watchlist, MAX_GROSS_EXPOSURE_PCT fills at 13 or so,
+#: and the count never bound. The ladder changes that. A winner at +3R is
+#: down to a third of its size but still holds a slot, so twenty trimmed
+#: runners would sit at ~30% of the account with the other 65% in cash and
+#: no room to open anything -- the count blocking exactly the redeployment
+#: the ladder exists to free. A slot limit's remaining job is to stop the
+#: book fragmenting into dust, and 40 -- half the watchlist -- does that
+#: while leaving a trimmed book room to grow.
+#:
+#: Diversity is not this constant's job and never was. It comes from the
+#: limits that target concentration directly: MAX_EXPOSURE_GROUP_PCT across
+#: twenty groups, the sleeve budgets, and the per-kind caps. More slots can
+#: only make the book wider; they cannot make it more concentrated.
+MAX_OPEN_POSITIONS: Final[int] = 40
 
 #: Wilder ATR lookback, in trading days.
 ATR_PERIOD: Final[int] = 14
