@@ -20,7 +20,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable, Optional
@@ -28,6 +28,7 @@ from typing import Any, Iterable, Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from config import settings as cfg  # noqa: E402
+from orchestrator import analysts, fundamentals, insiders, technicals  # noqa: E402
 
 #: Lines this far apart belong to different cycles. A daily cycle over 35
 #: tickers takes a few minutes; 20 leaves room for a slow run without
@@ -161,10 +162,67 @@ def _news_block(context: dict) -> list[str]:
     return out
 
 
-def _snapshot_block(snapshot: Any) -> list[str]:
-    """A stored snapshot dict as a compact table. Nested lists are summarised."""
+#: How each stored section is turned back into the object that rendered it
+#: for the model: the snapshot class, and the class of any nested records.
+_SNAPSHOT_CLASSES: dict[str, tuple[type, dict[str, type]]] = {
+    "technicals": (technicals.TechnicalSnapshot, {}),
+    "fundamentals": (fundamentals.FundamentalSnapshot, {}),
+    "analysts": (analysts.AnalystSnapshot, {}),
+    "insiders": (insiders.InsiderSnapshot, {"buys": insiders.InsiderTrade, "sells": insiders.InsiderTrade}),
+}
+
+
+def _rebuild(cls: type, data: dict, nested: dict[str, type]) -> Any:
+    """A snapshot back from its ``asdict()`` form.
+
+    Keys the class does not know are dropped rather than fatal: a journal
+    line written by a newer or older schema should still render, and an
+    unknown field is not evidence the model saw.
+    """
+    known = {f.name for f in fields(cls)}
+    kwargs = {k: v for k, v in data.items() if k in known}
+    for key, sub in nested.items():
+        items = kwargs.get(key)
+        if isinstance(items, list):
+            sub_known = {f.name for f in fields(sub)}
+            kwargs[key] = [
+                sub(**{k: v for k, v in item.items() if k in sub_known})
+                for item in items
+                if isinstance(item, dict)
+            ]
+    return cls(**kwargs)
+
+
+def prompt_lines(context_key: str, snapshot: Any) -> Optional[list[str]]:
+    """The exact lines the model was shown for this section, or None.
+
+    None means the stored dict could not be rebuilt -- the caller falls back
+    to a field table rather than showing nothing, because a report that
+    hides evidence it cannot format is worse than one that formats it badly.
+    """
+    spec = _SNAPSHOT_CLASSES.get(context_key)
+    if spec is None or not isinstance(snapshot, dict):
+        return None
+    cls, nested = spec
+    try:
+        return list(_rebuild(cls, snapshot, nested).as_lines())
+    except Exception:  # noqa: BLE001 - any failure means "use the table"
+        return None
+
+
+def _snapshot_block(snapshot: Any, context_key: str = "") -> list[str]:
+    """A stored section as the prose the model read; a field table if it cannot be rebuilt.
+
+    The prose carries the interpretation the numbers alone do not -- "50d
+    above 200d", "92% of the way up the 52-week range" -- and it is
+    literally what the model was judging. The table is the fallback, not
+    the goal.
+    """
     if not isinstance(snapshot, dict) or not snapshot:
         return ["_Unavailable this cycle._"]
+    lines = prompt_lines(context_key, snapshot)
+    if lines is not None:
+        return ["```text"] + lines + ["```"]
     rows = ["| field | value |", "| --- | --- |"]
     for key, value in snapshot.items():
         if isinstance(value, list):
@@ -225,7 +283,7 @@ def render_ticker(line: Line) -> list[str]:
         if context_key == "news":
             out += _news_block(context)
         else:
-            out += _snapshot_block(context.get(context_key))
+            out += _snapshot_block(context.get(context_key), context_key)
         out += ["", "</details>", ""]
 
     gaps = context.get("gaps") or []

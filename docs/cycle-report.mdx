@@ -43,9 +43,18 @@ You do not have to run it. Every cycle renders it automatically to two places:
 </details>
 
 <details><summary><b>TECHNICALS</b> — scored +0.50</summary>
-| `rsi14` | 61.2 |
+Trend: vs 20d SMA 179.10 (+3.0%), 50d 171.40 (+7.7%), 200d 163.70 (+12.8%); 50d above 200d
+Momentum: RSI(14) 61.2 | MACD 2.140 vs signal 1.820 (histogram 0.320)
+52-week range: 121.30 - 190.20 (now 92.0% of the way up)
 </details>
 ````
+
+The four enrichment sections are shown as **the prose the model read**, rebuilt
+from what the journal stored — not as a table of raw fields. The prose carries
+the interpretation the numbers alone do not ("50d above 200d", "92% of the way
+up the range"), and it is literally what was being judged. A line the report
+cannot rebuild (an older schema, a malformed value) falls back to a field
+table rather than disappearing.
 
 Tickers are ordered by conviction, so the calls worth arguing with are at the
 top. A ticker that failed names its failure; one the [funnel](/orchestrator/llm)
