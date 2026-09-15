@@ -1,0 +1,81 @@
+name: brightdata setup
+
+# One-off, run by hand: make the Bright Data account usable from Actions.
+#
+# The news provider sends every request through a Bright Data *zone*, and
+# defaults to `cli_unlocker` -- the Web Unlocker zone that `brightdata login`
+# creates on a developer's machine. An account set up through the website has
+# no such zone, so every fetch fails with `zone "cli_unlocker" not found`.
+#
+# This does what `brightdata login --api-key` does, with the same two API
+# calls the CLI makes (@brightdata/cli, commands/login.js: ensure_zones), but
+# only for the one zone this project needs. Then it fetches one ticker's news
+# for real, so a green run means the live path works -- not just that a zone
+# exists.
+#
+# Safe to re-run: an existing zone is left alone.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ensure the Web Unlocker zone exists
+        env:
+          BRIGHTDATA_API_TOKEN: ${{ secrets.BRIGHTDATA_API_TOKEN }}
+          ZONE: ${{ vars.BRIGHTDATA_SERP_ZONE || 'cli_unlocker' }}
+        run: |
+          set -euo pipefail
+          test -n "$BRIGHTDATA_API_TOKEN" || { echo "::error::BRIGHTDATA_API_TOKEN secret is not set"; exit 1; }
+          auth="Authorization: Bearer $BRIGHTDATA_API_TOKEN"
+
+          zones=$(curl -sS -f -H "$auth" https://api.brightdata.com/zone/get_active_zones) \
+            || { echo "::error::could not list zones -- is the token valid for this account?"; exit 1; }
+          echo "active zones: $(echo "$zones" | jq -r '[.[].name] | join(", ")')"
+
+          if echo "$zones" | jq -e --arg z "$ZONE" '.[] | select(.name == $z)' >/dev/null; then
+            echo "zone \"$ZONE\" already exists; nothing to create"
+          else
+            echo "zone \"$ZONE\" not found; creating a Web Unlocker zone by that name"
+            curl -sS -f -H "$auth" -H "Content-Type: application/json" \
+              -X POST https://api.brightdata.com/zone \
+              -d "$(jq -cn --arg z "$ZONE" '{zone: {name: $z, type: "unblocker"}, plan: {type: "unblocker"}}')" \
+              || { echo "::error::zone creation failed -- create a Web Unlocker zone named \"$ZONE\" in the dashboard instead"; exit 1; }
+            echo
+            echo "zone \"$ZONE\" created"
+          fi
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Fetch one ticker's news through it
+        env:
+          BRIGHTDATA_API_TOKEN: ${{ secrets.BRIGHTDATA_API_TOKEN }}
+          BRIGHTDATA_SERP_ZONE: ${{ vars.BRIGHTDATA_SERP_ZONE }}
+        run: |
+          python - <<'EOF'
+          from config.settings import get_settings
+          from orchestrator.news import BrightDataNewsProvider
+
+          s = get_settings()
+          provider = BrightDataNewsProvider(
+              s.brightdata_api_token, s.brightdata_serp_zone,
+              unlocker_zone=s.brightdata_unlocker_zone,
+          )
+          headlines = provider.fetch("MSFT")
+          print(f"MSFT: {len(headlines)} headlines")
+          for h in headlines[:3]:
+              print(" -", h[:120])
+          raise SystemExit(0 if headlines else 1)
+          EOF
