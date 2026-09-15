@@ -30,7 +30,8 @@ You do not have to run it. Every cycle renders it automatically to two places:
 | Group | Looked at | Took a side | No clear view | Problems |
 | --- | --- | --- | --- | --- |
 | Companies | 14 | 3 | 11 | 0 |
-| Index funds | 10 | 2 | 8 | 0 |
+| Whole-market funds | 14 | 2 | 12 | 0 |
+| Sector and country funds | 41 | 6 | 35 | 0 |
 | Commodities | 9 | 3 | 6 | 0 |
 
 ## Companies
@@ -88,8 +89,9 @@ report puts both on every heading:
 </Note>
 
 The sleeve tag is repeated on every heading even though the tickers are also
-**grouped** under `## Companies`, `## Index funds` and `## Commodities`: a
-heading copied or linked on its own still has to say what it is about. An
+**grouped** under `## Companies`, `## Whole-market funds`, `## Sector and
+country funds` and `## Commodities`: a heading copied or linked on its own
+still has to say what it is about. An
 unnamed ticker falls back to its own symbol, and an unrecognised one labels as
 `Company` — the same fail-closed default `kind_for()` uses for the position
 cap, never the widest one.

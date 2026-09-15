@@ -48,7 +48,7 @@ def test_it_is_not_three_correlated_megacaps_any_more():
 
 def test_every_sleeve_and_asset_class_is_reachable():
     """The reason the list exists: breadth that single US tech names cannot give."""
-    for bucket in ("Financials", "Energy", "Fund: International equity",
+    for bucket in ("Financials", "Energy", "Fund: Country: developed",
                    "Fund: Duration", "Fund: Precious metals", "Fund: Agriculture"):
         assert bucket in wl.BUCKETS
 
@@ -97,6 +97,54 @@ def test_an_explicit_watchlist_still_overrides():
     assert Settings(watchlist="AAPL, msft ", _env_file=None).watchlist_tickers == ["AAPL", "MSFT"]
 
 
+# --- breadth: a story has to have somewhere to land -----------------------
+
+
+def test_every_us_sector_is_reachable():
+    """A rate cut, an oil shock or a drug approval is a *sector* story.
+
+    With only RSP and IWM the strongest thing the model could say was "US
+    equities up", which is macro timing and the hardest call on the list.
+    """
+    for sector_fund in ("XLE", "XLF", "XLV", "XLK", "XLI", "XLY", "XLP", "XLU", "XLB", "XLC"):
+        assert sector_fund in wl.DEFAULT_WATCHLIST
+
+
+def test_the_list_spans_more_than_a_handful_of_countries():
+    """Four geographies was one fund per continent and no way to read an election."""
+    countries = set(inst.COUNTRY_DEVELOPED) | set(inst.COUNTRY_EMERGING)
+    assert len(countries) >= 20
+    assert countries <= set(wl.DEFAULT_WATCHLIST)
+    # Both halves of the world, not just the comfortable one.
+    assert len(inst.COUNTRY_EMERGING) >= 8
+
+
+def test_rates_are_more_than_one_point_on_the_curve():
+    """TLT alone made every rate story a bet on the long end."""
+    assert {"SHY", "IEF", "TLT", "TIP"} <= set(inst.DURATION)
+    assert {"LQD", "HYG", "EMB"} <= set(inst.CREDIT)
+
+
+def test_the_focused_sleeve_is_the_widest_one():
+    """Where the breadth actually came from, and where the cap work had to go."""
+    assert len(inst.FOCUSED_FUNDS) > len(inst.BROAD_FUNDS)
+    assert len(inst.FOCUSED_FUNDS) > len(inst.SINGLE_NAMES)
+
+
+def test_widening_the_list_did_not_widen_any_position():
+    """Breadth must buy diversification, not leverage.
+
+    Every ticker added is a fund, and no fund's cap went up -- so the most the
+    book can hold is unchanged, and the extra names compete for it.
+    """
+    from app import risk_engine
+
+    assert max(risk_engine.max_position_pct_for(t) for t in wl.DEFAULT_WATCHLIST) == (
+        pytest.approx(0.12)
+    )
+    assert sum(1 for t in wl.DEFAULT_WATCHLIST if inst.kind_for(t) is inst.InstrumentKind.EQUITY) == 16
+
+
 # --- cost is a function of list length ------------------------------------
 
 
@@ -110,6 +158,14 @@ def test_cost_scales_with_the_number_of_tickers():
 
 def test_the_default_list_has_an_estimable_cost():
     assert wl.estimated_monthly_cost_usd(len(wl.DEFAULT_WATCHLIST)) > 0
+
+
+def test_doubling_the_list_doubles_the_bill_and_nothing_hides_it():
+    """The list grew from 35 to 80. The cost has to grow with it, visibly."""
+    before = wl.estimated_monthly_cost_usd(35)
+    after = wl.estimated_monthly_cost_usd(len(wl.DEFAULT_WATCHLIST))
+    assert after > before
+    assert after / before == pytest.approx(len(wl.DEFAULT_WATCHLIST) / 35)
 
 
 # --- the zone fallback that used to be dead code --------------------------

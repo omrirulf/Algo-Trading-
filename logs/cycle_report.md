@@ -5,7 +5,8 @@
 | Group | Looked at | Took a side | No clear view | Problems |
 | --- | --- | --- | --- | --- |
 | Companies | 14 | 3 | 11 | 0 |
-| Index funds | 10 | 2 | 8 | 0 |
+| Whole-market funds | 7 | 2 | 5 | 0 |
+| Sector and country funds | 3 | 0 | 3 | 0 |
 | Commodities | 9 | 3 | 6 | 0 |
 
 ## How to read this
@@ -1491,7 +1492,7 @@ Distinct insiders: 0 buying, 0 selling
 
 </details>
 
-## Index funds
+## Whole-market funds
 
 ### US government bonds, 20+ years (TLT) · Index fund — BEARISH, confidence 0.45
 
@@ -1702,69 +1703,6 @@ _Not available today._
 
 </details>
 
-### Japan (EWJ) · Index fund — NEUTRAL, confidence 0.25
-
-**In the model's own words:**
-
-> EWJ (Nikkei 225 ETF) shows mixed signals with no clear catalyst for directional conviction. Technicals are constructive—the fund is up 8.3% vs 200-day MA, RSI at 53 is neutral, and price has recovered despite recent weakness. However, the 1-day and 5-day returns are negative, momentum histogram is weakly negative, and volume is sub-average at 0.29x normal, suggesting lack of conviction among buyers. Macro headwinds—elevated oil prices, geopolitical tensions, and tech sector selloff—weigh on Asian equities broadly, but the Nikkei showed relative resilience on Tuesday versus KOSPI, a slight positive. With Japan the largest holding in EWJ and the BOJ decision pending (mentioned as a factor investors are weighing), there is genuine macro uncertainty rather than a directional setup. The fund is near 52-week highs (91.6% of range) with moderate 17.7% annualized volatility, leaving limited upside room without a fresh catalyst. Insufficient material change to warrant conviction above NEUTRAL.
-
-**Main reasons it gave:**
-- Nikkei recovered vs KOSPI despite Asia tech selloff, showing relative resilience
-- Price 8.3% above 200-day MA but negative 1d/5d returns with sub-average volume signal weak follow-through
-- BOJ decision pending with elevated oil and geopolitical risks creating macro uncertainty
-- Near 52-week highs (91.6% of range) limits upside without fresh catalyst
-
-<details><summary><b>News</b> — score -0.15</summary>
-
-- [Asian markets slip as tech selloff deepens; oil prices remain elevated (EWJ:NYSEARCA)](https://www.google.com/goto?url=CAESowEB6zswFdkOjLfFHAggWW3uj973ic9d5nFq522N9IxTLCMon5WHDZ5mlecEy8ci8GgzBFTbF4L21Sr6Tvod6Mingv0T9aMqi1MGW0QfFB56bFWqyUM4xYK2paSlocJABfk98sAfS4hxfEo3S6kRHNlhVXF84CEjID07xUCt8n2ylqY4uICEwJ2vzVRvr19uTegTDRYxah7hD5g_da4N02wyH7xm)  
-  <sub>Seeking Alpha, 12 hours ago</sub>  
-  Asian markets were mostly lower on Tuesday as investors weighed elevated oil prices, geopolitical tensions and weakness in technology stocks,...
-- [KOSPI vs Nikkei: Asia’s AI trade fractures ahead of Fed and BOJ decisions](https://www.google.com/goto?url=CAESpgEB6zswFZfMEI7ehJBboyNIca0UioMR3KZr-LVvexDT7DKHYzu_sPUOsWWmNKhirsMqmrGCJIhEI0kU4nwgPWSdpMEclDAvPhLKLDgtjj6ZUcJsFiWWEoBrrXZSuOr8mCZCIQgjf-8vXVKltmvpILzco1PRO8_9gFszVSCHE7SlVH8dtIdXxlDQoV5dqc_prFQT2tajnDHMX0DgxmG8_vSPQsuV18mc)  
-  <sub>Invezz, 12 hours ago</sub>  
-  Asian stocks diverged on Tuesday as South Korea's KOSPI struggled to shake off pressure on semiconductor shares while Japan's Nikkei 225 recovered,...
-
-</details>
-
-<details><summary><b>Price and chart</b> — score +0.25</summary>
-
-```text
-Last close 96.87 (bar of 2026-09-15), from 501 daily bars
-Trend: vs 20d SMA 96.25 (+0.6%), 50d 94.70 (+2.3%), 200d 89.48 (+8.3%); 50d above 200d
-Momentum: RSI(14) 53.1 | MACD 0.743 vs signal 0.746 (histogram -0.003)
-Returns: 1d -0.7% | 5d -1.1% | 1m -1.4% | 3m +3.0%
-52-week range: 78.36 - 98.56 (now 91.6% of the way up)
-Volatility: ATR(14) 1.29 (1.3% of price) | annualised 20d 17.7%
-Volume: 0.29x the 20-day average
-```
-
-</details>
-
-<details><summary><b>Company numbers</b> — score +0.00</summary>
-
-```text
-Sector: n/a / n/a | market cap n/a
-Valuation: trailing P/E 19.30 | forward P/E n/a | P/B n/a | PEG n/a
-Profitability: profit margin n/a | operating margin n/a | ROE n/a
-Growth (YoY): revenue n/a | earnings n/a
-Balance sheet: debt/equity n/a | free cash flow n/a
-Risk: beta n/a | short interest n/a of float
-Next earnings: n/a
-```
-
-</details>
-
-<details><summary><b>What analysts and big funds say</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
 ### S&P 500, equal weight (RSP) · Index fund — NEUTRAL, confidence 0.25
 
 **In the model's own words:**
@@ -1881,64 +1819,6 @@ Volume: 0.73x the 20-day average
 ```text
 Sector: n/a / n/a | market cap n/a
 Valuation: trailing P/E 16.65 | forward P/E n/a | P/B 1.23 | PEG n/a
-Profitability: profit margin n/a | operating margin n/a | ROE n/a
-Growth (YoY): revenue n/a | earnings n/a
-Balance sheet: debt/equity n/a | free cash flow n/a
-Risk: beta n/a | short interest n/a of float
-Next earnings: n/a
-```
-
-</details>
-
-<details><summary><b>What analysts and big funds say</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-### Israel (EIS) · Index fund — NEUTRAL, confidence 0.20
-
-**In the model's own words:**
-
-> EIS is a multi-strategy closed-end fund with minimal information available for analysis. No macro news emerged in the past 24 hours. Technicals show mixed signals: the price sits slightly below its 20-day SMA (-0.6%), but above both 50-day and 200-day averages with a bullish 50/200 arrangement. Momentum is weak—RSI at 48.5 is neutral-to-slightly-bearish, and MACD histogram is negative (-0.211). Short-term performance is mildly negative across all timeframes (5d: -2.2%, 1m: -1.7%, 3m: -3.2%). Volatility is moderate at 19.6% annualized. Volume is below average at 0.76x. The trailing P/E of 17.87 provides limited insight without forward earnings or sector context. The lack of analyst coverage, insider filings, and fundamental data beyond a single valuation metric—combined with absent news flow—leaves no catalyst to justify a directional move. The position is mid-range within its 52-week band (65.5%), suggesting neither extreme undervaluation nor overbought conditions. This is a technical hold with no decisive signal.
-
-**Main reasons it gave:**
-- RSI 48.5 and negative MACD histogram indicate neutral-to-weak momentum
-- price below 20-day SMA with negative returns across 5d, 1m, 3m
-- below-average volume limits conviction in directional move
-- no macro news or catalyst identified in past 24 hours
-
-<details><summary><b>News</b> — score +0.00</summary>
-
-_No news found for this one today._
-
-</details>
-
-<details><summary><b>Price and chart</b> — score -0.10</summary>
-
-```text
-Last close 122.63 (bar of 2026-09-15), from 501 daily bars
-Trend: vs 20d SMA 123.39 (-0.6%), 50d 121.66 (+0.8%), 200d 121.55 (+0.9%); 50d above 200d
-Momentum: RSI(14) 48.5 | MACD 0.409 vs signal 0.620 (histogram -0.211)
-Returns: 1d -0.3% | 5d -2.2% | 1m -1.7% | 3m -3.2%
-52-week range: 94.07 - 137.69 (now 65.5% of the way up)
-Volatility: ATR(14) 1.69 (1.4% of price) | annualised 20d 19.6%
-Volume: 0.76x the 20-day average
-```
-
-</details>
-
-<details><summary><b>Company numbers</b> — score +0.00</summary>
-
-```text
-Sector: n/a / n/a | market cap n/a
-Valuation: trailing P/E 17.87 | forward P/E n/a | P/B n/a | PEG n/a
 Profitability: profit margin n/a | operating margin n/a | ROE n/a
 Growth (YoY): revenue n/a | earnings n/a
 Balance sheet: debt/equity n/a | free cash flow n/a
@@ -2110,7 +1990,130 @@ _Not available today._
 
 </details>
 
-### US real estate (VNQ) · Index fund — NEUTRAL, confidence 0.20
+## Sector and country funds
+
+### Japan (EWJ) · Sector or country — NEUTRAL, confidence 0.25
+
+**In the model's own words:**
+
+> EWJ (Nikkei 225 ETF) shows mixed signals with no clear catalyst for directional conviction. Technicals are constructive—the fund is up 8.3% vs 200-day MA, RSI at 53 is neutral, and price has recovered despite recent weakness. However, the 1-day and 5-day returns are negative, momentum histogram is weakly negative, and volume is sub-average at 0.29x normal, suggesting lack of conviction among buyers. Macro headwinds—elevated oil prices, geopolitical tensions, and tech sector selloff—weigh on Asian equities broadly, but the Nikkei showed relative resilience on Tuesday versus KOSPI, a slight positive. With Japan the largest holding in EWJ and the BOJ decision pending (mentioned as a factor investors are weighing), there is genuine macro uncertainty rather than a directional setup. The fund is near 52-week highs (91.6% of range) with moderate 17.7% annualized volatility, leaving limited upside room without a fresh catalyst. Insufficient material change to warrant conviction above NEUTRAL.
+
+**Main reasons it gave:**
+- Nikkei recovered vs KOSPI despite Asia tech selloff, showing relative resilience
+- Price 8.3% above 200-day MA but negative 1d/5d returns with sub-average volume signal weak follow-through
+- BOJ decision pending with elevated oil and geopolitical risks creating macro uncertainty
+- Near 52-week highs (91.6% of range) limits upside without fresh catalyst
+
+<details><summary><b>News</b> — score -0.15</summary>
+
+- [Asian markets slip as tech selloff deepens; oil prices remain elevated (EWJ:NYSEARCA)](https://www.google.com/goto?url=CAESowEB6zswFdkOjLfFHAggWW3uj973ic9d5nFq522N9IxTLCMon5WHDZ5mlecEy8ci8GgzBFTbF4L21Sr6Tvod6Mingv0T9aMqi1MGW0QfFB56bFWqyUM4xYK2paSlocJABfk98sAfS4hxfEo3S6kRHNlhVXF84CEjID07xUCt8n2ylqY4uICEwJ2vzVRvr19uTegTDRYxah7hD5g_da4N02wyH7xm)  
+  <sub>Seeking Alpha, 12 hours ago</sub>  
+  Asian markets were mostly lower on Tuesday as investors weighed elevated oil prices, geopolitical tensions and weakness in technology stocks,...
+- [KOSPI vs Nikkei: Asia’s AI trade fractures ahead of Fed and BOJ decisions](https://www.google.com/goto?url=CAESpgEB6zswFZfMEI7ehJBboyNIca0UioMR3KZr-LVvexDT7DKHYzu_sPUOsWWmNKhirsMqmrGCJIhEI0kU4nwgPWSdpMEclDAvPhLKLDgtjj6ZUcJsFiWWEoBrrXZSuOr8mCZCIQgjf-8vXVKltmvpILzco1PRO8_9gFszVSCHE7SlVH8dtIdXxlDQoV5dqc_prFQT2tajnDHMX0DgxmG8_vSPQsuV18mc)  
+  <sub>Invezz, 12 hours ago</sub>  
+  Asian stocks diverged on Tuesday as South Korea's KOSPI struggled to shake off pressure on semiconductor shares while Japan's Nikkei 225 recovered,...
+
+</details>
+
+<details><summary><b>Price and chart</b> — score +0.25</summary>
+
+```text
+Last close 96.87 (bar of 2026-09-15), from 501 daily bars
+Trend: vs 20d SMA 96.25 (+0.6%), 50d 94.70 (+2.3%), 200d 89.48 (+8.3%); 50d above 200d
+Momentum: RSI(14) 53.1 | MACD 0.743 vs signal 0.746 (histogram -0.003)
+Returns: 1d -0.7% | 5d -1.1% | 1m -1.4% | 3m +3.0%
+52-week range: 78.36 - 98.56 (now 91.6% of the way up)
+Volatility: ATR(14) 1.29 (1.3% of price) | annualised 20d 17.7%
+Volume: 0.29x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.00</summary>
+
+```text
+Sector: n/a / n/a | market cap n/a
+Valuation: trailing P/E 19.30 | forward P/E n/a | P/B n/a | PEG n/a
+Profitability: profit margin n/a | operating margin n/a | ROE n/a
+Growth (YoY): revenue n/a | earnings n/a
+Balance sheet: debt/equity n/a | free cash flow n/a
+Risk: beta n/a | short interest n/a of float
+Next earnings: n/a
+```
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+### Israel (EIS) · Sector or country — NEUTRAL, confidence 0.20
+
+**In the model's own words:**
+
+> EIS is a multi-strategy closed-end fund with minimal information available for analysis. No macro news emerged in the past 24 hours. Technicals show mixed signals: the price sits slightly below its 20-day SMA (-0.6%), but above both 50-day and 200-day averages with a bullish 50/200 arrangement. Momentum is weak—RSI at 48.5 is neutral-to-slightly-bearish, and MACD histogram is negative (-0.211). Short-term performance is mildly negative across all timeframes (5d: -2.2%, 1m: -1.7%, 3m: -3.2%). Volatility is moderate at 19.6% annualized. Volume is below average at 0.76x. The trailing P/E of 17.87 provides limited insight without forward earnings or sector context. The lack of analyst coverage, insider filings, and fundamental data beyond a single valuation metric—combined with absent news flow—leaves no catalyst to justify a directional move. The position is mid-range within its 52-week band (65.5%), suggesting neither extreme undervaluation nor overbought conditions. This is a technical hold with no decisive signal.
+
+**Main reasons it gave:**
+- RSI 48.5 and negative MACD histogram indicate neutral-to-weak momentum
+- price below 20-day SMA with negative returns across 5d, 1m, 3m
+- below-average volume limits conviction in directional move
+- no macro news or catalyst identified in past 24 hours
+
+<details><summary><b>News</b> — score +0.00</summary>
+
+_No news found for this one today._
+
+</details>
+
+<details><summary><b>Price and chart</b> — score -0.10</summary>
+
+```text
+Last close 122.63 (bar of 2026-09-15), from 501 daily bars
+Trend: vs 20d SMA 123.39 (-0.6%), 50d 121.66 (+0.8%), 200d 121.55 (+0.9%); 50d above 200d
+Momentum: RSI(14) 48.5 | MACD 0.409 vs signal 0.620 (histogram -0.211)
+Returns: 1d -0.3% | 5d -2.2% | 1m -1.7% | 3m -3.2%
+52-week range: 94.07 - 137.69 (now 65.5% of the way up)
+Volatility: ATR(14) 1.69 (1.4% of price) | annualised 20d 19.6%
+Volume: 0.76x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.00</summary>
+
+```text
+Sector: n/a / n/a | market cap n/a
+Valuation: trailing P/E 17.87 | forward P/E n/a | P/B n/a | PEG n/a
+Profitability: profit margin n/a | operating margin n/a | ROE n/a
+Growth (YoY): revenue n/a | earnings n/a
+Balance sheet: debt/equity n/a | free cash flow n/a
+Risk: beta n/a | short interest n/a of float
+Next earnings: n/a
+```
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+### US real estate (VNQ) · Sector or country — NEUTRAL, confidence 0.20
 
 **In the model's own words:**
 
@@ -2808,4 +2811,5 @@ Terms that appear above and have no simpler word:
 - **Stop-loss** — An order that closes the position if the price moves too far the wrong way.
 - **Insider** — A director or senior manager of the company. They have to report their own trades.
 - **Index fund** — One fund that holds many shares at once, so it follows a whole market instead of one company.
+- **Sector or country fund** — A fund that holds many companies, but all of them in one industry or one country. Safer than one company, riskier than a whole-market fund.
 

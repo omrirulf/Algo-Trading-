@@ -483,8 +483,8 @@ Try adding `"quantity": 500` to that payload — it will be rejected with a
 | Enriched context can't reach for a credential | CI greps `context.py` / `technicals.py` / `fundamentals.py` / `analysts.py` for settings and key reads |
 | The scorer cannot trade | CI greps `analysis/` for any order path or file write — it grades past decisions and must never be able to make one |
 | Prompt injection has a bounded blast radius | Headlines and firm names are third-party text. The system prompt marks the whole context block untrusted, and even a successful injection can only move `bias`/`conviction` — still subject to the conviction floor, the per-instrument cap, the group and sleeve limits, the gross exposure cap, and a mandatory stop |
-| Max 5% per single name, 12% per broad fund, 4% per single-commodity fund | `risk_engine.calculate_position_size()` (checked twice: pre- and post-rounding). The cap comes from `config/instruments.py` via `max_position_pct_for()` — never from the signal, which has no field that could carry an instrument kind. A commodity fund is capped *below* a stock: "fund" does no diversification work when it holds one commodity |
-| Max 25% per exposure group | `risk_engine.exposure_group_headroom()` — what stops a diversified watchlist producing a one-bet book. Spans both sleeves, so XOM plus two energy funds is one energy bet made three times |
+| Max 5% per single name, 12% per broad fund, 7% per focused (one-sector or one-country) fund, 4% per single-commodity fund | `risk_engine.calculate_position_size()` (checked twice: pre- and post-rounding). The cap comes from `config/instruments.py` via `max_position_pct_for()` — never from the signal, which has no field that could carry an instrument kind. A commodity fund is capped *below* a stock: "fund" does no diversification work when it holds one commodity |
+| Max 25% per exposure group | `risk_engine.exposure_group_headroom()` — what stops a diversified watchlist producing a one-bet book. Spans every sleeve, so XOM plus `XLE` plus two energy funds is one energy bet made four times |
 | Funds are the core: 70% vs 25% for single names | `risk_engine.sleeve_headroom()` — a deliberate statement that a stock-picking edge is unproven here |
 | Max 95% of equity deployed in total | `risk_engine.check_gross_exposure_limit()` — the 5% buffer |
 | Mandatory stop-loss on every order | `broker_client.submit_bracket_order()` — no code path submits without `StopLossRequest` (Alpaca OTO: market entry + attached stop) |
@@ -508,7 +508,7 @@ Try adding `"quantity": 500` to that payload — it will be rejected with a
 5. Open position in the opposite direction → `REJECTED`.
 6. Fetch latest close and 14-day ATR; ATR below `MIN_ATR_PCT_OF_PRICE` → `REJECTED`.
 7. Stop = entry ∓ `ATR_STOP_MULTIPLIER` × ATR (long / short).
-8. Size = floor((cap × equity − existing exposure) / price), bounded by the tightest of the group, sleeve and gross limits; 0 shares → `REJECTED`. The cap is 5% for a single name, 12% for a broad fund and 4% for a single-commodity fund, resolved from the ticker.
+8. Size = floor((cap × equity − existing exposure) / price), bounded by the tightest of the group, sleeve and gross limits; 0 shares → `REJECTED`. The cap is 5% for a single name, 12% for a broad fund, 7% for a one-sector or one-country fund and 4% for a single-commodity fund, resolved from the ticker.
 9. Submit market entry with attached stop → `ACCEPTED`.
 
 Any broker / market-data failure produces an `ERROR` result rather than an

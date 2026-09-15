@@ -46,7 +46,39 @@ MAX_POSITION_PCT: Final[float] = 0.05
 #: conservative. This number started as a guess and is now checked.
 MAX_BROAD_FUND_PCT: Final[float] = 0.12
 
-#: A fund tracking ONE commodity gets the tightest cap of the three, below
+#: A fund holding many companies, all in ONE sector or ONE country.
+#:
+#: The cap that makes it safe to widen the watchlist past a couple of index
+#: funds. A sector or country fund is diversified against a single company
+#: failing and against nothing else -- XLE is twenty-three ways of being long
+#: the oil price, and a Brazil fund is one currency, one central bank and one
+#: election. Sizing it like a fund that spans the world would repeat, one
+#: level up, the error the commodity cap exists to avoid: reading the cap off
+#: the word "fund" rather than off the risk.
+#:
+#: Above the single-name cap because a sector cannot go to zero on a fraud;
+#: below the broad-fund cap because one sector is one bet.
+#:
+#: MEASURED, 2026-09-15, by the `market checks` workflow over the new sleeve.
+#: Two measurements disagreed, and the tighter one wins -- which is the same
+#: call MAX_COMMODITY_FUND_PCT already makes:
+#:
+#: - Median daily volatility, 3mo of real bars: 1.16% for a focused fund
+#:   against 2.25% for a single name, a ratio of 1.9x. Volatility *alone*
+#:   would justify about 9.7%.
+#: - Realised risk per trade, 2 years and 3,977 mechanical trades through the
+#:   actual ATR stop and sizing math (backtest/compare_sleeves.py): a focused
+#:   fund at 8% carried 0.28% of the account per trade against 0.25% for a
+#:   single name at 5% -- *above* parity, which is exactly what the
+#:   broad-fund cap was tuned down to avoid. Its worst trade was -1.09%
+#:   against the single name's -0.97%.
+#:
+#: 7% is where the second measurement puts parity (8% x 0.25/0.28 = 7.1%).
+#: The median volatility figure is the loose bound and the stop is what
+#: actually decides what a position can lose, so the stop wins.
+MAX_FOCUSED_FUND_PCT: Final[float] = 0.07
+
+#: A fund tracking ONE commodity gets the tightest cap of the four, below
 #: even a single name. "Fund" does no diversification work here -- coffee is
 #: one thing -- and three risks pile on top that no equity carries: roll decay
 #: in contango (USO being the notorious case), issuer credit risk on the ETNs,

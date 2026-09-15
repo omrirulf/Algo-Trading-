@@ -36,6 +36,7 @@ from orchestrator.fx import fetch_rate as fetch_fx_rate  # noqa: E402
 from config.instruments import (  # noqa: E402
     BROAD_FUNDS,
     COMMODITY_FUNDS,
+    FOCUSED_FUNDS,
     SINGLE_NAMES,
     InstrumentKind,
     kind_for,
@@ -185,6 +186,8 @@ def render(results: list[Check]) -> str:
                 if r.kind == InstrumentKind.EQUITY.value and r.daily_vol_pct]
     funds = [r.daily_vol_pct for r in results
              if r.kind == InstrumentKind.BROAD_FUND.value and r.daily_vol_pct]
+    focused = [r.daily_vol_pct for r in results
+               if r.kind == InstrumentKind.FOCUSED_FUND.value and r.daily_vol_pct]
     commodities = [r.daily_vol_pct for r in results
                    if r.kind == InstrumentKind.COMMODITY_FUND.value and r.daily_vol_pct]
     if equities and funds:
@@ -194,6 +197,8 @@ def render(results: list[Check]) -> str:
             f"  single name      {statistics.median(equities):.2f}%",
             f"  broad fund       {statistics.median(funds):.2f}%",
         ]
+        if focused:
+            lines.append(f"  focused fund     {statistics.median(focused):.2f}%")
         if commodities:
             lines.append(f"  commodity fund   {statistics.median(commodities):.2f}%")
         ratio = statistics.median(equities) / statistics.median(funds)
@@ -203,6 +208,15 @@ def render(results: list[Check]) -> str:
             "Risk per trade scales as cap/volatility, so the broad-fund cap is",
             f"defensible up to about {ratio:.1f}x the single-name cap on these numbers.",
         ]
+        if focused:
+            # The focused cap is the one still carrying a provisional number,
+            # so this line is the measurement it is waiting on.
+            f_ratio = statistics.median(equities) / statistics.median(focused)
+            lines += [
+                f"A single name is {f_ratio:.1f}x as volatile as a focused fund here,",
+                f"so the focused cap is defensible up to about "
+                f"{f_ratio * 100 * 0.05:.1f}% against a 5% single-name cap.",
+            ]
         if commodities:
             c_ratio = statistics.median(commodities) / statistics.median(equities)
             lines.append(
@@ -222,7 +236,7 @@ def main(argv: list[str] | None = None) -> int:
 
     results = [
         check(t, args.period, args.equity)
-        for t in SINGLE_NAMES + BROAD_FUNDS + COMMODITY_FUNDS
+        for t in SINGLE_NAMES + BROAD_FUNDS + FOCUSED_FUNDS + COMMODITY_FUNDS
     ]
 
     # Not tradeable and not a holding -- but if USD/ILS stops resolving, the

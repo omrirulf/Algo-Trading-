@@ -135,10 +135,12 @@ back as `attempt to write a readonly database`.
 SQLite makes the logs queryable. It does not stop them having to live in git.
 
 The heartbeat commits the journal back to the repository after every cycle,
-because a discarded runner would otherwise lose it. At 35 tickers and roughly
-seven cycles a session that is a few hundred lines a day, and journal lines
-carrying a full context run to several kilobytes each — order of tens of
-megabytes a month, permanently, because git history does not forget.
+because a discarded runner would otherwise lose it. At 80 tickers and one
+cycle a day that is 80 lines a day, and journal lines carrying a full context
+run to several kilobytes each — order of tens of megabytes a month,
+permanently, because git history does not forget. The figure was written when
+the list was 35 names deep and the cycle ran hourly; the list has since more
+than doubled while the cadence dropped to daily, which is roughly a wash.
 
 `store/push_remote.py` copies both logs to a Postgres database (Supabase), over
 PostgREST:

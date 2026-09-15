@@ -43,6 +43,7 @@ from config import settings as cfg  # noqa: E402
 from config.instruments import (  # noqa: E402
     BROAD_FUNDS,
     COMMODITY_FUNDS,
+    FOCUSED_FUNDS,
     SINGLE_NAMES,
 )
 
@@ -271,6 +272,7 @@ def main(argv: list[str] | None = None) -> int:
     results = [
         run_sleeve("single name", SINGLE_NAMES, cfg.MAX_POSITION_PCT, **common),
         run_sleeve("broad fund", BROAD_FUNDS, cfg.MAX_BROAD_FUND_PCT, **common),
+        run_sleeve("focused fund", FOCUSED_FUNDS, cfg.MAX_FOCUSED_FUND_PCT, **common),
         run_sleeve("commodity", COMMODITY_FUNDS, cfg.MAX_COMMODITY_FUND_PCT, **common),
     ]
 

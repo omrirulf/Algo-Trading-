@@ -26,7 +26,11 @@ permissions:
 jobs:
   cycle:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Raised from 15 with the watchlist. A cycle costs roughly 24 seconds a
+    # ticker -- 14 minutes over 35 names, so 80 names would have hit the old
+    # ceiling and been killed mid-run, after paying for every call it had
+    # already made. 45 leaves room for a slow news provider.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 

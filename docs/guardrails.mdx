@@ -18,8 +18,9 @@ that last part works.
 | Market-context modules read no credentials | CI greps every `orchestrator/` module except `heartbeat.py`, `news.py` and `llm.py` for credential reads — a settings lookup, an environment read, or attribute access on a `secret` / `api_key` / `_token` / `password` name. yfinance is unauthenticated; the check keeps it that way. |
 | Max 5% per **single name** | `risk_engine.calculate_position_size()` — checked twice, pre- and post-rounding. |
 | Max 12% per **broad fund** | Same function, cap chosen by `risk_engine.max_position_pct_for()` from `config/instruments.py` — never from the signal. |
+| Max 7% per **focused fund** | One sector or one country. Above a single name, below a fund that spans the world. |
 | Max 4% per **single-commodity fund** | Tighter than a single stock: "fund" does no diversification work when it holds one commodity. |
-| Max 25% per **exposure group** | `risk_engine.exposure_group_headroom()` — spans both sleeves. |
+| Max 25% per **exposure group** | `risk_engine.exposure_group_headroom()` — spans every sleeve. |
 | 45% funds / 15% single names | `risk_engine.sleeve_headroom()` — funds are the core holding. |
 | Max 95% of equity deployed **in total** | `risk_engine.check_gross_exposure_limit()` — the only check that sees every holding at once. |
 | Mandatory stop-loss on every order | `broker_client.submit_bracket_order()` — no code path submits an entry without a `StopLossRequest`. |
@@ -154,11 +155,15 @@ inline in `broker_client.py`, specifically so that no environment variable,
 however misconfigured, can flip it. Going live requires editing this line,
 which shows up in a diff.
 
-## Two position caps, and the boundary between them
+## Four position caps, and the boundary between them
 
-A single name is capped at 5%; a broad fund at 12%; a single-commodity fund at 4% — *below* a stock, because a fund holding one commodity is not diversified and carries roll decay, issuer risk and thin volume on top. A broad fund
-is already hundreds of positions, so holding one at the single-name cap buys
-5% of market exposure and leaves the account in cash.
+A single name is capped at 5%; a broad fund at 12%; a focused fund — one
+sector or one country — at 7%; a single-commodity fund at 4%, *below* a stock,
+because a fund holding one commodity is not diversified and carries roll
+decay, issuer risk and thin volume on top. A broad fund is already hundreds of
+positions, so holding one at the single-name cap buys 5% of market exposure
+and leaves the account in cash. A sector fund is hundreds of positions in one
+industry, which is why it sits between the two rather than sharing either.
 
 The larger cap makes the classification a **privilege boundary**. If a model
 could assert *"this is a fund"*, it could enlarge its own position by claiming
@@ -170,6 +175,8 @@ def max_position_pct_for(ticker: str) -> float:
     kind = kind_for(ticker)
     if kind is InstrumentKind.BROAD_FUND:
         return cfg.MAX_BROAD_FUND_PCT
+    if kind is InstrumentKind.FOCUSED_FUND:
+        return cfg.MAX_FOCUSED_FUND_PCT
     if kind is InstrumentKind.COMMODITY_FUND:
         return cfg.MAX_COMMODITY_FUND_PCT
     return cfg.MAX_POSITION_PCT
@@ -177,8 +184,10 @@ def max_position_pct_for(ticker: str) -> float:
 
 `LLMSignal` has no field that could carry an instrument kind, and `extra="forbid"`
 turns an invented one into a validation error before any execution logic runs.
-An unrecognised ticker resolves to `EQUITY` — the tighter cap — so a mistake
-can only ever size down.
+An unrecognised ticker resolves to `EQUITY` — never the widest cap, and not
+the focused one either — so a mistake can only ever size down. Adding a fourth
+kind added a fourth thing worth claiming, and changed nothing about who gets
+to claim it.
 
 <Warning>
   **A bigger cap is not a safer one.** Risk per trade scales as

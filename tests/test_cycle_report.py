@@ -219,6 +219,8 @@ def test_a_link_journalled_before_the_fix_still_opens():
     [
         ("LLY", "Eli Lilly", "Company"),
         ("TLT", "US government bonds, 20+ years", "Index fund"),
+        ("XLE", "US energy companies", "Sector or country"),
+        ("EWZ", "Brazil", "Sector or country"),
         ("GLD", "Gold", "Commodity"),
     ],
 )
@@ -247,10 +249,17 @@ def test_the_sleeve_tag_is_on_the_heading_even_though_the_list_is_grouped():
 
 
 def test_the_report_groups_by_what_the_thing_is():
-    text = cr.render([_line("GLD"), _line("LLY"), _line("TLT")])
-    assert text.index("## Companies") < text.index("## Index funds") < text.index("## Commodities")
+    text = cr.render([_line("GLD"), _line("LLY"), _line("TLT"), _line("XLE")])
+    order = [
+        text.index("## Companies"),
+        text.index("## Whole-market funds"),
+        text.index("## Sector and country funds"),
+        text.index("## Commodities"),
+    ]
+    assert order == sorted(order)
     # ...and each name sits under its own group.
-    assert text.index("Eli Lilly") < text.index("## Index funds")
+    assert text.index("Eli Lilly") < text.index("## Whole-market funds")
+    assert text.index("US energy companies (XLE)") > text.index("## Sector and country funds")
     assert text.index("Gold (GLD)") > text.index("## Commodities")
 
 
