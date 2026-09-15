@@ -66,3 +66,21 @@ def receive_signal(
     engine: Annotated[ExecutionEngine, Depends(get_engine)],
 ) -> ExecutionResult:
     return engine.execute(signal)
+
+
+@app.post(
+    "/webhook/positions/manage",
+    dependencies=[Depends(require_webhook_secret)],
+)
+def manage_positions(
+    engine: Annotated[ExecutionEngine, Depends(get_engine)],
+) -> dict:
+    """Walk every open position up the profit ladder once.
+
+    No request body: there is nothing a caller could say that should change
+    what the ladder does. Same secret as the signal endpoint, because this
+    can sell.
+    """
+    from app.position_manager import PositionManager
+
+    return PositionManager(engine.broker, engine.market_data).manage().as_dict()

@@ -48,6 +48,8 @@ class Dispatcher(Protocol):
 
     def is_market_open(self) -> bool: ...
 
+    def manage_positions(self) -> dict: ...
+
 
 class DirectDispatcher:
     """Calls the execution engine in this process."""
@@ -71,6 +73,14 @@ class DirectDispatcher:
 
     def is_market_open(self) -> bool:
         return bool(self._get_engine().broker.is_market_open())
+
+    def manage_positions(self) -> dict:
+        # Same broker and feed the engine uses, so a tranche is priced off
+        # the quote a new entry would be.
+        from app.position_manager import PositionManager
+
+        engine = self._get_engine()
+        return PositionManager(engine.broker, engine.market_data).manage().as_dict()
 
     def dispatch(self, signal: LLMSignal) -> dict:
         result = self._get_engine().execute(signal)
@@ -98,6 +108,23 @@ class WebhookDispatcher:
         # market-hours gate makes the call -- correct, just not free.
         return True
 
+    def manage_positions(self) -> dict:
+        settings = get_settings()
+        headers = {"x-webhook-secret": settings.webhook_shared_secret}
+        url = manage_url(settings.webhook_url)
+        if self._client is None:
+            with httpx.Client(timeout=60.0) as client:
+                response = client.post(url, headers=headers)
+        else:
+            response = self._client.post(url, headers=headers)
+        if response.status_code != 200:
+            return {"error": f"HTTP {response.status_code}", "body": response.text[:500]}
+        try:
+            body = response.json()
+        except ValueError:
+            return {"error": "non-JSON body", "body": response.text[:500]}
+        return body if isinstance(body, dict) else {"error": "unexpected body", "body": body}
+
     def dispatch(self, signal: LLMSignal) -> dict:
         settings = get_settings()
         headers = {"x-webhook-secret": settings.webhook_shared_secret}
@@ -108,6 +135,18 @@ class WebhookDispatcher:
         else:
             response = self._client.post(settings.webhook_url, json=body, headers=headers)
         return _webhook_outcome(response)
+
+
+def manage_url(signal_url: str) -> str:
+    """The management endpoint, beside the signal one.
+
+    ``.../webhook/signal`` -> ``.../webhook/positions/manage``. Derived rather
+    than a second setting, so the two cannot point at different engines.
+    """
+    base = signal_url.rstrip("/")
+    if base.endswith("/signal"):
+        base = base[: -len("/signal")]
+    return f"{base}/positions/manage"
 
 
 def _webhook_outcome(response: httpx.Response) -> dict:
@@ -136,6 +175,7 @@ def build_dispatcher(mode: str = "") -> Dispatcher:
 
 
 __all__ = [
+    "manage_url",
     "DIRECT",
     "WEBHOOK",
     "VALID_MODES",

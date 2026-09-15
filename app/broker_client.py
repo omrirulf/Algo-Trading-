@@ -123,10 +123,24 @@ class OpenPosition:
     ticker: str
     qty: float          # positive for long, negative for short
     market_value: float  # absolute dollar exposure
+    #: What the shares actually cost, from the broker. The baseline every
+    #: profit-ladder rung is measured from; zero means the broker did not say.
+    avg_entry_price: float = 0.0
 
     @property
     def side(self) -> str:
         return "buy" if self.qty > 0 else "sell"
+
+
+@dataclass(frozen=True)
+class StopOrder:
+    """The live stop-loss protecting a position -- the OTO child, once the entry fills."""
+
+    order_id: str
+    ticker: str
+    qty: int
+    stop_price: float
+    side: str  # the stop's own side: "sell" protects a long, "buy" a short
 
 
 @dataclass(frozen=True)
@@ -139,7 +153,7 @@ class SubmittedOrder:
 
 
 class BrokerClient(Protocol):
-    """What the execution engine needs from a broker."""
+    """What the execution engine and the position manager need from a broker."""
 
     def is_market_open(self) -> bool: ...
 
@@ -150,6 +164,14 @@ class BrokerClient(Protocol):
     def submit_bracket_order(
         self, ticker: str, qty: int, side: str, stop_price: float
     ) -> SubmittedOrder: ...
+
+    # --- position management: the only three things the ladder may do ---
+
+    def get_open_stop_order(self, ticker: str) -> Optional[StopOrder]: ...
+
+    def replace_stop_order(self, order_id: str, qty: int, stop_price: float) -> StopOrder: ...
+
+    def close_position_partially(self, ticker: str, qty: int) -> str: ...
 
 
 def cli_config_dir() -> Path:
@@ -318,6 +340,7 @@ class AlpacaPaperBroker:
                 ticker=p.symbol.upper(),
                 qty=float(p.qty),
                 market_value=abs(float(p.market_value)),
+                avg_entry_price=float(getattr(p, "avg_entry_price", 0) or 0),
             )
             for p in positions
         ]
@@ -369,3 +392,116 @@ class AlpacaPaperBroker:
             side=side,
             stop_price=stop_price,
         )
+
+    # ------------------------------------------------------------------ #
+    # Position management
+    # ------------------------------------------------------------------ #
+    # Three primitives, and deliberately no fourth. Between them a winning
+    # position can be scaled out and its stop walked up; none of them can
+    # open a position, add to one, or reverse one. The rule that every entry
+    # carries a stop is untouched because nothing here is an entry.
+
+    #: Order states in which a stop is no longer protecting anything.
+    _TERMINAL_ORDER_STATES = frozenset(
+        {"filled", "canceled", "cancelled", "expired", "rejected", "replaced", "done_for_day"}
+    )
+
+    def get_open_stop_order(self, ticker: str) -> Optional[StopOrder]:
+        """The live stop protecting ``ticker``, or ``None`` if there is not one.
+
+        The OTO child is born ``held`` and becomes its own open order once the
+        entry fills, so it can surface either as a top-level open order or as
+        a leg of a still-open parent. Both are scanned; the first live stop
+        for the symbol wins. ``None`` is a real answer -- the position manager
+        treats it as "leave this one alone and say so", never as permission to
+        act unprotected.
+        """
+        from alpaca.trading.enums import OrderType, QueryOrderStatus
+        from alpaca.trading.requests import GetOrdersRequest
+
+        symbol = ticker.strip().upper()
+        try:
+            orders = self._client.get_orders(
+                GetOrdersRequest(status=QueryOrderStatus.OPEN, symbols=[symbol], nested=True)
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise BrokerError(f"get_orders failed for {symbol}: {exc}") from exc
+
+        seen: set[str] = set()
+        for parent in orders or []:
+            for candidate in (parent, *(getattr(parent, "legs", None) or [])):
+                order_id = str(getattr(candidate, "id", ""))
+                if not order_id or order_id in seen:
+                    continue
+                seen.add(order_id)
+                if str(getattr(candidate, "symbol", "")).upper() != symbol:
+                    continue
+                kind = getattr(candidate, "order_type", None) or getattr(candidate, "type", None)
+                if str(getattr(kind, "value", kind)) != OrderType.STOP.value:
+                    continue
+                state = str(getattr(getattr(candidate, "status", ""), "value", getattr(candidate, "status", "")))
+                if state in self._TERMINAL_ORDER_STATES:
+                    continue
+                stop_price = getattr(candidate, "stop_price", None)
+                if stop_price is None:
+                    continue
+                side = getattr(candidate, "side", "")
+                return StopOrder(
+                    order_id=order_id,
+                    ticker=symbol,
+                    qty=int(float(candidate.qty)),
+                    stop_price=float(stop_price),
+                    side=str(getattr(side, "value", side)),
+                )
+        return None
+
+    def replace_stop_order(self, order_id: str, qty: int, stop_price: float) -> StopOrder:
+        """Move a live stop and shrink it to the shares it still protects.
+
+        One call, so there is no moment between "old stop cancelled" and "new
+        stop placed" in which the position is naked -- Alpaca applies a
+        replace atomically or refuses it. The position manager calls this
+        *before* selling a tranche, for the same reason: a stop that still
+        covers the old size would reserve shares the exit needs.
+        """
+        from alpaca.trading.requests import ReplaceOrderRequest
+
+        if qty < 1 or int(qty) != qty:
+            raise BrokerError(f"qty must be a positive whole number, got {qty}")
+        if stop_price <= 0:
+            raise BrokerError(f"stop_price must be positive, got {stop_price}")
+        try:
+            order = self._client.replace_order_by_id(
+                order_id, ReplaceOrderRequest(qty=int(qty), stop_price=stop_price)
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise BrokerError(f"replace_order failed for {order_id}: {exc}") from exc
+        side = getattr(order, "side", "")
+        return StopOrder(
+            order_id=str(order.id),
+            ticker=str(order.symbol).upper(),
+            qty=int(float(order.qty)),
+            stop_price=float(order.stop_price if order.stop_price is not None else stop_price),
+            side=str(getattr(side, "value", side)),
+        )
+
+    def close_position_partially(self, ticker: str, qty: int) -> str:
+        """Sell (or cover) ``qty`` shares of an open position. Returns the order id.
+
+        This is the one exit path, and it is close-only by the broker's own
+        definition: it maps to ``DELETE /v2/positions/{symbol}?qty=N``, which
+        reduces the named position and cannot open, add to, or reverse one.
+        That property is what lets a partial exit exist at all without
+        weakening the rule that every *entry* is a bracket with a stop -- a
+        ``MarketOrderRequest`` without ``stop_loss`` is still never built.
+        """
+        from alpaca.trading.requests import ClosePositionRequest
+
+        if qty < 1 or int(qty) != qty:
+            raise BrokerError(f"qty must be a positive whole number, got {qty}")
+        symbol = ticker.strip().upper()
+        try:
+            order = self._client.close_position(symbol, ClosePositionRequest(qty=str(int(qty))))
+        except Exception as exc:  # noqa: BLE001
+            raise BrokerError(f"close_position failed for {symbol}: {exc}") from exc
+        return str(getattr(order, "id", "") or "")

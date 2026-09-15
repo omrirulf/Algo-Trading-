@@ -312,6 +312,9 @@ class CycleReport:
     #: The clock could not be read and the cycle went ahead regardless.
     clock_unreadable: bool = False
     fx: FxRate | None = None
+    #: What the profit ladder did to the open book before any signal was
+    #: judged; ``None`` when the dispatcher cannot manage positions.
+    positions: dict | None = None
 
     @property
     def completed(self) -> tuple[TickerResult, ...]:
@@ -377,6 +380,8 @@ def render_summary(report: CycleReport) -> str:
     attempted = len(report.tickers)
     reached = len(report.completed)
     screened = len(report.screened)
+
+    out += render_positions(report.positions)
 
     if report.produced_nothing:
         out += [
@@ -450,6 +455,41 @@ def render_summary(report: CycleReport) -> str:
         out += ["", "</details>", ""]
 
     return "\n".join(out)
+
+
+def render_positions(positions: dict | None) -> list[str]:
+    """The open book's day, in plain words, for the job summary."""
+    if positions is None:
+        return []
+    if positions.get("error"):
+        return [f"**Open positions:** not managed this cycle -- {positions['error']}", ""]
+    if positions.get("market_closed"):
+        return ["**Open positions:** market closed, not touched.", ""]
+    seen = positions.get("positions_seen", 0)
+    if not seen:
+        return ["**Open positions:** none.", ""]
+    out = [
+        f"**Open positions:** {seen} checked · {positions.get('tranches', 0)} tranche(s) sold · "
+        f"{positions.get('stops_raised', 0)} stop(s) raised · "
+        f"{positions.get('unmanaged', 0)} left alone (no stop) · {positions.get('errors', 0)} error(s)",
+        "",
+    ]
+    rows = []
+    for a in positions.get("actions") or []:
+        kind = a.get("action")
+        if kind == "tranche_taken":
+            what = (f"sold {a.get('qty_closed')} at +{a.get('gain_r', 0):.2f}R, {a.get('remaining_qty')} left; "
+                    f"stop {a.get('old_stop'):.2f} → {a.get('new_stop'):.2f}")
+        elif kind == "stop_raised":
+            what = f"stop {a.get('old_stop'):.2f} → {a.get('new_stop'):.2f} at +{a.get('gain_r', 0):.2f}R ({a.get('reason', '')})"
+        elif kind == "held":
+            what = f"{a.get('gain_r', 0):+.2f}R, holding {a.get('remaining_qty')}; stop {a.get('old_stop'):.2f}"
+        else:
+            what = f"{kind}: {a.get('reason', '')}"
+        rows.append(f"| {a.get('ticker')} | {what} |")
+    if rows:
+        out += ["| Position | What happened |", "| --- | --- |"] + rows + [""]
+    return out
 
 
 def write_step_summary(report: CycleReport) -> bool:
@@ -602,6 +642,33 @@ def process_ticker(
     return TickerResult(ticker, COMPLETED, status=outcome.get("status"), gaps=gaps)
 
 
+def manage_positions(dispatcher: Dispatcher) -> dict | None:
+    """Walk the open book up the profit ladder. Never raises.
+
+    ``None`` when the dispatcher has no such capability -- a test double, or
+    an older engine behind the webhook -- so a cycle that cannot manage
+    positions still trades, and the summary says so instead of implying an
+    empty book.
+    """
+    manage = getattr(dispatcher, "manage_positions", None)
+    if manage is None:
+        return None
+    try:
+        outcome = manage()
+    except Exception as exc:  # noqa: BLE001 - the ladder must not take the cycle down
+        log.warning("position management failed (%s); continuing with signals", exc)
+        return {"error": f"{type(exc).__name__}: {exc}"}
+    if isinstance(outcome, dict) and outcome.get("error"):
+        log.warning("position management reported an error: %s", outcome["error"])
+    elif isinstance(outcome, dict):
+        log.info(
+            "positions: %s seen, %s tranche(s) sold, %s stop(s) raised, %s unmanaged",
+            outcome.get("positions_seen", 0), outcome.get("tranches", 0),
+            outcome.get("stops_raised", 0), outcome.get("unmanaged", 0),
+        )
+    return outcome
+
+
 def run_cycle(dispatcher: Dispatcher | None = None) -> CycleReport:
     """Run every ticker on the watchlist once, and report what came of it."""
     tickers = tuple(get_settings().watchlist_tickers)
@@ -633,6 +700,13 @@ def run_cycle(dispatcher: Dispatcher | None = None) -> CycleReport:
     else:
         log.info("USD/ILS unavailable: %s", fx.gap)
 
+    # The open book first, new signals second. A winner that has reached a
+    # rung is sold down and its stop raised before any new entry competes for
+    # the same slot, and a tranche is priced off the same quote a new entry
+    # would be. Never fatal: a broker that refuses to be read here costs the
+    # ladder one day, not the cycle.
+    positions = manage_positions(dispatcher)
+
     log.info("heartbeat cycle start: %s", list(tickers))
     results = tuple(process_ticker(ticker, dispatcher, fx) for ticker in tickers)
     report = CycleReport(
@@ -640,6 +714,7 @@ def run_cycle(dispatcher: Dispatcher | None = None) -> CycleReport:
         results=results,
         clock_unreadable=clock_unreadable,
         fx=fx,
+        positions=positions,
     )
     log.info(
         "heartbeat cycle end: %d/%d reached the engine (%s)",

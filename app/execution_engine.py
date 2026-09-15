@@ -36,6 +36,11 @@ class ExecutionEngine:
         """
         return self._broker
 
+    @property
+    def market_data(self) -> MarketDataProvider:
+        """Read-only, for the position manager to share the engine's feed."""
+        return self._market_data
+
     # ------------------------------------------------------------------ #
     # Public API
     # ------------------------------------------------------------------ #

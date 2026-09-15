@@ -64,7 +64,7 @@ a shift across `MIN_CONVICTION` changes whether a trade happens at all.
 | Change | Consequential |
 |---|---|
 | Bias flip | Yes — a different trade, or none |
-| Crossed the 0.60 floor | Yes — the only threshold the engine measures against |
+| Crossed the conviction floor | Yes — the only threshold the engine measures against |
 | A cycle that failed now produces a signal | Yes |
 | Conviction 0.90 → 0.85 | No |
 | A dimension score moved | No — scores are inert by design |
@@ -73,11 +73,11 @@ a shift across `MIN_CONVICTION` changes whether a trade happens at all.
 WHAT WOULD CHANGE
 Consequential changes : 1 of 3
   bias flips          : 1
-  floor crossings     : 1   (the 0.60 threshold the engine actually uses)
+  floor crossings     : 1   (the threshold the engine actually uses)
 
 Mean conviction change: +0.163 -- the new prompt is systematically bolder
   A uniform shift is not better calibration; it just moves
-  signals across the 0.60 floor.
+  signals across the conviction floor.
 ```
 
 <Warning>

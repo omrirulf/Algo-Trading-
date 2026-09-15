@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 
 import pytest
 
-from app.broker_client import OpenPosition, SubmittedOrder
+from app.broker_client import BrokerError, OpenPosition, StopOrder, SubmittedOrder
 from app.execution_engine import ExecutionEngine
 
 
@@ -18,6 +18,12 @@ class FakeBroker:
     # Open by default so existing tests exercise the trading path; set False
     # to test the closed-market gate.
     market_open: bool = True
+    # Position management. ``stop_orders`` is what the ladder reads; the two
+    # lists are what it did, in order, so a test can assert the sequence
+    # (stop replaced *before* the tranche sold) and not only the totals.
+    stop_orders: dict[str, StopOrder] = field(default_factory=dict)
+    replaced: list[dict] = field(default_factory=list)
+    closed: list[dict] = field(default_factory=list)
 
     def is_market_open(self) -> bool:
         return self.market_open
@@ -30,7 +36,45 @@ class FakeBroker:
 
     def submit_bracket_order(self, ticker: str, qty: int, side: str, stop_price: float) -> SubmittedOrder:
         self.submitted.append({"ticker": ticker, "qty": qty, "side": side, "stop_price": stop_price})
-        return SubmittedOrder(order_id=f"fake-{len(self.submitted)}", ticker=ticker, qty=qty, side=side, stop_price=stop_price)
+        order_id = f"fake-{len(self.submitted)}"
+        # The OTO child, as the real broker would create it once the entry fills.
+        self.stop_orders[ticker] = StopOrder(
+            order_id=f"stop-{order_id}", ticker=ticker, qty=qty, stop_price=stop_price,
+            side="sell" if side == "buy" else "buy",
+        )
+        return SubmittedOrder(order_id=order_id, ticker=ticker, qty=qty, side=side, stop_price=stop_price)
+
+    # --- position management ---
+
+    def get_open_stop_order(self, ticker: str):
+        return self.stop_orders.get(ticker)
+
+    def replace_stop_order(self, order_id: str, qty: int, stop_price: float) -> StopOrder:
+        for ticker, current in self.stop_orders.items():
+            if current.order_id == order_id:
+                updated = StopOrder(order_id, ticker, qty, stop_price, current.side)
+                self.stop_orders[ticker] = updated
+                self.replaced.append({"order_id": order_id, "ticker": ticker, "qty": qty,
+                                      "stop_price": stop_price, "was": current.stop_price})
+                return updated
+        raise BrokerError(f"no open stop order {order_id}")
+
+    def close_position_partially(self, ticker: str, qty: int) -> str:
+        for index, position in enumerate(self.positions):
+            if position.ticker != ticker:
+                continue
+            sign = 1 if position.qty > 0 else -1
+            remaining = position.qty - sign * qty
+            if abs(remaining) < 1e-9:
+                self.positions.pop(index)
+            else:
+                scale = abs(remaining) / abs(position.qty)
+                self.positions[index] = OpenPosition(
+                    ticker, remaining, position.market_value * scale, position.avg_entry_price
+                )
+            self.closed.append({"ticker": ticker, "qty": qty})
+            return f"close-{len(self.closed)}"
+        raise BrokerError(f"no open position in {ticker}")
 
 
 @dataclass

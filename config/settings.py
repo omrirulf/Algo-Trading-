@@ -12,7 +12,7 @@ Two kinds of values live here, and the distinction is deliberate:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Final
+from typing import Final, NamedTuple
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -144,7 +144,60 @@ MAX_GROSS_EXPOSURE_PCT: Final[float] = 0.95
 
 #: Signals with conviction below this are rejected before any market data is
 #: fetched.
-MIN_CONVICTION: Final[float] = 0.60
+#:
+#: Was 0.60. Three live cycles produced some 120 signals and zero trades: the
+#: model's directional calls landed between 0.30 and 0.58, and the floor sat
+#: above every one of them. A floor nobody has measured is a guess, and a
+#: guess that stops every trade produces no data with which to replace it.
+#:
+#: 0.30 is where the model starts taking a side at all, so everything sided
+#: now trades and the journal records the conviction on each one. That is the
+#: experiment: let realised returns, bucketed by conviction, say where the
+#: floor belongs, instead of this constant saying it. Lowering it makes no
+#: single trade larger -- size comes from the cap and the stop, never from
+#: conviction -- and costs no extra API spend, because the model is called
+#: either way. What it buys is the only thing a paper account is for. A floor
+#: set from data can be raised back; the risk engine, the ladder below and
+#: the stop had never once run in live conditions, and would have stayed
+#: untested at 0.60 for as long as the model kept answering under it.
+MIN_CONVICTION: Final[float] = 0.30
+
+
+class LadderRung(NamedTuple):
+    """One rung of the profit ladder, measured in R.
+
+    R is the distance from the entry to the initial stop -- what the trade
+    would lose if it were stopped out. Measuring in R rather than in percent
+    makes one rule fit a 30%-volatility chip fund and a 0.5%-volatility bond
+    fund alike: each rung is "the trade has earned N times what it risked".
+    """
+
+    take_at_r: float      #: unrealised gain, in R, at which the rung triggers
+    take_fraction: float  #: share of the ORIGINAL position closed at this rung
+    stop_to_r: float      #: where the stop moves afterwards, in R from entry
+
+
+#: How a winning position is unwound, and how its stop follows it up.
+#:
+#: Rung 1, at +1R: close a third and move the stop to the entry. The trade has
+#: earned back what it risked, so a third of it is banked and the rest can no
+#: longer lose. Rung 2, at +3R: close another third and move the stop to +1R,
+#: so the remainder is guaranteed a profit. The final third has no rung -- it
+#: runs on that stop until the market takes it out.
+#:
+#: Three properties the position manager enforces around this table:
+#:
+#: - The stop only ever tightens. A rung can raise it; nothing lowers it.
+#: - The fractions sum to less than one, so a runner always exists.
+#: - A rung reached by a gap is not skipped: a position that opens at +3.5R
+#:   takes both rungs in the same cycle, in order.
+#:
+#: A position too small to split (fewer than three shares) takes no tranche
+#: and is managed by its stop alone; the ratchet still applies.
+PROFIT_LADDER: Final[tuple[LadderRung, ...]] = (
+    LadderRung(take_at_r=1.0, take_fraction=1 / 3, stop_to_r=0.0),
+    LadderRung(take_at_r=3.0, take_fraction=1 / 3, stop_to_r=1.0),
+)
 
 #: Maximum number of distinct tickers that may be held at once.
 #:

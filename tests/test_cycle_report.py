@@ -369,3 +369,63 @@ def test_a_cycle_longer_than_the_old_window_stays_whole():
     ]
     picked = {l.ticker for l in cr.latest_cycle(lines)}
     assert picked == {"LLY", "XLE", "CANE"}
+
+
+# --------------------------------------------------------------------------- #
+# The open book, from the audit log
+# --------------------------------------------------------------------------- #
+
+
+def _audit_line(day, **action):
+    return json.dumps({"ts": f"{day} 18:42:00,000", "level": "INFO",
+                       "event": "position_managed", "action": action})
+
+
+def test_the_positions_section_reads_the_audit_log_for_the_cycles_day(tmp_path):
+    audit = tmp_path / "audit.log"
+    audit.write_text("\n".join([
+        _audit_line("2026-09-15", ticker="LLY", action="tranche_taken", gain_r=1.02, qty_closed=1,
+                    remaining_qty=3, old_stop=1079.13, new_stop=1142.29),
+        _audit_line("2026-09-15", ticker="GLD", action="held", gain_r=0.31, remaining_qty=12, old_stop=310.5, new_stop=310.5),
+        _audit_line("2026-09-14", ticker="XOM", action="tranche_taken", gain_r=1.0, qty_closed=5, remaining_qty=10),
+        json.dumps({"event": "signal_processed", "ts": "2026-09-15 18:50:00,000", "result": {}}),
+        "{ not json",
+    ]))
+    actions = cr.read_position_actions(audit, "2026-09-15")
+    assert [a["ticker"] for a in actions] == ["LLY", "GLD"]   # yesterday's XOM is not today's
+
+
+def test_the_positions_section_is_plain_english_with_names_and_kinds(tmp_path):
+    actions = [
+        {"ticker": "LLY", "action": "tranche_taken", "gain_r": 1.02, "qty_closed": 1,
+         "remaining_qty": 3, "old_stop": 1079.13, "new_stop": 1142.29},
+        {"ticker": "GLD", "action": "held", "gain_r": 0.31, "remaining_qty": 12, "old_stop": 310.5, "new_stop": 310.5},
+        {"ticker": "TLT", "action": "unmanaged", "reason": "no live stop order; left untouched"},
+    ]
+    text = cr.render([_line("LLY")], actions)
+    assert "## Open positions" in text
+    assert "| Eli Lilly (LLY) · Company | **Sold part.** Sold 1 of 4 shares at +1.02R, 3 still held. Stop-loss raised 1079.13 → 1142.29. |" in text
+    assert "| Gold (GLD) · Commodity | **Holding.** +0.31R, holding 12 shares. Stop-loss 310.50. |" in text
+    assert "**Left alone.** No stop-loss order found" in text
+    # Sold and flagged rows come before the merely-held ones.
+    assert text.index("Eli Lilly (LLY)") < text.index("Gold (GLD)")
+    assert text.index("(TLT)") < text.index("Gold (GLD)")
+
+
+def test_no_management_records_means_no_section_not_an_empty_one():
+    text = cr.render([_line("LLY")], [])
+    assert "## Open positions" not in text
+    text = cr.render([_line("LLY")])
+    assert "## Open positions" not in text
+
+
+def test_the_word_list_explains_r():
+    text = cr.render([_line("LLY")])
+    assert "**R**" in text and "+1R" in text
+
+
+def test_the_opening_states_the_new_floor_and_the_ladder():
+    text = cr.render([_line("LLY")])
+    assert "reaches **0.30**" in text
+    assert "a third of it is sold" in text
+    assert "The stop only ever moves up" in text

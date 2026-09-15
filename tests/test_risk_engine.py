@@ -158,3 +158,80 @@ def test_atr_sanity():
     assert not re_.check_atr_sanity(atr=0.0, price=100.0)
     assert not re_.check_atr_sanity(atr=math.nan, price=100.0)
     assert not re_.check_atr_sanity(atr=1.0, price=0.0)
+
+
+# --------------------------------------------------------------------------- #
+# Profit ladder arithmetic
+# --------------------------------------------------------------------------- #
+
+
+def test_r_is_the_entry_to_stop_distance():
+    assert re_.initial_r(100.0, 96.0) == 4.0
+    assert re_.initial_r(96.0, 100.0) == 4.0  # a short's stop is above
+
+
+def test_r_must_be_positive():
+    with pytest.raises(re_.RiskViolation):
+        re_.initial_r(100.0, 100.0)
+
+
+def test_r_multiple_is_signed_by_side():
+    assert re_.r_multiple(100.0, 104.0, 4.0, "buy") == pytest.approx(1.0)
+    assert re_.r_multiple(100.0, 96.0, 4.0, "buy") == pytest.approx(-1.0)
+    assert re_.r_multiple(100.0, 96.0, 4.0, "sell") == pytest.approx(1.0)
+    assert re_.r_multiple(100.0, 104.0, 4.0, "sell") == pytest.approx(-1.0)
+
+
+@pytest.mark.parametrize("base,expected", [(1, 0), (2, 0), (3, 1), (4, 1), (5, 1), (9, 3), (10, 3), (100, 33)])
+def test_tranche_size_floors(base, expected):
+    assert re_.tranche_size(base, 1 / 3) == expected
+
+
+def test_two_ladder_tranches_always_leave_a_runner():
+    """The property the whole ladder rests on, checked across every plausible size."""
+    for base in range(1, 500):
+        taken = sum(re_.tranche_size(base, rung.take_fraction) for rung in cfg.PROFIT_LADDER)
+        assert taken < base or base == 0, base
+
+
+def test_the_ladder_fractions_sum_to_less_than_one():
+    assert sum(r.take_fraction for r in cfg.PROFIT_LADDER) < 1.0
+
+
+def test_the_ladder_rungs_are_ascending_and_the_stop_only_climbs():
+    takes = [r.take_at_r for r in cfg.PROFIT_LADDER]
+    stops = [r.stop_to_r for r in cfg.PROFIT_LADDER]
+    assert takes == sorted(takes) and len(set(takes)) == len(takes)
+    assert stops == sorted(stops)
+    assert all(s < t for s, t in zip(stops, takes)), "a stop must sit below the rung that set it"
+
+
+def test_stop_for_rung_moves_in_the_moneys_favour():
+    assert re_.stop_for_rung(100.0, 4.0, "buy", 0.0) == 100.0
+    assert re_.stop_for_rung(100.0, 4.0, "buy", 1.0) == 104.0
+    assert re_.stop_for_rung(100.0, 4.0, "sell", 0.0) == 100.0
+    assert re_.stop_for_rung(100.0, 4.0, "sell", 1.0) == 96.0
+
+
+def test_tighter_stop_never_loosens():
+    assert re_.tighter_stop(98.0, 100.0, "buy") == 100.0
+    assert re_.tighter_stop(101.0, 100.0, "buy") == 101.0
+    assert re_.tighter_stop(102.0, 100.0, "sell") == 100.0
+    assert re_.tighter_stop(99.0, 100.0, "sell") == 99.0
+
+
+def test_rungs_due_is_contiguous_and_ordered():
+    assert re_.rungs_due(0.5, 0) == []
+    assert re_.rungs_due(1.0, 0) == [0]
+    assert re_.rungs_due(2.9, 0) == [0]
+    assert re_.rungs_due(3.5, 0) == [0, 1]
+    assert re_.rungs_due(3.5, 1) == [1]
+    assert re_.rungs_due(3.5, 2) == []
+    assert re_.rungs_due(10.0, 0) == [0, 1]
+
+
+def test_the_floor_now_admits_what_the_model_actually_produces():
+    """The three live cycles' directional calls sat between 0.30 and 0.58."""
+    assert cfg.MIN_CONVICTION == pytest.approx(0.30)
+    assert re_.check_conviction_threshold(0.30)
+    assert not re_.check_conviction_threshold(0.29)

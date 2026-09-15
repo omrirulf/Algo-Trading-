@@ -27,7 +27,7 @@ Neither path ever raises out of `execute()` — see
   </Step>
   <Step title="Conviction floor">
     Checked before any network I/O, because it's free.
-    `signal.conviction >= MIN_CONVICTION` (0.60). This is also why the
+    `signal.conviction >= MIN_CONVICTION` (0.30). This is also why the
     orchestrator's system prompt asks Claude to calibrate conviction
     honestly — a model that always answers 0.9 makes this gate meaningless,
     and a model handed five kinds of context instead of one has more ways to
@@ -190,7 +190,7 @@ def execute(self, signal: LLMSignal) -> ExecutionResult:
 | Status | Means | Example reason |
 |---|---|---|
 | `ACCEPTED` | Order submitted with a stop-loss attached | `"submitted buy 50 AAPL @ ~189.20, stop 185.10"` |
-| `REJECTED` | A guardrail said no; nothing was submitted | `"conviction 0.45 below minimum 0.60"` |
+| `REJECTED` | A guardrail said no; nothing was submitted | `"conviction 0.25 below minimum 0.30"` |
 | `ERROR` | Broker, market data, or risk math raised | `"BrokerError: insufficient buying power"` |
 
 Every one of these — accepted, rejected, or errored — is written to

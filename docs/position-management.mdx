@@ -1,0 +1,145 @@
+---
+title: "Position management"
+description: "Sell a winner down in thirds, walk its stop up behind it, never loosen"
+---
+
+Until this existed, the engine opened positions and then never touched them
+again. A trade was entered with a stop and left alone: the only way out was
+that stop, so a loser left on schedule and a winner sat in the book
+indefinitely. That is backwards, and once `MAX_OPEN_POSITIONS` fills, a book
+full of old winners blocks every new signal.
+
+Once per cycle, **before any new signal is judged**, every open position is
+measured in **R** and walked up the ladder.
+
+## R, and why the ladder is measured in it
+
+R is the distance from the entry to the initial stop — what the trade risked.
+A position at +1R has earned back exactly what it would have lost if stopped
+out; at +3R, three times that.
+
+Measuring in R rather than in percent is what lets **one rule fit every
+instrument kind**: a 30%-volatility chip fund and a 0.5%-volatility bond fund
+have very different stops, so "+1R" is a different number of dollars for each
+— but the same statement about the trade.
+
+## The ladder
+
+`config/settings.py`:
+
+```python
+PROFIT_LADDER = (
+    LadderRung(take_at_r=1.0, take_fraction=1 / 3, stop_to_r=0.0),
+    LadderRung(take_at_r=3.0, take_fraction=1 / 3, stop_to_r=1.0),
+)
+```
+
+| Rung | When | Sell | Stop moves to | The position afterwards |
+|---|---|---|---|---|
+| 1 | +1R | a third | the entry (breakeven) | can no longer lose |
+| 2 | +3R | another third | +1R | is guaranteed a profit |
+| — | — | the last third runs | stays at +1R | until the market takes it out |
+
+Three properties the manager enforces around that table:
+
+- **The stop only ever tightens.** A rung can raise it; nothing lowers it. A
+  stop someone already moved higher keeps its height.
+- **A runner always exists.** The fractions sum to less than one and are
+  floored to whole shares, so arithmetic — not hope — guarantees the last
+  share is never the ladder's to sell.
+- **A gap is not a skipped rung.** A position that opens at +3.5R takes both
+  rungs in the same cycle, in order.
+
+A position too small to split (fewer than three shares) takes no tranche and
+is managed by its stop alone; the ratchet still applies.
+
+## What it cannot do, by construction
+
+The manager reaches the broker through exactly three primitives:
+
+| Primitive | Alpaca call | Can it open or enlarge a position? |
+|---|---|---|
+| read the live stop | `get_orders` | no |
+| replace the stop | `replace_order_by_id` | no |
+| close *part* of a position | `close_position(qty=N)` | **no — close-only by the broker's definition** |
+
+`DELETE /v2/positions/{symbol}?qty=N` reduces the named position and cannot
+open, add to, or reverse one. That property is what lets a partial exit exist
+at all without weakening the rule that every *entry* is a bracket with a
+stop: a `MarketOrderRequest` without `stop_loss` is still never constructed
+anywhere in the codebase, and CI checks both that and that these three calls
+exist in `app/broker_client.py` and nowhere else.
+
+<Warning>
+  **A position with no live stop is not managed.** It is reported as
+  *unmanaged* and left exactly as found. Acting on an unprotected position is
+  the one thing the ladder must never make worse, so it does nothing to it —
+  and the daily report says so, because a position in that state deserves a
+  human's eyes.
+</Warning>
+
+## Protect first, then sell
+
+At every rung the stop is **replaced before** the tranche is sold, in one
+atomic call that shrinks it to the shares it will still protect and moves it
+up. Two reasons, one practical and one principled:
+
+- A stop still sized for the old position reserves the shares the exit needs;
+  the broker would refuse the sale.
+- There must never be a moment in which the position is naked. A replace is
+  atomic; a cancel-then-resubmit is not.
+
+## Where the state lives
+
+Nowhere new. The audit log — the system of record for what the engine did —
+already carries the `ACCEPTED` record for each entry with its `entry_price`
+and `stop_price`, so R is read from there. Every action the manager takes is
+written to the same log as a `position_managed` record, and which rungs are
+already taken is the count of those records since the entry.
+
+That makes the ladder **idempotent under re-runs**: a second pass at the same
+price sees the rung recorded and holds. A crash between "stop replaced" and
+"tranche sold" heals on the next cycle — the rung is still due, the stop is
+already where it should be, and the replace becomes a no-op.
+
+If the entry record is missing (a position opened outside the engine, or a
+lost log), R is estimated as `ATR_STOP_MULTIPLIER × today's ATR` — which is
+exactly how the stop would have been set — and the record says
+`r_estimated: true`.
+
+## The conviction floor moved with it
+
+`MIN_CONVICTION` went from 0.60 to **0.30** in the same change. Three live
+cycles had produced some 120 signals and zero trades: the model's directional
+calls landed between 0.30 and 0.58, and the floor sat above every one of them.
+
+Lowering it makes **no single trade larger** — size comes from the cap and the
+stop, never from conviction — and costs **no extra API spend**, because the
+model is called either way. What it buys is the only thing a paper account is
+for: trades, across a spread of convictions, so that
+[scoring](/scoring) can say where the floor belongs instead of a constant
+saying it. Until that data exists, the risk engine, this ladder and the stop
+had never once run in live conditions.
+
+## Running it by hand
+
+```bash
+python -m app.position_manager          # one pass, in this process
+python -m app.position_manager --json
+```
+
+Behind the webhook it is `POST /webhook/positions/manage`, same secret as the
+signal endpoint, no body — there is nothing a caller could say that should
+change what the ladder does.
+
+## What the report shows
+
+The [daily report](/cycle-report) gains an **Open positions** section, read
+from the same audit records, in plain words:
+
+```
+| Eli Lilly (LLY) · Company | Sold part. Sold 1 of 4 shares at +1.02R, 3 still held. Stop-loss raised 1079.13 → 1142.29. |
+| Gold (GLD) · Commodity    | Holding. +0.31R, holding 12 shares. Stop-loss 310.50. |
+```
+
+Sold and flagged rows come first; the merely-held ones after.

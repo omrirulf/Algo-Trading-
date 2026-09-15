@@ -31,7 +31,7 @@ write to the journal it reads. CI greps `analysis/` to keep that true.
   </Accordion>
 
   <Accordion title="Is the conviction floor filtering the right signals?" icon="filter">
-    `MIN_CONVICTION` (0.60) is the gate that decides what gets traded. The
+    `MIN_CONVICTION` (0.30) is the gate that decides what gets traded. The
     report splits scored signals either side of it and reports the *edge* — the
     difference in mean signed return between what was acted on and what was
     filtered.
@@ -59,7 +59,7 @@ write to the journal it reads. CI greps `analysis/` to keep that true.
 
   <Accordion title="Is conviction drifting upward?" icon="chart-line">
     First half against second half. A model that creeps toward always-confident
-    turns the 0.60 floor into a no-op without anything visibly breaking.
+    turns the floor into a no-op without anything visibly breaking.
   </Accordion>
 
   <Accordion title="Was the context actually there?" icon="heart-pulse">

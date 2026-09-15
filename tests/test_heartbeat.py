@@ -530,3 +530,91 @@ def test_a_context_that_cannot_be_rendered_fails_only_its_own_ticker(monkeypatch
     assert result.stage == hb.CONTEXT_FAILED
     assert called == []
     assert "failed to render context" in caplog.text
+
+
+# --------------------------------------------------------------------------- #
+# The open book is managed before any new signal is judged
+# --------------------------------------------------------------------------- #
+
+
+class _ManagingDispatcher:
+    """Records the order of calls so 'book first, signals second' is provable."""
+
+    def __init__(self, outcome=None, raise_on_manage=None):
+        self.calls: list[str] = []
+        self.outcome = outcome if outcome is not None else {
+            "positions_seen": 2, "market_closed": False, "tranches": 1,
+            "stops_raised": 1, "unmanaged": 0, "errors": 0,
+            "actions": [{"ticker": "LLY", "action": "tranche_taken", "gain_r": 1.0,
+                         "qty_closed": 3, "remaining_qty": 6, "old_stop": 96.0, "new_stop": 100.0}],
+        }
+        self.raise_on_manage = raise_on_manage
+
+    def is_market_open(self):
+        return True
+
+    def manage_positions(self):
+        self.calls.append("manage")
+        if self.raise_on_manage:
+            raise self.raise_on_manage
+        return self.outcome
+
+    def dispatch(self, signal):
+        self.calls.append(f"dispatch:{signal.ticker}")
+        return {"mode": "direct", "status": "ACCEPTED", "reason": "ok", "quantity": 1, "order_id": "x"}
+
+
+class _PlainDispatcher:
+    """An engine that predates the ladder: no manage_positions at all."""
+
+    def is_market_open(self):
+        return True
+
+    def dispatch(self, signal):
+        return {"mode": "direct", "status": "ACCEPTED", "reason": "ok", "quantity": 1, "order_id": "x"}
+
+
+def _cycle_with(monkeypatch, dispatcher):
+    monkeypatch.setattr(hb, "get_settings", lambda: Settings(watchlist="AAPL", _env_file=None))
+    monkeypatch.setattr(hb, "fetch_fx_rate", lambda: FxRate(rate=3.0363))
+    monkeypatch.setattr(hb, "fetch_news", lambda t: ["news"])
+    monkeypatch.setattr(hb, "call_llm", lambda s, u, j: completion(
+        {"ticker": "AAPL", "bias": "BULLISH", "conviction": 0.9, "rationale": "r"}))
+    monkeypatch.setattr(hb, "screen_signal", lambda s, u, j: completion(
+        {"ticker": "AAPL", "bias": "BULLISH", "conviction": 0.9, "rationale": "r"}))
+    return hb.run_cycle(dispatcher)
+
+
+def test_positions_are_managed_before_the_first_signal_is_dispatched(monkeypatch):
+    d = _ManagingDispatcher()
+    report = _cycle_with(monkeypatch, d)
+    assert d.calls[0] == "manage"
+    assert "dispatch:AAPL" in d.calls
+    assert report.positions["tranches"] == 1
+
+
+def test_a_failing_ladder_does_not_stop_the_signals(monkeypatch):
+    d = _ManagingDispatcher(raise_on_manage=RuntimeError("broker down"))
+    report = _cycle_with(monkeypatch, d)
+    assert "dispatch:AAPL" in d.calls
+    assert report.positions == {"error": "RuntimeError: broker down"}
+
+
+def test_a_dispatcher_without_the_ladder_reports_none_not_an_empty_book(monkeypatch):
+    report = _cycle_with(monkeypatch, _PlainDispatcher())
+    assert report.positions is None
+
+
+def test_the_summary_says_what_the_ladder_did():
+    report = hb.CycleReport(tickers=("AAPL",), positions=_ManagingDispatcher().outcome)
+    text = hb.render_summary(report)
+    assert "**Open positions:** 2 checked · 1 tranche(s) sold · 1 stop(s) raised" in text
+    assert "| LLY | sold 3 at +1.00R, 6 left; stop 96.00 → 100.00 |" in text
+
+
+def test_the_summary_distinguishes_no_book_from_no_ladder():
+    assert "**Open positions:** none." in hb.render_summary(
+        hb.CycleReport(tickers=("AAPL",), positions={"positions_seen": 0, "actions": []}))
+    assert "Open positions" not in hb.render_summary(hb.CycleReport(tickers=("AAPL",), positions=None))
+    assert "not managed this cycle -- boom" in hb.render_summary(
+        hb.CycleReport(tickers=("AAPL",), positions={"error": "boom"}))
