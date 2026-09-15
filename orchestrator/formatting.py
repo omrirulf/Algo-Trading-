@@ -29,7 +29,13 @@ def is_missing(value: Any) -> bool:
         return False
     if isinstance(value, numbers.Real):
         return not math.isfinite(float(value))
-    return False
+    # pandas' own missing scalars (``pd.NA``, ``pd.NaT``) are neither None nor
+    # a Real, and ``float(pd.NA)`` raises rather than returning NaN. Matched
+    # by type name so this module stays free of a pandas import. The first
+    # live-data run with news died on exactly this: yfinance's insider rollup
+    # carried ``<NA>`` for "% net shares purchased", it passed through here as
+    # present, and ``pct()`` crashed on it inside the prompt builder.
+    return type(value).__name__ in ("NAType", "NaTType")
 
 
 def num(value: Any, digits: int = 2) -> str:

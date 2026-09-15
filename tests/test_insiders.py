@@ -204,3 +204,16 @@ def test_missing_values_render_as_na_not_zero():
     lines = "\n".join(snap.as_lines())
     assert "unnamed insider" in lines
     assert "n/a" in lines
+
+
+def test_a_pandas_na_in_the_rollup_is_a_missing_value():
+    """yfinance's rollup carried ``<NA>`` for the percentage row on a real
+    ticker, and the prompt builder crashed formatting it. It must read as
+    unknown, and the section must still render."""
+    with_na = PURCHASES.copy()
+    with_na.loc[with_na.index[-1], "Shares"] = pd.NA
+    snap = insiders.build_snapshot(purchases=with_na, transactions=TRANSACTIONS)
+    assert snap.net_pct_of_held is None
+    text = "\n".join(snap.as_lines())
+    assert "of insider holdings" not in text
+    assert "bought 120,000 shares" in text

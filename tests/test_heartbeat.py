@@ -516,3 +516,17 @@ def test_an_unwritable_summary_does_not_fail_the_cycle(monkeypatch, tmp_path):
     """A summary is a convenience. It must never cost a good cycle."""
     monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(tmp_path / "nope" / "summary.md"))
     assert hb.write_step_summary(hb.CycleReport(tickers=())) is False
+
+
+def test_a_context_that_cannot_be_rendered_fails_only_its_own_ticker(monkeypatch, caplog):
+    """A formatter crash inside the prompt builder used to escape process_ticker
+    and end the cycle for every other ticker."""
+    monkeypatch.setattr(hb, "fetch_news", lambda t: ["news"])
+    monkeypatch.setattr(hb, "build_user_prompt", lambda ctx: (_ for _ in ()).throw(TypeError("float() argument must be a string or a real number, not 'NAType'")))
+    called = []
+    monkeypatch.setattr(hb, "call_llm", lambda *a: called.append(a))
+
+    result = hb.process_ticker("AAPL")
+    assert result.stage == hb.CONTEXT_FAILED
+    assert called == []
+    assert "failed to render context" in caplog.text
