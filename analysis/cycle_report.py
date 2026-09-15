@@ -45,10 +45,20 @@ from config.instruments import InstrumentKind, kind_for, name_for, sleeve_label 
 from orchestrator import analysts, fundamentals, insiders, technicals  # noqa: E402
 from orchestrator.news import absolute_url  # noqa: E402
 
-#: Lines this far apart belong to different cycles. A daily cycle over 35
-#: tickers takes a few minutes; 20 leaves room for a slow run without
-#: swallowing yesterday's.
-CYCLE_WINDOW_MINUTES = 20
+#: Lines this far apart belong to different cycles.
+#:
+#: This was 20, chosen when a cycle over 35 tickers took a few minutes. The
+#: first 80-ticker cycle ran for 27.7 minutes, so the window silently cut the
+#: cycle in half: it kept the last 20 minutes and dropped the first 8 -- which
+#: is every single name, because the watchlist is walked in sleeve order. The
+#: report looked complete and was missing sixteen companies.
+#:
+#: The right bound is structural rather than observed. A cycle cannot outlive
+#: the heartbeat job's `timeout-minutes` (45), and the next cycle cannot start
+#: before HEARTBEAT_INTERVAL_MINUTES (1440). Anything strictly between those
+#: is correct; 120 sits well clear of both ends, so neither a slow run nor a
+#: re-run an hour later is mis-grouped.
+CYCLE_WINDOW_MINUTES = 120
 
 #: The report is read from Israel, so it leads with Israel time and keeps UTC
 #: beside it -- the journal's own timestamps are UTC and have to stay

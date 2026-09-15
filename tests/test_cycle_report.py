@@ -325,3 +325,47 @@ def test_the_stamp_leads_with_israel_time():
     text = cr.render([_line("LLY", when="2026-09-15T14:07:00+00:00")])
     assert "17:07 Israel time" in text
     assert "(14:07 UTC)" in text
+
+
+# --------------------------------------------------------------------------- #
+# The cycle window has to outlast a cycle
+# --------------------------------------------------------------------------- #
+
+
+def test_the_window_outlasts_the_longest_possible_cycle():
+    """A window shorter than a run truncates the report and says nothing.
+
+    Regression: at 20 minutes, the first 80-ticker cycle (27.7 minutes) was
+    rendered from its last 20 minutes only. Every single name was missing and
+    the report looked complete, because the watchlist is walked in sleeve
+    order and the companies go first.
+
+    The job's own timeout is the upper bound on how long a cycle can run, so
+    that is what the window is checked against -- not against a duration
+    someone observed once.
+    """
+    import re
+    from pathlib import Path
+
+    workflow = Path(__file__).resolve().parent.parent / ".github/workflows/heartbeat.yml"
+    timeout = int(re.search(r"^\s*timeout-minutes:\s*(\d+)", workflow.read_text(), re.M).group(1))
+    assert cr.CYCLE_WINDOW_MINUTES > timeout
+
+
+def test_the_window_is_shorter_than_the_gap_between_cycles():
+    """Too wide and two days of signals render as one cycle."""
+    from config import settings as cfg
+
+    assert cr.CYCLE_WINDOW_MINUTES < cfg.HEARTBEAT_INTERVAL_MINUTES
+
+
+def test_a_cycle_longer_than_the_old_window_stays_whole():
+    now = datetime(2026, 9, 15, 19, 10, tzinfo=timezone.utc)
+    lines = [
+        _line("LLY", when=(now - timedelta(minutes=28)).isoformat()),   # first out
+        _line("XLE", when=(now - timedelta(minutes=14)).isoformat()),
+        _line("CANE", when=now.isoformat()),                            # last out
+        _line("OLD", when=(now - timedelta(days=1)).isoformat()),       # yesterday
+    ]
+    picked = {l.ticker for l in cr.latest_cycle(lines)}
+    assert picked == {"LLY", "XLE", "CANE"}

@@ -82,10 +82,34 @@ class Usage:
         cost = self.cost_usd
         if not cost:
             return None
-        price = PRICES.get(self.model)
+        price = price_for(self.model)
         if price is None:
             return None
         return (self.output_tokens * price.output_per_mtok / 1e6) / cost
+
+
+def price_for(model: str) -> Optional[Price]:
+    """The price row for a model id, tolerating the API's dated form.
+
+    ``MODEL`` and ``SCREENING_MODEL`` are configured as aliases
+    (``claude-haiku-4-5``), but the API answers with the snapshot it actually
+    ran (``claude-haiku-4-5-20251001``) and that is what the journal records.
+    An exact-match lookup therefore priced **every screening call at
+    ``None``** -- which, by the honest-``None`` rule below, silently dropped
+    the entire first stage of the funnel out of the measured bill. The first
+    80-ticker cycle recorded 114 screening calls and $0.00 for them.
+
+    Matching is by longest alias prefix, so a dated snapshot prices as its
+    family and a genuinely unknown model still returns ``None`` rather than
+    borrowing a neighbour's price.
+    """
+    price = PRICES.get(model)
+    if price is not None:
+        return price
+    candidates = [k for k in PRICES if model.startswith(f"{k}-")]
+    if not candidates:
+        return None
+    return PRICES[max(candidates, key=len)]
 
 
 def cost_usd(usage: Usage) -> Optional[float]:
@@ -94,7 +118,7 @@ def cost_usd(usage: Usage) -> Optional[float]:
     ``None`` rather than 0.0 on an unknown model: a zero would quietly read as
     "this was free" and would sum into a total that understates the bill.
     """
-    price = PRICES.get(usage.model)
+    price = price_for(usage.model)
     if price is None:
         return None
     return (
@@ -160,6 +184,7 @@ __all__ = [
     "Price",
     "Usage",
     "cost_usd",
+    "price_for",
     "usage_from_response",
     "monthly_usd",
     "cycles_per_trading_day",
