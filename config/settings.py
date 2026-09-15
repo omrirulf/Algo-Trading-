@@ -57,23 +57,26 @@ MAX_BROAD_FUND_PCT: Final[float] = 0.12
 #: the word "fund" rather than off the risk.
 #:
 #: Above the single-name cap because a sector cannot go to zero on a fraud;
-#: below the broad-fund cap because one sector is one bet. Positioned by the
-#: same arithmetic as the others -- risk per trade is roughly
-#: ``cap / volatility``, so the cap that carries no more risk than 5% on a
-#: single name is ``5% x single_name_vol / focused_vol``.
+#: below the broad-fund cap because one sector is one bet.
 #:
-#: PROVISIONAL at 8% pending the first measurement over the new tickers.
-#: ``backtest/verify_tickers.py`` reports median daily volatility by kind, and
-#: the `market checks` workflow runs it. If focused funds measure near the
-#: broad-fund figure this is too tight; if they measure near a single name it
-#: is too loose. Either way the number below should be replaced by a measured
-#: one with a date on it, the way MAX_BROAD_FUND_PCT and
-#: MAX_COMMODITY_FUND_PCT already are.
+#: MEASURED, 2026-09-15, by the `market checks` workflow over the new sleeve.
+#: Two measurements disagreed, and the tighter one wins -- which is the same
+#: call MAX_COMMODITY_FUND_PCT already makes:
 #:
-#: The exposure-group ceiling is what actually bounds this sleeve in
-#: aggregate: eleven developed-country funds at this cap is 88% of the
-#: account on paper and 25% in practice, because they share one group.
-MAX_FOCUSED_FUND_PCT: Final[float] = 0.08
+#: - Median daily volatility, 3mo of real bars: 1.16% for a focused fund
+#:   against 2.25% for a single name, a ratio of 1.9x. Volatility *alone*
+#:   would justify about 9.7%.
+#: - Realised risk per trade, 2 years and 3,977 mechanical trades through the
+#:   actual ATR stop and sizing math (backtest/compare_sleeves.py): a focused
+#:   fund at 8% carried 0.28% of the account per trade against 0.25% for a
+#:   single name at 5% -- *above* parity, which is exactly what the
+#:   broad-fund cap was tuned down to avoid. Its worst trade was -1.09%
+#:   against the single name's -0.97%.
+#:
+#: 7% is where the second measurement puts parity (8% x 0.25/0.28 = 7.1%).
+#: The median volatility figure is the loose bound and the stop is what
+#: actually decides what a position can lose, so the stop wins.
+MAX_FOCUSED_FUND_PCT: Final[float] = 0.07
 
 #: A fund tracking ONE commodity gets the tightest cap of the four, below
 #: even a single name. "Fund" does no diversification work here -- coffee is

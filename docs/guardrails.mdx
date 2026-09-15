@@ -18,7 +18,7 @@ that last part works.
 | Market-context modules read no credentials | CI greps every `orchestrator/` module except `heartbeat.py`, `news.py` and `llm.py` for credential reads — a settings lookup, an environment read, or attribute access on a `secret` / `api_key` / `_token` / `password` name. yfinance is unauthenticated; the check keeps it that way. |
 | Max 5% per **single name** | `risk_engine.calculate_position_size()` — checked twice, pre- and post-rounding. |
 | Max 12% per **broad fund** | Same function, cap chosen by `risk_engine.max_position_pct_for()` from `config/instruments.py` — never from the signal. |
-| Max 8% per **focused fund** | One sector or one country. Above a single name, below a fund that spans the world. |
+| Max 7% per **focused fund** | One sector or one country. Above a single name, below a fund that spans the world. |
 | Max 4% per **single-commodity fund** | Tighter than a single stock: "fund" does no diversification work when it holds one commodity. |
 | Max 25% per **exposure group** | `risk_engine.exposure_group_headroom()` — spans every sleeve. |
 | 45% funds / 15% single names | `risk_engine.sleeve_headroom()` — funds are the core holding. |
@@ -158,7 +158,7 @@ which shows up in a diff.
 ## Four position caps, and the boundary between them
 
 A single name is capped at 5%; a broad fund at 12%; a focused fund — one
-sector or one country — at 8%; a single-commodity fund at 4%, *below* a stock,
+sector or one country — at 7%; a single-commodity fund at 4%, *below* a stock,
 because a fund holding one commodity is not diversified and carries roll
 decay, issuer risk and thin volume on top. A broad fund is already hundreds of
 positions, so holding one at the single-name cap buys 5% of market exposure

@@ -163,7 +163,7 @@ trades on a US exchange, not choices.
 |---|---|---|
 | Single name | 5% | One company, idiosyncratic: it can gap on a fraud or a failed trial. |
 | Broad fund | 12% | Hundreds of positions across sectors, countries or issuers. Its tail is truncated in a way a company's is not. |
-| **Focused fund** | **8%** | One sector or one country. Above a single name because a sector cannot go to zero on a fraud; below a broad fund because one sector is one bet. |
+| **Focused fund** | **7%** | One sector or one country. Above a single name because a sector cannot go to zero on a fraud; below a broad fund because one sector is one bet. |
 | Single-commodity fund | 4% | "Fund" does no diversification work — coffee is one thing — plus roll decay, issuer risk and thin volume. |
 
 The ordering is the point: **the tightest cap belongs to the commodity funds,
@@ -172,14 +172,13 @@ ETFs would be picking a cap by label rather than by risk — and the focused
 tier exists so that widening the list from ten funds to fifty-five did not
 have to repeat that mistake one level up.
 
-<Warning>
-  **8% is provisional.** The other two caps carry a measured date; this one
-  does not yet. `backtest/verify_tickers.py` reports median daily volatility
-  per kind and the `market checks` workflow runs it — if focused funds measure
-  near the broad-fund figure, 8% is too tight; near a single name, too loose.
-  Either way the number should be replaced by a measured one with a date on
-  it, the way the two below already are.
-</Warning>
+<Note>
+  **The focused cap started at 8% and the measurement moved it down to 7%.**
+  It shipped provisional, the `market checks` workflow measured it over two
+  years of real bars, and 8% came back carrying *more* risk per trade than a
+  single name at 5% — the exact thing the broad-fund cap had already been
+  tuned down to avoid. Details below.
+</Note>
 
 ### What the real data said about these caps
 
@@ -188,14 +187,37 @@ defensible against measured volatility. Three months of real bars, 2026-09-14:
 
 | Kind | Median daily volatility | vs a single name |
 |---|---|---|
-| Single name | 2.26% | — |
-| Broad fund | 0.88% | 0.39× |
-| Single-commodity fund | 1.58% | 0.70× |
+| Single name | 2.25% | — |
+| Broad fund | 0.47% | 0.21× |
+| Focused fund | 1.16% | 0.52× |
+| Single-commodity fund | 1.54% | 0.68× |
 
-**The broad-fund cap checks out.** A single name is 2.57× as volatile as a
-broad fund, so a broad-fund cap up to ~12.8% carries no more risk per trade
-than 5% on a stock. 12% is 2.40× — inside the range, slightly conservative. It
-started as a guess and is now checked.
+**The broad-fund cap checks out.** A single name is 4.8× as volatile as a
+broad fund, so a broad-fund cap well above 12% would still carry no more risk
+per trade than 5% on a stock. It started as a guess and is now checked twice.
+
+### Volatility is the loose bound — the stop is what decides
+
+`backtest/compare_sleeves.py` opens a mechanical trade every five bars across
+each sleeve and runs it through the **real** ATR stop and sizing math. Two
+years, 2026-09-15:
+
+| Sleeve | Cap | Trades | Risk per trade | Worst trade |
+|---|---|---|---|---|
+| Single name | 5% | 1,552 | **0.25%** | −0.97% |
+| Broad fund | 12% | 1,263 | 0.21% | −0.85% |
+| Focused fund | **8%** | 3,977 | **0.28%** | −1.09% |
+| Single commodity | 4% | 873 | 0.18% | −0.82% |
+
+**This is what moved the focused cap from 8% to 7%.** On median volatility
+alone a focused fund is half as volatile as a single name, and 9.7% would have
+been defensible. Through the actual stop it was not: at 8% a sector or country
+position could lose 0.28% of the account, against 0.25% for a stock at 5%, and
+its worst trade was worse. 7% is where that reaches parity — `8% × 0.25/0.28`.
+
+The same disagreement, resolved the same way, is why single commodities sit at
+4% when their volatility would allow ~7%. **Where two measurements disagree,
+the one closer to what a position can actually lose wins.**
 
 **The commodity cap is deliberately tighter than the arithmetic allows.**
 Volatility alone would justify ~7%. It stays at 4% for three reasons the
