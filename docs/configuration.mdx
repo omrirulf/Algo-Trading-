@@ -200,7 +200,7 @@ detail on what each one prevents is in [Guardrails](/guardrails).
 | `MAX_GROSS_EXPOSURE_PCT` | `0.95` | Ceiling on total deployed capital across every position. Leaves a 5% operational buffer. |
 | `MIN_CONVICTION` | `0.30` | Signals below this are rejected before any market data is fetched. Was 0.60; lowered to where the model actually starts taking a side. |
 | `PROFIT_LADDER` | `+1R: sell ⅓, stop→entry · +3R: sell ⅓, stop→+1R` | How a winning position is unwound. R is entry-to-stop distance. See [Position management](/position-management). |
-| `MAX_OPEN_POSITIONS` | `20` | Max distinct tickers held at once. |
+| `MAX_OPEN_POSITIONS` | `40` | Max distinct tickers held at once. Raised from 20 with the profit ladder: a trimmed runner keeps its slot, and the count must not block the cash the ladder frees. |
 | `ATR_PERIOD` | `14` | Wilder ATR lookback, in trading days. |
 | `ATR_STOP_MULTIPLIER` | `2.0` | Stop-loss distance from entry, in multiples of ATR. |
 | `MIN_ATR_PCT_OF_PRICE` | `0.002` | Below this, ATR is treated as degenerate data and the signal is rejected. |

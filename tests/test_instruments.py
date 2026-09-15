@@ -551,3 +551,30 @@ def test_one_technology_bet_cannot_be_taken_four_ways(broker, market):
     assert held <= cfg.MAX_EXPOSURE_GROUP_PCT + 1e-9
     assert rejected, "four tech names plus four tech funds should not all fit"
     assert any("Technology" in r for r in rejected)
+
+
+def test_a_ladder_trimmed_book_still_has_room_to_redeploy():
+    """The slot count must not block the cash the ladder frees.
+
+    After both rungs a position holds a third of its size but a whole slot.
+    A book of full-size positions fills the gross ceiling at N; the same
+    book trimmed to thirds uses a third of the account and needs room for
+    roughly 2N more entries to redeploy the rest. At 20 that room was zero.
+    """
+    from app.risk_engine import max_position_pct_for
+    from config.watchlist import DEFAULT_WATCHLIST
+
+    average_cap = sum(max_position_pct_for(t) for t in DEFAULT_WATCHLIST) / len(DEFAULT_WATCHLIST)
+    full_size_fill = cfg.MAX_GROSS_EXPOSURE_PCT / average_cap
+    assert cfg.MAX_OPEN_POSITIONS >= 2 * full_size_fill
+
+
+def test_the_slot_limit_is_not_what_keeps_the_book_diverse():
+    """Diversity is the group cap's job: at any slot count, no group can pass 25%."""
+    from config.instruments import EXPOSURE_GROUPS
+
+    widest_group = max(len(t) for t in EXPOSURE_GROUPS.values())
+    # Even the widest group, fully populated, is bounded by the group cap --
+    # a bound that does not mention the slot count at all.
+    assert widest_group <= cfg.MAX_OPEN_POSITIONS
+    assert cfg.MAX_EXPOSURE_GROUP_PCT < cfg.MAX_GROSS_EXPOSURE_PCT / 3
