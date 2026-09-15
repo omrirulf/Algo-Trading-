@@ -50,8 +50,8 @@ def test_a_headline_is_rendered_as_a_link():
 def test_each_score_sits_next_to_its_own_evidence():
     """The reason this report exists: a score out of reach of its inputs is an assertion."""
     text = "\n".join(cr.render_ticker(_line()))
-    news_at = text.index("NEWS</b> — scored +0.80")
-    tech_at = text.index("TECHNICALS</b> — scored +0.50")
+    news_at = text.index("News</b> — score +0.80")
+    tech_at = text.index("Price and chart</b> — score +0.50")
     assert news_at < text.index("Apple beats on earnings") < tech_at
     assert "rsi14" in text[tech_at:]
 
@@ -61,7 +61,7 @@ def test_a_journal_without_urls_still_renders_and_says_so():
     line = _line()
     line.raw["context"]["sources"] = []
     text = "\n".join(cr.render_ticker(line))
-    assert "Links were not captured" in text
+    assert "did not save the links" in text
     assert "Apple beats on earnings" in text
 
 
@@ -78,7 +78,8 @@ def test_a_screened_ticker_says_the_full_model_was_not_asked():
         screen={"model": "claude-haiku-4-5", "bias": "NEUTRAL"},
     )
     text = "\n".join(cr.render_ticker(line))
-    assert "Screened out" in text
+    assert "Stopped early" in text
+    assert "never asked" in text
 
 
 def test_the_latest_cycle_excludes_yesterday():
@@ -115,7 +116,7 @@ def test_a_missing_journal_is_empty_not_an_exception(tmp_path):
 
 def test_the_header_counts_what_happened():
     text = cr.render([_line("AAPL"), _line("MSFT", outcome=None, error="down")])
-    assert "2 tickers" in text and "1 accepted" in text and "1 failed" in text
+    assert "2 names checked" in text and "1 traded" in text and "1 with a problem" in text
 
 
 def test_the_report_never_places_an_order():
@@ -206,3 +207,112 @@ def test_a_link_journalled_before_the_fix_still_opens():
     }]
     text = "\n".join(cr.render_ticker(line))
     assert "[Old story](https://www.google.com/goto?url=CAESkQEB)" in text
+
+
+# --------------------------------------------------------------------------- #
+# Every name says what it is: a real name, and a sleeve tag
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize(
+    "ticker,name,sleeve",
+    [
+        ("LLY", "Eli Lilly", "Company"),
+        ("TLT", "US government bonds, 20+ years", "Index fund"),
+        ("GLD", "Gold", "Commodity"),
+    ],
+)
+def test_a_heading_carries_the_real_name_and_the_sleeve(ticker, name, sleeve):
+    """"NVO" asks the reader to hold 35 symbols in their head. "Novo Nordisk" does not."""
+    head = cr.heading(_line(ticker))
+    assert name in head
+    assert f"({ticker})" in head
+    assert sleeve in head
+
+
+def test_a_ticker_with_no_name_falls_back_to_its_symbol():
+    """A ticker added to the watchlist before anyone wrote its name down still renders."""
+    head = cr.heading(_line("ZZZZ"))
+    assert "ZZZZ" in head
+    # Unrecognised resolves to EQUITY, the smallest cap -- so "Company" here
+    # is the same fail-closed default the sizing code uses.
+    assert "Company" in head
+
+
+def test_the_sleeve_tag_is_on_the_heading_even_though_the_list_is_grouped():
+    """A heading linked or copied on its own has to stand up by itself."""
+    text = cr.render([_line("GLD")])
+    assert "## Commodities" in text
+    assert "· Commodity —" in text
+
+
+def test_the_report_groups_by_what_the_thing_is():
+    text = cr.render([_line("GLD"), _line("LLY"), _line("TLT")])
+    assert text.index("## Companies") < text.index("## Index funds") < text.index("## Commodities")
+    # ...and each name sits under its own group.
+    assert text.index("Eli Lilly") < text.index("## Index funds")
+    assert text.index("Gold (GLD)") > text.index("## Commodities")
+
+
+def test_conviction_still_orders_within_a_group():
+    loud, quiet = _line("LLY"), _line("TEVA")
+    loud.raw["signal"]["conviction"] = 0.90
+    quiet.raw["signal"]["conviction"] = 0.10
+    text = cr.render([quiet, loud])
+    assert text.index("Eli Lilly") < text.index("Teva")
+
+
+def test_an_empty_sleeve_gets_no_heading():
+    text = cr.render([_line("LLY")])
+    assert "## Companies" in text
+    assert "## Commodities" not in text
+
+
+def test_the_summary_says_what_each_group_did():
+    """"Did we even look at the commodities today" has to be answerable at a glance."""
+    quiet = _line("SLV")
+    quiet.raw["signal"]["bias"] = "NEUTRAL"
+    broken = _line("USO", signal=None, outcome=None, error="down")
+    text = cr.render([_line("GLD"), quiet, broken])
+    assert "| Commodities | 3 | 1 | 1 | 1 |" in text
+
+
+def test_a_neutral_call_is_not_counted_as_taking_a_side():
+    line = _line("LLY")
+    line.raw["signal"]["bias"] = "NEUTRAL"
+    assert not line.took_a_side
+    assert _line("LLY").took_a_side
+
+
+# --------------------------------------------------------------------------- #
+# Plain English
+# --------------------------------------------------------------------------- #
+
+
+def test_the_report_explains_the_floor_and_the_three_sides():
+    """The reader is not a developer. The rules have to be in the report itself."""
+    text = cr.render([_line("LLY")])
+    assert "0.60" in text
+    for side in ("BULLISH", "BEARISH", "NEUTRAL"):
+        assert side in text
+
+
+def test_the_word_list_covers_the_terms_with_no_simpler_synonym():
+    text = cr.render([_line("LLY")])
+    for term in ("RSI", "MACD", "P/E", "Stop-loss"):
+        assert f"**{term}**" in text
+
+
+def test_the_models_own_words_are_quoted_not_rewritten():
+    """The rationale is evidence. A paraphrase of it is not."""
+    line = _line()
+    line.raw["signal"]["rationale"] = "A rich multiple tempers an otherwise clean catalyst."
+    text = "\n".join(cr.render_ticker(line))
+    assert "> A rich multiple tempers an otherwise clean catalyst." in text
+
+
+def test_the_stamp_leads_with_israel_time():
+    """The person reading this is in Israel; UTC stays beside it, not instead of it."""
+    text = cr.render([_line("LLY", when="2026-09-15T14:07:00+00:00")])
+    assert "17:07 Israel time" in text
+    assert "(14:07 UTC)" in text

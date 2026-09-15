@@ -1,6 +1,6 @@
 ---
 title: "Cycle report"
-description: "What the model saw, next to what it concluded — with links"
+description: "What the model saw, next to what it concluded — in plain English, with links"
 ---
 
 The journal answers "what did the model decide". It is a poor answer to **"why
@@ -23,29 +23,42 @@ You do not have to run it. Every cycle renders it automatically to two places:
 ## What it looks like
 
 ````markdown
-### NVDA — BULLISH @ 0.72
+# Daily report
 
-**Engine:** ACCEPTED · 27 shares · within all caps
+**15 Sep 2026, 20:07 Israel time (17:07 UTC)** · 33 names checked · 0 traded · 0 with a problem
 
-> A material product catalyst corroborated by an uptrend and rising sector
-> capex, tempered by a rich multiple.
+| Group | Looked at | Took a side | No clear view | Problems |
+| --- | --- | --- | --- | --- |
+| Companies | 14 | 3 | 11 | 0 |
+| Index funds | 10 | 2 | 8 | 0 |
+| Commodities | 9 | 3 | 6 | 0 |
 
-**What drove it:**
-- Next-gen accelerator announced
-- Price above the 200-day average
+## Companies
 
-<details><summary><b>NEWS</b> — scored +0.80</summary>
+### Eli Lilly (LLY) · Company — BULLISH, confidence 0.58
 
-- [Nvidia unveils next-gen accelerator](https://www.reuters.com/...)
-  <sub>Reuters, 3 hours ago</sub>
-  Blackwell successor claims 2x throughput
+**Result:** REJECTED · conviction 0.58 below minimum 0.60
+
+**In the model's own words:**
+
+> Fresh Berenberg upgrade to Buy with ~21% upside plus positive EASD 2026
+> pipeline previews are a real ticker-specific catalyst...
+
+**Main reasons it gave:**
+- Berenberg upgrade Hold->Buy citing upside to 2026 revenue guidance
+
+<details><summary><b>News</b> — score +0.60</summary>
+
+- [Eli Lilly boosted to Buy at Berenberg](https://www.google.com/goto?url=...)
+  <sub>Seeking Alpha, 3 hours ago</sub>
+  Berenberg upgraded Eli Lilly to Buy from Hold...
 
 </details>
 
-<details><summary><b>TECHNICALS</b> — scored +0.50</summary>
-Trend: vs 20d SMA 179.10 (+3.0%), 50d 171.40 (+7.7%), 200d 163.70 (+12.8%); 50d above 200d
-Momentum: RSI(14) 61.2 | MACD 2.140 vs signal 1.820 (histogram 0.320)
-52-week range: 121.30 - 190.20 (now 92.0% of the way up)
+<details><summary><b>Price and chart</b> — score -0.25</summary>
+Trend: vs 20d SMA 1,178.99 (-3.1%), 50d 1,181.99 (-3.4%), 200d 1,065.35 (+7.2%); 50d above 200d
+Momentum: RSI(14) 43.6 | MACD -17.295 vs signal -11.824 (histogram -5.472)
+52-week range: 714.59 - 1,280.34 (now 75.6% of the way up)
 </details>
 ````
 
@@ -56,9 +69,57 @@ up the range"), and it is literally what was being judged. A line the report
 cannot rebuild (an older schema, a malformed value) falls back to a field
 table rather than disappearing.
 
-Tickers are ordered by conviction, so the calls worth arguing with are at the
-top. A ticker that failed names its failure; one the [funnel](/orchestrator/llm)
-screened out says the full model was never asked.
+## Every name says what it is
+
+A ticker is an identifier, not a name. A report that says only `NVO` asks its
+reader to hold thirty-five symbols in their head; one that says **Novo
+Nordisk** does not. `config/instruments.py` carries a `DISPLAY_NAMES` map for
+the whole watchlist and a `sleeve_label()` derived from `kind_for()`, and the
+report puts both on every heading:
+
+```
+### US government bonds, 20+ years (TLT) · Index fund — BEARISH, confidence 0.45
+```
+
+<Note>
+  The names are a static map, not a yfinance lookup. The watchlist is fixed and
+  curated, so a name is a fact about the list itself — and the report has to
+  work offline from a journal, with no network call available to it.
+</Note>
+
+The sleeve tag is repeated on every heading even though the tickers are also
+**grouped** under `## Companies`, `## Index funds` and `## Commodities`: a
+heading copied or linked on its own still has to say what it is about. An
+unnamed ticker falls back to its own symbol, and an unrecognised one labels as
+`Company` — the same fail-closed default `kind_for()` uses for the position
+cap, never the widest one.
+
+The summary table at the top counts each group. It exists because a flat list
+ordered by conviction cannot answer *"did we even look at the commodities
+today"*, which turned out to be the first question a reader asks — and a cycle
+where every commodity came back NEUTRAL looks identical, in a list sorted by
+conviction, to one where none was checked.
+
+## Written to be read by a person, not a developer
+
+The framing text, the section titles and the verdict lines are written at
+roughly **B1–B2 English** — short sentences, common words, no idioms — and a
+word list at the end covers the terms that have no simpler synonym: RSI, MACD,
+P/E, ATR, stop-loss, insider. The prompt's own headings are shouted
+abbreviations aimed at a model (`ANALYST & INSTITUTIONAL VIEW`); the report
+uses "What analysts and big funds say".
+
+<Warning>
+  The model's **rationale** and **key factors** are reproduced verbatim, and
+  the report says so where it prints them. Those are the evidence; a
+  plain-English paraphrase of them would be a summary of a summary, and the
+  thing being checked would no longer be in the document.
+</Warning>
+
+Renaming a report section cannot touch the prompt — the prompt builds its own
+headings in `orchestrator/context.py`, and the byte-identity test pins that.
+The timestamp leads with Israel time and keeps UTC beside it, because the
+journal's own stamps are UTC and have to stay checkable against it.
 
 ## The links are new, and the prompt did not change
 

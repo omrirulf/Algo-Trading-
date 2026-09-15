@@ -207,6 +207,82 @@ def is_fund(ticker: str) -> bool:
 
 
 # --------------------------------------------------------------------------- #
+# Human labels
+# --------------------------------------------------------------------------- #
+# A ticker is an identifier, not a name. A report that says only "NVO" asks
+# the reader to hold 35 symbols in their head; one that says "Novo Nordisk"
+# does not. Kept as a static map rather than read from yfinance: the
+# watchlist is fixed and curated, so a name is a fact about the list itself,
+# and looking one up would mean a network call in a report that is meant to
+# work offline from a journal.
+
+DISPLAY_NAMES: Final[dict[str, str]] = {
+    # Single names
+    "MSFT": "Microsoft",
+    "NVDA": "Nvidia",
+    "ASML": "ASML",
+    "GOOGL": "Alphabet (Google)",
+    "JPM": "JPMorgan Chase",
+    "RY": "Royal Bank of Canada",
+    "HDB": "HDFC Bank",
+    "LLY": "Eli Lilly",
+    "NVO": "Novo Nordisk",
+    "TEVA": "Teva Pharmaceutical",
+    "CAT": "Caterpillar",
+    "ESLT": "Elbit Systems",
+    "TM": "Toyota",
+    "MELI": "MercadoLibre",
+    "PG": "Procter & Gamble",
+    "XOM": "Exxon Mobil",
+    # Broad funds
+    "RSP": "S&P 500, equal weight",
+    "IWM": "US small companies",
+    "VGK": "Europe",
+    "EWJ": "Japan",
+    "VWO": "Emerging markets",
+    "EIS": "Israel",
+    "VNQ": "US real estate",
+    "TLT": "US government bonds, 20+ years",
+    "DBC": "Commodities basket",
+    "DBA": "Farm goods basket",
+    # Single commodities
+    "GLD": "Gold",
+    "SLV": "Silver",
+    "CPER": "Copper",
+    "USO": "Oil",
+    "UNG": "Natural gas",
+    "CORN": "Corn",
+    "WEAT": "Wheat",
+    "SOYB": "Soybeans",
+    "CANE": "Sugar",
+}
+
+#: What each kind is called in a report. The enum names are for code; these
+#: are for a person, and they say what the thing *is* rather than how the
+#: sizing code groups it.
+SLEEVE_LABELS: Final[dict[InstrumentKind, str]] = {
+    InstrumentKind.EQUITY: "Company",
+    InstrumentKind.BROAD_FUND: "Index fund",
+    InstrumentKind.COMMODITY_FUND: "Commodity",
+}
+
+
+def name_for(ticker: str) -> str:
+    """The readable name, or the ticker itself when there is no entry.
+
+    Falling back to the symbol keeps this safe for a ticker added to the
+    watchlist before anyone writes its name down.
+    """
+    symbol = ticker.strip().upper()
+    return DISPLAY_NAMES.get(symbol, symbol)
+
+
+def sleeve_label(ticker: str) -> str:
+    """"Company", "Index fund" or "Commodity" -- what this ticker is."""
+    return SLEEVE_LABELS[kind_for(ticker)]
+
+
+# --------------------------------------------------------------------------- #
 # Exposure groups
 # --------------------------------------------------------------------------- #
 # Deliberately coarse, and deliberately spanning both sleeves. GOOGL sits with
@@ -260,4 +336,8 @@ __all__ = [
     "kind_for",
     "is_fund",
     "group_for",
+    "DISPLAY_NAMES",
+    "SLEEVE_LABELS",
+    "name_for",
+    "sleeve_label",
 ]
