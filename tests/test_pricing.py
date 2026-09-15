@@ -10,12 +10,14 @@ from __future__ import annotations
 
 import pytest
 
+from orchestrator import pricing
 from orchestrator.pricing import (
     CACHE_READ_MULTIPLIER,
     PRICES,
     Usage,
     cost_usd,
     monthly_usd,
+    price_for,
     usage_from_response,
 )
 
@@ -130,3 +132,45 @@ def test_usage_serialises_with_its_cost():
     payload = Usage(model="claude-opus-5", input_tokens=1420, output_tokens=1500).as_dict()
     assert payload["cost_usd"] > 0
     assert payload["input_tokens"] == 1420
+
+
+# --------------------------------------------------------------------------- #
+# The API answers with a dated snapshot; the config names an alias
+# --------------------------------------------------------------------------- #
+
+
+def test_a_dated_snapshot_prices_as_its_family():
+    """Regression: every screening call in the first 80-ticker cycle cost None.
+
+    ``SCREENING_MODEL`` is configured as an alias, the API answers with the
+    snapshot it ran, and the journal records the answer. An exact-match lookup
+    therefore priced 114 real calls at ``None`` -- and by the honest-``None``
+    rule those dropped out of the measured bill entirely, so the first stage
+    of the funnel appeared to be free.
+    """
+    assert pricing.price_for("claude-haiku-4-5-20251001") is pricing.PRICES["claude-haiku-4-5"]
+    assert pricing.price_for("claude-opus-5-20260101") is pricing.PRICES["claude-opus-5"]
+
+
+def test_an_alias_still_prices_as_itself():
+    for alias in pricing.PRICES:
+        assert pricing.price_for(alias) is pricing.PRICES[alias]
+
+
+def test_an_unknown_model_still_refuses_to_guess():
+    """The honest-None rule survives the prefix match: no borrowing a neighbour."""
+    for unknown in ("gpt-4", "claude-nonexistent-9", "", "claude", "claude-opus"):
+        assert pricing.price_for(unknown) is None
+
+
+def test_a_dated_snapshot_now_has_a_cost_instead_of_none():
+    usage = pricing.Usage(
+        model="claude-haiku-4-5-20251001", input_tokens=3399, output_tokens=612,
+    )
+    assert usage.cost_usd is not None
+    assert usage.cost_usd > 0
+
+
+def test_a_prefix_match_never_beats_an_exact_one():
+    """A longer alias that happens to prefix-match must not shadow the real row."""
+    assert pricing.price_for("claude-haiku-4-5") is pricing.PRICES["claude-haiku-4-5"]

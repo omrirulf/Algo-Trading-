@@ -1,10 +1,11 @@
 # Daily report
 
-**15 Sep 2026, 22:10 Israel time (19:10 UTC)** · 52 names checked · 0 traded · 0 with a problem
+**15 Sep 2026, 22:10 Israel time (19:10 UTC)** · 72 names checked · 0 traded · 0 with a problem
 
 | Group | Looked at | Took a side | No clear view | Problems |
 | --- | --- | --- | --- | --- |
-| Whole-market funds | 7 | 3 | 4 | 0 |
+| Companies | 16 | 3 | 13 | 0 |
+| Whole-market funds | 11 | 4 | 7 | 0 |
 | Sector and country funds | 36 | 5 | 31 | 0 |
 | Commodities | 9 | 3 | 6 | 0 |
 
@@ -17,6 +18,1692 @@ The three sides: **BULLISH** = the model thinks the price will go up; **BEARISH*
 Being sure is not enough on its own. A trade only happens when confidence reaches **0.60**. Below that the system writes down what it thought and does nothing. The size of a trade, the stop-loss and every limit are decided by plain code, not by the model.
 
 Under each name you will find the five scores. Click a grey line to open it and see the exact evidence behind that score. The words inside quotation marks are the model's own; nothing there has been rewritten.
+
+## Companies
+
+### Eli Lilly (LLY) · Company — BULLISH, confidence 0.58
+
+**Result:** REJECTED · conviction 0.58 below minimum 0.60
+
+**In the model's own words:**
+
+> Fresh, ticker-specific catalysts: Berenberg upgrade to Buy with ~21% upside citing upside to 2026 guidance, plus positive EASD 2026 pipeline data previews for orforglipron/retatrutide (up to ~49.6 lb weight loss). Fundamentals are strong (revenue +47.7%, 54% operating margin, forward P/E 24 with PEG 1.1), and consensus target sits 16.5% above last close. Offsetting: price is below 20d/50d SMAs with negative MACD and RSI 42, volume thin at 0.4x, and insider activity is net selling (though routine-looking). Catalyst-driven bullish tilt, moderate conviction given technical weakness.
+
+**Main reasons it gave:**
+- Berenberg upgrade Hold->Buy, ~21% upside on 2026 guidance beat
+- EASD 2026 data previews for orforglipron/retatrutide, up to 49.6 lb weight loss
+- Below 20d/50d SMAs, MACD histogram -5.8, RSI 42
+- Revenue +47.7% YoY, forward P/E 24, PEG 1.12
+- 5 insiders selling, no open-market buys; volume only 0.4x average
+
+<details><summary><b>News</b> — score +0.60</summary>
+
+- [Eli Lilly To Present Fresh Data On Foundayo, Retatrutide In Europe – Here’s Why Berenberg Sees A 21% Potential Upside In LLY Stock](https://www.google.com/goto?url=CAESkQEB6zswFRwmFGG3Eae6cPmcA2mKU2o27OEszznT8ZZqRzZIzK6RPX4diyv_gpe-EYxMsC3EGZVY7lJ8Qmj7qNsh3Pz_vXJxJ4qKGxUQ82kJU84bd_OBhHY-0gnyDa0m_ppWTAx8rJ-oWN9IGEdVOcH6rZi4M_B16NknwU6mU-vjXLF8aqk0er_QynIsN7ay0rgh)  
+  <sub>Yahoo Finance, 5 hours ago</sub>  
+  Berenberg sees potential upside to Lilly's full-year 2026 revenue forecast, which ranges from $85 billion to $87 billion.
+- [Eli Lilly Stock Gains as Retatrutide and Foundayo Data Highlight Pipeline Strength](https://www.google.com/goto?url=CAESxgEB6zswFaRfnrw8cfRRbdWBaiDGULUcepatKXSgl1oBCeKQLcCZhK-MRXCIXFDCk9HRcvvQerjk4RysqYUXw5tOpDZ3F71i1SmFHBkdoPi8-t9nE8hu8eR-gwFkzjxe8TDPWp9nolB8KR8JZO_BhhFWba5wsr7yctOQyG1r0nSBUDQaJtDRPLeIBj3wPwdZwH-VyTlB_3dXMiUXC4BAxXjLu397vfnNx1f2WXiMZCHDlk6coYHoIfCYh2WqcL7uKNCk1EVRg-E)  
+  <sub>TradingView, 5 hours ago</sub>  
+  Shares of Eli Lilly and Company (NYSE:LLY) are trading higher Tuesday morning following positive previews of its late-stage obesity and diabetes pipeline.
+- [People lost up to an average of 49.6 pounds in data Lilly will present on an investigational drug.](https://www.google.com/goto?url=CAESsAEB6zswFWuaYjIS8mkMsI3stmV1wHFwlwpfuTonZQciR4f57Igwpv2jIqak4DUNh0yHwJZno6ppQ9L0e3P-lftVpbcLCwAsPiuOsIJpFGBam1DSzJetI_pp5ZjXDRJIZ_ydEIhMG569D6AyjK22jbZCTlqGxsmomC-09ktspNqzkYDRo0yygLH-9msABAricM4Xf5-SfAE0LmytbDC0vY0J4eqkZhSt5nPFrmMEzTmsEA)  
+  <sub>Stock Titan, 8 hours ago</sub>  
+  Eli Lilly (LLY) will present extensive new data on Foundayo (orforglipron), retatrutide and eloraTZP at the EASD 2026 meeting in Milan from September 28 to...
+- [Eli Lilly boosted to Buy at Berenberg as upside to 2026 guidance seen](https://www.google.com/goto?url=CAESlwEB6zswFRez29o7HDjUvxWt1Kq4KqaPG1wrwTBTIkZvBwFJd2F80esmGUrfRYbDViycNkEy1Mcd1ixnbTZuiXIaH3gFyfIJHcZt94UmPqmGdV1JQr9LDLbD_oI8FxJt3Ixrs0d4rdcAxuTZQKW1zPD3uRNA9Fyjw7D4WIPnKF6v2vmATaAkkXgh5OOt1fUUVf9cbUzFEHGL)  
+  <sub>Seeking Alpha, 5 hours ago</sub>  
+  Berenberg upgraded Eli Lilly (LLY) to Buy from Hold, saying that it sees the drugmaker exceeding its 2026 guidance driven by continuing its lead in the...
+- [Eli Lilly Vs. Merck: One is a No-Brainer to Hold Through 2030](https://www.google.com/goto?url=CAESnwEB6zswFVieOgCrIsxpxDXMB6zME9SLO3mC1qVG4cb4dtF6__ytgIDKo9fObFLKUJcmtRpb7I5974_RQnvQPoJvLVhLZlh38NtKOQ3jw5AzS0fASSvWnwKk5pm8zZbB1N3CnDqmbNym9En4E-daVm4_ZUQvh5aGCax4VZ0qRK1mOo0wvvLU4DWgy0ZvHIp8JU_3XwOaDE-0Qu51uvvhrwU)  
+  <sub>24/7 Wall St., 6 hours ago</sub>  
+  Eli Lilly and Merck both reported second quarter earnings, and the contrast could not be sharper. One company is compounding a franchise that keeps widening...
+- [3 Healthcare Stocks for 3 Stages of Life](https://www.google.com/goto?url=CAEShQEB6zswFRt5zXbZigrs1CL_E_UaxAJ3u39ApeP6yLkDBPBLtAMWXgIMPHo_KH0vIj80YBQpMSxF9REcOZg2nhUnFHnjWwDaPGb_wLXiI2krpE8bhGH9iZ2On0Sl7b8djaC7lfHmlsnrRP2th1n-U-dBzDUgvyy8tD_0sZXmifVs0cUAa5nY)  
+  <sub>MarketBeat, 39 minutes ago</sub>  
+  Healthcare stocks Eli Lilly, UnitedHealth Group, and Johnson & Johnson offer options for investors of different ages, combining growth potential,...
+- [Is This LLY Stock Dip Big Enough To Be Worth Buying?](https://www.google.com/goto?url=CAESpwEB6zswFZ2TbcIK9ruzhcikclbYCaG2FpA6zvofKtIkhmcJu8EeoE0Rhyc-MCPkRiXr-cKUcEvQ1XsX5vnVgbXE3GAssBMFedWp-2sPLQ3hWEbF-RzWqgxs7UasMV85L-WrEb-sHe9XebW-cL6iE73Jty_WyQpXbo2e13P-1znFa4l1dvsL9-xxQMwqSgiKpRZi_TZn3DDRqdwBV4H7AeSJjGYen7xi1w)  
+  <sub>Trefis, 23 hours ago</sub>  
+  Eli Lilly (LLY) trades near $1120, about 13% below the high it set in August, and the question is whether to step in. The stock's record after sharp falls...
+- [LLY Looks 25.2% Undervalued on GF Value™ Amid Berenberg Upgrade](https://www.google.com/goto?url=CAESmwEB6zswFUpCkXbhOLhfZ3WNnC7FmiWsMsUDJ_3-sMcfRNl7M71_TCwRz72sHkmo1OvBUD_VIPBtuJ3k5Nm-IbwYeoUfhopmtvd6C-sx0knaL91c9FhqxPlPF6G5oIpeWFJGE22D6OSprkuefgnXgoheeMG1kuLhs5CnmKz2iQw4At1rFHpWdIdMrBO53j2ObIcMBUuuWsTsSEHLnQ)  
+  <sub>GuruFocus, 5 hours ago</sub>  
+  On September 15, 2026, Berenberg upgraded Eli Lilly and Co (NYSE: LLY) from Hold to Buy, citing expectations that the company will exceed its 2026 guidance...
+- [Eli Lilly posts strong revenue growth but faces pricing pressures and acquisition costs, prompting a Hold rating.](https://www.google.com/goto?url=CAESlAEB6zswFZXi7rNOCA533I2pRY9_2z371ykC2_xth_wSlK7hXxHKHvNhhWwxpot0n9im8nEFhd53ZxvxQmEqIK-L9AMhN6Kr-bkJuPSCytIMJCpjgxv0xpngTwEZt4VT2ydig18MgFCeDQV68jTtXF2QkcgNCJrKNWC2b0Z3f4l35RAT1uoTNFplj1alUaWufKUAKl7c)  
+  <sub>Pluang, 5 hours ago</sub>  
+  Eli Lilly reported a 47.7% revenue increase in Q2 2026, driven mainly by volume growth from key drugs like Mounjaro and Zepbound, with earnings per share...
+
+</details>
+
+<details><summary><b>Price and chart</b> — score -0.30</summary>
+
+```text
+Last close 1,137.10 (bar of 2026-09-15), from 501 daily bars
+Trend: vs 20d SMA 1,178.73 (-3.5%), 50d 1,181.88 (-3.8%), 200d 1,065.32 (+6.7%); 50d above 200d
+Momentum: RSI(14) 42.2 | MACD -17.709 vs signal -11.906 (histogram -5.803)
+Returns: 1d -0.1% | 5d +1.2% | 1m -3.6% | 3m +0.7%
+52-week range: 714.59 - 1,280.34 (now 74.7% of the way up)
+Volatility: ATR(14) 31.70 (2.8% of price) | annualised 20d 30.3%
+Volume: 0.40x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.50</summary>
+
+```text
+Sector: Healthcare / Drug Manufacturers - General | market cap 1.01T
+Valuation: trailing P/E 38.13 | forward P/E 24.03 | P/B 29.92 | PEG 1.12
+Profitability: profit margin 33.5% | operating margin 54.2% | ROE 102.3%
+Growth (YoY): revenue +47.7% | earnings +26.2%
+Balance sheet: debt/equity 162.1% | free cash flow 11.07B
+Risk: beta 0.50 | short interest 0.9% of float
+Next earnings: 2026-10-29
+```
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.60</summary>
+
+```text
+Consensus: buy (mean 1.70 on a 1=strong buy to 5=strong sell scale, 29 analysts)
+Ratings: 6 strong buy, 19 buy, 3 hold, 1 sell, 1 strong sell
+Price target: mean 1,324.87 (+16.5% vs last close), range 930.00 - 1,600.00
+Recent rating changes:
+  - 2026-09-10 HSBC: main, Reduce -> Reduce
+  - 2026-08-07 Truist Securities: main, Buy -> Buy
+  - 2026-08-06 Wells Fargo: main, Overweight -> Overweight
+  - 2026-08-06 Cantor Fitzgerald: main, Overweight -> Overweight
+  - 2026-07-15 Citigroup: main, Buy -> Buy
+  - 2026-07-14 Bernstein: main, Outperform -> Outperform
+Institutional ownership: 85.3%
+Largest holders: Lilly Endowment, Inc (9.6%), Blackrock Inc. (7.2%), Vanguard Capital Management LLC (5.7%), PNC Financial Services Group, Inc. (5.5%), State Street Corporation (3.9%)
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score -0.15</summary>
+
+```text
+Last 180 days: bought 1,485 shares in 28 transaction(s) | sold 308,215 shares in 8
+Net: -306,730 shares (-18.0% of insider holdings) | insiders hold 1,399,430 shares
+Distinct insiders: 0 buying, 5 selling
+Sales — weak evidence on their own; often scheduled 10b5-1 plans, tax on vesting, or diversification:
+  - 2026-08-17 JONSSON PATRIK (Officer): 6,500 shares, 7.64M
+  - 2026-08-10 ZAKROWSKI DONALD A (Officer): 2,000 shares, 2.37M
+  - 2026-08-07 HAKIM ANAT (General Counsel): 5,000 shares, 5.95M
+  - 2026-06-10 YUFFA ILYA (Officer): 2,500 shares, 2.88M
+(24 grant/option/gift transaction(s) excluded — compensation, not a view on the price)
+```
+
+</details>
+
+### Teva Pharmaceutical (TEVA) · Company — BULLISH, confidence 0.56
+
+**Result:** REJECTED · conviction 0.56 below minimum 0.60
+
+**In the model's own words:**
+
+> Stock closed at a 52-week high on a strong, broad uptrend (above 20/50/200d, 50d>200d, +15.7% 3m) with RSI 65 — momentum intact but not yet extreme. Newsflow is supportive though largely structural rather than fundamental: NYSE direct listing of ordinary shares plus ADS termination (broadens index/institutional eligibility), a debt refinancing on a heavily levered balance sheet (D/E 218%), and reiterated 'Pivot to Growth' progress in branded/biosimilars. Forward P/E 12.6 and PEG 0.71 with 2.2B FCF make this a cheap-on-forward-earnings setup; analyst consensus is strong buy with ~9% upside to mean target and a fresh Leerink Outperform initiation. Offsets: flat revenue, thin margins, insider selling by eight distinct insiders including the CFO, volume only 0.72x average on the breakout, and no earnings catalyst until Nov 4. Moderate conviction long.
+
+**Main reasons it gave:**
+- Ordinary shares began direct NYSE trading, ADS program terminated — broadens institutional/index eligibility
+- Closed at 52-week high 38.98, +11.3% vs 50d and +18.3% vs 200d, RSI 65
+- Forward P/E 12.6, PEG 0.71, 2.22B FCF vs debt/equity 218% and -0.8% revenue growth
+- Strong-buy consensus (mean 1.46), target 42.45 (+8.9%), Leerink initiated Outperform 9/9
+- 8 insiders selling incl. CFO 106.6K shares, zero open-market buyers
+- Breakout on 0.72x average volume
+
+<details><summary><b>News</b> — score +0.40</summary>
+
+- [Teva's Shares Now Trade Directly on the NYSE — Here's What Else Changed](https://www.tradingview.com/news/benzinga:150629361094b:0-teva-s-shares-now-trade-directly-on-the-nyse-here-s-what-else-changed/)  
+  <sub>TradingView, 6 hours ago</sub>  
+  Teva Pharmaceutical Industries Ltd. (NYSE:TEVA) had a busy week that included a major debt refinancing, a milestone shift in how its shares trade on the...
+- [Watch Teva CEO on Shares Trading Directly on the NYSE](https://www.bloomberg.com/news/videos/2026-09-14/teva-ceo-on-shares-trading-directly-on-the-nyse-video)  
+  <sub>Bloomberg.com, 21 hours ago</sub>  
+  Teva Pharmaceuticals President & CEO Richard Francis, discusses why Teva chose to make the change now and what will be different for investors as the shares...
+- [Teva Pharmaceutical Industries Ltd (TEVA) Stock Up 4.4% but GF Value Says Overvalued -- GF Score: 54/100](https://www.gurufocus.com/news/9080294/teva-pharmaceutical-industries-ltd-teva-stock-up-44-but-gf-value-says-overvalued-gf-score-54100)  
+  <sub>GuruFocus, 20 hours ago</sub>  
+  On September 14, 2026, Teva Pharmaceutical Industries Ltd (TEVA) shares rose 4.4% to a current price of $38.72, continuing a strong performance over the...
+- [We're turning into a more innovative company: Teva Pharmaceuticals CEO Richard Francis](https://www.cnbc.com/video/2026/09/14/were-turning-into-a-more-innovative-company-teva-pharmaceuticals-ceo-richard-francis.html)  
+  <sub>CNBC, 24 hours ago</sub>  
+  Richard Francis, Teva Pharmaceuticals CEO short and pro, joins 'Power Lunch' to discuss the company's turnaround strategy, expanding its market access,...
+- [Veea Stock Surges Tuesday: What's Driving the Action?](https://www.benzinga.com/trading-ideas/movers/26/09/61790983/veea-stock-surges-tuesday-whats-driving-the-action)  
+  <sub>Benzinga, 5 hours ago</sub>  
+  Shares of Veea are surging Tuesday after the edge-computing provider signed a term sheet to combine businesses with NovaGen Group.
+- [Teva CEO on the company’s NYSE debut and what's next](https://finance.yahoo.com/video/teva-ceo-company-nyse-debut-203900476.html)  
+  <sub>Yahoo Finance, 22 hours ago</sub>  
+  Teva Pharmaceuticals (TEVA) CEO Richard Francis joins Market Domination Overtime to discuss the company's NYSE debut and what's next for the pharmaceutical...
+- [Teva Says Pivot to Growth Gains Steam as Branded Drugs, Biosimilars Outperform](https://www.marketbeat.com/instant-alerts/event-teva-says-pivot-to-growth-gains-steam-as-branded-drugs-biosimilars-outperform-2026-09-14/)  
+  <sub>MarketBeat, 19 hours ago</sub>  
+  Teva Pharmaceutical Industries (NYSE:TEVA) CEO Richard Francis said the company has progressed from the initial phase of its “Pivot to Growth” plan into its...
+- [Teva begins NYSE trading of ordinary shares as ADS program terminates](https://www.tradingview.com/news/tradingview:0a365cb5e6d3e:0-teva-begins-nyse-trading-of-ordinary-shares-as-ads-program-terminates/)  
+  <sub>TradingView, 23 hours ago</sub>  
+  Teva began trading its ordinary shares on the New York Stock Exchange and terminated its ADS program.Key Highlights:Original SEC Filing: TEVA PHARMACEUTICAL...
+- [Perk Brings Its Spend Platform to U.S.: NYSE Content Update](https://www.prnewswire.com/apac/news-releases/perk-brings-its-spend-platform-to-us-nyse-content-update-302879142.html)  
+  <sub>PR Newswire, 5 hours ago</sub>  
+  PRNewswire/ -- The New York Stock Exchange (NYSE) provides a daily pre-market update directly from the NYSE Trading Floor. Access today's NYSE Pre-market...
+- [Israel stocks lower at close of trade; TA 35 down 0.85%](https://www.investing.com/news/stock-market-news/israel-stocks-lower-at-close-of-trade-ta-35-down-085-4902134)  
+  <sub>Investing.com, 4 hours ago</sub>  
+  Investing.com – Israel stocks were lower after the close on Tuesday, as losses in the Technology, Insurance and Communication sectors led shares lower.
+
+</details>
+
+<details><summary><b>Price and chart</b> — score +0.60</summary>
+
+```text
+Last close 38.98 (bar of 2026-09-15), from 501 daily bars
+Trend: vs 20d SMA 37.13 (+5.0%), 50d 35.03 (+11.3%), 200d 32.96 (+18.3%); 50d above 200d
+Momentum: RSI(14) 65.3 | MACD 0.681 vs signal 0.615 (histogram 0.066)
+Returns: 1d +0.7% | 5d +6.0% | 1m +6.0% | 3m +15.7%
+52-week range: 18.34 - 38.98 (now 100.0% of the way up)
+Volatility: ATR(14) 1.16 (3.0% of price) | annualised 20d 32.1%
+Volume: 0.72x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.25</summary>
+
+```text
+Sector: Healthcare / Drug Manufacturers - Specialty & Generic | market cap 45.42B
+Valuation: trailing P/E 64.97 | forward P/E 12.60 | P/B 5.86 | PEG 0.71
+Profitability: profit margin 4.1% | operating margin 4.0% | ROE 9.7%
+Growth (YoY): revenue -0.8% | earnings n/a
+Balance sheet: debt/equity 217.8% | free cash flow 2.22B
+Risk: beta 0.87 | short interest 3.2% of float
+Next earnings: 2026-11-04
+```
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.50</summary>
+
+```text
+Consensus: strong_buy (mean 1.46 on a 1=strong buy to 5=strong sell scale, 11 analysts)
+Ratings: 4 strong buy, 8 buy, 1 hold, 0 sell, 0 strong sell
+Price target: mean 42.45 (+8.9% vs last close), range 33.00 - 50.00
+Recent rating changes:
+  - 2026-09-09 Leerink Partners: init, ? -> Outperform
+  - 2026-09-04 UBS: main, Buy -> Buy
+  - 2026-08-12 Barclays: main, Overweight -> Overweight
+  - 2026-07-28 Piper Sandler: main, Overweight -> Overweight
+  - 2026-05-06 Barclays: main, Overweight -> Overweight
+  - 2026-04-30 JP Morgan: main, Overweight -> Overweight
+Institutional ownership: 64.4%
+Largest holders: GordonMD Global Investments LP (0.1%), Pacer Advisors, Inc. (0.0%)
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score -0.30</summary>
+
+```text
+Last 180 days: bought 43,476 shares in 3 transaction(s) | sold 194,459 shares in 6
+Net: -150,983 shares (-75.1% of insider holdings) | insiders hold 46,611 shares
+Distinct insiders: 0 buying, 8 selling
+Sales — weak evidence on their own; often scheduled 10b5-1 plans, tax on vesting, or diversification:
+  - 2026-08-21 WEISS AMIR (Officer): 9,445 shares, 355.30K
+  - 2026-08-03 HUGHES ERIC A (Officer): 25,578 shares, 892.05K
+  - 2026-08-03 JOVER PLACID (Officer): 12,827 shares, 447.35K
+  - 2026-06-11 KALIF ELIYAHU SHARON (Chief Financial Officer): 106,563 shares, 3.63M
+(12 grant/option/gift transaction(s) excluded — compensation, not a view on the price)
+```
+
+</details>
+
+### Exxon Mobil (XOM) · Company — BULLISH, confidence 0.56
+
+**Result:** REJECTED · conviction 0.56 below minimum 0.60
+
+**In the model's own words:**
+
+> Oil supply shock (Brent >$107, record diesel cracks) is a live, material catalyst for an integrated major, and XOM is in a strong uptrend (+20% 3m, above all key SMAs, 50d>200d, MACD positive). Offsets: price is already at 96% of the 52-week range with mean PT only ~1% above spot, RSI 65 with light volume, GF Value flags overvaluation, and the Joliet refinery outage is a modest negative. Debt tenders are neutral balance-sheet housekeeping. Insider data lacks distinct-buyer detail so treated as near-noise.
+
+**Main reasons it gave:**
+- Brent above $107 and record US diesel prices on Gulf supply disruption
+- Price 96.1% of 52-week range, above 20/50/200d SMAs, MACD positive
+- Mean analyst PT 170.91 only +1.1% vs 169.12 close; 15 of 22 at hold
+- Revenue +44% and earnings +113% YoY with low debt/equity 15.9% and 20.7B FCF
+- Joliet 264kbpd refinery offline after power outage; volume only 0.51x average
+
+<details><summary><b>News</b> — score +0.45</summary>
+
+- [XOM Stock Quote Price and Forecast](https://www.google.com/goto?url=CAESXgHrOzAVBcSUy0K9kNk638n8b-wBtEv5ElfnSNMLguNe_55lVUR7H539iMWvNkHHg0Xq_LtsjytpAOYBZ1IQTyF6jvK46loJplec-JYUajhex5D_IfuHiBLylnZiKe0)  
+  <sub>CNN, 9 hours ago</sub>  
+  Exxonmobil Holdings Corporation ... XOM is trading near the top of its 52-week range and above its 200-day simple moving average. Price change. The price of XOM...
+- [Bondholders tendered $570M and $616M in ExxonMobil's buyback offers](https://www.google.com/goto?url=CAESrwEB6zswFYNAtgfkyw_5-LSfP2OFcA55CM7HAb8gGmmd2_0DTmOfabTAsxLUPUejMLaP__tq62yLdh_rdr2JCjVMI5IN7ve5o0kYnIbkBNQzgUIcFVBSImHoAjSeFjvI6zgdO9geiZMicYt9MsfvpU_DKqieF5R-FSLdmyJmpqK8rSykV0kjbVu-CyfIXESFzWdlypYHcwNG7I-qDMOuPg0ykXf1T254etwi8xGX54BZ)  
+  <sub>Stock Titan, 6 hours ago</sub>  
+  SPRING, Texas --(BUSINESS WIRE)-- ExxonMobil Holdings Corporation ("ExxonMobil") (NYSE: XOM) today announces the pricing terms, expiration and results of...
+- [ExxonMobil Trending After Subsidiary Completes $2.1 Billion Debt Tender](https://www.google.com/goto?url=CAESugEB6zswFXD5P__moy0iWY-O2TVImuqqtN-N3OKz0VckPqgjVox2FRq5ZEcccouPZzA0CQqznvZr_mz-5O7dFUa2Lt_o0Xep2hHb0QZik9uYYRkmQe_8T5xCEx-gilDThQBTZFWNnKzVicEOtdXUbVDjY3GiicBMliMmY7r2khSA0NkOXe0iUEcaZaFgNMkEBs2pu3vl8jMCBROvQvMqjF7GK_a5jCB614byPavIvxz8ZZbKyvplP2KyMn4)  
+  <sub>TradingView, 5 hours ago</sub>  
+  Exxon Mobil Corporation (NYSE:XOM) is trending Tuesday. Its subsidiary ExxonMobil Holdings announced the pricing terms, expiration and results of its cash...
+- [Exxon Mobil shuts down Joliet refinery after power outage](https://www.google.com/goto?url=CAESpwEB6zswFbbvXLFnmyf4WDufZomMvjHQaxOgf22scr-S1myr4jQnyD8G91KNzLszbt_d-BbtnY0DN4rabaE_ohqAeQIz33ic_TBS_jYgUrcrRVMV2TmpEKC8-uARSEmIM_XjPJ1fl5ZaRczNIOIBHrP5nwQNi4hZCj8pJw2ssYv0lnz6-29zyxV9XVvIlYLsiOLoZ2AUh3jXTPpsUA54MkpF5HfUIj5N6A)  
+  <sub>Reuters, 23 hours ago</sub>  
+  Exxon Mobil brought its 264000-barrel-per-day (bpd) refinery in ​Joliet, Illinois, offline after a power outage occurred ‌on Sunday, the company said on...
+- [Oil Crisis Worsens, Diesel Hits Record High: Here's How to Trade It](https://www.google.com/goto?url=CAEStAEB6zswFUM_lIgBJrLpjyBZy4a0c01eK81U_kkBBZK1V5FmUXR-zmG8xHrdLwzGp0Gc9opMHEHsvq8DSW343MDzPBfqPRapOmttypLIjFXKWPSTn9dLXUuidgHjsL83UywpwfvIWOWoxuaixKxDwo6XJazt0T9OTV7qbH1pld8Ia53x4UCVCxbV-FiKuB35cnModDKV-6MiI1F5PwSxF_Ht7MRv6mcPfdyfx1T1c0RMcAEhfwA)  
+  <sub>Benzinga, 41 minutes ago</sub>  
+  Oil prices surged as Gulf attacks disrupted Saudi infrastructure, threatening supplies; Brent topped $107 and U.S. diesel hit record highs.
+- [ExxonMobil's unit to retire $1.19B debt via cash tender offers: Key details](https://www.google.com/goto?url=CAESpQEB6zswFY2JfKtA5nBZ65pqa6tLFBYNhHZ99YvKjGx5da2C8HsJyU3Yp6PLTVR1qtQ82e0NHgwbsONEL-2hrMGHgogcdU9GDyRti-XU5GnWPaN3e75SAV0_FnHexAK79PsO_ZV4WtM1fgPKLJqj2Y5BoN5AE7bJJo1G_AZkf26M7zISIj6CxuyaSkNkDvQsK_fmFx5do6fi-vEv6JNIUuo1awi9H0Y)  
+  <sub>Seeking Alpha, 5 hours ago</sub>  
+  ExxonMobil (XOM) said on Tuesday that its wholly owned subsidiary, Pioneer Natural Resources, expects to purchase ~$1.19B of outstanding senior notes for...
+- [XOM Looks 30.9% Overvalued on GF Value™ Amid Strong Dividend Fun](https://www.google.com/goto?url=CAESpQEB6zswFeMrE3RVEuM37NuzYX-SgcVl4R5VIqKcajSpsIkSlf2aUsbX7FOzsANrVxhnxkn0XVjPpJWL-sDh014_pWX-P0WKkRYIt9sPizUikvtUVtU2sloWwIwyT8c7-3vEiDrCQ3E6E6NB4U0rfpakmSvhpQhuODoqHvdD-y6e2AvQrG9SUwec7ebLcW7yS14OM3GyAx3Dk_7qMviNKN5uj50xohg)  
+  <sub>GuruFocus, 3 hours ago</sub>  
+  On September 15, 2026, ExxonMobil Holdings Corp (NYSE: XOM) announced that its subsidiary, Pioneer Natural Resources, plans to acquire approximately $1.19...
+- [Valero Energy Corp Stock (VLO) Moved Up by 3.83% on Sep 15: A Full Analysis](https://www.google.com/goto?url=CAESigEB6zswFagImzkv1YE5hPp8E-5YNbYBny0_MK-tztH6eW5yfxwwKlieO5LbyAu63KMtj8Vp1oyu_1b44ajwwny8W8PTN8uBiydM7Yx0Gpf5F6mX21JpkqgYT-Bck11XasiMqE-N-vL6TNjMZ4ouu2CwynfffsT2uIuhuo0CE40s4dh6QXtxxacyKL8)  
+  <sub>TradingKey, 32 minutes ago</sub>  
+  Global refining crack spreads and tight fuel markets drove Valero's upward momentum.Wall Street firms raised price targets due to Valero's strong...
+- [Should You Buy ExxonMobil Stock For What Guyana Pays Next?](https://www.google.com/goto?url=CAESrQEB6zswFRQDQnaYtfIcLfRrwWgfJSAB5GuuSeKj5KpRPCyvmIap4gJPtkXudQjOIBxBIfJc63Z_yLt91JBw4XdH_35Y2HpHy4TQuSKAf--WecANeCv_-bQ8fR0b68GXXfEW9cKC6bLUwLJqgqyf2VkPMNuuAo2qtPrvFbH7t4INgI0p608DgGx2XyDQmeMHkCr76Tlo2g1q8SFUvy_7IfTvABmYzeaFITVGeZkwNQ)  
+  <sub>Trefis, 21 hours ago</sub>  
+  ExxonMobil (XOM) stock has gained about 52% over the past year and now trades right at the top of its 52-week range. Anyone buying here is paying for...
+- [Exxon Looks to Ditch New Jersey Incorporation for Texas Homecoming](https://www.google.com/goto?url=CAESmQEB6zswFU7O-SICsQyp_4OCl887vHV6jfCL9Iy8vc7ZRu9hH_J-9asBbSjuKpgRqseYsxn2jMCXWCNywjw79OLwcxyV6FSq_7jM_S1Dxzj2Nn6yqdLBynYqmIA7HXvr47QrU_awQ3v5zBv-745rp1d6TeMkI6iHQYalVFzLsYollj20IrcX4nD1WqKMtch9jrTb5QEOywH-TBE)  
+  <sub>EnergyNow.com, 16 hours ago</sub>  
+  Summary Exxon is latest high-profile company moving to Texas for business-friendly environment New Jersey sued…
+
+</details>
+
+<details><summary><b>Price and chart</b> — score +0.60</summary>
+
+```text
+Last close 169.12 (bar of 2026-09-15), from 501 daily bars
+Trend: vs 20d SMA 162.96 (+3.8%), 50d 156.38 (+8.1%), 200d 146.19 (+15.7%); 50d above 200d
+Momentum: RSI(14) 65.3 | MACD 2.565 vs signal 2.300 (histogram 0.265)
+Returns: 1d +2.4% | 5d +5.3% | 1m +5.6% | 3m +20.0%
+52-week range: 110.64 - 171.47 (now 96.1% of the way up)
+Volatility: ATR(14) 3.74 (2.2% of price) | annualised 20d 24.1%
+Volume: 0.51x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.30</summary>
+
+```text
+Sector: Energy / Oil & Gas Integrated | market cap 695.40B
+Valuation: trailing P/E 21.74 | forward P/E 15.67 | P/B 2.68 | PEG 1.41
+Profitability: profit margin 9.1% | operating margin 15.9% | ROE 12.6%
+Growth (YoY): revenue +44.1% | earnings +112.8%
+Balance sheet: debt/equity 15.9% | free cash flow 20.67B
+Risk: beta 0.17 | short interest 1.1% of float
+Next earnings: 2026-10-30
+```
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score -0.05</summary>
+
+```text
+Consensus: buy (mean 2.32 on a 1=strong buy to 5=strong sell scale, 22 analysts)
+Ratings: 3 strong buy, 7 buy, 15 hold, 0 sell, 0 strong sell
+Price target: mean 170.91 (+1.1% vs last close), range 142.00 - 200.00
+Recent rating changes:
+  - 2026-09-03 Piper Sandler: main, Neutral -> Neutral
+  - 2026-08-19 Morgan Stanley: main, Overweight -> Overweight
+  - 2026-08-17 Barclays: main, Overweight -> Overweight
+  - 2026-08-07 TD Cowen: main, Buy -> Buy
+  - 2026-08-04 Freedom Broker: up, Sell -> Hold
+  - 2026-07-28 B of A Securities: down, Buy -> Neutral
+Institutional ownership: 67.1%
+Largest holders: Blackrock Inc. (8.1%), Vanguard Capital Management LLC (6.5%), State Street Corporation (5.0%), FMR, LLC (3.3%), Vanguard Portfolio Management LLC (2.8%)
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.10</summary>
+
+```text
+Last 180 days: bought 10,818,651 shares in 251 transaction(s) | sold 3,904,152 shares in 49
+Net: +6,914,499 shares (-194.8% of insider holdings) | insiders hold 3,371,767 shares
+Distinct insiders: 0 buying, 0 selling
+```
+
+</details>
+
+### Nvidia (NVDA) · Company — NEUTRAL, confidence 0.42
+
+**Result:** REJECTED · bias is NEUTRAL; no trade
+
+**In the model's own words:**
+
+> News flow is mostly commentary and roundups (buy-the-dip pieces, AI-slowdown debate, Cisco/Splunk partnership) with no fresh material catalyst. Technicals are soft: five-session pullback, price below 20d and 50d SMA, MACD negative, RSI 45, though the 200d uptrend holds and volume is thin. Fundamentals remain exceptional (106% revenue growth, 64% margins, forward P/E 13.6) and consensus is strong buy with a 55% target gap, but that prior is already in the price. Insider flow is director/executive selling only, weak evidence. Conflicting dimensions argue for a modest, low-conviction stance rather than a directional bet ahead of Nov 17 earnings.
+
+**Main reasons it gave:**
+- Price -6.1% over 5d, below 20d SMA, MACD histogram -1.57
+- Forward P/E 13.6 with revenue +105.9% and 63.7% margins
+- Consensus strong buy, mean target 328.66 (+55%)
+- No ticker-specific catalyst; news dominated by opinion/roundup pieces
+- Director Mark Stevens sold ~3.7M shares over recent months; zero insider buyers
+
+<details><summary><b>News</b> — score +0.10</summary>
+
+- [CSCO, NVDA Stock Inch Higher — Cisco And Nvidia Expand Partnership To Bring Agentic AI To Splunk Customers](https://www.tradingview.com/news/stocktwits:64bddc62b094b:0-csco-nvda-stock-inch-higher-cisco-and-nvidia-expand-partnership-to-bring-agentic-ai-to-splunk-customers/)  
+  <sub>TradingView, 2 hours ago</sub>  
+  Cisco Systems Inc. (CSCO) unveiled a series of product updates for its Splunk platform on Tuesday, aiming to remove enterprise barriers to AI adoption by...
+- [Signal Says 'Buy the Dip' After Nvidia Stock Pullback](https://www.schaeffersresearch.com/content/analysis/2026/09/15/signal-says-'buy-the-dip'-after-nvidia-stock-pullback)  
+  <sub>Schaeffer's Investment Research, 13 hours ago</sub>  
+  Shares of Nvidia Corp (NASDAQ:NVDA) stock are inching 0.4% higher to trade at $211.72 this afternoon, taking a breather after five-straight losing sessions,...
+- [Why I’m Doubling Down on Nvidia Stock Hand Over Fist](https://247wallst.com/investing/2026/09/15/why-im-doubling-down-on-nvidia-stock-hand-over-fist/)  
+  <sub>24/7 Wall St., 5 hours ago</sub>  
+  Nvidia shares just dropped over 8% in a week while AI slowdown headlines pile up, and that is exactly when one investor keeps hitting the buy button with...
+- [Cashing in on the Qubit: NVIDIA Takes the Quantum Leap](https://www.marketbeat.com/articles/cashing-in-on-the-qubit-nvidia-takes-the-quantum-leap/)  
+  <sub>MarketBeat, 2 hours ago</sub>  
+  NVIDIA's new CUDA-Q Logical software links GPUs with quantum processors to tackle error correction, potentially benefiting IonQ, Rigetti, and D-Wave as...
+- [Nvidia vs. Micron: Which Is the Better Artificial Intelligence (AI) Semiconductor Stock to Own for the Next 5 Years?](https://www.fool.com/investing/2026/09/15/nvidia-vs-micron-which-is-the-better-artificial-in/)  
+  <sub>The Motley Fool, 27 minutes ago</sub>  
+  Between 2023 and 2025, Nvidia (NVDA +0.40%) was the market's most obvious artificial intelligence (AI) trade. During this period, the stock went parabolic,...
+- [Nvidia: Why The 'AI Slowdown' Could Extend The Boom (NASDAQ:NVDA)](https://seekingalpha.com/article/4946417-nvidia-why-the-ai-slowdown-could-extend-the-boom?source=generic_rss)  
+  <sub>Seeking Alpha, 6 hours ago</sub>  
+  Nvidia Corporation's Q2 revenue hit $96B; supply limits still cap FY2028 growth near 70%. Click for this updated look at NVDA stock and see why I am...
+- [Why Is NVDA Stock Jumping Over 2% In Overnight Trading Today?](https://stocktwits.com/news-articles/markets/equity/why-is-nvda-stock-jumping-over-2-in-overnight-trading-today/cZ0HYfHRe6S)  
+  <sub>Stocktwits, 16 hours ago</sub>  
+  Planet Labs PBC (PL): The American Earth imaging company's shares edged about 2% higher in the overnight session after a steep drop on Friday following a new at...
+- [This Unassuming Stock is Trouncing Nvidia in 2026. Here’s Why It’s a No-Brainer Buy.](https://finance.yahoo.com/markets/stocks/articles/unassuming-stock-trouncing-nvidia-2026-083201705.html)  
+  <sub>Yahoo Finance, 10 hours ago</sub>  
+  Nvidia (NASDAQ:NVDA) has been a no-brainer buy for investors over the past few years. The company, as leader in the artificial intelligence (AI) chip market...
+- [Nvidia To Curb A.I. Model Use As Concerns Grow](http://www.baystreet.ca/articles/stockstowatch.aspx?articleid=123859)  
+  <sub>Baystreet.ca, 5 hours ago</sub>  
+  Chipmaker Nvidia (NVDA) says it is likely to restrict or stop using artificial intelligence (A.I.) models unless startups Anthropic and OpenAI guarantee...
+- [Nvidia Stock Gains as Fund Manager Warns AI Trade Could Unwind Fast](https://www.gurufocus.com/news/9082105/nvidia-stock-gains-as-fund-manager-warns-ai-trade-could-unwind-fast)  
+  <sub>GuruFocus, 4 hours ago</sub>  
+  Nvidia (NVDA) shares edged up 1% on Tuesday's session after plunging more than 3% on Monday, with investors assessing whether heavy spending on AI...
+
+</details>
+
+<details><summary><b>Price and chart</b> — score -0.35</summary>
+
+```text
+Last close 212.07 (bar of 2026-09-15), from 501 daily bars
+Trend: vs 20d SMA 218.81 (-3.1%), 50d 213.24 (-0.5%), 200d 197.79 (+7.2%); 50d above 200d
+Momentum: RSI(14) 45.0 | MACD 0.828 vs signal 2.401 (histogram -1.572)
+Returns: 1d +0.5% | 5d -6.1% | 1m -5.8% | 3m -0.2%
+52-week range: 165.17 - 235.74 (now 66.5% of the way up)
+Volatility: ATR(14) 6.75 (3.2% of price) | annualised 20d 46.1%
+Volume: 0.44x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.70</summary>
+
+```text
+Sector: Technology / Semiconductors | market cap 5.12T
+Valuation: trailing P/E 26.81 | forward P/E 13.58 | P/B 22.36 | PEG 0.45
+Profitability: profit margin 63.7% | operating margin 66.2% | ROE 117.2%
+Growth (YoY): revenue +105.9% | earnings +127.8%
+Balance sheet: debt/equity 17.0% | free cash flow 41.81B
+Risk: beta 2.22 | short interest 1.3% of float
+Next earnings: 2026-11-17
+```
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.50</summary>
+
+```text
+Consensus: strong_buy (mean 1.30 on a 1=strong buy to 5=strong sell scale, 58 analysts)
+Ratings: 10 strong buy, 48 buy, 2 hold, 1 sell, 0 strong sell
+Price target: mean 328.66 (+55.0% vs last close), range 180.00 - 515.00
+Recent rating changes:
+  - 2026-09-10 Piper Sandler: init, ? -> Overweight
+  - 2026-09-04 Rosenblatt: main, Buy -> Buy
+  - 2026-09-04 Needham: reit, Buy -> Buy
+  - 2026-08-27 Citigroup: main, Buy -> Buy
+  - 2026-08-27 Mizuho: main, Outperform -> Outperform
+  - 2026-08-27 JP Morgan: main, Overweight -> Overweight
+Institutional ownership: 71.4%
+Largest holders: Blackrock Inc. (8.1%), Vanguard Capital Management LLC (6.4%), FMR, LLC (4.3%), State Street Corporation (4.2%), Geode Capital Management, LLC (2.5%)
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score -0.15</summary>
+
+```text
+Last 180 days: bought 61,415,957 shares in 19 transaction(s) | sold 5,413,597 shares in 13
+Net: +56,002,360 shares (+6.2% of insider holdings) | insiders hold 965,928,000 shares
+Distinct insiders: 0 buying, 7 selling
+Sales — weak evidence on their own; often scheduled 10b5-1 plans, tax on vesting, or diversification:
+  - 2026-09-04 STEVENS MARK A (Director): 1,022,239 shares, 235.64M
+  - 2026-09-02 STEVENS MARK A (Director): 1,848,501 shares, 410.84M
+  - 2026-08-31 TETER TIMOTHY S (General Counsel): 30,000 shares, 6.54M
+  - 2026-06-18 STEVENS MARK A (Director): 885,000 shares, 186.00M
+(17 grant/option/gift transaction(s) excluded — compensation, not a view on the price)
+```
+
+</details>
+
+### Alphabet (Google) (GOOGL) · Company — NEUTRAL, confidence 0.40
+
+**Result:** REJECTED · bias is NEUTRAL; no trade
+
+**In the model's own words:**
+
+> News is a mix of commentary pieces — FCF concerns from AI capex versus cheap trailing P/E and a Fortum nuclear deal — with no fresh material catalyst. Technicals are neutral: price sits right at the 20d/50d cluster, RSI 51, thin 0.49x volume, MACD just turning up, 3-month return -6.8%. Fundamentals are strong (54.8% margin, +24% revenue, low leverage) but forward P/E 23 already discounts it, and capex-driven FCF pressure is a real bear point. Strong-buy consensus with a 24% target gap is a mild positive but is long-standing and already in the price; no insider transactions. Congressional share sales are not insider information. Net: no edge this cycle.
+
+**Main reasons it gave:**
+- Price within 1% of 20d and 50d SMAs, RSI 51, volume only 0.49x average
+- News flow is opinion/valuation commentary, no ticker-specific catalyst
+- Trailing P/E 17.3 vs forward 23.2; FCF pressure from AI capex flagged
+- Strong-buy consensus (1.37, 54 analysts) with mean target +24%, but no fresh rating changes
+- Zero insider open-market buys or sells in 180 days
+
+<details><summary><b>News</b> — score +0.10</summary>
+
+- [What Happens To Alphabet Stock If Free Cash Flow Stays Negative?](https://finance.yahoo.com/markets/stocks/articles/happens-alphabet-stock-free-cash-170227368.html)  
+  <sub>Yahoo Finance, 2 hours ago</sub>  
+  Alphabet (GOOGL) has returned about 46% over the past year. In the June quarter it spent more on AI capacity than its operations produced in cash,...
+- [A Sub-20 P/E on GOOGL? The Market May Be Missing Something](https://www.marketbeat.com/articles/a-sub-20-p-e-on-googl-the-market-may-be-missing-something/)  
+  <sub>MarketBeat, 4 hours ago</sub>  
+  Alphabet shares rose after its P/E fell near 17.5, a discount to the S&P 500, while a 22-year nuclear power deal with Fortum and Buy-rated analyst support...
+- [RDDT vs. GOOGL: Which Digital Advertising Stock Has an Edge Right Now?](https://www.theglobeandmail.com/investing/markets/stocks/RDDT/pressreleases/4618695/rddt-vs-googl-which-digital-advertising-stock-has-an-edge-right-now/)  
+  <sub>The Globe and Mail, 31 minutes ago</sub>  
+  Detailed price information for Reddit Cl A (RDDT-N) from The Globe and Mail including charting and trades.
+- [2 Stocks That Will Cash In When Anthropic Goes Public](https://www.fool.com/investing/2026/09/15/stocks-cash-in-anthropic-goes-public-amzn-goog/)  
+  <sub>The Motley Fool, 5 hours ago</sub>  
+  These tech juggernauts are tied to the Claude parent through equity stakes and multi-gigawatt cloud deals.
+- [Alphabet's Distorted Forward P/E Meets AI Regulation Prospects (NASDAQ:GOOGL)](https://seekingalpha.com/article/4946429-alphabet-distorted-forward-pe-meets-ai-regulation-prospects)  
+  <sub>Seeking Alpha, 5 hours ago</sub>  
+  Alphabet's adjusted EPS and P/E show less upside despite strong Search and Cloud growth. Click here to look at GOOG stock and its valuation.
+- [Google Stock Price Forecast: Bucks Trend With Three-Day Rally, Shares Poised to Challenge $380 Again](https://www.tradingkey.com/analysis/stocks/us-stocks/262168290-google-stock-price-forecast-defying-trend-rises-three-consecutive-days-stock-price-expected-challenge-380-tradingkey)  
+  <sub>TradingKey, 10 hours ago</sub>  
+  TradingKey - As of the close on September 14, Eastern Time, against the backdrop of a 0.48% drop in the S&P 500 Index and a 0.56% decline in the Nasdaq,...
+- [Dan Ives Says AI Capex Boom Continues 'Full Steam Ahead' After TSLA, GOOGL Earnings — Gene Munster Notes Tech Industry Still In '3rd Inning'](https://stocktwits.com/news-articles/markets/equity/dan-ives-ai-capex-boom-continues-full-steam-tsla-googl-q2-gene-munster-3rd-inning/cZZnV4ER7xp)  
+  <sub>Stocktwits, 15 hours ago</sub>  
+  Tech strategist Dan Ives said that the AI capital expenditure boom remains “full steam ahead” after the latest quarterly results from Tesla Inc. (TSLA) and...
+- [US Rep. Thomas Kean sells more Alphabet shares amid ongoing tech stock exits in 2026](https://pluang.com/en/news-feed/politikus-as-jual-saham-google-mencurigakan)  
+  <sub>Pluang, 5 hours ago</sub>  
+  US Representative Thomas Kean disclosed another sale of Alphabet (Google parent) shares on August 27, 2026, continuing a pattern of stock sales throughout...
+- [U.S. politician makes super suspicious Google stock trade](https://finbold.com/u-s-politician-makes-super-suspicious-google-stock-trade/)  
+  <sub>Finbold, 5 hours ago</sub>  
+  United States Representative Thomas Kean has disclosed another notable sale of Alphabet (NASDAQ: GOOGL) stock.
+- [Why Google and Meta Stocks Are the Big Winners From the Latest AI Concerns](https://www.barrons.com/articles/google-meta-stock-ai-slowdown-7205d231)  
+  <sub>Barron's, 23 hours ago</sub>  
+  Google and Meta socks are getting some love from investors, even amid a broader tech selloff.
+
+</details>
+
+<details><summary><b>Price and chart</b> — score +0.00</summary>
+
+```text
+Last close 344.11 (bar of 2026-09-15), from 501 daily bars
+Trend: vs 20d SMA 341.24 (+0.8%), 50d 346.52 (-0.7%), 200d 337.07 (+2.1%); 50d above 200d
+Momentum: RSI(14) 51.0 | MACD -1.965 vs signal -2.825 (histogram 0.860)
+Returns: 1d -1.5% | 5d +1.7% | 1m -0.5% | 3m -6.8%
+52-week range: 236.57 - 402.62 (now 64.8% of the way up)
+Volatility: ATR(14) 8.27 (2.4% of price) | annualised 20d 23.2%
+Volume: 0.49x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.35</summary>
+
+```text
+Sector: Communication Services / Internet Content & Information | market cap 4.21T
+Valuation: trailing P/E 17.27 | forward P/E 23.16 | P/B 6.76 | PEG 1.25
+Profitability: profit margin 54.8% | operating margin 34.0% | ROE 48.7%
+Growth (YoY): revenue +24.2% | earnings +294.0%
+Balance sheet: debt/equity 18.9% | free cash flow 22.67B
+Risk: beta 1.23 | short interest 1.3% of float
+Next earnings: 2026-10-28
+```
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.40</summary>
+
+```text
+Consensus: strong_buy (mean 1.37 on a 1=strong buy to 5=strong sell scale, 54 analysts)
+Ratings: 13 strong buy, 45 buy, 5 hold, 0 sell, 0 strong sell
+Price target: mean 428.07 (+24.4% vs last close), range 340.00 - 515.00
+Recent rating changes:
+  - 2026-09-03 Rosenblatt: main, Buy -> Buy
+  - 2026-07-23 UBS: main, Neutral -> Neutral
+  - 2026-07-23 Morgan Stanley: main, Overweight -> Overweight
+  - 2026-07-23 Truist Securities: main, Buy -> Buy
+  - 2026-07-23 BMO Capital: main, Outperform -> Outperform
+  - 2026-07-23 DA Davidson: main, Neutral -> Neutral
+Institutional ownership: 81.0%
+Largest holders: Blackrock Inc. (7.9%), Vanguard Capital Management LLC (6.5%), FMR, LLC (4.3%), State Street Corporation (4.1%), Geode Capital Management, LLC (2.6%)
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+
+```text
+Last 180 days: bought 0 shares in 0 transaction(s) | sold n/a shares in 0
+Net: +0 shares | insiders hold 195,190,800 shares
+Distinct insiders: 0 buying, 0 selling
+(2 grant/option/gift transaction(s) excluded — compensation, not a view on the price)
+```
+
+</details>
+
+### Microsoft (MSFT) · Company — NEUTRAL, confidence 0.40
+
+**Result:** REJECTED · bias is NEUTRAL; no trade
+
+**In the model's own words:**
+
+> News flow is generic: comparison listicles, a price-target rehash, and a routine Rule 144 notice for CFO Amy Hood. Technicals are constructive on trend (above 20/50/200d, +24.8% 3m) but momentum is fading (MACD below signal, thin 0.44x volume, -1.3% day). Fundamentals are high quality with strong growth and a reasonable forward P/E; consensus strong buy with ~15% upside is already the market's prior. Insider activity is sales-only by distinct insiders, which is weak evidence. No fresh ticker-specific catalyst before Oct 28 earnings, so slight upward drift bias at best.
+
+**Main reasons it gave:**
+- Price above 20/50/200d SMAs with 50d>200d, +24.8% over 3 months
+- MACD histogram -2.971 and volume only 0.44x average signal fading momentum
+- Consensus strong_buy, mean target 572.92 (+14.8%), no fresh upgrades
+- Revenue +17.7%, earnings +31.7%, 45% operating margin, forward P/E 21.1
+- Insider activity is sales-only (Nadella 86.5k shares, CFO 10b5-1 notice), no open-market buyers
+- Earnings not until 2026-10-28; news flow is roundups and target rehashes
+
+<details><summary><b>News</b> — score +0.05</summary>
+
+- [ORCL vs. MSFT: Which Stock Should Value Investors Buy Now?](https://www.google.com/goto?url=CAESkQEB6zswFS5echoiypv4WPVNwXy5OTsu2xkm64pMrKVmKVmukftxDK1nY05cVR18YcjXdyK1M4M5BU3yYxRM5olbOxKhbFytd7vMsI2C0tOSMKF_RDbe5FMHHFGniTO4fBdHGPR2cVn91gX566NnlnUq4y7dfgvV9OiTSESOTJMwDNECg5J2_MiWPs7CJRfFyz6l)  
+  <sub>Yahoo Finance, 3 hours ago</sub>  
+  Investors interested in Computer - Software stocks are likely familiar with Oracle (ORCL) and Microsoft (MSFT). But which of these two stocks presents...
+- [MSFT Stock Holds Up Amid US-Iran Geopolitical Jitters: Retail Calls It ‘Safest Earnings Play’](https://www.google.com/goto?url=CAES0wEB6zswFY7jaX1PrkRNgEQH6WrzZm7mu2a_eorzCXZUSwUD_RHoLIUVKAq7xo9SZCPsP9puHbkg7G8IbKTMlbEVxROdHlCLU8XHcFJsFekOprhbuo_RQFgasIupMMs9NEh1cxdglq3hc-iNNE9dpfopmJ9_3-dXMg7pA6Ozb1H9-rgvNwTTQf0FVGxaiveArjHNB6_oI09_TnOg8KkGa_3NDHo3KfUUi18ULbevB7rVjmNm-TjUzSainxlPlyErY36lKlvkJEjOqJVP_fdZlrpv9O_I)  
+  <sub>Stocktwits, 14 hours ago</sub>  
+  MSFT Stock Holds Up Amid US-Iran Geopolitical Jitters: Retail Calls It 'Safest Earnings Play'. After a terrible first half, MSFT stock shows fresh signs of life...
+- [Microsoft Is Defying AI Gravity (NASDAQ:MSFT)](https://www.google.com/goto?url=CAESgAEB6zswFWShMSCMsuLbTEaHm1uegy-Ogq2a2bvuC-4xZUnaEZondtcBl3lRAc7UgaZ6qI8opZG7ctnW8Ce-zHA81Ek78V4zUVZAhvVh3nY94ZgTX0wNEAG7PkBmVvollQGDJWZ43e_F1C2MKTXndjxatK0M3hI6Es5gYAfsDbXZzw)  
+  <sub>Seeking Alpha, 4 hours ago</sub>  
+  Microsoft plans to expand data-center capacity from roughly 12GW to over 38GW by 2032 despite infrastructure constraints. Read why MSFT stock is a buy.
+- [Asian Citrus Disposes 590 MSFT Shares At $503.73 Per Share For $297,200.70 On Sept 14](https://www.google.com/goto?url=CAES0gEB6zswFfhsQU-DSHMvs2uKl0P1rd9GfSH251s-tJssXn_BUqaS3j9gHOgUb8xZGYd9lg-2jIU0EQMeoioibCS74JULT1jXk35_49HYfy2QzuVxLxPEjf61S0AJ8Y_vL4escZeWOQXh2Ei-_Pe3bgaxyE4db58ZpbFhibGpDoHGM5LwW7BheZ5nYSoVrI2wNeWgghB8ZJt49Wh1MilN1P4I8qFHbLMhM_UHDVTau0uBERqJKDYX8u8wkiPAwjlIQ0L1D0rTydTO8ABi7amrqmr1omg)  
+  <sub>TradingView, 4 hours ago</sub>  
+  Select market data provided by ICE Data Services. Select reference data provided by FactSet. Copyright © 2026 FactSet Research Systems Inc.Copyright © 2026,...
+- [Analysts revise Microsoft stock price target](https://www.google.com/goto?url=CAESewHrOzAVDfxKWLb1z98-VOhHtP9gO4dCW1xzfpvadY_JdOaJcvXUV2EjGjPC5WjqgrWYUDGs8_aAEEfQnGOK6Io2B1-z6zwp3oWVVqmxnO_-GK8ERJAA1z1nTcVN0ukc1AnzdwhTmM2jAueqgCLCMLgFjz8Pr3QftDN_PA)  
+  <sub>Finbold, 3 hours ago</sub>  
+  As Microsoft Corp. (NASDAQ: MSFT) stock successfully rebounded from its multi-year support level around $355 over the past two months through September 15,...
+- [Microsoft Stock Tests $509 as Azure Growth and AI Safety Strategy Support the Bull Case](https://www.google.com/goto?url=CAESrAEB6zswFX2VM5vsAK7Dn8-u76ITdyGIy-AG0ycffWTpg44nLPQYNO41ZAiKBRjBuCvtlm42oVZ9naE4n61TbuX2YGoelItIgQ4WOoxwOwZSzGRB-B-gVc601QrybK3x544q2xv4ziHdmPkAvkGhTUJHElpHduTF2XaUPrbfaedArycR-73dtfnLMAfpSvvThZNhSD0jHdTccmD6iDCyc5l6SL02mmWmW8lNhGzS)  
+  <sub>TradingKey, 4 hours ago</sub>  
+  TradingKey - MSFT closed at $505.41 after a 1.97% gain as Azure growth and AI adoption remain strong. Can $509.82 unlock $517.24-$522.45?
+- [MSFT Reiterated by Citizens -- Price Target Maintained at $550](https://www.google.com/goto?url=CAESmQEB6zswFfq6UG1QWphPoLXodSh5Esq7QGnJDwWK7cwb9pf0_NOPY19IhoE8WgR7fy4X22l0CkiRvz60_m2sZEVE7GD0CfiCnnC8YhJV2bjU09xTtwDosg6G4uYuMyvLOzo6yuJLE018er5jlMh4f3N9ptZSn0FGiVmAS60ZP5EK6n20CMZ2mGkiZY9XC1Zed3Q6bGdvwbK5WKc)  
+  <sub>GuruFocus, 5 hours ago</sub>  
+  Microsoft (MSFT) Analyst Rating and Valuation Analysis On October 04, 2023, Citizens reiterated its "Market Outperform" rating for Microsoft (MSFT),...
+- [Analysts’ Opinions Are Mixed on These Technology Stocks: Microsoft (MSFT) and Salesforce (CRM)](https://www.google.com/goto?url=CAES5QEB6zswFRCIwMfK11u_skvE2jj6iIu1-k75QkVgE-jT-XIj0mDFkb6zrGsAZRSUvImXDgQWlx3ADmXl-l2vRh302fbB4xutXC83VuB3bFQfard9-3tYX-86HDazkx-HFbT84u7BZxyvONCs-LbXB2esvMhER4O1J7eK9AYmlC9EbN6lkAN8l9PlWsGtY-uB63Sv_t2u5MdXW0sEW2dn4cDAyHciNV7fVzOwEskttjIjnCZWJblZklZmDf-KDkWBoQq32SfPAG2XOgTSSYPi4FLBoPCMjgeNR_B6WH3FICZkDNj6ypGw)  
+  <sub>The Globe and Mail, 8 hours ago</sub>  
+  Detailed price information for Salesforce Inc (CRM-N) from The Globe and Mail including charting and trades.
+- [Microsoft (MSFT) CFO moves to sell tens of thousands of shares under preset plan](https://www.google.com/goto?url=CAESkwEB6zswFS_nx8fJIIr_yql_erss0E-_qFkmaycJvxzMoj_cpIId9qP_4GbphuXjo-Pb_HRfhYjE11KPjTGSHqRZQp3kBB6KBTOXOYgl8YNs7TCV-gTnCdnV_AQLdRf2Of7L7Z-0Kn3aTIfrQj78LNc2Bp5aer6NKYGygkUzcQKV5YpocfyP6apdyd_Y2BpMP7stzX8)  
+  <sub>Stock Titan, 21 hours ago</sub>  
+  Microsoft Corporation (MSFT) received a Rule 144 notice covering a proposed sale of its common stock for the account of Amy Hood, Executive Vice President...
+- [Why Is Microsoft (MSFT) Slowing Advanced AI Development?](https://www.google.com/goto?url=CAESsQEB6zswFVuXY0tDzKM-6aXRN8LkTH-oHvGL8I4OtuX2oQYrot15WyTbioS91vHT-e9iHphjvJfJ6snVYy4q4eaNj_yUWbooMCqUhUQ-ifcg7VJV5-0lrK1IW5hscf9dA1I9Fua--ZzIViaucrhhC1fIfUezvviAsAiT0zkIkfvHzVF6Eqph6NjflMAY5iUljL1ULqwq7PrCkJeF_NPrApRFyxvVRkmiuUMquSOr3vnuCDA)  
+  <sub>Simply Wall Street, 16 hours ago</sub>  
+  Microsoft (NasdaqGS:MSFT) executives joined leaders from OpenAI, Anthropic, and Tesla in calling for a slowdown in advanced AI development over safety...
+
+</details>
+
+<details><summary><b>Price and chart</b> — score +0.15</summary>
+
+```text
+Last close 498.86 (bar of 2026-09-15), from 501 daily bars
+Trend: vs 20d SMA 495.86 (+0.6%), 50d 458.21 (+8.9%), 200d 431.52 (+15.6%); 50d above 200d
+Momentum: RSI(14) 56.9 | MACD 9.524 vs signal 12.495 (histogram -2.971)
+Returns: 1d -1.3% | 5d +1.0% | 1m +0.7% | 3m +24.8%
+52-week range: 352.83 - 542.07 (now 77.2% of the way up)
+Volatility: ATR(14) 10.76 (2.2% of price) | annualised 20d 20.3%
+Volume: 0.44x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.50</summary>
+
+```text
+Sector: Technology / Software - Infrastructure | market cap 3.70T
+Valuation: trailing P/E 27.81 | forward P/E 21.14 | P/B 8.38 | PEG 1.64
+Profitability: profit margin 40.3% | operating margin 45.1% | ROE 34.0%
+Growth (YoY): revenue +17.7% | earnings +31.7%
+Balance sheet: debt/equity 29.1% | free cash flow 16.55B
+Risk: beta 1.11 | short interest 1.0% of float
+Next earnings: 2026-10-28
+```
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.30</summary>
+
+```text
+Consensus: strong_buy (mean 1.36 on a 1=strong buy to 5=strong sell scale, 52 analysts)
+Ratings: 14 strong buy, 38 buy, 3 hold, 0 sell, 0 strong sell
+Price target: mean 572.92 (+14.8% vs last close), range 400.00 - 870.00
+Recent rating changes:
+  - 2026-09-15 Citizens: reit, Market Outperform -> Market Outperform
+  - 2026-09-04 Stifel: main, Hold -> Hold
+  - 2026-09-01 B of A Securities: main, Buy -> Buy
+  - 2026-08-12 Wells Fargo: main, Overweight -> Overweight
+  - 2026-08-05 Tigress Financial: main, Buy -> Buy
+  - 2026-07-30 Bernstein: main, Outperform -> Outperform
+Institutional ownership: 75.8%
+Largest holders: Blackrock Inc. (8.2%), Vanguard Capital Management LLC (6.5%), State Street Corporation (4.2%), Geode Capital Management, LLC (2.5%), FMR, LLC (2.5%)
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score -0.10</summary>
+
+```text
+Last 180 days: bought 513,644 shares in 16 transaction(s) | sold 200,670 shares in 8
+Net: +312,974 shares (+4.9% of insider holdings) | insiders hold 6,757,246 shares
+Distinct insiders: 0 buying, 4 selling
+Sales — weak evidence on their own; often scheduled 10b5-1 plans, tax on vesting, or diversification:
+  - 2026-09-01 NADELLA SATYA (Chief Executive Officer): 86,525 shares, 43.39M
+  - 2026-08-05 ALTHOFF JUDSON (Officer): 10,000 shares, 4.88M
+  - 2026-08-04 NUMOTO TAKESHI (Officer): 4,810 shares, 2.39M
+  - 2026-06-10 NUMOTO TAKESHI (Officer): 4,500 shares, 1.81M
+(15 grant/option/gift transaction(s) excluded — compensation, not a view on the price)
+```
+
+</details>
+
+### ASML (ASML) · Company — NEUTRAL, confidence 0.35
+
+**In the model's own words:**
+
+> ASML faces a sharp near-term pullback (down 14% in one month, 7% in a single day) triggered by AI leaders' calls to slow frontier-model development—a sector-level sentiment shock rather than company-specific bad news. The catalyst is real but sector-driven, not tied to ASML's fundamentals or market position. Technicals show oversold conditions (RSI 38, MACD negative histogram) after an extended decline, typical of capitulation that can reverse quickly. Fundamentals remain exceptionally strong: 21% revenue growth, 29% earnings growth, 37% operating margins, 6% above 200d MA—these do not justify the selloff magnitude. Analyst consensus is heavily bullish (strong buy; +35% mean price target vs current) and unchanged in recent weeks, suggesting the market views this as a buying opportunity rather than a thesis break. However, no recent analyst upgrades corroborate the buying case, and no insider purchases show management conviction that the dip is overdone. Valuation is stretched (P/E 54, though PEG 1.41 suggests growth justifies it), making the stock vulnerable to further sentiment shifts. The options flow shows 85% calls, indicating some bullish positioning, but this is positioning sentiment, not fundamental evidence. Next earnings (Oct 14) is 29 days away—material enough to dominate near-term catalysts. The conflict between excellent fundamentals and recent technical damage, combined with the sector-level (not company-level) nature of the catalyst, argues for neutrality rather than a strong directional call. Conviction is low because the news is noise, technicals are oversold (a timing signal, not a thesis), and analyst consensus is already embedded in price targets.
+
+**Main reasons it gave:**
+- AI slowdown concerns from Dario Amodei essay triggered 7% single-day drop; sector-level sentiment not ASML-specific
+- RSI 38 and negative MACD histogram signal oversold conditions after 14% one-month decline
+- Fundamentals remain robust: 21% YoY revenue growth, 29% YoY earnings growth, 37% operating margin
+- Analyst consensus strong buy with +35% mean price target, but no recent rating changes corroborate the buying case
+- Zero insider purchases or sales; no management voting with capital on pullback attractiveness
+
+<details><summary><b>News</b> — score -0.25</summary>
+
+- [Are Computer and Technology Stocks Lagging ASML Holding (ASML) This Year?](https://www.google.com/goto?url=CAESoAEB6zswFYZ5MO-v3Xus-gasAdxYc8OOEDIs5IsJeClCOvvhNd4g7JileK18HJ2M7YeJyDAcUd9uxxrCqiaYR3xNQQAaCK3D1E8wLrzmF0wNl_k52m_JYp6uYfdXiemZ3XBWCLcz_iprPuamHDRtprJAeduMqGk121rJzvh5f19BYqY7Q87ekmoInlKyrnRtngNOiADHWVVTihYAZqA9vihq)  
+  <sub>Yahoo Finance, 5 hours ago</sub>  
+  Investors interested in Computer and Technology stocks should always be looking to find the best-performing companies in the group. Is ASML (ASML) one of...
+- [ASML Stock Fell 7% in a Day on AI Slowdown Fears. Here’s Where the Stock Could Go](https://www.google.com/goto?url=CAESoAEB6zswFVWpA3-KJog9inzMMeYMARcKfXKpMhZ2fuAwPogr7cqpp0Lpn4Cuw7BCoeAOKKfxcoShEmD8fQ_G-_hWPeOi_K5SDEmdOf9bZ040S26qHFkJmr3eHE2PWE0umqXl5cV0dzbpn7xDo96TKWcK_fLTwZmF7gpkwq-uHzEpN76JUybnI-RT6P-VpaCruYvUnVv6dGvPUqlL1hKENGpM)  
+  <sub>TIKR.com, 6 hours ago</sub>  
+  One AI CEO's September 12 essay did what raised guidance and a record backlog could not: it knocked 7% off ASML in a single session.
+- [ASML shares drop 14% but remain a strong buy wi...](https://www.google.com/goto?url=CAESiwEB6zswFXmSSs0MGzKkR0Y91tO53TGNEhoR7e5n1vAJjIXjTkusAfY1eZod8IBDW4pUn7nz3Bo5ynP6E7j_yjyglQlq4lcVMB9l2tp-JQxk5jI_8BAYjm4Q0JH-L4Yx7K21TjQAsrImIaHLzB20dR1epJ9QxTFIlV3oCfEIh2RT6ABtzJgDR12i2PsK)  
+  <sub>Pluang, 4 hours ago</sub>  
+  ASML's stock fell over 14% recently, yet it remains a strong buy due to its monopoly on EUV lithography machines essential for advanced chip manufacturing.
+- [Why ASML Stock Is Falling Today](https://www.google.com/goto?url=CAESggEB6zswFV6MxZ1t7mwbczMz8Sw61LNm9fQWYreRd9WxD05lB0Kcjrk2tc7DrkLZcKVxNbNFcbvVFCinJigV0gyDG9Odopt-FveGdZqWMkBuieJCScrnzTi0lNYvab5vmkQKntmdBKze4Z2orJHfQ11B33lBIiJKdwxshQW1q5Mw5EXd)  
+  <sub>The Motley Fool, 23 hours ago</sub>  
+  ASML shares dropped 6.2% Monday morning after Anthropic CEO Dario Amodei and other AI leaders called for slowing frontier-model development.
+- [ASML’s Current Share Price of $1,575 Shouldn’t Scare You.](https://www.google.com/goto?url=CAESmAEB6zswFSNF-wlk41Ffpk_YViZKJVkuWFo5hu6TW6u84e2lkleRvZA4Wps1lYUD5onHgEMesEP86aRHehja6lJYsXexIqy4uD-HEcWOArKgvikbmNhJ3FwuOzX5YUaHmR-1QRbFpmSM6UvF_XgmN6ClWpPCouXQD8vQhzwwRCuxO-4n3COP7mFzlPTLk-hlzFcnSCjQiLxVyQ)  
+  <sub>24/7 Wall St., 5 hours ago</sub>  
+  ASML just shed over 14% in a month, and while the bears are pointing at stretched valuations and geopolitical exposure, the bulls see something the selloff...
+- [Can Applied Materials Sustain Strong AGS Growth Beyond 2026?](https://www.google.com/goto?url=CAESqwEB6zswFUbElz8XXd2RX5TJ9OTVhuaIBxuxghznGVFynA2HRxKqwHTXEaHAoTaM5drzBK5ofue8Wm-VR4GdDz2E5LrfI-BeMbVSbbjdaUlwGLwz-DjPgmS4K7mYZTglxn2FTCr99jY5u4E786CHAFG80XrsScrLJ7E4XwYZqewzi3JTjb-Tp_AOAagXfC7AyIXFe1UTfCT8CZtOYyFiEr1DuWSIEWSsvyr88-I)  
+  <sub>TradingView, 4 hours ago</sub>  
+  Applied Materials' AMAT Applied Global Services (“AGS”) business has shown consistent growth in the past few quarters. In the third quarter of fiscal 2026,...
+- [ASML options flow shows bullish long-dated call positioning despite near-term weakness](https://www.google.com/goto?url=CAES0wEB6zswFcvfjG-zZ2lbFK1R3_A85RjGVVXRgwuH7v-iTuXyEovtaR3ovCUe2HiCzzL8tTtjOR38xQcRXRKYEQBTkLAQZQlQfMKFse-FUDe5RmSKorNGir_bVWNQbSqA_9RfnTRaBdnWp2HCWhqeAPHnuj8j-PTVZmyipXi77jZ48_8RgTRZLc8_StTaLdxWuqwo8AU5FbB85LVnEA5-7m4iJOlkDElITBeKERc2h7Cg-hY6relHta3BhujIwTEPsiySquJY0QYHYtPntbkt4gNRLYii)  
+  <sub>Investing.com, 5 hours ago</sub>  
+  Investing.com -- The options tape on ASML Holding NV (ASML) tells a notable story. With 85.2% of today's volume in calls (10,713 vs.
+- [Brokers Suggest Investing in ASML (ASML): Read This Before Placing a Bet](https://www.google.com/goto?url=CAESnAEB6zswFYCFZpvmLpLrzizVjBC8vzbbfaHaWckKNwiakfZjb-Ef_4DoojS2ZK3ZrD57R6bCwRD_E9KcWgnfLqmDboJJX5A1GRnASUFWVwl6f7f5eYz6PFRFb7Lf1Y6XXuZMy0xAZIb60JlFJcngmzICbVtNXrOrW9eIFLxE62Hi6o5AJZlLi1z9Eun9GYRvmFIEvUk0VeKLp6qtvZQ)  
+  <sub>Yahoo Finance, 5 hours ago</sub>  
+  When deciding whether to buy, sell, or hold a stock, investors often rely on analyst recommendations. Media reports about rating changes by these...
+- [ASML Holding NV (ASML) Shares Fall 7.2% -- What GF Score of 94 T](https://www.google.com/goto?url=CAESpgEB6zswFfFOSloM1MwfyEP3RW2r_ere2gbbWN7ytY5YYk6-dR-Ej5gQilPfhHg6otRk94IRHD6SeZ-IEPaZ88xvokgnKKLg8mJGHGG5eR1xfzJTfu_ScRnmZyadeKE8pFZ4LP2PT2ZHgdfj4Acfw_nQ5KUJYKv3ioEXjPLZCq52jX6EWkzuqh7oqV3KAgRhQwBvlphuZUSfT_prs8ZpKl6Qq78cq2RY)  
+  <sub>GuruFocus, 21 hours ago</sub>  
+  On September 14, 2026, ASML Holding NV (ASML) shares fell 7.2%, closing at $1575.15. Over the past year, the stock has ranged from a low of $806.30 to a...
+- [【US Pre-Market】US Treasury Yields Top 5% as Stock Futures and Crypto Stocks Drop; ASML Gains Over 3%](https://www.google.com/goto?url=CAESjwEB6zswFZifp6RlrZq05GojMWiDWlT1vajK8T1Ool7w_VIk0kwFD7jCi-xYmMhHhaxh50ViioWD3jTkDWJNVskp7IjGzH7-xT6nHfpTpYIM38PZ7GUDSNyBbJTGg1JpHW-nvQv2KZLaI382mlP5jN-4bOOiG_wZftVDMdIFNqq4QZR_J5Fx3PwWHcSsHkgkWQ)  
+  <sub>TradingKey, 7 hours ago</sub>  
+  TradingKey - On Tuesday (September 15) Eastern Time, futures on the three major U.S. stock indexes fell across the board in pre-market trading.
+
+</details>
+
+<details><summary><b>Price and chart</b> — score -0.35</summary>
+
+```text
+Last close 1,591.06 (bar of 2026-09-15), from 501 daily bars
+Trend: vs 20d SMA 1,709.04 (-6.9%), 50d 1,730.31 (-8.0%), 200d 1,500.85 (+6.0%); 50d above 200d
+Momentum: RSI(14) 38.0 | MACD -29.055 vs signal -16.123 (histogram -12.932)
+Returns: 1d +1.0% | 5d -9.8% | 1m -13.7% | 3m -15.9%
+52-week range: 867.30 - 1,989.44 (now 64.5% of the way up)
+Volatility: ATR(14) 58.34 (3.7% of price) | annualised 20d 39.9%
+Volume: 1.07x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.75</summary>
+
+```text
+Sector: Technology / Semiconductor Equipment & Materials | market cap 611.12B
+Valuation: trailing P/E 54.01 | forward P/E 26.53 | P/B 1,341.79 | PEG 1.41
+Profitability: profit margin 30.1% | operating margin 37.1% | ROE 53.9%
+Growth (YoY): revenue +21.3% | earnings +28.5%
+Balance sheet: debt/equity 9.1% | free cash flow 8.44B
+Risk: beta 1.36 | short interest 0.4% of float
+Next earnings: 2026-10-14
+```
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.55</summary>
+
+```text
+Consensus: strong_buy (mean 1.40 on a 1=strong buy to 5=strong sell scale, 16 analysts)
+Ratings: 7 strong buy, 32 buy, 3 hold, 1 sell, 0 strong sell
+Price target: mean 2,147.50 (+35.0% vs last close), range 893.04 - 2,859.66
+Recent rating changes:
+  - 2026-07-16 JP Morgan: main, Overweight -> Overweight
+  - 2026-07-16 Wells Fargo: main, Overweight -> Overweight
+  - 2026-07-16 RBC Capital: main, Outperform -> Outperform
+  - 2026-07-14 RBC Capital: main, Outperform -> Outperform
+  - 2026-07-06 Bernstein: main, Outperform -> Outperform
+  - 2026-06-22 B of A Securities: main, Buy -> Buy
+Institutional ownership: 20.4%
+Largest holders: FMR, LLC (1.4%), Fisher Asset Management, LLC (1.2%), Capital World Investors (1.0%), Invesco Ltd. (0.8%), State Farm Mutual Automobile Insurance Co (0.7%)
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+
+```text
+Last 180 days: bought 0 shares in 0 transaction(s) | sold n/a shares in 0
+Net: +0 shares | insiders hold 3,414,222 shares
+Distinct insiders: 0 buying, 0 selling
+```
+
+</details>
+
+### Caterpillar (CAT) · Company — NEUTRAL, confidence 0.35
+
+**Result:** REJECTED · bias is NEUTRAL; no trade
+
+**In the model's own words:**
+
+> Downtrend: -16% over 3 months, below 20d and 50d SMAs, RSI 39, testing 200d support at 780. News flow is mostly commentary (Zacks watch lists, GuruFocus valuation piece) with no material ticker-specific catalyst; autonomous quarry expansion is small. Fundamentals show strong growth (+24% rev, +68% EPS) but rich multiples (33x trailing, 18.5x book) and high leverage, which is exactly the valuation concern the tape is pricing. Analyst targets sit 25% above price but ratings are stale and split. Insider flow is CEO selling $26M with only a token director buy. Conflicting dimensions argue for no directional bet; MACD histogram turning up and 200d support offer a mild stabilization case.
+
+**Main reasons it gave:**
+- 3-month return -16.2%, price below 20d and 50d SMA, RSI 39
+- Sitting on 200d SMA (780.74) with volume only 0.46x average
+- Revenue +24% YoY, earnings +68% but trailing P/E 33.7 and D/E 233%
+- Mean target 975.61 (+24.6%) but no rating changes since 2024
+- CEO sold 32,401 shares ($26.2M) in August; only one small director buy
+
+<details><summary><b>News</b> — score -0.10</summary>
+
+- [Investors Heavily Search Caterpillar Inc. (CAT): Here is What You Need to Know](https://www.google.com/goto?url=CAESoQEB6zswFRtmLRgSOwucFVXWNoKH5C0Vkq_t28iOc_36bS1aSEJEnloU0vbYglNYVmvC8VS42z-wCRyoHJ_GyOxo93m2mQQzh0AZSw9OagdVnr9R7I9dVIJgtUA7xo3LAnyYeoqV_5Zje0_foAeaG-mcjL35zkUuMFuNU2NEpoWPcjVXwPXbphi7OfGGWAAFnYyQ_J9BlOozls3inbg_KI9vWA)  
+  <sub>Yahoo Finance, 6 hours ago</sub>  
+  Caterpillar (CAT) has been one of the stocks most watched by Zacks.com users lately. So, it is worth exploring what lies ahead for the stock.
+- [Should You Buy Caterpillar Stock With An Order Book Almost As Big As Its Annual Revenue?](https://www.google.com/goto?url=CAESzAEB6zswFYzOoexNqfXoSVMungLxeJrY7z3IHW-kHtwIN1b7wlJcFIWAsbjhprBubUDhQw1KzA48r-4E7wKTcVmhWam6CKGvjn4Jrw85ExQBOmBEgIDuozLmhlvokdBz8TcoRGH4KXur4tPix2U0w1esmhE36KX_08S6ktVhz5Mql8Mamzx9OiMDllcLnqV3jC0ws3z5XuVYZQP_URrhLjugPmps0NBAaS8gzGj_X6jm62jwjPGVovdPLsj8C3XBv0ACO7BWUvPz1NI31YE)  
+  <sub>Trefis, 25 minutes ago</sub>  
+  Caterpillar (CAT) has fallen about 26% from its 52-week high, and the argument has narrowed to two questions: does construction demand slow,...
+- [Autonomous trucks hauled 3.5 million tons. Caterpillar will bring them to two more quarries.](https://www.google.com/goto?url=CAESogEB6zswFWNGYnqIS8UUclaB9Qzf9wsXT8eIEQwYOOW7Jt8hL0EPdo4uWVBFOB7OKTcY3vU79lnbdA0BikiWwIMPpQ6iEysPkQVbJwXVcxRyV1J4rr_5M84JMXA1Tz29eGUowSV0DxcgGlRvswjTqycCwLxV25WXj1FkC9OrsWNgL2WRmYixs-E5yMPUAvld5sPRMCcCNJWSWASrPWK9UeRY7FQ)  
+  <sub>Stock Titan, 5 hours ago</sub>  
+  Caterpillar (CAT) and Luck Stone are expanding their autonomous hauling technology from the Bull Run Quarry to two additional Virginia quarries after an...
+- [Caterpillar and Campbell's have been highlighted as Zacks Bull and Bear of the Day](https://www.google.com/goto?url=CAESwwEB6zswFaZXfGd6u3BGMdU36Xm_1ezOl9O0LHfG7zbOk_BRmV67w00EfuVYq2Bc0emEBBumP8-XVCqmu5OgKjo-tv7Snb5cGiWA1_eus9akZQ3NVtYUyAFgy0pmajo-EWKU5TE_a1N1IMVwfsZedm5xm5fHvKaDON07f_o5dMMIVuiU6W_nyHR8ui06sIC95MArsxRAnP1ipJS96ZlOSC7hza56gIBw2U7ReLsIGe_gau-29wmrES_CROTSxPa3yqUn38A)  
+  <sub>TradingView, 4 hours ago</sub>  
+  For Immediate ReleaseChicago, IL – September 15, 2026 – Zacks Equity Research shares Caterpillar CAT as the Bull of the Day and The Campbell's Company CPB...
+- [How Caterpillar (CAT) Drives Sector-Leading Performance Beyond AI Models](https://www.google.com/goto?url=CAESngEB6zswFYvQZ5L_m2v3At-lE0lc8xZN6tNNGpzu5ma8qx9opyUiRos9_3XfJFVXBuTCC2OlfS5MMFfw6fnwKKNeBNK_I7qTpRgl2pd7nXymzGFwj12Ixx_JyZTxQ-JQQTatazOklz5qwkyq0xLWkpdeRqzApWB0K4HcKJfwR6WriNytVHUCYQn2PzzCqqocUgoSsbPPbZoDP9pxEW2CEA)  
+  <sub>Yahoo Finance, 3 hours ago</sub>  
+  Auxier Asset Management, an investment advisory firm, released its second-quarter 2026 investor letter. The letter can be downloaded here.
+- [Why Is RCAT Stock Lifting Off Premarket Today?](https://www.google.com/goto?url=CAESpQEB6zswFZHidbDxstiJvKwr9mup-P7mWOStDBVozF_3NEIb_UQcn627Dk8wtohuH36C51E38dZ2mYhX773wUcDP1dahnwE_T4PJJUXAPg8GsWxICLNDVmuk1F0fvHeQSH0A1iG7ejoh1B8mxpBqBO2YQRhKMQzzpcnh9L1vABHCxGGDLUKHxVKKbVZDVuDvO4N1RTemPFH5d57YMr7OD5EBkhcvpxw)  
+  <sub>Stocktwits, 21 hours ago</sub>  
+  Red Cat Holdings (RCAT) stock gained nearly 5% in early premarket trading on Monday after the company unveiled a new small unmanned aircraft system (UAS)...
+- [3 Defense Stocks Riding the High-Energy Laser Boom](https://www.google.com/goto?url=CAESjwEB6zswFYbMpm_mGbY6CRgU815qOZLxjgGRWSOjnq9OaxDRIh5ZR47xPn91N5s_EjxW0kAseEaQoDA4WkeN57brIBonsedKysI3lDWHE5fysIh5mAhsF8KGLNQnGiLvos-BPBCnPKf41o1OMKES0fCrIb-4wG7wKnOBw2gRooHXCszNysYNw00UpWd9wR_6lA)  
+  <sub>MarketBeat, 7 hours ago</sub>  
+  AeroVironment won a $465 million Army laser weapon contract and posted record revenue, while Kratos and Red Cat Holdings also stand to benefit from growing...
+- [Caterpillar Inc (CAT) Shares Fall 4.2% -- GF Value Says Still Ov](https://www.google.com/goto?url=CAESoAEB6zswFXt-WBkK3IK7DVjqtBVwzMyuHkbR7MYdE7lnWcZV_bk2cajxYdK2cSXIH0a41zM1Ny4NCAfCOODIPFqOAYZAxLKOTecMiCj04QVrXOU-XepKdCAhv_gzatt00fBjcq6Dq1d-UXrG2zfAVOMJGcT6Rz7QEhyU1bE1V7LG-3QB1vl_RGXP2skTqje47_0_YJLnfJRriEbo2abwj1AN)  
+  <sub>GuruFocus, 21 hours ago</sub>  
+  On September 14, 2026, Caterpillar Inc (CAT) shares fell 4.2% to a current price of $784.00, marking a significant decline in the context of its recent...
+- [Caterpillar stock falls as valuation concerns emerge despite strong quarterly earnings](https://www.google.com/goto?url=CAESuwEB6zswFb3FJZ_jq2xyz1NAyISxx1YPsrdiDhfmqTi_jLUrRq8q4jg4tVHDtak1k5dDS6QoAfayyNafaB-ELaiKNR_3qY1Kv3Y7KK36P4ND-NiD7ztlizb3OTd4Mjd3TtiPSmSdedc5DNoFZkpDEGt1pG_4DLSM1-9S8FQX6Pks9_zOBCuk6bSCB4d1TcmcrOMVxomAZdhUglTVkcFMeWNITHHZgJUtuJ3gFzU0TdVn5_SZGLRTBbmCsZut)  
+  <sub>ad-hoc-news.de, 6 hours ago</sub>  
+  Caterpillar stock dropped more than 4 percent to about USD 784.00 on September 14, 2026, as valuation worries overshadow recent strength in earnings.
+- [Why Does Caterpillar (CAT) Matter in This Market?](https://www.google.com/goto?url=CAESkgEB6zswFWo5Ofdi47ypd7IXXxVxlu9Ox7xoKbJlXGYMiVsYIh-XqkO_XmhKqii-g_0DlrJ2ZndXeID9mrFQGd-kBzIc-emHwW1i7ruYHQ2TIpv_Rj2eYLBujrBXNUsEWrVE4NgUq1b_f8mBw6-NmmB-xY7znVpyQEaz9-IV4PyByyObPOIJrT2IRXFPcaiKdiCwBw)  
+  <sub>Kalkine Media, 10 hours ago</sub>  
+  Infrastructure demand met concern about financing costs and global industrial momentum. Caterpillar brings a distinct construction and mining equipment with...
+
+</details>
+
+<details><summary><b>Price and chart</b> — score -0.35</summary>
+
+```text
+Last close 782.88 (bar of 2026-09-15), from 501 daily bars
+Trend: vs 20d SMA 808.66 (-3.2%), 50d 848.85 (-7.8%), 200d 780.74 (+0.3%); 50d above 200d
+Momentum: RSI(14) 39.2 | MACD -15.194 vs signal -16.004 (histogram 0.811)
+Returns: 1d -0.1% | 5d -4.8% | 1m -8.6% | 3m -16.2%
+52-week range: 435.94 - 1,064.90 (now 55.2% of the way up)
+Volatility: ATR(14) 25.74 (3.3% of price) | annualised 20d 31.0%
+Volume: 0.46x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.10</summary>
+
+```text
+Sector: Industrials / Farm & Heavy Construction Machinery | market cap 359.87B
+Valuation: trailing P/E 33.73 | forward P/E 24.18 | P/B 18.55 | PEG 1.37
+Profitability: profit margin 14.5% | operating margin 22.2% | ROE 57.0%
+Growth (YoY): revenue +24.0% | earnings +68.2%
+Balance sheet: debt/equity 232.8% | free cash flow 5.05B
+Risk: beta 1.59 | short interest 1.8% of float
+Next earnings: 2026-10-29
+```
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.25</summary>
+
+```text
+Consensus: buy (mean 2.14 on a 1=strong buy to 5=strong sell scale, 26 analysts)
+Ratings: 1 strong buy, 13 buy, 12 hold, 1 sell, 1 strong sell
+Price target: mean 975.61 (+24.6% vs last close), range 575.00 - 1,225.00
+Recent rating changes:
+  - 2024-10-14 JP Morgan: main, Overweight -> Overweight
+  - 2024-10-14 Morgan Stanley: down, Equal-Weight -> Underweight
+  - 2024-10-09 Citigroup: main, Buy -> Buy
+  - 2024-10-09 Truist Securities: main, Buy -> Buy
+  - 2024-09-30 B of A Securities: main, Buy -> Buy
+  - 2024-08-19 Evercore ISI Group: main, In-Line -> In-Line
+Institutional ownership: 73.5%
+Largest holders: Blackrock Inc. (8.3%), State Street Corporation (7.5%), Vanguard Capital Management LLC (6.5%), State Farm Mutual Automobile Insurance Co (3.2%), Vanguard Portfolio Management LLC (2.6%)
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score -0.20</summary>
+
+```text
+Last 180 days: bought 169,246 shares in 20 transaction(s) | sold 128,174 shares in 10
+Net: +41,072 shares (+4.2% of insider holdings) | insiders hold 1,011,284 shares
+Distinct insiders: 1 buying, 8 selling
+Open-market purchases — insiders spending their own money:
+  - 2026-05-04 MACLENNAN DAVID W (Director): 250 shares, 219.21K
+Sales — weak evidence on their own; often scheduled 10b5-1 plans, tax on vesting, or diversification:
+  - 2026-08-28 CREED JOSEPH E (Chief Executive Officer): 32,401 shares, 26.21M
+  - 2026-05-14 JOHNSON DENISE C. (Officer): 12,605 shares, 11.44M
+  - 2026-05-13 SCHAUPP WILLIAM E (Officer): 360 shares, 326.16K
+  - 2026-05-13 JOHNSON DENISE C. (Officer): 6,196 shares, 5.64M
+(19 grant/option/gift transaction(s) excluded — compensation, not a view on the price)
+```
+
+</details>
+
+### Elbit Systems (ESLT) · Company — NEUTRAL, confidence 0.35
+
+**In the model's own words:**
+
+> ESLT trades at elevated valuation multiples (P/E 55.29, P/B 7.79) despite solid growth (revenue +15.9%, earnings +34.2%) and positive technical momentum (+1.3% 1-day, +3.6% 5-day). However, negative free cash flow (-38.48M), weak analyst consensus (hold, only 1 buy vs 5 holds), and a 72-point gap between mean price target (+11.2%) and current price create conflicting signals. Technicals show RSI at neutral 47.9 with MACD histogram improving slightly, but trading on 52% below 52-week highs with below-average volume (0.52x) suggests positioning is loose rather than committed. Recent insider selling (multiple officers sold in April, net negative on recent activity despite small buy cluster earlier in the period) provides no bullish conviction. The news item references GPUS, not ESLT, making it irrelevant. Next earnings 71 days out. Insufficient agreement across dimensions warrants neutral stance with low-to-moderate conviction.
+
+**Main reasons it gave:**
+- Elevated valuation multiples (P/E 55.29) versus sector peers not justified by near-term visibility
+- Negative free cash flow despite earnings growth
+- Analyst consensus remains hold with only 1 buy rating among 6 analysts
+- Recent insider selling by CEO and officers with no offsetting buy transactions
+- Below-average trading volume contradicts momentum strength
+
+<details><summary><b>News</b> — score +0.00</summary>
+
+- [GPUS Stock Pivot: Hyperscale Data Swaps ATM For Share Buyback](https://www.google.com/goto?url=CAESvAEB6zswFdBOidxrUWxNrMIIIzEYIffKQi6cwyQT3IArMLEYJ1MV3RRq6oYkEjEPHNkbYDsEf43GR-uR3OmSlxM7l_mVkOqju4atLK9JqpOSmaKdEb4DmRmkrLOPjBAcmlmt4WWbDqnVvUEIWzS8DK1THL0Y0wrL4IrV4Fo3ctAiggOz1JxnPQVs10oG8umPwBz6sAoLTJ6DRVX36A-6DSiUvtNKJMMQTmQg7JTmAnxgUquAD-1Rj6QCkrWQ4g)  
+  <sub>Stocktwits, 23 hours ago</sub>  
+  Shares of Hyperscale Data (GPUS) edged lower in pre-market trade on Thursday amid broader market weakness after the company announced it was ending its...
+
+</details>
+
+<details><summary><b>Price and chart</b> — score +0.25</summary>
+
+```text
+Last close 734.26 (bar of 2026-09-15), from 501 daily bars
+Trend: vs 20d SMA 724.62 (+1.3%), 50d 763.99 (-3.9%), 200d 758.28 (-3.2%); 50d above 200d
+Momentum: RSI(14) 47.9 | MACD -14.518 vs signal -18.881 (histogram 4.362)
+Returns: 1d +1.3% | 5d +3.6% | 1m -6.3% | 3m -9.9%
+52-week range: 454.95 - 1,014.33 (now 49.9% of the way up)
+Volatility: ATR(14) 17.57 (2.4% of price) | annualised 20d 24.9%
+Volume: 0.52x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score -0.15</summary>
+
+```text
+Sector: Industrials / Aerospace & Defense | market cap 34.41B
+Valuation: trailing P/E 55.29 | forward P/E 39.99 | P/B 7.79 | PEG n/a
+Profitability: profit margin 7.4% | operating margin 9.6% | ROE 15.2%
+Growth (YoY): revenue +15.9% | earnings +34.2%
+Balance sheet: debt/equity 19.3% | free cash flow -38.48M
+Risk: beta -0.30 | short interest 0.8% of float
+Next earnings: 2026-11-24
+```
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score -0.20</summary>
+
+```text
+Consensus: hold (mean 2.67 on a 1=strong buy to 5=strong sell scale, 6 analysts)
+Ratings: 0 strong buy, 1 buy, 5 hold, 0 sell, 0 strong sell
+Price target: mean 816.33 (+11.2% vs last close), range 518.00 - 960.00
+Recent rating changes:
+  - 2026-08-19 JP Morgan: main, Neutral -> Neutral
+  - 2026-06-24 Jefferies: main, Hold -> Hold
+  - 2026-05-27 JP Morgan: main, Neutral -> Neutral
+  - 2026-04-13 JP Morgan: main, Neutral -> Neutral
+  - 2025-12-19 JP Morgan: main, Neutral -> Neutral
+  - 2025-12-11 Morgan Stanley: init, ? -> Equal-Weight
+Institutional ownership: 23.0%
+Largest holders: Clal Insurance Enterprises Holdings Ltd (3.5%), Vanguard Capital Management LLC (1.6%), Van Eck Associates Corporation (1.2%), Y.D. More Investments Ltd (1.0%), Altshuler Shaham Ltd (1.0%)
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score -0.15</summary>
+
+```text
+Last 180 days: bought 82,000 shares in 7 transaction(s) | sold 69,736 shares in 7
+Net: +12,264 shares (+0.1% of insider holdings) | insiders hold 19,279,282 shares
+Distinct insiders: 0 buying, 5 selling
+Sales — weak evidence on their own; often scheduled 10b5-1 plans, tax on vesting, or diversification:
+  - 2026-04-09 DELMAR HAIM DANIEL (Officer): 7,654 shares, 6.79M
+  - 2026-04-09 MACHLIS BEZHALEL (Chief Executive Officer): 25,514 shares, 22.64M
+  - 2026-04-09 VERED YEHUDA (Officer): 5,953 shares, 5.28M
+  - 2026-04-09 KRIL RAN (Officer): 6,803 shares, 6.04M
+(5 grant/option/gift transaction(s) excluded — compensation, not a view on the price)
+```
+
+</details>
+
+### HDFC Bank (HDB) · Company — NEUTRAL, confidence 0.35
+
+**Result:** REJECTED · bias is NEUTRAL; no trade
+
+**In the model's own words:**
+
+> Downtrend intact (50d below 200d, near 52-week low, -19% vs 200d) with no fresh catalyst. News flow is negative-to-noise: a securities class action solicitation, an unsolicited ESG rating disclosure, and a promotional DCF piece. Fundamentals remain solid (16-18% growth, 27% margins, low beta) and analyst targets imply +36%, but that gap has persisted while the stock fell. Faint MACD improvement and thin volume argue for no directional edge; earnings not until Oct 17. Low conviction NEUTRAL.
+
+**Main reasons it gave:**
+- Price 4.9% off 52-week low; 50d SMA below 200d, -19% vs 200d
+- Shareholder class action solicitation covering Jul 2023-May 2026
+- Revenue +16.6%, earnings +18.1% YoY with 26.8% net margin
+- Mean target 30.77 implies +36% but no fresh upgrades since 2024 JPM downgrade
+- Volume 0.41x 20-day average; no insider transactions in 180 days
+
+<details><summary><b>News</b> — score -0.20</summary>
+
+- [HDFC Bank Flags Unsolicited ESG Rating in NYSE Disclosure](https://www.theglobeandmail.com/investing/markets/stocks/HDB-N/pressreleases/4616572/hdfc-bank-flags-unsolicited-esg-rating-in-nyse-disclosure/)  
+  <sub>The Globe and Mail, 2 hours ago</sub>  
+  An update from Hdfc Bank ( (HDB) ) is now available. On September 11, 2026, HDFC Bank disclosed to the New York Stock Exchange that Niche Ninety Nine...
+- [HDFC BANK LIMITED INVESTORS WITH LOSSES HAVE UNTIL OCTOBER](https://www.globenewswire.com/news-release/2026/09/15/3362260/0/en/hdfc-bank-limited-investors-with-losses-have-until-october-13-2026-to-join-securities-class-action-bernstein-liebhard-llp-announces-deadline.html)  
+  <sub>GlobeNewswire, 5 hours ago</sub>  
+  HDFC Bank Shareholders Between July 17, 2023 and May 26, 2026 - Contact Bernstein Liebhard For More Information Regarding Lawsuit...
+- [HDB DCF Analysis: Intrinsic Value $31 vs Price $23](https://www.gurufocus.com/news/9081499/hdb-dcf-analysis-intrinsic-value-31-vs-price-23)  
+  <sub>GuruFocus, 7 hours ago</sub>  
+  On September 15, 2026, we conducted a DCF analysis for HDFC Bank Ltd (HDB) amidst a challenging price performance context, with the stock down 36.3%...
+- [Bourses and brokers may win from India’s proposed auction revamp](https://m.economictimes.com/markets/stocks/news/bourses-and-brokers-may-win-from-indias-proposed-auction-revamp/articleshow/134249897.cms)  
+  <sub>The Economic Times, 17 hours ago</sub>  
+  Stock exchanges and brokers may be among the biggest beneficiaries of the Securities and Exchange Board of India's proposed changes to the newly launched...
+- [Landmark NSE IPO threatens to hollow out India's unlisted share market](https://www.business-standard.com/amp/markets/news/landmark-nse-ipo-threatens-to-hollow-out-india-s-unlisted-share-market-126091500111_1.html)  
+  <sub>Business Standard, 15 hours ago</sub>  
+  The operator of the world's busiest derivatives market accounted for roughly half of the trading volume in the shadow market, according to an estimate by...
+- [Kotak CRISIL-IBX AAA Financial Services Index - Sep 2027 Fund(G)-Direct Plan](https://univest.in/mutual-funds/kotak-crisil-ibx-aaa-financial-services-index-sep-2027-fund-g-direct-plan)  
+  <sub>Univest, 11 hours ago</sub>  
+  Kotak CRISIL-IBX AAA Financial Services Index - Sep 2027 Fund(G)-Direct Plan details: NAV ₹11.6136, AUM 467 Cr, Expense Ratio 0.2%. Check returns, holdings...
+
+</details>
+
+<details><summary><b>Price and chart</b> — score -0.40</summary>
+
+```text
+Last close 22.59 (bar of 2026-09-15), from 501 daily bars
+Trend: vs 20d SMA 22.98 (-1.7%), 50d 23.83 (-5.2%), 200d 27.91 (-19.1%); 50d below 200d
+Momentum: RSI(14) 44.5 | MACD -0.299 vs signal -0.322 (histogram 0.023)
+Returns: 1d -1.3% | 5d +0.5% | 1m -3.3% | 3m -8.7%
+52-week range: 21.84 - 37.18 (now 4.9% of the way up)
+Volatility: ATR(14) 0.55 (2.5% of price) | annualised 20d 35.4%
+Volume: 0.41x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.30</summary>
+
+```text
+Sector: Financial Services / Banks - Regional | market cap 116.07B
+Valuation: trailing P/E 15.69 | forward P/E 15.91 | P/B 9.03 | PEG n/a
+Profitability: profit margin 26.8% | operating margin 33.3% | ROE 13.8%
+Growth (YoY): revenue +16.6% | earnings +18.1%
+Balance sheet: debt/equity n/a | free cash flow n/a
+Risk: beta 0.40 | short interest 0.7% of float
+Next earnings: 2026-10-17
+```
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.35</summary>
+
+```text
+Consensus: buy (mean 1.75 on a 1=strong buy to 5=strong sell scale, 4 analysts)
+Ratings: 1 strong buy, 2 buy, 1 hold, 0 sell, 0 strong sell
+Price target: mean 30.77 (+36.2% vs last close), range 26.10 - 35.00
+Recent rating changes:
+  - 2024-07-22 JP Morgan: down, Overweight -> Neutral
+  - 2019-09-09 Bernstein: down, Outperform -> Market Perform
+  - 2019-06-11 Nomura: down, Buy -> Neutral
+  - 2017-03-21 Morgan Stanley: down, Overweight -> Equal-Weight
+  - 2016-09-14 Goldman Sachs: main, ? -> Buy
+  - 2015-03-11 Societe Generale: init, ? -> Buy
+Institutional ownership: 13.6%
+Largest holders: Morgan Stanley (1.0%), Royal Bank of Canada (0.8%), Schroder Investment Management Group (0.4%), JPMORGAN CHASE & CO (0.4%), Bank of America Corporation (0.3%)
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+
+```text
+Last 180 days: bought 0 shares in 0 transaction(s) | sold n/a shares in 0
+Net: +0 shares | insiders hold 6,928,096 shares
+Distinct insiders: 0 buying, 0 selling
+```
+
+</details>
+
+### JPMorgan Chase (JPM) · Company — NEUTRAL, confidence 0.35
+
+**In the model's own words:**
+
+> JPM presents conflicting signals across dimensions. Fundamentally, the stock appears reasonably valued with strong profitability (ROE 17.8%, operating margin 50.4%), robust growth (earnings +46.9% YoY), and consensus analyst support (mean 2.12 rating, +9.0% price target upside). However, technicals show deterioration: the stock is down 4.9% over one month, trading below both 20-day and 50-day SMAs, with RSI at 39 (approaching oversold) and negative MACD histogram. Volume is below average, suggesting weak conviction in the recent move. News is largely non-material: a credit card bonus promotion, Jamie Dimon commentary on broader economic concerns, and routine Q2 institutional position updates offer no ticker-specific catalyst. Insider activity shows routine officer sales (scheduled 10b5-1 plans likely, given small amounts and regularity) with no offsetting buys from insiders with material information. The recent positioning updates from Palmer Knight Co, Diversify Advisory Services, and Stevens Capital Partners are Q2 filings with substantial lag and carry little forward signal. The GuruFocus overvaluation claim conflicts with analyst consensus and forward P/E of 13.81, which is not expensive for a diversified financial. Earnings are not until October 13, leaving 28 days for the technical weakness to either resolve or deepen. With no fresh, material catalyst, mixed technicals, and neutral-to-positive fundamentals already reflected in consensus, conviction remains low.
+
+**Main reasons it gave:**
+- RSI 39 and below 20/50-day SMAs signal short-term momentum weakness
+- Earnings 28 days out with no near-term catalyst
+- Analyst consensus +9.0% upside and strong profitability already reflected in valuation
+- Routine officer sales with no offsetting insider buys
+
+<details><summary><b>News</b> — score +0.00</summary>
+
+- [Chase Freedom cardmembers can earn 5% back on groceries, meals and Red Cross donations](https://www.google.com/goto?url=CAESrAEB6zswFT7P0g-la5Cl-AzWglpHuBHrmFYg9iQLONvqBgbDEY8sPOcu2Kf25faYf8sBS4r8DTTaUTVT7awxeImRivzYL1b9Yzkyc9Um-IuypJScCI0zJNDXa3wXAOUf6tjH5dNiYBSSU8VUlN9CLfqtMj8Unlt5FkbgfQY4XHJpFX7KBYHSnuW5F7JQgGO2qz4sjhL__B0AbfZLQ1iel2aCGdgH5gbAFAAK4TBX)  
+  <sub>Stock Titan, 7 hours ago</sub>  
+  Cardmembers have until Dec. 14 to activate; 5% applies to up to $1500 in combined purchases from Oct. 1 through Dec. 31, excluding Walmart and Target.
+- [JPM sees this UK bank stock most positively geared and here is why](https://www.google.com/goto?url=CAESswEB6zswFZpONKOnCnB-RGTPWOjNce96ofMEXK2aLbIQDJNU2-B8DPXni4Jvr_bqdy6k1rnms6Hh6SzlkJGqsNyJ3wjWDyk4e-XWsiIHhAzihR3uZ8M_W5hhWU4xOlvyue61iLL012Y0xOBu8KpVdYRYKferKql8_w6Fc_-Zv5kmpM2DVF1GI9WN9dj0qMjJM74YYBfBdAKgJygVhDX6peJts9T-QGlNylutyCh9drAjTCRdWg)  
+  <sub>Investing.com, 9 hours ago</sub>  
+  Investing.com -- This UK lender is J.P. Morgan's preferred UK bank stock, with the brokerage describing the lender as the bank "most positively geared" to a...
+- [JPM Looks 10.4% Overvalued on GF Value™](https://www.google.com/goto?url=CAESgwEB6zswFQWV7ackuoIveC9ITCVCXoNolYqSMpnzyQMDr5vsqf6G37VZ6OyobV8X_b2y5cJTq51yIQknf6euE6t3ya0sY4vJG9RJURVBd7UG89g7blWbLL8uKH5FnEriHkr4uECcx0GO5p4vZxKROo-HqSXNB34C_rUNiL6w6fPFRSdPnA)  
+  <sub>GuruFocus, 2 hours ago</sub>  
+  On September 15, 2026, JPMorgan Chase & Co (NYSE: JPM) announced a new 5% cash back offer for holders of its Chase Freedom and Chase Freedom Flex cards,...
+- [JPMorgan Chase & Co. $JPM Stock Position Lifted by Palmer Knight Co](https://www.google.com/goto?url=CAEStAEB6zswFeCJhKnExlpyw0cU5WybqylMoGYuBpaf8pO0WxCS5DmKbbBWoGszIRl0y5XaIFp_fuPZ_B7NdKYTw1ZNATET3p3I6Dn_tizkxrWUea4a2LJ7nTarS0H5t9bqb2HF_66aSvclDt5lUCOIeClIpKdXg73pA6k5rT0mKk7R6UYeWWE06KT2gmm2Zp3oxInE8--63xQVPUuHRaaeJ2a5VNXiEvz49mGCVjhaxpCPsIvhZ2o)  
+  <sub>MarketBeat, 11 hours ago</sub>  
+  Palmer Knight Co increased its stake in JPMorgan Chase & Co. (NYSE:JPM - Free Report) by 15.7% in the second quarter, according to the company in its most...
+- [Why Is JPMorgan Chase (JPM) Warning The American Dream Is Slipping Away?](https://www.google.com/goto?url=CAESlwEB6zswFaxTOioBnrUyvb7Yj3KcizA9iAy3Gilr6HpamnXkaA04FU3pbCzzwWMyTwWbH5dd4r7gGED1SbDlqFf80KgFDW2Hzmu3dJveEThRrZiHtxxgokdWMXmwpoPSN3yRWIlpfVI7eAkKrVi8pjtG65fTv4bB2_5IqJLO197JBTprhLkOgcI6uk8rZyHK2KrypqXXCwgK)  
+  <sub>Yahoo Finance, 23 hours ago</sub>  
+  JPMorgan Chase (NYSE:JPM) and CEO Jamie Dimon warned that the American Dream is at risk from a looming small business succession crunch.
+- [JPMorgan Chase & Co. $JPM Stock Position Increased by Diversify Advisory Services LLC](https://www.google.com/goto?url=CAESxwEB6zswFcafJa9nAqbuuXK-6CBM0IhQID91Gd5Az9zz3blQikS3PTsKqOSSlQM-JWN4-fQY88tj_WpD5qOaQNPD3amnxjsTPdW8wu8HWH0wUmDByNnStPzugYNi9VnDKKChFh-EoeyXCMjwDc3k2P0xLHy5DaJR0fLbMHTpy_IRbNCJ-gRbrbz9AwLaaQF1_rbi-1-pYfFMG-kV9x5K9q9w8xUBIx0C9jtShWKsUksvceixj-pvgdYvSjlNIeeL2a5B0pMRrvOV)  
+  <sub>MarketBeat, 11 hours ago</sub>  
+  Diversify Advisory Services LLC lifted its holdings in shares of JPMorgan Chase & Co. (NYSE:JPM) by 1505.1% in the 2nd quarter, according to the company in...
+- [Stevens Capital Partners Boosts Stock Position in JPMorgan Chase & Co. $JPM](https://www.google.com/goto?url=CAESvQEB6zswFdr8r5jQ8rK14NIVXamUEWTEE_l32JI6-xZeJqrwXuj-etNGSxvFcd8Gr5fraZtwHjrj3zuMbAUP-AwHmFLoI460ECQHGegp6nLP8iEJmHOzsdS9rsN4PjWNj_PiAw9O6RH10sa9B9bLcrjRf5f9di8-QgUIOeOjnYDI64Xwta3aX2DJYWdysb2JmjsyyOJ8oMRvaFBGLN-OqqNoS7nJ_vqN2yjS-cIxlIVpcee3OYGQ9XxMqvmFKYQ)  
+  <sub>MarketBeat, 11 hours ago</sub>  
+  Stevens Capital Partners grew its stake in JPMorgan Chase & Co. (NYSE:JPM - Free Report) by 222.1% during the 2nd quarter, according to the company in its...
+- [Evonik stock steadies after recent slide with JP Morgan underweight call](https://www.google.com/goto?url=CAESwAEB6zswFcqs9b33Icu31DtY5deIy9HJ1k9bzYBMTTUu2YnOW8lbHSXdiVE_rWFqHYEKSSWZduV3G7Rd9X102Be_8x6qtm-HmiL2qPoF0nnJJYvQvxAYaoDNttjs020Hc94-XqKO91Gt8xa5SXl083DXijTJC9YqLJh4MouPRIaVoRsQbKsYONpdOdHCT1wGeirosRVc5FtEOvOoJkhLRxcaMMAJYQ9MROxXFw8MgI87PKw8mlvrH_hj0EnK2ZfxF8U)  
+  <sub>ad-hoc-news.de, 24 hours ago</sub>  
+  Evonik stock traded around EUR 18.08 on Xetra as of September 11, 2026 after a weaker close in recent sessions. JP Morgan reiterated its Underweight rating...
+- [JPMorgan Chase & Co. $JPM Shares Sold by Danica Pension Livsforsikringsaktieselskab](https://www.google.com/goto?url=CAESxQEB6zswFXxnffuJH3MLWhe_xCL-YmSTo3XATUMDAIL1QeUlADeagn2_idBIWnrMsDRIYGF_C8sfxVxsxrKytBUhLfaThKXc_b308AHhCpmwg2B3HOTtKd8m8kZ69UDWyty1V5lhDLEwyo0JQF64B5CO8q2-mpr6qAcHXagRpIO1bI-rQzxuEJuu4H88TeWb7u1bmzOJb4cFbfAVGTz-mayiU9LN6vyyaU3njA_BTCLXUdub1NLF1NlTnXipdh4Nr2bSTyK2rw)  
+  <sub>MarketBeat, 11 hours ago</sub>  
+  Danica Pension Livsforsikringsaktieselskab lowered its holdings in JPMorgan Chase & Co. (NYSE:JPM - Free Report) by 12.8% during the second quarter,...
+- [JPMorgan Chase & Co. $JPM Shares Bought by Mmbg Investment Advisors CO.](https://www.google.com/goto?url=CAEStwEB6zswFXhRCwdoKz8aegzL3-fmMvVMIOqX7FMEBmaVb-CDEgN_cWYOyTSN3UELZ_5BHSu_eGx1va_209B8XOCXd0nFOM82er3ILXekoFkPB6UjlyJv_Nqb_GoYRmFz4TrD0EHLxgaeqhmCCnANI-ndzgHZg_Nau7NR25leYkhTusQRwP-LkZvHe1lJ6dMvrcGYGC9ABpaykgxnx_OgGeEx4yw7hL7B09s4ggT9DQuvYASaJjwKECo)  
+  <sub>MarketBeat, 11 hours ago</sub>  
+  Mmbg Investment Advisors CO. increased its stake in JPMorgan Chase & Co. (NYSE:JPM) by 4.8% during the 2nd quarter, according to its most recent Form 13F...
+
+</details>
+
+<details><summary><b>Price and chart</b> — score -0.45</summary>
+
+```text
+Last close 345.04 (bar of 2026-09-15), from 501 daily bars
+Trend: vs 20d SMA 355.31 (-2.9%), 50d 352.20 (-2.0%), 200d 319.91 (+7.9%); 50d above 200d
+Momentum: RSI(14) 39.0 | MACD -0.429 vs signal 1.113 (histogram -1.541)
+Returns: 1d -1.5% | 5d -2.4% | 1m -4.9% | 3m +8.0%
+52-week range: 282.84 - 365.18 (now 75.5% of the way up)
+Volatility: ATR(14) 6.29 (1.8% of price) | annualised 20d 16.2%
+Volume: 0.75x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.55</summary>
+
+```text
+Sector: Financial Services / Banks - Diversified | market cap 917.18B
+Valuation: trailing P/E 14.78 | forward P/E 13.81 | P/B 2.59 | PEG 1.63
+Profitability: profit margin 34.9% | operating margin 50.4% | ROE 17.8%
+Growth (YoY): revenue +30.4% | earnings +46.9%
+Balance sheet: debt/equity n/a | free cash flow n/a
+Risk: beta 0.97 | short interest 1.0% of float
+Next earnings: 2026-10-13
+```
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.45</summary>
+
+```text
+Consensus: buy (mean 2.12 on a 1=strong buy to 5=strong sell scale, 21 analysts)
+Ratings: 4 strong buy, 9 buy, 10 hold, 0 sell, 1 strong sell
+Price target: mean 376.14 (+9.0% vs last close), range 305.00 - 452.00
+Recent rating changes:
+  - 2026-08-14 Wells Fargo: main, Overweight -> Overweight
+  - 2026-08-03 UBS: main, Buy -> Buy
+  - 2026-07-20 Citigroup: main, Neutral -> Neutral
+  - 2026-07-17 Evercore ISI Group: main, Outperform -> Outperform
+  - 2026-07-16 B of A Securities: main, Buy -> Buy
+  - 2026-07-15 Baird: main, Neutral -> Neutral
+Institutional ownership: 75.7%
+Largest holders: Blackrock Inc. (7.8%), Vanguard Capital Management LLC (6.1%), State Street Corporation (4.7%), Bank of America Corporation (2.6%), Morgan Stanley (2.5%)
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score -0.10</summary>
+
+```text
+Last 180 days: bought 969,320 shares in 22 transaction(s) | sold 230,669 shares in 20
+Net: +738,651 shares (+7.7% of insider holdings) | insiders hold 10,393,508 shares
+Distinct insiders: 0 buying, 10 selling
+Sales — weak evidence on their own; often scheduled 10b5-1 plans, tax on vesting, or diversification:
+  - 2026-09-10 LEOPOLD ROBIN (Officer): 2,500 shares, 882.03K
+  - 2026-08-11 LEOPOLD ROBIN (Officer): 2,500 shares, 903.52K
+  - 2026-06-22 FRIEDMAN STACEY R. (General Counsel): 5,467 shares, 1.81M
+  - 2026-05-20 FRIEDMAN STACEY R. (General Counsel): 5,468 shares, 1.64M
+(22 grant/option/gift transaction(s) excluded — compensation, not a view on the price)
+```
+
+</details>
+
+### MercadoLibre (MELI) · Company — NEUTRAL, confidence 0.35
+
+**In the model's own words:**
+
+> MercadoLibre shows a mixed picture with conflicting signals. The near-term technical action is weak—down 3.1% today, breaking below key moving averages (20d, 50d) and deteriorating momentum (RSI 43.8, MACD deep in negative histogram). The $1B debt issuance, while a sign of confidence in the company's access to capital and future growth, is cited as a near-term price headwind. However, the fundamental backdrop remains constructive: revenue growth is strong at +49.8% YoY, the valuation is not cheap but reasonable for growth (PEG 0.92), profitability metrics are solid (ROE 27.5%), and analyst consensus is strongly bullish with a mean target 22.3% above last close. The heavy insider buying in recent months (two distinct insiders, including an operating officer, buying on open market in May-June) suggests confidence, though it predates the debt issuance. The macro catalyst—earnings on 2026-11-04—is still seven weeks away. The conflicting combination of weak technicals, near-term overhang from the debt raise, and longer-term analyst optimism does not support high conviction in either direction over the next few days. The stock appears range-bound and awaiting either a technical bounce or fresh catalysts.
+
+**Main reasons it gave:**
+- $1B debt issuance cited as near-term headwind despite strong institutional demand
+- Price fallen 3.1% today, now 3.9% below 20-day SMA with negative MACD histogram
+- Revenue growth +49.8% YoY with PEG 0.92 supports long-term case
+- Analyst consensus strongly bullish (20 buy/strong buy vs 4 hold) with +22.3% mean target
+- Two insiders bought on open market in May-June, suggesting confidence in medium term
+
+<details><summary><b>News</b> — score +0.00</summary>
+
+- [MercadoLibre slips as fresh debt issuance appears to weigh on shares](https://www.google.com/goto?url=CAESnQEB6zswFXblrhl0Xo5hJVOeDbnxrT_FgHJFb0bAsd5wyAgAwXw63mLGYY-Elb8ppDfUFhwSkYeaHK0qRlZvSzUDyERgX5xyw4Z3DyW2SAtC920i-ze7cWfqwnSWSaYo7ujcZv5HwGJzs2qU60n-ZwQQRa0GFjaXzECrui4Sl8Pf9qSAv7-3Pcnc7RwK1zwA_DQYCD_uPjnTdAbXlT08)  
+  <sub>Quiver Quantitative, 4 hours ago</sub>  
+  MercadoLibre (MELI) is down 3.1% today. Here is some analysis on what might have caused this price m.
+- [Should E Commerce And Fintech Growth Require Action From MercadoLibre (MELI) Investors?](https://www.google.com/goto?url=CAESvgEB6zswFSDKZ3atq2QUiC9628SqCROqLgfNo22QFkDX-TZuVBPy50RXzRx8pLuezKzaxYbuPQFbgJTMFkqo8_14xaBGQeU2lqklYw8z8gxUyjglN1GSmkarKo_MLZpA9ZpcK9kaWlLmtxPitaehJ5-VkX7Vln4iOXEs1jJgHgI8qkAnFDw62OnKQ2rd0SAEccUnY6b15QfMAu4klfLoa18erj517KTIITeNvw9HlY11r9_RrHfnZRPTqaMmRcIY)  
+  <sub>Simply Wall Street, 22 hours ago</sub>  
+  MercadoLibre recently issued US$1b of SEC registered 5.850% senior unsecured notes due 2036, attracting strong demand from over one hundred institutional...
+- [MercadoLibre Boosts Long-Term Funding with New Bond Offering](https://www.google.com/goto?url=CAESqAEB6zswFcKIa8ih237IF1qEOALHG1kuzDgGqiodlgeMqNet2hc1-UeTUj15kUjY6ApGWF1TcFkz_ZZke3RWanAJfycuRxFxnLnM-W5VBKJOqUix_47RXbLlgtzjYBeTEbDazwf2puKA8xSwUVzpcrVCDbv77IqGv2kaiOeRpt74O3lOZga6PoCuiq_awRvgLbqlWI1IVLIEWx51DdDQwzUFs06DIOcdVSI)  
+  <sub>TipRanks, 21 hours ago</sub>  
+  The latest update is out from Mercadolibre ( ($MELI) ). On September 14, 2026, MercadoLibre closed an underwritten public offering of $1 billion aggregate...
+
+</details>
+
+<details><summary><b>Price and chart</b> — score -0.35</summary>
+
+```text
+Last close 1,852.22 (bar of 2026-09-15), from 501 daily bars
+Trend: vs 20d SMA 1,927.96 (-3.9%), 50d 1,877.50 (-1.3%), 200d 1,856.70 (-0.2%); 50d above 200d
+Momentum: RSI(14) 43.8 | MACD 7.999 vs signal 22.661 (histogram -14.662)
+Returns: 1d -2.5% | 5d -3.8% | 1m +0.4% | 3m +12.5%
+52-week range: 1,546.81 - 2,510.97 (now 31.7% of the way up)
+Volatility: ATR(14) 63.82 (3.4% of price) | annualised 20d 37.1%
+Volume: 1.00x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.55</summary>
+
+```text
+Sector: Consumer Cyclical / Internet Retail | market cap 93.90B
+Valuation: trailing P/E 50.51 | forward P/E 32.59 | P/B 11.99 | PEG 0.92
+Profitability: profit margin 5.3% | operating margin 6.7% | ROE 27.5%
+Growth (YoY): revenue +49.8% | earnings -10.9%
+Balance sheet: debt/equity 168.6% | free cash flow 353.38M
+Risk: beta 1.31 | short interest 1.6% of float
+Next earnings: 2026-11-04
+```
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.65</summary>
+
+```text
+Consensus: buy (mean 1.54 on a 1=strong buy to 5=strong sell scale, 24 analysts)
+Ratings: 5 strong buy, 15 buy, 4 hold, 0 sell, 0 strong sell
+Price target: mean 2,264.88 (+22.3% vs last close), range 1,750.00 - 2,800.00
+Recent rating changes:
+  - 2026-09-03 BTIG: reit, Buy -> Buy
+  - 2026-08-11 JP Morgan: main, Neutral -> Neutral
+  - 2026-08-06 Cantor Fitzgerald: main, Overweight -> Overweight
+  - 2026-08-06 BTIG: reit, Buy -> Buy
+  - 2026-07-15 Citigroup: main, Neutral -> Neutral
+  - 2026-06-02 BTIG: reit, Buy -> Buy
+Institutional ownership: 80.3%
+Largest holders: Capital Research Global Investors (6.2%), BAILLIE GIFFORD & CO (6.0%), Capital International Investors (3.7%), Capital World Investors (3.5%), Morgan Stanley (2.9%)
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.40</summary>
+
+```text
+Last 180 days: bought 0 shares in 0 transaction(s) | sold n/a shares in 0
+Net: +0 shares | insiders hold 3,529,511 shares
+Distinct insiders: 2 buying, 0 selling
+Open-market purchases — insiders spending their own money:
+  - 2026-06-11 MELAMUD MARCELO (Officer): 124 shares, 200.00K
+  - 2026-05-22 AGUZIN ALEJANDRO NICOLAS (Director): 600 shares, 993.56K
+(4 grant/option/gift transaction(s) excluded — compensation, not a view on the price)
+```
+
+</details>
+
+### Novo Nordisk (NVO) · Company — NEUTRAL, confidence 0.35
+
+**In the model's own words:**
+
+> NVO is caught between conflicting signals that resist a clear directional call. On the positive side, the company trades at a low trailing P/E of 10.45 with exceptional profitability (42.5% operating margin, 59.8% ROE) and strong free cash flow of $37.7B, suggesting the valuation is supportable. The recent rebranding and cultural reset reflect management action, and the expansion of semaglutide to children (STEP Young trial) opens a new revenue stream. The company is also executing a substantial $9.33B share repurchase. Analyst price targets average 47.00 (+10.3%), offering modest upside. On the negative side, technicals are materially broken: the stock is down 6.7% below its 20-day MA, down 9.9% below its 50-day MA, with RSI at 35.7 (oversold territory) and MACD negative. Volume is below average at 0.53x the 20-day mean, suggesting weak conviction to support a bounce. News flow includes a 2% same-day decline on the rebrand announcement, signaling market skepticism about the rebranding's impact. Earnings miss (down 20.6% YoY) and recent downgrades from Morgan Stanley, Goldman Sachs, and JPMorgan (all within the past year) indicate consensus is cooling on execution. Most critically, there is no insider buying to validate management's confidence despite the buyback program. The obesity-drug-to-pediatrics narrative is positive but not a surprise (trial data was known), and adoption risk in children remains unproven. The rebranding itself is a communications exercise, not a business catalyst. This is a reasonably valued, defensive business showing technical weakness and mixed momentum. Conviction is held low because the upside thesis (valuation recovery, buyback accretion) is latent and generic, while downside risks (continued earnings pressure, Eli Lilly competition) are active.
+
+**Main reasons it gave:**
+- RSI 35.7 and price 9.9% below 50-day MA indicate technical breakdown
+- Earnings down 20.6% YoY despite low P/E suggests unproven recovery
+- Morgan Stanley downgrade to Underweight on 2026-09-11, recent trend of analyst downgrades
+- Volume 0.53x 20-day average suggests weak support for continuation
+- Rebranding announcement produced 2% same-day decline and no insider buying support
+
+<details><summary><b>News</b> — score +0.05</summary>
+
+- [Novo Nordisk Expands Obesity Drug to Children, But Market Hesitates on Adoption](https://www.google.com/goto?url=CAES1gEB6zswFW4wfr510uD2SFLSEh8k2_rlUM9pLW9jr4l6BpxuiMIUt6-9bJxsM57Jsa2Rjs5RItIbc_a142wxEJgyYRkOJL9CUmfS_AQKT02PfMb5Wz4ur8PoscQMx0qdQR4gEIihHoemLXYYn9qhwqEGzsGQhhQOKRk2_dbwKlTmCpGvoqz1l1n8RIyGaxcDj33Q1ew8H4ndmYtZyFHUvZ1sNGPiKnXX48RU5RMgh5ybokEhaBKRMwAcYfFEOPgIs-bXqKJZtAcxs97tiB5aI59OlVxNPmCQ)  
+  <sub>24/7 Wall St., 2 hours ago</sub>  
+  NVO shares have fallen 17% over the past year. This decline came despite STEP Young trial data showing semaglutide moved children ages 6 to 12 below the...
+- [From Novo Nordisk to ‘Novo’: A Strategic Reset Amid Rising Lilly Pressure](https://www.google.com/goto?url=CAESlgEB6zswFVOkzKkL-H-_3rjOPqegrmPujqIDRK0QuHroUrR9wRZPMfpswutWDOVSenJLSMm_7heb0VdhPevcO-FVRgB6RRCVajtOO1XJL_QdmErjsi2CO8wkoo-UxtEvJjQ757U4M0DWHA3Y41WZKlYHHxk2RzcVtMyWhCIyTnxvfH-ibCTw2FBj-kYDl-hIM7o_otsmmik)  
+  <sub>Yahoo Finance, 4 hours ago</sub>  
+  Novo Nordisk A/S (NYSE:NVO)'s decision to rebrand its day-to-day identity as “Novo” and launch a cultural reset is primarily a strategic response to the...
+- [Novo Nordisk Stock Falls After Major Rebrand](https://www.google.com/goto?url=CAESoAEB6zswFTi-DTkofi5_5OyuWbOjgta3Lqb0K-KRY8-p3gcPGLrLQgGqkPObjJtpDzLI3hJioXunkW2dthWgQxmo-a-weoV8P6wWsIEaRwCJX7uEIp7ADoJQOMT11RjklgSs43TNGnuFMGYonvlV_yF6xmOgd07xXQK7YaDvYoJSlhuFx67T-sWHw5scnFWq3PwY5y-S_WQHwSX4AfLGjfg4)  
+  <sub>TradingView, 3 hours ago</sub>  
+  Novo Nordisk NYSE:NVO shares fell 2% on Tuesday even after the drugmaker introduced a new brand identity and updated its corporate culture, as an analyst...
+- [Novo CEO seeks a more consumer-centric culture (NVO:NYSE)](https://www.google.com/goto?url=CAESzAEB6zswFSK91Nr7vxqCyJ6zGFucEDzk3Mucv5ZBkqEEqvY6ZU85LIYefQr3N2LkaXGG9mJdmGaE9NOiCo7DQ3Oe6sRvImdcm1NEVQnsxEkMxMAKB7-xcpHj1aBIlIsQcl2pd41WBU1Z8tItt1f-BprYcPf9jQmc1-TROv6jbhV5ao3Q7dEcyh960M8oo8KznuaETKJ-kTF8qy_yVQJazmd5S7T6Se6qn2rGbrPFWdFZgVGpNYNfPJZzWI7poNmaIsYkCUYMO9UJKPzP8Rw)  
+  <sub>Seeking Alpha, 21 minutes ago</sub>  
+  Close on the heels of a major rebranding exercise, Novo Nordisk's (NVO) CEO Mike Doustdar on Tuesday urged his employees to be more consumer-focused as the...
+- [Novo Nordisk (NYSE: NVO) has repurchased 33,084,179 shares](https://www.google.com/goto?url=CAESpwEB6zswFfsuB-A7IoIFjPsEet3HmPNQzGpcUZzpJKiqiNXaof-15Y7YTv6GqYkuoejrJeFJGsd8Gws8SK3AxdIaZmR6MVlHXBIjdJtBdup0wgGyud8M5PK5PBUGq4LLw3E1DPGsp7T1CFX3c577ZqmzwHEFEUuyfi7iwSq50reegw_w-BkEvwWAjtZ_XBI31VHf6zJZnfD_ixp_2kZog0hzuYKDpWLY7Q)  
+  <sub>Stock Titan, 9 hours ago</sub>  
+  Since 4 Feb 2026, Novo Nordisk has bought back 33084179 B shares for DKK 9.33bn at an average DKK 281.89, now holding 1.1% of its capital in treasury.
+- [Novo Nordisk (NVO) Unveils Global Rebrand As Novo](https://www.google.com/goto?url=CAESlAEB6zswFaEBtakFeu23T5uBhxcw09R_CfFmtK4IZ1HSdxyOAH_QYDbg-GdfTvpAH2CLMiASHKcGJpR-e29V0A4RkbLgiclRutmbgJa4djaISgYF3JzxDCZPMN8oJxWH_9hOOMBSZngLbTFj0PY4f6hywde_ssE1xnBr5qSF79LQHwCLpf7x7WfxRbU2jMauGaTM65P3)  
+  <sub>Yahoo Finance, 13 hours ago</sub>  
+  Novo Nordisk (NYSE:NVO) has rebranded globally as "Novo" and introduced the "Lasting Health Starts Now" platform. The group is rolling out an updated...
+- [SHAK Stock Slips Premarket — Shake Shack’s Guidance Reset Prompts Price Target Cuts](https://www.google.com/goto?url=CAESygEB6zswFZr-38n95-VZHnHi1cI3Oeu3Hbwnicnuaktx6p3Zkqx-gGVDsdMCC-Bx4CYFunm4ImBhjr4syKmKW7wSG8kJ1VywsxCHQTjAXkQnAQyEJCaIHPWt6bsNQyTU3BRH5EOERqzyE_JoXKtIg9489JKe1aE5ILsxoWJPTCacyavlPf6yKxnQPbAf5mX-Q0A8yGasM2dVd8uLmrVCH0w4kyGEwj8Cp4xn3SsmEr7JqKCGoNr6bU4-bepXfuBCC74ziBxui2EF1tnf)  
+  <sub>Stocktwits, 18 hours ago</sub>  
+  Shake Shack Inc. (SHAK) stock slipped premarket on Wednesday after the burger chain reduced its fiscal second-quarter (Q2) and full-year earnings outlook,...
+- [Why Is Ascendis Pharma Stock Trading Lower on Tuesday?](https://www.google.com/goto?url=CAESqgEB6zswFWqkZ4pnWTVkPzZMgxSTE_fTpOp3da_o09lBnxclyHzuRpXEXVRahRCHGYwpBBu2rt9R60A_LrqlQaHBNjPGb68RKuUtBJvZgCv69HedHRo2QuobXwJV-rIX35Tt9SEM3nC2VN5wgYB0t16LWkpGkFdz8NBr2Pqg896KHFFyeN-JEc1gHU6ZyZspTSQqfquidJzqqzJN5e9esYh_4UDZiO_yGLYUlQ)  
+  <sub>Benzinga, 48 minutes ago</sub>  
+  Ascendis Pharma shares dip as it reclaims TransCon technology rights from Novo Nordisk and initiates a $400 million share repurchase program.
+- [NVO Looks 58.7% Undervalued on GF Value™ with Strong Dividend Ap](https://www.google.com/goto?url=CAESoAEB6zswFUYXc6cbBFNJ6qte709O-hXjBTCKM7C160GecRHRmVh6mUB__yMvOp77mafyaa4VQ7TwMIiPeZFondRvWASKGo6UnRqDBqoOSDwezcludHpLg9-n3m0Lzro_M7mYxnWIGsOFNHZL-xVlK87_kz9tiqy0R-kq3gCWLibHHRxtMJctcqpT8taLOUImrnwkqx_rdbv1rZJCFhxpILl5)  
+  <sub>GuruFocus, 8 hours ago</sub>  
+  On September 15, 2026, Novo Nordisk AS (NYSE: NVO) announced a strategic rebranding to simply "Novo," alongside unveiling a new cultural initiative called...
+
+</details>
+
+<details><summary><b>Price and chart</b> — score -0.65</summary>
+
+```text
+Last close 42.62 (bar of 2026-09-15), from 501 daily bars
+Trend: vs 20d SMA 45.70 (-6.7%), 50d 47.29 (-9.9%), 200d 46.24 (-7.8%); 50d above 200d
+Momentum: RSI(14) 35.7 | MACD -0.979 vs signal -0.641 (histogram -0.339)
+Returns: 1d -1.9% | 5d -5.6% | 1m -7.1% | 3m -3.0%
+52-week range: 35.29 - 63.98 (now 25.5% of the way up)
+Volatility: ATR(14) 1.24 (2.9% of price) | annualised 20d 32.2%
+Volume: 0.53x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.50</summary>
+
+```text
+Sector: Healthcare / Drug Manufacturers - General | market cap 188.33B
+Valuation: trailing P/E 10.45 | forward P/E 12.54 | P/B 5.50 | PEG 3.07
+Profitability: profit margin 35.3% | operating margin 42.5% | ROE 59.8%
+Growth (YoY): revenue +2.1% | earnings -20.6%
+Balance sheet: debt/equity 63.3% | free cash flow 37.67B
+Risk: beta 0.34 | short interest 1.0% of float
+Next earnings: 2026-11-04
+```
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score -0.15</summary>
+
+```text
+Consensus: hold (mean 2.71 on a 1=strong buy to 5=strong sell scale, 12 analysts)
+Ratings: 0 strong buy, 3 buy, 10 hold, 1 sell, 0 strong sell
+Price target: mean 47.00 (+10.3% vs last close), range 39.78 - 63.70
+Recent rating changes:
+  - 2026-09-11 Morgan Stanley: down, Equal-Weight -> Underweight
+  - 2026-03-02 Goldman Sachs: down, Buy -> Neutral
+  - 2026-02-24 JP Morgan: down, Overweight -> Neutral
+  - 2026-01-09 CICC: init, ? -> Outperform
+  - 2025-12-08 Argus Research: down, Buy -> Hold
+  - 2025-11-28 Goldman Sachs: main, Buy -> Buy
+Institutional ownership: 9.9%
+Largest holders: Dodge & Cox Inc. (0.6%), LOOMIS SAYLES & CO L P (0.5%), Franklin Resources, Inc. (0.4%), Price (T.Rowe) Associates Inc (0.3%), Morgan Stanley (0.3%)
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+
+```text
+Last 180 days: bought 0 shares in 0 transaction(s) | sold n/a shares in 0
+Net: +0 shares | insiders hold 132,841 shares
+Distinct insiders: 0 buying, 0 selling
+```
+
+</details>
+
+### Procter & Gamble (PG) · Company — NEUTRAL, confidence 0.35
+
+**In the model's own words:**
+
+> PG presents conflicting signals that justify a neutral stance. News is mixed but lacks material catalysts—the Tide refresh story is incremental product news rather than a major driver, and most articles are sector commentary or rehashes rather than ticker-specific catalysts. The Bank of America position is noted but not a fresh catalyst. Technicals show a stock consolidating near its 20-day and 50-day moving averages with mild momentum (RSI 54.5, MACD histogram turning positive), but price is down 2.4% over three months and well below the 52-week high, with below-average volume suggesting weak conviction. Fundamentals are the concern: forward P/E of 19.85 is reasonable for a defensive compounder, but trailing earnings fell 15.5% YoY, and the PEG of 3.74 reflects slow growth (revenue +1.5%). High leverage (debt/equity 64.5%) and valuation stretched relative to growth rate it. Analyst consensus is buy with a +9.4% target, but recent rating changes are mixed (two downgrades to Hold in late July/early August), and the wide target range (143–186) signals disagreement. Insider activity shows net buying but entirely from option/grant exercises (excluded from net count); actual open-market sales by officers outnumber buys, a weak signal. No clear catalyst, mixed technicals, and deteriorating earnings growth do not support conviction in either direction.
+
+**Main reasons it gave:**
+- Trailing earnings declined 15.5% YoY despite stable revenue growth
+- Recent analyst downgrades (Argus, HSBC to Hold in late July/early August)
+- Tide refresh story is incremental product news, not a material catalyst
+- Insider open-market sales outnumber buys; compensation exercises dominate net activity
+- Stock consolidating with below-average volume and down 2.4% over three months
+
+<details><summary><b>News</b> — score +0.00</summary>
+
+- [PG&E Corporation (PCG) Stock Price, News, Quote & History](https://www.google.com/goto?url=CAESXAHrOzAVzWvsG0-VCmbyAIw1TxyATcqomPA2cTSy8HfAvkjuj7OITNfKoupUE6aoLBxu0dFnUlezG43WX-myCNn27KTRww03Jx3FUKOhHSwRRV20w46SqdI_gbky)  
+  <sub>Yahoo Finance, 3 hours ago</sub>  
+  Find the latest PG&E Corporation (PCG) stock quote, history, news and other vital information to help you with your stock trading and investing.
+- [Former P&G CEO David Taylor shares lessons on learning, listening and leading](https://www.google.com/goto?url=CAESqwEB6zswFXjvsmK7qq7faO2oCLksgDrxuaxmwr8Cn9OPYC4ZqErX3QiCokYxGD3sF5DuaU8sD3tNLzLFmtreGoQmUo7Ea8DPltALIfm5MzKCfzFVVDD9iyTFppLlLL0mQvh5FTR3GNDYbp1ssg89H4RpKGA7q6VanSbTJreZVN_J7ZdSFdlhPZqFK2iz_LKmpm0zkanzvoarhLuCxyiODhA2gpObS3TJeuFomgw)  
+  <sub>Elon University, 8 hours ago</sub>  
+  David Taylor, former Procter & Gamble chairman, president and CEO joined the Martha and Spencer Love School of Business for its first Lessons from Leaders...
+- [Will Tide Refresh Change P&G Stock Narrative](https://www.google.com/goto?url=CAESrQEB6zswFcD5FtpbjN_k88cZB4bRLAlp2W9mZLY0qW5PKbVPkUX4vqPtuO1uKicdOE85UXWw0awsu-DxoffoHHJn6xDnZB73PMdd4N9u1sDU0VDb_MICmWGfkEyXMd1UtheX1RwnxXJ4DL2SJwwXl8rPSTMlObx1QwCpwMdWW4SLrvxzTuo3aflPqj6kW7WGm6PEW26WcLxdKfIceENUU5jNyXXS__H2U3hnSYrgsA)  
+  <sub>Simply Wall Street, 11 hours ago</sub>  
+  Procter & Gamble recently highlighted early traction in its Fabric & Home Care segment, pointing to upgraded Tide liquid detergent and the Tide evo...
+- [Opinion: Institutional investors are dangerously overinvested in stocks](https://www.google.com/goto?url=CAESoQEB6zswFdSOueN54WiKMUpaBzadz8wyZQlRPKoMZ6_0NwhxKRzDOrjHnLLpvRfKphxt7_VONco6Lhv3U9-xE6LWmvyhZfQz7t6IXWcTIC_9Tspt3iA02HturloJRvpNGSy9zEofxKYCO4kJQqZM2IMy5i8IvsP8aJLNa-z5nqRzqrIm-OLZtBABImGffqvdGV4ULokGzEvt9MwZteNvGfwOkA)  
+  <sub>MarketWatch, 2 hours ago</sub>  
+  What's astonishing after the events of the past couple of months is not how fearful Wall Street is, but how complacent. Major institutional investors remain...
+- [Bank of America Corp DE Takes Position in Procter & Gamble Company (The) $PG](https://www.google.com/goto?url=CAESvQEB6zswFRQDqfRP2NBXLXOjXMdDPdezl76OsVEjWzT8LAWWskSJ02z75W_XGqcLtWDZqSPzQoINEdTRE7LV3YUeQxVmhMt0xiWFBdm4HFeKcshWIdc9Ym-zLF9RAWGlAWlamHLaeYbFQZrrqVTdSXFyiu1qQidTZVpVaRw0WwX0t8aGaDYQdxgpNleBF-wGWul7qHcAkzSZtfQCA5mpjud7H4aorpoPbT4SCPMCdYZNZMy1dhYcYTMwI8JjakY)  
+  <sub>MarketBeat, 11 hours ago</sub>  
+  Bank of America Corp DE purchased a new stake in Procter & Gamble Company (The) (NYSE:PG - Free Report) in the 2nd quarter, according to the company in its...
+- [Has PG&E Stock Quietly Become a Value Opportunity?](https://www.google.com/goto?url=CAESrwEB6zswFaLEMsfXNZdBTPXHg328ElhVnXwM8FC4kfKUO7SMZuGmzmEwffCzoDlcoyyNiqczjHWrPEFW_GE9wS1QTrVsLHGyaXyrGgXC9_3BmYO8TyKNV78RJq77SLU0TwU9NVjPA4r4fseHob2iuxwMGwALIM0h1bmKJs98x11ADFWy48R44GDFmqFqjlVsW20_3HHknVH7kncnLqEqmiEMN19Ok7U6dkZ-5Daf2p_l)  
+  <sub>Trefis, 6 hours ago</sub>  
+  Is PG&E Worth A Look As Value Stock? How Do The Fundamentals Look? The Bear View & The Current Investment Debate. Stocks Like PCG.
+- [3 Dividend Stocks That Are No-Brainer Buys Right Now, Starting With This Healthcare Giant](https://www.google.com/goto?url=CAESkwEB6zswFR8DaHu73IH_b9u7_nV2S3A2AlCdJD9uh8oEWAmD4zh2kFEqYJ2dmaefNaBN2zEkySVGrspM0iIpWDt8azVRevPXdtMc6YXy7N4OeuCJM7zlcFDBtSRerca6EjtfhKcSg8Pr3PmHQ5ACMZxgLKc1N-jgz4vaJd153S-unlKO1hqS6nsVHVEGiYmWNaxLUao)  
+  <sub>The Motley Fool, 2 hours ago</sub>  
+  These three stocks meet multiple criteria for long-term dividend investing success.
+- [Should Value Investors Buy PG&E (PCG) Stock?](https://www.google.com/goto?url=CAESkQEB6zswFSSSZaCg7ZOccUGK6_RJvbMTlxn_HvYA58RUUE_9gSAyWD6gizi6h9_G7BioPOqSGiT5fcI_8VqQgxt1RsZYnfFxK-R-pR5cOFWMVFG1DcjWiFEneOT2uh8ufTHK5g-TfGSyubF7g82rMT2Cq5mUh2qEoqjBYkfPe1Z7FVQL2TR2ewpQEpE9JoydXWNN)  
+  <sub>Yahoo Finance, 5 hours ago</sub>  
+  Here at Zacks, our focus is on the proven Zacks Rank system, which emphasizes earnings estimates and estimate revisions to find great stocks.
+- [PG&E: The Wildfire Risk Is Manageable (NYSE:PCG)](https://www.google.com/goto?url=CAESjAEB6zswFSsYWxw79ZqxZdiFJUkt5ERnTZbCH9vXt_aGPctK889etnrBwTzSm0V5UQKX1gW8Lr1XaumE0JoSH1tgOJRLCzPIOdz7qdam7lhk09sSrMzl8ats69RilTEmwwRECDsYGEEEzqBGeRHYnKtwvxPhUlYhVsonDQk3iqX4UkFdjQM5RyZ3xXswfg)  
+  <sub>Seeking Alpha, 11 hours ago</sub>  
+  PG&E is executing a $70B+ capital plan through 2030, aiming for high single-digit EPS growth and no new equity issuance. See why PCG stock is a Buy.
+- [Why Is the Market Reassessing Procter & Gamble (PG)?](https://www.google.com/goto?url=CAESkwEB6zswFYiWRrhpE3LFYAaV-h6bi65bO5LAR-XQ3QTUmjo4x3ZbzJcO7T1GbWtK0IchOZY6K-y73ygxF1JiqTb1MhD3oTcJ90hCBuomucsMJFwUZk-ZcOrzxl-nCxyZxWmXDL12cMPJnKjRrFaaq33DGxO7ADtIjVqbJwGelC0MVoYmDcEu9adC4biAy1PBIZoF0Co)  
+  <sub>Kalkine Media, 10 hours ago</sub>  
+  Steady everyday demand offered contrast to volatility in technology and commodity-sensitive shares. Procter & Gamble brings a distinct household,...
+
+</details>
+
+<details><summary><b>Price and chart</b> — score +0.15</summary>
+
+```text
+Last close 146.87 (bar of 2026-09-15), from 501 daily bars
+Trend: vs 20d SMA 145.06 (+1.2%), 50d 146.26 (+0.4%), 200d 147.48 (-0.4%); 50d below 200d
+Momentum: RSI(14) 54.5 | MACD -0.073 vs signal -0.267 (histogram 0.194)
+Returns: 1d +0.5% | 5d +0.9% | 1m +1.6% | 3m -2.4%
+52-week range: 138.04 - 167.20 (now 30.3% of the way up)
+Volatility: ATR(14) 2.50 (1.7% of price) | annualised 20d 15.1%
+Volume: 0.44x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score -0.25</summary>
+
+```text
+Sector: Consumer Defensive / Household & Personal Products | market cap 341.12B
+Valuation: trailing P/E 22.19 | forward P/E 19.85 | P/B 6.40 | PEG 3.74
+Profitability: profit margin 18.4% | operating margin 22.1% | ROE 30.3%
+Growth (YoY): revenue +1.5% | earnings -15.5%
+Balance sheet: debt/equity 64.5% | free cash flow 13.28B
+Risk: beta 0.38 | short interest 1.2% of float
+Next earnings: 2026-10-22
+```
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.40</summary>
+
+```text
+Consensus: buy (mean 2.20 on a 1=strong buy to 5=strong sell scale, 23 analysts)
+Ratings: 6 strong buy, 7 buy, 12 hold, 0 sell, 0 strong sell
+Price target: mean 160.61 (+9.4% vs last close), range 143.00 - 186.00
+Recent rating changes:
+  - 2026-08-07 Argus Research: down, Buy -> Hold
+  - 2026-07-30 HSBC: down, Buy -> Hold
+  - 2026-07-30 Citigroup: main, Buy -> Buy
+  - 2026-07-21 Barclays: main, Equal-Weight -> Equal-Weight
+  - 2026-07-16 JP Morgan: main, Overweight -> Overweight
+  - 2026-07-10 B of A Securities: main, Buy -> Buy
+Institutional ownership: 71.8%
+Largest holders: Blackrock Inc. (8.2%), Vanguard Capital Management LLC (6.6%), State Street Corporation (4.4%), Geode Capital Management, LLC (2.9%), Vanguard Portfolio Management LLC (2.7%)
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score -0.10</summary>
+
+```text
+Last 180 days: bought 90,413 shares in 26 transaction(s) | sold 40,243 shares in 13
+Net: +50,170 shares (+2.4% of insider holdings) | insiders hold 2,115,234 shares
+Distinct insiders: 0 buying, 10 selling
+Sales — weak evidence on their own; often scheduled 10b5-1 plans, tax on vesting, or diversification:
+  - 2026-08-24 JANZARUK MATTHEW W. (Officer): 359 shares, 52.14K
+  - 2026-08-21 RAMAN SUNDAR G. (Officer): 3,435 shares, 491.27K
+  - 2026-08-20 SCHULTEN ANDRE (Chief Financial Officer): 5,402 shares, 776.75K
+  - 2026-08-20 JANZARUK MATTHEW W. (Officer): 156 shares, 22.43K
+(24 grant/option/gift transaction(s) excluded — compensation, not a view on the price)
+```
+
+</details>
+
+### Royal Bank of Canada (RY) · Company — NEUTRAL, confidence 0.35
+
+**In the model's own words:**
+
+> Royal Bank of Canada presents a mixed picture with no clear directional catalyst. News items are either sector-generic (ETF distributions, parent survey) or unrelated (Trifecta Gold exploration, Tesla/SpaceX rumor, Apotex offering). The one RY-specific item—CGI Trade360 platform recognition—is positive but incremental and lacks quantifiable business impact. Technicals show weakness: price is 1.4% below the 20-day MA, RSI at 41.4 (below 50, not yet oversold), MACD histogram negative, and volume at 0.2x average suggests low conviction from the market. The stock is down 5.9% over one month despite sitting 10.9% above its 200-day MA, indicating a pullback within a longer uptrend. Fundamentals are solid—trailing P/E 17.80, forward 15.81, ROE 16.2%, revenue and earnings growth both strong at 8.9% and 12.8% respectively—but offer no near-term catalyst. Analyst consensus is constructive (buy, mean target +3.5%) but reflects an existing, already-priced view. Insider activity shows issuer share buybacks in late August totaling ~$140M, which is routine capital management rather than opportunistic conviction betting. No fresh rating changes in recent months. The absence of material ticker-specific news, thin volume, technical pullback, and lack of independent corroboration across dimensions do not support a directional move in either direction over the next few days. Conviction is held low pending clearer catalysts.
+
+**Main reasons it gave:**
+- Technicals showing pullback: RSI 41.4, below 20d MA by 1.4%, negative MACD histogram
+- Volume at 0.2x average indicates low conviction
+- No material company-specific catalyst in recent news
+- Analyst consensus already reflected in 3.5% upside to mean target
+- Issuer buybacks are routine capital allocation, not insider conviction
+
+<details><summary><b>News</b> — score +0.00</summary>
+
+- [Rock samples showed up to 19.25 grams of gold per tonne. Trifecta Gold expects drill results in early October.](https://www.google.com/goto?url=CAESsgEB6zswFa2QK9XzOAdFu37QNg6C8gR2U3oBLDVa__aXMusraX_YSO5jPMrJrvqNcAhC6EvwW3hSmjapU0MOOrOq8QMQVaU0qtgm78sRLSxDQkDZUZ_QfUGWDrX4gKExeC7D64C5ALX0SoMUHfZGL-Bu-z1O5aguopo4tIEglZiBxQd2uAOHm0QmuB-9cjyA_l3cbk9cMi8fgEe-hrsURgXIeiTd0vmkItitjiCo_pmH36dE)  
+  <sub>Stock Titan, 7 hours ago</sub>  
+  Six Rye holes targeted a 1.5-km fault and other zones; Liam work found additional sheeted veining, and Rye assays are expected in early October.
+- [CGI Trade360 platform earns three global industry recognitions for trade finance technology leadership](https://www.google.com/goto?url=CAES8gEB6zswFYm8GOcCsqLyLDuYyjDuaR1qtOMUMotQc5uCMwWL7tyEnQzrFaNAnft5ao-V58dAnGW9COdzdQFvU1Su5QQ8hx9z-EnaM1crBfKbH_1lNkQWCPNdEem6HTyzxary4Ve98LuiN4kYluvD8STK13R61LhgebzynJb2FyfNIj43YCw9BU9_thsdGtcRffXF55IoR06nD3B5HWpJhaTd996MxC4ewKUfu1Uo24ruUTKE2Dm3_38qDeueDFrUXg4y3PCXSfbu-ukVwgLeGUU0xv-jcClAkn7txZI0u0cUhC4HBAI5WgeMPO0yMmLizNwPoA)  
+  <sub>The Globe and Mail, 8 hours ago</sub>  
+  Detailed price information for Royal Bank of Canada (RY-N) from The Globe and Mail including charting and trades.
+- [Elon Musk Teases Merger Between Tesla And SpaceX](https://www.google.com/goto?url=CAESfAHrOzAV9kVbCthcpM63gktrnn29pI5YInJwnn63nBbjMPuS3hIIzY78RwGlk6W2sOoCbXOs4U4e_wb6pdCKXgR1Hly9uVkFrYYhwWgAychmHMc2cM27ZIA_gbwFzaaX6rIATa-qKChI6eX1ANq0N0-JMcGb0hokgYJMEdI)  
+  <sub>Baystreet.ca, 5 hours ago</sub>  
+  Elon Musk is teasing a merger between the two publicly traded companies he runs: Tesla (TSLA) and SpaceX (SPCX). Musk, who is the chief executive officer...
+- [RBC Global Asset Management Inc. announces RBC ETF cash distributions for September 2026](https://www.google.com/goto?url=CAESxQEB6zswFYcQP5bqnZ97HPHoJj6zZaeXYIiYbgeI7ewHKbhJO-U7LewNnldMKi41SPCWdvIcMZPEdlbH3CCL1gmwKFEYfYVZ6iZ9kupjD5CpzgxB0lAMoLP1INL62IcQaco1A976j1jAe96rjJUjcn1CktoNY3cZWhCtuLZGGM1lN0zWGKwjMst0y9dDB73yQA65dszd59N8jrqHd256Oo3iiVZ7EszalRDW-fpUg5R49KnEvMhbO0n0p9oj5iukJy6C66MYjA)  
+  <sub>www.marketscreener.com, 6 hours ago</sub>  
+  TORONTO, Sept. 15, 2026 /CNW/ -- RBC Global Asset Management Inc. today announced September 2026 cash distributions for unitholders of RBC ETFs,...
+- [RBC Survey: 1 in 5 Parents of 35 to 40-Year-Olds Are Still Helping Pay the Bills](https://www.google.com/goto?url=CAESvQEB6zswFdfRseowRvLRyS6p4e5ZIBC9xzqW57_euHhcrUcwmWpxnzUKA_cIa8anOITP3Owviz6C0OD7VSIZrdCb0GD6enqBKHf3-gp3hfuhKlBKJwHgPWb_SkcB5YYEtJIn-WLHxsKuzZYxIBVAYpgUGucxS7rlfGskj7fP-fmdmxNZaZNhdAOjwTNAfJK25czWi3lMc8Tptt7FCKFrYwOIBp8J2u2OZKKFYUySTimWSItVBkW511QGJm8EjDw)  
+  <sub>www.marketscreener.com, 11 hours ago</sub>  
+  Nearly one in three Canadian parents say their adult children aged 18-40 are not yet financially independent, including nearly one in five parents of adult...
+- [APOTEX HEALTH CORP. ANNOUNCES $750 MILLION BOUGHT DEAL SECONDARY OFFERING](https://www.google.com/goto?url=CAES1QEB6zswFdByhfQxuyDj0OjvKRi8DNzgd0d0Z_7e8avpGu_Ra3gJTuniTLVC2Ka-n7YGJjVHyuhooXZB0nWcCrMTERGAw-tYieVptN5JemqQj-2-K-8GmfHOoXNzWBYkqzV9s-9GfqkxnF_5Cdp0Vwdxf-Kqb3Zt-OxMt75aQaRL_B3IqX2s08eseMim8zz-rJKmI5f_JXttxfP1smreCVaDXEG0gwlA7EQnjjkPu0rxCxkLGgoHaXeFBw4PEa1-xz3VQF8aCDK7ZnTi18K8IpS034uP0D0)  
+  <sub>The Globe and Mail, 22 hours ago</sub>  
+  Detailed price information for Royal Bank of Canada (RY-T) from The Globe and Mail including charting and trades.
+- [Royal Bank of Canada shares technical analysis: Consolidation near C$285.82 resistance](https://www.google.com/goto?url=CAEShQEB6zswFQn0DAwA3zMlmLcxhKK3g5j3nd_4CFlG1T8RyLnuZHKalMe7oq8ZSPhni9BsYofmy_Q2PsAsKVoCgnUT5QK5wy20DO1aWz62dFv8GNlPI0fxpW4cc7C-Dt-8WgP8S7i41slOXnSXZux2r7kVu3h2doigkrNvLpo0fmNmEwXEXvlV)  
+  <sub>Traders Union, 5 hours ago</sub>  
+  Royal Bank of Canada trades at C$283.86 today, down 0.47%. Get the latest price trend and outlook for RY stock.
+
+</details>
+
+<details><summary><b>Price and chart</b> — score -0.25</summary>
+
+```text
+Last close 203.84 (bar of 2026-09-15), from 501 daily bars
+Trend: vs 20d SMA 206.65 (-1.4%), 50d 209.50 (-2.7%), 200d 183.77 (+10.9%); 50d above 200d
+Momentum: RSI(14) 41.4 | MACD -0.899 vs signal -0.610 (histogram -0.289)
+Returns: 1d -0.6% | 5d -2.5% | 1m -5.9% | 3m +2.4%
+52-week range: 143.64 - 217.87 (now 81.1% of the way up)
+Volatility: ATR(14) 3.25 (1.6% of price) | annualised 20d 17.9%
+Volume: 0.20x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.40</summary>
+
+```text
+Sector: Financial Services / Banks - Diversified | market cap 282.20B
+Valuation: trailing P/E 17.80 | forward P/E 15.81 | P/B 2.92 | PEG 2.26
+Profitability: profit margin 33.9% | operating margin 46.4% | ROE 16.2%
+Growth (YoY): revenue +8.9% | earnings +12.8%
+Balance sheet: debt/equity n/a | free cash flow n/a
+Risk: beta 0.92 | short interest n/a of float
+Next earnings: 2026-12-03
+```
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.25</summary>
+
+```text
+Consensus: buy (mean 2.13 on a 1=strong buy to 5=strong sell scale, 3 analysts)
+Ratings: 4 strong buy, 5 buy, 5 hold, 0 sell, 1 strong sell
+Price target: mean 210.98 (+3.5% vs last close), range 183.12 - 230.09
+Recent rating changes:
+  - 2025-08-29 Argus Research: main, Buy -> Buy
+  - 2024-12-05 BMO Capital: main, Outperform -> Outperform
+  - 2024-08-29 BMO Capital: main, Outperform -> Outperform
+  - 2024-06-06 Argus Research: main, Buy -> Buy
+  - 2024-04-05 BMO Capital: up, Market Perform -> Outperform
+  - 2023-12-18 B of A Securities: up, Neutral -> Buy
+Institutional ownership: 49.6%
+Largest holders: Royal Bank of Canada (5.1%), Bank of Montreal /CAN/ (4.4%), Vanguard Capital Management LLC (3.1%), FIL LTD (1.7%), TD Asset Management, Inc (1.7%)
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+
+```text
+Last 180 days: bought 0 shares in 0 transaction(s) | sold n/a shares in 0
+Net: +0 shares | insiders hold 387,640 shares
+Distinct insiders: 1 buying, 0 selling
+Open-market purchases — insiders spending their own money:
+  - 2026-08-31 Royal Bank of Canada (Issuer): 350,000 shares, 69.76M
+  - 2026-08-28 Royal Bank of Canada (Issuer): 350,000 shares, 70.00M
+  - 2026-07-31 Royal Bank of Canada (Issuer): 211 shares, 43.82K
+  - 2026-07-31 Royal Bank of Canada (Issuer): 140 shares, 29.09K
+(105 grant/option/gift transaction(s) excluded — compensation, not a view on the price)
+```
+
+</details>
+
+### Toyota (TM) · Company — NEUTRAL, confidence 0.35
+
+**In the model's own words:**
+
+> TM faces mixed signals across multiple dimensions. NEWS: The item about China operations restructuring is sector-level commentary on auto-industry competition, not a material TM-specific catalyst. The 24-hour news list is dominated by unrelated companies (GRLF, MCC, HMAX, FMAX, HEALWELL, etc.) with no substantive TM news beyond routine competitive pressures. TECHNICALS: The stock is modestly above its 20d and 50d SMAs but below the 200d, indicating a recovery within a still-choppy intermediate trend. RSI at 54.7 is neutral (not overbought). MACD histogram is negative, suggesting fading momentum. Volume at 0.43x the 20d average indicates thin participation. 1m and 3m returns are positive but not compelling. FUNDAMENTALS: TM is cheaply valued (trailing P/E 8.46, forward 12.39) on a strong business with 10.4% revenue growth and 86.9% earnings growth YoY. However, free cash flow is deeply negative (-3.60T), debt/equity is elevated at 115%, and the 50d is below the 200d—all yellow flags. The next earnings date is 2026-11-05, nearly two months away, limiting near-term catalysts. ANALYST VIEW: Consensus is technically divided (2 strong buys, 2 buys, 0 sells) but mean target of 231.58 is only +18.5% above last close, modest relative to the valuation discount and growth rate. Recent trend shows downgrades outweighing upgrades (5 downgrades since 2022 vs 1 upgrade). INSIDER: Zero buying or selling in 180 days is neutral; no conviction signal either direction. KEY FACTORS: cheap trailing valuation (P/E 8.46), elevated leverage (debt/equity 115%), negative free cash flow, weak recent momentum (RSI neutral, MACD negative), thin trading volume.
+
+**Main reasons it gave:**
+- Trailing P/E 8.46 suggests deep valuation discount
+- Negative free cash flow of -3.60T despite 86.9% earnings growth signals capital intensity or asset sales
+- Debt/equity 115% and 50d below 200d indicate structural headwinds
+- MACD histogram negative, RSI neutral, volume at 0.43x—weak momentum confirmation
+- No substantive TM-specific news in past 24 hours; China comments are industry-level
+
+<details><summary><b>News</b> — score +0.00</summary>
+
+- [Toyota plans China operation revamp as auto competition intensifies (TM:NYSE)](https://www.google.com/goto?url=CAESoQEB6zswFeW7QeWu-zuw3irFOIViEllraBqb8I6Ag6i6_mb7syLwupVNWpR5BN-l1b_qR1uhM3fEKAF4_CDmO7e3FF2AigKwrQwfFF91WiJ9cmN5H4uObNjIEgEHzgZ1ubrs8xc6V6FyGJTVxRrydkz4pXciNCKRX9lduqYw1nRBGGfnfiP6WG_YmMJ7JeSlPEcrkDiEn7pU1ySGVt7dskhm1Q)  
+  <sub>Seeking Alpha, 6 hours ago</sub>  
+  Toyota's (TM) push to streamline its China operations may signal a broader restructuring of the country's crowded auto industry, where slowing demand,...
+- [A plan to turn ocean seaweed into fertilizer gets more time. Green Leaf targets an Oct. 15 agreement.](https://www.google.com/goto?url=CAESsQEB6zswFUHhe55-YXPWKo3ca3A94SJU0iOjTma0hpfcbf0FMVHwyZRYlsDjO5C4Dj7r6XCNdsmg_94AuDGSTXMTJK6SNxZsA9gt0-SKS3ZU2WfGLqLucfNl4g05l6HfX-23C7A-KCtYeDMKiyBe4VbmO-iehM6V_18W3_Mmfc0P7ej4041OZKPzvd1T33HNBgU_oicDqBPEJ-vUQ1jWBSb62JUru-p8pUK2q8cGLKEqZnw)  
+  <sub>Stock Titan, 3 hours ago</sub>  
+  Green Leaf Innovations (GRLF) and DURTEQ™ have extended their August 11, 2026 Letter of Intent as they work toward a definitive strategic partnership...
+- [Morocco Strategic Minerals Reports New Gold Mineralization North of Aït Zekri and Announces Stock Option Grants](https://www.google.com/goto?url=CAESkAEB6zswFYBaMi2pQV8ETqp_Rs3P4fEIR6-_21XigOGOgD0IeDSFnNTXzJbbU4_d8IFp2F6zsarDY_ppWyQggvxcWqXYv4ReIyHqrdi2Gebh-OeJTsmHDC1uwNCUVhWr71vheaZ7NjYxZ_PVmARzI_aMTyW68FDUyIuNJjl2I9iYHLYipAnGNVo8Coy6FeOaV-Q)  
+  <sub>Yahoo Finance Singapore, 7 hours ago</sub>  
+  MONTRÉAL, Sept. 15, 2026 (GLOBE NEWSWIRE) -- Morocco Strategic Minerals Corporation. (TSXV: MCC) ("Morocco Strategic Minerals" or the "Company") announces...
+- [(HMAX) Technical Patterns and Signals (HMAX:CA)](https://www.google.com/goto?url=CAESlQEB6zswFSagASUNSH6T5ohA10451akRQJoeUh-2s219_3f9Kgs9E9UlebCXsdTGIlRFJ-kk71EmQZi1tJBk8OZIORDsVe5K9lmsg8gu9Vu-5a4Fo8lNSsbAzNTHefV1zfI9GJTSlJBHMmK_csJN7MVbTSkwCEnFzS7wrmMU-0qYXNHWjjTWUj4_pTo_YMxZ32Ft8mKNcg)  
+  <sub>Stock Traders Daily, 10 hours ago</sub>  
+  Technical Patterns and Signals for Hamilton Canadian Financials YIELD MAXIMIZER TM ETF (HMAX) with Buy and Sell Indicators.
+- [Harry Potter gaming accessories are now available for Nintendo and Xbox](https://www.google.com/goto?url=CAESsAEB6zswFSKTlqq_SOXz3EWnfnSAySAbsCjvC71XLs-C9MJOkdoCkJXzIil9_KdOwMrkXNiT-cMVfUTT2qkJ4bQYra2UEpQrhGkFFqMfUoQJzGWnaO8_gWuYVteNay1bSAYDKCOVMi54G6jYZ1N2C8J-W1kMeYZ0mattfKBalwME8MlQT7UMONkOakaIe_qMDzwfpAp8PsWjbIQ41i7iYLEe-Zkbs852gDGcJiTUW0bAzw)  
+  <sub>Stock Titan, 5 hours ago</sub>  
+  MSRPs for the debut collection run from $24.99 protection cases to a $99.99 Xbox controller; products are sold at PowerA.com and participating retailers.
+- [(FMAX) Market Insights and Trading Signals (FMAX:CA)](https://www.google.com/goto?url=CAESmgEB6zswFffMFB413oUlLM9UglkI0FdF27C4uVpxb9xPBAAk4Bi4VTTYIxy6yWdKKxyHcvPG1hQkDM2Sian6mHmPOSzQqSJu0zrjlqfvf8j0xbTej9qDAPL4KARWC15DJ2tPM0EdtJFNgkt18HjvN1FgEIIwFoDXMmckW1etyO09NIVX1ByQTBR_AUkGK3_kxYb3hZDNHA9GYbJs)  
+  <sub>Stock Traders Daily, 11 hours ago</sub>  
+  Market Insights Report for Hamilton U.S. Financials YIELD MAXIMIZER TM ETF (FMAX) with Key Trading Signals.
+- [Sensex Today Plunges 777 Points | Nifty Below 23,200 | 3 Reasons Why Indian Stock Markets Are Falling](https://www.google.com/goto?url=CAES1wEB6zswFRRSwX11qLLIH_qJK32vtj2fNlkwBaSIb8j_jUjJsqHTTDJf1-eabFkJKzHsRu83FeF5s82Q99j40yrblSzQ9l9oehT1fz507weKAL55_UGxPJqkIxe-VuxBNHkABZbFmi8X5tlN6RHMEXelYrGvapIiwwPtG1GQLxH8wBlp8gupXrXKcBXn3iN3PIqFP-pXsyqwicMQuN1MYEjY0SUonXEqPPIHszl3SKv5TT3UWmm8ZD2yduaeUcrZVgFJMcExG56Kd1z_MWPyvkUbnrwgl5mx2Q)  
+  <sub>Equitymaster, 8 hours ago</sub>  
+  The BSE Sensex ended 777 points lower while the Nifty ended 279 points lower at 23118 level.
+- [AI found 4,100 heart-failure patients missing treatment. HEALWELL reports a 70% improvement in six months.](https://www.google.com/goto?url=CAESrgEB6zswFT9uJzbbHJ4hQVwsLhbQHpP0owhbdsRjYJ5x9hediUHfaYldNUMdTRlSRX6l3aOrAsR7IfyIcUngSS0j0U7ypsYb5HXU8olmjYkt4kwOVUK9xcFguYr-ek6Sf4zLSy2Pjt-SGM_Dpc5XzsIhrPswQRs0VJg1B-ss-_t09yYSYBjFGmdFZQ4wpf_346qFpyzQXKor91WuszHMxkCrsa20oQvKHBHAm5pXJow)  
+  <sub>Stock Titan, 9 hours ago</sub>  
+  Separate blinded clinician reviews found nearly 50% higher treatment-plan accuracy, with outputs naming drugs and doses; research was accepted at 12 fall...
+- [Magnetic-field experiments produced hotter, denser charged gas that stayed stable](https://www.google.com/goto?url=CAESrwEB6zswFW_7Gay4z7K5O3jngIYT74MCd78GoSyNIlDkk3TrBFIwXKjxmKyLco2jKqZarHfbLf2Hk906OffqJus6ARSQu9ltViWrhcOlppws45hznIb0K-5-pxt_m5zDLUlELR7frr1VokGds2wpkNBJuuKwAXPxDoDVMabLPhE5g2e_R2dKzMsSOGbe9iaNGtvUXiYZ2jlbhpF_c4BESk5FvOmDU_hHmLtWJynvA3eF)  
+  <sub>Stock Titan, 7 hours ago</sub>  
+  American Fusion says pulsed magnetic fields compressed doughnut-shaped plasma; future tests will measure temperature, density, confinement and stability.
+- [Indian Stock Market News, Equity Market and Sensex Today in India](https://www.google.com/goto?url=CAES8AEB6zswFfZuvR7HzVp0_L1xLIWNywsesOuTsT9EDdC5rD9Wp55BjQTYgRfWiAyd9Yir8GefBDSG7Qu_yfbQ_dSgHniDq1XgtR5AUQxurLF8fD3jIPZpNT1G2Q7ISI5xaGhX5dM490UfE45D8uIzf8dtF30qJJ4OLIhlUK5bE5AThv0KHKKWAjZ4qt_85fPsaSC_U7Js1NvbGX4qnhWDGETnOGG1l7Sz5-R4iKCpiFNWitYAuyVwunpuXe01vz7V-maV7FkS-534szqooWiQ9dEdD0tA2X7P5UIbKeOZqzNIMKkvSUE1fBd9MDv5_TbI5EY)  
+  <sub>Equitymaster, 18 hours ago</sub>  
+  Top cues to track in today's stock market session.
+
+</details>
+
+<details><summary><b>Price and chart</b> — score -0.15</summary>
+
+```text
+Last close 195.45 (bar of 2026-09-15), from 501 daily bars
+Trend: vs 20d SMA 194.38 (+0.5%), 50d 187.79 (+4.1%), 200d 202.17 (-3.3%); 50d below 200d
+Momentum: RSI(14) 54.7 | MACD 2.183 vs signal 2.527 (histogram -0.343)
+Returns: 1d -1.1% | 5d +2.1% | 1m +2.3% | 3m +8.4%
+52-week range: 166.50 - 248.29 (now 35.4% of the way up)
+Volatility: ATR(14) 3.37 (1.7% of price) | annualised 20d 22.7%
+Volume: 0.43x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.25</summary>
+
+```text
+Sector: Consumer Cyclical / Auto Manufacturers | market cap 231.44B
+Valuation: trailing P/E 8.46 | forward P/E 12.39 | P/B 15.89 | PEG n/a
+Profitability: profit margin 8.6% | operating margin 7.9% | ROE 12.4%
+Growth (YoY): revenue +10.4% | earnings +86.9%
+Balance sheet: debt/equity 115.0% | free cash flow -3.60T
+Risk: beta 0.34 | short interest 0.1% of float
+Next earnings: 2026-11-05
+```
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.30</summary>
+
+```text
+Consensus: none (mean n/a on a 1=strong buy to 5=strong sell scale, 4 analysts)
+Ratings: 2 strong buy, 2 buy, 0 hold, 0 sell, 0 strong sell
+Price target: mean 231.58 (+18.5% vs last close), range 220.00 - 239.31
+Recent rating changes:
+  - 2025-11-07 Freedom Broker: down, Buy -> Hold
+  - 2025-02-04 Macquarie: up, Neutral -> Outperform
+  - 2024-06-14 Erste Group: down, Buy -> Hold
+  - 2023-07-11 Morgan Stanley: down, Overweight -> Equal-Weight
+  - 2022-10-06 UBS: down, Buy -> Neutral
+  - 2022-07-07 Jefferies: main, ? -> Hold
+Institutional ownership: 2.2%
+Largest holders: Fisher Asset Management, LLC (0.5%), Morgan Stanley (0.2%), FMR, LLC (0.1%), Goldman Sachs Group Inc (0.1%), Northern Trust Corporation (0.1%)
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+
+```text
+Last 180 days: bought 0 shares in 0 transaction(s) | sold n/a shares in 0
+Net: +0 shares | insiders hold 757,877 shares
+Distinct insiders: 0 buying, 0 selling
+(1 grant/option/gift transaction(s) excluded — compensation, not a view on the price)
+```
+
+</details>
 
 ## Whole-market funds
 
@@ -89,6 +1776,78 @@ Volume: 0.81x the 20-day average
 ```text
 Sector: n/a / n/a | market cap n/a
 Valuation: trailing P/E n/a | forward P/E -4,036.25 | P/B 0.54 | PEG n/a
+Profitability: profit margin n/a | operating margin n/a | ROE n/a
+Growth (YoY): revenue n/a | earnings n/a
+Balance sheet: debt/equity n/a | free cash flow n/a
+Risk: beta n/a | short interest n/a of float
+Next earnings: n/a
+```
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+### US government bonds, 7-10 years (IEF) · Index fund — BEARISH, confidence 0.35
+
+**Result:** REJECTED · conviction 0.35 below minimum 0.60
+
+**In the model's own words:**
+
+> IEF is in a clear downtrend: closing at a 52-week low, below 20/50/200d SMAs with 50d under 200d, MACD negative and widening. The 10-year yield pushing 5% ahead of a Fed decision is a genuine macro development corroborating the price action. Against that, RSI(14) at 25 is deeply oversold and a Fed decision within days is a two-sided event risk, so conviction stays modest. News items are largely pundit commentary (Schiff bearish, Yardeni sanguine) plus one irrelevant rollover listicle; only the yield level itself is informative. Analyst and insider dimensions do not exist for a fund.
+
+**Main reasons it gave:**
+- Close 90.83 is the 52-week low, 0% of the way up the range
+- Below 20d (-1.7%), 50d (-2.2%) and 200d (-4.3%) SMAs with 50d under 200d
+- MACD -0.566 below signal, histogram -0.179
+- 10-year Treasury yield briefly topped 5% ahead of Wednesday Fed decision
+- RSI(14) 25 signals oversold, a counterweight to the downtrend
+
+<details><summary><b>News</b> — score -0.30</summary>
+
+- [Peter Schiff Says Bond Selloff Won't Stop Even If Fed Hikes - iShares 7-10 Year Treasury Bond ETF (NASDAQ](https://www.google.com/goto?url=CAEStwEB6zswFfAIYE3CsOMuruJJnVk2Ju0VI-RJj4-pmIJdYOLVft3l_CJaSIWR_sjflCxIFOFeYh6GUrpsel0DQAaGlJ41oN50MFaigXpKJgqvPXXX2KNm0szsTKrJT96rJNO6wdiE5BURhIpUTPoITT_2mmbmrVNWU9x3V_Bb5VAOYZrAYDd1yLh6LWtpSwXFgbbdpHqj4jm36Qn4AFwX3Q32oxUky0d1HdUAVhKxPW0sz3cCP44zdnM)  
+  <sub>Benzinga, 8 hours ago</sub>  
+  Peter Schiff says Treasury yields will keep climbing no matter what the Fed decides Wednesday, in a selloff no small hike can reverse.
+- [If You Left a 401(k) Behind at Your Old Job, These 4 ETFs Are What the Rollover Should Look Like](https://www.google.com/goto?url=CAESxgEB6zswFV1t4JZx7Sd_53icUm0JUwLKa22tlVxsY82ITEFHv6PaVntp3zuNW-Q8edyoyiadlffZyWudTkfYl1NxiGX5G2IrO1jj0n_I5R7toyVRN6YhLMxYotjmT_Upg86XCyTqEay7FFaa55gQwYS1mXmE9IMPQoyMGuhR13VFU-a30ztsAic-twuJJNViYXVvpnjObsOnQO9g3-xXNiAuxFsxr-9VBtpkU6lzBgEqfzqAcdPkF4mVNZ3xbB6vA932G4urBqQ)  
+  <sub>24/7 Wall St., 21 hours ago</sub>  
+  Four ETFs can turn an old 401(k) rollover into a diversified retirement portfolio built for long-term growth, income, and stability.
+- [Why a 10-Year Yield at 5% Is a Red Flag for Stocks](https://www.google.com/goto?url=CAESlgEB6zswFQWTrBwqNaHIZSYinsEaao4fuVczJ77if0-21AZtJll3sZt9JbjBMEYcD5yj-SBPEW7tqrhxpt4fhlmO9BOB73O609RfxlGUrUsx589CfH9cYk1HGA6LyIWjRtp4btB-lYRhA6zwH-NqZE1dXfQJOTgVRgu6lKuULe3PwQdKg3eeWGZbDsNgxndGIFBh9KL70dU)  
+  <sub>Baystreet.ca, 16 hours ago</sub>  
+  The stock trading week starting on September 13 shook up equity investors. The US 10-year Treasury bond yield jumped to 5.0%. Although the yield dropped by...
+- [Ed Yardeni Calls 10-Year Bond Yields At 5% a 'Vote of Confidence' - iShares 7-10 Year Treasury Bond ETF](https://www.google.com/goto?url=CAEStQEB6zswFRJTXvqGaGj3jKx9tmINeySO894lxy1X2Tby_Qoqn0U5NKel3RnpO91NviFm5vJLE2HqDW-ONv5N5BHjNQQ0eJ2VkUUUiOLUDyP0nNJ6f0r0AhVM28BBCdSruCJ4u-K6hReHsVskLj13V1BinunEQIlgfR9btWKXzZzL-p5i3SJ9rv325oMteKPiGCQk128_13282uFJKq70VVv3YMtue-NL2hCrO7LuUmxltTuwrSvw)  
+  <sub>Benzinga, 15 hours ago</sub>  
+  Wall Street is split on the 10-year Treasury yield briefly topping 5% Monday, days before the Fed's interest rate decision Wednesday.
+
+</details>
+
+<details><summary><b>Price and chart</b> — score -0.60</summary>
+
+```text
+Last close 90.83 (bar of 2026-09-15), from 501 daily bars
+Trend: vs 20d SMA 92.38 (-1.7%), 50d 92.91 (-2.2%), 200d 94.90 (-4.3%); 50d below 200d
+Momentum: RSI(14) 25.0 | MACD -0.566 vs signal -0.387 (histogram -0.179)
+Returns: 1d -0.1% | 5d -1.4% | 1m -2.4% | 3m -3.7%
+52-week range: 90.83 - 97.99 (now 0.0% of the way up)
+Volatility: ATR(14) 0.37 (0.4% of price) | annualised 20d 5.2%
+Volume: 1.05x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.00</summary>
+
+```text
+Sector: n/a / n/a | market cap n/a
+Valuation: trailing P/E n/a | forward P/E n/a | P/B n/a | PEG n/a
 Profitability: profit margin n/a | operating margin n/a | ROE n/a
 Growth (YoY): revenue n/a | earnings n/a
 Balance sheet: debt/equity n/a | free cash flow n/a
@@ -206,6 +1965,139 @@ Returns: 1d -0.1% | 5d -0.9% | 1m -1.6% | 3m -2.0%
 52-week range: 78.43 - 81.32 (now 0.0% of the way up)
 Volatility: ATR(14) 0.21 (0.3% of price) | annualised 20d 4.0%
 Volume: 0.85x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.00</summary>
+
+```text
+Sector: n/a / n/a | market cap n/a
+Valuation: trailing P/E n/a | forward P/E n/a | P/B n/a | PEG n/a
+Profitability: profit margin n/a | operating margin n/a | ROE n/a
+Growth (YoY): revenue n/a | earnings n/a
+Balance sheet: debt/equity n/a | free cash flow n/a
+Risk: beta n/a | short interest n/a of float
+Next earnings: n/a
+```
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+### S&P 500, equal weight (RSP) · Index fund — NEUTRAL, confidence 0.25
+
+**In the model's own words:**
+
+> RSP (Invesco S&P 500 Equal Weight ETF) is trading 2.1% below its 20-day SMA and 1.4% below its 50-day SMA, showing weakness in the near term despite being up 4.7% against the 200-day SMA. Momentum indicators are clearly bearish: RSI at 38.9 signals oversold conditions but the sharp negative MACD histogram (-0.854) indicates deteriorating momentum. The fund is down 3.9% over one month, which is material weakness. However, the technical setup contains some offsetting factors: RSP is still 52% above its 52-week low and maintains its position in an uptrend on the intermediate timeframe (50d above 200d). Volume is below average, suggesting the recent decline lacks conviction. News sentiment is mixed; the BofA bull flag pattern commentary suggests potential upside if support holds, but current price action has broken below key moving averages. Fundamental data is not applicable for an ETF. Analyst and insider scores are inapplicable to funds by definition. The macro backdrop (Fed rate trajectory, bond yields, seasonality) remains uncertain. Given the short-term technical deterioration, below-average volume, and lack of a clear fresh catalyst to reverse the weakness, a mild bearish lean is warranted, but conviction is low because the intermediate trend remains positive and oversold RSI could bounce. This is a marginal call in a narrow range.
+
+**Main reasons it gave:**
+- Price 2.1% below 20-day SMA and 1.4% below 50-day SMA
+- RSI at 38.9 indicating oversold but MACD histogram sharply negative at -0.854
+- Down 3.9% over one month showing material weakness
+- Below-average volume (0.89x) suggests weak conviction to the decline
+- 50-day SMA still above 200-day SMA preserving intermediate uptrend
+
+<details><summary><b>News</b> — score +0.00</summary>
+
+- [Why Stocks Could Defy Fed Rate Hikes: ETFs to Watch](https://www.google.com/goto?url=CAESogEB6zswFW_ohkeM1goszilAcBXZJpiKP6Xdd3UY2AeOMgmtinqc6wYLQ3TBE0p-4MUgGJ8j6LxUw_IGbW8pHli1zX97mmhFKHH_zkYfG-OblVtWlCQhK3d7lbybGVwxf7pGivNHbur3fGPweUqmbPGernqyh6_gnURmq1Tc5Sm4EDZ1rIPOdMwiZd0vD9bjkXHZQTkORYwRUdV6L4obIR6BbZ8)  
+  <sub>TradingView, 7 hours ago</sub>  
+  The stock market has enjoyed a strong run this year, and investors are wondering whether the rally can continue even as bond yields climb and the Federal...
+- [Forget JEPI: QQQ's Sponsor Sells an Equal-Weight S&P Income Fund That Charges Less and Is Beating It by 8 Points](https://www.google.com/goto?url=CAES1gEB6zswFWufpVPwW7StHWdUs2p2-QNlzr25XJyxc8viub4grYEgRLUwB8sKWrpJg3XenKDOG7KVlgTGH9OYngwt9-AUPN4h58m7ipJegr4Qmqb1upUawK4bab287oJlvaDet0VBzZiYLYcbQSH7hLu23QamndxwHBBMfSJTaMd8PACEEKIsb9ooyFy3eLO2mNiz1VamgLSL6ylQlKmYIFf5bCrohhQqz7z8LnGA-5ac_BYY3-0e-WVohRFJwJT61d-IqU-z22lM0fSHPY_WMxaYkxOsPd6P)  
+  <sub>24/7 Wall St., 21 hours ago</sub>  
+  Invesco's equal-weight S&P income ETF charges less than JEPI and is beating it by 8 percentage points, offering investors another approach to equity income.
+- [BofA tracks bull flag pattern in S&P 500 consolidation](https://www.google.com/goto?url=CAESmAEB6zswFSDdkgALrKjU7FMRumgLM4a7al1stNjkc5WZPg9FX1wHdALtKtto_MFJVrVRQmZM-VaciavLB8Ywky4yhKsIt7zkut9VRbLiUtohLA00Vqzt9i0PJHtwliP2QXyZ6FdE0DMorKMrzniIeugre84g5KxpwgaYm7EmI6ntMqKbgKrrO0wdRDLVkRe3pW0vPI99Fime1g)  
+  <sub>Seeking Alpha, 23 hours ago</sub>  
+  BofA sees S&P 500 rally toward 8000+ if key levels hold, but warns of yield, oil and seasonality headwinds.
+
+</details>
+
+<details><summary><b>Price and chart</b> — score -0.35</summary>
+
+```text
+Last close 214.16 (bar of 2026-09-15), from 501 daily bars
+Trend: vs 20d SMA 218.75 (-2.1%), 50d 217.30 (-1.4%), 200d 204.50 (+4.7%); 50d above 200d
+Momentum: RSI(14) 38.9 | MACD -1.024 vs signal -0.170 (histogram -0.854)
+Returns: 1d -0.4% | 5d -1.2% | 1m -3.9% | 3m +0.6%
+52-week range: 182.18 - 222.77 (now 78.8% of the way up)
+Volatility: ATR(14) 1.79 (0.8% of price) | annualised 20d 9.8%
+Volume: 0.89x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.00</summary>
+
+```text
+Sector: n/a / n/a | market cap n/a
+Valuation: trailing P/E 20.89 | forward P/E n/a | P/B n/a | PEG n/a
+Profitability: profit margin n/a | operating margin n/a | ROE n/a
+Growth (YoY): revenue n/a | earnings n/a
+Balance sheet: debt/equity n/a | free cash flow n/a
+Risk: beta n/a | short interest n/a of float
+Next earnings: n/a
+```
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+### US government bonds, 1-3 years (SHY) · Index fund — NEUTRAL, confidence 0.25
+
+**In the model's own words:**
+
+> SHY tracks short-duration US Treasuries, making this a macro call on near-term rates and fixed-income sentiment. The recent backdrop shows conflicting signals: bond market commentary suggests yields may stabilize after steep rises, but technical momentum is deeply depressed (RSI 25.5, MACD histogram negative) and price sits at the bottom of a narrow 52-week range. The fund has drifted lower against its 20d, 50d, and 200d moving averages, though the decline over multiple timeframes is modest (all under 1.3%). Low volatility (1.8% annualized) and tick-size moves leave little conviction in either direction. Political noise (Trump trading volume, criticism of Fed toughness) does not materially alter the macro outlook for short-duration Treasuries. A technical oversold condition and stabilizing-yield narrative offer mild headwinds to further downside, but the trend remains soft and there is no clear catalyst to reverse it within hours or days. This is a hold-steady signal.
+
+**Main reasons it gave:**
+- RSI(14) at 25.5 indicating oversold technical condition
+- Price below all major moving averages with negative momentum (MACD histogram -0.056)
+- Bond market commentary citing stabilizing yield conditions but no confirmation in fund price action
+- Minimal volatility and price drift suggest low conviction either direction
+
+<details><summary><b>News</b> — score +0.00</summary>
+
+- [Beaten-up bond market may be nearing 'escape velocity' for investors. Here's what that means](https://www.google.com/goto?url=CAESggEB6zswFbTygvW6hAIT6TW86VO2zs1p0xLGP6G5TF3ym8FN2oAin11PS50_Nb1Bx14ZzB8R9auA27na2mgn6u5-Z_u0JqMbLX7Z4uzUdzgvNeMIjI2W35w-hysFJaOxNWVO9e5LkwVxZc4w64jAO45YtNUADVzDhVPOvj_kxRlbCdvV)  
+  <sub>CNBC, 2 hours ago</sub>  
+  Rising yields across the bond market have spooked investors, but the surge from zero interest rates since Covid suggests fixed-income risk-reward has...
+- [Trump out-traded all members of Congress combined - report (SPY:NYSEARCA)](https://www.google.com/goto?url=CAESmAEB6zswFUhXw8PqY4Gwho0dyzYkUXLwu68OcOQVnSDbgXCuoMCDFKwLqbKLZmifGexXzAJZhb8Ew611-ZaSvxAAydCap1s6rxTwL7_RGUo-reeEN2FcXqvHSBsIkqDKF8ms1AgGEoRwsK4n4oulsmx6l5x7pdlFcuQPWofWR4H2GUrSdd5GHA2FNggnFbbGr8mySXLdb7CFvA)  
+  <sub>Seeking Alpha, 2 hours ago</sub>  
+  Trump logged 28.7K stock, bond & crypto trades after his 2nd inauguration—more than Congress—while backing a law banning lawmakers' trading.
+- [Peter Schiff: Don’t Buy the Fed’s Tough Talk on Tight Money](https://www.google.com/goto?url=CAEStgEB6zswFfvxkK3x6p-GPqb9MsJHc-q1oHix6nvNIMzadhUzKDzI7bEQY0-D3-_pb35-VVUQoUQ1jKNgppTkrKYoSHDwa-R5rL452Lgc8hKwjJAmkK-85xJQ_lXWhSzuN9KdOuplqkuIjb4cErJX4mAq_ehqWfUYUveFTudfXMPeDPHtQVVhTH2qVWA11HznZC9VAMlNw0YIlgL_gKZ3GxkiAjauv9YQIinJ03iSR_gYmJdlJ9POxQ)  
+  <sub>Benzinga, 8 hours ago</sub>  
+  Why Treasuries offer no real return: Peter Schiff breaks down rising national debt, stagflation, and the commodities refuge.
+
+</details>
+
+<details><summary><b>Price and chart</b> — score -0.35</summary>
+
+```text
+Last close 81.33 (bar of 2026-09-15), from 501 daily bars
+Trend: vs 20d SMA 81.77 (-0.5%), 50d 81.85 (-0.6%), 200d 82.37 (-1.3%); 50d below 200d
+Momentum: RSI(14) 25.5 | MACD -0.150 vs signal -0.095 (histogram -0.056)
+Returns: 1d -0.0% | 5d -0.4% | 1m -0.8% | 3m -0.9%
+52-week range: 81.33 - 83.18 (now 0.0% of the way up)
+Volatility: ATR(14) 0.09 (0.1% of price) | annualised 20d 1.8%
+Volume: 1.03x the 20-day average
 ```
 
 </details>
@@ -422,6 +2314,79 @@ Volume: 0.71x the 20-day average
 ```text
 Sector: n/a / n/a | market cap n/a
 Valuation: trailing P/E n/a | forward P/E n/a | P/B n/a | PEG n/a
+Profitability: profit margin n/a | operating margin n/a | ROE n/a
+Growth (YoY): revenue n/a | earnings n/a
+Balance sheet: debt/equity n/a | free cash flow n/a
+Risk: beta n/a | short interest n/a of float
+Next earnings: n/a
+```
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+### US small companies (IWM) · Index fund — NEUTRAL, confidence 0.20
+
+**Result:** REJECTED · bias is NEUTRAL; no trade
+
+**In the model's own words:**
+
+> Small caps are in a short-term pullback: price is 3.3% below the 20d and 3.6% below the 50d, MACD is negative and widening, RSI 33.9. But the 50d remains above the 200d and price is still 4% above the 200d, so the primary trend is intact and RSI near oversold argues against chasing weakness. News is generic breadth commentary and flow roundups with no policy, rates or data surprise; one item is a single-holding/listicle style piece and is noise. No macro catalyst, volume only 1.03x average, so no edge in timing a broad small-cap basket here. Analyst and insider dimensions do not exist for an ETF.
+
+**Main reasons it gave:**
+- Price 3.3% below 20d SMA and 3.6% below 50d SMA
+- MACD -2.67 below signal, histogram -1.23
+- RSI(14) 33.9 approaching oversold
+- 50d still above 200d; price +4.0% vs 200d
+- No macro/policy/data catalyst in news; only breadth commentary and flow roundups
+- Volume just 1.03x 20-day average, no decisive break
+
+<details><summary><b>News</b> — score -0.10</summary>
+
+- [Breadth Weakens Again, but the Broader Trend Remains Neutral With a Negative Bias](https://www.chartmill.com/news/IWM/Chartmill-54855-Breadth-Weakens-Again-but-the-Broader-Trend-Remains-Neutral-With-a-Negative-Bias)  
+  <sub>ChartMill, 5 hours ago</sub>  
+  Monday reversed much of Friday's breadth improvement, with all three major index ETFs slipping below their EMA9 and EMA21 and participation weakening across...
+- [Daily ETF Flows: Investors Scoop Up TLT](https://www.etf.com/sections/daily-etf-flows/daily-etf-flows-investors-scoop-tlt)  
+  <sub>ETF.com, 18 hours ago</sub>  
+  Here are the daily ETF fund flows for September 11, 2026.
+- [VOO vs. IVV: Same S&P 500, Same Fee, So Does It Even Matter Which One You Buy?](https://247wallst.com/investing/etf/2026/09/14/voo-vs-ivv-same-sp-500-same-fee-so-does-it-even-matter-which-one-you-buy/)  
+  <sub>24/7 Wall St., 21 hours ago</sub>  
+  VOO and IVV both track the S&P 500 at 0.03%, posting nearly identical 17% returns last year, but their corporate structures tell a very different story.
+- [Finding Value Opportunities Among Highly Rated Stocks](https://seekingalpha.com/article/4946294-finding-value-opportunities-among-highly-rated-stocks)  
+  <sub>Seeking Alpha, 15 hours ago</sub>  
+  U.S. equity markets moved lower this week, with broad weakness across most major ETFs and sector benchmarks.
+
+</details>
+
+<details><summary><b>Price and chart</b> — score -0.35</summary>
+
+```text
+Last close 285.11 (bar of 2026-09-15), from 501 daily bars
+Trend: vs 20d SMA 294.80 (-3.3%), 50d 295.81 (-3.6%), 200d 274.27 (+4.0%); 50d above 200d
+Momentum: RSI(14) 33.9 | MACD -2.668 vs signal -1.440 (histogram -1.227)
+Returns: 1d -1.0% | 5d -3.2% | 1m -6.5% | 3m -3.2%
+52-week range: 229.11 - 305.09 (now 73.7% of the way up)
+Volatility: ATR(14) 3.32 (1.2% of price) | annualised 20d 12.8%
+Volume: 1.03x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.05</summary>
+
+```text
+Sector: n/a / n/a | market cap n/a
+Valuation: trailing P/E 16.78 | forward P/E n/a | P/B 1.30 | PEG n/a
 Profitability: profit margin n/a | operating margin n/a | ROE n/a
 Growth (YoY): revenue n/a | earnings n/a
 Balance sheet: debt/equity n/a | free cash flow n/a
