@@ -429,3 +429,16 @@ def test_the_opening_states_the_new_floor_and_the_ladder():
     assert "reaches **0.30**" in text
     assert "a third of it is sold" in text
     assert "The stop only ever moves up" in text
+
+
+def test_a_trailing_raise_reads_as_following_the_price():
+    actions = [{"ticker": "GLD", "action": "stop_raised", "reason": "trailing stop", "gain_r": 0.5,
+                "remaining_qty": 12, "old_stop": 310.5, "new_stop": 314.2, "rung": None}]
+    text = cr.render([_line("LLY")], actions)
+    assert "| Gold (GLD) · Commodity | **Stop raised.** At +0.50R, following the price. Stop-loss raised 310.50 → 314.20. |" in text
+
+
+def test_the_opening_says_the_stop_follows_the_price():
+    text = cr.render([_line("LLY")])
+    assert "follows the price up" in text
+    assert "only ever closes when its stop is hit" in text

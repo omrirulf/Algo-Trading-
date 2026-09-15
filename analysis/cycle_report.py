@@ -492,6 +492,8 @@ def _position_line(a: dict) -> str:
         return (f"Sold {a.get('qty_closed')} of {total} shares at {gain_text}, "
                 f"{a.get('remaining_qty')} still held. {stop_move}").strip()
     if kind == "stop_raised":
+        if "trailing" in str(a.get("reason") or ""):
+            return f"At {gain_text}, following the price. {stop_move}".strip()
         return f"Reached {gain_text}; too small to split, so only the stop moved. {stop_move}".strip()
     if kind == "held":
         return f"{gain_text}, holding {a.get('remaining_qty')} shares. {stop_move}".strip()
@@ -508,8 +510,8 @@ def render_positions(actions: list[dict]) -> list[str]:
         "## Open positions",
         "",
         "Checked before any new trade. R is what the trade risked at entry; "
-        "the ladder sells a third at +1R and another at +3R, and the stop-loss "
-        "only ever moves up.",
+        "the ladder sells a third at +1R and another at +3R, the stop-loss "
+        "follows the price up every day, and it only ever moves up.",
         "",
         "| Position | What happened |",
         "| --- | --- |",
@@ -545,7 +547,9 @@ def _how_to_read() -> list[str]:
         "has earned back what it risked (+1R), a third of it is sold and the "
         "stop-loss moves up to the entry price, so it can no longer lose. At "
         "three times that (+3R) another third is sold and the stop moves up "
-        "again. The last third stays open. The stop only ever moves up.",
+        "again. The last third stays open. Every day the stop-loss also follows "
+        "the price up, so a position only ever closes when its stop is hit. "
+        "The stop only ever moves up.",
         "",
         "Under each name you will find the five scores. Click a grey line to "
         "open it and see the exact evidence behind that score. The words inside "

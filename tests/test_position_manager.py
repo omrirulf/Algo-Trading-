@@ -97,6 +97,7 @@ def audit_actions(audit):
 def test_below_the_first_rung_nothing_is_touched(broker, market, audit):
     r = enter(broker, audit)
     market.price = 100.0 + 0.5 * r
+    market.atr = 5.0  # trail would sit at 92, below the 96 stop: nothing to tighten
     report = manager(broker, market, audit).manage()
     assert [a.action for a in report.actions] == [pm.HELD]
     assert broker.replaced == [] and broker.closed == []
@@ -139,7 +140,12 @@ def test_at_three_r_the_second_third_goes_and_the_stop_locks_in_one_r(broker, ma
     [action] = report.actions
     assert action.action == pm.TRANCHE_TAKEN and action.rung == 1
     assert action.qty_closed == 3 and action.remaining_qty == 3
-    assert broker.stop_orders["LLY"].stop_price == pytest.approx(100.0 + R2.stop_to_r * r)
+    # The rung would put the stop at +1R (104); the trail at 112 - 2xATR is
+    # 108 and tighter, and the tighter one always wins.
+    rung_target = 100.0 + R2.stop_to_r * r
+    trail = market.price - cfg.ATR_STOP_MULTIPLIER * market.atr
+    assert trail > rung_target
+    assert broker.stop_orders["LLY"].stop_price == pytest.approx(trail)
     assert broker.stop_orders["LLY"].qty == 3
 
 
@@ -151,7 +157,8 @@ def test_a_gap_through_both_rungs_takes_both_in_order(broker, market, audit):
     assert [a.qty_closed for a in report.actions] == [3, 3]
     assert broker.calls == ["replace", "close", "replace", "close"]
     assert broker.positions[0].qty == 3  # the runner
-    assert broker.stop_orders["LLY"].stop_price == pytest.approx(100.0 + r)
+    # +3.5R with the trail: 114 - 2xATR = 110, above the rung's +1R.
+    assert broker.stop_orders["LLY"].stop_price == pytest.approx(market.price - cfg.ATR_STOP_MULTIPLIER * market.atr)
 
 
 def test_the_runner_is_never_sold_by_the_ladder(broker, market, audit):
@@ -405,3 +412,104 @@ def test_the_suite_never_writes_into_the_repositorys_audit_log(broker, market, a
     manager(broker, market, audit).manage()
     after = real.read_text() if real.exists() else None
     assert before == after
+
+
+
+# --------------------------------------------------------------------------- #
+# The stop trails the price, every cycle, rung or no rung
+# --------------------------------------------------------------------------- #
+
+
+def test_the_stop_trails_the_price_up_with_no_rung_due(broker, market, audit):
+    """Halfway to the first rung the stop already follows: 102 - 2x2 = 98 > 96."""
+    r = enter(broker, audit, qty=9, entry=100.0, stop=96.0)
+    market.price, market.atr = 102.0, 2.0
+    report = manager(broker, market, audit).manage()
+    [action] = report.actions
+    assert action.action == pm.STOP_RAISED and action.reason == "trailing stop"
+    assert action.rung is None and action.qty_closed == 0
+    assert broker.replaced == [{"order_id": "stop-LLY", "ticker": "LLY", "qty": 9,
+                                "stop_price": 98.0, "was": 96.0}]
+    assert broker.closed == []
+
+
+def test_a_trailing_raise_is_not_a_rung(broker, market, audit):
+    """Trailing every day must not make the ladder think a rung was taken."""
+    r = enter(broker, audit, qty=9)
+    market.price, market.atr = 102.0, 2.0
+    manager(broker, market, audit).manage()                 # trailed to 98
+    _, rungs = pm.ladder_history("LLY", audit)
+    assert rungs == []
+    market.price = 100.0 + r                                # now +1R
+    report = manager(broker, market, audit).manage()
+    assert report.actions[0].action == pm.TRANCHE_TAKEN and report.actions[0].rung == 0
+
+
+def test_the_trail_never_loosens_when_atr_widens(broker, market, audit):
+    enter(broker, audit, qty=9)
+    market.price, market.atr = 102.0, 2.0
+    manager(broker, market, audit).manage()                 # 98
+    market.atr = 5.0                                        # candidate 92
+    report = manager(broker, market, audit).manage()
+    assert report.actions[0].action == pm.HELD
+    assert broker.stop_orders["LLY"].stop_price == 98.0
+
+
+def test_a_falling_price_does_not_move_the_stop(broker, market, audit):
+    enter(broker, audit, qty=9)
+    market.price, market.atr = 99.0, 2.0                    # candidate 95 < 96
+    report = manager(broker, market, audit).manage()
+    assert report.actions[0].action == pm.HELD
+    assert broker.replaced == []
+
+
+def test_trail_and_rung_in_the_same_cycle_apply_the_tighter_and_record_the_true_old_stop(broker, market, audit):
+    r = enter(broker, audit, qty=9, entry=100.0, stop=96.0)
+    market.price, market.atr = 104.0, 0.5                   # +1R; trail = 103 > rung's 100
+    report = manager(broker, market, audit).manage()
+    [action] = report.actions
+    assert action.action == pm.TRANCHE_TAKEN
+    assert action.old_stop == 96.0 and action.new_stop == 103.0
+    assert broker.stop_orders["LLY"].stop_price == 103.0
+    assert broker.calls == ["replace", "close"]
+
+
+def test_a_rung_too_small_to_split_still_carries_the_trail(broker, market, audit):
+    """qty 2: no tranche, but the replace must still land the trailed stop."""
+    r = enter(broker, audit, qty=2, entry=100.0, stop=96.0)
+    market.price, market.atr = 104.0, 0.5                   # +1R; trail 103
+    report = manager(broker, market, audit).manage()
+    [action] = report.actions
+    assert action.action == pm.STOP_RAISED and action.rung == 0
+    assert broker.stop_orders["LLY"].stop_price == 103.0
+
+
+def test_a_short_trails_down(broker, market, audit):
+    enter(broker, audit, qty=9, entry=100.0, stop=104.0, side="sell")
+    market.price, market.atr = 98.0, 2.0                    # candidate 102 < 104
+    report = manager(broker, market, audit).manage()
+    assert report.actions[0].action == pm.STOP_RAISED
+    assert broker.stop_orders["LLY"].stop_price == 102.0
+
+
+def test_an_absurd_atr_leaves_the_stop_alone_rather_than_failing(broker, market, audit):
+    """102 - 2x100 is negative; the stop formula refuses; the position is simply held."""
+    enter(broker, audit, qty=9)
+    market.price, market.atr = 102.0, 100.0
+    report = manager(broker, market, audit).manage()
+    assert report.actions[0].action == pm.HELD
+    assert report.errors == 0 and broker.replaced == []
+
+
+def test_a_zero_atr_skips_the_trail(broker, market, audit):
+    enter(broker, audit, qty=9)
+    market.price, market.atr = 102.0, 0.0
+    report = manager(broker, market, audit).manage()
+    assert report.actions[0].action == pm.HELD
+
+
+def test_render_says_trailing(broker, market, audit):
+    enter(broker, audit, qty=9)
+    market.price, market.atr = 102.0, 2.0
+    text = pm.render(manager(broker, market, audit).manage())
+    assert "LLY: +0.50R -> stop 96.00 -> 98.00 (trailing stop)" in text

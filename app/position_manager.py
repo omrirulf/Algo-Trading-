@@ -11,7 +11,10 @@ measured in **R** -- the distance from its entry to its initial stop, which
 is what the trade risked. ``config.settings.PROFIT_LADDER`` says what happens
 at each multiple of it: at +1R a third is sold and the stop moves to the
 entry; at +3R another third is sold and the stop moves to +1R; the last third
-runs on that stop. Both rungs raise the stop and nothing ever lowers it.
+runs. Independently of the rungs, every cycle the stop is also trailed up to
+``price - ATR_STOP_MULTIPLIER x ATR`` where that is tighter -- the initial
+stop's own formula, re-anchored to today -- so the stop follows the price and
+is the only exit. Rungs and trail both raise the stop; nothing ever lowers it.
 
 What this module cannot do, by construction
 -------------------------------------------
@@ -302,17 +305,45 @@ class PositionManager:
         gain = risk_engine.r_multiple(state.entry_price, price, state.r, side)
         due = risk_engine.rungs_due(gain, state.rungs_taken, self._ladder)
 
+        # The trail. Today's price less the same ATR distance the entry was
+        # protected by -- the initial stop's own formula, re-anchored to now
+        # -- taken only where it tightens. It runs every cycle, rung or no
+        # rung, so the stop follows the price up and the stop is the only
+        # exit: a runner at +10R is not left to ride back to +1R. A widening
+        # ATR cannot lower it, and an ATR so large the formula goes negative
+        # simply leaves the stop where it is rather than failing the position.
+        broker_stop = stop.stop_price
+        trailed = broker_stop
+        try:
+            atr = self._market_data.get_atr(ticker)
+            if atr > 0:
+                trailed = risk_engine.tighter_stop(
+                    broker_stop, risk_engine.calculate_stop_price(price, atr, side), side
+                )
+        except risk_engine.RiskViolation:
+            trailed = broker_stop
+
         if not due:
-            action = ManagementAction(
-                ticker=ticker, action=HELD, side=side, gain_r=round(gain, 2), price=price,
-                remaining_qty=qty, old_stop=stop.stop_price, new_stop=stop.stop_price,
-                r=round(state.r, 4), r_estimated=state.r_estimated,
-            )
+            if trailed != broker_stop:
+                self._broker.replace_stop_order(stop.order_id, qty, trailed)
+                action = ManagementAction(
+                    ticker=ticker, action=STOP_RAISED, side=side, gain_r=round(gain, 2),
+                    price=price, remaining_qty=qty, rung=None,
+                    old_stop=broker_stop, new_stop=trailed,
+                    r=round(state.r, 4), r_estimated=state.r_estimated,
+                    reason="trailing stop",
+                )
+            else:
+                action = ManagementAction(
+                    ticker=ticker, action=HELD, side=side, gain_r=round(gain, 2), price=price,
+                    remaining_qty=qty, old_stop=broker_stop, new_stop=broker_stop,
+                    r=round(state.r, 4), r_estimated=state.r_estimated,
+                )
             _record(action)
             return [action]
 
         actions: list[ManagementAction] = []
-        current_stop = stop.stop_price
+        current_stop = trailed
         remaining = qty
         for index in due:
             rung = self._ladder[index]
@@ -326,7 +357,9 @@ class PositionManager:
             # Protect first, then sell. A stop still sized for the old
             # position would reserve the shares the exit needs, and a moment
             # with no stop at all is the one thing this must not create.
-            if tranche > 0 or new_stop != current_stop:
+            # Compared against what the broker actually holds, so a trail
+            # that tightened above the rung's own target is still applied.
+            if tranche > 0 or new_stop != broker_stop:
                 self._broker.replace_stop_order(stop.order_id, after, new_stop)
 
             if tranche > 0:
@@ -334,20 +367,20 @@ class PositionManager:
                 action = ManagementAction(
                     ticker=ticker, action=TRANCHE_TAKEN, side=side, gain_r=round(gain, 2),
                     price=price, qty_closed=tranche, remaining_qty=after, rung=index,
-                    old_stop=current_stop, new_stop=new_stop, order_id=order_id,
+                    old_stop=broker_stop, new_stop=new_stop, order_id=order_id,
                     r=round(state.r, 4), r_estimated=state.r_estimated,
                 )
             else:
                 action = ManagementAction(
                     ticker=ticker, action=STOP_RAISED, side=side, gain_r=round(gain, 2),
                     price=price, remaining_qty=after, rung=index,
-                    old_stop=current_stop, new_stop=new_stop,
+                    old_stop=broker_stop, new_stop=new_stop,
                     r=round(state.r, 4), r_estimated=state.r_estimated,
                     reason="too small to split; stop ratcheted only",
                 )
             _record(action)
             actions.append(action)
-            current_stop, remaining = new_stop, after
+            current_stop, broker_stop, remaining = new_stop, new_stop, after
         return actions
 
 
