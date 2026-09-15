@@ -526,8 +526,16 @@ def process_ticker(
         # less than the strategy assumes it has.
         log.warning("%s: context gaps: %s", ticker, "; ".join(ticker_context.gaps))
 
-    system_prompt = system_prompt_for(ticker_context.ticker)
-    user_prompt = build_user_prompt(ticker_context)
+    try:
+        system_prompt = system_prompt_for(ticker_context.ticker)
+        user_prompt = build_user_prompt(ticker_context)
+    except Exception:  # noqa: BLE001
+        # Rendering the gathered context into text is the last step of
+        # "context", and a value the formatters cannot render is a data
+        # problem with this one ticker. Unguarded, it took the whole cycle
+        # down with it -- the other thirty-four never ran.
+        log.exception("%s: failed to render context into a prompt", ticker)
+        return TickerResult(ticker, CONTEXT_FAILED, gaps=gaps)
 
     # Stage one. The cheap model reads the same prompt; NEUTRAL ends the
     # ticker here, journalled, without the expensive call. Any failure of the
