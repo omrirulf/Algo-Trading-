@@ -137,16 +137,18 @@ def test_heartbeat_fetch_news_uses_settings(monkeypatch):
             seen["token"], seen["zone"] = token, zone
             seen["unlocker_zone"] = unlocker_zone
 
-        def fetch(self, ticker):
+        def fetch_items(self, ticker):
             seen["ticker"] = ticker
-            return ["headline"]
+            return [news.Headline(title="headline")]
 
     monkeypatch.setattr(hb, "BrightDataNewsProvider", FakeProvider)
     monkeypatch.setattr(
         hb, "get_settings",
         lambda: Settings(brightdata_api_token="t", brightdata_serp_zone="z", _env_file=None),
     )
-    assert hb.fetch_news("MSFT") == ["headline"]
+    # The cycle now takes structured records so the journal can carry links;
+    # the line the model sees is unchanged.
+    assert [h.as_line() for h in hb.fetch_news("MSFT")] == ["headline"]
     assert seen == {
         "token": "t", "zone": "z", "ticker": "MSFT", "unlocker_zone": "cli_unlocker",
     }
@@ -354,3 +356,42 @@ def test_a_pasted_token_with_stray_whitespace_is_stripped(monkeypatch):
     monkeypatch.setattr(news, "token_from_cli", lambda: None)
     assert news.resolve_token("  abc123\n") == "abc123"
     assert news.resolve_token("\n") is None
+
+
+# --------------------------------------------------------------------------- #
+# Structured headlines: the link the prompt line drops
+# --------------------------------------------------------------------------- #
+
+
+def test_items_carry_the_link():
+    items = news.parse_news_items(PARSED_NEWS)
+    assert items[0].url == "https://x/1"
+    assert items[0].title == "Apple beats on earnings"
+    assert items[0].source == "Reuters"
+
+
+def test_the_prompt_line_is_unchanged_by_the_link():
+    """Every replay and sanity baseline was measured against this exact string."""
+    items = news.parse_news_items(PARSED_NEWS)
+    assert [i.as_line() for i in items] == news.parse_news_results(PARSED_NEWS)
+    assert items[0].as_line() == "Apple beats on earnings — Revenue up 8% (Reuters, 2 hours ago)"
+
+
+def test_a_result_without_a_link_is_still_a_headline():
+    items = news.parse_news_items({"news": [{"title": "No link here", "source": "Wire"}]})
+    assert items[0].url == ""
+    assert items[0].as_line() == "No link here (Wire)"
+
+
+def test_items_are_json_serialisable_for_the_journal():
+    import json as _json
+
+    payload = _json.loads(_json.dumps([i.as_dict() for i in news.parse_news_items(PARSED_NEWS)]))
+    assert payload[0]["url"] == "https://x/1"
+    assert set(payload[0]) == {"title", "snippet", "source", "when", "url"}
+
+
+def test_items_are_deduplicated_by_title_like_the_lines():
+    items = news.parse_news_items(PARSED_NEWS)
+    assert len(items) == len(news.parse_news_results(PARSED_NEWS))
+    assert len({i.title.lower() for i in items}) == len(items)

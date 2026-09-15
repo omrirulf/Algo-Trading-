@@ -49,6 +49,7 @@
         "group": "Reference",
         "pages": [
           "api-reference/webhook",
+          "cycle-report",
           "scoring",
           "replay",
           "database",

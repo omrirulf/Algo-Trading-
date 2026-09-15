@@ -25,7 +25,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any, Optional, Sequence
 
 from config.instruments import is_fund
 from orchestrator import analysts, fundamentals, insiders, technicals
@@ -213,6 +213,11 @@ class TickerContext:
 
     ticker: str
     headlines: list[str] = field(default_factory=list)
+    #: The same news, structured, with the link each prompt line drops. Kept
+    #: beside ``headlines`` rather than inside them so the prompt stays
+    #: byte-identical to what every replay and sanity baseline was measured
+    #: against, while a person reviewing a signal can still open the source.
+    sources: list[dict] = field(default_factory=list)
     technicals: Optional[technicals.TechnicalSnapshot] = None
     fundamentals: Optional[fundamentals.FundamentalSnapshot] = None
     analysts: Optional[analysts.AnalystSnapshot] = None
@@ -224,6 +229,7 @@ class TickerContext:
         return {
             "ticker": self.ticker,
             "headlines": list(self.headlines),
+            "sources": list(self.sources),
             "technicals": self.technicals.as_dict() if self.technicals else None,
             "fundamentals": self.fundamentals.as_dict() if self.fundamentals else None,
             "analysts": self.analysts.as_dict() if self.analysts else None,
@@ -257,12 +263,33 @@ class TickerContext:
         return f"{title}\n" + "\n".join(snapshot.as_lines())
 
 
+def _split_headlines(headlines: Sequence[Any]) -> tuple[list[str], list[dict]]:
+    """Prompt lines, and the structured records when the caller supplied them."""
+    lines: list[str] = []
+    sources: list[dict] = []
+    for item in headlines:
+        as_line = getattr(item, "as_line", None)
+        if callable(as_line):
+            lines.append(as_line())
+            sources.append(item.as_dict())
+        else:
+            lines.append(str(item))
+    return lines, sources
+
+
 def gather(
     ticker: str,
-    headlines: list[str],
+    headlines: Sequence[Any],
     provider: Optional[YFinanceContextProvider] = None,
 ) -> TickerContext:
-    """Build the full context for ``ticker``. Never raises."""
+    """Build the full context for ``ticker``. Never raises.
+
+    ``headlines`` takes either plain prompt lines or ``news.Headline``
+    records. Records additionally carry their URL into ``sources``; strings
+    are accepted unchanged so the replay harnesses, which rebuild lines from
+    a stored journal, need no change.
+    """
+    lines, sources = _split_headlines(headlines)
     raw = (provider or get_provider()).fetch(ticker)
     gaps = list(raw.gaps)
 
@@ -314,7 +341,8 @@ def gather(
 
     return TickerContext(
         ticker=ticker,
-        headlines=list(headlines),
+        headlines=lines,
+        sources=sources,
         technicals=technical_snapshot,
         fundamentals=fundamental_snapshot,
         analysts=analyst_snapshot,

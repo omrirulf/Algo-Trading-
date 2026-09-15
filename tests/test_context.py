@@ -250,3 +250,17 @@ def test_a_raising_source_is_recorded_as_a_gap():
 def test_get_provider_is_a_singleton_so_the_cache_survives_cycles(monkeypatch):
     monkeypatch.setattr(context, "_provider", None)
     assert context.get_provider() is context.get_provider()
+
+
+def test_structured_headlines_carry_their_urls_without_changing_the_prompt():
+    """The URL reaches the journal; the model's input stays byte-identical."""
+    from orchestrator.news import Headline
+
+    items = [Headline(title="T", snippet="S", source="Reuters", when="2h ago", url="https://x/1")]
+    with_urls = context.gather("AAPL", items)
+    as_text = context.gather("AAPL", [items[0].as_line()])
+
+    assert with_urls.as_prompt() == as_text.as_prompt()
+    assert with_urls.sources[0]["url"] == "https://x/1"
+    assert as_text.sources == []
+    assert with_urls.as_dict()["sources"][0]["title"] == "T"

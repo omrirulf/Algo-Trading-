@@ -1,0 +1,85 @@
+---
+title: "Cycle report"
+description: "What the model saw, next to what it concluded — with links"
+---
+
+The journal answers "what did the model decide". It is a poor answer to **"why
+should I believe it"**, because the evidence is spread across five nested
+objects and a list of prompt lines. The cycle report puts each score next to
+the evidence that produced it.
+
+```bash
+python -m analysis.cycle_report                 # the most recent cycle
+python -m analysis.cycle_report --all           # every cycle in the journal
+python -m analysis.cycle_report --ticker NVDA   # one name (repeatable)
+```
+
+You do not have to run it. Every cycle renders it automatically to two places:
+
+- **The run's job summary** — open the latest [heartbeat run](https://github.com/omrirulf/Algo-Trading-/actions/workflows/heartbeat.yml) and read it on the page.
+- **`logs/cycle_report.md`**, committed to the repository — browsable on a
+  phone, and diffable between cycles.
+
+## What it looks like
+
+````markdown
+### NVDA — BULLISH @ 0.72
+
+**Engine:** ACCEPTED · 27 shares · within all caps
+
+> A material product catalyst corroborated by an uptrend and rising sector
+> capex, tempered by a rich multiple.
+
+**What drove it:**
+- Next-gen accelerator announced
+- Price above the 200-day average
+
+<details><summary><b>NEWS</b> — scored +0.80</summary>
+
+- [Nvidia unveils next-gen accelerator](https://www.reuters.com/...)
+  <sub>Reuters, 3 hours ago</sub>
+  Blackwell successor claims 2x throughput
+
+</details>
+
+<details><summary><b>TECHNICALS</b> — scored +0.50</summary>
+| `rsi14` | 61.2 |
+</details>
+````
+
+Tickers are ordered by conviction, so the calls worth arguing with are at the
+top. A ticker that failed names its failure; one the [funnel](/orchestrator/llm)
+screened out says the full model was never asked.
+
+## The links are new, and the prompt did not change
+
+Headlines reach the model as `title — snippet (source, when)`. The URL was
+being parsed out of the Bright Data response and **thrown away**, which meant a
+signal could cite a story nobody could go and read.
+
+Links are now kept — but deliberately *beside* the prompt line, in
+`context.sources`, not inside it:
+
+<Note>
+  The prompt is the input every [replay](/historical-replay) and
+  [sanity](/signal-sanity) baseline was measured against. Adding a URL to the
+  text the model reads would have changed the token stream and quietly
+  invalidated the comparison. `TickerContext.as_prompt()` is byte-identical to
+  what it was before; a test pins that.
+</Note>
+
+A cycle journalled before this existed still renders — it says so, and falls
+back to the plain headline text.
+
+## What it cannot tell you
+
+<Warning>
+  This is a record of the **inputs**, not a verdict on the output. A signal
+  with beautiful-looking evidence can still be wrong, and the report has no
+  opinion about that. Only [scoring](/scoring) against realised returns can say
+  whether the signals are worth trading.
+</Warning>
+
+The snapshots are rendered from what the journal stored, so a dimension that
+was unavailable shows as unavailable rather than as a neutral reading — the
+same distinction the prompt itself makes.
