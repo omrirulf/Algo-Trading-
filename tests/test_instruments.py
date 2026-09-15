@@ -354,3 +354,69 @@ def test_the_group_cap_binds_where_it_can_be_reached(broker, market):
     assert held <= cfg.MAX_EXPOSURE_GROUP_PCT + 1e-9
     assert rejected, "four funds at the broad cap should not all fit in one group"
     assert any("International equity" in r for r in rejected)
+
+
+# --------------------------------------------------------------------------- #
+# Human labels
+# --------------------------------------------------------------------------- #
+
+
+def test_every_watchlist_ticker_has_a_name():
+    """A report that says "NVO" makes the reader look it up. That is the bug."""
+    from config.instruments import DISPLAY_NAMES, SINGLE_NAMES, FUNDS
+
+    missing = [t for t in SINGLE_NAMES + FUNDS if t not in DISPLAY_NAMES]
+    assert missing == []
+
+
+def test_a_name_is_not_just_the_ticker_again():
+    from config.instruments import DISPLAY_NAMES
+
+    # Two exceptions, both honest: ASML is the company's actual name, and
+    # CORN is corn.
+    same = [t for t, name in DISPLAY_NAMES.items() if t == name.upper()]
+    assert same == ["ASML", "CORN"]
+
+
+@pytest.mark.parametrize(
+    "ticker,name",
+    [("NVO", "Novo Nordisk"), ("GOOGL", "Alphabet (Google)"), ("TLT", "US government bonds, 20+ years")],
+)
+def test_name_for_returns_the_readable_name(ticker, name):
+    from config.instruments import name_for
+
+    assert name_for(ticker) == name
+    assert name_for(ticker.lower()) == name
+    assert name_for(f"  {ticker} ") == name
+
+
+def test_an_unnamed_ticker_falls_back_to_its_symbol():
+    """A ticker added to the watchlist before its name was written down."""
+    from config.instruments import name_for
+
+    assert name_for("zzzz") == "ZZZZ"
+
+
+@pytest.mark.parametrize(
+    "ticker,label",
+    [("MSFT", "Company"), ("RSP", "Index fund"), ("DBC", "Index fund"), ("GLD", "Commodity")],
+)
+def test_the_sleeve_label_says_what_the_thing_is(ticker, label):
+    """DBC is a basket, so it reads as an index fund; GLD is one metal, so it does not."""
+    from config.instruments import sleeve_label
+
+    assert sleeve_label(ticker) == label
+
+
+def test_every_kind_has_a_label():
+    """A new kind must not render as a KeyError in the report."""
+    from config.instruments import SLEEVE_LABELS, InstrumentKind
+
+    assert set(SLEEVE_LABELS) == set(InstrumentKind)
+
+
+def test_an_unknown_ticker_labels_as_a_company():
+    """The same fail-closed default the position cap uses: never the widest one."""
+    from config.instruments import sleeve_label
+
+    assert sleeve_label("ZZZZ") == "Company"
