@@ -21,6 +21,7 @@ import json
 import logging
 import os
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
 from datetime import date, timedelta
@@ -149,8 +150,54 @@ def _unwrap(payload: Any) -> dict[str, Any]:
     return payload
 
 
-def parse_news_results(payload: Any, limit: int = MAX_HEADLINES) -> list[str]:
-    """Turn a Bright Data parsed-Google payload into ``"title — snippet (source, when)"`` lines."""
+@dataclass(frozen=True)
+class Headline:
+    """One news result, including the link the prompt line leaves out.
+
+    ``as_line()`` is what the model is shown, and it is deliberately
+    byte-identical to the string this module has always produced. The prompt
+    is the input every replay and sanity baseline was measured against, so
+    carrying a new field into the journal must not change one character of
+    it -- and the model is never handed a URL it cannot open anyway.
+
+    ``url`` exists for the reader: a person reviewing a signal afterwards
+    needs to be able to open the story the model scored, and a headline with
+    no source to check is an assertion rather than evidence.
+    """
+
+    title: str
+    snippet: str = ""
+    source: str = ""
+    when: str = ""
+    url: str = ""
+
+    def as_line(self) -> str:
+        """The prompt line: ``title — snippet (source, when)``."""
+        line = self.title
+        if self.snippet:
+            line += f" — {self.snippet}"
+        meta = ", ".join(x for x in (self.source, self.when) if x)
+        if meta:
+            line += f" ({meta})"
+        return line
+
+    def as_dict(self) -> dict[str, str]:
+        """Plain JSON-serialisable form, for the signal journal."""
+        return {
+            "title": self.title,
+            "snippet": self.snippet,
+            "source": self.source,
+            "when": self.when,
+            "url": self.url,
+        }
+
+
+def parse_news_items(payload: Any, limit: int = MAX_HEADLINES) -> list[Headline]:
+    """Turn a Bright Data parsed-Google payload into ``Headline`` records.
+
+    Deduplicated by title, because the same story syndicated across three
+    outlets is one piece of evidence, not three.
+    """
     data = _unwrap(payload)
     items: list[Any] = []
     for key in _RESULT_KEYS:
@@ -159,7 +206,7 @@ def parse_news_results(payload: Any, limit: int = MAX_HEADLINES) -> list[str]:
             items = value
             break
 
-    lines: list[str] = []
+    out: list[Headline] = []
     seen: set[str] = set()
     for item in items:
         if not isinstance(item, dict):
@@ -168,19 +215,23 @@ def parse_news_results(payload: Any, limit: int = MAX_HEADLINES) -> list[str]:
         if not title or title.lower() in seen:
             continue
         seen.add(title.lower())
-        snippet = _first(item, "description", "snippet")
-        source = _first(item, "source", "source_name", "display_link")
-        when = _first(item, "date", "time", "published", "age")
-        line = title
-        if snippet:
-            line += f" — {snippet}"
-        meta = ", ".join(x for x in (source, when) if x)
-        if meta:
-            line += f" ({meta})"
-        lines.append(line)
-        if len(lines) >= limit:
+        out.append(
+            Headline(
+                title=title,
+                snippet=_first(item, "description", "snippet"),
+                source=_first(item, "source", "source_name", "display_link"),
+                when=_first(item, "date", "time", "published", "age"),
+                url=_first(item, "link", "url", "source_link"),
+            )
+        )
+        if len(out) >= limit:
             break
-    return lines
+    return out
+
+
+def parse_news_results(payload: Any, limit: int = MAX_HEADLINES) -> list[str]:
+    """The same results as ``parse_news_items``, rendered as prompt lines."""
+    return [h.as_line() for h in parse_news_items(payload, limit)]
 
 
 # --------------------------------------------------------------------------- #
@@ -301,9 +352,13 @@ class BrightDataNewsProvider:
         with httpx.Client(timeout=REQUEST_TIMEOUT_SECONDS) as client:
             return client.post(BRIGHTDATA_REQUEST_URL, json=body, headers=headers)
 
+    def fetch_items(self, ticker: str) -> list[Headline]:
+        """Headlines from the past 24 hours, with their links -- the live path."""
+        return self._fetch_items(build_news_search_url(ticker))
+
     def fetch(self, ticker: str) -> list[str]:
-        """Headlines from the past 24 hours -- the live path."""
-        return self._fetch_url(build_news_search_url(ticker))
+        """The same headlines as prompt lines, for callers that want only text."""
+        return [h.as_line() for h in self.fetch_items(ticker)]
 
     def fetch_on(self, ticker: str, day: date) -> list[str]:
         """Headlines as of a past date -- the historical replay's path.
@@ -313,9 +368,9 @@ class BrightDataNewsProvider:
         sparser than the day's real coverage and biased towards stories that
         lasted. The caller counts empty results rather than hiding them.
         """
-        return self._fetch_url(build_news_search_url(ticker, on=day))
+        return [h.as_line() for h in self._fetch_items(build_news_search_url(ticker, on=day))]
 
-    def _fetch_url(self, url: str) -> list[str]:
+    def _fetch_items(self, url: str) -> list[Headline]:
         body = {"zone": self._zone, "url": url, "format": "raw"}
         try:
             resp = self._post(body)
@@ -323,4 +378,4 @@ class BrightDataNewsProvider:
             raise NewsFetchError(f"Bright Data unreachable: {exc}") from exc
         if resp.status_code != 200:
             raise NewsFetchError(f"Bright Data HTTP {resp.status_code}: {resp.text[:300]}")
-        return parse_news_results(resp.text)
+        return parse_news_items(resp.text)

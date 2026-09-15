@@ -211,7 +211,7 @@ def system_prompt_for(ticker: str) -> str:
 # --------------------------------------------------------------------------- #
 
 
-def fetch_news(ticker: str) -> list[str]:
+def fetch_news(ticker: str) -> list:
     """Return recent headlines / snippets for ``ticker`` from Bright Data."""
     settings = get_settings()
     provider = BrightDataNewsProvider(
@@ -219,7 +219,7 @@ def fetch_news(ticker: str) -> list[str]:
         settings.brightdata_serp_zone,
         unlocker_zone=settings.brightdata_unlocker_zone,
     )
-    return provider.fetch(ticker)
+    return provider.fetch_items(ticker)
 
 
 def screen_signal(system_prompt: str, user_prompt: str, json_schema: dict) -> Completion:

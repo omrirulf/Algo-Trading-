@@ -51,6 +51,29 @@ jobs:
           BRIGHTDATA_SERP_ZONE: ${{ vars.BRIGHTDATA_SERP_ZONE }}
         run: python -m orchestrator.heartbeat --once
 
+      - name: Render the cycle for a human
+        # `always()` for the same reason the commit below is: a cycle that
+        # failed some tickers still produced the lines worth reading, and a
+        # report that only exists when everything worked is a report nobody
+        # needs. Never fails the job -- it is a view of the journal, not a
+        # second chance to break the cycle.
+        if: always()
+        run: |
+          set -o pipefail
+          # Rendered to a temp file first: `> logs/cycle_report.md` would
+          # truncate the previous cycle's report before finding out this
+          # cycle has nothing to render, replacing a good report with an
+          # empty one.
+          if python -m analysis.cycle_report > "$RUNNER_TEMP/cycle_report.md"; then
+            mv "$RUNNER_TEMP/cycle_report.md" logs/cycle_report.md
+            {
+              echo '<!-- Rendered from logs/signal_journal.log by analysis/cycle_report.py -->'
+              cat logs/cycle_report.md
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "no journal lines to render; last report left in place"
+          fi
+
       - name: Commit the journal
         # `always()` because a cycle can fail *and* still have written lines:
         # a ticker that reached the model and was refused there is journalled
@@ -69,7 +92,7 @@ jobs:
           # -f because logs/*.log is gitignored for local development, where
           # nobody wants their scratch runs committed. Here the journal is
           # the deliverable, so it is added explicitly by name.
-          git add -f logs/signal_journal.log logs/execution_audit.log || true
+          git add -f logs/signal_journal.log logs/execution_audit.log logs/cycle_report.md || true
           if git diff --cached --quiet; then
             echo "no journal changes"
             exit 0

@@ -23,6 +23,7 @@ to settle: **are the signals any good?**
   "ticker": "NVDA",
   "context": {
     "headlines": ["Chipmaker raises guidance — revenue seen up 20% (Reuters, 2h ago)"],
+    "sources": [{ "title": "Chipmaker raises guidance", "source": "Reuters", "when": "2h ago", "url": "https://..." }],
     "technicals": { "rsi14": 61.2, "distance_sma200": 0.128, "...": "..." },
     "fundamentals": { "trailing_pe": 34.2, "revenue_growth": 0.061, "...": "..." },
     "analysts": { "recommendation": "buy", "target_upside": 0.13, "...": "..." },
@@ -50,6 +51,12 @@ so on those lines `signal` *is* the screen's answer, `outcome` is `null`, and
 the disagreement has to be estimated from a sample run with screening off. A
 screen that failed carries `{"model": ..., "error": ...}` instead; `null`
 means screening was disabled.
+
+`context.sources` is the same news as `context.headlines`, structured, with the
+URL each prompt line leaves out — so a signal can be checked against the story
+it cites. The prompt the model reads is unchanged by it; see
+[the cycle report](/cycle-report), which renders each score next to the
+evidence behind it.
 
 <Note>
   `ts_utc` is an explicit ISO-8601 UTC timestamp, separate from the formatter's
