@@ -329,12 +329,13 @@ def test_a_full_book_must_span_several_exposure_groups():
 
 
 def test_the_group_cap_binds_where_it_can_be_reached(broker, market):
-    """Four international funds at 12% would be 48% of the book in one bet.
+    """Eleven developed-country funds at 8% would be 88% of the book in one bet.
 
-    This is where the group cap does visible work: unlike the technology
-    names, this group *can* exceed 25%, so something has to stop it.
+    This is where the group cap does visible work, and the reason the focused
+    sleeve is safe to widen: every per-ticker cap is satisfied the whole way
+    up, so something else has to stop it.
     """
-    from config.instruments import INTERNATIONAL
+    from config.instruments import COUNTRY_DEVELOPED as INTERNATIONAL
 
     engine = ExecutionEngine(broker, market)
     rejected = []
@@ -352,8 +353,8 @@ def test_the_group_cap_binds_where_it_can_be_reached(broker, market):
 
     held = sum(p.market_value for p in broker.positions) / broker.equity
     assert held <= cfg.MAX_EXPOSURE_GROUP_PCT + 1e-9
-    assert rejected, "four funds at the broad cap should not all fit in one group"
-    assert any("International equity" in r for r in rejected)
+    assert rejected, "eleven country funds should not all fit in one group"
+    assert any("Developed international" in r for r in rejected)
 
 
 # --------------------------------------------------------------------------- #
@@ -399,10 +400,14 @@ def test_an_unnamed_ticker_falls_back_to_its_symbol():
 
 @pytest.mark.parametrize(
     "ticker,label",
-    [("MSFT", "Company"), ("RSP", "Index fund"), ("DBC", "Index fund"), ("GLD", "Commodity")],
+    [
+        ("MSFT", "Company"), ("RSP", "Index fund"), ("DBC", "Index fund"),
+        ("XLE", "Sector or country"), ("EWZ", "Sector or country"),
+        ("GLD", "Commodity"),
+    ],
 )
 def test_the_sleeve_label_says_what_the_thing_is(ticker, label):
-    """DBC is a basket, so it reads as an index fund; GLD is one metal, so it does not."""
+    """DBC is a basket across commodities; XLE is one sector; GLD is one metal."""
     from config.instruments import sleeve_label
 
     assert sleeve_label(ticker) == label
@@ -420,3 +425,129 @@ def test_an_unknown_ticker_labels_as_a_company():
     from config.instruments import sleeve_label
 
     assert sleeve_label("ZZZZ") == "Company"
+
+
+# --------------------------------------------------------------------------- #
+# The focused sleeve: one sector, or one country
+# --------------------------------------------------------------------------- #
+
+
+def test_the_focused_cap_sits_between_the_other_two():
+    """Not a broad fund and not a single name, and priced as neither."""
+    assert cfg.MAX_POSITION_PCT < cfg.MAX_FOCUSED_FUND_PCT < cfg.MAX_BROAD_FUND_PCT
+
+
+@pytest.mark.parametrize("ticker", ["XLE", "XLK", "SMH", "VNQ", "EWJ", "EWZ", "KSA", "GDX"])
+def test_a_sector_or_country_fund_gets_the_focused_cap(ticker):
+    from config.instruments import InstrumentKind, kind_for
+
+    assert kind_for(ticker) is InstrumentKind.FOCUSED_FUND
+    assert risk_engine.max_position_pct_for(ticker) == cfg.MAX_FOCUSED_FUND_PCT
+
+
+def test_a_single_country_is_no_longer_sized_as_a_whole_market():
+    """Japan and Israel moved down a tier: one country is one bet."""
+    from config.instruments import InstrumentKind, kind_for
+
+    for ticker in ("EWJ", "EIS", "VNQ"):
+        assert kind_for(ticker) is not InstrumentKind.BROAD_FUND
+        assert risk_engine.max_position_pct_for(ticker) < cfg.MAX_BROAD_FUND_PCT
+
+
+def test_a_multi_country_fund_is_still_broad():
+    from config.instruments import InstrumentKind, kind_for
+
+    for ticker in ("VGK", "VWO", "RSP", "IWM"):
+        assert kind_for(ticker) is InstrumentKind.BROAD_FUND
+
+
+def test_an_unknown_ticker_never_gets_the_focused_cap():
+    """The fail-closed default has to stay the smallest of the equity tiers."""
+    assert risk_engine.max_position_pct_for("ZZZZ") == cfg.MAX_POSITION_PCT
+
+
+def test_the_model_still_cannot_assert_a_focused_kind():
+    """A fourth kind is a fourth cap, so it is a fourth thing worth claiming."""
+    from app.schemas import LLMSignal
+
+    assert "kind" not in LLMSignal.model_fields
+    assert "instrument" not in LLMSignal.model_fields
+    with pytest.raises(Exception):
+        LLMSignal(ticker="MSFT", bias=Bias.BULLISH, conviction=0.9, rationale="x",
+                  kind="focused fund")
+
+
+# --------------------------------------------------------------------------- #
+# Exposure groups: what makes a wide watchlist safe
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize(
+    "fund,single_name",
+    [("XLE", "XOM"), ("XLK", "MSFT"), ("XLF", "JPM"), ("XLV", "LLY"), ("XLI", "CAT")],
+)
+def test_a_sector_fund_shares_a_group_with_the_names_it_contains(fund, single_name):
+    """Otherwise the sector fund is a second helping of the same bet, uncounted."""
+    from config.instruments import group_for
+
+    assert group_for(fund) == group_for(single_name)
+
+
+def test_a_gold_miner_groups_with_gold_not_with_materials():
+    """A miner is a levered bet on the metal, not a diversifier from it."""
+    from config.instruments import group_for
+
+    assert group_for("GDX") == group_for("GLD")
+    assert group_for("GDX") != group_for("XLB")
+
+
+def test_credit_is_not_filed_with_government_duration():
+    """They move opposite ways in a sell-off; one group would net them to nothing."""
+    from config.instruments import group_for
+
+    assert group_for("HYG") == group_for("LQD") == group_for("EMB")
+    assert group_for("HYG") != group_for("TLT")
+
+
+def test_developed_and_emerging_are_not_one_bet():
+    from config.instruments import group_for
+
+    assert group_for("EWG") == group_for("EWJ")
+    assert group_for("EWZ") == group_for("TUR")
+    assert group_for("EWG") != group_for("EWZ")
+
+
+def test_every_watchlist_ticker_belongs_to_exactly_one_group():
+    """An ungrouped ticker is one the group cap cannot see."""
+    from config.instruments import EXPOSURE_GROUPS, UNGROUPED, group_for
+    from config.watchlist import DEFAULT_WATCHLIST
+
+    assert [t for t in DEFAULT_WATCHLIST if group_for(t) == UNGROUPED] == []
+    listed = [t for tickers in EXPOSURE_GROUPS.values() for t in tickers]
+    assert sorted(listed) == sorted(DEFAULT_WATCHLIST)
+
+
+def test_one_technology_bet_cannot_be_taken_four_ways(broker, market):
+    """NVDA + MSFT + XLK + SMH is one bet, and every per-ticker cap allows it.
+
+    The reason the focused sleeve could be widened at all: this is the check
+    that stops a sector fund stacking on top of the names inside it.
+    """
+    engine = ExecutionEngine(broker, market)
+    rejected = []
+    for ticker in ("NVDA", "MSFT", "ASML", "GOOGL", "XLK", "XLC", "SMH", "IGV"):
+        result = engine.execute(
+            LLMSignal(ticker=ticker, bias=Bias.BULLISH, conviction=0.9, rationale="x")
+        )
+        if result.status is ExecutionStatus.ACCEPTED:
+            broker.positions.append(
+                OpenPosition(ticker=ticker, qty=result.quantity,
+                             market_value=result.quantity * market.price)
+            )
+        else:
+            rejected.append(result.reason)
+
+    held = sum(p.market_value for p in broker.positions) / broker.equity
+    assert held <= cfg.MAX_EXPOSURE_GROUP_PCT + 1e-9
+    assert rejected, "four tech names plus four tech funds should not all fit"
+    assert any("Technology" in r for r in rejected)

@@ -1,6 +1,6 @@
 """What we trade, what kind of thing each ticker is, and what it correlates with.
 
-Three kinds, because they carry three different risks and so deserve three
+Four kinds, because they carry four different risks and so deserve four
 different position caps:
 
 ``EQUITY``
@@ -10,9 +10,18 @@ different position caps:
     content.
 
 ``BROAD_FUND``
-    A basket of hundreds of positions. Internally diversified, so a larger
-    share of equity is appropriate -- the diversification argument for index
-    funds and a single-name cap cancel each other out.
+    A basket of hundreds of positions spanning sectors, countries or issuers.
+    Internally diversified, so a larger share of equity is appropriate -- the
+    diversification argument for index funds and a single-name cap cancel each
+    other out.
+
+``FOCUSED_FUND``
+    A fund holding many companies, all of them in **one sector or one
+    country**. Diversified against a single company failing and not against
+    anything else: an energy fund is twenty-three ways of making the same bet
+    on the oil price, and a Brazil fund is one currency, one central bank and
+    one election. It sits between the two caps above because that is where its
+    risk sits -- above a single name, below a fund that spans the world.
 
 ``COMMODITY_FUND``
     A fund tracking **one** commodity. The word "fund" is doing no
@@ -50,6 +59,7 @@ from typing import Final
 class InstrumentKind(str, Enum):
     EQUITY = "equity"
     BROAD_FUND = "broad fund"
+    FOCUSED_FUND = "focused fund"
     COMMODITY_FUND = "commodity fund"
 
 
@@ -93,26 +103,45 @@ SINGLE_NAMES: Final[tuple[str, ...]] = tuple(
 # --------------------------------------------------------------------------- #
 # Sleeve 2a: broad funds -- the core
 # --------------------------------------------------------------------------- #
+# What belongs here is a fund whose holdings span sectors, countries or
+# issuers. One that holds a hundred companies in a single sector, or a single
+# country, is not this -- it is a FOCUSED_FUND below, and it gets a smaller
+# cap for it.
+#
 # RSP rather than SPY: a cap-weighted US index is a concentrated technology
 # bet wearing a diversified label, and equal weight is the diversified version
 # of the same market.
 
 US_BROAD: Final[tuple[str, ...]] = ("RSP", "IWM")
-INTERNATIONAL: Final[tuple[str, ...]] = ("VGK", "EWJ", "VWO", "EIS")
-REAL_ESTATE: Final[tuple[str, ...]] = ("VNQ",)
-#: The only holding here that is not equity risk, and historically the most
-#: reliable diversifier against it.
-DURATION: Final[tuple[str, ...]] = ("TLT",)
+#: Multi-country by construction. The single-country funds that used to sit
+#: here (Japan, Israel) moved to the focused sleeve: one country is one
+#: currency, one central bank and one election, which is a narrower bet than
+#: this row is sized for.
+INTERNATIONAL_BROAD: Final[tuple[str, ...]] = ("VGK", "VWO")
+#: Government paper across the curve. Not equity risk, and historically the
+#: most reliable diversifier against it -- but only at the long end: SHY is a
+#: cash proxy and TIP prices inflation rather than growth, so the curve is
+#: carried in pieces rather than as one duration bet.
+DURATION: Final[tuple[str, ...]] = ("SHY", "IEF", "TLT", "TIP")
+#: Corporate and sovereign credit. Each fund holds hundreds of issuers, so
+#: default risk is diversified -- but spread risk is not, and it correlates
+#: with equities exactly when that hurts. Hence its own exposure group.
+CREDIT: Final[tuple[str, ...]] = ("LQD", "HYG", "EMB")
 #: Broad commodity baskets. These *are* diversified across commodities, so
 #: they are broad funds rather than commodity funds.
 BROAD_COMMODITY: Final[tuple[str, ...]] = ("DBC", "DBA")
+#: The dollar, as a basket against six developed currencies. Here because
+#: almost every other row on this list is priced in dollars, so the dollar is
+#: a factor in all of them and is otherwise unobservable.
+CURRENCY: Final[tuple[str, ...]] = ("UUP",)
 
 BROAD_FUND_ROLES: Final[dict[str, tuple[str, ...]]] = {
     "US broad equity": US_BROAD,
-    "International equity": INTERNATIONAL,
-    "Real estate": REAL_ESTATE,
+    "International equity": INTERNATIONAL_BROAD,
     "Duration": DURATION,
+    "Credit": CREDIT,
     "Broad commodities": BROAD_COMMODITY,
+    "Currency": CURRENCY,
 }
 
 BROAD_FUNDS: Final[tuple[str, ...]] = tuple(
@@ -121,7 +150,86 @@ BROAD_FUNDS: Final[tuple[str, ...]] = tuple(
 
 
 # --------------------------------------------------------------------------- #
-# Sleeve 2b: single-commodity funds
+# Sleeve 2b: focused funds -- one sector, or one country
+# --------------------------------------------------------------------------- #
+# The sleeve that makes the watchlist wide enough to be worth reading. A model
+# handed only RSP and IWM can say "US equities up" and nothing more useful; a
+# story about a rate cut, an oil shock, a drug approval or an election is
+# about a *sector* or a *country*, and until this sleeve existed there was
+# nowhere for such a story to land.
+#
+# Why they are not broad funds
+# ----------------------------
+# A sector fund is diversified against one company failing and against nothing
+# else. XLE is twenty-three different ways of being long the oil price. A
+# country fund is one currency, one central bank, one government. Sizing
+# either like a fund that spans the world would repeat, one level up, the
+# error the commodity sleeve exists to avoid: picking a cap from the word
+# "fund" rather than from the risk.
+#
+# Why they are not single names either
+# ------------------------------------
+# One company can go to zero on a fraud or a failed trial. A sector cannot. So
+# the cap sits between the two, at MAX_FOCUSED_FUND_PCT.
+#
+# Overlap with the broad sleeve is deliberate and is not double-counting: RSP
+# already contains every US sector, so a sector position is a *tilt* on top of
+# the market, and EXPOSURE_GROUPS is what stops the tilt and the single names
+# beneath it adding up to one undiversified bet.
+
+SECTOR_ENERGY: Final[tuple[str, ...]] = ("XLE",)
+SECTOR_FINANCIALS: Final[tuple[str, ...]] = ("XLF", "KRE")
+SECTOR_HEALTH_CARE: Final[tuple[str, ...]] = ("XLV", "XBI")
+#: XLC is here rather than in a communication row of its own for the same
+#: reason GOOGL is: in a drawdown it trades like technology.
+SECTOR_TECHNOLOGY: Final[tuple[str, ...]] = ("XLK", "XLC", "SMH", "IGV")
+SECTOR_INDUSTRIALS: Final[tuple[str, ...]] = ("XLI", "ITA", "IYT")
+SECTOR_CONSUMER: Final[tuple[str, ...]] = ("XLY", "XLP")
+SECTOR_UTILITIES: Final[tuple[str, ...]] = ("XLU",)
+SECTOR_MATERIALS: Final[tuple[str, ...]] = ("XLB",)
+#: House builders sit with property rather than with retail. GICS calls them
+#: consumer discretionary; rates and housing starts call them real estate, and
+#: the point of a grouping here is what a thing trades like.
+SECTOR_REAL_ESTATE: Final[tuple[str, ...]] = ("VNQ", "XHB")
+#: Miners are equities, not metal -- but they are a levered bet on the metal,
+#: so they are grouped with it rather than with materials.
+SECTOR_MINERS: Final[tuple[str, ...]] = ("GDX",)
+
+#: Single developed markets. Israel is here on MSCI's classification, and
+#: Japan moved down from the broad sleeve with the rest of them.
+COUNTRY_DEVELOPED: Final[tuple[str, ...]] = (
+    "EWJ", "EIS", "EWU", "EWG", "EWL", "EWN", "EWI", "EWP", "EWD", "EWC", "EWA",
+)
+#: Single emerging markets. Thinner, more volatile and more prone to a single
+#: political event than the developed row, and sized the same -- which is an
+#: argument for watching what verify_tickers.py measures on this row in
+#: particular.
+COUNTRY_EMERGING: Final[tuple[str, ...]] = (
+    "MCHI", "INDA", "EWY", "EWT", "EWZ", "EWW", "KSA", "TUR", "EZA", "EPOL", "ARGT",
+)
+
+FOCUSED_FUND_ROLES: Final[dict[str, tuple[str, ...]]] = {
+    "Sector: energy": SECTOR_ENERGY,
+    "Sector: financials": SECTOR_FINANCIALS,
+    "Sector: health care": SECTOR_HEALTH_CARE,
+    "Sector: technology": SECTOR_TECHNOLOGY,
+    "Sector: industrials": SECTOR_INDUSTRIALS,
+    "Sector: consumer": SECTOR_CONSUMER,
+    "Sector: utilities": SECTOR_UTILITIES,
+    "Sector: materials": SECTOR_MATERIALS,
+    "Sector: real estate": SECTOR_REAL_ESTATE,
+    "Sector: miners": SECTOR_MINERS,
+    "Country: developed": COUNTRY_DEVELOPED,
+    "Country: emerging": COUNTRY_EMERGING,
+}
+
+FOCUSED_FUNDS: Final[tuple[str, ...]] = tuple(
+    t for bucket in FOCUSED_FUND_ROLES.values() for t in bucket
+)
+
+
+# --------------------------------------------------------------------------- #
+# Sleeve 2c: single-commodity funds
 # --------------------------------------------------------------------------- #
 # Alpaca trades us_equity, us_option and crypto only, so futures are out of
 # reach and physical metal is not a thing one can hold in a brokerage account.
@@ -169,9 +277,11 @@ COMMODITY_FUNDS: Final[tuple[str, ...]] = tuple(
 )
 
 #: Everything that is not a single name.
-FUNDS: Final[tuple[str, ...]] = BROAD_FUNDS + COMMODITY_FUNDS
+FUNDS: Final[tuple[str, ...]] = BROAD_FUNDS + FOCUSED_FUNDS + COMMODITY_FUNDS
 
-FUND_ROLES: Final[dict[str, tuple[str, ...]]] = {**BROAD_FUND_ROLES, **COMMODITY_ROLES}
+FUND_ROLES: Final[dict[str, tuple[str, ...]]] = {
+    **BROAD_FUND_ROLES, **FOCUSED_FUND_ROLES, **COMMODITY_ROLES,
+}
 
 
 # --------------------------------------------------------------------------- #
@@ -179,6 +289,7 @@ FUND_ROLES: Final[dict[str, tuple[str, ...]]] = {**BROAD_FUND_ROLES, **COMMODITY
 # --------------------------------------------------------------------------- #
 
 _BROAD_SET: Final[frozenset[str]] = frozenset(BROAD_FUNDS)
+_FOCUSED_SET: Final[frozenset[str]] = frozenset(FOCUSED_FUNDS)
 _COMMODITY_SET: Final[frozenset[str]] = frozenset(COMMODITY_FUNDS)
 
 
@@ -192,6 +303,8 @@ def kind_for(ticker: str) -> InstrumentKind:
     symbol = ticker.strip().upper()
     if symbol in _BROAD_SET:
         return InstrumentKind.BROAD_FUND
+    if symbol in _FOCUSED_SET:
+        return InstrumentKind.FOCUSED_FUND
     if symbol in _COMMODITY_SET:
         return InstrumentKind.COMMODITY_FUND
     return InstrumentKind.EQUITY
@@ -245,6 +358,56 @@ DISPLAY_NAMES: Final[dict[str, str]] = {
     "TLT": "US government bonds, 20+ years",
     "DBC": "Commodities basket",
     "DBA": "Farm goods basket",
+    # Sectors -- what an American would call the industry, not the GICS label
+    "XLE": "US energy companies",
+    "XLF": "US banks and finance",
+    "XLV": "US health care",
+    "XLK": "US technology",
+    "XLI": "US industry",
+    "XLY": "US shopping and leisure",
+    "XLP": "US everyday goods",
+    "XLU": "US electricity and water",
+    "XLB": "US materials and chemicals",
+    "XLC": "US media and communication",
+    # Narrower themes inside those sectors
+    "SMH": "Chip makers",
+    "IGV": "Software",
+    "XBI": "Biotech",
+    "KRE": "US regional banks",
+    "ITA": "Defence and aerospace",
+    "IYT": "Transport and delivery",
+    "XHB": "US house builders",
+    "GDX": "Gold mining companies",
+    # Single countries
+    "EWU": "United Kingdom",
+    "EWG": "Germany",
+    "EWL": "Switzerland",
+    "EWN": "Netherlands",
+    "EWI": "Italy",
+    "EWP": "Spain",
+    "EWD": "Sweden",
+    "EWC": "Canada",
+    "EWA": "Australia",
+    "MCHI": "China",
+    "INDA": "India",
+    "EWY": "South Korea",
+    "EWT": "Taiwan",
+    "EWZ": "Brazil",
+    "EWW": "Mexico",
+    "KSA": "Saudi Arabia",
+    "TUR": "Turkey",
+    "EZA": "South Africa",
+    "EPOL": "Poland",
+    "ARGT": "Argentina",
+    # Bonds and credit
+    "SHY": "US government bonds, 1-3 years",
+    "IEF": "US government bonds, 7-10 years",
+    "TIP": "US inflation-linked bonds",
+    "LQD": "US company bonds, safer",
+    "HYG": "US company bonds, riskier",
+    "EMB": "Developing country bonds",
+    # Currency
+    "UUP": "US dollar",
     # Single commodities
     "GLD": "Gold",
     "SLV": "Silver",
@@ -263,6 +426,7 @@ DISPLAY_NAMES: Final[dict[str, str]] = {
 SLEEVE_LABELS: Final[dict[InstrumentKind, str]] = {
     InstrumentKind.EQUITY: "Company",
     InstrumentKind.BROAD_FUND: "Index fund",
+    InstrumentKind.FOCUSED_FUND: "Sector or country",
     InstrumentKind.COMMODITY_FUND: "Commodity",
 }
 
@@ -278,7 +442,7 @@ def name_for(ticker: str) -> str:
 
 
 def sleeve_label(ticker: str) -> str:
-    """"Company", "Index fund" or "Commodity" -- what this ticker is."""
+    """What this ticker is, in one phrase a non-specialist can read."""
     return SLEEVE_LABELS[kind_for(ticker)]
 
 
@@ -291,19 +455,39 @@ def sleeve_label(ticker: str) -> str:
 # correlated risk rather than to reproduce a classification standard.
 
 EXPOSURE_GROUPS: Final[dict[str, tuple[str, ...]]] = {
-    "Technology": TECHNOLOGY + COMMUNICATION,
-    "Financials": FINANCIALS,
-    "Health care": HEALTH_CARE,
-    "Industrials": INDUSTRIALS,
-    "Consumer": CONSUMER_DISCRETIONARY + CONSUMER_STAPLES,
-    # One energy bet, whether taken through a driller or the barrel.
-    "Energy": ENERGY_EQUITY + ENERGY_COMMODITY,
+    # Each sector fund sits with the single names it is a diversified version
+    # of. This is the check that makes the focused sleeve safe to widen: NVDA
+    # plus MSFT plus XLK plus SMH is one technology bet made four times, and
+    # without this row every per-ticker cap would be satisfied while it
+    # happened.
+    "Technology": TECHNOLOGY + COMMUNICATION + SECTOR_TECHNOLOGY,
+    "Financials": FINANCIALS + SECTOR_FINANCIALS,
+    "Health care": HEALTH_CARE + SECTOR_HEALTH_CARE,
+    "Industrials": INDUSTRIALS + SECTOR_INDUSTRIALS,
+    "Consumer": CONSUMER_DISCRETIONARY + CONSUMER_STAPLES + SECTOR_CONSUMER,
+    # One energy bet, whether taken through a driller, a sector fund or the
+    # barrel.
+    "Energy": ENERGY_EQUITY + ENERGY_COMMODITY + SECTOR_ENERGY,
+    "Utilities": SECTOR_UTILITIES,
+    "Materials": SECTOR_MATERIALS,
+    "Real estate": SECTOR_REAL_ESTATE,
     "US broad equity": US_BROAD,
-    "International equity": INTERNATIONAL,
-    "Real estate": REAL_ESTATE,
+    # Split in two, because they are not one bet. A European fund and a Japan
+    # fund move together far more than either moves with Brazil, and holding
+    # them under one 25% ceiling would have made "the rest of the world" a
+    # single position.
+    "Developed international": ("VGK",) + COUNTRY_DEVELOPED,
+    "Emerging markets": ("VWO",) + COUNTRY_EMERGING,
     "Duration": DURATION,
+    # Its own group rather than part of duration: credit sells off with
+    # equities, while government paper rallies. Putting them together would
+    # net two opposite risks into one number.
+    "Credit": CREDIT,
+    "US dollar": CURRENCY,
     "Broad commodities": BROAD_COMMODITY,
-    "Precious metals": PRECIOUS_METALS,
+    # Miners with the metal: a gold miner is a levered bet on gold, not a
+    # diversifier from it.
+    "Precious metals": PRECIOUS_METALS + SECTOR_MINERS,
     "Industrial metals": INDUSTRIAL_METALS,
     "Agriculture": AGRICULTURE,
 }
@@ -327,6 +511,8 @@ __all__ = [
     "SINGLE_NAMES",
     "BROAD_FUND_ROLES",
     "BROAD_FUNDS",
+    "FOCUSED_FUND_ROLES",
+    "FOCUSED_FUNDS",
     "COMMODITY_ROLES",
     "COMMODITY_FUNDS",
     "FUNDS",

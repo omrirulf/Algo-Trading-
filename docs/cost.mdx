@@ -47,11 +47,19 @@ full model. The arithmetic, per ticker, at the ~1,400-token prompt:
 | Decide | `claude-opus-5` | `low` | $0.022 |
 
 So a screened ticker costs about a tenth of a decided one, and the cycle's
-bill is `35 × $0.002 + (escalated) × $0.022`. On a day the screen escalates
-a third of the list, that is roughly $0.33 against $0.77 before; on a quiet
+bill is `80 × $0.002 + (escalated) × $0.022`. On a day the screen escalates
+a third of the list, that is roughly $0.75 against $1.76 before; on a quiet
 day, less. The saving is bounded by how much of the watchlist has nothing
-happening — which, across sixteen single names, ten broad funds and nine
-commodity funds, is usually most of it.
+happening — which, across sixteen single names, fourteen broad funds,
+forty-one sector and country funds and nine commodity funds, is usually most
+of it.
+
+<Note>
+  The watchlist grew from 35 names to 80 in one change, and the funnel is why
+  that was affordable. Screening the whole list costs about $0.16; the bill
+  only moves for the names something is actually happening to. Widening a list
+  that had no screen in front of it would have been a 2.3× bill.
+</Note>
 
 <Warning>
   The screen cannot make the system trade more, only less. What it *can* do is

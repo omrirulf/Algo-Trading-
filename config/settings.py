@@ -46,7 +46,36 @@ MAX_POSITION_PCT: Final[float] = 0.05
 #: conservative. This number started as a guess and is now checked.
 MAX_BROAD_FUND_PCT: Final[float] = 0.12
 
-#: A fund tracking ONE commodity gets the tightest cap of the three, below
+#: A fund holding many companies, all in ONE sector or ONE country.
+#:
+#: The cap that makes it safe to widen the watchlist past a couple of index
+#: funds. A sector or country fund is diversified against a single company
+#: failing and against nothing else -- XLE is twenty-three ways of being long
+#: the oil price, and a Brazil fund is one currency, one central bank and one
+#: election. Sizing it like a fund that spans the world would repeat, one
+#: level up, the error the commodity cap exists to avoid: reading the cap off
+#: the word "fund" rather than off the risk.
+#:
+#: Above the single-name cap because a sector cannot go to zero on a fraud;
+#: below the broad-fund cap because one sector is one bet. Positioned by the
+#: same arithmetic as the others -- risk per trade is roughly
+#: ``cap / volatility``, so the cap that carries no more risk than 5% on a
+#: single name is ``5% x single_name_vol / focused_vol``.
+#:
+#: PROVISIONAL at 8% pending the first measurement over the new tickers.
+#: ``backtest/verify_tickers.py`` reports median daily volatility by kind, and
+#: the `market checks` workflow runs it. If focused funds measure near the
+#: broad-fund figure this is too tight; if they measure near a single name it
+#: is too loose. Either way the number below should be replaced by a measured
+#: one with a date on it, the way MAX_BROAD_FUND_PCT and
+#: MAX_COMMODITY_FUND_PCT already are.
+#:
+#: The exposure-group ceiling is what actually bounds this sleeve in
+#: aggregate: eleven developed-country funds at this cap is 88% of the
+#: account on paper and 25% in practice, because they share one group.
+MAX_FOCUSED_FUND_PCT: Final[float] = 0.08
+
+#: A fund tracking ONE commodity gets the tightest cap of the four, below
 #: even a single name. "Fund" does no diversification work here -- coffee is
 #: one thing -- and three risks pile on top that no equity carries: roll decay
 #: in contango (USO being the notorious case), issuer credit risk on the ETNs,

@@ -38,11 +38,13 @@ def max_position_pct_for(ticker: str) -> float:
     say: ``LLMSignal`` carries no instrument field, and if it did, a model
     could enlarge its own position cap by claiming a name was a fund. An
     unrecognised ticker gets the single-name cap, which is never the largest
-    of the three.
+    of the four.
     """
     kind = kind_for(ticker)
     if kind is InstrumentKind.BROAD_FUND:
         return cfg.MAX_BROAD_FUND_PCT
+    if kind is InstrumentKind.FOCUSED_FUND:
+        return cfg.MAX_FOCUSED_FUND_PCT
     if kind is InstrumentKind.COMMODITY_FUND:
         return cfg.MAX_COMMODITY_FUND_PCT
     return cfg.MAX_POSITION_PCT

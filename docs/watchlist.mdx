@@ -1,6 +1,6 @@
 ---
 title: "Watchlist"
-description: "Three instrument kinds, three position caps, and three portfolio limits"
+description: "Four instrument kinds, four position caps, and three portfolio limits"
 ---
 
 What gets traded lives in `config/instruments.py`, version-controlled rather
@@ -35,21 +35,82 @@ only ones where all five prompt dimensions have content.
   directly.
 </Note>
 
-## Sleeve 2a — broad funds (10)
+## Sleeve 2a — broad funds (14)
+
+A fund belongs here only if its holdings span **sectors, countries or
+issuers**. One that holds a hundred companies inside a single sector, or a
+single country, is a focused fund below and gets a smaller cap for it.
 
 | Role | Tickers |
 |---|---|
 | US broad equity | RSP, IWM |
-| International equity | VGK, EWJ, VWO, EIS |
-| Real estate | VNQ |
-| Duration | TLT |
+| International equity | VGK, VWO |
+| Duration | SHY, IEF, TLT, TIP |
+| Credit | LQD, HYG, EMB |
 | Broad commodities | DBC, DBA |
+| Currency | UUP |
 
 `RSP` rather than `SPY`: a cap-weighted US index is a concentrated technology
 bet wearing a diversified label. Equal weight is the diversified version of
 the same market.
 
-## Sleeve 2b — the goods themselves (10)
+**Rates are no longer one point on the curve.** `TLT` alone made every rate
+story a bet on the long end. `SHY` is a cash proxy, `IEF` the belly, `TIP`
+prices inflation rather than growth — and credit is kept out of that group
+entirely, because `HYG` sells off with equities while government paper
+rallies. Netting those two into one number would have hidden both.
+
+`UUP` is here because almost everything else on this list is priced in
+dollars, so the dollar is a factor inside all of them and otherwise
+unobservable.
+
+## Sleeve 2b — focused funds (41)
+
+One sector, or one country. **This is the sleeve that makes the watchlist
+worth reading.** With only `RSP` and `IWM`, the strongest thing the model
+could say was "US equities up" — macro timing, the hardest call on the list.
+A rate cut, an oil shock, a drug approval or an election is a *sector* or a
+*country* story, and until this sleeve existed there was nowhere for such a
+story to land.
+
+| Role | Tickers |
+|---|---|
+| Energy | XLE |
+| Financials | XLF, KRE |
+| Health care | XLV, XBI |
+| Technology | XLK, XLC, SMH, IGV |
+| Industrials | XLI, ITA, IYT |
+| Consumer | XLY, XLP |
+| Utilities | XLU |
+| Materials | XLB |
+| Real estate | VNQ, XHB |
+| Miners | GDX |
+| Developed countries | EWJ, EIS, EWU, EWG, EWL, EWN, EWI, EWP, EWD, EWC, EWA |
+| Emerging countries | MCHI, INDA, EWY, EWT, EWZ, EWW, KSA, TUR, EZA, EPOL, ARGT |
+
+<Warning>
+  **A sector fund is diversified against one company failing and against
+  nothing else.** `XLE` is twenty-three different ways of being long the oil
+  price. A country fund is one currency, one central bank and one government.
+  Sizing either like a fund that spans the world would repeat, one level up,
+  the error the commodity cap exists to avoid — reading a cap off the word
+  "fund" rather than off the risk.
+</Warning>
+
+Two holdings moved *down* a tier when this sleeve was created: `EWJ` and
+`EIS` were broad funds at 12%, and `VNQ` with them. Japan is one country and
+real estate is one sector; neither is a whole market.
+
+<Note>
+  **Overlap with the broad sleeve is deliberate and is not double counting.**
+  `RSP` already contains every US sector, so a sector position is a *tilt* on
+  top of the market. What stops the tilt and the single names beneath it
+  adding up to one undiversified bet is the exposure group — see below, where
+  `XLK`, `SMH`, `IGV`, `XLC`, `MSFT`, `NVDA`, `ASML` and `GOOGL` all share
+  one 25% ceiling.
+</Note>
+
+## Sleeve 2c — the goods themselves (9)
 
 | Role | Tickers |
 |---|---|
@@ -96,17 +157,29 @@ trades on a US exchange, not choices.
   exposure now comes through `DBA`, whose basket includes it.
 </Note>
 
-## Three kinds, three caps
+## Four kinds, four caps
 
 | Kind | Cap | Why |
 |---|---|---|
 | Single name | 5% | One company, idiosyncratic: it can gap on a fraud or a failed trial. |
-| Broad fund | 12% | Hundreds of positions. Its tail is truncated in a way a company's is not. |
+| Broad fund | 12% | Hundreds of positions across sectors, countries or issuers. Its tail is truncated in a way a company's is not. |
+| **Focused fund** | **8%** | One sector or one country. Above a single name because a sector cannot go to zero on a fraud; below a broad fund because one sector is one bet. |
 | Single-commodity fund | 4% | "Fund" does no diversification work — coffee is one thing — plus roll decay, issuer risk and thin volume. |
 
 The ordering is the point: **the tightest cap belongs to the commodity funds,
 not the stocks.** Sizing a coffee ETN like `RSP` because both are technically
-ETFs would be picking a cap by label rather than by risk.
+ETFs would be picking a cap by label rather than by risk — and the focused
+tier exists so that widening the list from ten funds to fifty-five did not
+have to repeat that mistake one level up.
+
+<Warning>
+  **8% is provisional.** The other two caps carry a measured date; this one
+  does not yet. `backtest/verify_tickers.py` reports median daily volatility
+  per kind and the `market checks` workflow runs it — if focused funds measure
+  near the broad-fund figure, 8% is too tight; near a single name, too loose.
+  Either way the number should be replaced by a measured one with a date on
+  it, the way the two below already are.
+</Warning>
 
 ### What the real data said about these caps
 
@@ -144,7 +217,7 @@ per-ticker cap satisfied.
 
 | Limit | Value | What it stops |
 |---|---|---|
-| Exposure group | 25% | A one-bet book. Spans both sleeves, so XOM + `USO` + `UNG` is one energy bet made three times. |
+| Exposure group | 25% | A one-bet book. Spans every sleeve, so XOM + `XLE` + `USO` + `UNG` is one energy bet made four times. |
 | Single-name sleeve | 25% | Stock picking growing past its budget. |
 | Fund sleeve | 70% | — the core allocation. |
 | Gross exposure | 95% | Leverage, and nothing else. |
@@ -166,13 +239,15 @@ A greedily-filled book, 100k account:
 12 positions across 6 exposure groups
 funds 74% of the book | names 26% | deployed 95% | cash 5%
 
-International equity  25%    Real estate  12%
-US broad equity       24%    Duration      9%
-Technology            20%    Financials    5%
+Developed international  25%    Real estate  12%
+US broad equity          24%    Duration      9%
+Technology               20%    Financials    5%
 ```
 
 No group exceeds 25%, and filling the book **requires** at least four of them:
-being fully invested and being concentrated are now incompatible.
+being fully invested and being concentrated are now incompatible. Twenty
+exposure groups now exist rather than fourteen, so the four are easier to
+find — but none of them got bigger.
 
 ## The instrument kind is a privilege boundary
 
@@ -183,9 +258,9 @@ enlarge its own position by claiming one.
 - The kind resolves from `config/instruments.py`, keyed on the ticker.
 - `LLMSignal` has no field that could carry one, and `extra="forbid"` turns an
   invented one into a validation error before any execution logic runs.
-- An unrecognised ticker resolves to `EQUITY` — never the largest cap — so a
-  misspelling can only size down. It also lands in its own exposure group, so
-  it cannot consume another group's room.
+- An unrecognised ticker resolves to `EQUITY` — never the largest cap, and
+  never the focused one either — so a misspelling can only size down. It also
+  lands in its own exposure group, so it cannot consume another group's room.
 - CI invariants enforce the schema stays closed, the fund caps are readable
   only where defined and applied, and all three portfolio limits reach the
   execution path.
@@ -211,17 +286,30 @@ question and sets a higher bar for a non-neutral call.
 
 ## Cost
 
-| Watchlist size | Rough Claude spend / month |
+`estimated_monthly_cost_usd()` prices **every** ticker through the full model,
+which is what the list would cost with the [funnel](/orchestrator/llm) off:
+
+| Watchlist size | Full model on every ticker |
 |---|---|
-| 12 | ~$83 |
-| 24 | ~$166 |
-| **35 (default)** | **~$242** |
+| 35 | ~$242 |
+| **80 (default)** | **~$553** |
+
+That is the ceiling, not the bill. The funnel screens each ticker with a model
+that costs about a tenth as much and stops there unless something is
+happening, and the first live cycle measured **$0.25–0.40 for 35 tickers** —
+so 80 comes to roughly **$0.60–0.90 a cycle, $13–19 a month**.
 
 <Warning>
-  Estimates, and the assumed output length is the whole uncertainty in them.
-  Once real cycles exist the journal carries measured `usage` blocks — use
-  those instead, and see [Cost](/cost).
+  Both figures rest on an assumed output length. The journal records measured
+  `usage` on every call — use that instead, and see [Cost](/cost).
 </Warning>
+
+<Note>
+  Time, not just money: a cycle costs roughly 24 seconds a ticker, so 80 names
+  is a ~32-minute run. The heartbeat workflow's timeout was raised from 15
+  minutes to 45 with this change — at 15 it would have been killed mid-run,
+  after paying for every call it had already made.
+</Note>
 
 ## Overriding it
 

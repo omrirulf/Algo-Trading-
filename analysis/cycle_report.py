@@ -73,13 +73,15 @@ SCORE_SECTIONS = (
 SLEEVE_ORDER = (
     InstrumentKind.EQUITY,
     InstrumentKind.BROAD_FUND,
+    InstrumentKind.FOCUSED_FUND,
     InstrumentKind.COMMODITY_FUND,
 )
 
 #: The heading each sleeve gets. Plural, because it heads a list.
 SLEEVE_HEADINGS: dict[InstrumentKind, str] = {
     InstrumentKind.EQUITY: "Companies",
-    InstrumentKind.BROAD_FUND: "Index funds",
+    InstrumentKind.BROAD_FUND: "Whole-market funds",
+    InstrumentKind.FOCUSED_FUND: "Sector and country funds",
     InstrumentKind.COMMODITY_FUND: "Commodities",
 }
 
@@ -104,6 +106,7 @@ GLOSSARY = (
     ("Stop-loss", "An order that closes the position if the price moves too far the wrong way."),
     ("Insider", "A director or senior manager of the company. They have to report their own trades."),
     ("Index fund", "One fund that holds many shares at once, so it follows a whole market instead of one company."),
+    ("Sector or country fund", "A fund that holds many companies, but all of them in one industry or one country. Safer than one company, riskier than a whole-market fund."),
 )
 
 
