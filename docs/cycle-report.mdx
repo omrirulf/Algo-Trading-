@@ -80,6 +80,21 @@ Links are now kept — but deliberately *beside* the prompt line, in
 A cycle journalled before this existed still renders — it says so, and falls
 back to the plain headline text.
 
+### The link is Google's, not the publisher's
+
+Google's news results usually hand back their own redirect stub
+(`/goto?url=<encrypted blob>`) rather than the article's address, and the
+parser returns it with no origin — which makes it resolve against whatever
+page renders it, i.e. nowhere. The first live cycle stored 100 of 176 links
+in that shape.
+
+`news.absolute_url()` now gives every link an origin at parse time, and the
+report repairs older journal lines the same way on the way out. One click
+still lands on the story; the stub's payload is encrypted, so recovering the
+publisher's URL directly would cost an HTTP round trip per headline — 350 of
+them on a 35-ticker cycle — which is not a trade worth making for a link that
+already works.
+
 ## What it cannot tell you
 
 <Warning>
