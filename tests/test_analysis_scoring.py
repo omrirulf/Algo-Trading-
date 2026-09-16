@@ -37,6 +37,7 @@ class FakePrices:
 def journal_line(offset=0, hour=14, ticker="NVDA", bias="BULLISH", conviction=0.72, **scores):
     """One journal line, ``offset`` sessions into the fake price series."""
     stamp = datetime(2026, 3, 2, hour, tzinfo=timezone.utc) + timedelta(days=offset)
+    blend = scores.pop("blend", None)
     payload = {
         "ts_utc": stamp.isoformat(),
         "ticker": ticker,
@@ -51,6 +52,7 @@ def journal_line(offset=0, hour=14, ticker="NVDA", bias="BULLISH", conviction=0.
         },
         "outcome": {"http_status": 200, "status": "ACCEPTED"},
         "error": None,
+        "blend": blend,
     }
     return json.dumps(payload) + "\n"
 
@@ -238,3 +240,48 @@ def test_defaults_come_from_the_engines_own_settings():
     args = build_parser().parse_args([])
     assert args.floor == cfg.MIN_CONVICTION
     assert args.journal == cfg.SIGNAL_JOURNAL_PATH
+
+
+
+# --------------------------------------------------------------------------- #
+# The learned blend
+# --------------------------------------------------------------------------- #
+
+
+def test_the_blend_is_judged_on_neutral_lines_too_and_the_report_compares_policies(journal):
+    lines = [
+        journal_line(offset=d, blend={"mode": "shadow", "composite": 0.3, "level": "equal"})
+        for d in (0, 1, 2)
+    ]
+    lines.append(journal_line(
+        offset=3, bias="NEUTRAL", conviction=0.2, news=-0.5,
+        blend={"mode": "shadow", "composite": -0.2, "level": "ticker:NVDA"},
+    ))
+    read = read_journal(journal(lines))
+    run = build_run(read, FakePrices(), horizon=3, floor=0.6, today=date(2026, 4, 1))
+
+    assert len(run.signals) == 3          # directional only, as before
+    assert len(run.blend_signals) == 4    # the NEUTRAL line joins the blend's population
+
+    text = report.render(run)
+    section = text.split("Does the learned blend carry information?")[1]
+    for label in ("model conviction", "equal weights", "learned blend"):
+        assert label in section
+    assert "from fitted weights: 1; from the equal-weight fallback: 3" in section
+    assert "too few" in section
+
+    payload = as_json(run)
+    assert payload["blend"]["learned"]["n"] == 4
+    assert payload["blend"]["learned_fitted"] == 1
+    assert payload["blend"]["model"]["called"] == 3
+    assert payload["blend"]["equal"]["n"] == 4
+
+
+def test_lines_from_before_the_blend_existed_still_get_the_equal_weight_row(journal):
+    read = read_journal(journal([journal_line(offset=d) for d in (0, 1, 2)]))
+    run = build_run(read, FakePrices(), horizon=3, floor=0.6, today=date(2026, 4, 1))
+    payload = as_json(run)
+    assert payload["blend"]["learned"]["n"] == 0
+    assert payload["blend"]["equal"]["n"] == 3
+    assert payload["blend"]["equal"]["hit_rate"] == 1.0   # rising prices, bullish scores
+    assert "Does the learned blend carry information?" in report.render(run)

@@ -41,6 +41,7 @@ def render(run: ScoringRun) -> str:
         _coverage(run),
         _conviction(run),
         _dimensions(run),
+        _blend(run),
         _agreement(run),
         _drift(run),
         _health(run),
@@ -147,6 +148,72 @@ def _dimensions(run: ScoringRun) -> str:
     if max((c.n for c in correlations.values()), default=0) < MIN_SAMPLE:
         lines.append("")
         lines.append(_thin(max((c.n for c in correlations.values()), default=0)))
+    return "\n".join(lines)
+
+
+def _blend(run: ScoringRun) -> str:
+    if not run.blend_signals:
+        return ""
+    comparison = metrics.blend_comparison(run.blend_signals)
+    lines = [
+        _rule("Does the learned blend carry information?"),
+        "The five scores blended into one, against the ticker's raw forward return.",
+        "Every line with a signal and a score counts here, NEUTRAL included: the",
+        "blend takes a side on those too. 'learned blend' is the composite as it",
+        "was journalled, with whatever weights that cycle had -- the walk-forward",
+        "record, never a refit that has seen the return it is judged on.",
+        "",
+        f"{'policy':<18}{'n':>5}{'called':>8}{'rank corr':>14}{'hit rate':>10}",
+    ]
+    for check in (comparison.model, comparison.equal, comparison.learned):
+        lines.append(
+            f"{check.label:<18}{check.n:>5}{check.called:>8}"
+            f"{_rho(check.rank_corr, show_n=False):>14}{_pct(check.hit_rate):>10}"
+        )
+    learned = comparison.learned
+    if learned.n:
+        fallback = learned.n - comparison.learned_fitted
+        lines.append(
+            f"  learned composites from fitted weights: {comparison.learned_fitted}; "
+            f"from the equal-weight fallback: {fallback}"
+        )
+    if comparison.disagreements:
+        lines += [
+            "",
+            f"  model and blend called opposite directions  n={comparison.disagreements:<5} "
+            f"model hit {_pct(comparison.model_hit_rate_when_disagreeing)}  "
+            f"blend hit {_pct(comparison.blend_hit_rate_when_disagreeing)}",
+        ]
+    lines.append("")
+    if learned.n == 0:
+        lines.append(
+            "  no line carries a learned composite yet; the equal-weight row is the "
+            "floor the fitted weights have to clear"
+        )
+        return "\n".join(lines)
+    if learned.n < MIN_SAMPLE:
+        lines.append(_thin(learned.n))
+        return "\n".join(lines)
+    model_rho = comparison.model.rank_corr.rho
+    equal_rho = comparison.equal.rank_corr.rho
+    learned_rho = learned.rank_corr.rho
+    if learned_rho is None or model_rho is None:
+        lines.append("  a rank correlation is undefined for one policy; no verdict")
+    elif learned_rho > model_rho and (equal_rho is None or learned_rho > equal_rho):
+        lines.append(
+            "  the learned blend carries more information than the model's conviction "
+            "and than equal weights"
+        )
+    elif learned_rho > model_rho:
+        lines.append(
+            "  the learned blend beats the model's conviction but not equal weights -- "
+            "the fitted weights are not yet earning their keep"
+        )
+    else:
+        lines.append(
+            "  the model's conviction still carries more information than the learned "
+            "blend -- keep it in shadow"
+        )
     return "\n".join(lines)
 
 

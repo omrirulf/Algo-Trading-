@@ -271,6 +271,101 @@ def agreement_check(entries: Sequence[JournalEntry]) -> AgreementCheck:
     )
 
 
+@dataclass(frozen=True)
+class PolicyCheck:
+    """One way of turning a line into a directional number, against what followed."""
+
+    label: str
+    #: Lines the policy could be evaluated on.
+    n: int
+    #: Of which it took a side (a non-zero value).
+    called: int
+    #: The policy's value against the ticker's raw forward return, over ``n``.
+    rank_corr: Correlation
+    #: Share of the lines it called whose direction was right.
+    hit_rate: Optional[float]
+
+
+@dataclass(frozen=True)
+class BlendComparison:
+    """The learned blend beside the two things it has to beat."""
+
+    model: PolicyCheck
+    equal: PolicyCheck
+    learned: PolicyCheck
+    #: Learned composites that came from a fitted level rather than the
+    #: equal-weight fallback a cycle uses while nothing has been learned.
+    learned_fitted: int
+    #: Lines where the model and the learned blend called opposite directions.
+    disagreements: int
+    model_hit_rate_when_disagreeing: Optional[float]
+    blend_hit_rate_when_disagreeing: Optional[float]
+
+
+def policy_check(label: str, pairs: Sequence[tuple[float, float]]) -> PolicyCheck:
+    """``pairs`` are (policy value, raw forward return)."""
+    called = [(value, ret) for value, ret in pairs if _sign(value) != 0]
+    hits = [_sign(value) * ret > 0 for value, ret in called]
+    return PolicyCheck(
+        label=label,
+        n=len(pairs),
+        called=len(called),
+        rank_corr=spearman([p[0] for p in pairs], [p[1] for p in pairs]),
+        hit_rate=(sum(hits) / len(hits)) if hits else None,
+    )
+
+
+def blend_comparison(signals: Sequence[ScoredSignal]) -> BlendComparison:
+    """Does the blend carry information, and more of it than the model's own conviction?
+
+    Three policies over the same lines. The model's is its conviction signed
+    by its bias, zero on NEUTRAL. Equal weights is the plain average of the
+    scores, recomputed here so lines from before the blend existed count.
+    The learned blend is the composite as journalled: whatever weights that
+    cycle had, applied at the time -- the honest walk-forward record, never
+    a refit that has seen the return it is judged on.
+    """
+    from analysis import blend as blending  # local: keeps analysis.blend importable on its own
+
+    model_pairs: list[tuple[float, float]] = []
+    equal_pairs: list[tuple[float, float]] = []
+    learned_pairs: list[tuple[float, float]] = []
+    fitted = 0
+    disagreements: list[tuple[bool, bool]] = []
+
+    for signal in signals:
+        entry = signal.entry
+        ret = signal.raw_return
+        model_value = entry.direction * (entry.conviction or 0.0)
+        model_pairs.append((model_value, ret))
+        equal = blending.composite(entry.scores, blending.EQUAL_WEIGHTS)
+        if equal is not None:
+            equal_pairs.append((equal.value, ret))
+        learned = entry.composite
+        if learned is None:
+            continue
+        learned_pairs.append((learned, ret))
+        if entry.blend.get("level") not in (None, blending.EQUAL_KEY):
+            fitted += 1
+        if _sign(model_value) != 0 and _sign(learned) != 0 and _sign(model_value) != _sign(learned):
+            disagreements.append((_sign(model_value) * ret > 0, _sign(learned) * ret > 0))
+
+    def rate(index: int) -> Optional[float]:
+        if not disagreements:
+            return None
+        return sum(pair[index] for pair in disagreements) / len(disagreements)
+
+    return BlendComparison(
+        model=policy_check("model conviction", model_pairs),
+        equal=policy_check("equal weights", equal_pairs),
+        learned=policy_check("learned blend", learned_pairs),
+        learned_fitted=fitted,
+        disagreements=len(disagreements),
+        model_hit_rate_when_disagreeing=rate(0),
+        blend_hit_rate_when_disagreeing=rate(1),
+    )
+
+
 def conviction_drift(entries: Sequence[JournalEntry], floor: float) -> Drift:
     """Is conviction creeping up until the floor stops filtering anything?"""
     dated = sorted(
