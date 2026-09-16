@@ -22,6 +22,23 @@ rather than modelled. It needs no key, only two price histories this project
 already knows how to fetch, and it works for a basket like DBC where no
 single pair of contracts would.
 
+The reference has a limit of its own, and it is the reason for the band
+below. Yahoo's ``CL=F`` and friends are *continuous front-month* series: at
+each contract change the quoted price becomes the next contract's, and where
+the two differ the series steps without anyone having gained or lost. Gold
+suggests this is small -- GLD measured against ``GC=F`` came back at -0.1% a
+year, which is about its fee and could not happen if the steps were large.
+Crude did not: USO against ``CL=F`` measured **+55.9% a year**, a roll yield
+at the very edge of what deep backwardation can produce and equally
+consistent with the reference stepping down at every roll.
+
+Faced with a number that could be either, this module does what the rest of
+the project does with a number it cannot corroborate: it does not show it.
+Past ``MAX_CREDIBLE_DRAG_PCT`` the section is omitted and the prompt is
+shorter. A drag of 15% a year on a grain fund is ordinary and survives; a
+claimed 56% gain does not, because being wrong about that one would be worse
+than saying nothing about it.
+
 Three honest limits, all stated in the prompt:
 
 * **It is backward-looking.** A fund that bled 8% a year to contango will
@@ -73,6 +90,16 @@ FLAT_DRAG_PCT = 1.0
 #: Past this a yearly drag is severe enough to name. USO has spent whole years
 #: beyond it.
 HEAVY_DRAG_PCT = 5.0
+
+#: Past this, annualised, the figure is not credible as a roll yield and is
+#: at least as likely to be an artefact of the reference series stepping at
+#: contract changes. The section is omitted rather than shown: see the module
+#: docstring for the USO reading that set this.
+#:
+#: Wide on purpose. Real carry on a grain or gas fund reaches the high teens
+#: and should survive; the band is here to catch the impossible, not to
+#: flatten the merely dramatic.
+MAX_CREDIBLE_DRAG_PCT = 25.0
 
 #: Both histories must overlap by at least this many days for the shortest
 #: window to mean anything.
@@ -210,6 +237,12 @@ def build_snapshot(
     if not windows:
         return None
 
+    # The headline is what the model reads first and what it would carry into
+    # a decision. If that cannot be believed, none of it can.
+    headline = windows[-1].annualised_pct
+    if headline is None or abs(headline) > MAX_CREDIBLE_DRAG_PCT:
+        return None
+
     return CarrySnapshot(ticker=ticker.strip().upper(), commodity=name, windows=windows)
 
 
@@ -222,4 +255,5 @@ __all__ = [
     "WINDOWS",
     "FLAT_DRAG_PCT",
     "HEAVY_DRAG_PCT",
+    "MAX_CREDIBLE_DRAG_PCT",
 ]

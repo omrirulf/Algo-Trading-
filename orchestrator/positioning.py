@@ -24,6 +24,16 @@ Three numbers go into the prompt, because the level alone is not a signal:
 
 Two honest limits, stated in the prompt itself:
 
+* A contract that stopped reporting is worse than one that never reported.
+  The live audit found TLT matching a market whose most recent row is dated
+  **February 2022** -- four and a half years old, printed as "positions as of"
+  with no hint that it was not this week's. A series whose *newest* row is
+  older than ``MAX_REPORT_AGE_DAYS`` is therefore treated as dead and the
+  section omitted, which is the only honest reading of a contract that has
+  been renamed or delisted. Judged on the newest row rather than row by row:
+  dropping every old row would leave a month of history and destroy the
+  52-week percentile, which is most of what this block is for.
+
 * The data is **as of Tuesday, published Friday**, so it is three to six days
   stale by the time a cycle reads it. That is the dataset, not a bug.
 * Positioning is a **crowding measure, not a forecast**. The prompt says so,
@@ -38,6 +48,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import asdict, dataclass
+from datetime import date
 from typing import Any, Iterable, Optional, Sequence
 
 from orchestrator import formatting as fmt
@@ -55,6 +66,12 @@ FINANCIAL = "gpe5-46if"
 #: Weeks of history pulled, for the percentile. A year plus a margin, so a
 #: missing week or two still leaves a full 52 to rank against.
 HISTORY_WEEKS = 60
+
+#: How old the newest report may be before the series is treated as dead.
+#: The CFTC publishes weekly, so a month covers a holiday and a late release;
+#: past that the contract has been renamed or delisted and its last reading is
+#: history rather than positioning.
+MAX_REPORT_AGE_DAYS = 31
 
 #: Below this many weeks the percentile is not reported rather than computed
 #: from a handful of points and quietly believed.
@@ -195,6 +212,32 @@ class PositioningSnapshot:
         ]
 
 
+def report_date(row: dict) -> Optional[date]:
+    """The date a row was reported for, or ``None`` if it has none."""
+    raw = _field(row, "date")
+    if raw is None:
+        return None
+    text = str(raw).strip()[:10]
+    try:
+        return date.fromisoformat(text)
+    except ValueError:
+        return None
+
+
+def _series_is_live(rows: Sequence[dict], today: Optional[date] = None) -> bool:
+    """Whether this contract is still reporting, judged on its newest row.
+
+    A series with no readable date anywhere is treated as live: the CFTC's two
+    datasets spell their date column differently, and refusing every series
+    over a spelling would silently empty sections that are working. Only a
+    newest date that is *readable and old* disqualifies.
+    """
+    stamps = [stamp for stamp in (report_date(row) for row in rows) if stamp]
+    if not stamps:
+        return True
+    return ((today or date.today()) - max(stamps)).days <= MAX_REPORT_AGE_DAYS
+
+
 def build_snapshot(ticker: str, rows: Sequence[dict]) -> Optional[PositioningSnapshot]:
     """Parse weekly CFTC rows, newest first, into one snapshot.
 
@@ -203,6 +246,13 @@ def build_snapshot(ticker: str, rows: Sequence[dict]) -> Optional[PositioningSna
     """
     contract = contract_for(ticker)
     if contract is None or not rows:
+        return None
+
+    # Judged on the newest row, not row by row. Filtering every old row would
+    # leave five weeks of history and destroy the 52-week percentile, which is
+    # most of what this block is for: the question is whether the *series* is
+    # still reporting, and its newest row is the only thing that answers it.
+    if not _series_is_live(rows):
         return None
 
     shares = [net_share(row) for row in rows]
@@ -260,6 +310,8 @@ __all__ = [
     "contract_for",
     "build_snapshot",
     "fetch_rows",
+    "report_date",
+    "MAX_REPORT_AGE_DAYS",
     "net_share",
     "percentile",
     "BASE_URL",

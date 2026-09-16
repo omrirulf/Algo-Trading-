@@ -27,9 +27,14 @@ def flat(price, n=DAYS):
 
 
 def bleeding(start, yearly_pct, n=DAYS):
-    """A fund losing ``yearly_pct`` a year against a flat commodity."""
-    daily = yearly_pct / 100.0 / 252.0
-    return hist([start * (1 + daily) ** i for i in range(n)])
+    """A fund whose return over a 252-day year is exactly ``yearly_pct``.
+
+    Compounded from the exact yearly figure rather than from a daily slice of
+    it: a naive ``yearly/252`` drifts by a couple of points over the window,
+    which is enough to make a boundary test measure the helper.
+    """
+    daily = (1.0 + yearly_pct / 100.0) ** (1.0 / 252.0)
+    return hist([start * daily ** i for i in range(n)])
 
 
 # --- who gets this section ----------------------------------------------------
@@ -173,3 +178,43 @@ def test_the_block_reaches_the_journal():
     record = carry.build_snapshot("USO", bleeding(100.0, -9.0), flat(70.0)).as_dict()
     assert record["commodity"] == "crude oil"
     assert len(record["windows"]) == 3
+
+
+# --- the reading the live audit could not corroborate --------------------------
+#
+# Yahoo's `CL=F` and friends are continuous front-month series: at each
+# contract change the quoted price becomes the next contract's, and where the
+# two differ the series steps without anyone gaining or losing.
+#
+# Gold suggests the steps are small -- GLD against `GC=F` measured -0.1% a
+# year, about its fee, which could not happen if they were large. Crude did
+# not: USO against `CL=F` measured +55.9% a year, which is at the very edge of
+# what deep backwardation produces and equally consistent with an artefact.
+#
+# A number that could be either does not go in front of the model.
+
+
+def test_the_uso_reading_that_set_this_band_is_suppressed():
+    snapshot = carry.build_snapshot("USO", bleeding(100.0, +56.0), flat(70.0))
+    assert snapshot is None
+
+
+@pytest.mark.parametrize("yearly", [-40.0, -26.0, 26.0, 60.0, 300.0])
+def test_an_incredible_carry_is_no_section_rather_than_a_dramatic_one(yearly):
+    assert carry.build_snapshot("USO", bleeding(100.0, yearly), flat(70.0)) is None
+
+
+@pytest.mark.parametrize("yearly", [-24.0, -15.0, -0.4, 0.0, 5.0, 24.0])
+def test_an_ordinary_carry_survives_because_the_band_catches_the_impossible(yearly):
+    """Real carry on a grain or gas fund reaches the high teens. The band is
+    here to catch what cannot be true, not to flatten what is merely large."""
+    snapshot = carry.build_snapshot("CORN", bleeding(100.0, yearly), flat(70.0))
+    assert snapshot is not None
+    assert snapshot.headline.annualised_pct == pytest.approx(yearly, abs=1.5)
+
+
+def test_the_band_is_judged_on_the_headline_the_model_reads_first():
+    """A wild quarter inside a believable year is the year's story; a wild
+    year is not rescued by a calm quarter."""
+    assert carry.build_snapshot("GLD", bleeding(200.0, -0.4), flat(2000.0)) is not None
+    assert carry.build_snapshot("GLD", bleeding(200.0, -80.0), flat(2000.0)) is None

@@ -12,6 +12,8 @@ allowed to say nothing: an unmapped ticker and an empty response.
 
 from __future__ import annotations
 
+from datetime import date, timedelta
+
 import httpx
 import pytest
 
@@ -192,3 +194,69 @@ def test_a_refusal_raises_so_the_caller_records_a_gap():
     client = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(503, text="down")))
     with pytest.raises(httpx.HTTPStatusError):
         pos.fetch_rows("GLD", client=client)
+
+
+# --- the contract that stopped reporting in 2022 -------------------------------
+#
+# The live audit found TLT matching a market whose most recent row is dated
+# February 2022 -- four and a half years old, printed as "positions as of"
+# with nothing to say it was not this week's. A discontinued series is worse
+# than a missing one: it reads as current.
+
+def dated(day, net=1000, oi=100000):
+    return {
+        "report_date_as_yyyy_mm_dd": day.isoformat(),
+        "open_interest_all": str(oi),
+        "m_money_positions_long_all": str(5000 + net),
+        "m_money_positions_short_all": "5000",
+    }
+
+
+def weekly(weeks, end=None):
+    end = end or date.today()
+    return [dated(end - timedelta(days=7 * i)) for i in range(weeks)]
+
+
+def test_a_current_series_is_read_normally():
+    assert pos.build_snapshot("CORN", weekly(30)) is not None
+
+
+def test_the_series_that_stopped_in_2022_is_dropped_rather_than_shown():
+    stale = weekly(30, end=date(2022, 2, 1))
+    assert pos.build_snapshot("TLT", stale) is None
+
+
+@pytest.mark.parametrize("days_old,kept", [
+    (0, True), (7, True), (28, True),
+    (pos.MAX_REPORT_AGE_DAYS, True),
+    (pos.MAX_REPORT_AGE_DAYS + 1, False),
+    (120, False), (1600, False),
+])
+def test_the_boundary_is_where_the_constant_says_it_is(days_old, kept):
+    rows = weekly(30, end=date.today() - timedelta(days=days_old))
+    assert (pos.build_snapshot("CORN", rows) is not None) is kept
+
+
+def test_a_live_series_keeps_its_whole_history_for_the_percentile():
+    """The guard judges the series on its newest row. Filtering row by row
+    would leave five weeks and destroy the 52-week percentile, which is most
+    of what this block is for."""
+    snapshot = pos.build_snapshot("CORN", weekly(60))
+    assert snapshot is not None
+    assert snapshot.weeks_of_history == 60
+    assert snapshot.year_percentile is not None
+
+
+def test_a_row_with_no_readable_date_is_kept():
+    """The two CFTC datasets spell their date column differently. Dropping
+    every row over a spelling would silently empty a working section, so only
+    a date that is readable *and* old disqualifies."""
+    rows = [{"open_interest_all": "100000",
+             "m_money_positions_long_all": "6000",
+             "m_money_positions_short_all": "5000"}] * 30
+    assert pos.build_snapshot("CORN", rows) is not None
+
+
+@pytest.mark.parametrize("raw", ["", "not-a-date", "2026-13-45", None, 17])
+def test_an_unparseable_date_does_not_raise(raw):
+    assert pos.report_date({"report_date_as_yyyy_mm_dd": raw}) is None
