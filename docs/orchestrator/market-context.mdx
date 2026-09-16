@@ -69,6 +69,84 @@ per-request cost.**
   </Accordion>
 </AccordionGroup>
 
+## Each kind of ticker is asked the question that fits it
+
+For a long time every ticker was handed the *company* form. A fund has no
+sector, no market cap, no profit margin and no earnings date, so an index's
+`FUNDAMENTALS` block rendered as seven lines of `n/a` — and occasionally as
+something worse. The first 80-ticker cycle showed the model a **forward P/E
+of −4,036.25** for a Treasury bond fund, and the model scored that fund's
+fundamentals −0.1.
+
+Two sections now replace it, chosen by `kind_for()`:
+
+| Slot | Company | Sector / country fund | Bond fund | Commodity |
+|---|---|---|---|---|
+| News | ✓ | ✓ | ✓ | ✓ |
+| Price and chart | ✓ | ✓ | ✓ | ✓ |
+| Numbers | `FUNDAMENTALS` | `FUND BASICS` — holdings P/E, P/B, growth, yield, cost, top names | `FUND BASICS` — yield, duration, maturity, credit quality | *absent* |
+| Analyst view | `ANALYST & INSTITUTIONAL VIEW` | — | — | — |
+| Informed money | `INSIDER ACTIVITY` | — | `POSITIONING` | `POSITIONING` |
+
+### `FUND BASICS` — three shapes, and one of them is silence
+
+`orchestrator/funds.py` builds an equity shape, a bond shape, or nothing at
+all. Gold has no valuation, no yield and no holdings; inventing a form for it
+would be the original mistake in a new costume, so `build_snapshot` returns
+`None` and the section is **omitted outright** rather than printed as blanks.
+
+A P/E outside `(0, 1000)` is suppressed as `n/a`. That is what stops another
+−4,036 reaching a prompt:
+
+<Warning>
+  **A number the model cannot use is worse than a stated blank, because it
+  looks usable.** yfinance reports a negative forward P/E for bond funds —
+  there are no earnings to divide by — and the model has no way to know the
+  figure is an artefact rather than a fact about the fund.
+</Warning>
+
+### `POSITIONING` — the fund world's answer to insider filings
+
+Nobody files a Form 4 on gold. But every large futures trader must report
+their position, and the **CFTC publishes the aggregate every Friday**, free
+and without a key. `orchestrator/positioning.py` maps 19 tickers to their
+dominant contract and carries three numbers into the prompt:
+
+```
+POSITIONING (CFTC, weekly)
+Contract: GOLD (positions as of 2026-09-15, published the following Friday)
+Large speculators: net long 40.0% of open interest (500,000 contracts)
+Change on the week: +0.2% of open interest
+Crowding: 100% percentile over 52 weeks -- a crowded long by the standards of the past year
+Read this as crowding, not as a forecast: an extreme is as often the end of a move as the middle of one.
+```
+
+The level alone is not a signal, which is why all three are there: direction
+and size, whether conviction is arriving or leaving, and how unusual it is
+against the past year. The prompt states both honest limits — the data is
+Tuesday's, published Friday, and positioning is a **crowding measure, not a
+forecast**.
+
+`DBC` and `DBA` are absent by design: a basket spanning a dozen contracts has
+no single position to report. So is every single-country fund — there is no
+future on Brazil-the-ETF.
+
+<Note>
+  **The company prompt did not move.** It is the input every
+  [replay](/historical-replay) and [sanity](/signal-sanity) baseline was
+  measured against, so a test asserts a single name's prompt still carries
+  exactly `NEWS`, `TECHNICALS`, `FUNDAMENTALS`, `ANALYST & INSTITUTIONAL
+  VIEW`, `INSIDER ACTIVITY` — and neither fund section, ever.
+</Note>
+
+### Absent is not the same as failed
+
+Both new sections are omitted when `None`, and that carries a precise
+meaning: *this kind of thing does not have one*. A fetch that was attempted
+and failed still records a named gap, so the two cases never blur. A
+commodity records no fund-basics gap because nothing was asked for; a sector
+fund whose holdings fetch times out records one, and the model is told.
+
 ## How the model is told to weigh them
 
 More data is only an improvement if it does not simply make the model more

@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 from typing import Any, Optional, Sequence
 
 from config.instruments import is_fund
-from orchestrator import analysts, fundamentals, insiders, technicals
+from orchestrator import analysts, fundamentals, funds, insiders, positioning, technicals
 from orchestrator.technicals import TechnicalSnapshot
 
 log = logging.getLogger(__name__)
@@ -60,6 +60,10 @@ class RawMarketData:
     institutional_holders: Any = None
     insider_purchases: Any = None
     insider_transactions: Any = None
+    #: yfinance ``funds_data`` payloads, fetched only for funds.
+    fund_payloads: dict[str, Any] = field(default_factory=dict)
+    #: Weekly CFTC rows, newest first, for tickers with a futures contract.
+    positioning_rows: list[dict] = field(default_factory=list)
     gaps: list[str] = field(default_factory=list)
 
 
@@ -72,6 +76,8 @@ class _SlowData:
     institutional_holders: Any
     insider_purchases: Any
     insider_transactions: Any
+    fund_payloads: dict[str, Any]
+    positioning_rows: list[dict]
     gaps: list[str]
 
 
@@ -109,6 +115,8 @@ class YFinanceContextProvider:
             institutional_holders=slow.institutional_holders,
             insider_purchases=slow.insider_purchases,
             insider_transactions=slow.insider_transactions,
+            fund_payloads=slow.fund_payloads,
+            positioning_rows=slow.positioning_rows,
             gaps=history_gaps + slow.gaps,
         )
 
@@ -129,6 +137,8 @@ class YFinanceContextProvider:
         gaps: list[str] = []
         info = _attempt(lambda: dict(handle.info or {}), "company fundamentals", gaps) or {}
         slow = _SlowData(
+            fund_payloads=self._fund_payloads(handle, ticker, gaps),
+            positioning_rows=self._positioning_rows(ticker, gaps),
             info=info,
             calendar=_attempt(lambda: handle.calendar, "earnings calendar", gaps),
             recommendations=_attempt(
@@ -150,6 +160,36 @@ class YFinanceContextProvider:
         )
         self._cache[ticker] = (time.monotonic() + self._ttl, slow)
         return slow
+
+    @staticmethod
+    def _fund_payloads(handle: Any, ticker: str, gaps: list[str]) -> dict[str, Any]:
+        """yfinance's fund section, for funds that have one.
+
+        Skipped entirely for a single name and for a single-commodity fund:
+        neither has holdings, and asking would record a gap for something
+        that was never on offer.
+        """
+        if funds.fund_shape(ticker) == funds.NO_FUND_SECTION:
+            return {}
+        data = _attempt(lambda: handle.funds_data, "fund holdings", gaps)
+        if data is None:
+            return {}
+        payloads: dict[str, Any] = {}
+        for name in (
+            "equity_holdings", "bond_holdings", "fund_operations",
+            "fund_overview", "top_holdings", "sector_weightings",
+        ):
+            # Each property fetches separately inside yfinance, so one that
+            # 404s must not cost the others.
+            payloads[name] = _attempt(lambda n=name: getattr(data, n, None), f"fund {name}", gaps)
+        return payloads
+
+    @staticmethod
+    def _positioning_rows(ticker: str, gaps: list[str]) -> list[dict]:
+        """Weekly CFTC rows, for the tickers that track one futures contract."""
+        if positioning.contract_for(ticker) is None:
+            return []
+        return _attempt(lambda: positioning.fetch_rows(ticker), "CFTC positioning", gaps) or []
 
 
 #: Gaps go into the prompt. A stack of connection errors quoted in full costs
@@ -194,8 +234,10 @@ def get_provider() -> YFinanceContextProvider:
 ENRICHMENT_SECTIONS = (
     ("TECHNICALS (daily bars)", "technicals"),
     ("FUNDAMENTALS", "fundamentals"),
+    ("FUND BASICS", "funds"),
     ("ANALYST & INSTITUTIONAL VIEW", "analysts"),
     ("INSIDER ACTIVITY", "insiders"),
+    ("POSITIONING (CFTC, weekly)", "positioning"),
 )
 
 #: Sections that only exist for a company. A fund has no analysts publishing
@@ -204,7 +246,20 @@ ENRICHMENT_SECTIONS = (
 #: difference is not cosmetic: "we tried and failed" invites the model to
 #: wonder what it missed, while a section that was never there is simply not
 #: part of the question.
-SINGLE_NAME_ONLY_SECTIONS = frozenset({"analysts", "insiders"})
+#:
+#: ``fundamentals`` joined them when the fund sections below arrived. A fund
+#: was being handed the company form -- sector, market cap, profit margin,
+#: next earnings date -- which rendered as seven blanks and, for bond funds,
+#: occasionally as nonsense: the first 80-ticker cycle showed the model a
+#: forward P/E of -4,036 for a Treasury fund. Funds get ``funds`` instead.
+SINGLE_NAME_ONLY_SECTIONS = frozenset({"fundamentals", "analysts", "insiders"})
+
+#: The mirror image: sections that only exist for a fund. Both are omitted
+#: when absent rather than rendered as unavailable, because absent here means
+#: "this kind of thing does not have one" -- gold has no holdings to report,
+#: and a single-country fund has no futures contract. A fetch that was
+#: attempted and failed still records a gap, so the two cases stay distinct.
+FUND_ONLY_SECTIONS = frozenset({"funds", "positioning"})
 
 
 @dataclass(frozen=True)
@@ -222,6 +277,10 @@ class TickerContext:
     fundamentals: Optional[fundamentals.FundamentalSnapshot] = None
     analysts: Optional[analysts.AnalystSnapshot] = None
     insiders: Optional[insiders.InsiderSnapshot] = None
+    #: A fund's own numbers, in place of the company form.
+    funds: Optional[funds.FundSnapshot] = None
+    #: What the large speculators hold, for the tickers that track a future.
+    positioning: Optional[positioning.PositioningSnapshot] = None
     gaps: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict:
@@ -234,17 +293,26 @@ class TickerContext:
             "fundamentals": self.fundamentals.as_dict() if self.fundamentals else None,
             "analysts": self.analysts.as_dict() if self.analysts else None,
             "insiders": self.insiders.as_dict() if self.insiders else None,
+            "funds": self.funds.as_dict() if self.funds else None,
+            "positioning": self.positioning.as_dict() if self.positioning else None,
             "gaps": list(self.gaps),
         }
 
     def as_prompt(self) -> str:
         fund = is_fund(self.ticker)
         sections = [f"TICKER: {self.ticker}", self._news_section()]
-        sections.extend(
-            self._section(title, getattr(self, attribute))
-            for title, attribute in ENRICHMENT_SECTIONS
-            if not (fund and attribute in SINGLE_NAME_ONLY_SECTIONS)
-        )
+        for title, attribute in ENRICHMENT_SECTIONS:
+            if fund and attribute in SINGLE_NAME_ONLY_SECTIONS:
+                continue
+            if not fund and attribute in FUND_ONLY_SECTIONS:
+                continue
+            value = getattr(self, attribute)
+            if value is None and attribute in FUND_ONLY_SECTIONS:
+                # Never on offer for this ticker, or fetched and failed -- in
+                # which case a gap already says so. Either way, printing a
+                # form of blanks would be the thing this replaced.
+                continue
+            sections.append(self._section(title, value))
         if self.gaps:
             sections.append(
                 "DATA GAPS (score these dimensions 0.0 rather than guessing)\n"
@@ -301,9 +369,25 @@ def gather(
     # tell the model to score as 0.0 something that was never on offer.
     company = not is_fund(ticker)
 
+    fund_snapshot = None
+    if not company:
+        fund_snapshot = _attempt(
+            lambda: funds.build_snapshot(ticker, info=raw.info, **(raw.fund_payloads or {})),
+            "fund basics",
+            gaps,
+        )
+
+    positioning_snapshot = None
+    if raw.positioning_rows:
+        positioning_snapshot = _attempt(
+            lambda: positioning.build_snapshot(ticker, raw.positioning_rows),
+            "CFTC positioning",
+            gaps,
+        )
+
     fundamental_snapshot = None
     analyst_snapshot = None
-    if raw.info:
+    if raw.info and company:
         fundamental_snapshot = _attempt(
             lambda: fundamentals.build_snapshot(raw.info, raw.calendar),
             "fundamentals",
@@ -347,6 +431,8 @@ def gather(
         fundamentals=fundamental_snapshot,
         analysts=analyst_snapshot,
         insiders=insider_snapshot,
+        funds=fund_snapshot,
+        positioning=positioning_snapshot,
         gaps=gaps,
     )
 
