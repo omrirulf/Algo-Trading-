@@ -176,8 +176,8 @@ class YFinanceContextProvider:
             return {}
         payloads: dict[str, Any] = {}
         for name in (
-            "equity_holdings", "bond_holdings", "fund_operations",
-            "fund_overview", "top_holdings", "sector_weightings",
+            "equity_holdings", "bond_holdings", "bond_ratings", "fund_operations",
+            "fund_overview", "top_holdings", "sector_weightings", "asset_classes",
         ):
             # Each property fetches separately inside yfinance, so one that
             # 404s must not cost the others.
