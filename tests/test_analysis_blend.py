@@ -237,3 +237,58 @@ def test_the_payload_is_plain_json():
     text = json.dumps(artifact.to_dict())
     assert "ticker:NVDA" in text
     assert math.isfinite(json.loads(text)["levels"]["global"]["intercept"])
+
+
+
+# --- calibration -------------------------------------------------------------
+
+
+def test_too_few_composites_means_no_calibration():
+    points = [(0.1 * i, True, 1.0) for i in range(blend.MIN_CALIBRATION - 1)]
+    assert blend.fit_calibration(points) is None
+    assert blend.fit_calibration(points, minimum=5) is not None
+
+
+def test_the_calibration_only_rises_and_pools_a_violation():
+    # Weak composites right half the time, strong ones right nine times in ten,
+    # with one stretch in the middle that was wrong more often than the weak ones.
+    points = []
+    points += [(0.1, i % 2 == 0, 1.0) for i in range(20)]        # 50%
+    points += [(0.4, i % 5 == 0, 1.0) for i in range(20)]        # 20%: a violator
+    points += [(0.8, i % 10 != 0, 1.0) for i in range(20)]       # 90%
+    calibration = blend.fit_calibration(points)
+    assert calibration is not None and calibration.n == 60
+    probabilities = [p for _, p in calibration.knots]
+    assert probabilities == sorted(probabilities)
+    # The violator was pooled with the weak block: together they are 35% right.
+    assert calibration.probability(0.1) == pytest.approx(0.35)
+    assert calibration.probability(0.4) == pytest.approx(0.35)
+    assert calibration.probability(0.8) == pytest.approx(0.9)
+    # Flat beyond the ends, linear between knots, sign ignored.
+    assert calibration.probability(0.0) == pytest.approx(0.35)
+    assert calibration.probability(5.0) == pytest.approx(0.9)
+    assert calibration.probability(-0.8) == pytest.approx(0.9)
+    assert calibration.knots == ((0.1, pytest.approx(0.35)), (0.4, pytest.approx(0.35)), (0.8, pytest.approx(0.9)))
+    assert 0.35 < calibration.probability(0.6) < 0.9   # across the gap between blocks
+
+
+def test_decay_weights_shape_the_calibration():
+    old_wrong = [(0.5, False, 0.01) for _ in range(20)]
+    recent_right = [(0.5, True, 1.0) for _ in range(20)]
+    calibration = blend.fit_calibration(old_wrong + recent_right)
+    assert calibration is not None
+    assert calibration.probability(0.5) > 0.95
+
+
+def test_the_calibration_rides_the_artifact_round_trip():
+    artifact = fit_hierarchy(planted(30), model="m", horizon=3, as_of=TODAY)
+    assert artifact.calibration is None
+    with_calibration = blend.WeightsArtifact(**{
+        **{f: getattr(artifact, f) for f in ("model", "fitted_on", "trained_through", "horizon",
+                                               "half_life", "prior_strength", "ridge", "levels")},
+        "calibration": blend.Calibration(knots=((0.1, 0.5), (0.8, 0.9)), n=40),
+    })
+    back = WeightsArtifact.from_dict(with_calibration.to_dict())
+    assert back == with_calibration
+    assert back.calibration is not None and back.calibration.probability(0.8) == 0.9
+    assert back.digest() != artifact.digest()

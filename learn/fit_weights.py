@@ -28,12 +28,25 @@ Lines journalled before the prompt asked for null scores carry 0.0 for a
 dimension whose source failed. Where the gap list names that source and the
 score is exactly 0.0, it is read as null.
 
+The calibration
+---------------
+Beside the weights, a map from the composite's magnitude to how often that
+direction was right, fitted by isotonic regression on the composites the
+journal actually recorded -- whatever weights each cycle had, applied at the
+time -- and the returns that followed. That is the walk-forward record, so
+the calibration is honest by construction, and it is what turns a composite
+into a conviction the engine's floor could read. It needs twenty such
+composites before it is stored at all. Nothing in the cycle reads it yet:
+BLEND_MODE is shadow, and a mode that acts on the composite would read this
+map rather than invent its own.
+
 What comes out
 --------------
 One JSON file, written atomically, in the shape ``analysis.blend`` reads:
-the weights per level with their counts, the model, the horizon, the decay
-and the prior, and the date the decay was measured from. It is the only file
-this package writes, and the package has no order path; CI checks both.
+the weights per level with their counts, the calibration, the model, the
+horizon, the decay and the prior, and the date the decay was measured from.
+It is the only file this package writes, and the package has no order path;
+CI checks both.
 """
 
 from __future__ import annotations
@@ -44,7 +57,7 @@ import logging
 import os
 import sys
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Iterable, Mapping, Optional
@@ -121,6 +134,9 @@ class Prepared:
     observations: list[blend.Observation] = field(default_factory=list)
     #: Why lines were left out, by reason; ``used`` is the count that went in.
     statuses: Counter = field(default_factory=Counter)
+    #: ``(|journalled composite|, direction was right, decay weight)`` for
+    #: every line that carried a composite and has a return behind it.
+    calibration_points: list[tuple[float, bool, float]] = field(default_factory=list)
 
 
 def prepare(
@@ -131,6 +147,7 @@ def prepare(
     entry_rule: str = ENTRY_AUTO,
     model: str = MODEL,
     today: Optional[date] = None,
+    half_life: float = blend.DEFAULT_HALF_LIFE,
 ) -> Prepared:
     """Turn journal lines into observations the blend can fit."""
     today = today or datetime.now(timezone.utc).date()
@@ -174,9 +191,14 @@ def prepare(
             if not lookup.ok:
                 statuses[lookup.status] += 1
                 continue
-            target = lookup.value.pct / entry.atr_pct  # type: ignore[union-attr]
-            target = max(-WINSOR, min(WINSOR, target))
+            pct = lookup.value.pct  # type: ignore[union-attr]
+            target = max(-WINSOR, min(WINSOR, pct / entry.atr_pct))
             prepared.observations.append(blend.Observation(ticker, day, scores, target))
+            composite = entry.composite
+            if composite is not None and composite != 0.0:
+                prepared.calibration_points.append(
+                    (abs(composite), (composite > 0) == (pct > 0), blend.decay_weight(day, today, half_life))
+                )
 
     statuses["used"] = len(prepared.observations)
     return prepared
@@ -209,6 +231,14 @@ def render(artifact: blend.WeightsArtifact, prepared: Prepared) -> str:
         f"fitted {artifact.fitted_on}",
         f"observations used: {statuses['used']}" + (f" (left out: {skipped})" if skipped else ""),
     ]
+    if artifact.calibration is None:
+        lines.append(
+            f"calibration: none stored ({len(prepared.calibration_points)} journalled composites "
+            f"with a return, want {blend.MIN_CALIBRATION}+)"
+        )
+    else:
+        knots = ", ".join(f"|{m:.2f}|->{p:.0%}" for m, p in artifact.calibration.knots)
+        lines.append(f"calibration: n={artifact.calibration.n}, {knots}")
     if not artifact.levels:
         lines.append("no level fitted; every ticker blends with equal weights")
         return "\n".join(lines)
@@ -273,7 +303,8 @@ def main(argv: list[str] | None = None) -> int:
 
     today = datetime.now(timezone.utc).date()
     prepared = prepare(
-        read.entries, YFinancePriceSource(), horizon=args.horizon, entry_rule=args.entry, today=today
+        read.entries, YFinancePriceSource(), horizon=args.horizon, entry_rule=args.entry,
+        today=today, half_life=args.half_life,
     )
     artifact = blend.fit_hierarchy(
         prepared.observations,
@@ -283,6 +314,7 @@ def main(argv: list[str] | None = None) -> int:
         half_life=args.half_life,
         prior_strength=args.prior,
     )
+    artifact = replace(artifact, calibration=blend.fit_calibration(prepared.calibration_points))
     print(render(artifact, prepared))
     if args.dry_run:
         return 0
