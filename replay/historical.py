@@ -24,7 +24,7 @@ insider filings. Two of those can be rebuilt as they stood on a past date:
 The other three cannot be rebuilt honestly. yfinance reports fundamentals,
 analyst targets and insider filings as they stand *today*; handing the model
 today's numbers under a past date would leak the future through the side door.
-They are withheld and named as gaps, so the model is told to score them 0.0
+They are withheld and named as gaps, so the model is told to leave them null
 rather than guess -- exactly what the live prompt tells it to do with a gap.
 
 So this tests a strategy with less to go on than the live one. A signal that
@@ -78,7 +78,7 @@ MIN_HISTORY_BARS = 252
 OHLC_PERIOD = "3y"
 
 #: Gaps named the way the live prompt names a gap, so the model treats them
-#: identically: score 0.0, do not infer.
+#: identically: leave the score null, do not infer.
 WITHHELD = {
     "fundamentals": "fundamentals withheld: not available point-in-time in this replay",
     "analysts": "analyst view withheld: not available point-in-time in this replay",

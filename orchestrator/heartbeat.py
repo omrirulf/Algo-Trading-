@@ -131,9 +131,11 @@ NEUTRAL with low conviction rather than inventing a view. A NEUTRAL signal is \
 always safe, and downstream the conviction floor will simply drop it.
 
 Also report your read on each dimension in the score fields, each in \
-[-1.0, 1.0], where -1.0 is maximally bearish, 0.0 is neutral or unknown, and \
-+1.0 is maximally bullish. Score a dimension 0.0 when the prompt says its data \
-was unavailable; never infer what a missing section would have contained. In \
+[-1.0, 1.0], where -1.0 is maximally bearish, 0.0 is neutral, and +1.0 is \
+maximally bullish. Leave a dimension null when the prompt says its data was \
+unavailable; never infer what a missing section would have contained. A null \
+is a named absence and a 0.0 is a read on the merits, and the record keeps \
+them apart. In \
 key_factors, list the 2 to 5 specific facts that actually drove the call, each \
 a short standalone phrase citing the datum rather than restating your \
 conclusion. The scores and key factors are recorded for later evaluation and \
@@ -275,8 +277,9 @@ picture. A NEUTRAL signal is always safe, and downstream the conviction floor \
 will simply drop it.
 
 Report your read in the score fields, each in [-1.0, 1.0], where -1.0 is \
-maximally bearish, 0.0 is neutral or unknown, and +1.0 is maximally bullish. \
-Score a dimension 0.0 when the prompt says its data was unavailable. Score \
+maximally bearish, 0.0 is neutral, and +1.0 is maximally bullish. Leave a \
+dimension null when the prompt says its data was unavailable, exactly as for \
+a section that was never on offer; never infer what it would have said. Score \
 analyst_score from ANALYST VIEW OF THE HOLDINGS when that section is present \
 and leave it null when it is not; score insider_score from POSITIONING, or \
 from FUND FLOWS when POSITIONING is absent, and leave it null only when \
@@ -284,8 +287,8 @@ neither is present; score fundamental_score from FUND BASICS, COST OF \
 HOLDING, ENERGY INVENTORIES and CROP CONDITION, whichever of them are \
 present. \
 A section that is absent entirely was never on offer for this instrument -- \
-that is not the same as a source that failed, and it is not a reason to \
-guess. In \
+that is not the same as a source that failed, which DATA GAPS names -- and \
+neither is a reason to guess: both leave the score null. In \
 key_factors, list the 2 to 5 specific facts that actually drove the call, each \
 a short standalone phrase citing the datum rather than restating your \
 conclusion. The scores and key factors are recorded for later evaluation and \

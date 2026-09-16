@@ -29,8 +29,8 @@ KeyFactor = Annotated[
 MAX_KEY_FACTORS = 6
 
 _SCORE_SCALE = (
-    "in [-1.0, 1.0], where -1.0 is maximally bearish, 0.0 is neutral or unknown, "
-    "and +1.0 is maximally bullish"
+    "in [-1.0, 1.0], where -1.0 is maximally bearish, 0.0 is neutral and +1.0 is "
+    "maximally bullish; null when the data for it was unavailable"
 )
 
 

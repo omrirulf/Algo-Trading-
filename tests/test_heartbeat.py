@@ -85,6 +85,15 @@ def test_system_prompt_forbids_inventing_missing_sections():
     assert "never infer what a missing section would have contained" in hb.SYSTEM_PROMPT
 
 
+def test_both_prompts_leave_a_missing_dimension_null_rather_than_zero():
+    # A 0.0 for "no data" is indistinguishable from an honest neutral once it
+    # is journalled, and it drags every per-dimension correlation toward zero.
+    # Null is a named absence that the scorer already leaves out.
+    for prompt in (hb.SYSTEM_PROMPT, hb.ETF_SYSTEM_PROMPT):
+        assert "Leave a dimension null when the prompt says its data was unavailable" in prompt
+        assert "0.0 when the prompt says" not in prompt
+
+
 def test_system_prompt_treats_fetched_context_as_untrusted():
     # Headlines and firm names are written by third parties who may want to
     # influence the signal. The closed schema bounds the damage; this reduces
