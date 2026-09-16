@@ -8,6 +8,8 @@ rather than an exception.
 from __future__ import annotations
 
 import json
+import sys
+import types
 
 import pytest
 
@@ -343,14 +345,23 @@ def test_a_sector_fund_gets_fund_basics_instead_of_the_company_form():
     assert "INSIDER ACTIVITY" not in prompt
 
 
-def test_a_bond_fund_is_asked_about_yield_and_duration():
+def test_a_bond_fund_is_asked_about_yield_and_credit():
     ctx = context.gather("TLT", HEADLINES, provider=FakeProvider(
         history=make_frame([100.0 + i * 0.1 for i in range(300)]),
-        fund_payloads={"bond_holdings": {"duration": 16.8, "maturity": 25.7}},
+        fund_payloads={
+            "bond_holdings": {"duration": 16.8, "maturity": 25.7},
+            "bond_ratings": {"aa": 1.0, "us_government": 0.996},
+        },
+        info={"yield": 0.0473, "totalAssets": 4.7e10, "beta3Year": 2.39},
         positioning_rows=COT_ROWS,
     ))
     prompt = ctx.as_prompt()
-    assert "duration 16.80 years" in prompt
+    assert "Yield: 4.7%" in prompt
+    assert "Credit quality: AA 100.0% | US government debt 99.6%" in prompt
+    assert "beta to the market 2.39" in prompt
+    # Yahoo's bond duration is wrong for every fund probed, so it is parsed
+    # and journalled but never shown. See tests/test_funds.py.
+    assert "duration" not in prompt.lower()
     assert "P/E" not in prompt
 
 
@@ -410,3 +421,193 @@ def test_a_broken_fund_fetch_degrades_to_a_named_gap():
     # Either it parsed what it could or it recorded a gap; what it must not do
     # is raise, and the cycle must still have a prompt.
     assert "TECHNICALS" in ctx.as_prompt()
+
+
+# --------------------------------------------------------------------------- #
+# The two sections that fill a fund's empty slots
+# --------------------------------------------------------------------------- #
+
+
+def _shares(values, start="2026-06-01", freq="7D"):
+    pd = pytest.importorskip("pandas")
+    return pd.Series(values, index=pd.date_range(start, periods=len(values), freq=freq))
+
+
+def _holding(mean, target, price=100.0, actions=None):
+    from orchestrator import analysts as analysts_module
+
+    return analysts_module.build_snapshot(
+        info={"recommendationMean": mean, "targetMeanPrice": target,
+              "numberOfAnalystOpinions": 30},
+        upgrades_downgrades=actions,
+        last_close=price,
+    )
+
+
+HOLDING_ANALYSTS = [
+    ("XOM", 0.229, _holding(2.1, 130.0)),
+    ("CVX", 0.171, _holding(2.3, 120.0)),
+    ("COP", 0.043, _holding(3.8, 95.0)),
+]
+SHARES = _shares([100e6, 101e6, 103e6, 106e6, 109e6, 112e6, 115e6,
+                  118e6, 121e6, 126e6, 130e6, 134e6])
+
+
+def test_an_equity_fund_is_given_the_analyst_view_of_what_it_holds():
+    """Nobody publishes a target on XLE. XLE is twenty-three companies, and
+    every one of them is covered."""
+    ctx = context.gather("XLE", HEADLINES, provider=FakeProvider(
+        history=make_frame([100.0 + i * 0.1 for i in range(300)]),
+        holding_analysts=HOLDING_ANALYSTS,
+    ))
+    prompt = ctx.as_prompt()
+    assert "ANALYST VIEW OF THE HOLDINGS" in prompt
+    assert "Rolled up from the 3 largest holdings" in prompt
+    assert "XOM, CVX, COP" in prompt
+    # The company section is a different thing and must not appear for a fund.
+    assert "ANALYST & INSTITUTIONAL VIEW" not in prompt
+
+
+def test_a_fund_is_given_its_flows():
+    ctx = context.gather("XLE", HEADLINES, provider=FakeProvider(
+        history=make_frame([100.0 + i * 0.1 for i in range(300)]),
+        shares_series=SHARES,
+    ))
+    prompt = ctx.as_prompt()
+    assert "FUND FLOWS (creations and redemptions)" in prompt
+    assert "Direction: money coming in" in prompt
+    assert "Shares outstanding: 134.00M" in prompt
+
+
+def test_flows_are_valued_at_the_price_the_technicals_already_found():
+    ctx = context.gather("XLE", HEADLINES, provider=FakeProvider(
+        history=make_frame([100.0] * 300),
+        shares_series=SHARES,
+    ))
+    assert ctx.flows.net_assets == pytest.approx(134e6 * 100.0)
+
+
+def test_a_fund_with_no_share_history_gets_no_flow_section_rather_than_blanks():
+    ctx = context.gather("XLE", HEADLINES, provider=FakeProvider(
+        history=make_frame([100.0 + i * 0.1 for i in range(300)]),
+        shares_series=_shares([1e6, 2e6]),
+    ))
+    assert ctx.flows is None
+    assert "FUND FLOWS" not in ctx.as_prompt()
+
+
+def test_a_fund_with_no_covered_holdings_gets_no_roll_up():
+    ctx = context.gather("XLE", HEADLINES, provider=FakeProvider(
+        history=make_frame([100.0 + i * 0.1 for i in range(300)]),
+        holding_analysts=[("XOM", 0.2, None), ("CVX", 0.1, None)],
+    ))
+    assert ctx.holdings is None
+    assert "ANALYST VIEW OF THE HOLDINGS" not in ctx.as_prompt()
+
+
+def test_a_single_name_is_given_neither_section_ever():
+    """The company prompt is the input every replay baseline was measured
+    against. A fund section leaking into it would invalidate all of them."""
+    ctx = context.gather("MSFT", HEADLINES, provider=FakeProvider(
+        history=make_frame([100.0 + i * 0.1 for i in range(300)]),
+        info=INFO,
+        holding_analysts=HOLDING_ANALYSTS,
+        shares_series=SHARES,
+    ))
+    prompt = ctx.as_prompt()
+    assert "FUND FLOWS" not in prompt
+    assert "ANALYST VIEW OF THE HOLDINGS" not in prompt
+    assert "ANALYST & INSTITUTIONAL VIEW" in prompt
+
+
+def test_both_sections_reach_the_journal_so_a_signal_can_be_audited():
+    ctx = context.gather("XLE", HEADLINES, provider=FakeProvider(
+        history=make_frame([100.0 + i * 0.1 for i in range(300)]),
+        holding_analysts=HOLDING_ANALYSTS,
+        shares_series=SHARES,
+    ))
+    record = ctx.as_dict()
+    assert record["holdings"]["covered"] == 3
+    assert record["flows"]["windows"]
+
+
+def test_a_commodity_fund_is_asked_for_flows_but_not_for_a_roll_up():
+    """Gold's holdings are bullion; there is nobody to rate them. Its share
+    count is still the clearest statement of who is buying gold."""
+    ctx = context.gather("GLD", HEADLINES, provider=FakeProvider(
+        history=make_frame([100.0 + i * 0.1 for i in range(300)]),
+        shares_series=SHARES,
+    ))
+    prompt = ctx.as_prompt()
+    assert "FUND FLOWS" in prompt
+    assert "ANALYST VIEW OF THE HOLDINGS" not in prompt
+    assert "FUND BASICS" not in prompt
+
+
+# --- the provider decides what to even ask for --------------------------------
+
+
+def test_the_provider_asks_for_no_holdings_coverage_on_a_single_name():
+    """Five extra network calls per ticker, for a section that would then be
+    dropped. The skip is the point."""
+    provider = context.YFinanceContextProvider()
+    gaps: list[str] = []
+    assert provider._holding_analysts("MSFT", {"top_holdings": {"AAPL": 0.1}}, gaps) == []
+    assert gaps == []
+
+
+def test_the_provider_asks_for_no_holdings_coverage_on_a_bond_or_commodity_fund():
+    provider = context.YFinanceContextProvider()
+    gaps: list[str] = []
+    for ticker in ("TLT", "HYG", "GLD", "CORN"):
+        assert provider._holding_analysts(ticker, {"top_holdings": {"AAPL": 0.1}}, gaps) == []
+    assert gaps == []
+
+
+def test_a_holding_looked_up_once_is_not_looked_up_again(monkeypatch):
+    """The same handful of megacaps sits at the top of a dozen funds, so the
+    cache is keyed by *holding* rather than by watchlist ticker. Without it,
+    one cycle would ask Yahoo about Apple a dozen times."""
+    opened: list[str] = []
+
+    class FakeTicker:
+        def __init__(self, symbol):
+            opened.append(symbol)
+            self.info = {"recommendationMean": 2.0, "targetMeanPrice": 120.0,
+                         "currentPrice": 100.0}
+            self.upgrades_downgrades = None
+
+    monkeypatch.setitem(sys.modules, "yfinance", types.SimpleNamespace(Ticker=FakeTicker))
+
+    provider = context.YFinanceContextProvider()
+    for ticker in ("XLE", "XLF", "RSP"):
+        provider._holding_analysts(ticker, {"top_holdings": {"XOM": 0.2, "AAPL": 0.1}}, [])
+
+    assert sorted(opened) == ["AAPL", "XOM"]
+    assert provider._analyst_for("XOM").recommendation_mean == 2.0
+
+
+def test_a_holding_that_cannot_be_reached_is_cached_as_missing_not_retried():
+    """A delisted or foreign line would otherwise be retried for every fund
+    that holds it, every cycle."""
+    provider = context.YFinanceContextProvider()
+    provider._holding_cache["VALE3.SA"] = (float("inf"), None)
+    assert provider._analyst_for("VALE3.SA") is None
+
+
+def test_the_provider_asks_for_no_share_count_on_a_single_name():
+    gaps: list[str] = []
+    assert context.YFinanceContextProvider._shares_series(object(), "MSFT", gaps) is None
+    assert gaps == []
+
+
+def test_missed_holdings_are_one_gap_line_rather_than_five():
+    """Five failures quoted in full cost more prompt than the section they
+    failed to fill."""
+    provider = context.YFinanceContextProvider()
+    provider._analyst_for = lambda symbol: None
+    gaps: list[str] = []
+    provider._holding_analysts(
+        "XLE", {"top_holdings": {"XOM": 0.2, "CVX": 0.1, "COP": 0.05}}, gaps)
+    assert len(gaps) == 1
+    assert "3 holdings" in gaps[0] and "XOM, CVX, COP" in gaps[0]

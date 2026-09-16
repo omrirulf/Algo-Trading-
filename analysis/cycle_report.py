@@ -42,7 +42,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from config import settings as cfg  # noqa: E402
 from config.instruments import InstrumentKind, kind_for, name_for, sleeve_label  # noqa: E402
-from orchestrator import analysts, fundamentals, funds, insiders, positioning, technicals  # noqa: E402
+from orchestrator import (  # noqa: E402
+    analysts, flows, fundamentals, funds, holdings, insiders, positioning, technicals,
+)
 from orchestrator.news import absolute_url  # noqa: E402
 
 #: Lines this far apart belong to different cycles.
@@ -80,8 +82,10 @@ SCORE_SECTIONS = (
     ("fundamental_score", "fundamentals", "Company numbers"),
     ("fundamental_score", "funds", "What this fund holds"),
     ("analyst_score", "analysts", "What analysts and big funds say"),
+    ("analyst_score", "holdings", "What analysts say about what this fund holds"),
     ("insider_score", "insiders", "Buying and selling by company insiders"),
     ("insider_score", "positioning", "Who is positioned how"),
+    ("insider_score", "flows", "Money going into and out of this fund"),
 )
 
 #: Sleeves in report order, widest-held first.
@@ -124,7 +128,9 @@ GLOSSARY = (
     ("Index fund", "One fund that holds many shares at once, so it follows a whole market instead of one company."),
     ("Sector or country fund", "A fund that holds many companies, but all of them in one industry or one country. Safer than one company, riskier than a whole-market fund."),
     ("Positioning", "How much the big professional traders are betting on a commodity or bond, from the weekly US regulator report. High numbers mean the bet is crowded, which cuts both ways."),
-    ("Duration", "How much a bond fund moves when interest rates change. Duration 17 means roughly 17% down if rates rise one point."),
+    ("Fund flows", "Money going into or out of a fund. When more people want a fund, new shares are created; when they leave, shares are destroyed. So a rising share count means real money came in. It has already happened -- it is not a forecast."),
+    ("Roll-up", "A fund does not get analyst ratings, but the companies it holds do. A roll-up adds those ratings up, weighted by how much of each company the fund owns. The \"coverage\" number says how much of the fund that actually covers."),
+    ("Beta", "How hard a fund swings compared with the whole market. Beta 1.0 moves with the market, 2.0 swings twice as hard, 0.5 half as hard."),
 )
 
 
@@ -293,7 +299,9 @@ _SNAPSHOT_CLASSES: dict[str, tuple[type, dict[str, type]]] = {
     "analysts": (analysts.AnalystSnapshot, {}),
     "insiders": (insiders.InsiderSnapshot, {"buys": insiders.InsiderTrade, "sells": insiders.InsiderTrade}),
     "funds": (funds.FundSnapshot, {}),
+    "holdings": (holdings.HoldingsSnapshot, {}),
     "positioning": (positioning.PositioningSnapshot, {}),
+    "flows": (flows.FlowSnapshot, {"windows": flows.FlowWindow}),
 }
 
 

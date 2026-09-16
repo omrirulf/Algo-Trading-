@@ -25,12 +25,13 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import yfinance as yf  # noqa: E402
 
-from orchestrator import funds  # noqa: E402
+from orchestrator import analysts, flows, funds, holdings  # noqa: E402
 
 #: One of each shape: two sector funds, a broad fund, a long-duration
 #: Treasury fund, a credit fund, a non-US fund, and a commodity fund that
@@ -76,6 +77,63 @@ def dump_raw(ticker: str) -> None:
             print(f"    {key} = {info[key]!r}")
 
 
+def dump_flows(handle: Any, ticker: str) -> None:
+    """Creations and redemptions, which is the one section nothing else proves.
+
+    Yahoo's share-count series is a different endpoint from everything else
+    here, and how often a fund reports is the whole question: a fund that
+    files twice a year has no weekly flow to read.
+    """
+    try:
+        series = handle.get_shares_full(start="2024-01-01")
+    except Exception as exc:  # noqa: BLE001
+        print(f"  flows: FAILED {type(exc).__name__}: {exc}")
+        return
+    if series is None or not len(series):
+        print("  flows: no share-count series")
+        return
+    price = None
+    try:
+        price = float(handle.fast_info["last_price"])
+    except Exception:  # noqa: BLE001 - the percentages stand without it
+        price = None
+    snapshot = flows.build_snapshot(ticker, series, price=price)
+    if snapshot is None:
+        print(f"  flows: {len(series)} readings, too few to window")
+        return
+    for line in snapshot.as_lines()[:3]:
+        print(f"  {line}")
+
+
+def dump_holdings(handle: Any, ticker: str) -> None:
+    """The analyst roll-up, and the thing that decides whether it is worth it.
+
+    ``coverage`` is the number to watch: a roll-up over 11% of a broad index
+    costs five lookups to say something about eleven percent.
+    """
+    if funds.fund_shape(ticker) != funds.EQUITY_FUND:
+        return
+    try:
+        payload = handle.funds_data.top_holdings
+    except Exception as exc:  # noqa: BLE001
+        print(f"  holdings: FAILED {type(exc).__name__}: {exc}")
+        return
+    rows = []
+    for symbol, weight in holdings.holdings_from_payload(payload):
+        try:
+            info = yf.Ticker(symbol).info or {}
+            price = info.get("currentPrice") or info.get("regularMarketPrice")
+            rows.append((symbol, weight, analysts.build_snapshot(info=info, last_close=price)))
+        except Exception:  # noqa: BLE001 - a missed holding is the finding
+            rows.append((symbol, weight, None))
+    snapshot = holdings.build_snapshot(ticker, rows)
+    if snapshot is None:
+        print(f"  holdings: {len(rows)} read, none covered")
+        return
+    for line in snapshot.as_lines()[:2]:
+        print(f"  {line}")
+
+
 def dump_parsed(ticker: str) -> None:
     """The block as the prompt would carry it."""
     handle = yf.Ticker(ticker)
@@ -100,9 +158,11 @@ def dump_parsed(ticker: str) -> None:
         return
     if snapshot is None:
         print("  (no fund section -- by design)")
-        return
-    for line in snapshot.as_lines():
-        print(f"  {line}")
+    else:
+        for line in snapshot.as_lines():
+            print(f"  {line}")
+    dump_holdings(handle, ticker)
+    dump_flows(handle, ticker)
 
 
 def main(argv: list[str] | None = None) -> int:

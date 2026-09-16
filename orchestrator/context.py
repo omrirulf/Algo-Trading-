@@ -28,7 +28,10 @@ from dataclasses import dataclass, field
 from typing import Any, Optional, Sequence
 
 from config.instruments import is_fund
-from orchestrator import analysts, fundamentals, funds, insiders, positioning, technicals
+from orchestrator import (
+    analysts, flows, formatting as fmt, fundamentals, funds, holdings, insiders,
+    positioning, technicals,
+)
 from orchestrator.technicals import TechnicalSnapshot
 
 log = logging.getLogger(__name__)
@@ -41,6 +44,11 @@ HISTORY_PERIOD = "2y"
 #: heartbeat runs daily. Caching them keeps an unauthenticated, rate-limited
 #: data source from being asked the same question 24 times a day.
 SLOW_DATA_TTL_SECONDS = 6 * 60 * 60
+
+#: How far back the share-count series is pulled. Long enough for the
+#: three-month window to have a point before it, short enough that Yahoo's
+#: fundamentals-timeseries endpoint stays quick.
+SHARES_HISTORY_START = "2024-01-01"
 
 
 # --------------------------------------------------------------------------- #
@@ -64,6 +72,10 @@ class RawMarketData:
     fund_payloads: dict[str, Any] = field(default_factory=dict)
     #: Weekly CFTC rows, newest first, for tickers with a futures contract.
     positioning_rows: list[dict] = field(default_factory=list)
+    #: ``(symbol, weight, analyst snapshot)`` for a fund's largest holdings.
+    holding_analysts: list = field(default_factory=list)
+    #: Shares outstanding over time, for funds. The share count is the flow.
+    shares_series: Any = None
     gaps: list[str] = field(default_factory=list)
 
 
@@ -78,6 +90,8 @@ class _SlowData:
     insider_transactions: Any
     fund_payloads: dict[str, Any]
     positioning_rows: list[dict]
+    holding_analysts: list
+    shares_series: Any
     gaps: list[str]
 
 
@@ -91,6 +105,11 @@ class YFinanceContextProvider:
     def __init__(self, ttl_seconds: float = SLOW_DATA_TTL_SECONDS) -> None:
         self._ttl = ttl_seconds
         self._cache: dict[str, tuple[float, _SlowData]] = {}
+        #: Analyst coverage keyed by *holding*, not by watchlist ticker. Forty
+        #: funds overlap heavily -- the same handful of megacaps sits at the
+        #: top of a dozen of them -- so without this the same company would be
+        #: looked up a dozen times in one cycle.
+        self._holding_cache: dict[str, tuple[float, Any]] = {}
 
     def fetch(self, ticker: str) -> RawMarketData:
         try:
@@ -117,6 +136,8 @@ class YFinanceContextProvider:
             insider_transactions=slow.insider_transactions,
             fund_payloads=slow.fund_payloads,
             positioning_rows=slow.positioning_rows,
+            holding_analysts=slow.holding_analysts,
+            shares_series=slow.shares_series,
             gaps=history_gaps + slow.gaps,
         )
 
@@ -136,9 +157,12 @@ class YFinanceContextProvider:
 
         gaps: list[str] = []
         info = _attempt(lambda: dict(handle.info or {}), "company fundamentals", gaps) or {}
+        fund_payloads = self._fund_payloads(handle, ticker, gaps)
         slow = _SlowData(
-            fund_payloads=self._fund_payloads(handle, ticker, gaps),
+            fund_payloads=fund_payloads,
             positioning_rows=self._positioning_rows(ticker, gaps),
+            holding_analysts=self._holding_analysts(ticker, fund_payloads, gaps),
+            shares_series=self._shares_series(handle, ticker, gaps),
             info=info,
             calendar=_attempt(lambda: handle.calendar, "earnings calendar", gaps),
             recommendations=_attempt(
@@ -191,6 +215,74 @@ class YFinanceContextProvider:
             return []
         return _attempt(lambda: positioning.fetch_rows(ticker), "CFTC positioning", gaps) or []
 
+    @staticmethod
+    def _shares_series(handle: Any, ticker: str, gaps: list[str]) -> Any:
+        """Shares outstanding over time. Funds only -- see ``orchestrator.flows``."""
+        if not is_fund(ticker):
+            return None
+        return _attempt(
+            lambda: handle.get_shares_full(start=SHARES_HISTORY_START),
+            "fund share count",
+            gaps,
+        )
+
+    def _holding_analysts(
+        self, ticker: str, fund_payloads: dict[str, Any], gaps: list[str]
+    ) -> list[tuple[str, Optional[float], Any]]:
+        """Analyst coverage of each of the fund's largest holdings.
+
+        Equity funds only. A bond fund's holdings are bonds, which nobody
+        rates on a 1-to-5 buy scale, and a commodity fund holds bullion.
+        """
+        if funds.fund_shape(ticker) != funds.EQUITY_FUND:
+            return []
+        pairs = holdings.holdings_from_payload(fund_payloads.get("top_holdings"))
+        if not pairs:
+            return []
+        out: list[tuple[str, Optional[float], Any]] = []
+        missed: list[str] = []
+        for symbol, weight in pairs:
+            snapshot = self._analyst_for(symbol)
+            if snapshot is None:
+                missed.append(symbol)
+            out.append((symbol, weight, snapshot))
+        if missed:
+            # One line, not one per holding: five failures quoted in full cost
+            # more prompt than the section they failed to fill.
+            gaps.append(f"analyst coverage of {len(missed)} holdings ({', '.join(missed)})")
+        return out
+
+    def _analyst_for(self, symbol: str) -> Any:
+        """One holding's analyst snapshot, cached across every fund that holds it."""
+        cached = self._holding_cache.get(symbol)
+        if cached and cached[0] > time.monotonic():
+            return cached[1]
+
+        snapshot = None
+        try:
+            import yfinance as yf
+
+            handle = yf.Ticker(symbol)
+            info = dict(handle.info or {})
+            if info:
+                price = fmt.clean(info.get("currentPrice"))
+                if price is None:
+                    price = fmt.clean(info.get("regularMarketPrice"))
+                actions = None
+                try:
+                    actions = handle.upgrades_downgrades
+                except Exception:  # noqa: BLE001 - the ratings alone are enough
+                    actions = None
+                snapshot = analysts.build_snapshot(
+                    info=info, upgrades_downgrades=actions, last_close=price
+                )
+        except Exception as exc:  # noqa: BLE001 - a missed holding is a gap
+            log.debug("analyst lookup failed for holding %s: %s", symbol, exc)
+            snapshot = None
+
+        self._holding_cache[symbol] = (time.monotonic() + self._ttl, snapshot)
+        return snapshot
+
 
 #: Gaps go into the prompt. A stack of connection errors quoted in full costs
 #: hundreds of tokens per ticker and tells the model nothing the first clause
@@ -236,8 +328,10 @@ ENRICHMENT_SECTIONS = (
     ("FUNDAMENTALS", "fundamentals"),
     ("FUND BASICS", "funds"),
     ("ANALYST & INSTITUTIONAL VIEW", "analysts"),
+    ("ANALYST VIEW OF THE HOLDINGS", "holdings"),
     ("INSIDER ACTIVITY", "insiders"),
     ("POSITIONING (CFTC, weekly)", "positioning"),
+    ("FUND FLOWS (creations and redemptions)", "flows"),
 )
 
 #: Sections that only exist for a company. A fund has no analysts publishing
@@ -259,7 +353,7 @@ SINGLE_NAME_ONLY_SECTIONS = frozenset({"fundamentals", "analysts", "insiders"})
 #: "this kind of thing does not have one" -- gold has no holdings to report,
 #: and a single-country fund has no futures contract. A fetch that was
 #: attempted and failed still records a gap, so the two cases stay distinct.
-FUND_ONLY_SECTIONS = frozenset({"funds", "positioning"})
+FUND_ONLY_SECTIONS = frozenset({"funds", "holdings", "positioning", "flows"})
 
 
 @dataclass(frozen=True)
@@ -279,8 +373,13 @@ class TickerContext:
     insiders: Optional[insiders.InsiderSnapshot] = None
     #: A fund's own numbers, in place of the company form.
     funds: Optional[funds.FundSnapshot] = None
+    #: The analyst view of a fund, rolled up from the analyst view of what it
+    #: holds -- nobody publishes a target on XLE, but XLE *is* its holdings.
+    holdings: Optional[holdings.HoldingsSnapshot] = None
     #: What the large speculators hold, for the tickers that track a future.
     positioning: Optional[positioning.PositioningSnapshot] = None
+    #: Creations and redemptions: a fund's share count is its money in and out.
+    flows: Optional[flows.FlowSnapshot] = None
     gaps: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict:
@@ -294,7 +393,9 @@ class TickerContext:
             "analysts": self.analysts.as_dict() if self.analysts else None,
             "insiders": self.insiders.as_dict() if self.insiders else None,
             "funds": self.funds.as_dict() if self.funds else None,
+            "holdings": self.holdings.as_dict() if self.holdings else None,
             "positioning": self.positioning.as_dict() if self.positioning else None,
+            "flows": self.flows.as_dict() if self.flows else None,
             "gaps": list(self.gaps),
         }
 
@@ -377,6 +478,22 @@ def gather(
             gaps,
         )
 
+    holdings_snapshot = None
+    if raw.holding_analysts:
+        holdings_snapshot = _attempt(
+            lambda: holdings.build_snapshot(ticker, raw.holding_analysts),
+            "analyst view of the holdings",
+            gaps,
+        )
+
+    flow_snapshot = None
+    if raw.shares_series is not None:
+        flow_snapshot = _attempt(
+            lambda: flows.build_snapshot(ticker, raw.shares_series, price=last_close),
+            "fund flows",
+            gaps,
+        )
+
     positioning_snapshot = None
     if raw.positioning_rows:
         positioning_snapshot = _attempt(
@@ -432,7 +549,9 @@ def gather(
         analysts=analyst_snapshot,
         insiders=insider_snapshot,
         funds=fund_snapshot,
+        holdings=holdings_snapshot,
         positioning=positioning_snapshot,
+        flows=flow_snapshot,
         gaps=gaps,
     )
 

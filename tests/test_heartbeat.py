@@ -639,10 +639,13 @@ def test_the_fund_prompt_sends_insider_score_to_positioning():
 
 
 def test_the_fund_prompt_still_forbids_inventing_an_analyst_view():
-    """No vendor publishes a price target on an index. That has not changed."""
-    prompt = hb.system_prompt_for("GLD")
+    """No vendor publishes a price target on an index. That has not changed --
+    what changed is that a fund's holdings *are* covered, so an equity fund now
+    gets a roll-up. A commodity still gets nothing and must say nothing."""
+    prompt = hb.system_prompt_for("GLD").replace("\n", " ")
     assert "leave analyst_score null" in prompt.lower()
-    assert "Nobody publishes a price target on an index" in prompt.replace("\n", " ")
+    assert "NO ANALYST PUBLISHES A PRICE TARGET ON AN INDEX" in prompt
+    assert "do not speculate about what it would have said" in prompt
 
 
 def test_the_fund_prompt_frames_positioning_as_crowding_not_direction():
@@ -666,4 +669,44 @@ def test_the_company_prompt_gained_none_of_this():
     """The single-name prompt is pinned by the replay baselines; it must not move."""
     prompt = hb.system_prompt_for("MSFT")
     for phrase in ("FUND BASICS", "POSITIONING", "CFTC", "crowding"):
+        assert phrase not in prompt
+
+
+def test_the_fund_prompt_explains_the_two_sections_that_fill_the_empty_slots():
+    """A fund had three of five dimensions permanently null. The holdings
+    roll-up and the flow series are what fill two of them, and the prompt has
+    to say which score each one feeds or the model will leave them null."""
+    prompt = hb.system_prompt_for("XLE").replace("\n", " ")
+    assert "ANALYST VIEW OF THE HOLDINGS" in prompt
+    assert "Score analyst_score from it" in prompt
+    assert "FUND FLOWS" in prompt
+    assert "score insider_score from it" in prompt
+
+
+def test_the_fund_prompt_says_a_thin_roll_up_deserves_a_smaller_score():
+    """A roll-up over 11% of a 500-stock index is a fact about eleven percent.
+    Without this the model reads the number and not the coverage behind it."""
+    prompt = hb.system_prompt_for("RSP").replace("\n", " ")
+    assert "a fact about eleven percent, not about the fund" in prompt
+    assert "a smaller score, not a louder one" in prompt
+
+
+def test_the_fund_prompt_keeps_flows_a_measure_of_conviction_not_a_forecast():
+    prompt = hb.system_prompt_for("XLE").replace("\n", " ")
+    assert "conviction of flow rather than as a forecast" in prompt
+    assert "a fund can bleed shares through a rally" in prompt
+
+
+def test_positioning_outranks_flows_when_a_fund_has_both():
+    """Both are behaviour, but one is a reported position and the other is a
+    share count. The prompt has to rank them or the model will double-count."""
+    prompt = hb.system_prompt_for("GLD").replace("\n", " ")
+    assert "POSITIONING is the sharper read and flows corroborate it" in prompt
+
+
+def test_the_company_prompt_learned_none_of_this():
+    """A single name has real analysts and real insiders. Every one of these
+    sections would be noise in its prompt, and the prompt is byte-pinned."""
+    prompt = hb.system_prompt_for("MSFT")
+    for phrase in ("FUND FLOWS", "ANALYST VIEW OF THE HOLDINGS", "POSITIONING", "FUND BASICS"):
         assert phrase not in prompt

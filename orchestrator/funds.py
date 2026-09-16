@@ -70,10 +70,24 @@ MAX_SANE_PE = 1000.0
 #: market basket genuinely can have, and guessing is what produced the bug.
 RECIPROCAL_PE_CEILING = 1.0
 
-#: Duration outside this band is not a duration. The longest Treasury fund on
-#: the watchlist sits near seventeen years; anything past forty is a parsing
-#: error, and zero or negative is a missing field dressed as a number.
+#: Duration outside this band is not a duration. Kept as a guard on a field
+#: that is parsed and journalled but no longer *shown* -- see below.
 MAX_SANE_DURATION = 40.0
+
+#: Yahoo's bond duration and maturity are not trustworthy and are therefore
+#: not put in front of the model. Both bond funds probed against live data
+#: came back wrong, and wrong in different directions: TLT, a 20+ year
+#: Treasury fund whose real duration is about sixteen and a half years,
+#: reported ``duration 3.6, maturity 7.69``; HYG, whose real duration is
+#: about three and a half, reported ``6.65`` and ``9.85``. They look like a
+#: category figure or a stale vendor row. There is no way to tell from the
+#: payload which funds are right, and an unverifiable number that reads as
+#: authoritative is the failure this module exists to prevent.
+#:
+#: Nothing is lost that matters. What separates a long Treasury fund from a
+#: high-yield credit fund is already in the block and already verified: the
+#: category name, the yield, the ratings mix and the three-year record.
+SHOW_BOND_DURATION = False
 
 #: Yahoo spells a fund's yield two ways and does not agree with itself about
 #: the units -- ``yield`` arrives as a fraction (0.0295) while
@@ -88,6 +102,12 @@ MAX_PLAUSIBLE_YIELD = 1.0
 #: Rating buckets named in the prompt. Yahoo returns the full ladder down to
 #: "below B" and most of it is noise for a fund that is 95% one rating.
 MAX_RATING_BUCKETS = 4
+
+#: ``us_government`` arrives inside ``bondRatings`` but is not a rating. TLT
+#: comes back as ``{"aa": 1.0, "us_government": 0.996}`` -- the same bonds
+#: counted twice, which as a ladder sums to 199.6%. It is pulled out and
+#: reported as its own fact, which is the more useful one anyway.
+GOVERNMENT_BUCKET = "us_government"
 
 #: Yahoo's sector and rating keys are machine spellings. These are the ones
 #: that do not survive a naive de-underscoring.
@@ -217,9 +237,13 @@ def _label(key: str) -> str:
     return text.replace("_", " ").capitalize()
 
 
-def _mix(payload: Any, limit: int) -> list[str]:
+def _mix(payload: Any, limit: int, skip: tuple[str, ...] = ()) -> list[str]:
     """``Name 42%`` strings for the largest slices of a weighting dict."""
-    rows = [(name, weight) for name, weight in _rows(payload, limit=None) if weight]
+    rows = [
+        (name, weight)
+        for name, weight in _rows(payload, limit=None)
+        if weight and name not in skip
+    ]
     rows.sort(key=lambda row: row[1], reverse=True)
     return [f"{_label(name)} {fmt.pct(weight, signed=False)}" for name, weight in rows[:limit]]
 
@@ -281,7 +305,10 @@ class FundSnapshot:
     maturity: Optional[float] = None
     credit_quality: Optional[float] = None
     credit_mix: list[str] = field(default_factory=list)
+    government_share: Optional[float] = None
     #: Both
+    three_year_return: Optional[float] = None
+    beta: Optional[float] = None
     dividend_yield: Optional[float] = None
     expense_ratio: Optional[float] = None
     total_assets: Optional[float] = None
@@ -295,13 +322,22 @@ class FundSnapshot:
     def as_lines(self) -> list[str]:
         lines = [f"Fund type: {self.category or fmt.NA}"]
         if self.shape == BOND_FUND:
+            rate_risk = ""
+            if SHOW_BOND_DURATION:
+                rate_risk = (
+                    f" | duration {fmt.num(self.duration)} years"
+                    f" | average maturity {fmt.num(self.maturity)} years"
+                )
             lines.append(
-                f"Yield and rate risk: yield {fmt.pct(self.dividend_yield, signed=False)} | "
-                f"duration {fmt.num(self.duration)} years | "
-                f"average maturity {fmt.num(self.maturity)} years"
+                f"Yield: {fmt.pct(self.dividend_yield, signed=False)}{rate_risk}"
             )
             credit = ", ".join(self.credit_mix) if self.credit_mix else fmt.NA
-            lines.append(f"Credit quality: {credit}")
+            government = (
+                f" | US government debt {fmt.pct(self.government_share, signed=False)}"
+                if self.government_share
+                else ""
+            )
+            lines.append(f"Credit quality: {credit}{government}")
         else:
             lines.append(
                 f"What it holds: P/E {fmt.num(self.holdings_pe)} | "
@@ -311,7 +347,13 @@ class FundSnapshot:
             )
             lines.append(f"Yield: {fmt.pct(self.dividend_yield, signed=False)}")
         lines.append(
-            f"Cost and size: expense ratio {fmt.pct(self.expense_ratio, signed=False)} | "
+            f"Three-year record: {fmt.pct(self.three_year_return)} a year | "
+            f"beta to the market {fmt.num(self.beta)}"
+        )
+        lines.append(
+            # Two digits: the whole point of the number is that 0.09% and 0.59% are
+            # different funds, and one digit rounds both to "0.1%".
+            f"Cost and size: expense ratio {fmt.pct(self.expense_ratio, digits=2, signed=False)} | "
             f"net assets {fmt.money(self.total_assets)}"
         )
         if self.asset_mix:
@@ -367,18 +409,27 @@ def build_snapshot(
         duration=_sane_duration(_value(bond_holdings, "duration", "Duration")),
         maturity=_sane_duration(_value(bond_holdings, "maturity", "Maturity")),
         credit_quality=_value(bond_holdings, "creditQuality", "Credit Quality"),
-        credit_mix=_mix(bond_ratings, MAX_RATING_BUCKETS),
+        credit_mix=_mix(bond_ratings, MAX_RATING_BUCKETS, skip=(GOVERNMENT_BUCKET,)),
+        government_share=_value(bond_ratings, GOVERNMENT_BUCKET),
+        three_year_return=_as_float(info.get("threeYearAverageReturn")),
+        beta=_as_float(info.get("beta3Year")),
         dividend_yield=_fund_yield(info),
         expense_ratio=_value(fund_operations, "annualReportExpenseRatio",
                              "Annual Report Expense Ratio")
         or _as_float(info.get("annualReportExpenseRatio")),
-        total_assets=_value(fund_operations, "totalNetAssets", "Total Net Assets")
-        or _as_float(info.get("totalAssets")),
+        # Deliberately *not* `fund_operations`. Its `totalNetAssets` is the
+        # category's total, quoted in millions: SPY and its category average
+        # both report 513975.7, which rendered as a $514K fund. `info` gives
+        # the fund's own assets in dollars, and matched reality for every
+        # fund probed.
+        total_assets=_as_float(info.get("totalAssets")),
         top_holdings=[
             f"{name} {fmt.pct(weight, signed=False)}" if weight is not None else name
             for name, weight in holdings
         ],
-        sector_mix=_mix(sector_weightings, MAX_SECTORS),
+        # Bond funds only ever get this wrong -- HYG came back "utilities
+        # 99.6%", which is not what a high-yield corporate fund holds.
+        sector_mix=_mix(sector_weightings, MAX_SECTORS) if shape == EQUITY_FUND else [],
         asset_mix=_mix(asset_classes, MAX_SECTORS),
     )
 
@@ -393,4 +444,7 @@ __all__ = [
     "MAX_SANE_PE",
     "MIN_SANE_PE",
     "MAX_SANE_DURATION",
+    "MAX_RATING_BUCKETS",
+    "SHOW_BOND_DURATION",
+    "GOVERNMENT_BUCKET",
 ]
