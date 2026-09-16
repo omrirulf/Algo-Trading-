@@ -90,7 +90,20 @@ def dump_flows(handle: Any, ticker: str) -> None:
         print(f"  flows: FAILED {type(exc).__name__}: {exc}")
         return
     if series is None or not len(series):
-        print("  flows: no share-count series")
+        # Yahoo's fundamentals-timeseries carries `shares_out` for companies
+        # and, it turns out, for no ETF at all. So the question becomes
+        # whether a *point* share count and a NAV are there to build from.
+        print("  flows: no share-count series -- looking for what is there instead")
+        try:
+            info = handle.info or {}
+        except Exception as exc:  # noqa: BLE001
+            print(f"    info failed: {type(exc).__name__}: {exc}")
+            return
+        for key in ("sharesOutstanding", "impliedSharesOutstanding", "floatShares",
+                    "navPrice", "previousClose", "regularMarketPrice", "totalAssets",
+                    "averageVolume", "averageVolume10days", "volume"):
+            if key in info:
+                print(f"    {key} = {info[key]!r}")
         return
     price = None
     try:
