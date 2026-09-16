@@ -173,9 +173,19 @@ jobs:
         # step only makes sure the day it becomes justified is not missed.
         # One open issue at a time, found by its label, and nothing at all
         # once the mode is no longer shadow.
+        #
+        # Assigned to the repository owner on purpose. An unassigned issue only
+        # notifies whoever is watching the repository, and "watching" email is
+        # the first thing people turn off; an assignment is a participating
+        # notification, which is emailed under the default settings and shows
+        # up under the Assigned filter. The assignment is best-effort: an owner
+        # GitHub will not accept as an assignee (an organisation, say) must not
+        # cost the issue, and nothing here may fail a job that has already
+        # placed trades.
         if: always() && steps.guard.outputs.ran != 'yes' && steps.score.outputs.ready == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          OWNER: ${{ github.repository_owner }}
         run: |
           if ! grep -qE '^BLEND_MODE: Final\[str\] = "shadow"$' config/settings.py; then
             echo "BLEND_MODE is no longer shadow; nothing to announce"
@@ -198,9 +208,18 @@ jobs:
             echo "\`config/settings.py\`, pinned to \`shadow\` by CI. Turning on \`gate\`, which can only remove"
             echo "trades, is a reviewed code change together with the wiring described as step 6b of the"
             echo "blend design. Nothing trades differently until that change is merged."
+            echo
+            echo "This issue is assigned to you because it needs a decision, not because anything"
+            echo "is wrong. Closing it without acting is a valid answer: the blend keeps running in"
+            echo "shadow, and this issue is opened again only if it is closed while the rule holds."
           } > "$RUNNER_TEMP/blend_ready.md"
-          gh issue create --title "The learned blend is ready to leave shadow" \
-            --label blend-ready --body-file "$RUNNER_TEMP/blend_ready.md"
+          open_issue() {
+            gh issue create --title "The learned blend is ready to leave shadow" \
+              --label blend-ready --body-file "$RUNNER_TEMP/blend_ready.md" "$@"
+          }
+          open_issue --assignee "$OWNER" \
+            || open_issue \
+            || echo "could not open the issue; the report still says ready and tomorrow's run retries"
 
       - name: Commit the journal
         # `always()` because a cycle can fail *and* still have written lines:
