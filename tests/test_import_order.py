@@ -38,6 +38,7 @@ MODULES = [
     "backtest.compare_sleeves",
     "backtest.verify_tickers",
     "analysis.score_journal",
+    "analysis.blend",
 ]
 
 
