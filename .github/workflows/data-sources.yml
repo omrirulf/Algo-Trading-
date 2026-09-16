@@ -43,6 +43,37 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Do the keyed sources answer, and under which name
+        # Four free keys, and the single most likely way this goes wrong is a
+        # key stored under a name nothing reads -- which is silent, because an
+        # absent key is a legitimate state everywhere else in this system.
+        #
+        # Every plausible spelling is passed through and the script reports
+        # which one carried each key. A secret that does not exist becomes an
+        # empty string here, which is exactly the "not set" case.
+        #
+        # The script never prints a key, and scrubs any that an error body
+        # echoes back, because this output is uploaded as an artifact.
+        continue-on-error: true
+        env:
+          EIA_API_KEY: ${{ secrets.EIA_API_KEY }}
+          EIA_KEY: ${{ secrets.EIA_KEY }}
+          EIA_TOKEN: ${{ secrets.EIA_TOKEN }}
+          USDA_NASS_KEY: ${{ secrets.USDA_NASS_KEY }}
+          USDA_API_KEY: ${{ secrets.USDA_API_KEY }}
+          NASS_API_KEY: ${{ secrets.NASS_API_KEY }}
+          USDA_KEY: ${{ secrets.USDA_KEY }}
+          NASS_KEY: ${{ secrets.NASS_KEY }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          FRED_KEY: ${{ secrets.FRED_KEY }}
+          FRED_TOKEN: ${{ secrets.FRED_TOKEN }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          FINNHUB_KEY: ${{ secrets.FINNHUB_KEY }}
+          FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
+        run: |
+          set -o pipefail
+          python backtest/probe_keyed_sources.py | tee keys.txt
+
       - name: CFTC positioning answers
         # The weekly Commitments of Traders report is the one source here with
         # no fallback: if the endpoint or the contract names move, the
@@ -119,6 +150,11 @@ jobs:
         if: always()
         run: |
           {
+            echo '## Keyed sources'
+            echo
+            echo '```'
+            cat keys.txt 2>/dev/null || echo "(did not run)"
+            echo '```'
             echo '## CFTC positioning'
             echo
             echo '```'
@@ -141,6 +177,7 @@ jobs:
         with:
           name: data-sources
           path: |
+            keys.txt
             positioning.txt
             funds.txt
             funds-raw.txt
