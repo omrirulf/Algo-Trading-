@@ -79,17 +79,55 @@ def test_content_from_the_record_is_escaped():
 # --- what it refuses to show without an input ----------------------------
 
 
-def test_no_price_means_no_unrealised_column():
+def test_no_mark_at_all_means_no_unrealised_column():
     page = db.render(book(LONG))
     assert "Unrealised" not in page.split("Not shown yet")[0]
-    assert "No live prices" in page
+    assert "No prices yet" in page
 
 
 def test_supplying_prices_brings_the_unrealised_column_back():
     page = db.render(book(LONG, prices={"LLY": 120.0}))
     assert "Unrealised" in page
     assert "+2.00R" in page, "an R multiple is the number the ladder is written in"
-    assert "No live prices" not in page
+    assert "No prices yet" not in page
+    assert "at live prices" in page
+
+
+# --- recorded marks -------------------------------------------------------
+
+
+MARKED = pf.Position(
+    "LLY", "buy", 10, 100.0, 90.0,
+    last_price=120.0, last_gain_r=2.0, last_managed="2026-09-16 18:47:56",
+)
+
+
+def test_a_recorded_mark_is_shown_but_labelled_as_recorded():
+    """The manager writes down the price it saw. That is a real mark."""
+    page = db.render(book(MARKED))
+    assert "Unrealised (recorded)" in page
+    assert "+2.00R" in page
+    assert "at the last recorded prices" in page
+
+
+def test_a_recorded_mark_says_how_old_it_is():
+    page = db.render(book(MARKED))
+    assert "Profit and loss is as of" in page
+    assert "16 Sep 2026, 18:47" in page, "the reader needs the age, not just a flag"
+
+
+def test_a_live_price_beats_a_recorded_one():
+    """Someone who fetched a quote wants that quote, not last cycle's."""
+    page = db.render(book(MARKED, prices={"LLY": 130.0}))
+    assert "at live prices" in page
+    assert "Profit and loss is as of" not in page
+    assert "+3.00R" in page
+
+
+def test_a_position_opened_since_the_last_check_says_so():
+    """A dash, not a zero -- zero would read as flat rather than unknown."""
+    page = db.render(book(MARKED, pf.Position("TEVA", "buy", 10, 50.0, 45.0)))
+    assert "not checked yet" in page
 
 
 def test_without_equity_the_page_says_which_number_is_missing():

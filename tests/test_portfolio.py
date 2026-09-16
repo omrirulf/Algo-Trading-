@@ -305,3 +305,67 @@ def test_the_text_view_names_a_protected_position():
 def test_the_text_view_says_when_equity_is_missing():
     book = pf.Book(positions=(pf.Position("LLY", "buy", 10, 100.0, 90.0),))
     assert "equity is not in the record" in pf.render(book)
+
+
+# --- recorded marks -------------------------------------------------------
+
+
+def test_a_management_pass_records_the_price_it_saw(tmp_path):
+    book = pf.read_book(audit(
+        tmp_path,
+        entry(price=100.0, stop=90.0, qty=10),
+        managed(action="stop_raised", new_stop=95.0, price=110.0, gain_r=1.0),
+    ))
+    position = book.positions[0]
+    assert position.last_price == 110.0
+    assert position.last_gain_r == 1.0
+
+
+def test_a_held_position_is_still_stamped_and_marked(tmp_path):
+    """"Held" is a pass too -- the manager looked and saw a price."""
+    book = pf.read_book(audit(
+        tmp_path,
+        entry(price=100.0, stop=90.0, qty=10),
+        managed(action="held", price=104.0, gain_r=0.4, old_stop=90.0, new_stop=90.0),
+    ))
+    position = book.positions[0]
+    assert position.last_price == 104.0
+    assert position.last_managed is not None
+
+
+def test_a_recorded_mark_is_labelled_recorded_not_live():
+    p = pf.Position("LLY", "buy", 10, 100.0, 90.0, last_price=110.0)
+    mark = pf.Book(positions=(p,)).mark_for(p)
+    assert mark.known and mark.source == pf.RECORDED and mark.is_live is False
+
+
+def test_a_supplied_price_wins_over_the_recorded_one():
+    p = pf.Position("LLY", "buy", 10, 100.0, 90.0, last_price=110.0)
+    mark = pf.Book(positions=(p,), prices={"LLY": 130.0}).mark_for(p)
+    assert mark.price == 130.0 and mark.source == pf.LIVE
+
+
+def test_marks_known_is_not_marks_are_live():
+    """The page leans on the difference, so it is pinned here."""
+    p = pf.Position("LLY", "buy", 10, 100.0, 90.0, last_price=110.0)
+    book = pf.Book(positions=(p,))
+    assert book.marks_known is True
+    assert book.marks_are_live is False
+
+
+def test_our_r_multiple_agrees_with_the_managers_own(tmp_path):
+    """Cross-check against the engine rather than trusting our own formula.
+
+    ``app.position_manager`` computes ``gain_r`` from its own R; this module
+    computes one from the entry and the entry stop. They are different code
+    paths over the same position and must not disagree.
+    """
+    book = pf.read_book(audit(
+        tmp_path,
+        entry(ticker="EMB", side="sell", qty=128, price=93.395, stop=94.18),
+        managed(ticker="EMB", action="stop_raised", new_stop=94.05,
+                price=93.265, gain_r=0.16),
+    ))
+    position = book.positions[0]
+    ours = position.recorded_mark().r_multiple
+    assert ours == pytest.approx(position.last_gain_r, abs=0.02)

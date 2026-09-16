@@ -304,7 +304,12 @@ def _tiles(book: Book) -> str:
         ),
     ]
     if pnl is not None:
-        tiles.append(("Unrealised", "$" + _signed(pnl, 0), "against supplied prices", False))
+        tiles.append((
+            "Unrealised",
+            "$" + _signed(pnl, 0),
+            "at live prices" if book.marks_are_live else "at the last recorded prices",
+            False,
+        ))
 
     out = ['<section class="strip">']
     for key, value, sub, flag in tiles:
@@ -345,15 +350,21 @@ def _position_row(book: Book, p: Position) -> str:
         f'<td class="num">{_e(_money(abs(p.risk_dollars), 0))}{protected}</td>',
     ]
     if book.marks_known:
-        cells.append(
-            f'<td class="num">{_e(_signed(mark.unrealised, 0))}'
-            + (
+        if mark.known:
+            detail = (
                 f'<span class="sub">{_e(f"{mark.r_multiple:+.2f}R")}</span>'
                 if mark.r_multiple is not None
-                else '<span class="sub">no quote</span>'
+                else ""
             )
-            + "</td>"
-        )
+            cells.append(
+                f'<td class="num">{_e(_signed(mark.unrealised, 0))}{detail}</td>'
+            )
+        else:
+            # Opened this cycle, so the manager has not looked at it yet. Said
+            # plainly rather than shown as a zero, which would read as flat.
+            cells.append(
+                '<td class="num">—<span class="sub">not checked yet</span></td>'
+            )
     cells.append(f'<td class="l"><span class="rung">{rungs}</span></td>')
     return "<tr>" + "".join(cells) + "</tr>"
 
@@ -369,7 +380,9 @@ def _book_table(book: Book) -> str:
         ("Stop in force", ""), ("Size", ""), ("Risk", ""),
     ]
     if book.marks_known:
-        headers.append(("Unrealised", ""))
+        headers.append(
+            ("Unrealised" if book.marks_are_live else "Unrealised (recorded)", "")
+        )
     headers.append(("Ladder", "l"))
 
     rows = "".join(
@@ -458,11 +471,21 @@ def _not_yet(book: Book, days: int) -> str:
     notes = []
     if not book.marks_known:
         notes.append((
-            "No live prices, so no profit or loss",
-            "The record carries each entry and its stop, not a current quote. "
+            "No prices yet, so no profit or loss",
+            "The record carries each entry and its stop, and the position "
+            "manager has not yet written down a price for anything held. "
             "Rather than compute something that looks like P&L from a stale "
-            "entry price, this page leaves it out. Supply prices and an "
-            "unrealised column appears.",
+            "entry, this page leaves it out until there is a real mark.",
+        ))
+    elif not book.marks_are_live:
+        stamps = [m.as_of for m in (book.mark_for(p) for p in book.positions) if m.as_of]
+        when = _stamp(max(stamps)) if stamps else "the last cycle"
+        notes.append((
+            f"Profit and loss is as of {when}, not now",
+            "These are the prices the position manager wrote down when it last "
+            "checked the book, which is the most recent mark the record holds. "
+            "They are a cycle old, not live, and a position opened since then "
+            "has no mark at all. Supply current prices to replace them.",
         ))
     if days < CHART_MIN_DAYS:
         notes.append((
@@ -492,7 +515,7 @@ def render(book: Book, *, days_of_history: int = 0) -> str:
     if book.positions:
         lede = (
             f"{len(book.positions)} positions are open — {longs} long and "
-            f"{shorts} short — carrying {_money(book.notional, 0)} of exposure. "
+            f"{shorts} short — carrying ${_money(book.notional, 0)} of exposure. "
             f"If every stop filled at once the book would "
             + ("give back " if book.risk_dollars >= 0 else "keep ")
             + f"${_money(abs(book.risk_dollars), 0)}."

@@ -75,6 +75,12 @@ STOP_RAISED = "stop_raised"
 #: Rungs on the ladder, in order, as ``app.position_manager`` applies them.
 LADDER_RUNGS = (1.0, 3.0)
 
+#: Where a mark's price came from. The distinction is the whole point: a
+#: live quote is now, a recorded one is as of the last management pass, and
+#: presenting the second as the first is the lie this module exists to avoid.
+LIVE = "live"
+RECORDED = "recorded"
+
 
 def _num(value: Any) -> Optional[float]:
     """A float, or None for anything that is not a real number.
@@ -104,8 +110,14 @@ class Position:
     rungs_taken: int = 0
     #: The stop as last moved, when a rung or a trail has moved it.
     current_stop: Optional[float] = None
-    #: When a rung or trail last touched this position.
+    #: When the manager last looked at this position, whatever it decided.
     last_managed: Optional[str] = None
+    #: The price the manager saw on that pass. Not a live quote -- a mark the
+    #: record actually kept, which is the only kind this module will report.
+    last_price: Optional[float] = None
+    #: The gain in R the manager computed on that pass, kept as a cross-check
+    #: on this module's own arithmetic rather than as the number displayed.
+    last_gain_r: Optional[float] = None
 
     # -- identity ---------------------------------------------------------
 
@@ -183,7 +195,9 @@ class Position:
 
     # -- what needs a quote -----------------------------------------------
 
-    def mark(self, price: Optional[float]) -> "Mark":
+    def mark(
+        self, price: Optional[float], source: str = LIVE, as_of: Optional[str] = None
+    ) -> "Mark":
         """This position's standing at ``price``, or an empty standing."""
         if price is None or not self.entry_price:
             return Mark()
@@ -194,7 +208,13 @@ class Position:
             unrealised=move * self.quantity,
             pct=move / self.entry_price * 100.0,
             r_multiple=(move / one_r) if one_r else None,
+            source=source,
+            as_of=as_of,
         )
+
+    def recorded_mark(self) -> "Mark":
+        """The standing at the last price the manager wrote down, if any."""
+        return self.mark(self.last_price, RECORDED, self.last_managed)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -217,21 +237,30 @@ class Position:
             "stop_distance_pct": self.stop_distance_pct,
             "protected": self.protected,
             "last_managed": self.last_managed,
+            "last_price": self.last_price,
+            "last_gain_r": self.last_gain_r,
         }
 
 
 @dataclass(frozen=True)
 class Mark:
-    """A position's standing against a current price. Empty without one."""
+    """A position's standing against a price, and where that price came from."""
 
     price: Optional[float] = None
     unrealised: Optional[float] = None
     pct: Optional[float] = None
     r_multiple: Optional[float] = None
+    source: str = ""
+    #: When the price was observed. ``None`` for a supplied live quote.
+    as_of: Optional[str] = None
 
     @property
     def known(self) -> bool:
         return self.price is not None
+
+    @property
+    def is_live(self) -> bool:
+        return self.source == LIVE
 
 
 @dataclass(frozen=True)
@@ -326,6 +355,12 @@ class Book:
 
     @property
     def marks_known(self) -> bool:
+        """True when any position can be marked at all, live or recorded."""
+        return any(self.mark_for(p).known for p in self.positions)
+
+    @property
+    def marks_are_live(self) -> bool:
+        """True only when a price was supplied for at least one position."""
         return any(p.ticker in self.prices for p in self.positions)
 
     @property
@@ -333,12 +368,21 @@ class Book:
         """Book P&L, or None when no quote was supplied for any position."""
         if not self.marks_known:
             return None
-        return sum(
-            (p.mark(self.prices.get(p.ticker)).unrealised or 0.0) for p in self.positions
-        )
+        return sum((self.mark_for(p).unrealised or 0.0) for p in self.positions)
 
     def mark_for(self, position: Position) -> Mark:
-        return position.mark(self.prices.get(position.ticker))
+        """A supplied price if there is one, else the last one recorded.
+
+        Preferring the supplied price matters: a caller who went and fetched a
+        quote wants that quote, not a mark from the last management pass. The
+        fallback is what makes the page useful without one -- the manager
+        writes down the price it saw, so the record does hold a mark, just not
+        a current one. Which it is travels with the number.
+        """
+        live = self.prices.get(position.ticker)
+        if live is not None:
+            return position.mark(live)
+        return position.recorded_mark()
 
     # -- exposure ---------------------------------------------------------
 
@@ -490,6 +534,8 @@ def read_book(
                 "rungs_taken": 0,
                 "current_stop": None,
                 "last_managed": None,
+                "last_price": None,
+                "last_gain_r": None,
             }
 
         elif event == MANAGED_EVENT:
@@ -508,8 +554,16 @@ def read_book(
                     held["quantity"] = int(remaining)
                 if isinstance(action.get("rung"), int):
                     held["rungs_taken"] = max(held["rungs_taken"], int(action["rung"]))
-            if kind in (TRANCHE, STOP_RAISED):
-                held["last_managed"] = stamp or None
+            # Every pass stamps the position, including a "held": the
+            # manager did look, and "when was this last checked" is the
+            # question the stamp answers. Price and gain come from any pass,
+            # because the manager records them whatever it decides.
+            held["last_managed"] = stamp or None
+            price, gain = _num(action.get("price")), _num(action.get("gain_r"))
+            if price is not None:
+                held["last_price"] = price
+            if gain is not None:
+                held["last_gain_r"] = gain
 
     positions = tuple(
         Position(**data)
