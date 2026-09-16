@@ -141,6 +141,7 @@ def as_json(run) -> dict:
     drift = metrics.conviction_drift(run.entries, run.floor)
     with_gaps, gap_kinds = metrics.gap_summary(run.entries)
     comparison = metrics.blend_comparison(run.blend_signals)
+    promotion = metrics.promotion_verdict(comparison, report.MIN_SAMPLE)
 
     return {
         "horizon": run.horizon,
@@ -169,6 +170,8 @@ def as_json(run) -> dict:
             "disagreements": comparison.disagreements,
             "model_hit_rate_when_disagreeing": comparison.model_hit_rate_when_disagreeing,
             "blend_hit_rate_when_disagreeing": comparison.blend_hit_rate_when_disagreeing,
+            # The daily job reads this and opens an issue the first day it is true.
+            "promotion": {"ready": promotion.ready, "reason": promotion.reason},
         },
         "agreement": {
             "aligned_n": agreement.aligned_n,
