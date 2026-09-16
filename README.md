@@ -256,6 +256,16 @@ Alongside `bias`, `conviction` and `rationale`, the model reports a score in
 are **inert**: they are journalled for later evaluation and nothing in the
 execution or risk engine reads them. A CI invariant check enforces that.
 
+**A learned blend of the five scores runs beside the model, in shadow.**
+`orchestrator/blend.py` reads `logs/blend_weights.json` once per cycle and
+writes a `blend` record on every full-model journal line: the composite, which
+dimensions had a score, the weights actually applied and the level they came
+from (ticker, instrument kind, global, or equal weights while nothing has been
+learned). `BLEND_MODE` is pinned to `shadow` by a CI invariant, so the
+composite is recorded next to realised returns and cannot touch a trade until
+the walk-forward report has shown it should. The arithmetic lives in
+`analysis/blend.py`; the weights file is written by a separate trainer.
+
 The call is constrained at generation time: `orchestrator/llm.py` derives a
 JSON schema from `LLMSignal` and passes it as `output_config.format`, so the
 model physically cannot emit a `quantity` field to be rejected later. Value
@@ -480,6 +490,7 @@ Try adding `"quantity": 500` to that payload — it will be rejected with a
 |---|---|
 | LLM cannot set qty/price/order params | `schemas.py` (`extra="forbid"`) — structural, not a convention |
 | Scores and `key_factors` cannot influence a trade | Only `bias` and `conviction` are read by `execution_engine.py`; CI greps the execution path for the transparency fields |
+| The learned blend cannot influence a trade | `BLEND_MODE` is pinned to `shadow`; CI greps the execution path and the dispatcher for the blend's output and checks that only the journal reads it |
 | Enriched context can't reach for a credential | CI greps `context.py` / `technicals.py` / `fundamentals.py` / `analysts.py` for settings and key reads |
 | The scorer cannot trade | CI greps `analysis/` for any order path or file write — it grades past decisions and must never be able to make one |
 | Prompt injection has a bounded blast radius | Headlines and firm names are third-party text. The system prompt marks the whole context block untrusted, and even a successful injection can only move `bias`/`conviction` — still subject to the conviction floor, the per-instrument cap, the group and sleeve limits, the gross exposure cap, and a mandatory stop |

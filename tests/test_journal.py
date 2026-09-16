@@ -75,3 +75,17 @@ def test_one_line_per_ticker_per_cycle(_journal_to_tmp, ctx):
     for _ in range(3):
         journal.record(ctx, SIGNAL)
     assert len(read_lines(_journal_to_tmp)) == 3
+
+
+def test_the_blend_record_is_written_beside_the_signal(_journal_to_tmp, ctx):
+    record = {"mode": "shadow", "composite": 0.31, "level": "equal"}
+    journal.record(ctx, SIGNAL, blend=record)
+    (line,) = read_lines(journal.cfg.SIGNAL_JOURNAL_PATH)
+    assert line["blend"] == record
+    assert line["signal"]["conviction"] == 0.72
+
+
+def test_a_line_without_a_blend_says_so_explicitly(_journal_to_tmp, ctx):
+    journal.record(ctx, SIGNAL)
+    (line,) = read_lines(journal.cfg.SIGNAL_JOURNAL_PATH)
+    assert "blend" in line and line["blend"] is None

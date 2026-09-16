@@ -820,3 +820,89 @@ def test_a_near_zero_holding_cost_is_named_as_a_finding_not_a_blank():
     prompt = hb.system_prompt_for("SLV").replace("\n", " ")
     assert "a figure near zero is a finding rather than a blank" in prompt
     assert "you are paying only the fee" in prompt
+
+
+# --------------------------------------------------------------------------- #
+# The learned blend, in shadow
+# --------------------------------------------------------------------------- #
+
+
+def _capture_journal(monkeypatch) -> list[dict]:
+    calls: list[dict] = []
+    monkeypatch.setattr(hb.journal, "record", lambda *args, **kwargs: calls.append(kwargs))
+    return calls
+
+
+def test_process_ticker_journals_the_blend_beside_an_untouched_signal(monkeypatch):
+    monkeypatch.setattr(hb, "fetch_news", lambda t: ["news"])
+    monkeypatch.setattr(hb, "call_llm", lambda s, u, j: completion({
+        "ticker": "AAPL", "bias": "BULLISH", "conviction": 0.9, "rationale": "r",
+        "news_score": 1.0, "technical_score": 0.5, "insider_score": None,
+    }))
+    posted = []
+    monkeypatch.setattr(hb, "post_signal", lambda s, dispatcher=None: (posted.append(s), {"status": "ACCEPTED"})[1])
+    calls = _capture_journal(monkeypatch)
+
+    hb.process_ticker("AAPL")
+
+    (kwargs,) = calls
+    record = kwargs["blend"]
+    assert record["mode"] == "shadow"
+    assert record["source"] == "missing"          # no weights file: equal weights, and it says so
+    assert record["level"] == "equal"
+    assert record["composite"] == pytest.approx((1.0 + 0.5) / 5)
+    assert record["used"] == ["news_score", "technical_score"]
+    # What reached the engine is the model's own signal, untouched.
+    assert posted[0].conviction == 0.9 and posted[0].bias.value == "BULLISH"
+
+
+def test_a_screened_ticker_carries_no_blend(monkeypatch):
+    monkeypatch.setattr(hb, "fetch_news", lambda t: ["news"])
+    monkeypatch.setattr(hb, "SCREENING_ENABLED", True)
+    monkeypatch.setattr(hb, "screen_signal", lambda s, u, j: completion(
+        {"ticker": "AAPL", "bias": "NEUTRAL", "conviction": 0.1, "rationale": "r", "news_score": 0.9}))
+    monkeypatch.setattr(hb, "call_llm", lambda *a: pytest.fail("the full model must not be asked"))
+    calls = _capture_journal(monkeypatch)
+
+    result = hb.process_ticker("AAPL")
+
+    assert result.stage == hb.SCREENED
+    (kwargs,) = calls
+    assert kwargs.get("blend") is None
+
+
+def test_a_blend_failure_is_journalled_and_costs_nothing(monkeypatch):
+    monkeypatch.setattr(hb, "fetch_news", lambda t: ["news"])
+    monkeypatch.setattr(hb, "call_llm", lambda s, u, j: completion(
+        {"ticker": "AAPL", "bias": "BULLISH", "conviction": 0.9, "rationale": "r"}))
+    monkeypatch.setattr(hb.blend, "blend_signal", lambda *a: (_ for _ in ()).throw(RuntimeError("boom")))
+    posted = []
+    monkeypatch.setattr(hb, "post_signal", lambda s, dispatcher=None: (posted.append(s), {"status": "ACCEPTED"})[1])
+    calls = _capture_journal(monkeypatch)
+
+    hb.process_ticker("AAPL")
+
+    assert len(posted) == 1
+    assert calls[0]["blend"] == {"mode": "shadow", "error": "RuntimeError: boom"}
+
+
+def test_a_cycle_reads_the_weights_once_for_every_ticker(monkeypatch):
+    monkeypatch.setattr(hb, "get_settings", lambda: Settings(watchlist="AAPL,MSFT", _env_file=None))
+    monkeypatch.setattr(hb, "fetch_fx_rate", lambda: FxRate(rate=3.0363))
+    monkeypatch.setattr(hb, "fetch_news", lambda t: ["news"])
+    monkeypatch.setattr(hb, "SCREENING_ENABLED", False)
+
+    def answer(system, user, schema):
+        ticker = "AAPL" if "TICKER: AAPL" in user else "MSFT"
+        return completion({"ticker": ticker, "bias": "BULLISH", "conviction": 0.9, "rationale": "r"})
+
+    monkeypatch.setattr(hb, "call_llm", answer)
+    loads = []
+    real = hb.blend.load_weights
+    monkeypatch.setattr(hb.blend, "load_weights", lambda *a, **k: (loads.append(k), real(*a, **k))[1])
+    calls = _capture_journal(monkeypatch)
+
+    hb.run_cycle(_PlainDispatcher())
+
+    assert len(loads) == 1 and loads[0]["model"] == hb.MODEL
+    assert [c["blend"]["source"] for c in calls] == ["missing", "missing"]

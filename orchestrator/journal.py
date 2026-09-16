@@ -58,6 +58,7 @@ def record(
     usage: Optional[Usage] = None,
     fx: Optional[FxRate] = None,
     screen: Optional[dict[str, Any]] = None,
+    blend: Optional[dict[str, Any]] = None,
 ) -> None:
     """Write one journal line. Swallows its own failures by design."""
     try:
@@ -88,6 +89,11 @@ def record(
                 # it escalated, are numbers the journal answers rather than
                 # assumptions the funnel rests on.
                 "screen": screen,
+                # The learned blend of the five scores, computed in shadow
+                # beside the model's answer. Recorded so the composite can be
+                # scored against realised returns exactly as conviction is;
+                # nothing in the cycle reads it back.
+                "blend": blend,
             },
         )
     except Exception:  # noqa: BLE001 - journalling must not break the cycle

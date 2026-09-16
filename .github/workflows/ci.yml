@@ -176,14 +176,40 @@ jobs:
         # the extra words stay inert: bias and conviction are the only fields
         # the engine may act on.
         run: |
-          hits=$(grep -rnE '\b([a-z_]+_score|key_factors)\b' \
-                   app/execution_engine.py app/risk_engine.py app/broker_client.py || true)
+          hits=$(grep -rnE '\b([a-z_]+_score|key_factors|blend[a-z_]*|composite)\b' \
+                   app/execution_engine.py app/risk_engine.py app/broker_client.py orchestrator/dispatch.py || true)
           if [ -n "$hits" ]; then
             echo "$hits"
             echo "::error::a transparency field is referenced in the execution path"
             exit 1
           fi
-          echo "OK: scores and key_factors are inert"
+          echo "OK: scores, key_factors and the blend are inert"
+
+      - name: The learned blend runs in shadow
+        # orchestrator/blend.py computes a composite of the five scores and the
+        # journal records it. Until the walk-forward report has shown, on
+        # realised returns, that the composite beats the model's own
+        # conviction, it must not be able to touch a trade: the mode is pinned
+        # to shadow, and the only orchestrator module that may read what the
+        # blend produced is the journal that writes it down.
+        run: |
+          if ! grep -qE '^BLEND_MODE: Final\[str\] = "shadow"$' config/settings.py; then
+            echo "::error::BLEND_MODE must be the Final constant \"shadow\" until the report says otherwise"
+            exit 1
+          fi
+          hits=$(grep -rnE 'blend_signal|blend_record|\bcomposite\b' \
+                   orchestrator --include='*.py' \
+                 | grep -vE '^orchestrator/(blend|heartbeat|journal)\.py:' || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::the blend's output is read outside the modules that compute and journal it"
+            exit 1
+          fi
+          if grep -nE 'post_signal\([^)]*blend' orchestrator/heartbeat.py; then
+            echo "::error::the blend must not be handed to post_signal"
+            exit 1
+          fi
+          echo "OK: the blend is shadow-only"
 
       - name: Instrument kind is never taken from the signal
         # An ETF's position cap is four times a single name's. That makes the
