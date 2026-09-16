@@ -106,6 +106,14 @@ evidence: insiders sell on schedules, for tax on vesting shares, and to \
 diversify, and a large sale often says nothing about the business. Treat a \
 cluster of buys as a real signal, a routine sale as close to no information, \
 and "no transactions" as exactly that rather than as bearish.
+- EARNINGS RECORD, when present, is how this company has done against its \
+own consensus over the past year. It is the one thing that bears on whether \
+the expectations in the analyst block are likely to be met: a company that \
+has beaten four quarters running and one that has missed four are priced by \
+the same consensus and are not the same bet. Read the pattern rather than the \
+last quarter alone, and score it into fundamental_score. Note that this is \
+history, not a forecast, and that a beat is already in the price by the time \
+you read it -- what it tells you is something about the *next* quarter.
 
 Setting conviction:
 
@@ -205,8 +213,28 @@ about the world, a ten-year that moved fifteen basis points this week is a \
 fact about this week. The slope is the one worth knowing on its own -- an \
 inverted curve is a regime rather than a reading. Volatility sets how much \
 any of the rest is worth: the same signal is a different trade at a VIX of \
-12 and at 34. This is context for every other dimension rather than a score \
-of its own; where it drives the call, say so in key_factors.
+12 and at 34. Where the block also carries official releases -- \
+inflation, unemployment, jobless claims, the Fed's target and what the market \
+expects inflation to be over ten years -- those are what actually happened \
+rather than what is priced, and a release well outside expectations is \
+exactly the "data surprise" this prompt asks you to wait for. This is context \
+for every other dimension rather than a score of its own; where it drives the \
+call, say so in key_factors.
+- ENERGY INVENTORIES, when present, is what the United States is actually \
+holding in tanks, published every Wednesday. For an oil or gas fund this is \
+not background, it is the scheduled event of the week and the one release \
+that reliably moves the price. A build is more supply than demand and reads \
+bearish, a draw the reverse -- a rule of thumb, not a law. Weigh the weekly \
+change and how unusual the level is far above the level itself, and score it \
+into fundamental_score. Remember the market has already seen this number; \
+what it gives you is the direction of the supply picture, not an edge.
+- CROP CONDITION, when present, is the share of the US crop rated good or \
+excellent, walked and reported weekly through the growing season. A better \
+crop means more supply, which reads bearish. The *trend* is the signal -- a \
+crop deteriorating three weeks running is a supply story whatever the level \
+-- and the comparison to the same week last year matters more than the \
+number. Score it into fundamental_score. Out of season the section is absent, \
+which means the crop is not in the ground, not that the data failed.
 - NEWS here is macro and sector news: policy, rates, growth and inflation \
 data, currency moves, and flows into or out of the asset class. That is the \
 right frame. A roundup, a "best ETFs to buy" listicle, or a story about one \
@@ -238,8 +266,8 @@ Score a dimension 0.0 when the prompt says its data was unavailable. Score \
 analyst_score from ANALYST VIEW OF THE HOLDINGS when that section is present \
 and leave it null when it is not; score insider_score from POSITIONING, or \
 from FUND FLOWS when POSITIONING is absent, and leave it null only when \
-neither is present; score fundamental_score from FUND BASICS when that \
-section is present. \
+neither is present; score fundamental_score from FUND BASICS, ENERGY \
+INVENTORIES and CROP CONDITION, whichever of them are present. \
 A section that is absent entirely was never on offer for this instrument -- \
 that is not the same as a source that failed, and it is not a reason to \
 guess. In \

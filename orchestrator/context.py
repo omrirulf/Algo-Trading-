@@ -30,8 +30,9 @@ from typing import Any, Optional, Sequence
 from config import settings as cfg
 from config.instruments import is_fund
 from orchestrator import (
-    analysts, flows, formatting as fmt, fundamentals, funds, holdings, insiders,
-    macro, positioning, technicals,
+    analysts, crops, earnings, energy, flows, formatting as fmt, fred,
+    fundamentals, funds, holdings, insiders, macro, positioning, sources,
+    technicals,
 )
 from orchestrator.technicals import TechnicalSnapshot
 
@@ -45,6 +46,13 @@ HISTORY_PERIOD = "2y"
 #: heartbeat runs daily. Caching them keeps an unauthenticated, rate-limited
 #: data source from being asked the same question 24 times a day.
 SLOW_DATA_TTL_SECONDS = 6 * 60 * 60
+
+def _this_year() -> int:
+    """The calendar year, as the USDA labels a growing season."""
+    from datetime import date
+
+    return date.today().year
+
 
 #: History pulled for each macro symbol. A month of sessions, so a one-week
 #: change has a full week of trading days behind it even across a holiday.
@@ -81,6 +89,15 @@ class RawMarketData:
     share_reading: tuple = ()
     #: Histories for the macro symbols, keyed by Yahoo symbol.
     macro_histories: dict[str, Any] = field(default_factory=dict)
+    #: Official statistical releases, keyed by label. Empty without a key.
+    macro_releases: dict[str, Any] = field(default_factory=dict)
+    #: Quarterly earnings surprises. Empty without a Finnhub key.
+    earnings_rows: list = field(default_factory=list)
+    #: EIA weekly stocks, keyed by series label. Empty without an EIA key.
+    energy_payloads: dict[str, Any] = field(default_factory=dict)
+    #: USDA condition rows for this season and last. Empty without a key.
+    crop_rows: list = field(default_factory=list)
+    crop_rows_last_year: list = field(default_factory=list)
     gaps: list[str] = field(default_factory=list)
 
 
@@ -99,6 +116,11 @@ class _SlowData:
     shares_series: Any
     share_reading: tuple
     macro_histories: dict[str, Any]
+    macro_releases: dict[str, Any]
+    earnings_rows: list
+    energy_payloads: dict[str, Any]
+    crop_rows: list
+    crop_rows_last_year: list
     gaps: list[str]
 
 
@@ -127,6 +149,8 @@ class YFinanceContextProvider:
         #: The macro block is the same for every ticker in a cycle, so it is
         #: cached once rather than once per ticker.
         self._macro_cache: Optional[tuple[float, dict[str, Any]]] = None
+        #: Likewise for the official releases: one fetch, every ticker.
+        self._release_cache: Optional[tuple[float, dict[str, Any]]] = None
 
     def fetch(self, ticker: str) -> RawMarketData:
         try:
@@ -157,6 +181,11 @@ class YFinanceContextProvider:
             shares_series=slow.shares_series,
             share_reading=slow.share_reading,
             macro_histories=slow.macro_histories,
+            macro_releases=slow.macro_releases,
+            earnings_rows=slow.earnings_rows,
+            energy_payloads=slow.energy_payloads,
+            crop_rows=slow.crop_rows,
+            crop_rows_last_year=slow.crop_rows_last_year,
             gaps=history_gaps + slow.gaps,
         )
 
@@ -185,6 +214,13 @@ class YFinanceContextProvider:
             if is_fund(ticker) else None,
             share_reading=flows.reading_from_info(info) if is_fund(ticker) else (),
             macro_histories=self._macro_histories(ticker, gaps),
+            macro_releases=self._macro_releases(ticker),
+            earnings_rows=(
+                [] if is_fund(ticker) else sources.fetch_earnings_rows(ticker)
+            ),
+            energy_payloads=sources.fetch_energy_payloads(ticker),
+            crop_rows=sources.fetch_crop_rows(ticker, _this_year()),
+            crop_rows_last_year=sources.fetch_crop_rows(ticker, _this_year() - 1),
             info=info,
             calendar=_attempt(lambda: handle.calendar, "earnings calendar", gaps),
             recommendations=_attempt(
@@ -229,6 +265,21 @@ class YFinanceContextProvider:
             # 404s must not cost the others.
             payloads[name] = _attempt(lambda n=name: getattr(data, n, None), f"fund {name}", gaps)
         return payloads
+
+    def _macro_releases(self, ticker: str) -> dict[str, Any]:
+        """Inflation, jobs and claims -- when a FRED key is configured.
+
+        No gap is recorded when there is no key. An absent optional source is
+        not a failure, and telling the model to score something 0.0 because a
+        key it never had is missing would be worse than saying nothing.
+        """
+        if not is_fund(ticker):
+            return {}
+        if self._release_cache and self._release_cache[0] > time.monotonic():
+            return self._release_cache[1]
+        releases = fred.build_releases(sources.fetch_fred_releases())
+        self._release_cache = (time.monotonic() + self._ttl, releases)
+        return releases
 
     @staticmethod
     def _positioning_rows(ticker: str, gaps: list[str]) -> list[dict]:
@@ -371,11 +422,14 @@ ENRICHMENT_SECTIONS = (
     ("TECHNICALS (daily bars)", "technicals"),
     ("MACRO (the weather every fund trades in)", "macro"),
     ("FUNDAMENTALS", "fundamentals"),
+    ("EARNINGS RECORD", "earnings"),
     ("FUND BASICS", "funds"),
     ("ANALYST & INSTITUTIONAL VIEW", "analysts"),
     ("ANALYST VIEW OF THE HOLDINGS", "holdings"),
     ("INSIDER ACTIVITY", "insiders"),
     ("POSITIONING (CFTC, weekly)", "positioning"),
+    ("ENERGY INVENTORIES (EIA, weekly)", "energy"),
+    ("CROP CONDITION (USDA, weekly)", "crops"),
     ("FUND FLOWS (creations and redemptions)", "flows"),
 )
 
@@ -391,14 +445,26 @@ ENRICHMENT_SECTIONS = (
 #: next earnings date -- which rendered as seven blanks and, for bond funds,
 #: occasionally as nonsense: the first 80-ticker cycle showed the model a
 #: forward P/E of -4,036 for a Treasury fund. Funds get ``funds`` instead.
-SINGLE_NAME_ONLY_SECTIONS = frozenset({"fundamentals", "analysts", "insiders"})
+SINGLE_NAME_ONLY_SECTIONS = frozenset(
+    {"fundamentals", "analysts", "insiders", "earnings"}
+)
 
 #: The mirror image: sections that only exist for a fund. Both are omitted
 #: when absent rather than rendered as unavailable, because absent here means
 #: "this kind of thing does not have one" -- gold has no holdings to report,
 #: and a single-country fund has no futures contract. A fetch that was
 #: attempted and failed still records a gap, so the two cases stay distinct.
-FUND_ONLY_SECTIONS = frozenset({"funds", "holdings", "macro", "positioning", "flows"})
+FUND_ONLY_SECTIONS = frozenset(
+    {"funds", "holdings", "macro", "positioning", "flows", "energy", "crops"}
+)
+
+
+#: Sections that are omitted outright when absent rather than rendered as
+#: "unavailable this cycle". Every fund-only section qualifies, and so does
+#: ``earnings``: it needs a key that is optional by design, and a system that
+#: works without one must not tell the model a source failed when there was
+#: never a source to fail.
+OPTIONAL_SECTIONS = FUND_ONLY_SECTIONS | {"earnings"}
 
 
 @dataclass(frozen=True)
@@ -428,6 +494,12 @@ class TickerContext:
     #: Rates, the curve, the dollar and volatility. The same for every ticker
     #: in a cycle, which is why the provider fetches it once.
     macro: Optional[macro.MacroSnapshot] = None
+    #: A company's record against its own consensus. Needs a Finnhub key.
+    earnings: Optional[earnings.EarningsSnapshot] = None
+    #: What the United States is holding in tanks. Needs an EIA key.
+    energy: Optional[energy.EnergySnapshot] = None
+    #: How the crop is doing. Needs a USDA key, and a crop in the ground.
+    crops: Optional[crops.CropSnapshot] = None
     #: ``(shares, source)`` measured this cycle, for the caller to append to
     #: the fund-size log. Not part of the prompt: it is the *series* the model
     #: reads, and one reading is not a series.
@@ -449,6 +521,9 @@ class TickerContext:
             "positioning": self.positioning.as_dict() if self.positioning else None,
             "flows": self.flows.as_dict() if self.flows else None,
             "macro": self.macro.as_dict() if self.macro else None,
+            "earnings": self.earnings.as_dict() if self.earnings else None,
+            "energy": self.energy.as_dict() if self.energy else None,
+            "crops": self.crops.as_dict() if self.crops else None,
             "gaps": list(self.gaps),
         }
 
@@ -461,7 +536,7 @@ class TickerContext:
             if not fund and attribute in FUND_ONLY_SECTIONS:
                 continue
             value = getattr(self, attribute)
-            if value is None and attribute in FUND_ONLY_SECTIONS:
+            if value is None and attribute in OPTIONAL_SECTIONS:
                 # Never on offer for this ticker, or fetched and failed -- in
                 # which case a gap already says so. Either way, printing a
                 # form of blanks would be the thing this replaced.
@@ -547,10 +622,38 @@ def gather(
             gaps,
         )
 
+    earnings_snapshot = None
+    if company and raw.earnings_rows:
+        earnings_snapshot = _attempt(
+            lambda: earnings.build_snapshot(ticker, raw.earnings_rows),
+            "earnings record",
+            gaps,
+        )
+
+    energy_snapshot = None
+    if raw.energy_payloads:
+        energy_snapshot = _attempt(
+            lambda: energy.build_snapshot(ticker, raw.energy_payloads),
+            "energy inventories",
+            gaps,
+        )
+
+    crop_snapshot = None
+    if raw.crop_rows:
+        crop_snapshot = _attempt(
+            lambda: crops.build_snapshot(
+                ticker, raw.crop_rows, raw.crop_rows_last_year, year=_this_year()
+            ),
+            "crop condition",
+            gaps,
+        )
+
     macro_snapshot = None
-    if raw.macro_histories:
+    if raw.macro_histories or raw.macro_releases:
         macro_snapshot = _attempt(
-            lambda: macro.build_snapshot(raw.macro_histories), "macro", gaps
+            lambda: macro.build_snapshot(raw.macro_histories, raw.macro_releases),
+            "macro",
+            gaps
         )
 
     positioning_snapshot = None
@@ -612,6 +715,9 @@ def gather(
         positioning=positioning_snapshot,
         flows=flow_snapshot,
         macro=macro_snapshot,
+        earnings=earnings_snapshot,
+        energy=energy_snapshot,
+        crops=crop_snapshot,
         share_reading=raw.share_reading,
         gaps=gaps,
     )

@@ -43,6 +43,37 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Do the keyed sources answer, and under which name
+        # Four free keys, and the single most likely way this goes wrong is a
+        # key stored under a name nothing reads -- which is silent, because an
+        # absent key is a legitimate state everywhere else in this system.
+        #
+        # Every plausible spelling is passed through and the script reports
+        # which one carried each key. A secret that does not exist becomes an
+        # empty string here, which is exactly the "not set" case.
+        #
+        # The script never prints a key, and scrubs any that an error body
+        # echoes back, because this output is uploaded as an artifact.
+        continue-on-error: true
+        env:
+          EIA_API_KEY: ${{ secrets.EIA_API_KEY }}
+          EIA_KEY: ${{ secrets.EIA_KEY }}
+          EIA_TOKEN: ${{ secrets.EIA_TOKEN }}
+          USDA_NASS_KEY: ${{ secrets.USDA_NASS_KEY }}
+          USDA_API_KEY: ${{ secrets.USDA_API_KEY }}
+          NASS_API_KEY: ${{ secrets.NASS_API_KEY }}
+          USDA_KEY: ${{ secrets.USDA_KEY }}
+          NASS_KEY: ${{ secrets.NASS_KEY }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          FRED_KEY: ${{ secrets.FRED_KEY }}
+          FRED_TOKEN: ${{ secrets.FRED_TOKEN }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          FINNHUB_KEY: ${{ secrets.FINNHUB_KEY }}
+          FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
+        run: |
+          set -o pipefail
+          python backtest/probe_keyed_sources.py | tee keys.txt
+
       - name: CFTC positioning answers
         # The weekly Commitments of Traders report is the one source here with
         # no fallback: if the endpoint or the contract names move, the
@@ -76,6 +107,74 @@ jobs:
         run: |
           set -o pipefail
           python backtest/probe_fund_data.py ${{ inputs.tickers }} | tee funds.txt
+
+      - name: The four keyed blocks, as the model would read them
+        # The probe above proves the keys work. This proves the *blocks* do:
+        # a key that answers and a section that renders correctly are two
+        # different things, and the fund block taught us which one costs more
+        # to get wrong.
+        continue-on-error: true
+        env:
+          EIA_API_KEY: ${{ secrets.EIA_API_KEY }}
+          USDA_NASS_KEY: ${{ secrets.USDA_NASS_KEY }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+        run: |
+          set -o pipefail
+          python - <<'EOF' | tee keyed-blocks.txt
+          from datetime import date
+
+          from orchestrator import crops, earnings, energy, fred, sources
+
+          print("configured:", sources.configured())
+          print()
+
+          print("=== MACRO releases (FRED) ===")
+          releases = fred.build_releases(sources.fetch_fred_releases())
+          for line in fred.as_lines(releases) or ["  (nothing returned)"]:
+              print(f"  {line}")
+
+          print()
+          print("=== ENERGY INVENTORIES (EIA) ===")
+          for ticker in sorted(energy.COVERAGE):
+              snap = energy.build_snapshot(ticker, sources.fetch_energy_payloads(ticker))
+              if snap is None:
+                  print(f"  {ticker:<5} nothing returned")
+                  continue
+              print(f"  {ticker}:")
+              for line in snap.as_lines()[:-1]:
+                  print(f"    {line}")
+
+          print()
+          print("=== CROP CONDITION (USDA) ===")
+          year = date.today().year
+          for ticker in sorted(crops.COMMODITIES):
+              snap = crops.build_snapshot(
+                  ticker,
+                  sources.fetch_crop_rows(ticker, year),
+                  sources.fetch_crop_rows(ticker, year - 1),
+                  year=year,
+              )
+              if snap is None:
+                  print(f"  {ticker:<5} out of season or nothing returned")
+                  continue
+              print(f"  {ticker}:")
+              for line in snap.as_lines()[:-1]:
+                  print(f"    {line}")
+
+          print()
+          print("=== EARNINGS RECORD (Finnhub) ===")
+          from config.instruments import SINGLE_NAMES
+          missing = []
+          for ticker in SINGLE_NAMES:
+              snap = earnings.build_snapshot(ticker, sources.fetch_earnings_rows(ticker))
+              if snap is None:
+                  missing.append(ticker)
+                  continue
+              print(f"  {ticker:<6} {snap.as_lines()[0].split(': ', 1)[1]}")
+          if missing:
+              print(f"  -> no history for: {', '.join(missing)}")
+          EOF
 
       - name: The macro backdrop
         # Six index symbols, and the one that matters is the curve: the slope
@@ -119,6 +218,11 @@ jobs:
         if: always()
         run: |
           {
+            echo '## Keyed sources'
+            echo
+            echo '```'
+            cat keys.txt 2>/dev/null || echo "(did not run)"
+            echo '```'
             echo '## CFTC positioning'
             echo
             echo '```'
@@ -128,6 +232,11 @@ jobs:
             echo
             echo '```'
             cat funds.txt 2>/dev/null || echo "(did not run)"
+            echo '```'
+            echo '## Keyed blocks'
+            echo
+            echo '```'
+            cat keyed-blocks.txt 2>/dev/null || echo "(did not run)"
             echo '```'
             echo '## Macro'
             echo
@@ -141,6 +250,8 @@ jobs:
         with:
           name: data-sources
           path: |
+            keys.txt
+            keyed-blocks.txt
             positioning.txt
             funds.txt
             funds-raw.txt

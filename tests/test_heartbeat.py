@@ -737,3 +737,53 @@ def test_macro_is_context_rather_than_a_sixth_score():
 
 def test_a_single_name_gets_no_macro_block_either():
     assert "MACRO" not in hb.system_prompt_for("MSFT")
+
+
+def test_the_company_prompt_explains_the_earnings_record():
+    """Two companies on the same consensus, one that has beaten four quarters
+    running and one that has missed four, are not the same bet."""
+    prompt = hb.system_prompt_for("MSFT").replace("\n", " ")
+    assert "EARNINGS RECORD" in prompt
+    assert "score it into fundamental_score" in prompt
+    assert "history, not a forecast" in prompt
+    assert "already in the price by the time you read it" in prompt
+
+
+def test_the_fund_prompt_explains_the_two_supply_sections():
+    prompt = hb.system_prompt_for("USO").replace("\n", " ")
+    assert "ENERGY INVENTORIES" in prompt
+    assert "the scheduled event of the week" in prompt
+    assert "A build is more supply than demand and reads bearish" in prompt
+    assert "CROP CONDITION" in prompt
+    assert "The *trend* is the signal" in prompt
+
+
+def test_a_supply_read_is_a_rule_of_thumb_rather_than_a_law():
+    prompt = hb.system_prompt_for("UNG").replace("\n", " ")
+    assert "a rule of thumb, not a law" in prompt
+    assert "the market has already seen this number" in prompt
+
+
+def test_out_of_season_is_explained_so_absence_is_not_read_as_failure():
+    prompt = hb.system_prompt_for("CORN").replace("\n", " ")
+    assert "the crop is not in the ground, not that the data failed" in prompt
+
+
+def test_the_three_supply_sections_all_feed_the_same_score():
+    """Five score fields and eight sections. Each has to be told where to go
+    or the model will pick one at random."""
+    prompt = hb.system_prompt_for("XLE").replace("\n", " ")
+    assert ("score fundamental_score from FUND BASICS, ENERGY INVENTORIES and "
+            "CROP CONDITION, whichever of them are present") in prompt
+
+
+def test_the_macro_block_says_what_the_official_releases_are_for():
+    prompt = hb.system_prompt_for("TLT").replace("\n", " ")
+    assert "what actually happened rather than what is priced" in prompt
+    assert 'exactly the "data surprise" this prompt asks you to wait for' in prompt
+
+
+def test_the_company_prompt_learned_nothing_about_supply_or_crops():
+    prompt = hb.system_prompt_for("XOM")
+    for phrase in ("ENERGY INVENTORIES", "CROP CONDITION", "MACRO", "FUND BASICS"):
+        assert phrase not in prompt
