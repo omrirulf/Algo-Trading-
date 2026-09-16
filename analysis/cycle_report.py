@@ -43,8 +43,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from config import settings as cfg  # noqa: E402
 from config.instruments import InstrumentKind, kind_for, name_for, sleeve_label  # noqa: E402
 from orchestrator import (  # noqa: E402
-    analysts, flows, fundamentals, funds, holdings, insiders, macro, positioning,
-    technicals,
+    analysts, crops, earnings, energy, flows, fundamentals, funds, holdings,
+    insiders, macro, positioning, technicals,
 )
 from orchestrator.news import absolute_url  # noqa: E402
 
@@ -83,6 +83,9 @@ SCORE_SECTIONS = (
     ("technical_score", "technicals", "Price and chart"),
     ("fundamental_score", "fundamentals", "Company numbers"),
     ("fundamental_score", "funds", "What this fund holds"),
+    ("fundamental_score", "earnings", "Does this company beat its own forecasts"),
+    ("fundamental_score", "energy", "How much oil and gas is in storage"),
+    ("fundamental_score", "crops", "How the crop is growing"),
     ("analyst_score", "analysts", "What analysts and big funds say"),
     ("analyst_score", "holdings", "What analysts say about what this fund holds"),
     ("insider_score", "insiders", "Buying and selling by company insiders"),
@@ -135,6 +138,9 @@ GLOSSARY = (
     ("Beta", "How hard a fund swings compared with the whole market. Beta 1.0 moves with the market, 2.0 swings twice as hard, 0.5 half as hard."),
     ("Yield curve", "The gap between what the government pays to borrow for three months and for ten years. Normally ten years costs more. When it costs less -- an \"inverted\" curve -- markets are expecting a slowdown."),
     ("VIX", "How nervous the market is about the next month. Under 15 is calm, over 25 is stressed."),
+    ("Build and draw", "A build means more oil or gas went into storage than came out last week, so there is more supply around — usually bad for the price. A draw is the opposite."),
+    ("Good or excellent", "The share of a US crop that government inspectors rate as healthy. A healthier crop means more grain, which usually pushes the price down."),
+    ("Beat and miss", "A company beat if it earned more than analysts forecast, and missed if it earned less."),
 )
 
 
@@ -305,6 +311,9 @@ _SNAPSHOT_CLASSES: dict[str, tuple[type, dict[str, type]]] = {
     "funds": (funds.FundSnapshot, {}),
     "holdings": (holdings.HoldingsSnapshot, {}),
     "macro": (macro.MacroSnapshot, {}),
+    "earnings": (earnings.EarningsSnapshot, {"quarters": earnings.Quarter}),
+    "energy": (energy.EnergySnapshot, {"stocks": energy.Stock}),
+    "crops": (crops.CropSnapshot, {}),
     "positioning": (positioning.PositioningSnapshot, {}),
     "flows": (flows.FlowSnapshot, {"windows": flows.FlowWindow}),
 }

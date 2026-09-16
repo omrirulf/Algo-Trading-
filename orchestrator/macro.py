@@ -19,6 +19,13 @@ somebody's summary of it:
 * **Volatility**, because the same signal means different things at a VIX of
   12 and a VIX of 34.
 
+Those six are prices, which say what traders think. What actually *happened*
+-- an inflation print, a jobs number, a claims figure -- is published by the
+statistical agencies and reaches this block through ``orchestrator.fred``,
+when a key for it is configured. With no key the block is four lines instead
+of six and nothing else changes: a key is a way to see more, never a thing
+the system depends on.
+
 Funds only, for now. The company prompt is the input every replay and sanity
 baseline was measured against, and changing it would invalidate all of them
 for a block that matters far less to a single name than to an index.
@@ -32,7 +39,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any, Optional
 
-from orchestrator import formatting as fmt
+from orchestrator import formatting as fmt, fred
 
 #: Yahoo symbols, in the order they are read out. The yields are quoted in
 #: percent already (``^TNX`` of 4.12 means 4.12%), which is why nothing here
@@ -125,6 +132,9 @@ class MacroSnapshot:
     dollar_change: Optional[float] = None
     volatility: Optional[float] = None
     volatility_change: Optional[float] = None
+    #: Official releases, already rendered. Stored as the lines the model was
+    #: shown rather than as numbers: this is the record of what it read.
+    release_lines: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict:
         return asdict(self)
@@ -133,6 +143,11 @@ class MacroSnapshot:
         parts = []
         for _, label in YIELD_SYMBOLS:
             level = self.yields.get(label)
+            if level is None:
+                # No trailing per-cent sign on a blank: "5-year n/a%" reads
+                # like a number that happens to be missing its digits.
+                parts.append(f"{label} {fmt.NA}")
+                continue
             change = self.yield_changes.get(label)
             parts.append(
                 f"{label} {fmt.num(level)}% ({_move(change)} on the week)"
@@ -153,10 +168,14 @@ class MacroSnapshot:
             f"({_move(self.volatility_change, digits=1)} on the week) -- "
             f"{_vix_band(self.volatility)}"
         )
+        lines.extend(self.release_lines)
         return lines
 
 
-def build_snapshot(histories: Optional[dict[str, Any]] = None) -> Optional[MacroSnapshot]:
+def build_snapshot(
+    histories: Optional[dict[str, Any]] = None,
+    releases: Optional[dict] = None,
+) -> Optional[MacroSnapshot]:
     """The macro block, or ``None`` when not one number arrived.
 
     ``None`` rather than four lines of ``n/a``: a block that says nothing four
@@ -179,7 +198,9 @@ def build_snapshot(histories: Optional[dict[str, Any]] = None) -> Optional[Macro
     if "10-year" in yields and "3-month" in yields:
         slope = yields["10-year"] - yields["3-month"]
 
-    if not yields and dollar is None and volatility is None:
+    release_lines = fred.as_lines(releases)
+
+    if not yields and dollar is None and volatility is None and not release_lines:
         return None
 
     return MacroSnapshot(
@@ -190,6 +211,7 @@ def build_snapshot(histories: Optional[dict[str, Any]] = None) -> Optional[Macro
         dollar_change=dollar_change,
         volatility=volatility,
         volatility_change=volatility_change,
+        release_lines=release_lines,
     )
 
 

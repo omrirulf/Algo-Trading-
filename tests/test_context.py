@@ -13,7 +13,7 @@ import types
 
 import pytest
 
-from orchestrator import context, flows
+from orchestrator import context, flows, fred
 from tests.test_analysts import HOLDERS, INFO as ANALYST_INFO, RECOMMENDATIONS, UPGRADES
 from tests.test_fundamentals import INFO as FUNDAMENTAL_INFO
 from tests.test_insiders import PURCHASES, TRANSACTIONS
@@ -175,13 +175,14 @@ def test_total_blackout_still_produces_a_usable_context():
     prompt = ctx.as_prompt()
 
     assert "Chipmaker raises guidance" in prompt
-    # Every enrichment section *that applies to a company* says so rather than
-    # silently rendering empty. The fund-only sections are not counted: a
-    # single name has no holdings and no futures contract, so they are absent
-    # by kind rather than by outage.
+    # Every enrichment section *that applies to a company and was asked for*
+    # says so rather than silently rendering empty. Two kinds are not counted:
+    # the fund-only ones, which a single name is absent from by kind rather
+    # than by outage, and the ones behind an optional key, which were never on
+    # offer at all when no key is configured.
     company_sections = [
         attribute for _, attribute in context.ENRICHMENT_SECTIONS
-        if attribute not in context.FUND_ONLY_SECTIONS
+        if attribute not in context.OPTIONAL_SECTIONS
     ]
     assert prompt.count("unavailable this cycle") == len(company_sections)
     assert "FUND BASICS" not in prompt and "POSITIONING" not in prompt
@@ -308,19 +309,48 @@ def headings(prompt: str) -> list[str]:
     return [title for title in ALL_HEADINGS if title in lines]
 
 
+#: What a single name has always been asked, and what every replay and sanity
+#: baseline was measured against.
+COMPANY_HEADINGS = [
+    "NEWS (past 24 hours)",
+    "TECHNICALS (daily bars)",
+    "FUNDAMENTALS",
+    "ANALYST & INSTITUTIONAL VIEW",
+    "INSIDER ACTIVITY",
+]
+
+
 def test_a_company_is_asked_exactly_what_it_was_asked_before():
-    """The company prompt is the input every replay and sanity baseline was
-    measured against. Adding fund sections must not have moved a byte of it."""
+    """No fund section, and no keyed section, has moved a byte of it."""
     prompt = context.gather("NVDA", HEADLINES, provider=full_provider()).as_prompt()
+    assert headings(prompt) == COMPANY_HEADINGS
+    assert "FUND BASICS" not in prompt
+    assert "POSITIONING" not in prompt
+
+
+def test_the_one_thing_that_does_change_the_company_prompt_is_deliberate():
+    """`EARNINGS RECORD` is the single addition to a single name's context
+    since those baselines were set, and it only appears where a Finnhub key
+    produced rows. It is a heading of its own rather than extra lines hidden
+    inside `FUNDAMENTALS`: if the input is changing, the change should be
+    visible in the shape of the question, not buried in an existing answer."""
+    prompt = context.gather("NVDA", HEADLINES, provider=FakeProvider(
+        history=make_frame([100.0 + i * 0.1 for i in range(300)]),
+        info=INFO, earnings_rows=FINNHUB_ROWS,
+    )).as_prompt()
     assert headings(prompt) == [
         "NEWS (past 24 hours)",
         "TECHNICALS (daily bars)",
         "FUNDAMENTALS",
+        "EARNINGS RECORD",
         "ANALYST & INSTITUTIONAL VIEW",
         "INSIDER ACTIVITY",
     ]
-    assert "FUND BASICS" not in prompt
-    assert "POSITIONING" not in prompt
+    # Every other new section stays out of a company's prompt entirely.
+    for heading in ("FUND BASICS", "POSITIONING", "MACRO", "FUND FLOWS",
+                    "ENERGY INVENTORIES", "CROP CONDITION",
+                    "ANALYST VIEW OF THE HOLDINGS"):
+        assert heading not in prompt
 
 
 def test_a_company_never_fetches_the_fund_sources():
@@ -650,3 +680,167 @@ def test_missed_holdings_are_one_gap_line_rather_than_five():
         "XLE", {"top_holdings": {"XOM": 0.2, "CVX": 0.1, "COP": 0.05}}, gaps)
     assert len(gaps) == 1
     assert "3 holdings" in gaps[0] and "XOM, CVX, COP" in gaps[0]
+
+
+# --------------------------------------------------------------------------- #
+# The keyed sources: absent without a key, and applied to the right kinds
+# --------------------------------------------------------------------------- #
+
+
+EIA_PAYLOAD = {"crude": {"response": {"data": [
+    {"period": "2026-09-04", "value": 424069}, {"period": "2026-08-28", "value": 424460},
+] + [{"period": "x", "value": 430000} for _ in range(30)]}}}
+USDA_ROWS = [
+    {"reference_period_desc": f"WEEK #{w}", "unit_desc": u, "Value": str(v)}
+    for w, g, e in ((22, 52, 10), (23, 53, 12), (24, 54, 12))
+    for u, v in (("PCT GOOD", g), ("PCT EXCELLENT", e))
+]
+FINNHUB_ROWS = [
+    {"period": "2026-06-30", "actual": 4.74, "estimate": 4.3274, "surprisePercent": 9.53},
+    {"period": "2026-03-31", "actual": 3.46, "estimate": 3.22, "surprisePercent": 7.45},
+]
+FRED_RELEASES = {
+    "inflation": fred.Release("inflation", 2.9, "2026-08-01", "percent"),
+    "policy_rate": fred.Release("policy_rate", 4.25, "2026-09-15", "percent"),
+}
+
+
+def test_an_oil_fund_is_told_what_is_in_the_tanks():
+    ctx = context.gather("USO", HEADLINES, provider=FakeProvider(
+        history=make_frame([100.0 + i * 0.1 for i in range(300)]),
+        energy_payloads=EIA_PAYLOAD,
+    ))
+    prompt = ctx.as_prompt()
+    assert "ENERGY INVENTORIES (EIA, weekly)" in prompt
+    assert "Crude oil: 424.1 million barrels" in prompt
+    assert "a draw" in prompt
+
+
+def test_a_grain_fund_is_told_how_the_crop_is_growing():
+    ctx = context.gather("CORN", HEADLINES, provider=FakeProvider(
+        history=make_frame([100.0 + i * 0.1 for i in range(300)]),
+        crop_rows=USDA_ROWS,
+    ))
+    prompt = ctx.as_prompt()
+    assert "CROP CONDITION (USDA, weekly)" in prompt
+    assert "Corn rated good or excellent: 66%" in prompt
+
+
+def test_a_company_is_told_whether_it_beats_its_own_forecasts():
+    ctx = context.gather("MSFT", HEADLINES, provider=FakeProvider(
+        history=make_frame([100.0 + i * 0.1 for i in range(300)]),
+        info=INFO, earnings_rows=FINNHUB_ROWS,
+    ))
+    prompt = ctx.as_prompt()
+    assert "EARNINGS RECORD" in prompt
+    assert "2 beats" in prompt
+
+
+def test_the_macro_block_carries_the_official_releases_when_a_key_is_configured():
+    ctx = context.gather("TLT", HEADLINES, provider=FakeProvider(
+        history=make_frame([100.0 + i * 0.1 for i in range(300)]),
+        macro_releases=FRED_RELEASES,
+    ))
+    prompt = ctx.as_prompt()
+    assert "Latest US data: inflation 2.9%" in prompt
+    assert "Fed target 4.25%" in prompt
+
+
+# --- a key is a way to see more, never a thing the system depends on ----------
+
+
+def test_without_any_keys_every_keyed_section_is_absent_not_unavailable():
+    """An absent optional source is not a failure. Rendering it as
+    "unavailable this cycle" would tell the model to score 0.0 something that
+    was never on offer."""
+    for ticker in ("USO", "CORN", "MSFT", "TLT"):
+        prompt = context.gather(ticker, HEADLINES, provider=FakeProvider(
+            history=make_frame([100.0 + i * 0.1 for i in range(300)]),
+            info=INFO,
+        )).as_prompt()
+        for heading in ("ENERGY INVENTORIES", "CROP CONDITION", "EARNINGS RECORD"):
+            assert f"{heading}\n- unavailable this cycle" not in prompt
+
+
+def test_no_keys_means_no_gaps_recorded_for_them():
+    ctx = context.gather("USO", HEADLINES, provider=FakeProvider(
+        history=make_frame([100.0 + i * 0.1 for i in range(300)]),
+    ))
+    joined = " ".join(ctx.gaps)
+    assert "energy" not in joined and "crop" not in joined and "earnings record" not in joined
+
+
+# --- the right kinds, and only those ------------------------------------------
+
+
+@pytest.mark.parametrize("ticker", ["GLD", "CORN", "TLT", "RSP", "MSFT"])
+def test_energy_never_reaches_a_ticker_with_no_energy_exposure(ticker):
+    ctx = context.gather(ticker, HEADLINES, provider=FakeProvider(
+        history=make_frame([100.0 + i * 0.1 for i in range(300)]),
+        info=INFO, energy_payloads=EIA_PAYLOAD,
+    ))
+    assert ctx.energy is None
+    assert "ENERGY INVENTORIES" not in ctx.as_prompt()
+
+
+@pytest.mark.parametrize("ticker", ["GLD", "USO", "XLE", "MSFT"])
+def test_crop_condition_never_reaches_a_ticker_with_no_crop(ticker):
+    ctx = context.gather(ticker, HEADLINES, provider=FakeProvider(
+        history=make_frame([100.0 + i * 0.1 for i in range(300)]),
+        info=INFO, crop_rows=USDA_ROWS,
+    ))
+    assert ctx.crops is None
+
+
+def test_a_fund_is_never_asked_whether_it_beat_its_earnings():
+    """A fund has no earnings to beat, and the section is single-name-only in
+    both directions: not built, and not rendered."""
+    ctx = context.gather("XLE", HEADLINES, provider=FakeProvider(
+        history=make_frame([100.0 + i * 0.1 for i in range(300)]),
+        earnings_rows=FINNHUB_ROWS,
+    ))
+    assert ctx.earnings is None
+    assert "EARNINGS RECORD" not in ctx.as_prompt()
+
+
+def test_a_single_name_is_never_given_the_macro_releases():
+    ctx = context.gather("MSFT", HEADLINES, provider=FakeProvider(
+        history=make_frame([100.0 + i * 0.1 for i in range(300)]),
+        info=INFO, macro_releases=FRED_RELEASES,
+    ))
+    assert "MACRO" not in ctx.as_prompt()
+
+
+def test_the_keyed_sections_reach_the_journal_so_a_signal_can_be_audited():
+    ctx = context.gather("USO", HEADLINES, provider=FakeProvider(
+        history=make_frame([100.0 + i * 0.1 for i in range(300)]),
+        energy_payloads=EIA_PAYLOAD,
+    ))
+    assert ctx.as_dict()["energy"]["stocks"][0]["name"] == "Crude oil"
+
+
+# --- the provider refuses to ask for what does not apply ----------------------
+
+
+def test_a_fund_is_never_asked_for_an_earnings_history(monkeypatch, tmp_path):
+    """A fund has no earnings to beat. Asking anyway would spend a call per
+    fund per cycle to be told so -- and the skip also means a Finnhub outage
+    cannot gap an index. The other three sources decide applicability inside
+    `orchestrator.sources`, where the keys live; this is the one rule that
+    needs to know the instrument kind, which is why it is here."""
+    asked: list[str] = []
+
+    def spy(ticker, client=None):
+        asked.append(ticker)
+        return FINNHUB_ROWS
+
+    monkeypatch.setattr(context.sources, "fetch_earnings_rows", spy)
+    provider = _provider_with(monkeypatch, tmp_path, ETF_INFO)
+
+    for ticker in ("XLE", "GLD", "TLT"):
+        assert provider.fetch(ticker).earnings_rows == []
+    assert asked == []
+
+    # ...and a single name is asked, or the section could never appear.
+    assert provider.fetch("MSFT").earnings_rows == FINNHUB_ROWS
+    assert asked == ["MSFT"]

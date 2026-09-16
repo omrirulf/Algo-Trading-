@@ -333,6 +333,14 @@ jobs:
         # context source, which is a check that fails open -- exactly how
         # insiders.py went uncovered when it was added.
         #
+        # sources.py joined this list rather than four modules joining it.
+        # Four free data sources need a key, and the choice was between four
+        # files that each read the environment or one that does it for all of
+        # them. One is auditable; four is a list that grows. The parsing
+        # modules stay pure, and a test asserts from the inside that they
+        # contain no environment read, no HTTP client and no key at all, so
+        # the reason survives a rewrite of this grep.
+        #
         # Matches credential *reads* -- a settings lookup, an environment
         # read, or attribute access on a credential-shaped name -- rather
         # than any line mentioning the word, so prose about prompt tokens in
@@ -340,13 +348,31 @@ jobs:
         run: |
           hits=$(grep -rnE '(get_settings|os\.environ|getenv|\bsettings\.|\.[A-Za-z_]*(secret|api_key|_token|password)\b)' \
                    orchestrator --include='*.py' \
-                 | grep -vE '^orchestrator/(heartbeat|news|llm|dispatch)\.py:' || true)
+                 | grep -vE '^orchestrator/(heartbeat|news|llm|dispatch|sources)\.py:' || true)
           if [ -n "$hits" ]; then
             echo "$hits"
             echo "::error::market context modules must not read credentials"
             exit 1
           fi
           echo "OK: market context needs no credentials"
+
+      - name: The one module that holds a key cannot put it in a prompt
+        # sources.py is allowed to read credentials. This is the other half of
+        # that permission: it may fetch and nothing else. It must not render
+        # prompt text, and it must not write files.
+        #
+        # The stake is concrete. The signal journal is committed back to this
+        # repository every cycle, so a key that reached a snapshot would reach
+        # a prompt and then a public git history, where it cannot be recalled.
+        run: |
+          hits=$(grep -nE '(as_lines|as_prompt|as_dict|\.write_text\(|open\([^)]*["'"'"'][wa])' \
+                   orchestrator/sources.py || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::orchestrator/sources.py must only fetch: no rendering, no writing"
+            exit 1
+          fi
+          echo "OK: the credentialed module only fetches"
 
       - name: The scorer is read-only
         # analysis/ grades past decisions. It must never be able to make one:

@@ -31,14 +31,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import httpx  # noqa: E402
 
-#: Every name a key might plausibly have been stored under. The first that is
-#: set wins. Generous on purpose: a key under an unread name is invisible.
-CANDIDATES = {
-    "EIA": ("EIA_API_KEY", "EIA_KEY", "EIA_TOKEN"),
-    "USDA": ("USDA_NASS_KEY", "USDA_API_KEY", "NASS_API_KEY", "USDA_KEY", "NASS_KEY"),
-    "FRED": ("FRED_API_KEY", "FRED_KEY", "FRED_TOKEN"),
-    "FINNHUB": ("FINNHUB_API_KEY", "FINNHUB_KEY", "FINNHUB_TOKEN"),
-}
+from orchestrator import sources  # noqa: E402
+
+#: Every name a key might plausibly have been stored under, taken from the
+#: module that actually reads them so this can never drift out of step with
+#: what the cycle looks for. Generous on purpose: a key stored under a name
+#: nothing reads is invisible.
+CANDIDATES = {source.upper(): names for source, names in sources.KEY_ENV_VARS.items()}
 
 TIMEOUT = 30.0
 
