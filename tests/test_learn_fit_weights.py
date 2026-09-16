@@ -157,3 +157,36 @@ def test_a_missing_journal_is_exit_1_and_bad_arguments_exit_2(tmp_path, capsys):
     assert fw.main(["--journal", str(tmp_path / "none.log"), "--out", str(tmp_path / "w.json")]) == 1
     assert fw.main(["--horizon", "0"]) == 2
     assert fw.main(["--since", "2026-01-01"]) == 2
+
+
+
+def test_the_calibration_is_fitted_from_journalled_composites_once_there_are_enough(tmp_path, monkeypatch):
+    journal = tmp_path / "signal_journal.log"
+    lines = []
+    for d in range(30):
+        line = payload(day=d, news=0.5)
+        line["blend"] = {"mode": "shadow", "composite": 0.4, "level": "equal"}   # prices rise: right every time
+        lines.append(json.dumps(line) + "\n")
+    journal.write_text("".join(lines))
+    out = tmp_path / "blend_weights.json"
+    monkeypatch.setattr(fw, "YFinancePriceSource", lambda: RisingSource(sessions=400))
+    assert fw.main(["--journal", str(journal), "--out", str(out)]) == 0
+    artifact = WeightsArtifact.from_dict(json.loads(out.read_text()))
+    assert artifact.calibration is not None
+    assert artifact.calibration.n == 30
+    assert artifact.calibration.probability(0.4) == pytest.approx(1.0)
+
+
+def test_no_calibration_below_the_minimum_and_a_zero_composite_is_not_a_call(tmp_path, monkeypatch, capsys):
+    journal = tmp_path / "signal_journal.log"
+    lines = []
+    for d in range(10):
+        line = payload(day=d, news=0.5)
+        line["blend"] = {"mode": "shadow", "composite": 0.4 if d else 0.0, "level": "equal"}
+        lines.append(json.dumps(line) + "\n")
+    journal.write_text("".join(lines))
+    out = tmp_path / "blend_weights.json"
+    monkeypatch.setattr(fw, "YFinancePriceSource", lambda: RisingSource(sessions=400))
+    assert fw.main(["--journal", str(journal), "--out", str(out)]) == 0
+    assert WeightsArtifact.from_dict(json.loads(out.read_text())).calibration is None
+    assert "calibration: none stored (9 journalled composites" in capsys.readouterr().out

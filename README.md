@@ -482,8 +482,12 @@ twenty observations of its own. The heartbeat workflow runs it after every
 cycle and commits the file with the journal, so each cycle applies the
 weights the previous one fitted. A signal whose horizon has not elapsed is
 pending and left out, so a refit never learns from a return that is not in
-yet. The package writes exactly that one file and has no order path; CI checks
-both, and checks that the cycle never imports it.
+yet. Beside the weights it fits a calibration: an isotonic map from the
+composite's magnitude to how often that direction was right, over the
+composites the journal actually recorded, which is what would turn a composite
+into a conviction the engine's floor can read. Nothing reads it while
+`BLEND_MODE` is `shadow`. The package writes exactly that one file and has no
+order path; CI checks both, and checks that the cycle never imports it.
 
 ## Test the guardrails directly
 

@@ -85,6 +85,11 @@ DEFAULT_RIDGE = 1.0
 
 SESSIONS_PER_YEAR = 252
 
+#: Journalled composites a calibration needs before it is stored at all.
+#: Mirrors the scorer's ``MIN_SAMPLE``: below it, nothing is stored for a
+#: live mode to read.
+MIN_CALIBRATION = 20
+
 
 # --------------------------------------------------------------------------- #
 # Applying weights
@@ -142,6 +147,97 @@ def chain_for(ticker: str) -> tuple[str, ...]:
     """The levels a ticker reads from, most specific first."""
     symbol = ticker.strip().upper()
     return (f"ticker:{symbol}", f"kind:{kind_for(symbol).value}", GLOBAL_KEY)
+
+
+# --------------------------------------------------------------------------- #
+# Calibration: composite magnitude -> how often that direction was right
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True)
+class Calibration:
+    """A monotone map from the composite's magnitude to a hit probability.
+
+    Fitted by isotonic regression on the composites the journal recorded and
+    the returns that followed, so a conviction of 0.6 read off it means the
+    direction was right six times in ten at that strength -- the same thing
+    the engine's floor has always assumed conviction meant.
+    """
+
+    #: ``(magnitude, probability)`` knots, ascending in magnitude.
+    knots: tuple[tuple[float, float], ...]
+    #: Observations behind the fit.
+    n: int
+
+    def probability(self, magnitude: float) -> float:
+        """Linear between knots, flat beyond the ends."""
+        magnitude = abs(float(magnitude))
+        if magnitude <= self.knots[0][0]:
+            return self.knots[0][1]
+        for (left_m, left_p), (right_m, right_p) in zip(self.knots, self.knots[1:]):
+            if magnitude <= right_m:
+                span = right_m - left_m
+                share = (magnitude - left_m) / span if span > 0 else 1.0
+                return left_p + share * (right_p - left_p)
+        return self.knots[-1][1]
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"knots": [[m, p] for m, p in self.knots], "n": self.n}
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "Calibration":
+        knots = tuple((float(m), float(p)) for m, p in payload["knots"])
+        if not knots:
+            raise ValueError("a calibration needs at least one knot")
+        return cls(knots=knots, n=int(payload.get("n", 0)))
+
+
+def fit_calibration(
+    observations: Iterable[tuple[float, bool, float]],
+    *,
+    minimum: int = MIN_CALIBRATION,
+) -> Optional[Calibration]:
+    """Isotonic regression of hit on composite magnitude.
+
+    ``observations`` are ``(magnitude, hit, weight)``. Pool-adjacent-violators
+    over the magnitudes in ascending order: any run where a stronger composite
+    was right less often than a weaker one is pooled into one block, so the
+    map can only rise. ``None`` below ``minimum`` observations -- a curve
+    through a dozen points is a drawing, not a calibration.
+    """
+    # Points at one magnitude are one block from the start: isotonic
+    # regression is over distinct magnitudes, and a block's probability is
+    # the weighted hit rate of everything at or pooled into it.
+    grouped: dict[float, list[float]] = {}
+    count = 0
+    for magnitude, hit, weight in observations:
+        if not (_finite(magnitude) and _finite(weight)) or weight <= 0:
+            continue
+        count += 1
+        block = grouped.setdefault(abs(float(magnitude)), [0.0, 0.0])
+        block[0] += float(weight)
+        block[1] += float(weight) * (1.0 if hit else 0.0)
+    if count < minimum:
+        return None
+    # Each block: [weight, weighted hits, lowest magnitude, highest magnitude].
+    blocks: list[list[float]] = []
+    for magnitude in sorted(grouped):
+        weight, hits = grouped[magnitude]
+        blocks.append([weight, hits, magnitude, magnitude])
+        while len(blocks) > 1 and blocks[-2][1] / blocks[-2][0] > blocks[-1][1] / blocks[-1][0]:
+            last = blocks.pop()
+            prev = blocks[-1]
+            blocks[-1] = [prev[0] + last[0], prev[1] + last[1], prev[2], last[3]]
+    # Flat across each block's range, linear across the gap to the next: the
+    # step function the regression fitted, joined so a magnitude between two
+    # blocks is not a cliff.
+    knots: list[tuple[float, float]] = []
+    for weight, hits, low, high in blocks:
+        probability = hits / weight
+        knots.append((low, probability))
+        if high > low:
+            knots.append((high, probability))
+    return Calibration(knots=tuple(knots), n=count)
 
 
 # --------------------------------------------------------------------------- #
@@ -211,6 +307,9 @@ class WeightsArtifact:
     prior_strength: float
     ridge: float
     levels: dict[str, LevelWeights]
+    #: Magnitude-to-hit-rate map fitted on the composites the journal recorded.
+    #: ``None`` until enough have a realised return behind them.
+    calibration: Optional[Calibration] = None
     version: int = ARTIFACT_VERSION
 
     def to_dict(self) -> dict[str, Any]:
@@ -224,6 +323,7 @@ class WeightsArtifact:
             "prior_strength": self.prior_strength,
             "ridge": self.ridge,
             "levels": {key: level.as_dict() for key, level in sorted(self.levels.items())},
+            "calibration": self.calibration.as_dict() if self.calibration else None,
         }
 
     @classmethod
@@ -241,6 +341,9 @@ class WeightsArtifact:
             prior_strength=float(payload["prior_strength"]),
             ridge=float(payload.get("ridge", DEFAULT_RIDGE)),
             levels={key: LevelWeights.from_dict(value) for key, value in payload["levels"].items()},
+            calibration=(
+                Calibration.from_dict(payload["calibration"]) if payload.get("calibration") else None
+            ),
             version=int(version),
         )
 
