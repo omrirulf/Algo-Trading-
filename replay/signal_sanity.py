@@ -49,7 +49,9 @@ from config import settings as cfg  # noqa: E402
 from config.instruments import kind_for  # noqa: E402
 from config.watchlist import DEFAULT_WATCHLIST  # noqa: E402
 from orchestrator.context import TickerContext  # noqa: E402
-from orchestrator.llm import BatchRequest, Completion, LLMError, batch_custom_id  # noqa: E402
+from orchestrator.llm import (  # noqa: E402
+    BATCH_TIMEOUT_SECONDS, BatchRequest, Completion, LLMError, batch_custom_id,
+)
 from orchestrator.pricing import Usage  # noqa: E402
 
 # --------------------------------------------------------------------------- #
@@ -434,6 +436,11 @@ def main(argv: list[str] | None = None) -> int:
     collect.add_argument("--trials", type=Path, required=True)
     collect.add_argument("--batch", required=True, metavar="BATCH_ID")
     collect.add_argument("--json", action="store_true", dest="as_json")
+    collect.add_argument(
+        "--timeout-minutes", type=float, default=BATCH_TIMEOUT_SECONDS / 60.0,
+        help="how long to wait for the batch before printing its id and giving up; "
+             "the caller sets this from its own job timeout, minus a margin",
+    )
 
     args = parser.parse_args(argv)
 
@@ -473,7 +480,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"submitted {len(prompts)} requests as {batch_id}", file=sys.stderr)
         return 0
 
-    results = provider.collect_batch(args.batch)
+    results = provider.collect_batch(args.batch, timeout_seconds=args.timeout_minutes * 60.0)
     apply_results(trials, results, parse_signal)
     report = assemble(trials, tickers)
     print(json.dumps(report.as_dict(), indent=2) if args.as_json else render(report))

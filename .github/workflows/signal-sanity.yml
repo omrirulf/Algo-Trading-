@@ -8,6 +8,13 @@ name: signal sanity
 #
 # Runs through the Message Batches API at half price. No broker credential is
 # needed or provided: nothing here can trade.
+#
+# Two clocks, and they are deliberately not equal. This job's
+# `timeout-minutes` kills the process; `--timeout-minutes` below makes the
+# collector give up first and *print the batch id*. That ordering is the whole
+# safety net: the API allows a batch up to 24 hours, and a batch that outlives
+# its job is still finished and still paid for, so the id is the only way back
+# to it without buying a second one. Keep the inner clock under the outer one.
 on:
   workflow_dispatch:
     inputs:
@@ -17,14 +24,22 @@ on:
       resume:
         description: "A batch id to collect instead of submitting a new one"
         default: ""
+      trials_run_id:
+        description: "With `resume`: the run id whose signal-sanity artifact holds sanity_trials.json"
+        default: ""
 
 permissions:
   contents: read
+  # Only to download the original run's artifact when resuming. A batch is
+  # keyed by custom_id, and only that run's sanity_trials.json says which
+  # ticker and which arm each custom_id belongs to; without it the results
+  # cannot be read back.
+  actions: read
 
 jobs:
   sanity:
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    timeout-minutes: 240
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -32,6 +47,23 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: pip install -r requirements.txt
+
+      - name: A resume needs the run it is resuming
+        if: inputs.resume != '' && inputs.trials_run_id == ''
+        run: |
+          echo "::error::resume needs trials_run_id -- the run id whose signal-sanity artifact holds sanity_trials.json"
+          exit 1
+
+      - name: Fetch the original run's trials
+        if: inputs.resume != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: signal-sanity
+          run-id: ${{ inputs.trials_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          # Into a subdirectory, so the old run's sanity.txt cannot be
+          # mistaken for this one's and re-uploaded as a fresh result.
+          path: resumed
 
       - name: Plan, submit, collect
         # Three stages over stdout, because nothing under replay/ may write a
@@ -45,20 +77,25 @@ jobs:
           set -o pipefail
           if [ -n "${{ inputs.resume }}" ]; then
             echo "${{ inputs.resume }}" > batch_id
-            test -s sanity_trials.json || { echo "::error::resume needs sanity_trials.json from the original run's artifact"; exit 1; }
+            cp resumed/sanity_trials.json .
+            test -s sanity_trials.json || { echo "::error::run ${{ inputs.trials_run_id }} has no sanity_trials.json in its signal-sanity artifact"; exit 1; }
           else
             python replay/signal_sanity.py plan --tickers "${{ inputs.tickers }}" > sanity_trials.json
             python replay/signal_sanity.py submit --trials sanity_trials.json > batch_id
           fi
           echo "batch: $(cat batch_id)"
-          python replay/signal_sanity.py collect --trials sanity_trials.json --batch "$(cat batch_id)" | tee sanity.txt
-          python replay/signal_sanity.py collect --trials sanity_trials.json --batch "$(cat batch_id)" --json > sanity.json || true
+          # Under the job's 240, so the collector gives up first and prints the
+          # id rather than the runner being killed holding it.
+          python replay/signal_sanity.py collect --trials sanity_trials.json --batch "$(cat batch_id)" --timeout-minutes 215 | tee sanity.txt
+          python replay/signal_sanity.py collect --trials sanity_trials.json --batch "$(cat batch_id)" --timeout-minutes 5 --json > sanity.json || true
 
       - name: Publish to the run summary
         if: always()
         run: |
           {
             echo '## Signal sanity'
+            echo
+            echo "batch: $(cat batch_id 2>/dev/null || echo '(never submitted)')"
             echo
             echo '```'
             cat sanity.txt 2>/dev/null || echo "(did not run)"
