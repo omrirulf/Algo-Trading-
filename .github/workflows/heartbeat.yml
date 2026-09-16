@@ -10,9 +10,22 @@ name: heartbeat
 # 09:30 open in both, and past the first half-hour's noise. GitHub cron has no
 # timezone, so the job itself still asks Alpaca's clock and exits at once when
 # the market is shut, which also covers holidays that no cron can express.
+#
+# The second cron is a catch-up, and it exists because on 16 Sep the first one
+# never fired. Not late, not failed -- GitHub created no run at all, and
+# nothing noticed. The day was rescued only because an unrelated reminder
+# happened to look. A schedule that can silently skip is not a schedule you
+# can build a daily experiment on.
+#
+# 17:35 UTC is two and a half hours after the first cron: long enough that a
+# slow cycle has finished (the concurrency group below would queue it anyway),
+# and still comfortably before the 20:00 close, so a rescued day is a real
+# trading day rather than a trade into the bell. It does nothing on the days
+# the first cron works, which is almost all of them.
 on:
   schedule:
     - cron: "5 15 * * 1-5"
+    - cron: "35 17 * * 1-5"   # catch-up; exits at once if 15:05 already ran
   workflow_dispatch:        # a manual run, for the first smoke test
 
 # Two runs writing the journal at once would race on the commit below.
@@ -52,7 +65,28 @@ jobs:
 
       - run: pip install -r requirements.txt
 
+      - name: Has today's cycle already run?
+        # Only the catch-up cron asks. The 15:05 run is the cycle, and a
+        # manual dispatch is somebody deliberately asking for one -- neither
+        # should ever be talked out of running. `github.event.schedule` is the
+        # cron string that fired, which is how the two are told apart.
+        id: guard
+        if: github.event.schedule == '35 17 * * 1-5'
+        run: |
+          set -o pipefail
+          ran=$(python analysis/cycle_day.py --journal logs/signal_journal.log)
+          echo "ran=$ran" >> "$GITHUB_OUTPUT"
+          if [ "$ran" = "yes" ]; then
+            echo "A cycle is already journalled for today; this catch-up stops here." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No cycle journalled for today. Running one now." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Run one cycle
+        # Skipped only when the guard above actually said yes. An unset output
+        # -- which is what a skipped guard leaves -- must run the cycle, so the
+        # test is on 'yes' and not on 'not no'.
+        if: steps.guard.outputs.ran != 'yes'
         env:
           EXECUTION_MODE: direct          # no webhook: nothing to host here
           ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
@@ -72,7 +106,7 @@ jobs:
         # report that only exists when everything worked is a report nobody
         # needs. Never fails the job -- it is a view of the journal, not a
         # second chance to break the cycle.
-        if: always()
+        if: always() && steps.guard.outputs.ran != 'yes'
         run: |
           set -o pipefail
           # Rendered to a temp file first: `> logs/cycle_report.md` would
@@ -96,7 +130,7 @@ jobs:
         # return that is not in yet. Never fails the job: a refit that cannot
         # fetch prices leaves the previous weights in place, which the next
         # cycle applies and flags stale after a fortnight.
-        if: always()
+        if: always() && steps.guard.outputs.ran != 'yes'
         run: python learn/fit_weights.py || echo "refit skipped; previous weights left in place"
 
       - name: Commit the journal
@@ -106,7 +140,7 @@ jobs:
         # red. Skipping this step on failure would discard exactly the record
         # of the failure being investigated. A failed cycle still fails the
         # job -- always() changes what runs, not the verdict.
-        if: always()
+        if: always() && steps.guard.outputs.ran != 'yes'
         # The runner is discarded, so an uncommitted journal is a lost cycle --
         # and the journal is the only record of what the model saw. Committed
         # rather than uploaded as an artifact so the scorer can read the whole
@@ -134,7 +168,7 @@ jobs:
         # Deliberately AFTER the commit above, and `always()` for the same
         # reason it is: the lines a failed cycle wrote belong in the archive
         # too. Note this is not a guard on the secrets -- see below.
-        if: always()
+        if: always() && steps.guard.outputs.ran != 'yes'
         # Two more decisions, unchanged:
         #
         # After, because the journal must already be safe in git before this
