@@ -15,6 +15,15 @@ Two honest limits, both stated in the prompt rather than left implied:
 * **It is seasonal.** Condition is reported while the crop is in the ground
   and not at all outside that window. Out of season the section is absent
   rather than showing a stale summer reading as though it were news.
+
+  This is not theoretical, and the shape it takes is nastier than a simple
+  gap. USDA labels winter wheat by its *harvest* year, so in September a
+  request for 2026 returns ``WEEK #47`` -- a week that has not happened yet
+  in 2026, because the reading is from November of the year before. Printed
+  as "week 47 of 2026" it reads as the freshest number in the block while
+  being ten months old. Every reading is therefore aged against the calendar,
+  wrapping the year, and anything older than ``MAX_READING_AGE_WEEKS`` is
+  dropped -- which correctly leaves wheat with no section between seasons.
 * **The market has already seen it.** These are published on a schedule that
   everyone trades. The edge, if any, is in the trend and the comparison to
   the same week last year, not in the number itself.
@@ -52,6 +61,11 @@ MAX_WEEKS = 30
 #: Fewer readings than this and there is no trend to speak of, only a number.
 MIN_WEEKS_FOR_TREND = 3
 
+#: How old the latest reading may be and still be called current. USDA
+#: publishes weekly in season, so a fortnight covers an ordinary gap; past
+#: this the crop is between seasons and there is nothing to report.
+MAX_READING_AGE_WEEKS = 5
+
 #: Change over the trend window past which the crop is called improving or
 #: deteriorating rather than steady. Condition ratings are noisy by a point
 #: or two from rain alone.
@@ -72,6 +86,18 @@ def _week_number(text: Any) -> Optional[int]:
         return int(raw[len("WEEK #"):].strip())
     except ValueError:
         return None
+
+
+def weeks_old(week: int, today: Optional[date] = None) -> int:
+    """How many weeks back a reading labelled ``week`` actually is.
+
+    Wraps the year, because a reading whose week number is *ahead* of today's
+    belongs to the previous calendar year -- which is exactly what a winter
+    crop labelled by its harvest year produces.
+    """
+    current = (today or date.today()).isocalendar()[1]
+    age = current - week
+    return age if age >= 0 else age + 52
 
 
 def _percent(text: Any) -> Optional[float]:
@@ -160,6 +186,7 @@ def build_snapshot(
     rows: Any = None,
     prior_rows: Any = None,
     year: Optional[int] = None,
+    today: Optional[date] = None,
 ) -> Optional[CropSnapshot]:
     """The crop block for one ticker, or ``None`` out of season.
 
@@ -177,8 +204,15 @@ def build_snapshot(
     if not weekly:
         return None
 
-    weeks = sorted(weekly)[-MAX_WEEKS:]
-    values = [weekly[w] for w in weeks]
+    # Age first, and against the calendar rather than against the other
+    # readings: a set of rows can be internally consistent and still be from
+    # last November. See the module docstring for the case that taught us.
+    fresh = {w: v for w, v in weekly.items() if weeks_old(w, today) <= MAX_READING_AGE_WEEKS}
+    if not fresh:
+        return None
+
+    weeks = sorted(fresh)[-MAX_WEEKS:]
+    values = [fresh[w] for w in weeks]
     latest_week = weeks[-1]
 
     change = None
@@ -206,5 +240,7 @@ __all__ = [
     "build_snapshot",
     "commodity_for",
     "good_or_excellent",
+    "weeks_old",
     "COMMODITIES",
+    "MAX_READING_AGE_WEEKS",
 ]

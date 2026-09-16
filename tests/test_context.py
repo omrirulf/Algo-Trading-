@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import sys
 import types
+from datetime import date
 
 import pytest
 
@@ -690,9 +691,14 @@ def test_missed_holdings_are_one_gap_line_rather_than_five():
 EIA_PAYLOAD = {"crude": {"response": {"data": [
     {"period": "2026-09-04", "value": 424069}, {"period": "2026-08-28", "value": 424460},
 ] + [{"period": "x", "value": 430000} for _ in range(30)]}}}
+#: Weeks near the current one: the crop block drops a reading it cannot call
+#: current, which is what keeps a winter-wheat figure from ten months ago out
+#: of a September prompt. Fixtures built on fixed week numbers would start
+#: failing as the calendar moved past them.
 USDA_ROWS = [
-    {"reference_period_desc": f"WEEK #{w}", "unit_desc": u, "Value": str(v)}
-    for w, g, e in ((22, 52, 10), (23, 53, 12), (24, 54, 12))
+    {"reference_period_desc": f"WEEK #{date.today().isocalendar()[1] - back}",
+     "unit_desc": u, "Value": str(v)}
+    for back, g, e in ((2, 52, 10), (1, 53, 12), (0, 54, 12))
     for u, v in (("PCT GOOD", g), ("PCT EXCELLENT", e))
 ]
 FINNHUB_ROWS = [
