@@ -5,6 +5,9 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 
+import pytest
+
+from analysis import reader
 from analysis.reader import read_journal, read_lines
 
 FULL = {
@@ -115,3 +118,19 @@ def test_read_journal_round_trips_a_real_file(tmp_path):
     path.write_text(line(FULL) + line({**FULL, "ticker": "AAPL"}), encoding="utf-8")
     read = read_journal(path)
     assert [e.ticker for e in read.entries] == ["NVDA", "AAPL"]
+
+
+def test_the_blend_record_comes_through_and_composite_reads_it():
+    payload = {**FULL, "blend": {"mode": "shadow", "composite": 0.31, "coverage": 0.8, "level": "equal"}}
+    entry = reader.entry_from(payload)
+    assert entry.blend["level"] == "equal"
+    assert entry.composite == pytest.approx(0.31)
+
+
+def test_a_line_without_a_blend_has_no_composite():
+    entry = reader.entry_from(FULL)
+    assert entry.blend == {} and entry.composite is None
+    entry = reader.entry_from({**FULL, "blend": None})
+    assert entry.blend == {} and entry.composite is None
+    entry = reader.entry_from({**FULL, "blend": {"composite": None}})
+    assert entry.composite is None

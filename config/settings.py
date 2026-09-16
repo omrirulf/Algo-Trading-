@@ -286,6 +286,28 @@ FUND_SIZE_LOG_PATH: Final[Path] = LOG_DIR / "fund_size.log"
 #: that changes every cycle would bloat the repository for nothing.
 DATABASE_PATH: Final[Path] = LOG_DIR / "trading.db"
 
+# --------------------------------------------------------------------------- #
+# Learned blend of the dimension scores
+# --------------------------------------------------------------------------- #
+
+#: How the learned blend of the five dimension scores takes part in a cycle.
+#: ``shadow``: the composite is computed and journalled beside the model's own
+#: answer, and nothing reads it. This is the only value the constant may take
+#: until the walk-forward report has said, on realised returns, that the
+#: composite beats the model's own conviction -- a CI invariant pins it here,
+#: and the modes that let the composite touch a trade arrive with that report.
+BLEND_MODE: Final[str] = "shadow"
+
+#: Where the trainer writes the fitted weights and the heartbeat reads them.
+#: Read once per cycle. A missing or unreadable file is equal weights, with
+#: the reason journalled on every line of that cycle.
+BLEND_WEIGHTS_PATH: Final[Path] = LOG_DIR / "blend_weights.json"
+
+#: Days after which a weights file is still applied but flagged stale in the
+#: journal. Two weeks: the trainer is meant to run nightly, so a fortnight
+#: without a refit is a broken job, not a quiet market.
+BLEND_STALE_AFTER_DAYS: Final[int] = 14
+
 from config.watchlist import default_watchlist_csv
 
 # --------------------------------------------------------------------------- #

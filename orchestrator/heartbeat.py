@@ -48,9 +48,10 @@ from config import settings as cfg  # noqa: E402
 from config.instruments import is_fund  # noqa: E402
 from orchestrator.fx import FxRate, fetch_rate as fetch_fx_rate  # noqa: E402
 from config.settings import get_settings  # noqa: E402
-from orchestrator import context, flows, journal  # noqa: E402
+from orchestrator import blend, context, flows, journal  # noqa: E402
 from orchestrator.context import TickerContext  # noqa: E402
 from orchestrator.llm import (  # noqa: E402
+    MODEL,
     SCREENING_ENABLED,
     SCREENING_MODEL,
     AnthropicSignalProvider,
@@ -644,12 +645,16 @@ def process_ticker(
     ticker: str,
     dispatcher: Dispatcher | None = None,
     fx: FxRate | None = None,
+    weights: blend.LoadedWeights | None = None,
 ) -> TickerResult:
     """Run one ticker end to end, and report how far it got.
 
     Returns rather than raises on every failure, because one broken ticker
     must not end the cycle for the other thirty-four. The return value is what
     lets the cycle notice that *all* of them broke.
+
+    ``weights`` is the cycle's one read of the blend weights; left ``None``,
+    the file is read here, which is what a ticker run on its own gets.
     """
     try:
         ticker_context = build_context(ticker)
@@ -726,27 +731,36 @@ def process_ticker(
         journal.record(ticker_context, fx=fx, screen=screen, error=f"unexpected {type(exc).__name__}: {exc}")
         return TickerResult(ticker, MODEL_FAILED, gaps=gaps)
 
+    # The learned blend, in shadow: computed from the model's scores and
+    # written beside its answer, read by nothing else in this cycle. A failure
+    # here is journalled as such; it cannot cost the signal.
+    try:
+        blend_record = blend.blend_signal(signal, weights or blend.load_weights(model=MODEL))
+    except Exception as exc:  # noqa: BLE001
+        log.exception("%s: blend failed", ticker)
+        blend_record = {"mode": cfg.BLEND_MODE, "error": f"{type(exc).__name__}: {exc}"}
+
     if signal.ticker != ticker:
         log.error("%s: LLM answered for %s instead; dropping", ticker, signal.ticker)
-        journal.record(ticker_context, signal, usage=usage, fx=fx, screen=screen, error=f"answered for {signal.ticker}")
+        journal.record(ticker_context, signal, usage=usage, fx=fx, screen=screen, blend=blend_record, error=f"answered for {signal.ticker}")
         return TickerResult(ticker, MODEL_FAILED, gaps=gaps)
 
     try:
         outcome = post_signal(signal, dispatcher)
     except httpx.HTTPError as exc:
         log.error("%s: webhook unreachable: %s", ticker, exc)
-        journal.record(ticker_context, signal, usage=usage, fx=fx, screen=screen, error=f"webhook unreachable: {exc}")
+        journal.record(ticker_context, signal, usage=usage, fx=fx, screen=screen, blend=blend_record, error=f"webhook unreachable: {exc}")
         return TickerResult(ticker, DISPATCH_FAILED, gaps=gaps)
     except BrokerError as exc:
         # Direct mode only: the engine could not be built or reached at all.
         # Same shape of failure as an unreachable webhook, so it is logged and
         # journalled the same way rather than killing the cycle.
         log.error("%s: engine unavailable: %s", ticker, exc)
-        journal.record(ticker_context, signal, usage=usage, fx=fx, screen=screen, error=f"engine unavailable: {exc}")
+        journal.record(ticker_context, signal, usage=usage, fx=fx, screen=screen, blend=blend_record, error=f"engine unavailable: {exc}")
         return TickerResult(ticker, DISPATCH_FAILED, gaps=gaps)
 
     log.info("%s -> %s %s", ticker, outcome.get("status"), outcome.get("reason", ""))
-    journal.record(ticker_context, signal, outcome=outcome, usage=usage, fx=fx, screen=screen)
+    journal.record(ticker_context, signal, outcome=outcome, usage=usage, fx=fx, screen=screen, blend=blend_record)
     return TickerResult(ticker, COMPLETED, status=outcome.get("status"), gaps=gaps)
 
 
@@ -808,6 +822,11 @@ def run_cycle(dispatcher: Dispatcher | None = None) -> CycleReport:
     else:
         log.info("USD/ILS unavailable: %s", fx.gap)
 
+    # Likewise once per cycle: the same weights blend every ticker, and a
+    # missing or unreadable file degrades to equal weights with the reason on
+    # every journal line rather than costing the cycle anything.
+    weights = blend.load_weights(model=MODEL)
+
     # The open book first, new signals second. A winner that has reached a
     # rung is sold down and its stop raised before any new entry competes for
     # the same slot, and a tranche is priced off the same quote a new entry
@@ -816,7 +835,7 @@ def run_cycle(dispatcher: Dispatcher | None = None) -> CycleReport:
     positions = manage_positions(dispatcher)
 
     log.info("heartbeat cycle start: %s", list(tickers))
-    results = tuple(process_ticker(ticker, dispatcher, fx) for ticker in tickers)
+    results = tuple(process_ticker(ticker, dispatcher, fx, weights) for ticker in tickers)
     report = CycleReport(
         tickers=tickers,
         results=results,

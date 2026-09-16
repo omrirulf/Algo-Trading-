@@ -218,3 +218,15 @@ def market() -> FakeMarketData:
 @pytest.fixture
 def engine(broker, market) -> ExecutionEngine:
     return ExecutionEngine(broker=broker, market_data=market)
+
+
+@pytest.fixture(autouse=True)
+def _blend_weights_to_tmp(tmp_path, monkeypatch):
+    """Point the blend at a weights file that does not exist.
+
+    The heartbeat reads ``BLEND_WEIGHTS_PATH`` on every cycle. A test must see
+    the same thing whether or not a trainer has written the real file.
+    """
+    from orchestrator import blend
+
+    monkeypatch.setattr(blend.cfg, "BLEND_WEIGHTS_PATH", tmp_path / "blend_weights.json", raising=True)

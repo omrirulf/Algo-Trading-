@@ -57,6 +57,9 @@ class JournalEntry:
     gaps: list[str] = field(default_factory=list)
     outcome_status: Optional[str] = None
     error: Optional[str] = None
+    #: The learned blend's record for this line, as journalled. Empty on lines
+    #: written before it existed and on screened lines, which carry none.
+    blend: dict[str, Any] = field(default_factory=dict)
 
     @property
     def has_signal(self) -> bool:
@@ -73,6 +76,12 @@ class JournalEntry:
 
     def available_scores(self) -> dict[str, float]:
         return {name: value for name, value in self.scores.items() if value is not None}
+
+    @property
+    def composite(self) -> Optional[float]:
+        """The blended score, when the line carries one."""
+        value = self.blend.get("composite")
+        return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else None
 
 
 @dataclass
@@ -179,6 +188,7 @@ def entry_from(payload: Any) -> Optional[JournalEntry]:
         gaps=[g for g in context.get("gaps", []) or [] if isinstance(g, str)],
         outcome_status=_text(outcome.get("status")),
         error=_text(payload.get("error")),
+        blend=payload.get("blend") if isinstance(payload.get("blend"), dict) else {},
     )
 
 
