@@ -30,7 +30,7 @@ from typing import Any, Optional, Sequence
 from config import settings as cfg
 from config.instruments import is_fund
 from orchestrator import (
-    analysts, crops, earnings, energy, flows, formatting as fmt, fred,
+    analysts, carry, crops, earnings, energy, flows, formatting as fmt, fred,
     fundamentals, funds, holdings, insiders, macro, positioning, sources,
     technicals,
 )
@@ -98,6 +98,8 @@ class RawMarketData:
     #: USDA condition rows for this season and last. Empty without a key.
     crop_rows: list = field(default_factory=list)
     crop_rows_last_year: list = field(default_factory=list)
+    #: Daily history for the commodity a fund tracks, for the holding cost.
+    commodity_history: Any = None
     gaps: list[str] = field(default_factory=list)
 
 
@@ -121,6 +123,7 @@ class _SlowData:
     energy_payloads: dict[str, Any]
     crop_rows: list
     crop_rows_last_year: list
+    commodity_history: Any
     gaps: list[str]
 
 
@@ -151,6 +154,9 @@ class YFinanceContextProvider:
         self._macro_cache: Optional[tuple[float, dict[str, Any]]] = None
         #: Likewise for the official releases: one fetch, every ticker.
         self._release_cache: Optional[tuple[float, dict[str, Any]]] = None
+        #: Futures histories keyed by symbol, shared across the funds that
+        #: track the same commodity.
+        self._commodity_cache: dict[str, tuple[float, Any]] = {}
 
     def fetch(self, ticker: str) -> RawMarketData:
         try:
@@ -186,6 +192,7 @@ class YFinanceContextProvider:
             energy_payloads=slow.energy_payloads,
             crop_rows=slow.crop_rows,
             crop_rows_last_year=slow.crop_rows_last_year,
+            commodity_history=slow.commodity_history,
             gaps=history_gaps + slow.gaps,
         )
 
@@ -221,6 +228,7 @@ class YFinanceContextProvider:
             energy_payloads=sources.fetch_energy_payloads(ticker),
             crop_rows=sources.fetch_crop_rows(ticker, _this_year()),
             crop_rows_last_year=sources.fetch_crop_rows(ticker, _this_year() - 1),
+            commodity_history=self._commodity_history(ticker, gaps),
             info=info,
             calendar=_attempt(lambda: handle.calendar, "earnings calendar", gaps),
             recommendations=_attempt(
@@ -265,6 +273,33 @@ class YFinanceContextProvider:
             # 404s must not cost the others.
             payloads[name] = _attempt(lambda n=name: getattr(data, n, None), f"fund {name}", gaps)
         return payloads
+
+    def _commodity_history(self, ticker: str, gaps: list[str]) -> Any:
+        """Daily bars for the commodity a fund tracks, cached across tickers.
+
+        The nine commodity funds map to nine futures symbols, but a cycle asks
+        for each at most once: two of them would otherwise fetch the same
+        series twice, and the cache is shared with any future caller.
+        """
+        mapping = carry.reference_for(ticker)
+        if mapping is None:
+            return None
+        symbol, _ = mapping
+        cached = self._commodity_cache.get(symbol)
+        if cached and cached[0] > time.monotonic():
+            return cached[1]
+
+        try:
+            import yfinance as yf
+
+            frame = yf.Ticker(symbol).history(period=HISTORY_PERIOD, interval="1d")
+        except Exception as exc:  # noqa: BLE001
+            gaps.append(f"{symbol} history for the holding cost: {_brief(exc)}")
+            frame = None
+        if frame is not None and getattr(frame, "empty", True):
+            frame = None
+        self._commodity_cache[symbol] = (time.monotonic() + self._ttl, frame)
+        return frame
 
     def _macro_releases(self, ticker: str) -> dict[str, Any]:
         """Inflation, jobs and claims -- when a FRED key is configured.
@@ -428,6 +463,7 @@ ENRICHMENT_SECTIONS = (
     ("ANALYST VIEW OF THE HOLDINGS", "holdings"),
     ("INSIDER ACTIVITY", "insiders"),
     ("POSITIONING (CFTC, weekly)", "positioning"),
+    ("COST OF HOLDING (the fund versus the commodity)", "carry"),
     ("ENERGY INVENTORIES (EIA, weekly)", "energy"),
     ("CROP CONDITION (USDA, weekly)", "crops"),
     ("FUND FLOWS (creations and redemptions)", "flows"),
@@ -455,7 +491,8 @@ SINGLE_NAME_ONLY_SECTIONS = frozenset(
 #: and a single-country fund has no futures contract. A fetch that was
 #: attempted and failed still records a gap, so the two cases stay distinct.
 FUND_ONLY_SECTIONS = frozenset(
-    {"funds", "holdings", "macro", "positioning", "flows", "energy", "crops"}
+    {"funds", "holdings", "macro", "positioning", "flows", "energy", "crops",
+     "carry"}
 )
 
 
@@ -500,6 +537,8 @@ class TickerContext:
     energy: Optional[energy.EnergySnapshot] = None
     #: How the crop is doing. Needs a USDA key, and a crop in the ground.
     crops: Optional[crops.CropSnapshot] = None
+    #: What holding the fund has cost against the commodity itself.
+    carry: Optional[carry.CarrySnapshot] = None
     #: ``(shares, source)`` measured this cycle, for the caller to append to
     #: the fund-size log. Not part of the prompt: it is the *series* the model
     #: reads, and one reading is not a series.
@@ -524,6 +563,7 @@ class TickerContext:
             "earnings": self.earnings.as_dict() if self.earnings else None,
             "energy": self.energy.as_dict() if self.energy else None,
             "crops": self.crops.as_dict() if self.crops else None,
+            "carry": self.carry.as_dict() if self.carry else None,
             "gaps": list(self.gaps),
         }
 
@@ -648,6 +688,14 @@ def gather(
             gaps,
         )
 
+    carry_snapshot = None
+    if raw.commodity_history is not None:
+        carry_snapshot = _attempt(
+            lambda: carry.build_snapshot(ticker, raw.history, raw.commodity_history),
+            "cost of holding",
+            gaps,
+        )
+
     macro_snapshot = None
     if raw.macro_histories or raw.macro_releases:
         macro_snapshot = _attempt(
@@ -718,6 +766,7 @@ def gather(
         earnings=earnings_snapshot,
         energy=energy_snapshot,
         crops=crop_snapshot,
+        carry=carry_snapshot,
         share_reading=raw.share_reading,
         gaps=gaps,
     )

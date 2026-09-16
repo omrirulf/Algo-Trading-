@@ -176,6 +176,36 @@ jobs:
               print(f"  -> no history for: {', '.join(missing)}")
           EOF
 
+      - name: What holding a commodity fund costs
+        # Key-free, and the one number that separates a fund holding bullion
+        # in a vault from a fund rolling futures every month. USO once lost
+        # most of its value over a stretch where crude ended flat.
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          python - <<'EOF' | tee carry.txt
+          import yfinance as yf
+
+          from orchestrator import carry
+
+          for ticker in sorted(carry.REFERENCES):
+              symbol, name = carry.REFERENCES[ticker]
+              try:
+                  fund = yf.Ticker(ticker).history(period="2y", interval="1d")
+                  commodity = yf.Ticker(symbol).history(period="2y", interval="1d")
+              except Exception as exc:
+                  print(f"  {ticker:<5} FAILED: {type(exc).__name__}: {exc}")
+                  continue
+              snap = carry.build_snapshot(ticker, fund, commodity)
+              if snap is None:
+                  fb = 0 if fund is None else len(fund)
+                  cb = 0 if commodity is None else len(commodity)
+                  print(f"  {ticker:<5} no block ({symbol}: {fb} fund bars, {cb} commodity bars)")
+                  continue
+              print(f"  {ticker:<5} {snap.as_lines()[0]}")
+              print(f"        {snap.as_lines()[1]}")
+          EOF
+
       - name: The macro backdrop
         # Six index symbols, and the one that matters is the curve: the slope
         # is a regime rather than a reading, and it is the only line here that
@@ -238,6 +268,11 @@ jobs:
             echo '```'
             cat keyed-blocks.txt 2>/dev/null || echo "(did not run)"
             echo '```'
+            echo '## Cost of holding'
+            echo
+            echo '```'
+            cat carry.txt 2>/dev/null || echo "(did not run)"
+            echo '```'
             echo '## Macro'
             echo
             echo '```'
@@ -252,6 +287,7 @@ jobs:
           path: |
             keys.txt
             keyed-blocks.txt
+            carry.txt
             positioning.txt
             funds.txt
             funds-raw.txt

@@ -850,3 +850,53 @@ def test_a_fund_is_never_asked_for_an_earnings_history(monkeypatch, tmp_path):
     # ...and a single name is asked, or the section could never appear.
     assert provider.fetch("MSFT").earnings_rows == FINNHUB_ROWS
     assert asked == ["MSFT"]
+
+
+def test_a_commodity_fund_is_told_what_holding_it_costs():
+    """Gold, silver and copper had four sections and no numbers at all."""
+    n = 300
+    ctx = context.gather("GLD", HEADLINES, provider=FakeProvider(
+        history=make_frame([200.0] * n),
+        commodity_history=make_frame([2000.0] * n),
+    ))
+    prompt = ctx.as_prompt()
+    assert "COST OF HOLDING (the fund versus the commodity)" in prompt
+    assert "instead of gold itself" in prompt
+
+
+@pytest.mark.parametrize("ticker", ["XLE", "TLT", "RSP", "MSFT", "DBC"])
+def test_the_holding_cost_never_reaches_a_ticker_with_no_single_commodity(ticker):
+    ctx = context.gather(ticker, HEADLINES, provider=FakeProvider(
+        history=make_frame([100.0] * 300), info=INFO,
+        commodity_history=make_frame([70.0] * 300),
+    ))
+    assert ctx.carry is None
+    assert "COST OF HOLDING" not in ctx.as_prompt()
+
+
+def test_the_provider_fetches_no_commodity_history_where_it_does_not_apply():
+    """Not merely unused -- never asked for, so nine funds cost nine fetches
+    rather than eighty."""
+    provider = context.YFinanceContextProvider()
+    gaps: list[str] = []
+    for ticker in ("MSFT", "XLE", "TLT", "DBC", "RSP"):
+        assert provider._commodity_history(ticker, gaps) is None
+    assert gaps == []
+
+
+def test_two_funds_on_the_same_commodity_fetch_it_once(monkeypatch):
+    fetched: list[str] = []
+
+    class FakeTicker:
+        def __init__(self, symbol):
+            fetched.append(symbol)
+
+        def history(self, **_kwargs):
+            return make_frame([70.0] * 300)
+
+    monkeypatch.setitem(sys.modules, "yfinance", types.SimpleNamespace(Ticker=FakeTicker))
+    provider = context.YFinanceContextProvider()
+    gaps: list[str] = []
+    for _ in range(3):
+        provider._commodity_history("USO", gaps)
+    assert fetched == ["CL=F"]
