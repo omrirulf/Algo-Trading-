@@ -459,8 +459,10 @@ last line is the verdict on leaving shadow. The rule behind it is one function,
 at least twenty learned composites with a return behind them, a rank
 correlation above the model's conviction's and above equal weights', and more
 hits than misses. The first day it is met the workflow opens an issue labelled
-`blend-ready`, once, and only while `BLEND_MODE` is still `shadow`. The switch
-itself stays a reviewed code change.
+`blend-ready`, once, and only while `BLEND_MODE` is still `shadow`. The issue is
+assigned to the repository owner, so it arrives as a participating notification
+rather than as watch-the-repository noise. The switch itself stays a reviewed
+code change.
 
 Two properties matter more than the numbers:
 
