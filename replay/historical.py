@@ -63,7 +63,9 @@ from config.instruments import is_fund  # noqa: E402
 from config.watchlist import DEFAULT_WATCHLIST  # noqa: E402
 from orchestrator import technicals  # noqa: E402
 from orchestrator.context import TickerContext  # noqa: E402
-from orchestrator.llm import BatchRequest, Completion, LLMError, batch_custom_id  # noqa: E402
+from orchestrator.llm import (  # noqa: E402
+    BATCH_TIMEOUT_SECONDS, BatchRequest, Completion, LLMError, batch_custom_id,
+)
 from orchestrator.pricing import Usage  # noqa: E402
 
 #: Bars of history a sample must have behind it. The 52-week range and the
@@ -412,6 +414,10 @@ def main(argv: list[str] | None = None) -> int:
     collect.add_argument("--trials", type=Path, required=True)
     collect.add_argument("--batch", required=True)
     collect.add_argument("--json", action="store_true", dest="as_json")
+    collect.add_argument(
+        "--timeout-minutes", type=float, default=BATCH_TIMEOUT_SECONDS / 60.0,
+        help="how long to wait for the batch before printing its id and giving up",
+    )
 
     args = parser.parse_args(argv)
 
@@ -471,7 +477,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"submitted {len(prompts)} as {batch_id}", file=sys.stderr)
         return 0
 
-    results = provider.collect_batch(args.batch)
+    results = provider.collect_batch(args.batch, timeout_seconds=args.timeout_minutes * 60.0)
     failed = apply_results(samples, results, parse_signal)
     frames = {t: f for t in {s.ticker for s in samples} if (f := fetch_ohlc(t)) is not None}
     score(samples, frames, horizon)

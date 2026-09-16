@@ -8,9 +8,12 @@ trials.
 from __future__ import annotations
 
 import json
+import re
 import types
+from pathlib import Path
 
 import pytest
+import yaml
 
 from app.schemas import Bias, LLMSignal
 from config import settings as cfg
@@ -286,3 +289,76 @@ def test_apply_results_routes_errors_to_the_failed_list():
     r = ss.assemble(trials, 2)
     assert "A" in r.real and "B" not in r.real
     assert [t.custom_id for t in r.failed] == ["B_real"]
+
+
+# --------------------------------------------------------------------------- #
+# the two clocks
+# --------------------------------------------------------------------------- #
+
+def _write_trials(tmp_path):
+    path = tmp_path / "trials.json"
+    path.write_text(json.dumps({"tickers": 1, "trials": [
+        {"ticker": "AAA", "condition": "real", "system_prompt": "S",
+         "user_prompt": "U", "donor": None},
+    ]}))
+    return path
+
+
+def test_collect_passes_its_own_clock_to_the_batch(tmp_path, monkeypatch):
+    """The CLI's --timeout-minutes must reach collect_batch.
+
+    The workflow sets it from its own job timeout so the collector gives up
+    first and prints a resumable id. A flag that never arrived would leave the
+    module default in force and the runner would be killed holding the batch.
+    """
+    seen = {}
+
+    class _Provider:
+        def __init__(self, key):
+            pass
+
+        def collect_batch(self, batch_id, **kw):
+            seen.update(kw, batch=batch_id)
+            return {}
+
+    monkeypatch.setattr(llm, "AnthropicSignalProvider", _Provider)
+    ss.main(["collect", "--trials", str(_write_trials(tmp_path)),
+                 "--batch", "msgbatch_x", "--timeout-minutes", "215"])
+    assert seen["batch"] == "msgbatch_x"
+    assert seen["timeout_seconds"] == 215 * 60
+
+
+def test_collect_without_the_flag_falls_back_to_the_module_default(tmp_path, monkeypatch):
+    seen = {}
+
+    class _Provider:
+        def __init__(self, key):
+            pass
+
+        def collect_batch(self, batch_id, **kw):
+            seen.update(kw)
+            return {}
+
+    monkeypatch.setattr(llm, "AnthropicSignalProvider", _Provider)
+    ss.main(["collect", "--trials", str(_write_trials(tmp_path)), "--batch", "b"])
+    assert seen["timeout_seconds"] == pytest.approx(llm.BATCH_TIMEOUT_SECONDS)
+
+
+def test_the_collector_gives_up_before_the_job_does():
+    """The inner clock must be under the outer one, or the id is never printed.
+
+    A job killed by GitHub prints nothing, and a batch id that was never
+    printed cannot be resumed -- the only way back to a batch that is already
+    finished and already paid for. The margin also has to cover planning and
+    submitting, which happen inside the same step before the wait begins.
+    """
+    workflow = yaml.safe_load(
+        (Path(__file__).resolve().parents[1] / ".github/workflows/signal-sanity.yml").read_text()
+    )
+    job = workflow["jobs"]["sanity"]
+    outer = job["timeout-minutes"]
+    script = next(s["run"] for s in job["steps"] if s.get("name") == "Plan, submit, collect")
+    waits = [float(m) for m in re.findall(r"--timeout-minutes (\d+(?:\.\d+)?)", script)]
+    assert waits, "the collect call must set its own clock explicitly"
+    assert max(waits) < outer, f"inner wait {max(waits)} is not under the job's {outer}"
+    assert outer - max(waits) >= 15, "leave room for planning and submitting"

@@ -258,7 +258,14 @@ class BatchRequest:
 
 #: How long to wait on a batch before giving up and handing back the id.
 #: Most small batches finish in minutes, but the API allows up to 24 hours,
-#: and an Actions job cannot outlive its own timeout.
+#: and an Actions job cannot outlive its own timeout -- so this is a default
+#: for callers that do not care, not a ceiling. Every batch CLI takes
+#: ``--timeout-minutes``, and the workflow that runs it sets that from its own
+#: ``timeout-minutes`` so the two clocks cannot disagree. They must not: the
+#: job's clock kills the process, while this one raises ``BatchTimeout``, which
+#: prints the id the batch can be resumed from. Giving up first is the whole
+#: point -- a batch that outlives its job is still finished and still paid for,
+#: and the id is the only way back to it.
 BATCH_TIMEOUT_SECONDS = 55 * 60
 BATCH_POLL_SECONDS = 30
 
