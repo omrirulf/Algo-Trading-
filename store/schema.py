@@ -75,9 +75,10 @@ CREATE TABLE IF NOT EXISTS signals (
     order_id           TEXT,
     error              TEXT,
 
-    -- Context health. A cycle that scored a dimension 0.0 because the data was
-    -- missing is a different event from one that scored it 0.0 on the merits,
-    -- and only the gap count can tell them apart at a glance.
+    -- Context health. The prompt asks for a null score when a dimension's
+    -- data was missing, so null and 0.0 are different events. Lines journalled
+    -- before it did carry a 0.0 for a missing dimension, and there only the
+    -- gap count can tell that from a 0.0 scored on the merits.
     gap_count          INTEGER NOT NULL DEFAULT 0,
 
     -- Measured, not estimated: taken from the API's own usage report.

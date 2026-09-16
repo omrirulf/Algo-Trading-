@@ -217,7 +217,7 @@ drift from it.
 
 **Failures degrade rather than propagate.** Every source is fetched
 independently; a failure records a named gap in the prompt and the model is
-told to score that dimension `0.0` rather than guess. News is the deliberate
+told to leave that dimension `null` rather than guess. News is the deliberate
 exception: if Bright Data is down the ticker is skipped entirely, because
 trading on technicals alone would quietly be a different strategy.
 

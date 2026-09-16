@@ -584,7 +584,7 @@ class TickerContext:
             sections.append(self._section(title, value))
         if self.gaps:
             sections.append(
-                "DATA GAPS (score these dimensions 0.0 rather than guessing)\n"
+                "DATA GAPS (leave these dimensions null rather than guessing)\n"
                 + "\n".join(f"- {gap}" for gap in self.gaps)
             )
         return "\n\n".join(sections)

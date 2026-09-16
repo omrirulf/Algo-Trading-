@@ -160,7 +160,7 @@ def test_provider_gaps_are_named_in_the_prompt():
 
     assert "DATA GAPS" in prompt
     assert "HTTP 429" in prompt
-    assert "score these dimensions 0.0" in prompt
+    assert "leave these dimensions null" in prompt
 
 
 def test_unusable_history_becomes_a_gap_not_an_exception():
@@ -757,7 +757,7 @@ def test_the_macro_block_carries_the_official_releases_when_a_key_is_configured(
 
 def test_without_any_keys_every_keyed_section_is_absent_not_unavailable():
     """An absent optional source is not a failure. Rendering it as
-    "unavailable this cycle" would tell the model to score 0.0 something that
+    "unavailable this cycle" would tell the model to null out something that
     was never on offer."""
     for ticker in ("USO", "CORN", "MSFT", "TLT"):
         prompt = context.gather(ticker, HEADLINES, provider=FakeProvider(
