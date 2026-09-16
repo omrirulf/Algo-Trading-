@@ -244,6 +244,49 @@ jobs:
 
       # The output is the deliverable, so it goes somewhere readable on a
       # phone rather than only into the job log.
+      - name: The whole prompt, for one ticker of each kind
+        # Every step above proves one source. This proves the thing that
+        # actually ships: `context.gather` end to end, exactly as a cycle
+        # calls it, printed as the model would read it.
+        #
+        # It is the audit that would otherwise have to wait for a cycle to
+        # run, and it answers the same question sooner: does every section
+        # appear for the kind it belongs to, is any of them silently `n/a`
+        # across the board, and how long does one ticker take now that a
+        # sector fund looks up five holdings.
+        #
+        # No LLM is called and no order is placed -- `gather` only reads.
+        continue-on-error: true
+        env:
+          EIA_API_KEY: ${{ secrets.EIA_API_KEY }}
+          USDA_NASS_KEY: ${{ secrets.USDA_NASS_KEY }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+        run: |
+          set -o pipefail
+          python - <<'EOF' | tee prompt.txt
+          import time
+
+          from orchestrator import context
+
+          # One of each kind, plus the two with the most sources to gather.
+          for ticker in ("MSFT", "XLE", "TLT", "GLD", "USO", "CORN"):
+              started = time.monotonic()
+              try:
+                  ctx = context.gather(ticker, [], provider=context.get_provider())
+                  prompt = ctx.as_prompt()
+              except Exception as exc:
+                  print(f"===== {ticker}: RAISED {type(exc).__name__}: {exc} =====")
+                  continue
+              took = time.monotonic() - started
+              blanks = prompt.count("n/a")
+              print(f"===== {ticker}  ({took:.1f}s, {len(prompt)} chars, {blanks} n/a) =====")
+              print(prompt)
+              if ctx.gaps:
+                  print(f"  GAPS: {'; '.join(ctx.gaps)}")
+              print()
+          EOF
+
       - name: Publish to the run summary
         if: always()
         run: |
@@ -273,6 +316,11 @@ jobs:
             echo '```'
             cat carry.txt 2>/dev/null || echo "(did not run)"
             echo '```'
+            echo '## Whole prompt per kind'
+            echo
+            echo '```'
+            cat prompt.txt 2>/dev/null || echo "(did not run)"
+            echo '```'
             echo '## Macro'
             echo
             echo '```'
@@ -288,6 +336,7 @@ jobs:
             keys.txt
             keyed-blocks.txt
             carry.txt
+            prompt.txt
             positioning.txt
             funds.txt
             funds-raw.txt
