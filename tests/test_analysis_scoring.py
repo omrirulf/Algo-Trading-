@@ -285,3 +285,38 @@ def test_lines_from_before_the_blend_existed_still_get_the_equal_weight_row(jour
     assert payload["blend"]["equal"]["n"] == 3
     assert payload["blend"]["equal"]["hit_rate"] == 1.0   # rising prices, bullish scores
     assert "Does the learned blend carry information?" in report.render(run)
+
+
+
+class WavyPrices:
+    """Closes that rise and fall, so three-session returns actually vary."""
+
+    def closes(self, ticker, start, end):
+        import math
+        bars = [(START + timedelta(days=i), 100.0 + 5.0 * math.sin(i / 2.0) + 0.3 * i) for i in range(60)]
+        return PriceSeries(ticker, bars)
+
+
+def test_the_json_carries_the_verdict_and_the_report_shouts_when_it_is_ready(journal):
+    import math
+    closes = [100.0 + 5.0 * math.sin(i / 2.0) + 0.3 * i for i in range(60)]
+    lines = []
+    for d in range(30):
+        up = closes[d + 3] > closes[d]
+        lines.append(journal_line(
+            offset=d, conviction=0.3 + 0.02 * (d % 10),   # the model's conviction varies but is noise
+            blend={"mode": "shadow", "composite": 0.6 if up else -0.6, "level": "ticker:NVDA"},
+        ))
+    run = build_run(read_journal(journal(lines)), WavyPrices(), horizon=3, floor=0.6, today=date(2026, 6, 1))
+    payload = as_json(run)
+    assert payload["blend"]["promotion"]["ready"] is True
+    assert "more often than not" in payload["blend"]["promotion"]["reason"]
+    assert "READY TO LEAVE SHADOW" in report.render(run)
+
+
+def test_a_thin_blend_is_reported_as_not_ready(journal):
+    lines = [journal_line(offset=d, blend={"mode": "shadow", "composite": 0.3, "level": "equal"}) for d in (0, 1, 2)]
+    run = build_run(read_journal(journal(lines)), FakePrices(), horizon=3, floor=0.6, today=date(2026, 4, 1))
+    payload = as_json(run)
+    assert payload["blend"]["promotion"] == {"ready": False, "reason": "too few learned composites to judge (n=3, want 20+)"}
+    assert "READY TO LEAVE SHADOW" not in report.render(run)

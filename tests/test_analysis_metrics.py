@@ -269,3 +269,47 @@ def test_a_policy_with_nothing_to_judge_is_empty_not_an_error():
     empty = metrics.blend_comparison([])
     assert empty.learned.n == 0 and empty.disagreements == 0
     assert empty.model_hit_rate_when_disagreeing is None
+
+
+
+# --------------------------------------------------------------------------- #
+# The rule for leaving shadow
+# --------------------------------------------------------------------------- #
+
+
+def _policy(label, n, rho, hit_rate):
+    return metrics.PolicyCheck(label=label, n=n, called=n, rank_corr=metrics.Correlation(n, rho), hit_rate=hit_rate)
+
+
+def _comparison(learned_n=40, learned_rho=0.30, model_rho=0.10, equal_rho=0.20, hit_rate=0.6):
+    return metrics.BlendComparison(
+        model=_policy("model conviction", 60, model_rho, 0.55),
+        equal=_policy("equal weights", 60, equal_rho, 0.52),
+        learned=_policy("learned blend", learned_n, learned_rho, hit_rate),
+        learned_fitted=learned_n, disagreements=0,
+        model_hit_rate_when_disagreeing=None, blend_hit_rate_when_disagreeing=None,
+    )
+
+
+def test_the_blend_is_ready_only_when_it_beats_both_baselines_with_enough_data():
+    verdict = metrics.promotion_verdict(_comparison(), min_sample=20)
+    assert verdict.ready and "more often than not" in verdict.reason
+
+
+@pytest.mark.parametrize("kwargs, phrase", [
+    ({"learned_n": 0}, "no line carries a learned composite yet"),
+    ({"learned_n": 19}, "too few learned composites to judge (n=19, want 20+)"),
+    ({"learned_rho": None}, "undefined"),
+    ({"model_rho": 0.35}, "model's conviction still carries more information"),
+    ({"equal_rho": 0.35}, "not equal weights"),
+    ({"hit_rate": 0.5}, "was right only 50% of the time"),
+    ({"hit_rate": None}, "was right only n/a of the time"),
+])
+def test_every_way_of_not_being_ready_says_which(kwargs, phrase):
+    verdict = metrics.promotion_verdict(_comparison(**kwargs), min_sample=20)
+    assert not verdict.ready
+    assert phrase in verdict.reason
+
+
+def test_an_undefined_equal_weight_correlation_does_not_block_promotion():
+    assert metrics.promotion_verdict(_comparison(equal_rho=None), min_sample=20).ready
