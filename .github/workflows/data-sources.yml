@@ -101,6 +101,19 @@ jobs:
           print(f"  -> {ok} ok, {broken} broken")
           EOF
 
+      - name: Is every CFTC mapping still reporting
+        # The check that would have caught TLT the day its contract went
+        # quiet, instead of four and a half years later in a prompt. Prints
+        # the newest report date per mapping, and flags any substring that
+        # matches more than one market -- two contracts interleaved into one
+        # series is a subtler wrong answer than no series.
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          python backtest/probe_cftc_contracts.py | tee contracts.txt
+          echo
+          python backtest/probe_cftc_contracts.py --like "TREASURY" | tee -a contracts.txt
+
       - name: Fund block, as the model would read it
         # The numbers matter as much as the connection. A P/E of 0.06 is a
         # live wire, not a gap: it reads as usable and is not.
@@ -301,6 +314,11 @@ jobs:
             echo '```'
             cat positioning.txt 2>/dev/null || echo "(did not run)"
             echo '```'
+            echo '## CFTC contract health'
+            echo
+            echo '```'
+            cat contracts.txt 2>/dev/null || echo "(did not run)"
+            echo '```'
             echo '## Fund block'
             echo
             echo '```'
@@ -338,6 +356,7 @@ jobs:
             carry.txt
             prompt.txt
             positioning.txt
+            contracts.txt
             funds.txt
             funds-raw.txt
             macro.txt
