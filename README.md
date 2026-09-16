@@ -452,6 +452,16 @@ whether conviction predicted the outcome, whether the 0.60 floor filtered the
 whether conviction fell when dimensions disagreed (the prompt demands it), and
 whether conviction is drifting upward over time.
 
+The heartbeat workflow runs this after every cycle, commits the text as
+`logs/score_report.md`, and shows it in the run summary. The blend section's
+last line is the verdict on leaving shadow. The rule behind it is one function,
+`metrics.promotion_verdict`, so the report and the workflow cannot disagree:
+at least twenty learned composites with a return behind them, a rank
+correlation above the model's conviction's and above equal weights', and more
+hits than misses. The first day it is met the workflow opens an issue labelled
+`blend-ready`, once, and only while `BLEND_MODE` is still `shadow`. The switch
+itself stays a reviewed code change.
+
 Two properties matter more than the numbers:
 
 - **It cannot enter at a price that predates the signal.** A signal fired after

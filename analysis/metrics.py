@@ -366,6 +366,65 @@ def blend_comparison(signals: Sequence[ScoredSignal]) -> BlendComparison:
     )
 
 
+@dataclass(frozen=True)
+class PromotionVerdict:
+    """Whether the blend has earned its way out of shadow, and why or why not."""
+
+    ready: bool
+    reason: str
+
+
+def promotion_verdict(comparison: BlendComparison, min_sample: int) -> PromotionVerdict:
+    """The rule for leaving shadow, written once so the report and the daily job cannot disagree.
+
+    Ready when at least ``min_sample`` learned composites have a realised
+    return behind them, the blend's rank correlation with what followed is
+    above the model's conviction's and above equal weights', and the blend
+    was right more often than not. Anything less is a reason to keep
+    watching, and the reason says which.
+    """
+    learned = comparison.learned
+    if learned.n == 0:
+        return PromotionVerdict(
+            False,
+            "no line carries a learned composite yet; the equal-weight row is the floor "
+            "the fitted weights have to clear",
+        )
+    if learned.n < min_sample:
+        return PromotionVerdict(
+            False, f"too few learned composites to judge (n={learned.n}, want {min_sample}+)"
+        )
+    model_rho = comparison.model.rank_corr.rho
+    equal_rho = comparison.equal.rank_corr.rho
+    learned_rho = learned.rank_corr.rho
+    if learned_rho is None or model_rho is None:
+        return PromotionVerdict(False, "a rank correlation is undefined for one policy; no verdict")
+    if learned_rho <= model_rho:
+        return PromotionVerdict(
+            False,
+            "the model's conviction still carries more information than the learned blend; "
+            "keep it in shadow",
+        )
+    if equal_rho is not None and learned_rho <= equal_rho:
+        return PromotionVerdict(
+            False,
+            "the learned blend beats the model's conviction but not equal weights; the fitted "
+            "weights are not yet earning their keep",
+        )
+    if learned.hit_rate is None or learned.hit_rate <= 0.5:
+        rate = f"{learned.hit_rate:.0%}" if learned.hit_rate is not None else "n/a"
+        return PromotionVerdict(
+            False,
+            f"the learned blend ranks outcomes better than the model but was right only {rate} "
+            "of the time; not a direction to trade on",
+        )
+    return PromotionVerdict(
+        True,
+        "the learned blend carries more information than the model's conviction and than "
+        "equal weights, and was right more often than not",
+    )
+
+
 def conviction_drift(entries: Sequence[JournalEntry], floor: float) -> Drift:
     """Is conviction creeping up until the floor stops filtering anything?"""
     dated = sorted(

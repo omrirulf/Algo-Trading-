@@ -185,35 +185,8 @@ def _blend(run: ScoringRun) -> str:
             f"blend hit {_pct(comparison.blend_hit_rate_when_disagreeing)}",
         ]
     lines.append("")
-    if learned.n == 0:
-        lines.append(
-            "  no line carries a learned composite yet; the equal-weight row is the "
-            "floor the fitted weights have to clear"
-        )
-        return "\n".join(lines)
-    if learned.n < MIN_SAMPLE:
-        lines.append(_thin(learned.n))
-        return "\n".join(lines)
-    model_rho = comparison.model.rank_corr.rho
-    equal_rho = comparison.equal.rank_corr.rho
-    learned_rho = learned.rank_corr.rho
-    if learned_rho is None or model_rho is None:
-        lines.append("  a rank correlation is undefined for one policy; no verdict")
-    elif learned_rho > model_rho and (equal_rho is None or learned_rho > equal_rho):
-        lines.append(
-            "  the learned blend carries more information than the model's conviction "
-            "and than equal weights"
-        )
-    elif learned_rho > model_rho:
-        lines.append(
-            "  the learned blend beats the model's conviction but not equal weights -- "
-            "the fitted weights are not yet earning their keep"
-        )
-    else:
-        lines.append(
-            "  the model's conviction still carries more information than the learned "
-            "blend -- keep it in shadow"
-        )
+    verdict = metrics.promotion_verdict(comparison, MIN_SAMPLE)
+    lines.append(("  READY TO LEAVE SHADOW: " if verdict.ready else "  ") + verdict.reason)
     return "\n".join(lines)
 
 

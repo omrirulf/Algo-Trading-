@@ -22,6 +22,7 @@ concurrency:
 
 permissions:
   contents: write           # only to push the journal back
+  issues: write             # only to open the one issue that says the blend may leave shadow
 
 jobs:
   cycle:
@@ -99,6 +100,70 @@ jobs:
         if: always()
         run: python learn/fit_weights.py || echo "refit skipped; previous weights left in place"
 
+      - name: Score the journal
+        # The report that decides when the blend may leave shadow, rendered
+        # every day so nobody has to remember to run it. The scorer runs
+        # twice, once for the text a person reads and once for the JSON the
+        # next step reads; each fetches one price series per ticker. Never
+        # fails the job: a scorer that cannot run leaves the previous report
+        # in place and answers "not ready".
+        if: always()
+        id: score
+        run: |
+          set -o pipefail
+          ready=false
+          if python analysis/score_journal.py > "$RUNNER_TEMP/score_report.md" \
+             && python analysis/score_journal.py --json > "$RUNNER_TEMP/score.json"; then
+            mv "$RUNNER_TEMP/score_report.md" logs/score_report.md
+            {
+              echo '<!-- Rendered from logs/signal_journal.log by analysis/score_journal.py -->'
+              echo '```text'
+              cat logs/score_report.md
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            if jq -e '.blend.promotion.ready == true' "$RUNNER_TEMP/score.json" > /dev/null; then
+              ready=true
+            fi
+            jq -r '.blend.promotion.reason' "$RUNNER_TEMP/score.json" > "$RUNNER_TEMP/promotion_reason.txt"
+          else
+            echo "scorer could not run; last report left in place"
+          fi
+          echo "ready=$ready" >> "$GITHUB_OUTPUT"
+
+      - name: Open the issue that says the blend may leave shadow
+        # Leaving shadow is a one-line code change a person reviews; this
+        # step only makes sure the day it becomes justified is not missed.
+        # One open issue at a time, found by its label, and nothing at all
+        # once the mode is no longer shadow.
+        if: always() && steps.score.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! grep -qE '^BLEND_MODE: Final\[str\] = "shadow"$' config/settings.py; then
+            echo "BLEND_MODE is no longer shadow; nothing to announce"
+            exit 0
+          fi
+          gh label create blend-ready --force --color 0E8A16 \
+            --description "The scorer says the learned blend beats the model's conviction" > /dev/null
+          if [ "$(gh issue list --label blend-ready --state open --json number --jq 'length')" != "0" ]; then
+            echo "an open blend-ready issue already exists"
+            exit 0
+          fi
+          {
+            echo "The daily scorer says the learned blend has met the rule for leaving shadow:"
+            echo
+            echo "> $(cat "$RUNNER_TEMP/promotion_reason.txt")"
+            echo
+            echo "The full report for this run is \`logs/score_report.md\` at the commit this workflow pushed."
+            echo
+            echo "What happens next is a person's decision. The mode is the \`BLEND_MODE\` constant in"
+            echo "\`config/settings.py\`, pinned to \`shadow\` by CI. Turning on \`gate\`, which can only remove"
+            echo "trades, is a reviewed code change together with the wiring described as step 6b of the"
+            echo "blend design. Nothing trades differently until that change is merged."
+          } > "$RUNNER_TEMP/blend_ready.md"
+          gh issue create --title "The learned blend is ready to leave shadow" \
+            --label blend-ready --body-file "$RUNNER_TEMP/blend_ready.md"
+
       - name: Commit the journal
         # `always()` because a cycle can fail *and* still have written lines:
         # a ticker that reached the model and was refused there is journalled
@@ -120,7 +185,7 @@ jobs:
           # fund_size.log is the one series nobody publishes: it exists only
           # because every cycle appends to it, so an uncommitted one is a lost
           # day of history that cannot be backfilled.
-          git add -f logs/signal_journal.log logs/execution_audit.log logs/cycle_report.md logs/fund_size.log logs/blend_weights.json || true
+          git add -f logs/signal_journal.log logs/execution_audit.log logs/cycle_report.md logs/fund_size.log logs/blend_weights.json logs/score_report.md || true
           if git diff --cached --quiet; then
             echo "no journal changes"
             exit 0
