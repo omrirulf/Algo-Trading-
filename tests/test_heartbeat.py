@@ -618,3 +618,52 @@ def test_the_summary_distinguishes_no_book_from_no_ladder():
     assert "Open positions" not in hb.render_summary(hb.CycleReport(tickers=("AAPL",), positions=None))
     assert "not managed this cycle -- boom" in hb.render_summary(
         hb.CycleReport(tickers=("AAPL",), positions={"error": "boom"}))
+
+
+# --------------------------------------------------------------------------- #
+# The fund prompt explains its own sections
+# --------------------------------------------------------------------------- #
+
+
+def test_the_fund_prompt_tells_the_model_what_fund_basics_is():
+    prompt = hb.system_prompt_for("XLE")
+    assert "FUND BASICS" in prompt
+    assert "score fundamental_score from FUND BASICS" in prompt
+
+
+def test_the_fund_prompt_sends_insider_score_to_positioning():
+    """The slot stops being dead for a commodity: the CFTC report fills it."""
+    prompt = hb.system_prompt_for("GLD")
+    assert "POSITIONING" in prompt
+    assert "score insider_score" in prompt and "when that section is present" in prompt
+
+
+def test_the_fund_prompt_still_forbids_inventing_an_analyst_view():
+    """No vendor publishes a price target on an index. That has not changed."""
+    prompt = hb.system_prompt_for("GLD")
+    assert "leave analyst_score null" in prompt.lower()
+    assert "Nobody publishes a price target on an index" in prompt.replace("\n", " ")
+
+
+def test_the_fund_prompt_frames_positioning_as_crowding_not_direction():
+    prompt = hb.system_prompt_for("USO")
+    assert "crowding rather than as direction" in prompt
+    assert "95th percentile" in prompt
+
+
+def test_the_fund_prompt_states_the_cftc_staleness():
+    """Tuesday's positions, published Friday. The model must not read it as live."""
+    assert "Tuesday's, published Friday" in hb.system_prompt_for("USO")
+
+
+def test_an_absent_section_is_distinguished_from_a_failed_one():
+    prompt = hb.system_prompt_for("GLD")
+    assert "never on offer for this instrument" in prompt
+    assert "not the same as a source that failed" in prompt
+
+
+def test_the_company_prompt_gained_none_of_this():
+    """The single-name prompt is pinned by the replay baselines; it must not move."""
+    prompt = hb.system_prompt_for("MSFT")
+    for phrase in ("FUND BASICS", "POSITIONING", "CFTC", "crowding"):
+        assert phrase not in prompt

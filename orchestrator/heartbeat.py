@@ -158,8 +158,24 @@ the basket dilutes it. Do not build a thesis on one constituent.
 - ANALYST COVERAGE AND INSIDER FILINGS DO NOT EXIST FOR A FUND. Nobody \
 publishes a price target on an index, and a fund has no insiders who file \
 Form 4. This is a property of the instrument, not a data outage. Leave \
-analyst_score and insider_score null, and do not speculate about what they \
-would have said.
+analyst_score null, and do not speculate about what it would have said.
+- FUND BASICS, when present, is what this fund actually holds, in the terms \
+that apply to it: for an equity fund the valuation and growth of its \
+holdings, for a bond fund its yield, duration and credit quality. It replaces \
+the company form, which described an index in terms it does not have. These \
+move slowly and rarely justify a change of view in one cycle; a single \
+commodity has none of them at all, and the section is simply absent.
+- POSITIONING, when present, is the CFTC weekly report: what large \
+speculators are actually holding in this contract. It is the nearest thing a \
+fund has to insider activity, and it is the one dimension here that is about \
+*behaviour* rather than price, so score insider_score from it when the \
+section is present. Read it as crowding rather than as direction: a net long \
+at the 95th percentile of the past year says the trade is popular, which is \
+as often the end of a move as the middle of one. Weigh a *change* in \
+positioning more than its level, and note the data is Tuesday's, published \
+Friday, so it is several days stale by the time you read it. When the section \
+is absent -- a basket spanning many contracts, or a country fund with no \
+future -- leave insider_score null.
 - NEWS here is macro and sector news: policy, rates, growth and inflation \
 data, currency moves, and flows into or out of the asset class. That is the \
 right frame. A roundup, a "best ETFs to buy" listicle, or a story about one \
@@ -168,8 +184,8 @@ holding is noise.
 name, precisely because the idiosyncratic dimensions are absent. Trend, \
 momentum and volatility are most of what you have. That is a reason to be \
 humble about the call, not a reason to lean on them harder than they deserve.
-- FUNDAMENTALS for a fund describe the basket in aggregate. They move very \
-slowly and rarely justify a change of view within one hour.
+
+
 
 Setting conviction -- the bar is higher here than for a single stock:
 
@@ -187,8 +203,13 @@ will simply drop it.
 
 Report your read in the score fields, each in [-1.0, 1.0], where -1.0 is \
 maximally bearish, 0.0 is neutral or unknown, and +1.0 is maximally bullish. \
-Score a dimension 0.0 when the prompt says its data was unavailable, and \
-leave analyst_score and insider_score null because they do not apply. In \
+Score a dimension 0.0 when the prompt says its data was unavailable. Leave \
+analyst_score null because it does not apply to a fund; score insider_score \
+from POSITIONING when that section is present and leave it null when it is \
+not; score fundamental_score from FUND BASICS when that section is present. \
+A section that is absent entirely was never on offer for this instrument -- \
+that is not the same as a source that failed, and it is not a reason to \
+guess. In \
 key_factors, list the 2 to 5 specific facts that actually drove the call, each \
 a short standalone phrase citing the datum rather than restating your \
 conclusion. The scores and key factors are recorded for later evaluation and \

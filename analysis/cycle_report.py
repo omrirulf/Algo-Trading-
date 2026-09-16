@@ -42,7 +42,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from config import settings as cfg  # noqa: E402
 from config.instruments import InstrumentKind, kind_for, name_for, sleeve_label  # noqa: E402
-from orchestrator import analysts, fundamentals, insiders, technicals  # noqa: E402
+from orchestrator import analysts, fundamentals, funds, insiders, positioning, technicals  # noqa: E402
 from orchestrator.news import absolute_url  # noqa: E402
 
 #: Lines this far apart belong to different cycles.
@@ -71,12 +71,17 @@ LOCAL_TZ_LABEL = "Israel time"
 #: INSTITUTIONAL VIEW") are shouted abbreviations aimed at a model; these are
 #: aimed at a person. Changing them cannot touch the prompt -- the prompt
 #: builds its own headings in ``orchestrator/context.py``.
+#: A ticker carries either the company section or its fund counterpart, never
+#: both -- ``render_ticker`` skips a key the context does not have -- so the
+#: two pairs sit side by side here rather than in separate tables.
 SCORE_SECTIONS = (
     ("news_score", "news", "News"),
     ("technical_score", "technicals", "Price and chart"),
     ("fundamental_score", "fundamentals", "Company numbers"),
+    ("fundamental_score", "funds", "What this fund holds"),
     ("analyst_score", "analysts", "What analysts and big funds say"),
     ("insider_score", "insiders", "Buying and selling by company insiders"),
+    ("insider_score", "positioning", "Who is positioned how"),
 )
 
 #: Sleeves in report order, widest-held first.
@@ -118,6 +123,8 @@ GLOSSARY = (
     ("Insider", "A director or senior manager of the company. They have to report their own trades."),
     ("Index fund", "One fund that holds many shares at once, so it follows a whole market instead of one company."),
     ("Sector or country fund", "A fund that holds many companies, but all of them in one industry or one country. Safer than one company, riskier than a whole-market fund."),
+    ("Positioning", "How much the big professional traders are betting on a commodity or bond, from the weekly US regulator report. High numbers mean the bet is crowded, which cuts both ways."),
+    ("Duration", "How much a bond fund moves when interest rates change. Duration 17 means roughly 17% down if rates rise one point."),
 )
 
 
@@ -285,6 +292,8 @@ _SNAPSHOT_CLASSES: dict[str, tuple[type, dict[str, type]]] = {
     "fundamentals": (fundamentals.FundamentalSnapshot, {}),
     "analysts": (analysts.AnalystSnapshot, {}),
     "insiders": (insiders.InsiderSnapshot, {"buys": insiders.InsiderTrade, "sells": insiders.InsiderTrade}),
+    "funds": (funds.FundSnapshot, {}),
+    "positioning": (positioning.PositioningSnapshot, {}),
 }
 
 

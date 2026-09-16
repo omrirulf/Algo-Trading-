@@ -1,0 +1,112 @@
+name: data sources
+
+# Does every source the prompt depends on still answer, and answer sanely?
+#
+# Separate from `market checks` on purpose. That workflow replays two years of
+# bars and takes twenty minutes; this one asks a much smaller question that
+# needs answering far more often, and answers it in about one. Keeping them
+# together meant a data question could only be asked at the price of a
+# backtest, so in practice it was not asked.
+#
+# None of this can run in a development container -- CFTC and Yahoo are both
+# unreachable from there -- which is the whole reason it lives on a runner.
+# Nothing here needs a credential: yfinance and the CFTC's Socrata endpoint
+# are unauthenticated, no LLM is called, and no order is ever placed.
+on:
+  workflow_dispatch:
+    inputs:
+      raw:
+        description: "Also dump the untouched Yahoo JSON behind the fund block"
+        type: boolean
+        default: false
+      tickers:
+        description: "Funds to probe (space separated, blank for the default set)"
+        default: ""
+
+permissions:
+  contents: read            # reads public data, writes nothing back
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: CFTC positioning answers
+        # The weekly Commitments of Traders report is the one source here with
+        # no fallback: if the endpoint or the contract names move, the
+        # positioning block silently empties and nothing else notices.
+        run: |
+          set -o pipefail
+          python - <<'EOF' | tee positioning.txt
+          from orchestrator import positioning
+
+          ok = broken = 0
+          for ticker in sorted(positioning.CONTRACTS):
+              try:
+                  rows = positioning.fetch_rows(ticker, weeks=60)
+                  snap = positioning.build_snapshot(ticker, rows)
+              except Exception as exc:
+                  print(f"  {ticker:<6} FETCH FAILED: {type(exc).__name__}: {exc}")
+                  broken += 1
+                  continue
+              if snap is None:
+                  print(f"  {ticker:<6} no usable rows ({len(rows)} returned)")
+                  broken += 1
+                  continue
+              ok += 1
+              print(f"  {ticker:<6} {snap.as_lines()[1]}  [{snap.weeks_of_history} weeks]")
+          print(f"  -> {ok} ok, {broken} broken")
+          EOF
+
+      - name: Fund block, as the model would read it
+        # The numbers matter as much as the connection. A P/E of 0.06 is a
+        # live wire, not a gap: it reads as usable and is not.
+        run: |
+          set -o pipefail
+          python backtest/probe_fund_data.py ${{ inputs.tickers }} | tee funds.txt
+
+      - name: Raw Yahoo payloads
+        if: inputs.raw
+        run: |
+          set -o pipefail
+          python backtest/probe_fund_data.py --raw ${{ inputs.tickers }} | tee funds-raw.txt
+
+      # The output is the deliverable, so it goes somewhere readable on a
+      # phone rather than only into the job log.
+      - name: Publish to the run summary
+        if: always()
+        run: |
+          {
+            echo '## CFTC positioning'
+            echo
+            echo '```'
+            cat positioning.txt 2>/dev/null || echo "(did not run)"
+            echo '```'
+            echo '## Fund block'
+            echo
+            echo '```'
+            cat funds.txt 2>/dev/null || echo "(did not run)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: data-sources
+          path: |
+            positioning.txt
+            funds.txt
+            funds-raw.txt
+          if-no-files-found: ignore

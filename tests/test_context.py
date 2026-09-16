@@ -173,8 +173,16 @@ def test_total_blackout_still_produces_a_usable_context():
     prompt = ctx.as_prompt()
 
     assert "Chipmaker raises guidance" in prompt
-    # Every enrichment section says so rather than silently rendering empty.
-    assert prompt.count("unavailable this cycle") == len(context.ENRICHMENT_SECTIONS)
+    # Every enrichment section *that applies to a company* says so rather than
+    # silently rendering empty. The fund-only sections are not counted: a
+    # single name has no holdings and no futures contract, so they are absent
+    # by kind rather than by outage.
+    company_sections = [
+        attribute for _, attribute in context.ENRICHMENT_SECTIONS
+        if attribute not in context.FUND_ONLY_SECTIONS
+    ]
+    assert prompt.count("unavailable this cycle") == len(company_sections)
+    assert "FUND BASICS" not in prompt and "POSITIONING" not in prompt
 
 
 def test_absent_news_is_stated_rather_than_omitted():
@@ -264,3 +272,141 @@ def test_structured_headlines_carry_their_urls_without_changing_the_prompt():
     assert with_urls.sources[0]["url"] == "https://x/1"
     assert as_text.sources == []
     assert with_urls.as_dict()["sources"][0]["title"] == "T"
+
+
+# --------------------------------------------------------------------------- #
+# Each kind of ticker is asked the question that fits it
+# --------------------------------------------------------------------------- #
+
+FUND_PAYLOADS = {
+    "equity_holdings": {"priceToEarnings": 18.27, "priceToBook": 1.26},
+    "fund_operations": {"annualReportExpenseRatio": 0.0008, "totalNetAssets": 3.1e10},
+    "fund_overview": {"categoryName": "Equity Energy", "yield": 0.031},
+    "top_holdings": {"XOM": 0.229, "CVX": 0.171},
+}
+
+COT_ROWS = [
+    {
+        "report_date_as_yyyy_mm_dd": f"2026-09-{15 - i:02d}",
+        "open_interest_all": "500000",
+        "m_money_positions_long_all": str(300000 - i * 1000),
+        "m_money_positions_short_all": "100000",
+    }
+    for i in range(30)
+]
+
+
+#: Every heading the prompt can carry, in the order as_prompt emits them.
+ALL_HEADINGS = ("NEWS (past 24 hours)",) + tuple(t for t, _ in context.ENRICHMENT_SECTIONS)
+
+
+def headings(prompt: str) -> list[str]:
+    """The section headings present, in order -- the shape of the question asked."""
+    lines = prompt.splitlines()
+    return [title for title in ALL_HEADINGS if title in lines]
+
+
+def test_a_company_is_asked_exactly_what_it_was_asked_before():
+    """The company prompt is the input every replay and sanity baseline was
+    measured against. Adding fund sections must not have moved a byte of it."""
+    prompt = context.gather("NVDA", HEADLINES, provider=full_provider()).as_prompt()
+    assert headings(prompt) == [
+        "NEWS (past 24 hours)",
+        "TECHNICALS (daily bars)",
+        "FUNDAMENTALS",
+        "ANALYST & INSTITUTIONAL VIEW",
+        "INSIDER ACTIVITY",
+    ]
+    assert "FUND BASICS" not in prompt
+    assert "POSITIONING" not in prompt
+
+
+def test_a_company_never_fetches_the_fund_sources():
+    """Not merely unused -- never asked for, so a CFTC outage cannot gap a stock."""
+    from orchestrator import funds, positioning
+
+    assert funds.fund_shape("NVDA") == funds.NO_FUND_SECTION
+    assert positioning.contract_for("NVDA") is None
+
+
+def test_a_sector_fund_gets_fund_basics_instead_of_the_company_form():
+    ctx = context.gather("XLE", HEADLINES, provider=FakeProvider(
+        history=make_frame([100.0 + i * 0.1 for i in range(300)]),
+        info=INFO, fund_payloads=FUND_PAYLOADS,
+    ))
+    prompt = ctx.as_prompt()
+    assert "FUND BASICS" in prompt
+    assert "P/E 18.27" in prompt and "XOM 22.9%" in prompt
+    # The company form, and the two sections a fund does not have, are gone.
+    assert "FUNDAMENTALS" not in prompt
+    assert "ANALYST & INSTITUTIONAL VIEW" not in prompt
+    assert "INSIDER ACTIVITY" not in prompt
+
+
+def test_a_bond_fund_is_asked_about_yield_and_duration():
+    ctx = context.gather("TLT", HEADLINES, provider=FakeProvider(
+        history=make_frame([100.0 + i * 0.1 for i in range(300)]),
+        fund_payloads={"bond_holdings": {"duration": 16.8, "maturity": 25.7}},
+        positioning_rows=COT_ROWS,
+    ))
+    prompt = ctx.as_prompt()
+    assert "duration 16.80 years" in prompt
+    assert "P/E" not in prompt
+
+
+def test_a_commodity_is_asked_no_fundamentals_at_all():
+    """Gold has no valuation. A form of blanks was the thing this replaced."""
+    ctx = context.gather("GLD", HEADLINES, provider=FakeProvider(
+        history=make_frame([100.0 + i * 0.1 for i in range(300)]),
+        info=INFO, positioning_rows=COT_ROWS,
+    ))
+    prompt = ctx.as_prompt()
+    assert "FUNDAMENTALS" not in prompt and "FUND BASICS" not in prompt
+    assert "POSITIONING (CFTC, weekly)" in prompt
+    assert ctx.funds is None
+    # Nothing was attempted, so nothing is reported as missing.
+    assert not any("fund" in gap.lower() for gap in ctx.gaps)
+
+
+def test_positioning_reaches_the_prompt_with_its_three_numbers():
+    ctx = context.gather("GLD", HEADLINES, provider=FakeProvider(
+        history=make_frame([100.0 + i * 0.1 for i in range(300)]), positioning_rows=COT_ROWS,
+    ))
+    prompt = ctx.as_prompt()
+    assert "net long 40.0% of open interest" in prompt
+    assert "Change on the week:" in prompt
+    assert "percentile over 52 weeks" in prompt
+    assert "crowding, not as a forecast" in prompt
+
+
+def test_a_fund_with_no_futures_contract_simply_has_no_positioning_section():
+    ctx = context.gather("EWZ", HEADLINES, provider=FakeProvider(
+        history=make_frame([100.0 + i * 0.1 for i in range(300)]), fund_payloads=FUND_PAYLOADS,
+    ))
+    prompt = ctx.as_prompt()
+    assert "POSITIONING" not in prompt
+    assert not any("CFTC" in gap for gap in ctx.gaps)
+
+
+def test_the_new_sections_reach_the_journal():
+    ctx = context.gather("GLD", HEADLINES, provider=FakeProvider(
+        history=make_frame([100.0 + i * 0.1 for i in range(300)]), positioning_rows=COT_ROWS,
+    ))
+    stored = ctx.as_dict()
+    assert stored["funds"] is None
+    assert stored["positioning"]["contract"] == "GOLD"
+    assert stored["positioning"]["net_share"] == pytest.approx(0.4)
+
+
+def test_a_broken_fund_fetch_degrades_to_a_named_gap():
+    class Hostile(dict):
+        def __getitem__(self, key):
+            raise RuntimeError("boom")
+
+    ctx = context.gather("XLE", HEADLINES, provider=FakeProvider(
+        history=make_frame([100.0 + i * 0.1 for i in range(300)]),
+        fund_payloads={"equity_holdings": 1, "top_holdings": 2, "bad": Hostile()},
+    ))
+    # Either it parsed what it could or it recorded a gap; what it must not do
+    # is raise, and the cycle must still have a prompt.
+    assert "TECHNICALS" in ctx.as_prompt()

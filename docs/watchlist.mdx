@@ -157,6 +157,14 @@ trades on a US exchange, not choices.
   exposure now comes through `DBA`, whose basket includes it.
 </Note>
 
+## What each kind is asked about
+
+Beyond the caps, the instrument kind now decides **what evidence the model is
+shown**. A fund gets `FUND BASICS` in place of the company form, and the
+commodities, bond funds and broad index funds carry a weekly `POSITIONING`
+read from the CFTC — the nearest thing an index has to insider activity. See
+[market context](/orchestrator/market-context#each-kind-of-ticker-is-asked-the-question-that-fits-it).
+
 ## Four kinds, four caps
 
 | Kind | Cap | Why |
