@@ -211,6 +211,52 @@ jobs:
           fi
           echo "OK: the blend is shadow-only"
 
+      - name: The trainer writes one file and cannot trade
+        # learn/ reads the journal and writes the weights the next cycle will
+        # apply. That makes it the one package that feeds the cycle from
+        # outside it, so it is held to the same rules as the scorer plus one:
+        # no order path, exactly one write (the weights file, in one named
+        # function), and the orchestrator never imports it -- a cycle applies
+        # weights, it never fits them.
+        run: |
+          hits=$(grep -rnE '(submit_order|submit_bracket_order|ExecutionEngine|post_signal|AlpacaPaperBroker)' \
+                   learn --include='*.py' || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::learn/ must not place orders"
+            exit 1
+          fi
+          python3 - <<'PY'
+          import ast, pathlib, sys
+          writes = []
+          for path in sorted(pathlib.Path("learn").rglob("*.py")):
+              tree = ast.parse(path.read_text())
+              for node in ast.walk(tree):
+                  if not isinstance(node, ast.FunctionDef):
+                      continue
+                  for call in ast.walk(node):
+                      if not isinstance(call, ast.Call):
+                          continue
+                      name = getattr(call.func, "attr", getattr(call.func, "id", ""))
+                      if name in ("write_text", "write_bytes", "unlink", "rmtree") or (
+                          name == "open" and len(call.args) > 1
+                          and isinstance(call.args[1], ast.Constant)
+                          and any(ch in str(call.args[1].value) for ch in "wax")
+                      ):
+                          writes.append(f"{path}:{call.lineno} in {node.name}")
+          if len(writes) != 1 or not writes[0].startswith("learn/fit_weights.py:") or not writes[0].endswith(" in write_artifact"):
+              print("\n".join(writes) or "no write found")
+              sys.exit("::error::learn/ may write exactly once, in fit_weights.write_artifact")
+          for path in sorted(pathlib.Path("orchestrator").rglob("*.py")):
+              tree = ast.parse(path.read_text())
+              for node in ast.walk(tree):
+                  names = [a.name for a in node.names] if isinstance(node, ast.Import) else \
+                          [node.module or ""] if isinstance(node, ast.ImportFrom) else []
+                  if any(n == "learn" or n.startswith("learn.") for n in names):
+                      sys.exit(f"::error::{path}:{node.lineno} imports learn/ -- the cycle applies weights, it never fits them")
+          print("OK: the trainer writes one file, cannot trade, and is unreachable from the cycle")
+          PY
+
       - name: Instrument kind is never taken from the signal
         # An ETF's position cap is four times a single name's. That makes the
         # classification a privilege boundary: if a model could assert its own
@@ -525,7 +571,7 @@ jobs:
         # this check did fail on exactly that.
         run: |
           hits=$(grep -rnE '\.(supabase_url|supabase_service_key)\b' \
-                   app orchestrator analysis store backtest replay config --include='*.py' \
+                   app orchestrator analysis store backtest replay config learn --include='*.py' \
                  | grep -vE '^(store/remote\.py|config/settings\.py):' || true)
           if [ -n "$hits" ]; then
             echo "$hits"

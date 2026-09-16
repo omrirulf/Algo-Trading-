@@ -78,6 +78,16 @@ jobs:
             echo "no journal lines to render; last report left in place"
           fi
 
+      - name: Refit the blend weights
+        # After the cycle, never before it: a cycle applies the weights the
+        # previous run committed, and a signal whose horizon has not elapsed
+        # is pending and left out of the fit, so nothing here learns from a
+        # return that is not in yet. Never fails the job: a refit that cannot
+        # fetch prices leaves the previous weights in place, which the next
+        # cycle applies and flags stale after a fortnight.
+        if: always()
+        run: python learn/fit_weights.py || echo "refit skipped; previous weights left in place"
+
       - name: Commit the journal
         # `always()` because a cycle can fail *and* still have written lines:
         # a ticker that reached the model and was refused there is journalled
@@ -99,7 +109,7 @@ jobs:
           # fund_size.log is the one series nobody publishes: it exists only
           # because every cycle appends to it, so an uncommitted one is a lost
           # day of history that cannot be backfilled.
-          git add -f logs/signal_journal.log logs/execution_audit.log logs/cycle_report.md logs/fund_size.log || true
+          git add -f logs/signal_journal.log logs/execution_audit.log logs/cycle_report.md logs/fund_size.log logs/blend_weights.json || true
           if git diff --cached --quiet; then
             echo "no journal changes"
             exit 0

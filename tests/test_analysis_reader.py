@@ -134,3 +134,15 @@ def test_a_line_without_a_blend_has_no_composite():
     assert entry.blend == {} and entry.composite is None
     entry = reader.entry_from({**FULL, "blend": {"composite": None}})
     assert entry.composite is None
+
+
+def test_the_model_and_the_atr_come_through_for_the_trainer():
+    entry = reader.entry_from({
+        **FULL,
+        "usage": {"model": "claude-opus-5", "input_tokens": 1},
+        "context": {**FULL["context"], "technicals": {"atr_pct_of_price": 0.031}},
+    })
+    assert entry.model == "claude-opus-5"
+    assert entry.atr_pct == pytest.approx(0.031)
+    bare = reader.entry_from(FULL)
+    assert bare.model is None and bare.atr_pct is None
