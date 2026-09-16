@@ -26,11 +26,22 @@ permissions:
 jobs:
   cycle:
     runs-on: ubuntu-latest
-    # Raised from 15 with the watchlist. A cycle costs roughly 24 seconds a
-    # ticker -- 14 minutes over 35 names, so 80 names would have hit the old
-    # ceiling and been killed mid-run, after paying for every call it had
-    # already made. 45 leaves room for a slow news provider.
-    timeout-minutes: 45
+    # Raised from 45, on measurement rather than guesswork. The 45 was sized
+    # when a ticker cost roughly 24 seconds; the nine context sections added on
+    # 16 Sep pushed that to 32. The 16 Sep cycle ran 42m48s over 80 names and
+    # finished with 2m12s to spare -- a 5% margin on a job that places trades.
+    # A cycle killed at the ceiling is the worst outcome available: it has
+    # already paid for every call it made, and may have placed orders whose
+    # journal entry never gets written, leaving positions with no record.
+    #
+    # 90 is twice the measured run. That is the margin a single slow provider
+    # needs, and no more; the runner is free on a public repository, so the
+    # cost of the headroom is nothing and the cost of not having it is a lost
+    # trading day. The real fix is fetching a ticker's sections concurrently
+    # instead of one after another -- 32 seconds is almost all waiting on other
+    # people's servers. Until that lands, this ceiling is what stands between a
+    # slow day and a dead cycle.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
