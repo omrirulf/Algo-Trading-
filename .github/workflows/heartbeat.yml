@@ -141,7 +141,11 @@ jobs:
         # next step reads; each fetches one price series per ticker. Never
         # fails the job: a scorer that cannot run leaves the previous report
         # in place and answers "not ready".
-        if: always()
+        #
+        # Guarded like everything else after the catch-up check: on a day the
+        # 15:05 cycle ran, this already ran with it, and doing it again would
+        # re-fetch a price series per ticker to re-commit an identical report.
+        if: always() && steps.guard.outputs.ran != 'yes'
         id: score
         run: |
           set -o pipefail
@@ -169,7 +173,7 @@ jobs:
         # step only makes sure the day it becomes justified is not missed.
         # One open issue at a time, found by its label, and nothing at all
         # once the mode is no longer shadow.
-        if: always() && steps.score.outputs.ready == 'true'
+        if: always() && steps.guard.outputs.ran != 'yes' && steps.score.outputs.ready == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

@@ -447,7 +447,7 @@ python analysis/score_journal.py --db --since 2026-10-01   # from the index
 ```
 
 Joins every journalled signal to the return that actually followed and reports
-whether conviction predicted the outcome, whether the 0.60 floor filtered the
+whether conviction predicted the outcome, whether the 0.30 floor filtered the
 *right* signals, which of the five dimension scores carried any information,
 whether conviction fell when dimensions disagreed (the prompt demands it), and
 whether conviction is drifting upward over time.

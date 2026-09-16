@@ -41,7 +41,7 @@ algo-trading-system/
 │   ├── execution_engine.py     # validate -> size -> stop -> submit
 │   └── logger.py               # JSON audit log
 ├── orchestrator/                # the signal producer — no broker keys
-│   ├── heartbeat.py             # hourly job: context -> LLM -> POST -> journal
+│   ├── heartbeat.py             # daily job: context -> LLM -> POST -> journal
 │   ├── news.py                  # Bright Data SERP API (Google News)
 │   ├── context.py               # the ONLY module that touches yfinance
 │   ├── technicals.py            # pure parsing: trend, momentum, volatility

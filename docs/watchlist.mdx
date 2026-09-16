@@ -295,14 +295,37 @@ enlarge its own position by claiming one.
   only where defined and applied, and all three portfolio limits reach the
   execution path.
 
-## What the funds give up
+## What the funds read instead
 
-Two of the five dimensions are **structurally absent** for any fund: nobody
-publishes a price target on an index or on copper, and neither has insiders
-filing Form 4. That is carried through rather than papered over —
-`orchestrator/context.py` omits those sections instead of rendering them
-"unavailable this cycle", and a separate `ETF_SYSTEM_PROMPT` asks a macro
-question and sets a higher bar for a non-neutral call.
+Nobody publishes a price target on an index or on copper, and neither has
+insiders filing Form 4. For a while that meant a fund was scored on three
+dimensions rather than five.
+
+It no longer does. **A fund is scored on all five**, with the last two read
+from what a fund actually has:
+
+| Dimension | A company | A fund |
+| --- | --- | --- |
+| `analyst_score` | analyst ratings and price targets | **ANALYST VIEW OF THE HOLDINGS** — the ratings of the companies it holds, rolled up by weight, with a coverage figure saying what share of the fund that actually spans |
+| `insider_score` | Form 4 filings | **POSITIONING** (what large speculators hold, from the CFTC's weekly report) or **FUND FLOWS** (shares created and destroyed, so money actually going in or out) |
+
+Both substitutes are *behaviour that has already happened*, which is what the
+insider slot was always for.
+
+A score is left null only when the substitute is genuinely absent too — a bond
+fund has no analyst roll-up, and a basket spanning a dozen contracts has no
+single futures position. That is carried through rather than papered over:
+`orchestrator/context.py` omits the section instead of rendering it
+"unavailable this cycle", because a 0.00 on a missing section reads as
+"neutral" when the truth is "there was nothing to read". A separate
+`ETF_SYSTEM_PROMPT` asks a macro question and sets a higher bar for a
+non-neutral call.
+
+<Note>
+  This page said the opposite until 16 Sep, and so did the signals artifact.
+  Both were describing the version before the roll-up and the positioning
+  block existed. The code had moved on; the explanations had not.
+</Note>
 
 <Warning>
   **That higher bar interacts with the fund-heavy budget, and the interaction

@@ -20,9 +20,15 @@ so the number in the journal is measured.
 
 ## Where the money goes
 
-At this prompt shape — ~1,400 input tokens against a thinking response —
-**output is about 84% of the bill**, because thinking tokens bill at the output
-rate and output is 5× input.
+At this prompt shape — **~3,600 input tokens** against a thinking response —
+**output is most of the bill**, because thinking tokens bill at the output
+rate and output is several times input.
+
+<Note>
+  This page said ~1,400 tokens until 16 Sep. That was true before the nine
+  enrichment sections were added; the prompt is now about 2.5× that, and every
+  figure below was measured on the 16 Sep cycle rather than estimated.
+</Note>
 
 That ordering matters: **effort is a bigger lever than model tier.**
 
@@ -39,17 +45,16 @@ That ordering matters: **effort is a bigger lever than model tier.**
 
 Every ticker is read first by `claude-haiku-4-5` with reasoning off, on the
 identical prompt. A NEUTRAL there ends the ticker; anything else goes on to the
-full model. The arithmetic, per ticker, at the ~1,400-token prompt:
+full model. Measured on the 16 Sep cycle, per ticker:
 
-| Stage | Model | Reasoning | Roughly |
+| Stage | Model | Reasoning | Measured |
 |---|---|---|---|
-| Screen | `claude-haiku-4-5` | off | $0.002 |
-| Decide | `claude-opus-5` | `low` | $0.022 |
+| Screen | `claude-haiku-4-5` | off | $0.0068 |
+| Decide | `claude-opus-5` | `low` | $0.046 |
 
-So a screened ticker costs about a tenth of a decided one, and the cycle's
-bill is `80 × $0.002 + (escalated) × $0.022`. On a day the screen escalates
-a third of the list, that is roughly $0.75 against $1.76 before; on a quiet
-day, less. The saving is bounded by how much of the watchlist has nothing
+So a screened ticker costs about a seventh of a decided one, and the cycle's
+bill is `80 × $0.0068 + (escalated) × $0.046`. The 16 Sep cycle escalated 41%
+of 78 tickers and came to **$2.01**; on a quieter day, less. The saving is bounded by how much of the watchlist has nothing
 happening — which, across sixteen single names, fourteen broad funds,
 forty-one sector and country funds and nine commodity funds, is usually most
 of it.
