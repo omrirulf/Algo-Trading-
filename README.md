@@ -466,6 +466,25 @@ Returns are close-to-close and ignore the stop-loss, slippage and commission:
 this measures the *signal*, not the strategy's P&L. The agreement check needs no
 price data at all, so it works from the first cycle.
 
+## Train the blend
+
+```bash
+python learn/fit_weights.py              # journal file -> logs/blend_weights.json
+python learn/fit_weights.py --dry-run    # fit and print the weights, write nothing
+python learn/fit_weights.py --db --since 2026-10-01
+```
+
+Joins every full-model signal to the return that followed, by the scorer's own
+no-lookahead entry rule, scales each return by the ticker's ATR at signal time
+so tickers are comparable, and fits the weights per level (ticker, instrument
+kind, global) with each level shrunk toward the one above until it has about
+twenty observations of its own. The heartbeat workflow runs it after every
+cycle and commits the file with the journal, so each cycle applies the
+weights the previous one fitted. A signal whose horizon has not elapsed is
+pending and left out, so a refit never learns from a return that is not in
+yet. The package writes exactly that one file and has no order path; CI checks
+both, and checks that the cycle never imports it.
+
 ## Test the guardrails directly
 
 ```bash

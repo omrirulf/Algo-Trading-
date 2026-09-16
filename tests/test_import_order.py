@@ -39,6 +39,7 @@ MODULES = [
     "backtest.verify_tickers",
     "analysis.score_journal",
     "analysis.blend",
+    "learn.fit_weights",
 ]
 
 

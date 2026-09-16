@@ -60,6 +60,12 @@ class JournalEntry:
     #: The learned blend's record for this line, as journalled. Empty on lines
     #: written before it existed and on screened lines, which carry none.
     blend: dict[str, Any] = field(default_factory=dict)
+    #: The model that answered, as the API reported it. ``None`` on lines
+    #: written before usage was recorded.
+    model: Optional[str] = None
+    #: ATR(14) as a share of price at signal time, from the journalled
+    #: technicals. What the trainer scales a return by.
+    atr_pct: Optional[float] = None
 
     @property
     def has_signal(self) -> bool:
@@ -176,6 +182,8 @@ def entry_from(payload: Any) -> Optional[JournalEntry]:
     signal = payload.get("signal") if isinstance(payload.get("signal"), dict) else {}
     context = payload.get("context") if isinstance(payload.get("context"), dict) else {}
     outcome = payload.get("outcome") if isinstance(payload.get("outcome"), dict) else {}
+    usage = payload.get("usage") if isinstance(payload.get("usage"), dict) else {}
+    technicals = context.get("technicals") if isinstance(context.get("technicals"), dict) else {}
 
     return JournalEntry(
         ticker=ticker.strip().upper(),
@@ -189,6 +197,8 @@ def entry_from(payload: Any) -> Optional[JournalEntry]:
         outcome_status=_text(outcome.get("status")),
         error=_text(payload.get("error")),
         blend=payload.get("blend") if isinstance(payload.get("blend"), dict) else {},
+        model=_text(usage.get("model")),
+        atr_pct=_number(technicals.get("atr_pct_of_price")),
     )
 
 
