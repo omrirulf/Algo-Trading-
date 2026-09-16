@@ -32,6 +32,7 @@ import argparse
 import logging
 import os
 import sys
+from typing import Any
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
@@ -622,6 +623,53 @@ def build_user_prompt(ticker_context: TickerContext) -> str:
     return f"{prompt}\n\nRespond with the JSON signal for {ticker_context.ticker}."
 
 
+#: Which sections of the prompt can feed each score, per instrument kind.
+#:
+#: The prompt tells the model four separate times to leave a score null when
+#: none of its sections were rendered. On 16 Sep it returned 0.0 anyway for
+#: every bond fund -- and for TLT it returned -0.20, a bearish read invented
+#: from a section that was not there. A 0.0 is not a harmless default: it
+#: reads as "I looked and it was balanced" when the truth is "there was
+#: nothing to look at", and the learned blend cannot tell the two apart, so it
+#: fits weights against numbers nobody measured.
+#:
+#: So the orchestrator decides this rather than asking. It knows exactly which
+#: sections it rendered; it does not need the model to remember. Same
+#: principle as the instrument kind, which is resolved from the ticker and
+#: never from the signal.
+SCORE_SOURCES: dict[str, tuple[str, ...]] = {
+    # A company's analyst read comes from its own coverage; a fund's from the
+    # roll-up over what it holds. A bond fund has neither: nobody rates a bond
+    # on a buy-to-sell scale.
+    "analyst_score": ("analysts", "holdings"),
+    # A company's behaviour signal is Form 4 filings; a fund's is who is
+    # positioned how, or money moving in and out. A fund with no single
+    # futures contract and no share-count history has neither.
+    "insider_score": ("insiders", "positioning", "flows"),
+}
+
+
+def scores_without_a_source(signal: LLMSignal, context: Any) -> LLMSignal:
+    """Null any score whose every source section was absent from the prompt.
+
+    Returns the signal unchanged when nothing needs nulling, so the common
+    case allocates nothing and the journal keeps the model's own object.
+    """
+    missing = {
+        field: None
+        for field, sources in SCORE_SOURCES.items()
+        if getattr(signal, field, None) is not None
+        and not any(getattr(context, name, None) for name in sources)
+    }
+    if not missing:
+        return signal
+    log.info(
+        "%s: no source section for %s; recording null rather than the model's value",
+        getattr(context, "ticker", "?"), ", ".join(sorted(missing)),
+    )
+    return signal.model_copy(update=missing)
+
+
 def parse_signal(raw_json: str) -> LLMSignal:
     """Parse and validate the LLM output locally before sending it anywhere.
 
@@ -717,7 +765,7 @@ def process_ticker(
     try:
         completion = call_llm(system_prompt, user_prompt, SIGNAL_JSON_SCHEMA)
         usage = completion.usage
-        signal = parse_signal(completion.text)
+        signal = scores_without_a_source(parse_signal(completion.text), ticker_context)
     except LLMError as exc:
         log.error("%s: %s", ticker, exc)
         journal.record(ticker_context, fx=fx, screen=screen, error=str(exc))
