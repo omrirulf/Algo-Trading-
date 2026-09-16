@@ -295,7 +295,7 @@ def test_a_fund_gets_the_macro_prompt_and_a_company_does_not():
 def test_the_fund_prompt_sets_a_higher_bar_than_the_company_prompt():
     assert "NEUTRAL" in ETF_SYSTEM_PROMPT
     assert "macro timing" in ETF_SYSTEM_PROMPT
-    assert "DO NOT EXIST FOR A FUND" in ETF_SYSTEM_PROMPT
+    assert "NO ANALYST PUBLISHES A PRICE TARGET ON AN INDEX" in ETF_SYSTEM_PROMPT
 
 
 def test_the_account_is_not_left_sitting_in_cash():

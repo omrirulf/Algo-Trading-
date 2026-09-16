@@ -48,7 +48,7 @@ from config import settings as cfg  # noqa: E402
 from config.instruments import is_fund  # noqa: E402
 from orchestrator.fx import FxRate, fetch_rate as fetch_fx_rate  # noqa: E402
 from config.settings import get_settings  # noqa: E402
-from orchestrator import context, journal  # noqa: E402
+from orchestrator import context, flows, journal  # noqa: E402
 from orchestrator.context import TickerContext  # noqa: E402
 from orchestrator.llm import (  # noqa: E402
     SCREENING_ENABLED,
@@ -155,13 +155,23 @@ what the evidence can support:
 mispriced business here. Idiosyncratic news about any single holding is \
 almost always irrelevant: it is a small fraction of the fund, and the rest of \
 the basket dilutes it. Do not build a thesis on one constituent.
-- ANALYST COVERAGE AND INSIDER FILINGS DO NOT EXIST FOR A FUND. Nobody \
-publishes a price target on an index, and a fund has no insiders who file \
-Form 4. This is a property of the instrument, not a data outage. Leave \
-analyst_score null, and do not speculate about what it would have said.
+- NO ANALYST PUBLISHES A PRICE TARGET ON AN INDEX, and a fund has no \
+insiders who file Form 4. That is a property of the instrument, not a data \
+outage, and the two sections below are what stands in their place. Where \
+neither is present, leave the score null and do not speculate about what it \
+would have said.
+- ANALYST VIEW OF THE HOLDINGS, when present, is the analyst coverage of the \
+fund's largest holdings, rolled up by the fund's own weights. Score \
+analyst_score from it. Read the coverage figure first: it says what share of \
+the fund the roll-up actually covers, and a roll-up over 11% of a broad index \
+is a fact about eleven percent, not about the fund. Where it is thin, the \
+prompt says so and the right response is a smaller score, not a louder one. \
+When the section is absent -- a bond fund, a commodity -- leave analyst_score \
+null.
 - FUND BASICS, when present, is what this fund actually holds, in the terms \
 that apply to it: for an equity fund the valuation and growth of its \
-holdings, for a bond fund its yield, duration and credit quality. It replaces \
+holdings, for a bond fund its yield and the credit quality of what it lends \
+to. It replaces \
 the company form, which described an index in terms it does not have. These \
 move slowly and rarely justify a change of view in one cycle; a single \
 commodity has none of them at all, and the section is simply absent.
@@ -175,7 +185,28 @@ as often the end of a move as the middle of one. Weigh a *change* in \
 positioning more than its level, and note the data is Tuesday's, published \
 Friday, so it is several days stale by the time you read it. When the section \
 is absent -- a basket spanning many contracts, or a country fund with no \
-future -- leave insider_score null.
+future -- score insider_score from FUND FLOWS instead, and leave it null only \
+when neither section is present.
+- FUND FLOWS, when present, is the fund's share count over time. An ETF \
+creates and destroys shares on demand, so a rising count is money that was \
+actually put in and a falling one is money taken out. Like POSITIONING it is \
+behaviour rather than price, and it is settled: it has already happened. Read \
+it as conviction of flow rather than as a forecast -- a fund can bleed shares \
+through a rally -- and weigh the size in money as well as the percent. Where \
+POSITIONING is absent this is the behavioural dimension, so score \
+insider_score from it; where both are present, POSITIONING is the sharper \
+read and flows corroborate it.
+- MACRO is the backdrop, and it is the half of this instruction that used to \
+be missing: you are told to answer NEUTRAL unless a rate or policy surprise \
+has happened, so here are the rates. Treasury yields across the curve with \
+the week's move beside each, the curve's own slope, the dollar and \
+volatility. Read the *changes*, not the levels: a ten-year at 4% is a fact \
+about the world, a ten-year that moved fifteen basis points this week is a \
+fact about this week. The slope is the one worth knowing on its own -- an \
+inverted curve is a regime rather than a reading. Volatility sets how much \
+any of the rest is worth: the same signal is a different trade at a VIX of \
+12 and at 34. This is context for every other dimension rather than a score \
+of its own; where it drives the call, say so in key_factors.
 - NEWS here is macro and sector news: policy, rates, growth and inflation \
 data, currency moves, and flows into or out of the asset class. That is the \
 right frame. A roundup, a "best ETFs to buy" listicle, or a story about one \
@@ -203,10 +234,12 @@ will simply drop it.
 
 Report your read in the score fields, each in [-1.0, 1.0], where -1.0 is \
 maximally bearish, 0.0 is neutral or unknown, and +1.0 is maximally bullish. \
-Score a dimension 0.0 when the prompt says its data was unavailable. Leave \
-analyst_score null because it does not apply to a fund; score insider_score \
-from POSITIONING when that section is present and leave it null when it is \
-not; score fundamental_score from FUND BASICS when that section is present. \
+Score a dimension 0.0 when the prompt says its data was unavailable. Score \
+analyst_score from ANALYST VIEW OF THE HOLDINGS when that section is present \
+and leave it null when it is not; score insider_score from POSITIONING, or \
+from FUND FLOWS when POSITIONING is absent, and leave it null only when \
+neither is present; score fundamental_score from FUND BASICS when that \
+section is present. \
 A section that is absent entirely was never on offer for this instrument -- \
 that is not the same as a source that failed, and it is not a reason to \
 guess. In \
@@ -580,6 +613,14 @@ def process_ticker(
     except Exception:  # noqa: BLE001
         log.exception("%s: failed to gather context", ticker)
         return TickerResult(ticker, CONTEXT_FAILED)
+
+    # Before anything can fail: the reading is this cycle's contribution to a
+    # series nobody publishes, and a ticker that goes on to be screened out
+    # still moved money in or out of its fund. Recorded here rather than
+    # inside `context` so the gathering side stays free of side effects.
+    if ticker_context.share_reading:
+        shares, source = ticker_context.share_reading
+        flows.record(ticker_context.ticker, shares, source, cfg.FUND_SIZE_LOG_PATH)
 
     gaps = len(ticker_context.gaps)
     if ticker_context.gaps:
