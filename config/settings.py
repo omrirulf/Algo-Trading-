@@ -272,6 +272,13 @@ AUDIT_LOG_PATH: Final[Path] = LOG_DIR / "execution_audit.log"
 #: that one records what the engine did, this one records what the model saw.
 SIGNAL_JOURNAL_PATH: Final[Path] = LOG_DIR / "signal_journal.log"
 
+#: The one thing this project has to remember for itself. Nowhere free
+#: publishes a share-count series for an ETF, so the cycle records today's
+#: count for every fund and the series accumulates here, one line per fund per
+#: cycle. Committed back with the journal, because a runner is discarded and
+#: an uncommitted reading is a lost day of history.
+FUND_SIZE_LOG_PATH: Final[Path] = LOG_DIR / "fund_size.log"
+
 #: Queryable index over both logs above, built by ``store/build_db.py``.
 #:
 #: Derived data, and gitignored for that reason: the JSON-lines files are the

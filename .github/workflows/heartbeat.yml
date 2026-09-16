@@ -96,7 +96,10 @@ jobs:
           # -f because logs/*.log is gitignored for local development, where
           # nobody wants their scratch runs committed. Here the journal is
           # the deliverable, so it is added explicitly by name.
-          git add -f logs/signal_journal.log logs/execution_audit.log logs/cycle_report.md || true
+          # fund_size.log is the one series nobody publishes: it exists only
+          # because every cycle appends to it, so an uncommitted one is a lost
+          # day of history that cannot be backfilled.
+          git add -f logs/signal_journal.log logs/execution_audit.log logs/cycle_report.md logs/fund_size.log || true
           if git diff --cached --quiet; then
             echo "no journal changes"
             exit 0

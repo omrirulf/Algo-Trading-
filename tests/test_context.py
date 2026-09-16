@@ -13,7 +13,7 @@ import types
 
 import pytest
 
-from orchestrator import context
+from orchestrator import context, flows
 from tests.test_analysts import HOLDERS, INFO as ANALYST_INFO, RECOMMENDATIONS, UPGRADES
 from tests.test_fundamentals import INFO as FUNDAMENTAL_INFO
 from tests.test_insiders import PURCHASES, TRANSACTIONS
@@ -595,10 +595,49 @@ def test_a_holding_that_cannot_be_reached_is_cached_as_missing_not_retried():
     assert provider._analyst_for("VALE3.SA") is None
 
 
-def test_the_provider_asks_for_no_share_count_on_a_single_name():
-    gaps: list[str] = []
-    assert context.YFinanceContextProvider._shares_series(object(), "MSFT", gaps) is None
-    assert gaps == []
+def _provider_with(monkeypatch, tmp_path, info):
+    """A real provider whose yfinance is a stub and whose log is a temp file."""
+    class FakeTicker:
+        def __init__(self, symbol):
+            self.symbol = symbol
+            self.info = dict(info)
+
+        def history(self, **_kwargs):
+            return make_frame([100.0 + i * 0.1 for i in range(300)])
+
+        def __getattr__(self, name):  # every other payload is simply absent
+            raise AttributeError(name)
+
+    monkeypatch.setitem(sys.modules, "yfinance", types.SimpleNamespace(Ticker=FakeTicker))
+    return context.YFinanceContextProvider(fund_size_path=tmp_path / "fund_size.log")
+
+
+ETF_INFO = {"sharesOutstanding": 103_000_000, "totalAssets": 9.5e9, "navPrice": 92.0}
+
+
+def test_a_fund_is_measured_every_cycle_so_the_series_can_exist(monkeypatch, tmp_path):
+    """Nowhere free publishes a share-count series for an ETF, so the reading
+    is carried out for the caller to append. Without it there is no history."""
+    provider = _provider_with(monkeypatch, tmp_path, ETF_INFO)
+    raw = provider.fetch("XLE")
+    assert raw.share_reading == (103_000_000.0, flows.REPORTED)
+
+
+def test_a_single_name_is_not_measured_at_all(monkeypatch, tmp_path):
+    """A company has insiders who file. The fund-size log is not its question,
+    and a company's share count would pollute it."""
+    provider = _provider_with(monkeypatch, tmp_path, ETF_INFO)
+    raw = provider.fetch("MSFT")
+    assert raw.share_reading == ()
+    assert raw.shares_series is None
+
+
+def test_the_series_the_provider_hands_over_is_the_one_it_recorded(monkeypatch, tmp_path):
+    log = tmp_path / "fund_size.log"
+    for shares in (100e6, 101e6, 103e6):
+        flows.record("XLE", shares, flows.REPORTED, log)
+    provider = _provider_with(monkeypatch, tmp_path, ETF_INFO)
+    assert provider.fetch("XLE").shares_series
 
 
 def test_missed_holdings_are_one_gap_line_rather_than_five():

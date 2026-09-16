@@ -710,3 +710,30 @@ def test_the_company_prompt_learned_none_of_this():
     prompt = hb.system_prompt_for("MSFT")
     for phrase in ("FUND FLOWS", "ANALYST VIEW OF THE HOLDINGS", "POSITIONING", "FUND BASICS"):
         assert phrase not in prompt
+
+
+def test_the_fund_prompt_now_carries_the_rates_it_asks_the_model_to_judge():
+    """It told the model to answer NEUTRAL unless a rate surprise had
+    happened, then handed it a day of headlines and no rates at all."""
+    prompt = hb.system_prompt_for("TLT").replace("\n", " ")
+    assert "MACRO is the backdrop" in prompt
+    assert "so here are the rates" in prompt
+
+
+def test_the_macro_guidance_points_at_changes_rather_than_levels():
+    prompt = hb.system_prompt_for("TLT").replace("\n", " ")
+    assert "Read the *changes*, not the levels" in prompt
+    assert "an inverted curve is a regime rather than a reading" in prompt
+    assert "a different trade at a VIX of 12 and at 34" in prompt
+
+
+def test_macro_is_context_rather_than_a_sixth_score():
+    """There are five score fields. A sixth dimension with nowhere to go would
+    invite the model to fold it into one at random."""
+    prompt = hb.system_prompt_for("TLT").replace("\n", " ")
+    assert "context for every other dimension rather than a score of its own" in prompt
+    assert "macro_score" not in prompt
+
+
+def test_a_single_name_gets_no_macro_block_either():
+    assert "MACRO" not in hb.system_prompt_for("MSFT")

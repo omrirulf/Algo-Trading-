@@ -48,7 +48,7 @@ from config import settings as cfg  # noqa: E402
 from config.instruments import is_fund  # noqa: E402
 from orchestrator.fx import FxRate, fetch_rate as fetch_fx_rate  # noqa: E402
 from config.settings import get_settings  # noqa: E402
-from orchestrator import context, journal  # noqa: E402
+from orchestrator import context, flows, journal  # noqa: E402
 from orchestrator.context import TickerContext  # noqa: E402
 from orchestrator.llm import (  # noqa: E402
     SCREENING_ENABLED,
@@ -196,6 +196,17 @@ through a rally -- and weigh the size in money as well as the percent. Where \
 POSITIONING is absent this is the behavioural dimension, so score \
 insider_score from it; where both are present, POSITIONING is the sharper \
 read and flows corroborate it.
+- MACRO is the backdrop, and it is the half of this instruction that used to \
+be missing: you are told to answer NEUTRAL unless a rate or policy surprise \
+has happened, so here are the rates. Treasury yields across the curve with \
+the week's move beside each, the curve's own slope, the dollar and \
+volatility. Read the *changes*, not the levels: a ten-year at 4% is a fact \
+about the world, a ten-year that moved fifteen basis points this week is a \
+fact about this week. The slope is the one worth knowing on its own -- an \
+inverted curve is a regime rather than a reading. Volatility sets how much \
+any of the rest is worth: the same signal is a different trade at a VIX of \
+12 and at 34. This is context for every other dimension rather than a score \
+of its own; where it drives the call, say so in key_factors.
 - NEWS here is macro and sector news: policy, rates, growth and inflation \
 data, currency moves, and flows into or out of the asset class. That is the \
 right frame. A roundup, a "best ETFs to buy" listicle, or a story about one \
@@ -602,6 +613,14 @@ def process_ticker(
     except Exception:  # noqa: BLE001
         log.exception("%s: failed to gather context", ticker)
         return TickerResult(ticker, CONTEXT_FAILED)
+
+    # Before anything can fail: the reading is this cycle's contribution to a
+    # series nobody publishes, and a ticker that goes on to be screened out
+    # still moved money in or out of its fund. Recorded here rather than
+    # inside `context` so the gathering side stays free of side effects.
+    if ticker_context.share_reading:
+        shares, source = ticker_context.share_reading
+        flows.record(ticker_context.ticker, shares, source, cfg.FUND_SIZE_LOG_PATH)
 
     gaps = len(ticker_context.gaps)
     if ticker_context.gaps:

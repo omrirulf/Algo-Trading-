@@ -43,7 +43,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from config import settings as cfg  # noqa: E402
 from config.instruments import InstrumentKind, kind_for, name_for, sleeve_label  # noqa: E402
 from orchestrator import (  # noqa: E402
-    analysts, flows, fundamentals, funds, holdings, insiders, positioning, technicals,
+    analysts, flows, fundamentals, funds, holdings, insiders, macro, positioning,
+    technicals,
 )
 from orchestrator.news import absolute_url  # noqa: E402
 
@@ -78,6 +79,7 @@ LOCAL_TZ_LABEL = "Israel time"
 #: two pairs sit side by side here rather than in separate tables.
 SCORE_SECTIONS = (
     ("news_score", "news", "News"),
+    ("news_score", "macro", "Interest rates, the dollar and market nerves"),
     ("technical_score", "technicals", "Price and chart"),
     ("fundamental_score", "fundamentals", "Company numbers"),
     ("fundamental_score", "funds", "What this fund holds"),
@@ -131,6 +133,8 @@ GLOSSARY = (
     ("Fund flows", "Money going into or out of a fund. When more people want a fund, new shares are created; when they leave, shares are destroyed. So a rising share count means real money came in. It has already happened -- it is not a forecast."),
     ("Roll-up", "A fund does not get analyst ratings, but the companies it holds do. A roll-up adds those ratings up, weighted by how much of each company the fund owns. The \"coverage\" number says how much of the fund that actually covers."),
     ("Beta", "How hard a fund swings compared with the whole market. Beta 1.0 moves with the market, 2.0 swings twice as hard, 0.5 half as hard."),
+    ("Yield curve", "The gap between what the government pays to borrow for three months and for ten years. Normally ten years costs more. When it costs less -- an \"inverted\" curve -- markets are expecting a slowdown."),
+    ("VIX", "How nervous the market is about the next month. Under 15 is calm, over 25 is stressed."),
 )
 
 
@@ -300,6 +304,7 @@ _SNAPSHOT_CLASSES: dict[str, tuple[type, dict[str, type]]] = {
     "insiders": (insiders.InsiderSnapshot, {"buys": insiders.InsiderTrade, "sells": insiders.InsiderTrade}),
     "funds": (funds.FundSnapshot, {}),
     "holdings": (holdings.HoldingsSnapshot, {}),
+    "macro": (macro.MacroSnapshot, {}),
     "positioning": (positioning.PositioningSnapshot, {}),
     "flows": (flows.FlowSnapshot, {"windows": flows.FlowWindow}),
 }

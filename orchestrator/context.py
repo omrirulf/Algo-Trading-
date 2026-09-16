@@ -27,10 +27,11 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Optional, Sequence
 
+from config import settings as cfg
 from config.instruments import is_fund
 from orchestrator import (
     analysts, flows, formatting as fmt, fundamentals, funds, holdings, insiders,
-    positioning, technicals,
+    macro, positioning, technicals,
 )
 from orchestrator.technicals import TechnicalSnapshot
 
@@ -45,10 +46,9 @@ HISTORY_PERIOD = "2y"
 #: data source from being asked the same question 24 times a day.
 SLOW_DATA_TTL_SECONDS = 6 * 60 * 60
 
-#: How far back the share-count series is pulled. Long enough for the
-#: three-month window to have a point before it, short enough that Yahoo's
-#: fundamentals-timeseries endpoint stays quick.
-SHARES_HISTORY_START = "2024-01-01"
+#: History pulled for each macro symbol. A month of sessions, so a one-week
+#: change has a full week of trading days behind it even across a holiday.
+MACRO_PERIOD = "1mo"
 
 
 # --------------------------------------------------------------------------- #
@@ -74,8 +74,13 @@ class RawMarketData:
     positioning_rows: list[dict] = field(default_factory=list)
     #: ``(symbol, weight, analyst snapshot)`` for a fund's largest holdings.
     holding_analysts: list = field(default_factory=list)
-    #: Shares outstanding over time, for funds. The share count is the flow.
+    #: The accumulated share-count series for this fund, read back from the
+    #: project's own log -- nowhere free publishes one.
     shares_series: Any = None
+    #: Today's reading and how it was measured, for the caller to append.
+    share_reading: tuple = ()
+    #: Histories for the macro symbols, keyed by Yahoo symbol.
+    macro_histories: dict[str, Any] = field(default_factory=dict)
     gaps: list[str] = field(default_factory=list)
 
 
@@ -92,6 +97,8 @@ class _SlowData:
     positioning_rows: list[dict]
     holding_analysts: list
     shares_series: Any
+    share_reading: tuple
+    macro_histories: dict[str, Any]
     gaps: list[str]
 
 
@@ -102,14 +109,24 @@ class YFinanceContextProvider:
     (``max_instances=1``), so no locking is needed.
     """
 
-    def __init__(self, ttl_seconds: float = SLOW_DATA_TTL_SECONDS) -> None:
+    def __init__(
+        self,
+        ttl_seconds: float = SLOW_DATA_TTL_SECONDS,
+        fund_size_path: Any = None,
+    ) -> None:
         self._ttl = ttl_seconds
+        #: Read here, appended to by the caller after the cycle. Injectable so
+        #: a test never touches the repository's real history.
+        self._fund_size_path = fund_size_path or cfg.FUND_SIZE_LOG_PATH
         self._cache: dict[str, tuple[float, _SlowData]] = {}
         #: Analyst coverage keyed by *holding*, not by watchlist ticker. Forty
         #: funds overlap heavily -- the same handful of megacaps sits at the
         #: top of a dozen of them -- so without this the same company would be
         #: looked up a dozen times in one cycle.
         self._holding_cache: dict[str, tuple[float, Any]] = {}
+        #: The macro block is the same for every ticker in a cycle, so it is
+        #: cached once rather than once per ticker.
+        self._macro_cache: Optional[tuple[float, dict[str, Any]]] = None
 
     def fetch(self, ticker: str) -> RawMarketData:
         try:
@@ -138,6 +155,8 @@ class YFinanceContextProvider:
             positioning_rows=slow.positioning_rows,
             holding_analysts=slow.holding_analysts,
             shares_series=slow.shares_series,
+            share_reading=slow.share_reading,
+            macro_histories=slow.macro_histories,
             gaps=history_gaps + slow.gaps,
         )
 
@@ -162,7 +181,10 @@ class YFinanceContextProvider:
             fund_payloads=fund_payloads,
             positioning_rows=self._positioning_rows(ticker, gaps),
             holding_analysts=self._holding_analysts(ticker, fund_payloads, gaps),
-            shares_series=self._shares_series(handle, ticker, gaps),
+            shares_series=flows.series_from_log(ticker, self._fund_size_path)
+            if is_fund(ticker) else None,
+            share_reading=flows.reading_from_info(info) if is_fund(ticker) else (),
+            macro_histories=self._macro_histories(ticker, gaps),
             info=info,
             calendar=_attempt(lambda: handle.calendar, "earnings calendar", gaps),
             recommendations=_attempt(
@@ -215,16 +237,38 @@ class YFinanceContextProvider:
             return []
         return _attempt(lambda: positioning.fetch_rows(ticker), "CFTC positioning", gaps) or []
 
-    @staticmethod
-    def _shares_series(handle: Any, ticker: str, gaps: list[str]) -> Any:
-        """Shares outstanding over time. Funds only -- see ``orchestrator.flows``."""
+    def _macro_histories(self, ticker: str, gaps: list[str]) -> dict[str, Any]:
+        """Rates, the dollar and volatility -- six symbols, once per cycle.
+
+        Funds only. The company prompt is the input every replay and sanity
+        baseline was measured against, so a new section in it would invalidate
+        all of them, for a block that matters far less to a single name.
+        """
         if not is_fund(ticker):
-            return None
-        return _attempt(
-            lambda: handle.get_shares_full(start=SHARES_HISTORY_START),
-            "fund share count",
-            gaps,
-        )
+            return {}
+        if self._macro_cache and self._macro_cache[0] > time.monotonic():
+            return self._macro_cache[1]
+
+        try:
+            import yfinance as yf
+        except ImportError:  # pragma: no cover - dependency is pinned
+            return {}
+
+        histories: dict[str, Any] = {}
+        missed: list[str] = []
+        for symbol in macro.SYMBOLS:
+            try:
+                frame = yf.Ticker(symbol).history(period=MACRO_PERIOD, interval="1d")
+            except Exception:  # noqa: BLE001 - one missing rate is not a cycle
+                frame = None
+            if frame is None or getattr(frame, "empty", True):
+                missed.append(symbol)
+                continue
+            histories[symbol] = frame
+        if missed:
+            gaps.append(f"macro series for {', '.join(missed)}")
+        self._macro_cache = (time.monotonic() + self._ttl, histories)
+        return histories
 
     def _holding_analysts(
         self, ticker: str, fund_payloads: dict[str, Any], gaps: list[str]
@@ -325,6 +369,7 @@ def get_provider() -> YFinanceContextProvider:
 #: News is handled separately: it is never "unavailable", only empty.
 ENRICHMENT_SECTIONS = (
     ("TECHNICALS (daily bars)", "technicals"),
+    ("MACRO (the weather every fund trades in)", "macro"),
     ("FUNDAMENTALS", "fundamentals"),
     ("FUND BASICS", "funds"),
     ("ANALYST & INSTITUTIONAL VIEW", "analysts"),
@@ -353,7 +398,7 @@ SINGLE_NAME_ONLY_SECTIONS = frozenset({"fundamentals", "analysts", "insiders"})
 #: "this kind of thing does not have one" -- gold has no holdings to report,
 #: and a single-country fund has no futures contract. A fetch that was
 #: attempted and failed still records a gap, so the two cases stay distinct.
-FUND_ONLY_SECTIONS = frozenset({"funds", "holdings", "positioning", "flows"})
+FUND_ONLY_SECTIONS = frozenset({"funds", "holdings", "macro", "positioning", "flows"})
 
 
 @dataclass(frozen=True)
@@ -380,6 +425,13 @@ class TickerContext:
     positioning: Optional[positioning.PositioningSnapshot] = None
     #: Creations and redemptions: a fund's share count is its money in and out.
     flows: Optional[flows.FlowSnapshot] = None
+    #: Rates, the curve, the dollar and volatility. The same for every ticker
+    #: in a cycle, which is why the provider fetches it once.
+    macro: Optional[macro.MacroSnapshot] = None
+    #: ``(shares, source)`` measured this cycle, for the caller to append to
+    #: the fund-size log. Not part of the prompt: it is the *series* the model
+    #: reads, and one reading is not a series.
+    share_reading: tuple = ()
     gaps: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict:
@@ -396,6 +448,7 @@ class TickerContext:
             "holdings": self.holdings.as_dict() if self.holdings else None,
             "positioning": self.positioning.as_dict() if self.positioning else None,
             "flows": self.flows.as_dict() if self.flows else None,
+            "macro": self.macro.as_dict() if self.macro else None,
             "gaps": list(self.gaps),
         }
 
@@ -494,6 +547,12 @@ def gather(
             gaps,
         )
 
+    macro_snapshot = None
+    if raw.macro_histories:
+        macro_snapshot = _attempt(
+            lambda: macro.build_snapshot(raw.macro_histories), "macro", gaps
+        )
+
     positioning_snapshot = None
     if raw.positioning_rows:
         positioning_snapshot = _attempt(
@@ -552,6 +611,8 @@ def gather(
         holdings=holdings_snapshot,
         positioning=positioning_snapshot,
         flows=flow_snapshot,
+        macro=macro_snapshot,
+        share_reading=raw.share_reading,
         gaps=gaps,
     )
 

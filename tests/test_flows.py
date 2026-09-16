@@ -136,3 +136,179 @@ def test_the_flat_threshold_is_what_separates_noise_from_a_flow():
     tiny = series([100e6, 100e6, 100e6, 100_100_000.0])
     text = "\n".join(flows.build_snapshot("XLE", tiny).as_lines())
     assert "Direction: flat" in text
+
+
+# --- the series the project keeps for itself ----------------------------------
+#
+# Nowhere free publishes a share-count series for an ETF. The live probe was
+# unambiguous: every fund on the watchlist returned an empty series from
+# Yahoo's fundamentals-timeseries, which carries `shares_out` for companies
+# and for no fund. So the cycle records one reading a day and the history
+# accumulates. These pin the part that makes that safe.
+
+
+def test_a_reported_share_count_is_preferred():
+    assert flows.reading_from_info({"sharesOutstanding": 260_300_000}) == (
+        260_300_000.0, flows.REPORTED)
+
+
+def test_a_fund_without_one_has_it_derived_from_assets_over_nav():
+    """TLT reports no `sharesOutstanding`. Net assets over NAV is the same
+    quantity by definition."""
+    shares, source = flows.reading_from_info(
+        {"totalAssets": 47046328320, "navPrice": 80.92253})
+    assert shares == pytest.approx(581_374_906, rel=1e-6)
+    assert source == flows.DERIVED
+
+
+@pytest.mark.parametrize("info", [
+    {}, None, {"sharesOutstanding": 0}, {"sharesOutstanding": -5},
+    {"totalAssets": 1e9}, {"navPrice": 80.0}, {"totalAssets": 1e9, "navPrice": 0},
+    {"sharesOutstanding": "many"},
+])
+def test_a_reading_that_cannot_be_measured_is_none_rather_than_a_guess(info):
+    assert flows.reading_from_info(info)[0] is None
+
+
+def test_a_recorded_reading_comes_back():
+    import tempfile
+    from pathlib import Path
+
+    with tempfile.TemporaryDirectory() as tmp:
+        log = Path(tmp) / "fund_size.log"
+        assert flows.record("XLE", 100e6, flows.REPORTED, log) is True
+        assert list(flows.series_from_log("XLE", log).values()) == [100e6]
+
+
+def test_one_fund_never_reads_anothers_history():
+    import tempfile
+    from pathlib import Path
+
+    with tempfile.TemporaryDirectory() as tmp:
+        log = Path(tmp) / "fund_size.log"
+        flows.record("XLE", 100e6, flows.REPORTED, log)
+        flows.record("SMH", 55e6, flows.REPORTED, log)
+        assert list(flows.series_from_log("xle", log).values()) == [100e6]
+        assert list(flows.series_from_log("SMH", log).values()) == [55e6]
+
+
+def test_readings_measured_differently_are_never_compared():
+    """GLD reports `sharesOutstanding` of 260.3M while its assets over NAV give
+    390.7M. Mixing the two would invent a 50% flow on the day the source
+    changed -- which is a bigger lie than having no section at all."""
+    import json
+    import tempfile
+    from datetime import date, timedelta
+    from pathlib import Path
+
+    with tempfile.TemporaryDirectory() as tmp:
+        log = Path(tmp) / "fund_size.log"
+        today = date.today()
+        rows = [
+            {"date": (today - timedelta(days=3)).isoformat(), "ticker": "GLD",
+             "shares": 390.7e6, "source": flows.DERIVED},
+            {"date": (today - timedelta(days=2)).isoformat(), "ticker": "GLD",
+             "shares": 260.3e6, "source": flows.REPORTED},
+            {"date": (today - timedelta(days=1)).isoformat(), "ticker": "GLD",
+             "shares": 261.0e6, "source": flows.REPORTED},
+        ]
+        log.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+        series = flows.series_from_log("GLD", log)
+        assert sorted(series.values()) == [260.3e6, 261.0e6]
+
+
+def test_a_rerun_corrects_the_day_rather_than_adding_a_second_reading():
+    import tempfile
+    from pathlib import Path
+
+    with tempfile.TemporaryDirectory() as tmp:
+        log = Path(tmp) / "fund_size.log"
+        for shares in (100e6, 101e6, 102e6):
+            flows.record("XLE", shares, flows.REPORTED, log)
+        assert list(flows.series_from_log("XLE", log).values()) == [102e6]
+
+
+def test_a_missing_or_unreadable_log_is_an_empty_series_not_a_crash():
+    assert flows.series_from_log("XLE", "/nonexistent/fund_size.log") == {}
+
+
+def test_a_corrupt_line_costs_that_line_and_nothing_else():
+    """Append-only and one line at a time: a cycle that dies halfway leaves a
+    shorter file, and a half-written line must not lose the rest."""
+    import json
+    import tempfile
+    from datetime import date, timedelta
+    from pathlib import Path
+
+    with tempfile.TemporaryDirectory() as tmp:
+        log = Path(tmp) / "fund_size.log"
+        today = date.today()
+        good = json.dumps({"date": (today - timedelta(days=1)).isoformat(),
+                           "ticker": "XLE", "shares": 100e6, "source": flows.REPORTED})
+        log.write_text(f"{good}\n{{\"ticker\": \"XL\n\nnot json at all\n{good}\n")
+        assert list(flows.series_from_log("XLE", log).values()) == [100e6]
+
+
+def test_history_older_than_the_longest_window_needs_is_dropped():
+    import json
+    import tempfile
+    from datetime import date, timedelta
+    from pathlib import Path
+
+    with tempfile.TemporaryDirectory() as tmp:
+        log = Path(tmp) / "fund_size.log"
+        today = date.today()
+        rows = [
+            {"date": (today - timedelta(days=flows.MAX_HISTORY_DAYS + 5)).isoformat(),
+             "ticker": "XLE", "shares": 1e6, "source": flows.REPORTED},
+            {"date": today.isoformat(), "ticker": "XLE",
+             "shares": 100e6, "source": flows.REPORTED},
+        ]
+        log.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+        assert list(flows.series_from_log("XLE", log).values()) == [100e6]
+
+
+def test_the_accumulated_series_windows_exactly_like_any_other():
+    """The whole point of keeping it: once there are enough readings it is an
+    ordinary series and everything above applies unchanged."""
+    import json
+    import tempfile
+    from datetime import date, timedelta
+    from pathlib import Path
+
+    with tempfile.TemporaryDirectory() as tmp:
+        log = Path(tmp) / "fund_size.log"
+        today = date.today()
+        rows = [
+            {"date": (today - timedelta(days=days)).isoformat(), "ticker": "XLE",
+             "shares": shares, "source": flows.REPORTED}
+            for days, shares in ((40, 100e6), (30, 104e6), (7, 110e6), (0, 113e6))
+        ]
+        log.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+        snapshot = flows.build_snapshot("XLE", flows.series_from_log("XLE", log), price=90.0)
+        assert snapshot is not None
+        assert "Direction: money coming in" in "\n".join(snapshot.as_lines())
+        assert {w.label for w in snapshot.windows} == {"1 week", "1 month"}
+
+
+def test_two_readings_is_still_no_section():
+    """A fund's history starts empty and is thin for a fortnight. Absent beats
+    present-and-saying-nothing, which is what every module here replaced."""
+    import tempfile
+    from pathlib import Path
+
+    with tempfile.TemporaryDirectory() as tmp:
+        log = Path(tmp) / "fund_size.log"
+        flows.record("XLE", 100e6, flows.REPORTED, log)
+        assert flows.build_snapshot("XLE", flows.series_from_log("XLE", log)) is None
+
+
+def test_recording_never_writes_to_the_repositorys_own_log():
+    """The audit log was once filled with forty-two test records because a
+    module bound its path at import. This one takes the path as an argument,
+    and this asserts nothing changed that."""
+    import inspect
+
+    assert "path" in inspect.signature(flows.record).parameters
+    source = inspect.getsource(flows.record)
+    assert "FUND_SIZE_LOG_PATH" not in source and "cfg." not in source
