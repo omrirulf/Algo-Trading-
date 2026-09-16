@@ -108,6 +108,74 @@ jobs:
           set -o pipefail
           python backtest/probe_fund_data.py ${{ inputs.tickers }} | tee funds.txt
 
+      - name: The four keyed blocks, as the model would read them
+        # The probe above proves the keys work. This proves the *blocks* do:
+        # a key that answers and a section that renders correctly are two
+        # different things, and the fund block taught us which one costs more
+        # to get wrong.
+        continue-on-error: true
+        env:
+          EIA_API_KEY: ${{ secrets.EIA_API_KEY }}
+          USDA_NASS_KEY: ${{ secrets.USDA_NASS_KEY }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+        run: |
+          set -o pipefail
+          python - <<'EOF' | tee keyed-blocks.txt
+          from datetime import date
+
+          from orchestrator import crops, earnings, energy, fred, sources
+
+          print("configured:", sources.configured())
+          print()
+
+          print("=== MACRO releases (FRED) ===")
+          releases = fred.build_releases(sources.fetch_fred_releases())
+          for line in fred.as_lines(releases) or ["  (nothing returned)"]:
+              print(f"  {line}")
+
+          print()
+          print("=== ENERGY INVENTORIES (EIA) ===")
+          for ticker in sorted(energy.COVERAGE):
+              snap = energy.build_snapshot(ticker, sources.fetch_energy_payloads(ticker))
+              if snap is None:
+                  print(f"  {ticker:<5} nothing returned")
+                  continue
+              print(f"  {ticker}:")
+              for line in snap.as_lines()[:-1]:
+                  print(f"    {line}")
+
+          print()
+          print("=== CROP CONDITION (USDA) ===")
+          year = date.today().year
+          for ticker in sorted(crops.COMMODITIES):
+              snap = crops.build_snapshot(
+                  ticker,
+                  sources.fetch_crop_rows(ticker, year),
+                  sources.fetch_crop_rows(ticker, year - 1),
+                  year=year,
+              )
+              if snap is None:
+                  print(f"  {ticker:<5} out of season or nothing returned")
+                  continue
+              print(f"  {ticker}:")
+              for line in snap.as_lines()[:-1]:
+                  print(f"    {line}")
+
+          print()
+          print("=== EARNINGS RECORD (Finnhub) ===")
+          from config.instruments import SINGLE_NAMES
+          missing = []
+          for ticker in SINGLE_NAMES:
+              snap = earnings.build_snapshot(ticker, sources.fetch_earnings_rows(ticker))
+              if snap is None:
+                  missing.append(ticker)
+                  continue
+              print(f"  {ticker:<6} {snap.as_lines()[0].split(': ', 1)[1]}")
+          if missing:
+              print(f"  -> no history for: {', '.join(missing)}")
+          EOF
+
       - name: The macro backdrop
         # Six index symbols, and the one that matters is the curve: the slope
         # is a regime rather than a reading, and it is the only line here that
@@ -165,6 +233,11 @@ jobs:
             echo '```'
             cat funds.txt 2>/dev/null || echo "(did not run)"
             echo '```'
+            echo '## Keyed blocks'
+            echo
+            echo '```'
+            cat keyed-blocks.txt 2>/dev/null || echo "(did not run)"
+            echo '```'
             echo '## Macro'
             echo
             echo '```'
@@ -178,6 +251,7 @@ jobs:
           name: data-sources
           path: |
             keys.txt
+            keyed-blocks.txt
             positioning.txt
             funds.txt
             funds-raw.txt
