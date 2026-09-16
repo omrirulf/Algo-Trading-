@@ -78,44 +78,24 @@ def dump_raw(ticker: str) -> None:
 
 
 def dump_flows(handle: Any, ticker: str) -> None:
-    """Creations and redemptions, which is the one section nothing else proves.
+    """Today's share count, and which of the two ways it was arrived at.
 
-    Yahoo's share-count series is a different endpoint from everything else
-    here, and how often a fund reports is the whole question: a fund that
-    files twice a year has no weekly flow to read.
+    There is no series to check: Yahoo's fundamentals-timeseries carries
+    `shares_out` for companies and, this probe established, for no fund on the
+    watchlist. The series is the project's own, accumulated one reading per
+    cycle, so what matters here is that the *reading* is available for every
+    fund -- a fund it cannot measure contributes nothing, forever.
     """
     try:
-        series = handle.get_shares_full(start="2024-01-01")
+        info = handle.info or {}
     except Exception as exc:  # noqa: BLE001
-        print(f"  flows: FAILED {type(exc).__name__}: {exc}")
+        print(f"  flow reading: FAILED {type(exc).__name__}: {exc}")
         return
-    if series is None or not len(series):
-        # Yahoo's fundamentals-timeseries carries `shares_out` for companies
-        # and, it turns out, for no ETF at all. So the question becomes
-        # whether a *point* share count and a NAV are there to build from.
-        print("  flows: no share-count series -- looking for what is there instead")
-        try:
-            info = handle.info or {}
-        except Exception as exc:  # noqa: BLE001
-            print(f"    info failed: {type(exc).__name__}: {exc}")
-            return
-        for key in ("sharesOutstanding", "impliedSharesOutstanding", "floatShares",
-                    "navPrice", "previousClose", "regularMarketPrice", "totalAssets",
-                    "averageVolume", "averageVolume10days", "volume"):
-            if key in info:
-                print(f"    {key} = {info[key]!r}")
+    shares, source = flows.reading_from_info(info)
+    if shares is None:
+        print("  flow reading: NONE -- this fund can never build a flow series")
         return
-    price = None
-    try:
-        price = float(handle.fast_info["last_price"])
-    except Exception:  # noqa: BLE001 - the percentages stand without it
-        price = None
-    snapshot = flows.build_snapshot(ticker, series, price=price)
-    if snapshot is None:
-        print(f"  flows: {len(series)} readings, too few to window")
-        return
-    for line in snapshot.as_lines()[:3]:
-        print(f"  {line}")
+    print(f"  flow reading: {shares:,.0f} shares ({source})")
 
 
 def dump_holdings(handle: Any, ticker: str) -> None:

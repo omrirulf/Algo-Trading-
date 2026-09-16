@@ -77,6 +77,36 @@ jobs:
           set -o pipefail
           python backtest/probe_fund_data.py ${{ inputs.tickers }} | tee funds.txt
 
+      - name: The macro backdrop
+        # Six index symbols, and the one that matters is the curve: the slope
+        # is a regime rather than a reading, and it is the only line here that
+        # needs two symbols to have arrived to say anything at all.
+        run: |
+          set -o pipefail
+          python - <<'EOF' | tee macro.txt
+          import yfinance as yf
+          from orchestrator import macro
+
+          histories = {}
+          for symbol in macro.SYMBOLS:
+              try:
+                  frame = yf.Ticker(symbol).history(period="1mo", interval="1d")
+              except Exception as exc:
+                  print(f"  {symbol:<12} FAILED: {type(exc).__name__}: {exc}")
+                  continue
+              if frame is None or frame.empty:
+                  print(f"  {symbol:<12} no bars")
+                  continue
+              histories[symbol] = frame
+          snapshot = macro.build_snapshot(histories)
+          print()
+          if snapshot is None:
+              print("  no macro block at all")
+          else:
+              for line in snapshot.as_lines():
+                  print(f"  {line}")
+          EOF
+
       - name: Raw Yahoo payloads
         if: inputs.raw
         run: |
@@ -99,6 +129,11 @@ jobs:
             echo '```'
             cat funds.txt 2>/dev/null || echo "(did not run)"
             echo '```'
+            echo '## Macro'
+            echo
+            echo '```'
+            cat macro.txt 2>/dev/null || echo "(did not run)"
+            echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v4
@@ -109,4 +144,5 @@ jobs:
             positioning.txt
             funds.txt
             funds-raw.txt
+            macro.txt
           if-no-files-found: ignore
