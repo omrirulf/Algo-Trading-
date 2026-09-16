@@ -43,8 +43,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from config import settings as cfg  # noqa: E402
 from config.instruments import InstrumentKind, kind_for, name_for, sleeve_label  # noqa: E402
 from orchestrator import (  # noqa: E402
-    analysts, crops, earnings, energy, flows, fundamentals, funds, holdings,
-    insiders, macro, positioning, technicals,
+    analysts, carry, crops, earnings, energy, flows, fundamentals, funds,
+    holdings, insiders, macro, positioning, technicals,
 )
 from orchestrator.news import absolute_url  # noqa: E402
 
@@ -84,6 +84,7 @@ SCORE_SECTIONS = (
     ("fundamental_score", "fundamentals", "Company numbers"),
     ("fundamental_score", "funds", "What this fund holds"),
     ("fundamental_score", "earnings", "Does this company beat its own forecasts"),
+    ("fundamental_score", "carry", "What holding this fund costs you"),
     ("fundamental_score", "energy", "How much oil and gas is in storage"),
     ("fundamental_score", "crops", "How the crop is growing"),
     ("analyst_score", "analysts", "What analysts and big funds say"),
@@ -141,6 +142,7 @@ GLOSSARY = (
     ("Build and draw", "A build means more oil or gas went into storage than came out last week, so there is more supply around — usually bad for the price. A draw is the opposite."),
     ("Good or excellent", "The share of a US crop that government inspectors rate as healthy. A healthier crop means more grain, which usually pushes the price down."),
     ("Beat and miss", "A company beat if it earned more than analysts forecast, and missed if it earned less."),
+    ("Cost of holding", "A commodity fund does not own the gold or the oil. It owns contracts that expire every month and must be replaced, and the replacement often costs more. That difference comes out of the fund's price every month, even when the commodity itself does not move. Funds that hold real metal in a vault avoid almost all of it."),
 )
 
 
@@ -314,6 +316,7 @@ _SNAPSHOT_CLASSES: dict[str, tuple[type, dict[str, type]]] = {
     "earnings": (earnings.EarningsSnapshot, {"quarters": earnings.Quarter}),
     "energy": (energy.EnergySnapshot, {"stocks": energy.Stock}),
     "crops": (crops.CropSnapshot, {}),
+    "carry": (carry.CarrySnapshot, {"windows": carry.Window}),
     "positioning": (positioning.PositioningSnapshot, {}),
     "flows": (flows.FlowSnapshot, {"windows": flows.FlowWindow}),
 }

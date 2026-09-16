@@ -769,12 +769,12 @@ def test_out_of_season_is_explained_so_absence_is_not_read_as_failure():
     assert "the crop is not in the ground, not that the data failed" in prompt
 
 
-def test_the_three_supply_sections_all_feed_the_same_score():
-    """Five score fields and eight sections. Each has to be told where to go
-    or the model will pick one at random."""
+def test_the_four_numbers_sections_all_feed_the_same_score():
+    """Five score fields and nine sections. Each has to be told where to go or
+    the model will pick one at random."""
     prompt = hb.system_prompt_for("XLE").replace("\n", " ")
-    assert ("score fundamental_score from FUND BASICS, ENERGY INVENTORIES and "
-            "CROP CONDITION, whichever of them are present") in prompt
+    assert ("score fundamental_score from FUND BASICS, COST OF HOLDING, ENERGY "
+            "INVENTORIES and CROP CONDITION, whichever of them are present") in prompt
 
 
 def test_the_macro_block_says_what_the_official_releases_are_for():
@@ -787,3 +787,27 @@ def test_the_company_prompt_learned_nothing_about_supply_or_crops():
     prompt = hb.system_prompt_for("XOM")
     for phrase in ("ENERGY INVENTORIES", "CROP CONDITION", "MACRO", "FUND BASICS"):
         assert phrase not in prompt
+
+
+def test_the_fund_prompt_explains_what_a_commodity_fund_actually_holds():
+    """The single most important fact about USO, and the one least visible on
+    its chart: it does not hold oil, it holds contracts that expire."""
+    prompt = hb.system_prompt_for("USO").replace("\n", " ")
+    assert "COST OF HOLDING" in prompt
+    assert "it holds futures, and every month it sells the expiring contract" in prompt
+    assert "that roll loses money every month" in prompt
+
+
+def test_the_holding_cost_is_explicitly_not_a_direction():
+    """Heavy carry is a reason to want a bigger move, not a bearish signal.
+    Without this the model will read a negative number as "sell"."""
+    prompt = hb.system_prompt_for("GLD").replace("\n", " ")
+    assert "It is *not* a direction" in prompt
+    assert "a tailwind for a short, rather than a bearish signal in itself" in prompt
+    assert "temper conviction on a long rather than setting the direction" in prompt
+
+
+def test_a_near_zero_holding_cost_is_named_as_a_finding_not_a_blank():
+    prompt = hb.system_prompt_for("SLV").replace("\n", " ")
+    assert "a figure near zero is a finding rather than a blank" in prompt
+    assert "you are paying only the fee" in prompt

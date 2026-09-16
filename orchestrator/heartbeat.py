@@ -220,6 +220,20 @@ rather than what is priced, and a release well outside expectations is \
 exactly the "data surprise" this prompt asks you to wait for. This is context \
 for every other dimension rather than a score of its own; where it drives the \
 call, say so in key_factors.
+- COST OF HOLDING, when present, is the most important fact about a \
+commodity fund and the one least visible on its chart. The fund does not \
+hold the metal or the barrel; it holds futures, and every month it sells the \
+expiring contract to buy the next. Where the next month costs more, that roll \
+loses money every month, for ever. The number given is what that has actually \
+cost against the commodity itself, fees included -- measured, not modelled. \
+Read it three ways. It is *not* a direction: a heavy cost is a reason to want \
+a larger move before going long, and a tailwind for a short, rather than a \
+bearish signal in itself. It is history, so it says what the structure has \
+been costing while the curve stayed as it is, not what it will cost. And a \
+figure near zero is a finding rather than a blank -- it means the fund holds \
+the physical metal and you are paying only the fee. Score it into \
+fundamental_score, and let it temper conviction on a long rather than \
+setting the direction.
 - ENERGY INVENTORIES, when present, is what the United States is actually \
 holding in tanks, published every Wednesday. For an oil or gas fund this is \
 not background, it is the scheduled event of the week and the one release \
@@ -266,8 +280,9 @@ Score a dimension 0.0 when the prompt says its data was unavailable. Score \
 analyst_score from ANALYST VIEW OF THE HOLDINGS when that section is present \
 and leave it null when it is not; score insider_score from POSITIONING, or \
 from FUND FLOWS when POSITIONING is absent, and leave it null only when \
-neither is present; score fundamental_score from FUND BASICS, ENERGY \
-INVENTORIES and CROP CONDITION, whichever of them are present. \
+neither is present; score fundamental_score from FUND BASICS, COST OF \
+HOLDING, ENERGY INVENTORIES and CROP CONDITION, whichever of them are \
+present. \
 A section that is absent entirely was never on offer for this instrument -- \
 that is not the same as a source that failed, and it is not a reason to \
 guess. In \
