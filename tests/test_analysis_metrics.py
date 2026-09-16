@@ -220,3 +220,52 @@ def test_bias_distribution_counts_each_call():
         [entry(bias="BULLISH"), entry(bias="BULLISH"), entry(bias="NEUTRAL")]
     )
     assert counts["BULLISH"] == 2 and counts["NEUTRAL"] == 1
+
+
+
+# --------------------------------------------------------------------------- #
+# The learned blend beside what it has to beat
+# --------------------------------------------------------------------------- #
+
+
+def _scored_line(bias, conviction, ret, scores=None, blend=None):
+    from datetime import date as _date
+    from analysis import reader as _reader
+    from analysis.returns import ForwardReturn as _Forward
+    payload = {
+        "ts_utc": "2026-03-02T14:00:00+00:00", "ticker": "NVDA", "context": {"gaps": []},
+        "signal": {"ticker": "NVDA", "bias": bias, "conviction": conviction, "rationale": "r", **(scores or {})},
+        "blend": blend,
+    }
+    entry = _reader.entry_from(payload)
+    forward = _Forward(entry_date=_date(2026, 3, 2), exit_date=_date(2026, 3, 5),
+                       entry_price=100.0, exit_price=100.0 * (1 + ret), pct=ret)
+    return metrics.ScoredSignal(entry, forward)
+
+
+def test_the_blend_comparison_counts_neutral_lines_for_the_blend_but_not_the_model():
+    signals = [
+        _scored_line("BULLISH", 0.8, +0.02, {"news_score": 0.5}, {"composite": 0.1, "level": "equal"}),
+        _scored_line("NEUTRAL", 0.2, -0.01, {"news_score": -0.5}, {"composite": -0.1, "level": "ticker:NVDA"}),
+        # The model and the blend disagree here; the blend is right.
+        _scored_line("BEARISH", 0.6, +0.01, {"news_score": 0.5}, {"composite": 0.1, "level": "kind:equity"}),
+        # A line from before the blend existed: counts for the model and equal weights only.
+        _scored_line("BULLISH", 0.5, +0.01, {"news_score": 0.5}),
+    ]
+    c = metrics.blend_comparison(signals)
+    assert (c.model.n, c.model.called) == (4, 3)
+    assert c.model.hit_rate == pytest.approx(2 / 3)
+    assert (c.equal.n, c.equal.called) == (4, 4)
+    assert (c.learned.n, c.learned.called, c.learned_fitted) == (3, 3, 2)
+    assert c.learned.hit_rate == 1.0
+    assert c.disagreements == 1
+    assert c.model_hit_rate_when_disagreeing == 0.0
+    assert c.blend_hit_rate_when_disagreeing == 1.0
+
+
+def test_a_policy_with_nothing_to_judge_is_empty_not_an_error():
+    check = metrics.policy_check("x", [])
+    assert (check.n, check.called, check.hit_rate, check.rank_corr.n) == (0, 0, None, 0)
+    empty = metrics.blend_comparison([])
+    assert empty.learned.n == 0 and empty.disagreements == 0
+    assert empty.model_hit_rate_when_disagreeing is None

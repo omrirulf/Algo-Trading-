@@ -140,6 +140,7 @@ def as_json(run) -> dict:
     agreement = metrics.agreement_check(run.entries)
     drift = metrics.conviction_drift(run.entries, run.floor)
     with_gaps, gap_kinds = metrics.gap_summary(run.entries)
+    comparison = metrics.blend_comparison(run.blend_signals)
 
     return {
         "horizon": run.horizon,
@@ -159,6 +160,15 @@ def as_json(run) -> dict:
         "floor_check": asdict(metrics.floor_check(run.signals, run.floor)),
         "dimensions": {
             name: asdict(correlations[name]) for name in SCORE_FIELDS
+        },
+        "blend": {
+            "model": asdict(comparison.model),
+            "equal": asdict(comparison.equal),
+            "learned": asdict(comparison.learned),
+            "learned_fitted": comparison.learned_fitted,
+            "disagreements": comparison.disagreements,
+            "model_hit_rate_when_disagreeing": comparison.model_hit_rate_when_disagreeing,
+            "blend_hit_rate_when_disagreeing": comparison.blend_hit_rate_when_disagreeing,
         },
         "agreement": {
             "aligned_n": agreement.aligned_n,
