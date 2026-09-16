@@ -24,9 +24,8 @@ from __future__ import annotations
 
 import logging
 import time
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional, Sequence
+from typing import Any, Optional, Sequence
 
 from config import settings as cfg
 from config.instruments import is_fund
@@ -47,62 +46,6 @@ HISTORY_PERIOD = "2y"
 #: heartbeat runs daily. Caching them keeps an unauthenticated, rate-limited
 #: data source from being asked the same question 24 times a day.
 SLOW_DATA_TTL_SECONDS = 6 * 60 * 60
-
-#: How many of one ticker's sections are fetched at the same time.
-#:
-#: A ticker costs about 32 seconds and almost none of it is work: it is a
-#: queue of roughly twenty requests to six different companies' servers, each
-#: waiting its turn for no reason except that the code asked in order. On
-#: 16 Sep that queue brought an 80-name cycle to 42m48s against a 45-minute
-#: ceiling -- two minutes from losing the day.
-#:
-#: Eight rather than "all of them": the requests are not spread evenly, and a
-#: dozen at once at Yahoo is how an unauthenticated caller earns a 429. Eight
-#: collapses the wait to roughly the slowest few requests while leaving any
-#: one host a queue of two or three. The gain is in overlapping the waiting,
-#: not in the width of the pool.
-FETCH_WORKERS = 8
-
-#: How wide the fan-outs *inside* a section may go.
-#:
-#: Two of the sections are themselves a list of fetches -- the fund's eight
-#: properties, the six macro symbols, the holdings' analyst coverage -- and
-#: they run inside a worker of the wave above. Widths multiply: 8 outer with
-#: 8 inner is over twenty requests in flight, nearly all of them at Yahoo,
-#: which is how an unauthenticated caller collects a 429 and turns a working
-#: section into a gap. Four keeps the worst case near sixteen and still takes
-#: six macro symbols from six waits down to two.
-NESTED_FETCH_WORKERS = 4
-
-
-def _in_parallel(
-    jobs: Sequence[tuple[str, Callable[[list[str]], Any]]],
-    workers: int = FETCH_WORKERS,
-) -> tuple[dict[str, Any], dict[str, list[str]]]:
-    """Run each job on its own thread, each with its own list of gaps.
-
-    Two things here are not incidental:
-
-    **Each job gets a gap list of its own**, returned per job rather than
-    merged here. Gaps are printed into the prompt, so a set that reordered
-    itself between runs would change the bytes the model reads without a
-    single number having changed -- and would make every replay and sanity
-    baseline incomparable with the run that produced it. Handing the lists
-    back separately lets the caller state the order explicitly, in one place,
-    instead of inheriting whichever thread happened to finish first.
-
-    **Results are awaited in declared order too.** Every fetch in this module
-    is already wrapped so that a failure becomes a gap rather than an
-    exception, but if one ever does raise, waiting in order means the same one
-    surfaces that would have surfaced when this ran sequentially. Waiting on
-    whichever finished first would make the reported error depend on the
-    weather.
-    """
-    buckets: dict[str, list[str]] = {name: [] for name, _ in jobs}
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = {name: pool.submit(call, buckets[name]) for name, call in jobs}
-        results = {name: futures[name].result() for name, _ in jobs}
-    return results, buckets
 
 def _this_year() -> int:
     """The calendar year, as the USDA labels a growing season."""
@@ -226,18 +169,8 @@ class YFinanceContextProvider:
         except Exception as exc:  # noqa: BLE001 - any failure is just a gap
             return RawMarketData(gaps=[f"could not open {ticker} on yfinance: {exc}"])
 
-        # The price bars and the slow block share nothing, so they wait
-        # together rather than in turn. Two workers, not eight: this is one
-        # more request beside a block that already fans out inside itself.
-        (both, _) = _in_parallel(
-            [
-                ("history", lambda g: self._history(handle, ticker)),
-                ("slow", lambda g: self._slow_data(handle, ticker)),
-            ],
-            workers=2,
-        )
-        history, history_gaps = both["history"]
-        slow = both["slow"]
+        history, history_gaps = self._history(handle, ticker)
+        slow = self._slow_data(handle, ticker)
 
         return RawMarketData(
             history=history,
@@ -272,85 +205,48 @@ class YFinanceContextProvider:
             return None, [f"no price history returned for {ticker}"]
         return frame, []
 
-    #: The order gaps appear in the prompt, stated once, here.
-    #:
-    #: It is the order the sequential version happened to produce, kept
-    #: deliberately: the prompt these gaps are printed into is the input every
-    #: replay and sanity baseline was measured against, and reordering them
-    #: would change those bytes without changing a single number. A new source
-    #: goes where it belongs in the reading order, not at the end.
-    GAP_ORDER = (
-        "info", "fund_payloads", "positioning", "holding_analysts", "macro",
-        "commodity", "calendar", "recommendations", "upgrades", "institutional",
-        "insider_purchases", "insider_transactions",
-    )
-
     def _slow_data(self, handle: Any, ticker: str) -> _SlowData:
         cached = self._cache.get(ticker)
         if cached and cached[0] > time.monotonic():
             return cached[1]
 
-        # The fund block goes first and alone, because the holdings' analyst
-        # coverage is the one thing here that needs another fetch's answer:
-        # it cannot know which companies to look up until this says what the
-        # fund holds. Its own eight properties still go out together.
-        fund_gaps: list[str] = []
-        fund_payloads = self._fund_payloads(handle, ticker, fund_gaps)
-
-        # Everything else is independent of everything else, so it all goes at
-        # once. The list is long and that is the point: this is where a
-        # ticker's 32 seconds of waiting collapses into the slowest few.
-        results, buckets = _in_parallel([
-            ("info", lambda g: _attempt(lambda: dict(handle.info or {}), "company fundamentals", g) or {}),
-            ("positioning", lambda g: self._positioning_rows(ticker, g)),
-            ("holding_analysts", lambda g: self._holding_analysts(ticker, fund_payloads, g)),
-            ("macro", lambda g: self._macro_histories(ticker, g)),
-            ("commodity", lambda g: self._commodity_history(ticker, g)),
-            ("calendar", lambda g: _attempt(lambda: handle.calendar, "earnings calendar", g)),
-            ("recommendations", lambda g: _attempt(
-                lambda: handle.recommendations, "analyst recommendations", g)),
-            ("upgrades", lambda g: _attempt(
-                lambda: handle.upgrades_downgrades, "upgrade/downgrade history", g)),
-            ("institutional", lambda g: _attempt(
-                lambda: handle.institutional_holders, "institutional holders", g)),
-            ("insider_purchases", lambda g: _attempt(
-                lambda: handle.insider_purchases, "insider buy/sell summary", g)),
-            ("insider_transactions", lambda g: _attempt(
-                lambda: handle.insider_transactions, "insider transactions", g)),
-            # These four record no gaps of their own -- an optional source that
-            # was never configured is absent, not failed -- but they are real
-            # network waits and belong in the same overlap as the rest.
-            ("releases", lambda g: self._macro_releases(ticker)),
-            ("earnings", lambda g: [] if is_fund(ticker) else sources.fetch_earnings_rows(ticker)),
-            ("energy", lambda g: sources.fetch_energy_payloads(ticker)),
-            ("crops", lambda g: sources.fetch_crop_rows(ticker, _this_year())),
-            ("crops_last_year", lambda g: sources.fetch_crop_rows(ticker, _this_year() - 1)),
-        ])
-
-        buckets["fund_payloads"] = fund_gaps
-        info = results["info"]
+        gaps: list[str] = []
+        info = _attempt(lambda: dict(handle.info or {}), "company fundamentals", gaps) or {}
+        fund_payloads = self._fund_payloads(handle, ticker, gaps)
         slow = _SlowData(
             fund_payloads=fund_payloads,
-            positioning_rows=results["positioning"],
-            holding_analysts=results["holding_analysts"],
+            positioning_rows=self._positioning_rows(ticker, gaps),
+            holding_analysts=self._holding_analysts(ticker, fund_payloads, gaps),
             shares_series=flows.series_from_log(ticker, self._fund_size_path)
             if is_fund(ticker) else None,
             share_reading=flows.reading_from_info(info) if is_fund(ticker) else (),
-            macro_histories=results["macro"],
-            macro_releases=results["releases"],
-            earnings_rows=results["earnings"],
-            energy_payloads=results["energy"],
-            crop_rows=results["crops"],
-            crop_rows_last_year=results["crops_last_year"],
-            commodity_history=results["commodity"],
+            macro_histories=self._macro_histories(ticker, gaps),
+            macro_releases=self._macro_releases(ticker),
+            earnings_rows=(
+                [] if is_fund(ticker) else sources.fetch_earnings_rows(ticker)
+            ),
+            energy_payloads=sources.fetch_energy_payloads(ticker),
+            crop_rows=sources.fetch_crop_rows(ticker, _this_year()),
+            crop_rows_last_year=sources.fetch_crop_rows(ticker, _this_year() - 1),
+            commodity_history=self._commodity_history(ticker, gaps),
             info=info,
-            calendar=results["calendar"],
-            recommendations=results["recommendations"],
-            upgrades_downgrades=results["upgrades"],
-            institutional_holders=results["institutional"],
-            insider_purchases=results["insider_purchases"],
-            insider_transactions=results["insider_transactions"],
-            gaps=[gap for name in self.GAP_ORDER for gap in buckets.get(name, ())],
+            calendar=_attempt(lambda: handle.calendar, "earnings calendar", gaps),
+            recommendations=_attempt(
+                lambda: handle.recommendations, "analyst recommendations", gaps
+            ),
+            upgrades_downgrades=_attempt(
+                lambda: handle.upgrades_downgrades, "upgrade/downgrade history", gaps
+            ),
+            institutional_holders=_attempt(
+                lambda: handle.institutional_holders, "institutional holders", gaps
+            ),
+            insider_purchases=_attempt(
+                lambda: handle.insider_purchases, "insider buy/sell summary", gaps
+            ),
+            insider_transactions=_attempt(
+                lambda: handle.insider_transactions, "insider transactions", gaps
+            ),
+            gaps=gaps,
         )
         self._cache[ticker] = (time.monotonic() + self._ttl, slow)
         return slow
@@ -368,22 +264,15 @@ class YFinanceContextProvider:
         data = _attempt(lambda: handle.funds_data, "fund holdings", gaps)
         if data is None:
             return {}
-        names = (
+        payloads: dict[str, Any] = {}
+        for name in (
             "equity_holdings", "bond_holdings", "bond_ratings", "fund_operations",
             "fund_overview", "top_holdings", "sector_weightings", "asset_classes",
-        )
-        # Each property fetches separately inside yfinance, so one that 404s
-        # must not cost the others -- and eight separate fetches have no
-        # reason to queue behind each other.
-        payloads, buckets = _in_parallel(
-            [
-                (name, lambda g, n=name: _attempt(lambda: getattr(data, n, None), f"fund {n}", g))
-                for name in names
-            ],
-            workers=NESTED_FETCH_WORKERS,
-        )
-        gaps.extend(gap for name in names for gap in buckets[name])
-        return {name: payloads[name] for name in names}
+        ):
+            # Each property fetches separately inside yfinance, so one that
+            # 404s must not cost the others.
+            payloads[name] = _attempt(lambda n=name: getattr(data, n, None), f"fund {name}", gaps)
+        return payloads
 
     def _commodity_history(self, ticker: str, gaps: list[str]) -> Any:
         """Daily bars for the commodity a fund tracks, cached across tickers.
@@ -451,23 +340,13 @@ class YFinanceContextProvider:
         except ImportError:  # pragma: no cover - dependency is pinned
             return {}
 
-        def one(_gaps: list[str], symbol: str = "") -> Any:
-            try:
-                return yf.Ticker(symbol).history(period=MACRO_PERIOD, interval="1d")
-            except Exception:  # noqa: BLE001 - one missing rate is not a cycle
-                return None
-
-        frames, _ = _in_parallel(
-            [(symbol, lambda g, sym=symbol: one(g, sym)) for symbol in macro.SYMBOLS],
-            workers=NESTED_FETCH_WORKERS,
-        )
-        # Rebuilt by walking SYMBOLS, not the results: both the histories and
-        # the one gap line naming what is missing must read the same way every
-        # run, whichever symbol answered first.
         histories: dict[str, Any] = {}
         missed: list[str] = []
         for symbol in macro.SYMBOLS:
-            frame = frames[symbol]
+            try:
+                frame = yf.Ticker(symbol).history(period=MACRO_PERIOD, interval="1d")
+            except Exception:  # noqa: BLE001 - one missing rate is not a cycle
+                frame = None
             if frame is None or getattr(frame, "empty", True):
                 missed.append(symbol)
                 continue
@@ -490,17 +369,10 @@ class YFinanceContextProvider:
         pairs = holdings.holdings_from_payload(fund_payloads.get("top_holdings"))
         if not pairs:
             return []
-        snapshots, _ = _in_parallel(
-            [(symbol, lambda g, sym=symbol: self._analyst_for(sym)) for symbol, _ in pairs],
-            workers=NESTED_FETCH_WORKERS,
-        )
-        # Walked in the fund's own weight order, not in the order the lookups
-        # returned: this list is rendered holding by holding, and the gap line
-        # below names them.
         out: list[tuple[str, Optional[float], Any]] = []
         missed: list[str] = []
         for symbol, weight in pairs:
-            snapshot = snapshots[symbol]
+            snapshot = self._analyst_for(symbol)
             if snapshot is None:
                 missed.append(symbol)
             out.append((symbol, weight, snapshot))
