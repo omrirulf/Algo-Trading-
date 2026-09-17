@@ -113,4 +113,10 @@ class ExecutionResult(BaseModel):
     stop_price: Optional[float] = None
     atr: Optional[float] = None
     order_id: Optional[str] = None
+    #: Account equity the decision was sized against, once the engine has
+    #: read it. ``None`` for a signal refused before the account was
+    #: consulted (NEUTRAL, closed market, conviction floor). Recorded so the
+    #: audit log says what the book was worth at every decision, not only
+    #: what was traded -- the number a return has to be measured against.
+    equity: Optional[float] = None
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

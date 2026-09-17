@@ -275,6 +275,51 @@ jobs:
           git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
           git push origin "HEAD:${GITHUB_REF_NAME}"
 
+      - name: Sound the alarm on anything the record says went quietly wrong
+        # The 17 Sep lesson: eleven positions spent a day with no stop, a
+        # contract had been silent for years, and a cycle ran twice -- and
+        # every one of those was in the record, where nothing read it. This
+        # reads it. `analysis/health.py` turns the day's journal and audit
+        # log into alarms; the step writes them to the summary, keeps exactly
+        # one open issue assigned to the owner while anything is wrong (and
+        # closes it the day the record is clean), and fails the run on a
+        # critical alarm so the red mark is on the day it happened.
+        #
+        # After the commit on purpose: the record is safe in git before
+        # anything here can go wrong. Never on a protect-only run, which
+        # has its own exit code and writes no journal.
+        if: always() && steps.guard.outputs.ran != 'yes' && inputs.mode != 'protect'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          set +e
+          python -m analysis.health --journal logs/signal_journal.log --audit logs/execution_audit.log > "$RUNNER_TEMP/health.md"
+          code=$?
+          set -e
+          cat "$RUNNER_TEMP/health.md" >> "$GITHUB_STEP_SUMMARY"
+          gh label create health-alarm --force --color B60205 \
+            --description "The trading record says something went wrong today" > /dev/null
+          open=$(gh issue list --label health-alarm --state open --json number --jq '.[0].number')
+          if [ "$code" = "0" ]; then
+            if [ -n "$open" ]; then
+              gh issue close "$open" --comment "Today's record is clean. Closing; this reopens on the next alarm." || true
+            fi
+            exit 0
+          fi
+          if [ -n "$open" ]; then
+            gh issue comment "$open" --body-file "$RUNNER_TEMP/health.md" || true
+          else
+            title="The trading record says something went wrong ($(date -u +%Y-%m-%d))"
+            gh issue create --title "$title" --label health-alarm --body-file "$RUNNER_TEMP/health.md" --assignee "$OWNER" \
+              || gh issue create --title "$title" --label health-alarm --body-file "$RUNNER_TEMP/health.md" \
+              || echo "could not open the alarm issue; the summary above still carries it"
+          fi
+          if [ "$code" = "2" ]; then
+            echo "::error::critical health alarm; see the job summary"
+            exit 1
+          fi
+
       - name: Push the archive to Supabase
         # Deliberately AFTER the commit above, and `always()` for the same
         # reason it is: the lines a failed cycle wrote belong in the archive
