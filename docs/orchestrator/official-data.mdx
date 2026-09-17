@@ -153,20 +153,28 @@ sources publish what happened, and each needs a key:
 
 ## The rate path
 
-The MACRO block gained a third official line on 17 Sep 2026, from two more
-FRED series on the same key: the **two-year Treasury yield** (`DGS2`) and the
-**effective Fed funds rate** (`DFF`). The two-year is, near enough, the
-market's average expected policy rate over the next two years; against the
-overnight rate actually in force it says how many quarter-point moves the
+The MACRO block gained a third official line on 17 Sep 2026, from one more
+FRED series on the same key: the **two-year Treasury yield** (`DGS2`). The
+two-year is, near enough, the market's average expected policy rate over the
+next two years; against the middle of the Fed's target range (from
+`DFEDTARU`, which already shipped) it says how many quarter-point moves the
 bond market has priced, and in which direction:
 
 ```
-Rate path: 2-year Treasury 3.55% vs Fed funds 4.33% -- the bond market prices about 3 quarter-point cuts over the next two years (a rough read: the 2-year also carries a term premium)
+Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
 ```
 
 A bond fund and the dollar are bets on exactly this, and the prompt says so.
 Fewer than half a move either way reads as "roughly no change". The line
 needs both ends: with either series missing it is left out, not guessed.
+
+<Note>
+  Measured against the **target**, not the effective overnight rate. The
+  effective rate (`DFF`) was tried first, and on the day it was tried the
+  proof run returned it 37 basis points below the target's own floor and 34
+  below the three-month bill in the same block. A path measured from a number
+  the block itself contradicts is not a path, so the series was dropped.
+</Note>
 
 ## One module reads the keys
 

@@ -209,8 +209,8 @@ jobs:
 
           print()
           print("=== RATE PATH (FRED) ===")
-          path = fred.rate_path_line(releases.get("two_year"), releases.get("fed_funds"))
-          print(f"  {path or 'nothing: two_year or fed_funds did not arrive'}")
+          path = fred.rate_path_line(releases.get("two_year"), releases.get("policy_rate"))
+          print(f"  {path or 'nothing: two_year or policy_rate did not arrive'}")
 
           print()
           print("=== EARNINGS RECORD (Finnhub) ===")
