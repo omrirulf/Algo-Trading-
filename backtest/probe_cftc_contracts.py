@@ -16,6 +16,17 @@ Two questions, then:
     names matching a keyword, each with the date of its newest row, so a
     replacement is chosen from what reports today rather than from memory.
 
+``--live``
+    What does this dataset actually contain *this week*? ``--like`` can only
+    find a contract whose new name still carries the old keyword, and the
+    audit found a batch of unrelated majors -- every Treasury, the dollar
+    index, NYMEX natural gas and NYMEX crude -- all stopping on the same
+    date, 2022-02-01. Contracts are not delisted in batches on one day, and
+    ``COPPER-GRADE #1`` becoming ``COPPER- #1`` on that date says what
+    happened: the names were rewritten. So this lists every market still
+    reporting, which is the only way to find a contract whose new name
+    shares no keyword with its old one.
+
 default
     Is every mapping still alive? The newest report date for each ticker
     already in ``CONTRACTS``, which is the check that would have caught TLT
@@ -34,7 +45,9 @@ from __future__ import annotations
 import argparse
 import sys
 from collections import defaultdict
+from datetime import date, timedelta
 from pathlib import Path
+from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -92,6 +105,39 @@ def search(keyword: str) -> None:
         print()
 
 
+#: Rows asked for when listing a dataset's live markets. Comfortably above
+#: the few hundred markets either dataset reports in a week; if it is ever
+#: reached the listing is truncated, and a truncated list of "everything
+#: still reporting" is a wrong answer that reads like a right one, so it is
+#: said out loud rather than trusted.
+LIVE_LIMIT = 20000
+
+
+def live(keyword: Optional[str] = None, today: Optional[date] = None) -> None:
+    """Every market still reporting, by dataset, newest date first."""
+    cutoff = (today or date.today()) - timedelta(days=positioning.MAX_REPORT_AGE_DAYS)
+    where = f"{DATE_FIELD} >= '{cutoff.isoformat()}'"
+    if keyword:
+        where += f" AND upper({NAME_FIELD}) like '%{keyword.upper()}%'"
+    for dataset, label in ((positioning.FINANCIAL, "financial"),
+                           (positioning.DISAGGREGATED, "commodity")):
+        title = f"=== {label} dataset, reporting since {cutoff.isoformat()}"
+        print(f"{title}, names containing {keyword.upper()!r} ===" if keyword else f"{title} ===")
+        rows = _rows(dataset, where, limit=LIVE_LIMIT)
+        if len(rows) >= LIVE_LIMIT:
+            print(f"    !! {LIVE_LIMIT} rows returned -- the list below is TRUNCATED "
+                  "and must not be read as complete")
+        found = newest_by_name(rows)
+        if not found:
+            print("    nothing reporting")
+            print()
+            continue
+        for name, stamp in sorted(found.items()):
+            print(f"    {stamp}  {name}")
+        print(f"    ({len(found)} markets)")
+        print()
+
+
 def audit() -> int:
     """Every mapped ticker, with the newest date its contract reports."""
     print("=== every mapping in CONTRACTS ===")
@@ -124,7 +170,12 @@ def audit() -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--like", help="search for market names containing this")
+    parser.add_argument("--live", nargs="?", const="", metavar="KEYWORD",
+                        help="every market still reporting, optionally filtered by keyword")
     args = parser.parse_args(argv)
+    if args.live is not None:
+        live(args.live or None)
+        return 0
     if args.like:
         search(args.like)
         return 0
