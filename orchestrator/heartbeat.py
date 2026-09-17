@@ -736,7 +736,7 @@ def process_ticker(
     if SCREENING_ENABLED:
         try:
             first = screen_signal(system_prompt, user_prompt, SIGNAL_JSON_SCHEMA)
-            first_signal = parse_signal(first.text)
+            first_signal = scores_without_a_source(parse_signal(first.text), ticker_context)
             screen = {
                 "model": SCREENING_MODEL,
                 "bias": first_signal.bias.value,
