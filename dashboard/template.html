@@ -1,4 +1,13 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#8a5a1e">
+<meta name="description" content="The paper-trading book: positions against their stops, the risk caps, today's cycle and the alarms. Rebuilt from the record after each cycle.">
 <title>Algo Trading Desk</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
 :root{
@@ -197,90 +206,48 @@ button[disabled]{opacity:.55;cursor:default}
     $("closed").innerHTML = cl.length ? cl.map(p=>`<div><b>${esc(p.ticker)}</b> ${esc(p.name)} · ${p.side==="buy"?"long":"short"} ${p.quantity} sh from ${px(p.entry_price)} · last seen ${esc(p.last_seen)} · ${esc(p.closed_reason)}</div>`).join("") : `<div class="muted">Nothing closed on record. A position the manager stops seeing appears here with the last day it was seen.</div>`;
   }
 
-  // The page opens on the snapshot embedded at publish time, then lights up live.
+  // The page opens on the newest copy it has -- the one saved on this phone,
+  // else the one embedded at build time -- then reads the live file from
+  // GitHub. Nothing here needs a key: the repository is public and the
+  // snapshot is committed after every cycle.
+  const RAW = "https://raw.githubusercontent.com/" + REPO.owner + "/" + REPO.repo + "/main/" + REPO.path;
+  const SAVED = "algo-desk:book";
+  const live = (text)=>{ $("live").textContent = "Live updates: " + text; };
+  const clock = ()=> new Date().toLocaleTimeString("en-GB",{timeZone:"Asia/Jerusalem",hour:"2-digit",minute:"2-digit"});
+  let shown = null;
+  const newer = (a, b)=> !b || !b.day || (a && a.day && (a.day > b.day || (a.day === b.day && String(a.generated_at||"") >= String(b.generated_at||""))));
+  const show = (book, source)=>{ if(book && book.day && newer(book, shown)){ shown = book; render(book, source); } };
+
   let seed = {};
   try { seed = JSON.parse($("seed").textContent.replace(/^\s*\/\*__SEED__\*\//, "")) || {}; } catch(_) {}
-  if(seed && seed.day) render(seed, "embedded copy");
-
-  function extract(result){
-    // The GitHub connector returns the file as an embedded resource block; fall back to any JSON-looking text.
-    const blocks = (result && result.content) || [];
-    for(const b of blocks){
-      const text = (b && b.resource && b.resource.text) || null;
-      if(text){ try { return JSON.parse(text); } catch(_){} }
-    }
-    if(result && result.structuredContent && result.structuredContent.day) return result.structuredContent;
-    for(const b of blocks){
-      if(b && typeof b.text==="string" && b.text.trim().startsWith("{")){ try { return JSON.parse(b.text); } catch(_){} }
-    }
-    if(typeof result?.payload==="object" && result.payload && result.payload.day) return result.payload;
-    return null;
-  }
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(SAVED) || "null"); } catch(_) {}
+  show(seed, "built-in copy");
+  show(saved, "copy saved on this phone");
 
   const refresh = $("refresh");
-  refresh.disabled = true;
-  let mcpRef = null, permsRef = null, retryArmed = false;
-  const live = (text)=>{ $("live").textContent = "Live updates: " + text; };
-  if(!window.claude || !window.claude.use){ live("not available in this viewer (no runtime); showing the embedded copy."); }
-  window.claude?.use?.("mcp").then(async mcp=>{
-    if(!mcp){ live("this view cannot run connectors; showing the embedded copy. Try opening the page from the claude.ai web app."); return; }
-    mcpRef = mcp;
-    refresh.disabled = false;
-    try {
-      const listed = await mcp.listTools();
-      const gh = (listed.servers||[]).find(s=>String(s.server).toLowerCase()==="github");
-      if(!gh) live(`connector "github" not found in this view (available: ${(listed.servers||[]).map(s=>s.server).join(", ")||"none"}).`);
-      else live(`GitHub connector ${gh.authStatus}; asking for the file…`);
-    } catch(e){ live(`could not list connectors (${e?.code||"unknown"}).`); }
-    // Ask for the page's GitHub permission up front, in one dialog, rather
-    // than letting the first call ask at a moment the viewer may miss.
-    permsRef = await window.claude.use("permissions").catch(()=>null);
-    if(permsRef){
-      const st = await permsRef.state("mcp:github").catch(()=>"unavailable");
-      if(st==="prompt"){
-        live("GitHub connector found; please allow it for this page in the prompt…");
-        const out = await permsRef.request(["mcp:github"]).catch(()=>({}));
-        const now = out["mcp:github"] || "unknown";
-        live(now==="granted" ? "GitHub allowed; reading the file…" : `GitHub permission ${now} for this page load. Reload the page to be asked again.`);
-        if(now==="granted"){ try { await mcp.invalidate("github","get_file_contents",REPO); } catch(_){} }
-      } else if(st==="denied"){
-        live("GitHub was declined for this page load. Reload the page to be asked again.");
-      }
-    }
-    mcp.watchTool("github", "get_file_contents", REPO, (ev)=>{
-      if(ev.type==="data"){
-        const book = extract(ev.result);
-        if(book){ const when = ev.result.cache?.storedAt ? new Date(ev.result.cache.storedAt) : new Date(); render(book, "read from GitHub " + when.toLocaleTimeString("en-GB",{timeZone:"Asia/Jerusalem",hour:"2-digit",minute:"2-digit"})); live("on. Reading logs/book.json from GitHub every 5 minutes."); }
-        else { live("GitHub answered, but the file could not be read as a snapshot. Showing the last good copy."); }
-      } else {
-        const code = ev.error?.code;
-        const msg = {
-          needs_reauth: "Reconnect GitHub in claude.ai Settings → Connectors to resume live updates.",
-          server_not_connected: "Add the GitHub connector in claude.ai Settings → Connectors for live updates.",
-          not_in_manifest: "GitHub access was declined for this page; showing the last good copy.",
-          blocked_by_policy: "Your organisation blocks this GitHub tool for this page.",
-        }[code] || (ev.error?.retryable ? "GitHub is briefly unavailable; the page will try again." : `Live updates stopped (${code||"unknown"}); showing the last good copy.`);
-        live(`${msg} [${code||"unknown"}]`);
-        // One unattended retry per error, only when the runtime says it may help.
-        if(ev.error?.retryable && !retryArmed && mcpRef){
-          retryArmed = true;
-          const wait = Math.min(60000, Math.max(3000, ev.error.retryAfterMs || 5000)) + Math.random()*2000;
-          setTimeout(async ()=>{ try { await mcpRef.invalidate("github","get_file_contents",REPO); } catch(_){} retryArmed = false; }, wait);
-        }
-      }
-    }, {cache:{staleTime:60000}, refetchInterval:300000});
-  }).catch(()=>{});
-
-  refresh.addEventListener("click", async ()=>{
-    if(!mcpRef) return;
+  async function pull(reason){
     refresh.disabled = true;
-    if(permsRef){
-      const st = await permsRef.state("mcp:github").catch(()=>"unavailable");
-      if(st==="prompt"){ const out = await permsRef.request(["mcp:github"]).catch(()=>({})); live(`GitHub permission ${out["mcp:github"]||"unknown"}.`); }
-    }
-    live("asking GitHub for the file…");
-    try { await mcpRef.invalidate("github", "get_file_contents", REPO); } catch(_){}
-    setTimeout(()=>{ refresh.disabled = false; }, 3000);
-  });
+    live(reason + "…");
+    try {
+      const r = await fetch(RAW + "?t=" + Date.now(), {cache:"no-store"});
+      if(!r.ok) throw new Error("HTTP " + r.status);
+      const book = await r.json();
+      if(!book || !book.day) throw new Error("not a snapshot");
+      try { localStorage.setItem(SAVED, JSON.stringify(book)); } catch(_) {}
+      if(newer(book, shown)){ shown = null; show(book, "read from GitHub at " + clock()); live("on. Read from GitHub at " + clock() + " Israel time; checks again every 5 minutes."); }
+      else { live("on. GitHub has the same record (" + book.day + "); checked at " + clock() + " Israel time."); }
+    } catch(e){
+      live((navigator.onLine === false ? "offline" : "GitHub did not answer (" + (e && e.message || "unknown") + ")") + "; showing the last copy from " + (shown && shown.day || "never") + ".");
+    } finally { refresh.disabled = false; }
+  }
+  pull("reading the record from GitHub");
+  setInterval(()=>pull("checking GitHub"), 5*60*1000);
+  document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState === "visible") pull("checking GitHub"); });
+  window.addEventListener("online", ()=>pull("back online; checking GitHub"));
+  refresh.addEventListener("click", ()=>pull("checking GitHub"));
+
+  // Installable: the service worker keeps the page itself openable offline.
+  if("serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js").catch(()=>{}); }
 })();
 </script>

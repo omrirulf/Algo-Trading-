@@ -1,0 +1,64 @@
+name: pages
+
+# The desk on the owner's phone, without a Claude session in the loop.
+#
+# dashboard/build.py embeds logs/book.json into the page and copies the
+# manifest, the service worker and the icons beside it; this deploys the
+# result to GitHub Pages. Opened once in the phone's browser and added to
+# the home screen, it is an app: full screen, its own icon, and the last
+# snapshot readable offline. Online it reads the live snapshot straight
+# from the public repository, so a redeploy is only needed for the page
+# itself and for a fresh built-in copy.
+#
+# Runs after every journal commit (logs/book.json changes) and after any
+# change to the page. Nothing here needs a credential: the site is static
+# and the repository is public.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "dashboard/**"
+      - "logs/book.json"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write              # to publish the site
+  id-token: write           # what actions/deploy-pages needs to prove the source
+
+# One deploy at a time; a newer one waits rather than cancels, so the page
+# that lands is always the newest snapshot.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build the site
+        # The standard library only: build.py imports nothing from the
+        # project and needs nothing installed.
+        run: python dashboard/build.py --site _site
+
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true    # creates the Pages site on first run, no click in Settings
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
