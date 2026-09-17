@@ -228,11 +228,12 @@ def dimension_correlations(signals: Sequence[ScoredSignal]) -> dict[str, Correla
     matter which way the headline bias went.
     """
     results: dict[str, Correlation] = {}
+    sourced = [(s, s.entry.scores_with_a_source()) for s in signals]
     for name in SCORE_FIELDS:
         pairs = [
-            (s.entry.scores.get(name), s.raw_return)
-            for s in signals
-            if s.entry.scores.get(name) is not None
+            (scores.get(name), s.raw_return)
+            for s, scores in sourced
+            if scores.get(name) is not None
         ]
         results[name] = spearman([p[0] for p in pairs], [p[1] for p in pairs])
     return results
@@ -338,7 +339,7 @@ def blend_comparison(signals: Sequence[ScoredSignal]) -> BlendComparison:
         ret = signal.raw_return
         model_value = entry.direction * (entry.conviction or 0.0)
         model_pairs.append((model_value, ret))
-        equal = blending.composite(entry.scores, blending.EQUAL_WEIGHTS)
+        equal = blending.composite(entry.scores_with_a_source(), blending.EQUAL_WEIGHTS)
         if equal is not None:
             equal_pairs.append((equal.value, ret))
         learned = entry.composite

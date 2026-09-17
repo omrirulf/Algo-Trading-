@@ -15,7 +15,13 @@ FULL = {
     "ts_utc": "2026-03-02T14:00:02.331000+00:00",
     "event": "signal_generated",
     "ticker": "nvda",
-    "context": {"headlines": ["x"], "gaps": ["fundamentals unavailable: HTTP 429"]},
+    "context": {
+        "headlines": ["x"],
+        # A scored dimension needs its source section in the context, or the
+        # reader treats the score as having nothing behind it.
+        "analysts": "Mean target 180.00 (n=42), consensus BUY",
+        "gaps": ["fundamentals unavailable: HTTP 429"],
+    },
     "signal": {
         "ticker": "NVDA", "bias": "BULLISH", "conviction": 0.72, "rationale": "r",
         "news_score": 0.8, "technical_score": 0.5,

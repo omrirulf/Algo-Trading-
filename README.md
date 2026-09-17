@@ -224,6 +224,16 @@ trading on technicals alone would quietly be a different strategy.
 Slow-moving data (fundamentals, ratings, ownership, insider filings) is cached
 for six hours per ticker; price history is refetched every cycle.
 
+**A score with no source behind it is null, not zero.** A section that was
+never on offer records no gap -- absent is not failed -- so asking the model
+nicely is not enough: it answers anyway, usually `0.0`, sometimes with a
+direction. The orchestrator knows which sections it rendered, so it decides
+rather than asking, and nulls any score whose every source was missing before
+the line is journalled. `analysis/reader.py` holds the one map of score to
+sources; the trainer and the report apply the same rule backwards, off the
+context each older line recorded, so a number nobody measured never becomes a
+weight or an information coefficient.
+
 ### Analyst (Claude)
 
 Put an API key from [the Anthropic Console](https://console.anthropic.com)

@@ -28,6 +28,14 @@ Lines journalled before the prompt asked for null scores carry 0.0 for a
 dimension whose source failed. Where the gap list names that source and the
 score is exactly 0.0, it is read as null.
 
+A second, stronger reading comes before that one. A source that was never on
+offer records no gap at all -- absent is not failed -- so the gap list cannot
+find it. Every line journals the context it was built from, so the sections
+it carried are known: a score whose every source section was missing is read
+as null whatever number sits there, 0.0 or a confident -0.5. The cycle now
+nulls these at the source, so this only reaches lines written before it did;
+it leaves the same line's other dimensions, which did have a source, in.
+
 The calibration
 ---------------
 Beside the weights, a map from the composite's magnitude to how often that
@@ -162,7 +170,7 @@ def prepare(
         if not is_full_model(entry, model):
             statuses[SKIP_OTHER_MODEL] += 1
             continue
-        scores = nulled_by_gaps(entry.scores, entry.gaps)
+        scores = nulled_by_gaps(entry.scores_with_a_source(), entry.gaps)
         if not any(value is not None for value in scores.values()):
             statuses[SKIP_NO_SCORES] += 1
             continue
