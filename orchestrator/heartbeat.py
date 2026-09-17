@@ -638,6 +638,32 @@ def build_user_prompt(ticker_context: TickerContext) -> str:
 #: sections it rendered; it does not need the model to remember. Same
 #: principle as the instrument kind, which is resolved from the ticker and
 #: never from the signal.
+def journal_context_failure(ticker: str, exc: object, context: Any = None) -> None:
+    """Write the cycle's record of a ticker that never got a prompt.
+
+    The cycle knows every ticker's outcome -- it holds a ``TickerResult`` for
+    all eighty -- but only the journal survives the run, and the daily report
+    is rebuilt from that. So a ticker whose context could not be gathered used
+    to leave no trace at all: on 17 Sep four names died on the news fetch, each
+    logged as an ERROR, and the report's header still read "76 names checked,
+    0 with a problem". A report that cannot see a failure is worse than a
+    report that has none, because it reads the same.
+
+    The line carries no signal, so everything downstream that asks for one
+    skips it exactly as it skips a model failure: the trainer counts it
+    ``no signal``, the scorer ignores it, and the report counts it a problem.
+
+    Swallows its own failures, like ``journal.record`` -- a journal that
+    cannot be written must not take the cycle down with it.
+    """
+    from orchestrator.context import TickerContext
+
+    try:
+        journal.record(context or TickerContext(ticker=ticker), error=str(exc) or repr(exc))
+    except Exception:  # noqa: BLE001 - the record is a record, not a dependency
+        log.exception("%s: failed to journal the context failure", ticker)
+
+
 def scores_without_a_source(signal: LLMSignal, context: Any) -> LLMSignal:
     """Null any score whose every source section was absent from the prompt.
 
@@ -697,9 +723,11 @@ def process_ticker(
         ticker_context = build_context(ticker)
     except (NotImplementedError, NewsFetchError) as exc:
         log.error("%s: %s", ticker, exc)
+        journal_context_failure(ticker, exc)
         return TickerResult(ticker, CONTEXT_FAILED)
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
         log.exception("%s: failed to gather context", ticker)
+        journal_context_failure(ticker, exc)
         return TickerResult(ticker, CONTEXT_FAILED)
 
     # Before anything can fail: the reading is this cycle's contribution to a
@@ -719,12 +747,14 @@ def process_ticker(
     try:
         system_prompt = system_prompt_for(ticker_context.ticker)
         user_prompt = build_user_prompt(ticker_context)
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
         # Rendering the gathered context into text is the last step of
         # "context", and a value the formatters cannot render is a data
         # problem with this one ticker. Unguarded, it took the whole cycle
         # down with it -- the other thirty-four never ran.
         log.exception("%s: failed to render context into a prompt", ticker)
+        # The context itself was gathered, so journal what was actually read.
+        journal_context_failure(ticker, exc, ticker_context)
         return TickerResult(ticker, CONTEXT_FAILED, gaps=gaps)
 
     # Stage one. The cheap model reads the same prompt; NEUTRAL ends the
