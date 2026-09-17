@@ -161,6 +161,15 @@ jobs:
           else
             echo "book snapshot not written; previous one left in place"
           fi
+          # The day in one notification, written here so the Routine that
+          # pushes it to the owner's phone only has to fetch a text file:
+          # a fresh Claude session may not run code it cloned, and must not
+          # need to.
+          if python -m analysis.brief > "$RUNNER_TEMP/brief.txt"; then
+            mv "$RUNNER_TEMP/brief.txt" logs/brief.txt
+          else
+            echo "brief not written; previous one left in place"
+          fi
 
       - name: Refit the blend weights
         # After the cycle, never before it: a cycle applies the weights the
@@ -280,7 +289,7 @@ jobs:
           # fund_size.log is the one series nobody publishes: it exists only
           # because every cycle appends to it, so an uncommitted one is a lost
           # day of history that cannot be backfilled.
-          git add -f logs/signal_journal.log logs/execution_audit.log logs/cycle_report.md logs/fund_size.log logs/blend_weights.json logs/score_report.md logs/book.json || true
+          git add -f logs/signal_journal.log logs/execution_audit.log logs/cycle_report.md logs/fund_size.log logs/blend_weights.json logs/score_report.md logs/book.json logs/brief.txt || true
           if git diff --cached --quiet; then
             echo "no journal changes"
             exit 0

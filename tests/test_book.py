@@ -230,4 +230,6 @@ def test_the_workflow_writes_and_commits_the_snapshot():
     step = steps["Write the book snapshot"]
     assert step["if"] == "always() && steps.guard.outputs.ran != 'yes' && inputs.mode != 'protect'"
     assert "python -m analysis.book --json" in step["run"]
+    assert "python -m analysis.brief" in step["run"]
     assert "logs/book.json" in steps["Commit the journal"]["run"]
+    assert "logs/brief.txt" in steps["Commit the journal"]["run"]
