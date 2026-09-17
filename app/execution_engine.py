@@ -71,7 +71,14 @@ class ExecutionEngine:
     # ------------------------------------------------------------------ #
 
     def _execute(self, signal: LLMSignal) -> ExecutionResult:
-        reject = lambda reason, **kw: self._result(signal, ExecutionStatus.REJECTED, reason, **kw)  # noqa: E731
+        # Filled in once the account has been read, so every decision made
+        # after that point -- accepted or refused -- records the equity it
+        # was made against. Decisions before it (NEUTRAL, closed market, the
+        # conviction floor) never consulted the account and say so with None.
+        account: dict[str, float] = {}
+        reject = lambda reason, **kw: self._result(  # noqa: E731
+            signal, ExecutionStatus.REJECTED, reason, **account, **kw
+        )
 
         # 1. NEUTRAL is a valid thing for the LLM to say; it just means "do nothing".
         side = _SIDE_FOR_BIAS.get(signal.bias)
@@ -94,6 +101,7 @@ class ExecutionEngine:
 
         # 4. Account state.
         equity = self._broker.get_equity()
+        account["equity"] = equity
         positions = self._broker.get_open_positions()
         existing = next((p for p in positions if p.ticker == signal.ticker), None)
 
@@ -170,6 +178,7 @@ class ExecutionEngine:
             stop_price=stop_price,
             atr=atr,
             order_id=order.order_id,
+            equity=equity,
         )
 
     @staticmethod

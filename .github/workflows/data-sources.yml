@@ -13,6 +13,12 @@ name: data sources
 # Nothing here needs a credential: yfinance and the CFTC's Socrata endpoint
 # are unauthenticated, no LLM is called, and no order is ever placed.
 on:
+  schedule:
+    # Every trading day, forty-five minutes before the cycle's 15:05 UTC cron
+    # (GitHub delivers a cron late, not early). Daily rather than weekly
+    # because a source that dies on Monday must not feed the model blanks
+    # until the following week's check; the whole run costs about a minute.
+    - cron: '20 14 * * 1-5'
   workflow_dispatch:
     inputs:
       raw:
@@ -25,6 +31,7 @@ on:
 
 permissions:
   contents: read            # reads public data, writes nothing back
+  issues: write             # only to open the one issue that says a source died
 
 jobs:
   probe:
@@ -99,6 +106,10 @@ jobs:
               ok += 1
               print(f"  {ticker:<6} {snap.as_lines()[1]}  [{snap.weeks_of_history} weeks]")
           print(f"  -> {ok} ok, {broken} broken")
+          # A mapped contract that says nothing is a failure, not a gap: the
+          # cycle would show the model a stated blank for a source it was
+          # promised. Red here, and the issue below, is how that gets heard.
+          raise SystemExit(1 if broken else 0)
           EOF
 
       - name: Is every CFTC mapping still reporting
@@ -368,3 +379,33 @@ jobs:
             funds-raw.txt
             macro.txt
           if-no-files-found: ignore
+
+      - name: Open the issue that says a source died
+        # One open issue at a time, found by its label; a repeat failure adds
+        # a comment to it rather than opening another. Assigned to the owner
+        # so it is a participating notification, not a watch-list one.
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          gh label create data-sources --force --color B60205 \
+            --description "A source the prompt depends on stopped answering" > /dev/null
+          {
+            echo "The daily data-sources check failed on $(date -u +%Y-%m-%d). Read the run:"
+            echo
+            echo "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo
+            echo "A source the prompt depends on is not answering, or a CFTC mapping has gone quiet."
+            echo "Until it is fixed the cycle shows the model a stated blank for that section."
+          } > "$RUNNER_TEMP/dead_source.md"
+          open=$(gh issue list --label data-sources --state open --json number --jq '.[0].number')
+          if [ -n "$open" ]; then
+            gh issue comment "$open" --body-file "$RUNNER_TEMP/dead_source.md" || true
+          else
+            gh issue create --title "A data source stopped answering" --label data-sources \
+              --body-file "$RUNNER_TEMP/dead_source.md" --assignee "$OWNER" \
+              || gh issue create --title "A data source stopped answering" --label data-sources \
+                   --body-file "$RUNNER_TEMP/dead_source.md" \
+              || echo "could not open the issue; the run is red regardless"
+          fi

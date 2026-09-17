@@ -94,6 +94,7 @@ class DirectDispatcher:
             "reason": result.reason,
             "quantity": result.quantity,
             "order_id": result.order_id,
+            "equity": result.equity,
         }
 
 
