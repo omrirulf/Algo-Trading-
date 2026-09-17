@@ -271,8 +271,18 @@ jobs:
             exit 0
           fi
           git commit -m "Journal: ${{ inputs.mode == 'protect' && 'protection pass' || 'cycle' }} at $(date -u +'%Y-%m-%dT%H:%MZ')"
-          # Another cycle may have landed while this one ran.
-          git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
+          # Another run may have landed while this one ran. On 17 Sep one did:
+          # a cancelled duplicate cycle pushed its journal in the two seconds
+          # between this step's checkout and its push, the rebase conflicted
+          # on the end of the audit log, and the eleven stop records this run
+          # had written were lost from git. The logs merge as a union now
+          # (.gitattributes), so the append-only files never conflict; the
+          # rendered files are whole rewrites, and this run's is the newer.
+          if ! git pull --rebase --autostash origin "${GITHUB_REF_NAME}"; then
+            git checkout --theirs -- logs/cycle_report.md logs/score_report.md logs/blend_weights.json 2>/dev/null || true
+            git add -f logs/cycle_report.md logs/score_report.md logs/blend_weights.json 2>/dev/null || true
+            GIT_EDITOR=true git rebase --continue
+          fi
           git push origin "HEAD:${GITHUB_REF_NAME}"
 
       - name: Sound the alarm on anything the record says went quietly wrong

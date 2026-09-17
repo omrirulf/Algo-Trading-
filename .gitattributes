@@ -1,0 +1,10 @@
+# The logs are append-only: every run adds lines at the end and never edits
+# one. Two runs that land at once (a late cron and a dispatch, 17 Sep 2026)
+# therefore conflict on exactly the same spot -- the end of the file -- and
+# a plain merge cannot tell which lines to keep. Both, always: a union merge
+# keeps every line from both sides, which for an append-only record is the
+# only correct answer. The rendered files are whole rewrites and are not
+# listed; the commit step resolves those by taking the newer run's.
+logs/signal_journal.log merge=union
+logs/execution_audit.log merge=union
+logs/fund_size.log merge=union

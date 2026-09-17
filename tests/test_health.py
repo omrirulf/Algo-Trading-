@@ -270,3 +270,24 @@ def test_data_sources_runs_daily_before_the_cycle_and_a_dead_mapping_is_red():
     issue = next(s for s in steps if s.get("name") == "Open the issue that says a source died")
     assert issue["if"] == "failure()" and "--label data-sources" in issue["run"]
     assert wf["permissions"]["issues"] == "write"
+
+
+# --------------------------------------------------------------------------- #
+# Two runs landing at once must not lose either one's record
+# --------------------------------------------------------------------------- #
+
+
+def test_the_append_only_logs_merge_as_a_union():
+    """17 Sep 2026: a rebase conflict on the end of the audit log lost eleven stop records."""
+    attributes = (Path(__file__).resolve().parents[1] / ".gitattributes").read_text()
+    for log in ("logs/signal_journal.log", "logs/execution_audit.log", "logs/fund_size.log"):
+        assert f"{log} merge=union" in attributes, log
+
+
+def test_the_commit_step_finishes_the_rebase_when_the_rendered_files_conflict():
+    steps = _heartbeat()["jobs"]["cycle"]["steps"]
+    run = next(s for s in steps if s.get("name") == "Commit the journal")["run"]
+    assert 'if ! git pull --rebase --autostash origin "${GITHUB_REF_NAME}"; then' in run
+    assert "git checkout --theirs -- logs/cycle_report.md logs/score_report.md logs/blend_weights.json" in run
+    assert "GIT_EDITOR=true git rebase --continue" in run
+    assert run.rstrip().endswith('git push origin "HEAD:${GITHUB_REF_NAME}"')
