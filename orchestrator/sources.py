@@ -141,6 +141,34 @@ def fetch_energy_payloads(ticker: str, client: Any = None) -> dict[str, Any]:
     return out
 
 
+def fetch_outlook_payloads(ticker: str, client: Any = None) -> dict[str, Any]:
+    """Raw EIA Short-Term Energy Outlook rows per series label, for the
+    tickers they bear on. Same key as the inventories; empty without it."""
+    from orchestrator import outlook
+
+    wanted = outlook.series_for(ticker)
+    key = api_key("eia")
+    if not wanted or not key:
+        return {}
+    client, owned = _client(client, REQUEST_TIMEOUT_SECONDS)
+    out: dict[str, Any] = {}
+    try:
+        for label in wanted:
+            series_id, _, _ = outlook.SERIES[label]
+            payload = _json(client, f"{EIA_URL}/{outlook.ROUTE}/data/", {
+                "api_key": key, "frequency": "monthly", "data[0]": "value",
+                "facets[seriesId][]": series_id,
+                "sort[0][column]": "period", "sort[0][direction]": "desc",
+                "length": str(outlook.ROW_LIMIT),
+            }, f"EIA STEO {series_id}")
+            if payload is not None:
+                out[label] = payload
+    finally:
+        if owned:
+            client.close()
+    return out
+
+
 def fetch_crop_rows(ticker: str, year: int, client: Any = None) -> list:
     """Raw USDA national condition rows for one crop and season."""
     from orchestrator import crops
@@ -186,5 +214,6 @@ __all__ = [
     "fetch_earnings_rows",
     "fetch_energy_payloads",
     "fetch_fred_releases",
+    "fetch_outlook_payloads",
     "KEY_ENV_VARS",
 ]

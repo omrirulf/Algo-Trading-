@@ -194,6 +194,25 @@ jobs:
                   print(f"    {line}")
 
           print()
+          print("=== PRICE OUTLOOK (EIA STEO) ===")
+          from orchestrator import outlook
+          for ticker in sorted(outlook.COVERAGE):
+              payloads = sources.fetch_outlook_payloads(ticker)
+              snap = outlook.build_snapshot(ticker, payloads)
+              if snap is None:
+                  got = {k: len(outlook.by_month(v)) for k, v in payloads.items()}
+                  print(f"  {ticker:<5} nothing usable returned (months per series: {got})")
+                  continue
+              print(f"  {ticker}:")
+              for line in snap.as_lines()[1:-1]:
+                  print(f"    {line}")
+
+          print()
+          print("=== RATE PATH (FRED) ===")
+          path = fred.rate_path_line(releases.get("two_year"), releases.get("fed_funds"))
+          print(f"  {path or 'nothing: two_year or fed_funds did not arrive'}")
+
+          print()
           print("=== EARNINGS RECORD (Finnhub) ===")
           from config.instruments import SINGLE_NAMES
           missing = []

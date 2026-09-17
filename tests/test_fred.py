@@ -103,3 +103,46 @@ def test_a_series_that_never_arrived_is_simply_not_in_the_result():
     assert fred.build_releases({}) == {}
     assert fred.build_releases(None) == {}
     assert fred.build_releases({"inflation": obs(("2026-08-01", "."))}) == {}
+
+
+# --- the rate path -------------------------------------------------------------
+
+
+def _release(label, value):
+    return fred.Release(label=label, value=value, date="2026-09-16")
+
+
+def test_the_two_year_against_the_overnight_rate_counts_priced_moves():
+    assert fred.priced_moves(3.55, 4.33) == pytest.approx(-3.12)
+    assert fred.priced_moves(4.80, 4.33) == pytest.approx(1.88)
+    assert fred.priced_moves(None, 4.33) is None and fred.priced_moves(3.5, None) is None
+
+
+def test_the_rate_path_line_says_cuts_hikes_or_nothing_in_words():
+    cuts = fred.rate_path_line(_release("two_year", 3.55), _release("fed_funds", 4.33))
+    assert cuts.startswith("Rate path: 2-year Treasury 3.55% vs Fed funds 4.33% -- ")
+    assert "about 3 quarter-point cuts over the next two years" in cuts
+    hikes = fred.rate_path_line(_release("two_year", 4.60), _release("fed_funds", 4.33))
+    assert "about 1 quarter-point hike over the next two years" in hikes
+    flat = fred.rate_path_line(_release("two_year", 4.40), _release("fed_funds", 4.33))
+    assert "roughly no change" in flat
+    assert "term premium" in flat
+
+
+def test_the_rate_path_needs_both_ends():
+    assert fred.rate_path_line(_release("two_year", 3.55), None) == ""
+    assert fred.rate_path_line(None, _release("fed_funds", 4.33)) == ""
+
+
+def test_the_rate_path_is_the_third_macro_line_when_both_arrive():
+    releases = dict(RELEASES)
+    releases["two_year"] = _release("two_year", 3.55)
+    releases["fed_funds"] = _release("fed_funds", 4.33)
+    lines = fred.as_lines(releases)
+    assert len(lines) == 3 and lines[2].startswith("Rate path:")
+    assert fred.as_lines(RELEASES)[-1].startswith("Policy and expectations:")  # unchanged without them
+
+
+def test_the_two_series_are_fetched_with_the_others():
+    ids = [series_id for series_id, *_ in fred.SERIES]
+    assert "DGS2" in ids and "DFF" in ids
