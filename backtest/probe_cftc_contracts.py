@@ -60,10 +60,11 @@ NAME_FIELD = "market_and_exchange_names"
 DATE_FIELD = "report_date_as_yyyy_mm_dd"
 
 
-def _rows(dataset: str, where: str, limit: int = 2000) -> list[dict]:
+def _rows(dataset: str, where: str, limit: int = 2000,
+          select: tuple[str, ...] = (NAME_FIELD, DATE_FIELD)) -> list[dict]:
     url = f"{positioning.BASE_URL}/{dataset}.json"
     params = {
-        "$select": f"{NAME_FIELD},{DATE_FIELD}",
+        "$select": ",".join(select),
         "$where": where,
         "$order": f"{DATE_FIELD} DESC",
         "$limit": str(limit),
@@ -78,6 +79,9 @@ def _rows(dataset: str, where: str, limit: int = 2000) -> list[dict]:
     return [row for row in payload if isinstance(row, dict)]
 
 
+OI_FIELD = "open_interest_all"
+
+
 def newest_by_name(rows: list[dict]) -> dict[str, str]:
     """``{market name: newest report date}``."""
     newest: dict[str, str] = defaultdict(str)
@@ -87,6 +91,27 @@ def newest_by_name(rows: list[dict]) -> dict[str, str]:
         if name and stamp > newest[name]:
             newest[name] = stamp
     return dict(newest)
+
+
+def newest_row_by_name(rows: list[dict]) -> dict[str, tuple[str, Optional[float]]]:
+    """``{market name: (newest date, open interest on that date)}``.
+
+    Open interest is how a benchmark is told from a look-alike: several
+    exchanges list a contract on the same underlying, and the one the fund
+    actually tracks is the one with the size.
+    """
+    best: dict[str, tuple[str, Optional[float]]] = {}
+    for row in rows:
+        name = str(row.get(NAME_FIELD) or "")
+        stamp = str(row.get(DATE_FIELD) or "")[:10]
+        if not name or stamp <= best.get(name, ("", None))[0]:
+            continue
+        try:
+            interest = float(row.get(OI_FIELD))  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            interest = None
+        best[name] = (stamp, interest)
+    return best
 
 
 def search(keyword: str) -> None:
@@ -123,41 +148,44 @@ def live(keyword: Optional[str] = None, today: Optional[date] = None) -> None:
                            (positioning.DISAGGREGATED, "commodity")):
         title = f"=== {label} dataset, reporting since {cutoff.isoformat()}"
         print(f"{title}, names containing {keyword.upper()!r} ===" if keyword else f"{title} ===")
-        rows = _rows(dataset, where, limit=LIVE_LIMIT)
+        rows = _rows(dataset, where, limit=LIVE_LIMIT, select=(NAME_FIELD, DATE_FIELD, OI_FIELD))
         if len(rows) >= LIVE_LIMIT:
             print(f"    !! {LIVE_LIMIT} rows returned -- the list below is TRUNCATED "
                   "and must not be read as complete")
-        found = newest_by_name(rows)
+        found = newest_row_by_name(rows)
         if not found:
             print("    nothing reporting")
             print()
             continue
-        for name, stamp in sorted(found.items()):
-            print(f"    {stamp}  {name}")
-        print(f"    ({len(found)} markets)")
+        for name, (stamp, interest) in sorted(found.items()):
+            size = f"{interest:>12,.0f}" if interest is not None else f"{'n/a':>12}"
+            print(f"    {stamp}  {size}  {name}")
+        print(f"    ({len(found)} markets, open interest on the newest row)")
         print()
 
 
 def audit() -> int:
     """Every mapped ticker, with the newest date its contract reports."""
-    print("=== every mapping in CONTRACTS ===")
+    cutoff = (date.today() - timedelta(days=positioning.MAX_REPORT_AGE_DAYS)).isoformat()
+    print(f"=== every mapping in CONTRACTS (stale before {cutoff}) ===")
     dead = []
     for ticker in sorted(positioning.CONTRACTS):
         dataset, name = positioning.CONTRACTS[ticker]
-        rows = _rows(dataset, f"upper({NAME_FIELD}) like '%{name.upper()}%'", limit=400)
+        # Asked exactly as the cycle asks it. An audit that queries differently
+        # from the code it audits is testing something nothing runs.
+        rows = _rows(dataset, f"upper({NAME_FIELD}) = '{name.upper()}'", limit=400)
         found = newest_by_name(rows)
         if not found:
-            print(f"  {ticker:<6} NOTHING MATCHES {name!r}")
+            print(f"  {ticker:<6} NOTHING REPORTS UNDER {name!r}")
             dead.append(ticker)
             continue
-        # A substring can match more than one market; show every one, because
-        # two contracts interleaved is the failure this exists to expose.
+        # Exactly one market by construction; more would mean the query grew a
+        # wildcard back, so it is still worth saying out loud.
         for market, stamp in sorted(found.items(), key=lambda kv: kv[1], reverse=True):
-            print(f"  {ticker:<6} {stamp}  {market}")
+            print(f"  {ticker:<6} {stamp}  {market}  [{len(rows)} rows]")
         if len(found) > 1:
-            print(f"  {'':<6} ^^ {len(found)} markets match {name!r} -- they interleave")
-        newest = max(found.values())
-        if newest < "2026-08-01":
+            print(f"  {'':<6} ^^ {len(found)} markets matched an EXACT name -- the query is not exact")
+        if max(found.values()) < cutoff:
             dead.append(ticker)
     print()
     if dead:
