@@ -3,15 +3,17 @@
 
     python dashboard/build.py                      # writes dashboard/desk.html
     python dashboard/build.py --out /tmp/desk.html
+    python dashboard/build.py --site _site         # the whole installable site
 
-The page embeds ``logs/book.json`` at build time, so it reads correctly with
-no connector at all; where the viewer can run one it also reads the live file
-from GitHub. Rebuilt and republished after every cycle by a Routine in the
-owner's Claude account, because publishing an artifact needs a Claude
-session and the workflow runner has none.
+The page embeds ``logs/book.json`` at build time, so it opens correctly
+before the first network read; online it reads the live file straight from
+the public repository. ``--site`` writes the page as ``index.html`` beside
+the manifest, the service worker and the icons, which is what the ``pages``
+workflow deploys to GitHub Pages after every cycle so the owner's phone has
+it as an app.
 
-Reads two files, writes one. Nothing here touches a broker, a model or the
-network.
+Reads a handful of files, writes a handful. Nothing here touches a broker, a
+model or the network.
 """
 
 from __future__ import annotations
@@ -24,6 +26,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 TEMPLATE = Path(__file__).resolve().parent / "template.html"
 PLACEHOLDER = "/*__SEED__*/{}"
+#: Everything the installed app needs beside the page itself.
+STATIC = ("manifest.webmanifest", "sw.js", "icon.svg", "icon-192.png", "icon-512.png")
 
 
 def build(template: Path, book: Path) -> str:
@@ -35,12 +39,29 @@ def build(template: Path, book: Path) -> str:
     return text.replace(PLACEHOLDER, "/*__SEED__*/" + seed, 1)
 
 
+def build_site(template: Path, book: Path, site: Path) -> list[Path]:
+    """Write index.html and copy the static files next to it."""
+    site.mkdir(parents=True, exist_ok=True)
+    written = [site / "index.html"]
+    written[0].write_text(build(template, book), encoding="utf-8")
+    for name in STATIC:
+        target = site / name
+        target.write_bytes((template.parent / name).read_bytes())
+        written.append(target)
+    return written
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Build the dashboard page.")
     parser.add_argument("--template", type=Path, default=TEMPLATE)
     parser.add_argument("--book", type=Path, default=ROOT / "logs" / "book.json")
     parser.add_argument("--out", type=Path, default=Path(__file__).resolve().parent / "desk.html")
+    parser.add_argument("--site", type=Path, default=None, help="write the installable site into this directory")
     args = parser.parse_args(argv)
+    if args.site:
+        for path in build_site(args.template, args.book, args.site):
+            print(f"wrote {path} ({path.stat().st_size} bytes)")
+        return 0
     args.out.write_text(build(args.template, args.book), encoding="utf-8")
     print(f"wrote {args.out} ({args.out.stat().st_size} bytes) from {args.book}")
     return 0

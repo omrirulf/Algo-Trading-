@@ -399,6 +399,32 @@ jobs:
             macro.txt
           if-no-files-found: ignore
 
+      - name: Push the dead source to the owner's phone
+        # Same ntfy topic as the cycle's brief; a warning, not an alarm,
+        # because the cycle still runs and shows the model a stated blank.
+        if: failure()
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "${NTFY_TOPIC:-}" ]; then
+            echo "no phone configured (NTFY_TOPIC secret unset); nothing sent"
+            exit 0
+          fi
+          python - <<'EOF' > "$RUNNER_TEMP/phone.json"
+          import json, os
+          print(json.dumps({"topic": os.environ["NTFY_TOPIC"], "title": "⚠️ A data source stopped answering",
+                            "message": "The daily data-sources check failed. Until it is fixed the cycle shows the model a stated blank for that section.\n" + os.environ["RUN_URL"],
+                            "priority": 4, "tags": ["warning"], "click": os.environ["RUN_URL"]}))
+          EOF
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' \
+                 --data-binary @"$RUNNER_TEMP/phone.json" https://ntfy.sh/ || echo "000")
+          rm -f "$RUNNER_TEMP/phone.json"
+          case "$code" in
+            2*) echo "phone notified (HTTP $code)";;
+            *)  echo "::warning::phone not notified (HTTP $code)";;
+          esac
+
       - name: Open the issue that says a source died
         # One open issue at a time, found by its label; a repeat failure adds
         # a comment to it rather than opening another. Assigned to the owner

@@ -1,0 +1,81 @@
+---
+title: "On your phone"
+description: "The desk as an app on the home screen, and the day's brief as a push notification, with no login and no Claude session in the loop"
+---
+
+Two things reach the phone after every cycle, and neither needs an account,
+a server, or a login.
+
+## The desk as an app
+
+The dashboard is a static page deployed to GitHub Pages by the `pages`
+workflow after every journal commit:
+
+**https://omrirulf.github.io/Algo-Trading-/**
+
+<Steps>
+  <Step title="Open it once in Chrome">
+    The page shows the record: every position against its stop, the risk caps
+    and how full they are, today's funnel and cost, and the alarms.
+  </Step>
+  <Step title="Add to Home screen">
+    Chrome's menu → *Add to Home screen* (or the install banner). The page
+    becomes an app with its own icon, full screen, no browser bar.
+  </Step>
+  <Step title="That is all">
+    Online, the app reads `logs/book.json` straight from the public repository
+    every five minutes and whenever it comes to the front. Offline, it opens
+    on the last copy it saved, and says so.
+  </Step>
+</Steps>
+
+The page embeds the snapshot at build time (`dashboard/build.py --site`), so
+even its first open shows something. The service worker keeps the page itself
+openable with no network. Nothing on the page is a credential: the repository
+is public, so the page is too.
+
+<Note>
+Marks are what the position manager saw on its last pass, not live quotes.
+The page is a view of the record, rebuilt from the journal and the audit log;
+it never asks the broker anything.
+</Note>
+
+## The brief as a push notification
+
+The heartbeat writes `logs/brief.txt` after the book snapshot: the worst
+thing in the record first, then equity, positions, what was traded, what
+closed, any position without a stop on record, the other alarms, and the
+cycle's cost. The same step then posts it to [ntfy](https://ntfy.sh), a free
+push service with an Android app and no account.
+
+<Steps>
+  <Step title="Install ntfy on the phone">
+    Google Play → *ntfy*. Open it, tap **+**, and subscribe to a topic name
+    you invent: long and random, for example `algo-desk-` followed by twelve
+    letters and digits. Anyone who knows the name can read or send, so treat
+    it like a password.
+  </Step>
+  <Step title="Store the same name as a repository secret">
+    GitHub → Settings → Secrets and variables → Actions → **NTFY_TOPIC**.
+    The push steps read it from there and nowhere else.
+  </Step>
+  <Step title="Wait for the next cycle">
+    Until the secret exists every push step says *no phone configured* and
+    sends nothing. The first cycle after it exists sends the brief.
+  </Step>
+</Steps>
+
+What arrives, and when:
+
+| Notification | Sent by | Priority |
+|---|---|---|
+| The day's brief (🟢 / 🟡 / 🔴 headline) | `heartbeat`, the moment the brief is written | urgent when the headline is 🔴 |
+| *The trading cycle run failed* | `heartbeat`, when the run goes red for a reason the brief did not carry | urgent |
+| *A data source stopped answering* | `data sources`, when the morning probe fails | high |
+
+The topic is the only secret and it never appears in a URL or a log: the
+message is posted as JSON to ntfy's root, and the temporary file that carried
+it is removed. A push step never fails the run; the run's verdict is the
+cycle's.
+
+Tapping a notification opens the desk.

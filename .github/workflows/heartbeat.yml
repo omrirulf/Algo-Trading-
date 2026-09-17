@@ -171,6 +171,43 @@ jobs:
             echo "brief not written; previous one left in place"
           fi
 
+      - name: Push the day to the owner's phone
+        # The brief, sent the moment it is written, to an ntfy topic the
+        # owner subscribes to on their phone: no Claude session, no account,
+        # no login. A critical headline goes out as an urgent notification,
+        # so the alarm arrives when the record says it, not an hour later.
+        #
+        # The topic name is the only secret and it never appears in a URL or
+        # a log: the message is posted as JSON to ntfy's root, and the file
+        # that carried it is removed. Unset, the step says so and sends
+        # nothing; it never fails the job.
+        if: always() && steps.guard.outputs.ran != 'yes' && inputs.mode != 'protect'
+        id: phone
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          DESK_URL: https://omrirulf.github.io/Algo-Trading-/
+        run: |
+          if [ -z "${NTFY_TOPIC:-}" ]; then
+            echo "no phone configured (NTFY_TOPIC secret unset); nothing sent"
+            exit 0
+          fi
+          python - <<'EOF' > "$RUNNER_TEMP/phone.json"
+          import json, os, pathlib
+          text = pathlib.Path("logs/brief.txt").read_text(encoding="utf-8").strip()
+          first, _, rest = text.partition("\n")
+          priority = 5 if first.startswith("🔴") else 4 if first.startswith("⚠️") else 3
+          tags = {5: ["rotating_light"], 4: ["warning"], 3: []}[priority]
+          print(json.dumps({"topic": os.environ["NTFY_TOPIC"], "title": first, "message": rest or first,
+                            "priority": priority, "tags": tags, "click": os.environ["DESK_URL"]}))
+          EOF
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' \
+                 --data-binary @"$RUNNER_TEMP/phone.json" https://ntfy.sh/ || echo "000")
+          rm -f "$RUNNER_TEMP/phone.json"
+          case "$code" in
+            2*) echo "phone notified (HTTP $code)";;
+            *)  echo "::warning::phone not notified (HTTP $code)";;
+          esac
+
       - name: Refit the blend weights
         # After the cycle, never before it: a cycle applies the weights the
         # previous run committed, and a signal whose horizon has not elapsed
@@ -323,6 +360,7 @@ jobs:
         # anything here can go wrong. Never on a protect-only run, which
         # has its own exit code and writes no journal.
         if: always() && steps.guard.outputs.ran != 'yes' && inputs.mode != 'protect'
+        id: health
         env:
           GH_TOKEN: ${{ github.token }}
           OWNER: ${{ github.repository_owner }}
@@ -353,6 +391,35 @@ jobs:
             echo "::error::critical health alarm; see the job summary"
             exit 1
           fi
+
+      - name: Push the failure to the owner's phone
+        # A run that went red for any reason the brief did not already carry:
+        # a crash before the record was written, a lost push, a dead
+        # provider. When the health step is what failed, the brief above
+        # already went out as the urgent alarm and this stays quiet.
+        if: failure() && steps.guard.outputs.ran != 'yes' && steps.health.outcome != 'failure'
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          MODE: ${{ inputs.mode || 'cycle' }}
+        run: |
+          if [ -z "${NTFY_TOPIC:-}" ]; then
+            echo "no phone configured (NTFY_TOPIC secret unset); nothing sent"
+            exit 0
+          fi
+          python - <<'EOF' > "$RUNNER_TEMP/phone.json"
+          import json, os
+          print(json.dumps({"topic": os.environ["NTFY_TOPIC"], "title": "🔴 The trading " + os.environ["MODE"] + " run failed",
+                            "message": "Open the run to see which step went red:\n" + os.environ["RUN_URL"],
+                            "priority": 5, "tags": ["rotating_light"], "click": os.environ["RUN_URL"]}))
+          EOF
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' \
+                 --data-binary @"$RUNNER_TEMP/phone.json" https://ntfy.sh/ || echo "000")
+          rm -f "$RUNNER_TEMP/phone.json"
+          case "$code" in
+            2*) echo "phone notified (HTTP $code)";;
+            *)  echo "::warning::phone not notified (HTTP $code)";;
+          esac
 
       - name: Push the archive to Supabase
         # Deliberately AFTER the commit above, and `always()` for the same
