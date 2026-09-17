@@ -52,12 +52,13 @@ def test_the_pages_workflow_deploys_the_site_after_every_snapshot():
     on = wf[True] if True in wf else wf["on"]          # PyYAML reads the bare key `on` as True
     assert "logs/book.json" in on["push"]["paths"] and "dashboard/**" in on["push"]["paths"]
     job = wf["jobs"]["deploy"]
-    assert wf["permissions"] == {"contents": "read", "pages": "write", "id-token": "write"}
+    assert wf["permissions"] == {"contents": "write"}
     runs = [s.get("run", "") for s in job["steps"]]
     assert any("dashboard/build.py --site _site" in r for r in runs)
-    uses = [s.get("uses", "") for s in job["steps"]]
-    assert any(u.startswith("actions/deploy-pages@") for u in uses)
-    assert any(u.startswith("actions/configure-pages@") for u in uses)
+    publish = next(r for r in runs if "git push" in r)
+    assert "gh-pages" in publish and "git init -q -b gh-pages" in publish     # one commit, rewritten each time
+    assert "touch .nojekyll" in publish
+    assert "${GH_TOKEN}" in publish and "echo" not in publish.split("git push")[1]
 
 
 def test_the_build_embeds_the_snapshot_and_escapes_a_closing_tag(tmp_path):

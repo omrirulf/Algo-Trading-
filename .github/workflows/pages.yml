@@ -23,9 +23,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write              # to publish the site
-  id-token: write           # what actions/deploy-pages needs to prove the source
+  contents: write           # only to push the built site to the gh-pages branch
 
 # One deploy at a time; a newer one waits rather than cancels, so the page
 # that lands is always the newest snapshot.
@@ -37,9 +35,6 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -52,13 +47,31 @@ jobs:
         # project and needs nothing installed.
         run: python dashboard/build.py --site _site
 
-      - uses: actions/configure-pages@v5
-        with:
-          enablement: true    # creates the Pages site on first run, no click in Settings
+      - name: Publish the site to the gh-pages branch
+        # A branch rather than the Pages deploy action, because the job's
+        # own token may not create the Pages site, and a gh-pages branch is
+        # the one publishing source GitHub turns on by itself. The branch
+        # holds only the built site, one commit deep, rewritten each time:
+        # its history is in main, where the page and the snapshot live.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd _site
+          touch .nojekyll
+          git init -q -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -qm "Desk built from $(git -C .. rev-parse --short HEAD) at $(date -u +'%Y-%m-%dT%H:%MZ')"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
 
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: _site
-
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Say where the site is
+        # Advisory: prints the Pages address when the site is enabled, and
+        # says what to click when it is not. Never fails the job.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh api "repos/${GITHUB_REPOSITORY}/pages" --jq '"Pages is on: " + .html_url + " (source: " + .source.branch + ")"' 2>/dev/null; then
+            exit 0
+          fi
+          echo "::notice::Pages is not enabled yet. In the repository Settings → Pages, set the source to the gh-pages branch (root); the site then publishes from this branch on every push."
