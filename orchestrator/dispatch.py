@@ -48,7 +48,7 @@ class Dispatcher(Protocol):
 
     def is_market_open(self) -> bool: ...
 
-    def manage_positions(self) -> dict: ...
+    def manage_positions(self, protect_only: bool = False) -> dict: ...
 
 
 class DirectDispatcher:
@@ -74,13 +74,14 @@ class DirectDispatcher:
     def is_market_open(self) -> bool:
         return bool(self._get_engine().broker.is_market_open())
 
-    def manage_positions(self) -> dict:
+    def manage_positions(self, protect_only: bool = False) -> dict:
         # Same broker and feed the engine uses, so a tranche is priced off
         # the quote a new entry would be.
         from app.position_manager import PositionManager
 
         engine = self._get_engine()
-        return PositionManager(engine.broker, engine.market_data).manage().as_dict()
+        manager = PositionManager(engine.broker, engine.market_data)
+        return manager.manage(protect_only=protect_only).as_dict()
 
     def dispatch(self, signal: LLMSignal) -> dict:
         result = self._get_engine().execute(signal)

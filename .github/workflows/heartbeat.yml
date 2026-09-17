@@ -26,7 +26,16 @@ on:
   schedule:
     - cron: "5 15 * * 1-5"
     - cron: "35 17 * * 1-5"   # catch-up; exits at once if 15:05 already ran
-  workflow_dispatch:        # a manual run, for the first smoke test
+  workflow_dispatch:        # a manual run: a cycle, or just the protection pass
+    inputs:
+      mode:
+        description: >-
+          cycle = the full daily run (default). protect = place a stop on every
+          open position that has none, and nothing else; works after the close,
+          because the stops are good-till-cancelled and go live at the open.
+        type: choice
+        default: cycle
+        options: [cycle, protect]
 
 # Two runs writing the journal at once would race on the commit below.
 concurrency:
@@ -67,12 +76,14 @@ jobs:
       - run: pip install -r requirements.txt
 
       - name: Has today's cycle already run?
-        # Only the catch-up cron asks. The 15:05 run is the cycle, and a
-        # manual dispatch is somebody deliberately asking for one -- neither
-        # should ever be talked out of running. `github.event.schedule` is the
-        # cron string that fired, which is how the two are told apart.
+        # Every scheduled run asks, not only the catch-up. On 16 Sep the 15:05
+        # cron was delivered hours late, after the 17:35 catch-up had already
+        # run the cycle, and because only the catch-up asked, the day's cycle
+        # ran twice. Which cron fired is not the question; whether the journal
+        # already has today is. A manual dispatch is somebody deliberately
+        # asking for a run and is never talked out of it.
         id: guard
-        if: github.event.schedule == '35 17 * * 1-5'
+        if: github.event_name == 'schedule'
         run: |
           set -o pipefail
           ran=$(python analysis/cycle_day.py --journal logs/signal_journal.log)
@@ -83,11 +94,23 @@ jobs:
             echo "No cycle journalled for today. Running one now." >> "$GITHUB_STEP_SUMMARY"
           fi
 
+      - name: Protect every open position
+        # The one thing worth doing after the close. Fails the run if any
+        # position is still without a stop when it is done, because a green
+        # tick on an unprotected book is the failure this exists to end.
+        if: inputs.mode == 'protect'
+        env:
+          EXECUTION_MODE: direct
+          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+        run: python -m orchestrator.heartbeat --protect-only
+
       - name: Run one cycle
         # Skipped only when the guard above actually said yes. An unset output
         # -- which is what a skipped guard leaves -- must run the cycle, so the
-        # test is on 'yes' and not on 'not no'.
-        if: steps.guard.outputs.ran != 'yes'
+        # test is on 'yes' and not on 'not no'. A protect-only dispatch never
+        # runs a cycle: `inputs.mode` is empty on a scheduled run.
+        if: steps.guard.outputs.ran != 'yes' && inputs.mode != 'protect'
         env:
           EXECUTION_MODE: direct          # no webhook: nothing to host here
           ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
@@ -107,7 +130,7 @@ jobs:
         # report that only exists when everything worked is a report nobody
         # needs. Never fails the job -- it is a view of the journal, not a
         # second chance to break the cycle.
-        if: always() && steps.guard.outputs.ran != 'yes'
+        if: always() && steps.guard.outputs.ran != 'yes' && inputs.mode != 'protect'
         run: |
           set -o pipefail
           # Rendered to a temp file first: `> logs/cycle_report.md` would
@@ -131,7 +154,7 @@ jobs:
         # return that is not in yet. Never fails the job: a refit that cannot
         # fetch prices leaves the previous weights in place, which the next
         # cycle applies and flags stale after a fortnight.
-        if: always() && steps.guard.outputs.ran != 'yes'
+        if: always() && steps.guard.outputs.ran != 'yes' && inputs.mode != 'protect'
         run: python learn/fit_weights.py || echo "refit skipped; previous weights left in place"
 
       - name: Score the journal
@@ -145,7 +168,7 @@ jobs:
         # Guarded like everything else after the catch-up check: on a day the
         # 15:05 cycle ran, this already ran with it, and doing it again would
         # re-fetch a price series per ticker to re-commit an identical report.
-        if: always() && steps.guard.outputs.ran != 'yes'
+        if: always() && steps.guard.outputs.ran != 'yes' && inputs.mode != 'protect'
         id: score
         run: |
           set -o pipefail
@@ -182,7 +205,7 @@ jobs:
         # GitHub will not accept as an assignee (an organisation, say) must not
         # cost the issue, and nothing here may fail a job that has already
         # placed trades.
-        if: always() && steps.guard.outputs.ran != 'yes' && steps.score.outputs.ready == 'true'
+        if: always() && steps.guard.outputs.ran != 'yes' && inputs.mode != 'protect' && steps.score.outputs.ready == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           OWNER: ${{ github.repository_owner }}
@@ -247,7 +270,7 @@ jobs:
             echo "no journal changes"
             exit 0
           fi
-          git commit -m "Journal: cycle at $(date -u +'%Y-%m-%dT%H:%MZ')"
+          git commit -m "Journal: ${{ inputs.mode == 'protect' && 'protection pass' || 'cycle' }} at $(date -u +'%Y-%m-%dT%H:%MZ')"
           # Another cycle may have landed while this one ran.
           git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
           git push origin "HEAD:${GITHUB_REF_NAME}"
@@ -256,7 +279,7 @@ jobs:
         # Deliberately AFTER the commit above, and `always()` for the same
         # reason it is: the lines a failed cycle wrote belong in the archive
         # too. Note this is not a guard on the secrets -- see below.
-        if: always() && steps.guard.outputs.ran != 'yes'
+        if: always() && steps.guard.outputs.ran != 'yes' && inputs.mode != 'protect'
         # Two more decisions, unchanged:
         #
         # After, because the journal must already be safe in git before this

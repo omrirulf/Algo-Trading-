@@ -24,6 +24,7 @@ class FakeBroker:
     stop_orders: dict[str, StopOrder] = field(default_factory=dict)
     replaced: list[dict] = field(default_factory=list)
     closed: list[dict] = field(default_factory=list)
+    protected: list[dict] = field(default_factory=list)
 
     def is_market_open(self) -> bool:
         return self.market_open
@@ -48,6 +49,22 @@ class FakeBroker:
 
     def get_open_stop_order(self, ticker: str):
         return self.stop_orders.get(ticker)
+
+    def submit_stop_order(self, ticker: str, qty: int, side: str, stop_price: float) -> StopOrder:
+        """Mirrors the real primitive's refusals, so a test cannot protect a phantom."""
+        from app.broker_client import BrokerError
+
+        held = next((p for p in self.positions if p.ticker == ticker), None)
+        if held is None:
+            raise BrokerError(f"refusing a stop for {ticker}: there is no open position to protect")
+        closing = "sell" if held.qty > 0 else "buy"
+        if side != closing or qty > abs(held.qty):
+            raise BrokerError(f"refusing a stop for {ticker}: not a reduction")
+        self.protected.append({"ticker": ticker, "qty": qty, "side": side, "stop_price": stop_price})
+        placed = StopOrder(order_id=f"protect-{len(self.protected)}", ticker=ticker, qty=qty,
+                           stop_price=stop_price, side=side)
+        self.stop_orders[ticker] = placed
+        return placed
 
     def replace_stop_order(self, order_id: str, qty: int, stop_price: float) -> StopOrder:
         for ticker, current in self.stop_orders.items():
