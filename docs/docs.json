@@ -42,6 +42,8 @@
           "orchestrator/news",
           "orchestrator/market-context",
           "orchestrator/insiders",
+          "orchestrator/fund-context",
+          "orchestrator/official-data",
           "orchestrator/llm",
           "orchestrator/journal"
         ]
