@@ -98,7 +98,11 @@ def test_supplying_prices_brings_the_unrealised_column_back():
 
 MARKED = pf.Position(
     "LLY", "buy", 10, 100.0, 90.0,
-    last_price=120.0, last_gain_r=2.0, last_managed="2026-09-16 18:47:56",
+    last_price=120.0, last_gain_r=2.0,
+    # The pass that saw the price, and the pass that last looked, are separate
+    # stamps: a later pass can look without marking. The page dates the mark.
+    last_marked="2026-09-16 18:47:56", last_managed="2026-09-16 18:47:56",
+    last_action=pf.HELD,
 )
 
 
@@ -249,3 +253,31 @@ def test_the_renderer_offers_no_way_to_write_a_file():
     source = inspect.getsource(db)
     assert "write_text" not in source
     assert "--out" not in source
+
+
+# --- a position with no stop order -----------------------------------------
+
+
+UNREACHED = pf.Position(
+    "UUP", "buy", 422, 28.38, 28.16,
+    last_managed="2026-09-17 15:47:40", last_action=pf.UNMANAGED,
+)
+
+
+def test_a_missing_stop_order_is_the_loudest_thing_on_the_page():
+    page = db.render(book(UNREACHED))
+    assert "No stop order found" in page
+    assert "no live stop order" in page
+    assert "no stop order" in page, "and marked on the row itself"
+
+
+def test_the_missing_stop_note_says_why_it_matters():
+    """A reader who does not know the design needs the consequence spelled out."""
+    page = db.render(book(UNREACHED))
+    assert "only exit" in page
+    assert "assumes a stop that may" in page
+
+
+def test_a_fully_managed_book_raises_no_stop_alarm():
+    page = db.render(book(MARKED))
+    assert "No stop order found" not in page

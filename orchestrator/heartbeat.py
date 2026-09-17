@@ -44,6 +44,7 @@ import httpx  # noqa: E402
 from apscheduler.schedulers.blocking import BlockingScheduler  # noqa: E402
 from pydantic import ValidationError  # noqa: E402
 
+from analysis.reader import SCORE_SOURCES  # noqa: E402
 from app.schemas import Bias, LLMSignal  # noqa: E402
 from config import settings as cfg  # noqa: E402
 from config.instruments import is_fund  # noqa: E402
@@ -637,18 +638,6 @@ def build_user_prompt(ticker_context: TickerContext) -> str:
 #: sections it rendered; it does not need the model to remember. Same
 #: principle as the instrument kind, which is resolved from the ticker and
 #: never from the signal.
-SCORE_SOURCES: dict[str, tuple[str, ...]] = {
-    # A company's analyst read comes from its own coverage; a fund's from the
-    # roll-up over what it holds. A bond fund has neither: nobody rates a bond
-    # on a buy-to-sell scale.
-    "analyst_score": ("analysts", "holdings"),
-    # A company's behaviour signal is Form 4 filings; a fund's is who is
-    # positioned how, or money moving in and out. A fund with no single
-    # futures contract and no share-count history has neither.
-    "insider_score": ("insiders", "positioning", "flows"),
-}
-
-
 def scores_without_a_source(signal: LLMSignal, context: Any) -> LLMSignal:
     """Null any score whose every source section was absent from the prompt.
 
@@ -747,7 +736,7 @@ def process_ticker(
     if SCREENING_ENABLED:
         try:
             first = screen_signal(system_prompt, user_prompt, SIGNAL_JSON_SCHEMA)
-            first_signal = parse_signal(first.text)
+            first_signal = scores_without_a_source(parse_signal(first.text), ticker_context)
             screen = {
                 "model": SCREENING_MODEL,
                 "bias": first_signal.bias.value,

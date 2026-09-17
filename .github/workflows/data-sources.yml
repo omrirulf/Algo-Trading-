@@ -113,6 +113,13 @@ jobs:
           python backtest/probe_cftc_contracts.py | tee contracts.txt
           echo
           python backtest/probe_cftc_contracts.py --like "TREASURY" | tee -a contracts.txt
+          echo
+          # What each dataset actually contains this week. --like can only
+          # find a contract whose new name kept the old keyword, and the
+          # audit shows a batch of unrelated majors all stopping on
+          # 2022-02-01 -- a rename, not a delisting. This is the only view
+          # that can find the new name.
+          python backtest/probe_cftc_contracts.py --live | tee -a contracts.txt
 
       - name: Fund block, as the model would read it
         # The numbers matter as much as the connection. A P/E of 0.06 is a

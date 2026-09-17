@@ -34,6 +34,19 @@ Two honest limits, stated in the prompt itself:
   dropping every old row would leave a month of history and destroy the
   52-week percentile, which is most of what this block is for.
 
+  TLT was not alone, and the guard was only half the answer. A full audit of
+  all nineteen mappings found five reading a series that ended in February
+  2022 -- every Treasury and the dollar index -- and nine more matching two
+  to nine markets at once, because the contract name was matched as a
+  *substring*. Those nine were the worse half: the query returned every
+  matching market interleaved by date, the parser read consecutive rows as
+  consecutive weeks, and the section printed a week-over-week change that was
+  really the gap between two different contracts. Nothing failed. The
+  numbers simply stopped meaning anything, which the staleness guard cannot
+  see because the series is not stale -- it is mixed. The name is therefore
+  matched **exactly** now, which cannot interleave and turns the next rename
+  back into a visible gap.
+
 * The data is **as of Tuesday, published Friday**, so it is three to six days
   stale by the time a cycle reads it. That is the dataset, not a bug.
 * Positioning is a **crowding measure, not a forecast**. The prompt says so,
@@ -94,36 +107,56 @@ _FIELDS = {
     ),
 }
 
-#: Ticker -> (dataset, the contract's name in the report).
+#: Ticker -> (dataset, the contract's full name in the report).
 #:
-#: Matched as a case-insensitive substring of ``market_and_exchange_names``,
-#: which carries the exchange too ("GOLD - COMMODITY EXCHANGE INC."). Only
-#: tickers with one dominant futures contract appear: DBC and DBA are baskets
-#: spanning a dozen contracts with no single position to report, and a single
-#: country fund has no future at all, so both are absent by design rather
-#: than by oversight.
+#: Matched **exactly** against ``market_and_exchange_names``, which carries
+#: the exchange too ("GOLD - COMMODITY EXCHANGE INC."). It used to be matched
+#: as a substring, and that was the defect this map exists to record: a
+#: substring matches every market that contains it, the query returns all of
+#: them interleaved by date, and the parser reads consecutive rows as
+#: consecutive weeks. "GOLD" matched three markets, so the week-over-week
+#: change was the gap between two different gold contracts and the 52-week
+#: percentile ranked twenty real weeks of three mixed series. "NATURAL GAS"
+#: matched nine. The numbers looked usable and were not, which is worse than
+#: a blank. An exact name cannot interleave, and a name the CFTC stops
+#: publishing becomes a visible gap instead of a quiet corruption.
+#:
+#: Every name below was taken verbatim from the dataset's own list of markets
+#: reporting this week (``probe_cftc_contracts.py --live``), spacing included
+#: -- "MSCI EAFE  - ICE FUTURES U.S." really does carry two spaces.
+#:
+#: The CFTC rewrote these names in February 2022: ULTRA U.S. TREASURY BONDS
+#: became ULTRA UST BOND, U.S. DOLLAR INDEX became USD INDEX, COPPER-GRADE #1
+#: became COPPER- #1, and the NYMEX crude and gas contracts became
+#: WTI-PHYSICAL and NAT GAS NYME. Five mappings had been reading a series
+#: whose newest row was four and a half years old.
+#:
+#: Only tickers with one dominant futures contract appear: DBC and DBA are
+#: baskets spanning a dozen contracts with no single position to report, and
+#: a single country fund has no future at all, so both are absent by design
+#: rather than by oversight.
 CONTRACTS: dict[str, tuple[str, str]] = {
     # Physical commodities -- managed money
-    "GLD": (DISAGGREGATED, "GOLD"),
-    "SLV": (DISAGGREGATED, "SILVER"),
-    "CPER": (DISAGGREGATED, "COPPER"),
-    "USO": (DISAGGREGATED, "CRUDE OIL, LIGHT SWEET"),
-    "UNG": (DISAGGREGATED, "NATURAL GAS"),
-    "CORN": (DISAGGREGATED, "CORN"),
-    "WEAT": (DISAGGREGATED, "WHEAT-SRW"),
-    "SOYB": (DISAGGREGATED, "SOYBEANS"),
-    "CANE": (DISAGGREGATED, "SUGAR NO. 11"),
+    "GLD": (DISAGGREGATED, "GOLD - COMMODITY EXCHANGE INC."),
+    "SLV": (DISAGGREGATED, "SILVER - COMMODITY EXCHANGE INC."),
+    "CPER": (DISAGGREGATED, "COPPER- #1 - COMMODITY EXCHANGE INC."),
+    "USO": (DISAGGREGATED, "WTI-PHYSICAL - NEW YORK MERCANTILE EXCHANGE"),
+    "UNG": (DISAGGREGATED, "NAT GAS NYME - NEW YORK MERCANTILE EXCHANGE"),
+    "CORN": (DISAGGREGATED, "CORN - CHICAGO BOARD OF TRADE"),
+    "WEAT": (DISAGGREGATED, "WHEAT-SRW - CHICAGO BOARD OF TRADE"),
+    "SOYB": (DISAGGREGATED, "SOYBEANS - CHICAGO BOARD OF TRADE"),
+    "CANE": (DISAGGREGATED, "SUGAR NO. 11 - ICE FUTURES U.S."),
     # Rates, currencies and equity indices -- leveraged funds
-    "TLT": (FINANCIAL, "ULTRA U.S. TREASURY BONDS"),
-    "IEF": (FINANCIAL, "10-YEAR U.S. TREASURY NOTES"),
-    "SHY": (FINANCIAL, "2-YEAR U.S. TREASURY NOTES"),
-    "TIP": (FINANCIAL, "10-YEAR U.S. TREASURY NOTES"),
-    "UUP": (FINANCIAL, "U.S. DOLLAR INDEX"),
-    "RSP": (FINANCIAL, "E-MINI S&P 500"),
-    "IWM": (FINANCIAL, "RUSSELL E-MINI"),
-    "VWO": (FINANCIAL, "MSCI EM INDEX"),
-    "VGK": (FINANCIAL, "MSCI EAFE"),
-    "EWJ": (FINANCIAL, "NIKKEI STOCK AVERAGE"),
+    "TLT": (FINANCIAL, "ULTRA UST BOND - CHICAGO BOARD OF TRADE"),
+    "IEF": (FINANCIAL, "UST 10Y NOTE - CHICAGO BOARD OF TRADE"),
+    "SHY": (FINANCIAL, "UST 2Y NOTE - CHICAGO BOARD OF TRADE"),
+    "TIP": (FINANCIAL, "UST 10Y NOTE - CHICAGO BOARD OF TRADE"),
+    "UUP": (FINANCIAL, "USD INDEX - ICE FUTURES U.S."),
+    "RSP": (FINANCIAL, "E-MINI S&P 500 - CHICAGO MERCANTILE EXCHANGE"),
+    "IWM": (FINANCIAL, "RUSSELL E-MINI - CHICAGO MERCANTILE EXCHANGE"),
+    "VWO": (FINANCIAL, "MSCI EM INDEX - ICE FUTURES U.S."),
+    "VGK": (FINANCIAL, "MSCI EAFE  - ICE FUTURES U.S."),
+    "EWJ": (FINANCIAL, "NIKKEI STOCK AVERAGE YEN DENOM - CHICAGO MERCANTILE EXCHANGE"),
 }
 
 
@@ -212,6 +245,16 @@ class PositioningSnapshot:
         ]
 
 
+def _quote(value: str) -> str:
+    """Escape a value for a SoQL single-quoted string.
+
+    No contract name carries an apostrophe today. One that did would end the
+    string early and change what the query asks for, which is the one way an
+    exact match could go back to matching the wrong thing.
+    """
+    return value.replace("'", "''")
+
+
 def report_date(row: dict) -> Optional[date]:
     """The date a row was reported for, or ``None`` if it has none."""
     raw = _field(row, "date")
@@ -289,7 +332,7 @@ def fetch_rows(ticker: str, client: Any = None, weeks: int = HISTORY_WEEKS) -> l
     import httpx
 
     params = {
-        "$where": f"upper(market_and_exchange_names) like '%{name.upper()}%'",
+        "$where": f"upper(market_and_exchange_names) = '{_quote(name.upper())}'",
         "$order": "report_date_as_yyyy_mm_dd DESC",
         "$limit": str(weeks),
     }

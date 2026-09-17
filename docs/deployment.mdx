@@ -85,6 +85,11 @@ closed-market cycle actually spends money.
     *secrets*: `ALPACA_API_KEY`, `ALPACA_SECRET_KEY`, `ANTHROPIC_API_KEY`,
     `BRIGHTDATA_API_TOKEN`. Add as *variables*: `BRIGHTDATA_UNLOCKER_ZONE`
     (`cli_unlocker` if you used `brightdata login`) and `WATCHLIST`.
+
+    Four more secrets are optional and free: `FRED_API_KEY`, `EIA_API_KEY`,
+    `USDA_NASS_KEY` and `FINNHUB_API_KEY`. Each one adds a section to the
+    prompt and none of them is depended on — with a key absent that section
+    is simply not there. See [Official Data](/orchestrator/official-data).
   </Step>
   <Step title="Run it once by hand">
     **Actions → heartbeat → Run workflow.** This is the smoke test that
@@ -93,18 +98,61 @@ closed-market cycle actually spends money.
     empty headlines. See [Testing](/testing).
   </Step>
   <Step title="Let the schedule take over">
-    `cron: "5 13-21 * * 1-5"` spans US market hours across both DST offsets;
-    the job itself exits immediately when Alpaca says the market is shut.
+    Two crons, both on weekdays, and the job exits immediately when Alpaca
+    says the market is shut:
+
+    | cron (UTC) | what it is |
+    | --- | --- |
+    | `5 15 * * 1-5` | the cycle, once a day |
+    | `35 17 * * 1-5` | the catch-up, which usually does nothing |
+
+    The second one exists because the first can simply not fire — see below.
   </Step>
 </Steps>
 
+## Two things that make a missed run survivable
+
 <Warning>
   **GitHub Actions cron is best-effort.** Runs can be delayed 5–15 minutes or
-  more under load, and scheduled workflows are disabled automatically after 60
-  days without repository activity. If you want punctual, guaranteed
-  execution, run `python -m orchestrator.heartbeat` (no `--once`) on a small
-  always-on host instead — the same direct mode works there.
+  more under load, silently skipped under heavy load, and scheduled workflows
+  are disabled automatically after 60 days without repository activity. If you
+  want punctual, guaranteed execution, run `python -m orchestrator.heartbeat`
+  (no `--once`) on a small always-on host instead — the same direct mode works
+  there.
 </Warning>
+
+### The catch-up run
+
+A skipped 15:05 costs the whole day: no signals, no journal line, and a gap
+in the history the blend is fitted on. So a second schedule runs two and a
+half hours later and asks one question first — *did a cycle already run
+today?*
+
+```bash
+python analysis/cycle_day.py --journal logs/signal_journal.log   # prints yes or no
+```
+
+It reads the journal's own timestamps, prints `yes` or `no`, and **always
+exits 0**: a non-zero exit would be indistinguishable from the script itself
+breaking, and "the guard crashed" must not read as "no cycle ran". Every step
+after it in the catch-up run is conditional on `no`, including the ones that
+would otherwise run on failure.
+
+What makes a re-run safe is not the guard — it is the broker. Every order
+carries a client order id derived from the ticker, the side and the current
+day, so if the 15:05 run *did* place an order and the guard were somehow
+wrong, Alpaca rejects the duplicate rather than doubling the position. See
+[Position Management](/position-management).
+
+### The 90-minute ceiling
+
+The job's `timeout-minutes` is 90, raised from 45. The cycle asks the Batch
+API for eighty tickers and waits; a busy batch can take well over an hour,
+and the old ceiling killed the job mid-wait — losing the run *and* the batch
+results that had already been paid for. The collector has its own, shorter
+deadline inside that ceiling, so it gives up first and prints a batch id the
+run can be resumed from. Two clocks, deliberately: the outer one is a
+backstop, the inner one is the one that produces something useful.
 
 ## A cycle that reaches nothing fails the run
 

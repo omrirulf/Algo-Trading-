@@ -11,11 +11,16 @@ quarter -- and covers the non-US lines on this watchlist, which is what
 decided it over the alternatives. ASML and TEVA both return full histories;
 that was checked against the live API rather than assumed.
 
-Single names only, and only where the section can be added without moving
-the company prompt... which it cannot, so see ``orchestrator.context``: this
-rides in the existing ``FUNDAMENTALS`` block as extra lines rather than as a
-new section of its own. The prompt every replay and sanity baseline was
-measured against keeps its five headings.
+Single names only. It is a heading of its own, directly after
+``FUNDAMENTALS``, so a company's prompt carries five headings without a
+Finnhub key and six with one.
+
+Hiding the lines inside ``FUNDAMENTALS`` would have kept the heading count
+that every replay and sanity baseline was measured against, and that was
+briefly the plan. It is the wrong trade: if the input is changing, the change
+should be visible in the shape of the question rather than buried in an
+existing answer. ``tests/test_context.py`` pins both lists, so the cost of
+the change is recorded rather than hidden.
 
 Absent is not failed. With no key nothing is fetched and the section is
 simply not there.

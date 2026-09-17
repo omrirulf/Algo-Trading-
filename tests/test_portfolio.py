@@ -369,3 +369,94 @@ def test_our_r_multiple_agrees_with_the_managers_own(tmp_path):
     position = book.positions[0]
     ours = position.recorded_mark().r_multiple
     assert ours == pytest.approx(position.last_gain_r, abs=0.02)
+
+
+# --- the placeholder price -------------------------------------------------
+#
+# The position manager records `price: 0.0` on an `unmanaged` pass, because it
+# gives up before fetching a quote. Read as a mark, a zero values a short at
+# its entire entry: on the live book that fabricated a $28,098 gain across an
+# $86,000 book. These pin the rejection.
+
+
+def test_an_unmanaged_pass_supplies_no_price(tmp_path):
+    book = pf.read_book(audit(
+        tmp_path,
+        entry(ticker="EMB", side="sell", qty=128, price=93.395, stop=94.18),
+        managed(ticker="EMB", action="unmanaged", price=0.0, gain_r=0.0,
+                reason="no live stop order; left untouched"),
+    ))
+    position = book.positions[0]
+    assert position.last_price is None
+    assert position.recorded_mark().known is False
+
+
+def test_a_short_is_never_valued_at_a_zero_price(tmp_path):
+    """The specific arithmetic that went wrong, stated as a number."""
+    book = pf.read_book(audit(
+        tmp_path,
+        entry(ticker="EMB", side="sell", qty=128, price=93.395, stop=94.18),
+        managed(ticker="EMB", action="unmanaged", price=0.0, gain_r=0.0),
+    ))
+    assert book.unrealised is None, "a zero mark would have shown about +11,954"
+
+
+def test_an_unmanaged_pass_does_not_erase_an_earlier_real_mark(tmp_path):
+    """Yesterday's real price is better than today's placeholder."""
+    book = pf.read_book(audit(
+        tmp_path,
+        entry(price=100.0, stop=90.0, qty=10),
+        managed(action="stop_raised", new_stop=95.0, price=110.0, gain_r=1.0,
+                ts="2026-09-16 18:47:00"),
+        managed(action="unmanaged", price=0.0, gain_r=0.0,
+                ts="2026-09-17 15:47:00"),
+    ))
+    position = book.positions[0]
+    assert position.last_price == 110.0
+    assert position.last_marked.startswith("2026-09-16")
+    assert position.last_managed.startswith("2026-09-17")
+
+
+def test_a_zero_price_is_refused_even_from_a_marking_action(tmp_path):
+    """Belt and braces: no action's zero is ever a mark."""
+    book = pf.read_book(audit(
+        tmp_path, entry(), managed(action="held", price=0.0, gain_r=0.0),
+    ))
+    assert book.positions[0].last_price is None
+
+
+def test_the_marking_actions_exclude_the_ones_that_never_fetch_a_price():
+    assert pf.UNMANAGED not in pf.MARKING_ACTIONS
+    assert {pf.TRANCHE, pf.STOP_RAISED, pf.HELD} == set(pf.MARKING_ACTIONS)
+
+
+# --- a position with no stop order -----------------------------------------
+
+
+def test_a_position_the_manager_could_not_reach_is_flagged(tmp_path):
+    """The stop is the only exit, so "no stop order" is the loudest fact here."""
+    book = pf.read_book(audit(
+        tmp_path, entry(), managed(action="unmanaged", price=0.0),
+    ))
+    assert book.positions[0].unmanaged is True
+    assert len(book.unmanaged) == 1
+
+
+def test_a_managed_position_is_not_flagged(tmp_path):
+    book = pf.read_book(audit(
+        tmp_path, entry(), managed(action="held", price=104.0, gain_r=0.4),
+    ))
+    assert book.positions[0].unmanaged is False
+    assert book.unmanaged == ()
+
+
+def test_a_position_recovers_when_a_later_pass_manages_it(tmp_path):
+    """The flag is the *last* pass, not any pass."""
+    book = pf.read_book(audit(
+        tmp_path,
+        entry(),
+        managed(action="unmanaged", price=0.0, ts="2026-09-17 15:00:00"),
+        managed(action="stop_raised", new_stop=95.0, price=110.0, gain_r=1.0,
+                ts="2026-09-18 15:00:00"),
+    ))
+    assert book.positions[0].unmanaged is False

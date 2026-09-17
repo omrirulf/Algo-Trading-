@@ -436,7 +436,7 @@ def test_the_new_sections_reach_the_journal():
     ))
     stored = ctx.as_dict()
     assert stored["funds"] is None
-    assert stored["positioning"]["contract"] == "GOLD"
+    assert stored["positioning"]["contract"] == "GOLD - COMMODITY EXCHANGE INC."
     assert stored["positioning"]["net_share"] == pytest.approx(0.4)
 
 

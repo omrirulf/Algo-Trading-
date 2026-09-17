@@ -232,6 +232,7 @@ tbody tr:last-child td { border-bottom: none; }
           display: inline-block; }
 .rung b.on { background: var(--long); }
 .tag { font-size: .72rem; color: var(--long); font-weight: 600; white-space: nowrap; }
+.tag.warn { color: var(--crit); }
 
 /* -- exposure ----------------------------------------------------------- */
 .meters { display: grid; gap: 22px; margin-bottom: 34px;
@@ -303,6 +304,13 @@ def _tiles(book: Book) -> str:
             False,
         ),
     ]
+    if book.unmanaged:
+        tiles.append((
+            "No stop order found",
+            f"{len(book.unmanaged)} of {len(book.positions)}",
+            "nothing is protecting these",
+            True,
+        ))
     if pnl is not None:
         tiles.append((
             "Unrealised",
@@ -333,7 +341,12 @@ def _position_row(book: Book, p: Position) -> str:
         f'<b class="{"on" if i < p.rungs_taken else ""}"></b>'
         for i in range(len(LADDER_RUNGS))
     )
-    protected = ' <span class="tag">protected</span>' if p.protected else ""
+    if p.unmanaged:
+        flag = ' <span class="tag warn">no stop order</span>'
+    elif p.protected:
+        flag = ' <span class="tag">protected</span>'
+    else:
+        flag = ""
 
     cells = [
         f'<td class="l"><span class="name">{_e(p.name)}</span>'
@@ -347,7 +360,7 @@ def _position_row(book: Book, p: Position) -> str:
         f'<span class="bar{" safe" if p.protected else ""}">'
         f'<i style="width:{width:.0f}%"></i></span></td>',
         f'<td class="num">{_e(_money(p.notional, 0))}</td>',
-        f'<td class="num">{_e(_money(abs(p.risk_dollars), 0))}{protected}</td>',
+        f'<td class="num">{_e(_money(abs(p.risk_dollars), 0))}{flag}</td>',
     ]
     if book.marks_known:
         if mark.known:
@@ -469,6 +482,15 @@ def _exposure(book: Book) -> str:
 def _not_yet(book: Book, days: int) -> str:
     """What the page deliberately does not show, and what would change that."""
     notes = []
+    if book.unmanaged:
+        notes.append((
+            f"{len(book.unmanaged)} of {len(book.positions)} positions have no live stop order",
+            "The position manager looked and found nothing to work with, so it "
+            "left them untouched — no trailing, no ladder. The stop is this "
+            "system's only exit, so a position without one is running "
+            "unprotected, and the risk column below assumes a stop that may "
+            "not exist. Worth checking at the broker.",
+        ))
     if not book.marks_known:
         notes.append((
             "No prices yet, so no profit or loss",

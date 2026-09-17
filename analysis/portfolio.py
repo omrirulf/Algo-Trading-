@@ -71,6 +71,15 @@ MANAGED_EVENT = "position_managed"
 #: ``app.position_manager._RUNG_COMPLETING`` by a test rather than by memory.
 TRANCHE = "tranche_taken"
 STOP_RAISED = "stop_raised"
+HELD = "held"
+UNMANAGED = "unmanaged"
+
+#: Actions taken after the manager actually looked up a price. The ones left
+#: out matter more than the ones in: an ``unmanaged`` pass gives up before
+#: fetching a quote and records ``price: 0.0`` as a placeholder, and a zero
+#: read as a mark values a short at its full entry -- an invented gain the
+#: size of the position. A mark is taken only from a pass that made one.
+MARKING_ACTIONS = frozenset({TRANCHE, STOP_RAISED, HELD})
 
 #: Rungs on the ladder, in order, as ``app.position_manager`` applies them.
 LADDER_RUNGS = (1.0, 3.0)
@@ -112,9 +121,15 @@ class Position:
     current_stop: Optional[float] = None
     #: When the manager last looked at this position, whatever it decided.
     last_managed: Optional[str] = None
-    #: The price the manager saw on that pass. Not a live quote -- a mark the
-    #: record actually kept, which is the only kind this module will report.
+    #: What it decided on that pass.
+    last_action: Optional[str] = None
+    #: The price the manager saw, from the last pass that actually looked one
+    #: up. Not a live quote -- a mark the record kept, which is the only kind
+    #: this module will report.
     last_price: Optional[float] = None
+    #: When that price was observed. Distinct from ``last_managed``, because
+    #: the manager can look at a position without marking it.
+    last_marked: Optional[str] = None
     #: The gain in R the manager computed on that pass, kept as a cross-check
     #: on this module's own arithmetic rather than as the number displayed.
     last_gain_r: Optional[float] = None
@@ -214,7 +229,17 @@ class Position:
 
     def recorded_mark(self) -> "Mark":
         """The standing at the last price the manager wrote down, if any."""
-        return self.mark(self.last_price, RECORDED, self.last_managed)
+        return self.mark(self.last_price, RECORDED, self.last_marked)
+
+    @property
+    def unmanaged(self) -> bool:
+        """The manager last found no live stop order to work with.
+
+        Worth surfacing rather than burying: the stop is this system's only
+        exit, so a position the manager cannot reach is one nothing is
+        protecting.
+        """
+        return self.last_action == UNMANAGED
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -237,8 +262,11 @@ class Position:
             "stop_distance_pct": self.stop_distance_pct,
             "protected": self.protected,
             "last_managed": self.last_managed,
+            "last_action": self.last_action,
             "last_price": self.last_price,
             "last_gain_r": self.last_gain_r,
+            "last_marked": self.last_marked,
+            "unmanaged": self.unmanaged,
         }
 
 
@@ -352,6 +380,11 @@ class Book:
     @property
     def protected_count(self) -> int:
         return sum(1 for p in self.positions if p.protected)
+
+    @property
+    def unmanaged(self) -> tuple[Position, ...]:
+        """Positions the manager last found no live stop order for."""
+        return tuple(p for p in self.positions if p.unmanaged)
 
     @property
     def marks_known(self) -> bool:
@@ -534,8 +567,10 @@ def read_book(
                 "rungs_taken": 0,
                 "current_stop": None,
                 "last_managed": None,
+                "last_action": None,
                 "last_price": None,
                 "last_gain_r": None,
+                "last_marked": None,
             }
 
         elif event == MANAGED_EVENT:
@@ -559,11 +594,15 @@ def read_book(
             # question the stamp answers. Price and gain come from any pass,
             # because the manager records them whatever it decides.
             held["last_managed"] = stamp or None
+            held["last_action"] = kind
+            # Only from a pass that actually fetched a quote, and only a
+            # positive one. ``unmanaged`` writes price 0.0 as a placeholder;
+            # taking it would value a short at its whole entry.
             price, gain = _num(action.get("price")), _num(action.get("gain_r"))
-            if price is not None:
+            if kind in MARKING_ACTIONS and price is not None and price > 0:
                 held["last_price"] = price
-            if gain is not None:
                 held["last_gain_r"] = gain
+                held["last_marked"] = stamp or None
 
     positions = tuple(
         Position(**data)

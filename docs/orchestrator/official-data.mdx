@@ -1,0 +1,169 @@
+---
+title: "Official Data"
+description: "Four free government and vendor sources behind one key each — inventories, crop condition, the economy, and whether a company beats its own guidance"
+---
+
+Prices say what traders *think*. They do not say what happened. Four free
+sources publish what happened, and each needs a key:
+
+| section | source | key | who it is for |
+| --- | --- | --- | --- |
+| `MACRO`, last two lines | FRED (St. Louis Fed) | `FRED_API_KEY` | every fund |
+| `ENERGY INVENTORIES` | EIA | `EIA_API_KEY` | oil and gas funds |
+| `CROP CONDITION` | USDA NASS | `USDA_NASS_KEY` | grain funds |
+| `EARNINGS RECORD` | Finnhub | `FINNHUB_API_KEY` | single names |
+
+<Note>
+  **A key is a way to see more, never a thing the system depends on.** With a
+  key unset nothing is fetched and that section is simply not there — the same
+  state as a ticker with no energy exposure. Running with none of the four is
+  a supported configuration and is tested.
+</Note>
+
+## The sections
+
+<AccordionGroup>
+  <Accordion title="ENERGY INVENTORIES — orchestrator/energy.py" icon="oil-well">
+    How much oil and gas is actually sitting in tanks. Every Wednesday the
+    Energy Information Administration publishes what the United States is
+    holding — and for an oil or gas fund this is not background, it is *the*
+    scheduled event of the week, the one release that reliably moves the
+    price. Until this existed the model was being asked to judge USO with a
+    chart and a day of headlines.
+
+    Four series:
+
+    - **Crude** — commercial stocks, excluding the Strategic Petroleum
+      Reserve. The headline number.
+    - **Petrol** and **diesel** — what the refineries made of it. These move
+      the refiners and the broad energy sector even when crude does not.
+    - **Natural gas** — working gas in underground storage in the Lower 48.
+      In summer the weekly figure is an injection and in winter a withdrawal,
+      and the *sign flip* is the seasonal story.
+
+    Three numbers each, for the same reason as the CFTC block: what is held,
+    what changed on the week, and where that level sits against its own past
+    year — because "424 million barrels" means nothing to anyone who does not
+    already know the range.
+
+    A build is more supply than demand and a draw is the reverse, so a build
+    reads bearish and a draw bullish. The prompt says this is a rule of thumb
+    rather than a law, and reminds the model that the market has already seen
+    the number.
+  </Accordion>
+
+  <Accordion title="CROP CONDITION — orchestrator/crops.py" icon="wheat-awn">
+    A grain fund tracks one thing: how much of the crop there will be. The
+    USDA publishes exactly that — weekly condition ratings through the
+    growing season, county by county, aggregated nationally, free.
+
+    The measure is the share of the crop rated **good or excellent**. It is
+    the number the grain trade quotes, it is comparable week to week, and its
+    *direction* is the signal: a crop deteriorating three weeks running is a
+    supply story whatever the level.
+
+    <Warning>
+      **A seasonal source fails in a nastier way than a gap.** Condition is
+      reported while the crop is in the ground and not at all outside that
+      window — so out of season the section must be absent rather than
+      showing a stale summer reading as though it were news.
+
+      That much is straightforward. This is not: USDA labels winter wheat by
+      its **harvest** year, so in September a request for 2026 returns
+      `WEEK #47` — a week that has not happened yet in 2026, because the
+      reading is from November of the year before. Printed as "week 47 of
+      2026" it reads as the freshest number in the block while being ten
+      months old.
+
+      Every reading is therefore aged against the calendar, wrapping the
+      year, and anything older than five weeks is dropped. That correctly
+      leaves wheat with no section between seasons.
+    </Warning>
+
+    The prompt states the other limit plainly: these are published on a
+    schedule everyone trades, so the edge, if any, is in the trend and the
+    comparison to the same week last year — not in the number itself.
+  </Accordion>
+
+  <Accordion title="MACRO, the FRED half — orchestrator/fred.py" icon="landmark">
+    [`MACRO`](/orchestrator/fund-context) is four lines of prices without a
+    key and six with one. The two extra lines are what the statistical
+    agencies measured:
+
+    | number | why it is here |
+    | --- | --- |
+    | **Inflation** | CPI year on year, requested as `pc1` so the percentage arrives already computed — deriving it here from index levels would make an off-by-one month invisible and wrong |
+    | **Unemployment** | the rate; monthly, and the single most watched release there is |
+    | **Jobless claims** | weekly first-time claims — the only one of these that is *fresh*; the others describe last month, this describes last week |
+    | **Policy rate** | the upper limit of the Fed's target range: what the Fed has actually set, against which the three-month yield is the market's opinion |
+    | **Breakeven** | what the market expects inflation to average over ten years, read off the gap between nominal and inflation-linked Treasuries — backward-looking CPI says what happened, this says what is priced |
+  </Accordion>
+
+  <Accordion title="EARNINGS RECORD — orchestrator/earnings.py" icon="receipt">
+    Whether this company beats its own guidance, and by how much.
+
+    The company block already carries what analysts *expect*. It said nothing
+    about the one thing that predicts whether an expectation will be met: the
+    company's own record of meeting them. A business that has beaten four
+    quarters running and one that has missed four are priced by the same
+    consensus and are not the same bet.
+
+    Finnhub publishes the surprise history free — actual against estimate, by
+    quarter — and covers the non-US lines on this watchlist, which is what
+    decided it over the alternatives. ASML and TEVA both return full
+    histories; that was checked against the live API rather than assumed.
+
+    <Note>
+      **It is a heading of its own, and that was the deliberate part.** This
+      is the single addition to a single name's context since the replay and
+      sanity baselines were set, so a company's prompt carries five headings
+      without a Finnhub key and six with one.
+
+      Hiding the extra lines inside `FUNDAMENTALS` would have kept the
+      heading count unchanged, which was briefly the plan. It is the wrong
+      trade: if the input is changing, the change should be visible in the
+      shape of the question rather than buried in an existing answer. A test
+      pins both lists.
+    </Note>
+  </Accordion>
+</AccordionGroup>
+
+## One module reads the keys
+
+Every fetch above lives in `orchestrator/sources.py`, and the parsing modules
+stay what their siblings are — pure functions over payloads handed to them.
+
+This is not tidiness. Two CI guardrails hold every module under
+`orchestrator/` to reading no credentials, with a short allowlist for the ones
+that must, because **these modules assemble the text sent to a language model,
+and the signal journal they feed is committed to the repository every cycle.**
+A key that reached a snapshot would reach a prompt, and then a public git
+history.
+
+Three rules, each with a test behind it:
+
+- **A key goes into a request and nowhere else.** Never into a return value,
+  never into a log line, never into an exception message that is logged. These
+  APIs echo the query string back in their error bodies, so only exception
+  *types* are ever recorded.
+- **Nothing here formats or persists.** No rendering helpers, no file writes.
+  A guardrail greps the file to keep it that way.
+- **No key is a state, not a failure.** Every function returns empty and the
+  caller omits the section.
+
+## Checking them without guessing
+
+None of this can be verified from a development container — the endpoints are
+unreachable from it, and a mock proves only that the parser works on what the
+test author imagined. The **data sources** workflow runs the real thing on a
+GitHub runner:
+
+```
+Actions → data sources → Run workflow
+```
+
+It reports which spelling of each secret carried a key (never the key), then
+renders each block exactly as the model would read it. A key that answers and
+a section that renders correctly are two different things, and the fund block
+taught us which one costs more to get wrong. See
+[Continuous Integration](/continuous-integration).

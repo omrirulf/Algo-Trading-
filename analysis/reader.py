@@ -36,6 +36,27 @@ SCORE_FIELDS = (
     "insider_score",
 )
 
+#: Which context sections a score is allowed to be read from. A score whose
+#: every source was absent from the prompt has nothing behind it, whatever
+#: number the model put there. The cycle nulls such a score before it is
+#: journalled; the trainer applies the same rule to lines written before it
+#: did. One definition, so the two can never drift apart.
+#:
+#: A company's analyst read comes from its own coverage; a fund's from the
+#: roll-up over what it holds. A company's behaviour signal is Form 4
+#: filings; a fund's is who is positioned how, or money moving in and out.
+#: A bond fund has neither: nobody rates a bond on a buy-to-sell scale, and
+#: no insider files a Form 4 for it.
+SCORE_SOURCES: dict[str, tuple[str, ...]] = {
+    "analyst_score": ("analysts", "holdings"),
+    "insider_score": ("insiders", "positioning", "flows"),
+}
+
+#: Every context section named as some score's source.
+SOURCE_SECTIONS: frozenset[str] = frozenset(
+    name for sources in SCORE_SOURCES.values() for name in sources
+)
+
 #: Format of the logging module's ``asctime``, used by journal lines written
 #: before ``ts_utc`` existed. It carries no offset, so it is read as UTC and
 #: flagged; see ``JournalEntry.timestamp_is_exact``.
@@ -66,6 +87,32 @@ class JournalEntry:
     #: ATR(14) as a share of price at signal time, from the journalled
     #: technicals. What the trainer scales a return by.
     atr_pct: Optional[float] = None
+    #: Source sections the prompt actually carried, out of ``SOURCE_SECTIONS``.
+    #: ``None`` on a line that journalled no context at all: an empty set says
+    #: the prompt offered nothing, ``None`` says the line cannot tell us, and
+    #: the two must not be confused -- one nulls a score, the other must not.
+    sections: Optional[frozenset[str]] = None
+
+    def scores_with_a_source(self) -> dict[str, Optional[float]]:
+        """The line's scores, with any score that had no source read as null.
+
+        The cycle nulls these before journalling them (``heartbeat``), but
+        lines written before it did carry the model's own number -- usually
+        0.0, sometimes a confident direction -- for a dimension the prompt
+        never showed it. Read from the context the line itself recorded, so
+        it is the evidence that decides, not the date.
+        """
+        if self.sections is None:
+            return dict(self.scores)
+        return {
+            name: (
+                None
+                if name in SCORE_SOURCES
+                and not (self.sections & set(SCORE_SOURCES[name]))
+                else value
+            )
+            for name, value in self.scores.items()
+        }
 
     @property
     def has_signal(self) -> bool:
@@ -81,7 +128,12 @@ class JournalEntry:
         return {"BULLISH": 1, "BEARISH": -1}.get(self.bias or "", 0)
 
     def available_scores(self) -> dict[str, float]:
-        return {name: value for name, value in self.scores.items() if value is not None}
+        """The scores that are actually usable: not null, and not sourceless."""
+        return {
+            name: value
+            for name, value in self.scores_with_a_source().items()
+            if value is not None
+        }
 
     @property
     def composite(self) -> Optional[float]:
@@ -199,7 +251,16 @@ def entry_from(payload: Any) -> Optional[JournalEntry]:
         blend=payload.get("blend") if isinstance(payload.get("blend"), dict) else {},
         model=_text(usage.get("model")),
         atr_pct=_number(technicals.get("atr_pct_of_price")),
+        sections=_sections(payload),
     )
+
+
+def _sections(payload: dict) -> Optional[frozenset[str]]:
+    """Which source sections the journalled context carried, if it carried one."""
+    context = payload.get("context")
+    if not isinstance(context, dict):
+        return None
+    return frozenset(name for name in SOURCE_SECTIONS if context.get(name))
 
 
 def parse_timestamp(payload: dict) -> tuple[Optional[datetime], bool]:
