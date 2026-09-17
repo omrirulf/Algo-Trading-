@@ -104,6 +104,22 @@ jobs:
             echo "::error::broker_client.py must not be able to flatten the book or cancel every order"
             exit 1
           fi
+          # A standalone stop is the fourth primitive, and it is close-only
+          # only because broker_client.py reads the book and refuses anything
+          # that is not a reduction. So it, too, may be built in one file only.
+          stops=$(grep -rnE 'StopOrderRequest\(' \
+                    app orchestrator config analysis store backtest replay learn --include='*.py' \
+                  | grep -v '^app/broker_client.py:' || true)
+          if [ -n "$stops" ]; then
+            echo "$stops"
+            echo "::error::a stop order is constructed outside app/broker_client.py"
+            exit 1
+          fi
+          if ! grep -qE 'time_in_force=TimeInForce\.GTC' app/broker_client.py \
+             || grep -qE 'time_in_force=TimeInForce\.DAY' app/broker_client.py; then
+            echo "::error::every stop must be good-till-cancelled; a DAY stop dies at the close and protects nothing overnight"
+            exit 1
+          fi
           naked=$(grep -rnE 'MarketOrderRequest\(' app --include='*.py' | grep -v 'stop_loss' || true)
           # The request is built across lines; check the constructor's block carries stop_loss.
           if ! grep -qE 'stop_loss=StopLossRequest' app/broker_client.py; then

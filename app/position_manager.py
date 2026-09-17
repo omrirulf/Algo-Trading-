@@ -18,13 +18,21 @@ is the only exit. Rungs and trail both raise the stop; nothing ever lowers it.
 
 What this module cannot do, by construction
 -------------------------------------------
-It reaches the broker through exactly three primitives -- read a stop,
-replace a stop, close *part* of a position -- and the close is Alpaca's own
-close-only endpoint. There is no path here that opens, adds to, or reverses
-a position, so the rule that every entry is a bracket with a stop is not
-weakened by the existence of exits. A position with no live stop is not
-managed at all: it is reported, and left exactly as found, because acting on
-an unprotected position is the one thing this must never make worse.
+It reaches the broker through exactly four primitives -- read a stop,
+replace a stop, close *part* of a position, and place a stop on a position
+that has none -- and every one of them can only reduce a position. There is
+no path here that opens, adds to, or reverses one, so the rule that every
+entry is a bracket with a stop is not weakened by the existence of exits.
+
+The fourth was added on 17 Sep, and it reversed an earlier rule. This module
+used to leave a position with no live stop exactly as found, on the grounds
+that acting on an unprotected position could only make things worse. That
+held while stops were assumed to exist; the day it was measured, eleven of
+twelve positions had none -- the bracket's DAY stop leg had expired at each
+close and nothing put one back -- and "leave it as found" meant "leave it
+unprotected, indefinitely". So a position found without a stop is now given
+one at the last level the record says it had, and only then managed. The
+stop is the only exit; a position without one is not being managed at all.
 
 Where the state lives
 ---------------------
@@ -61,7 +69,8 @@ EVENT = "position_managed"
 TRANCHE_TAKEN = "tranche_taken"   #: part of it sold, stop raised
 STOP_RAISED = "stop_raised"       #: a rung reached, stop raised, nothing sold (too small to split)
 HELD = "held"                     #: checked, no rung reached
-UNMANAGED = "unmanaged"           #: left alone and said so -- no live stop
+UNMANAGED = "unmanaged"           #: (historical) left alone -- no live stop; no longer emitted
+PROTECTED = "protected"           #: had no live stop; one was placed at the last recorded level
 ERROR = "error"                   #: the broker or market data refused; nothing was done
 
 #: Actions that mean "this rung has been dealt with", for counting on re-run.
@@ -115,6 +124,10 @@ class ManagementReport:
         return self._count(UNMANAGED)
 
     @property
+    def protected(self) -> int:
+        return self._count(PROTECTED)
+
+    @property
     def errors(self) -> int:
         return self._count(ERROR)
 
@@ -125,6 +138,7 @@ class ManagementReport:
             "tranches": self.tranches,
             "stops_raised": self.raises,
             "unmanaged": self.unmanaged,
+            "protected": self.protected,
             "errors": self.errors,
             "actions": [a.as_dict() for a in self.actions],
         }
@@ -151,8 +165,37 @@ def ladder_history(ticker: str, audit_path: Path) -> tuple[Optional[dict], list[
     Unreadable or malformed lines are skipped; the audit log must not be able
     to take the cycle down.
     """
+    entry, actions = _history(ticker, audit_path)
+    rungs = [
+        a for a in actions
+        if a.get("action") in _RUNG_COMPLETING and isinstance(a.get("rung"), int)
+    ]
+    return entry, rungs
+
+
+def last_recorded_stop(ticker: str, audit_path: Path) -> Optional[float]:
+    """The stop the record says this position last had, or ``None`` with no entry.
+
+    The most recent ``new_stop`` any management pass wrote after the latest
+    entry -- a rung, a trail, or an earlier protection -- and failing that the
+    entry's own stop. This is what a position gets back when the broker has
+    lost its stop: not a fresh guess, but the level the system had already
+    decided on and recorded, which a lost order does not un-decide.
+    """
+    entry, actions = _history(ticker, audit_path)
+    for action in reversed(actions):
+        stop = action.get("new_stop")
+        if isinstance(stop, (int, float)) and not isinstance(stop, bool) and stop > 0:
+            return float(stop)
+    if entry is not None:
+        return float(entry["stop_price"])
+    return None
+
+
+def _history(ticker: str, audit_path: Path) -> tuple[Optional[dict], list[dict]]:
+    """The latest ``ACCEPTED`` entry for ``ticker`` and every management record after it."""
     entry: Optional[dict] = None
-    rungs: list[dict] = []
+    actions: list[dict] = []
     try:
         text = audit_path.read_text(encoding="utf-8")
     except OSError:
@@ -182,16 +225,12 @@ def ladder_history(ticker: str, audit_path: Path) -> tuple[Optional[dict], list[
                 and isinstance(result.get("stop_price"), (int, float))
             ):
                 entry = result
-                rungs = []
+                actions = []
         elif event == EVENT:
             action = record.get("action") or {}
-            if (
-                str(action.get("ticker") or "").upper() == symbol
-                and action.get("action") in _RUNG_COMPLETING
-                and isinstance(action.get("rung"), int)
-            ):
-                rungs.append(action)
-    return entry, rungs
+            if str(action.get("ticker") or "").upper() == symbol:
+                actions.append(action)
+    return entry, actions
 
 
 def _record(action: ManagementAction) -> None:
@@ -226,10 +265,18 @@ class PositionManager:
         self._audit_path = audit_path
         self._ladder = ladder
 
-    def manage(self) -> ManagementReport:
-        """One pass over every open position. Never raises."""
+    def manage(self, protect_only: bool = False) -> ManagementReport:
+        """One pass over every open position. Never raises.
+
+        ``protect_only`` does one thing and skips the market-hours gate to do
+        it: any position with no live stop gets one, at the last recorded
+        level, and nothing else is touched. A protective stop is the one order
+        that is *more* useful placed after the close than before -- a GTC stop
+        submitted overnight is live at the open, which is exactly when a
+        position that lost its stop yesterday is exposed.
+        """
         try:
-            if not self._broker.is_market_open():
+            if not protect_only and not self._broker.is_market_open():
                 return ManagementReport(market_closed=True)
             positions = self._broker.get_open_positions()
         except BrokerError as exc:
@@ -240,7 +287,10 @@ class PositionManager:
         actions: list[ManagementAction] = []
         for position in positions:
             try:
-                actions += self._manage_one(position)
+                if protect_only:
+                    actions += self._protect_if_naked(position)
+                else:
+                    actions += self._manage_one(position)
             except (BrokerError, MarketDataError, risk_engine.RiskViolation) as exc:
                 action = ManagementAction(
                     ticker=position.ticker, action=ERROR, side=position.side,
@@ -285,6 +335,38 @@ class PositionManager:
             estimated = True
         return LadderState(entry_price, r, base_qty, rungs_taken, estimated)
 
+    def _protect_if_naked(self, position: OpenPosition) -> list[ManagementAction]:
+        qty = int(abs(position.qty))
+        if qty < 1 or self._broker.get_open_stop_order(position.ticker) is not None:
+            return []
+        return [self._protect(position, qty)]
+
+    def _protect(self, position: OpenPosition, qty: int) -> ManagementAction:
+        """Place the stop the record says this position should have."""
+        ticker, side = position.ticker, position.side
+        closing = "sell" if side == "buy" else "buy"
+        recorded = last_recorded_stop(ticker, self._audit_path)
+        if recorded is not None:
+            stop, estimated = recorded, False
+            reason = "no live stop order; placed one at the last recorded level"
+        else:
+            # Nothing on record -- a position opened outside this system, or
+            # before the audit log. The initial stop's own formula, from
+            # today's price and ATR, and said so.
+            price = self._market_data.get_latest_price(ticker)
+            atr = self._market_data.get_atr(ticker)
+            stop = risk_engine.calculate_stop_price(price, atr, side)
+            estimated = True
+            reason = "no live stop order and no record; placed one at ATR distance from the last price"
+        placed = self._broker.submit_stop_order(ticker, qty, closing, stop)
+        action = ManagementAction(
+            ticker=ticker, action=PROTECTED, side=side, remaining_qty=qty,
+            old_stop=None, new_stop=placed.stop_price, order_id=placed.order_id,
+            r_estimated=estimated, reason=reason,
+        )
+        _record(action)
+        return action
+
     def _manage_one(self, position: OpenPosition) -> list[ManagementAction]:
         ticker, side = position.ticker, position.side
         qty = int(abs(position.qty))
@@ -293,12 +375,10 @@ class PositionManager:
 
         stop = self._broker.get_open_stop_order(ticker)
         if stop is None:
-            action = ManagementAction(
-                ticker=ticker, action=UNMANAGED, side=side, remaining_qty=qty,
-                reason="no live stop order; left untouched",
-            )
-            _record(action)
-            return [action]
+            # Protect first; manage next cycle. A position with no stop is
+            # not being managed at all, and putting the stop back is the whole
+            # of what this pass owes it.
+            return [self._protect(position, qty)]
 
         state = self._state_for(position, qty)
         price = self._market_data.get_latest_price(ticker)
@@ -388,13 +468,19 @@ def main(argv: Optional[list[str]] = None) -> int:
     """Run one management pass against the paper account, in this process."""
     parser = argparse.ArgumentParser(description="Walk open positions up the profit ladder once.")
     parser.add_argument("--json", action="store_true", dest="as_json")
+    parser.add_argument(
+        "--protect-only", action="store_true",
+        help="only place a stop on any position that has none; works after hours",
+    )
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
     from app.broker_client import AlpacaPaperBroker
     from app.market_data import YFinanceMarketData
 
-    report = PositionManager(AlpacaPaperBroker(), YFinanceMarketData()).manage()
+    report = PositionManager(AlpacaPaperBroker(), YFinanceMarketData()).manage(
+        protect_only=args.protect_only
+    )
     if args.as_json:
         print(json.dumps(report.as_dict(), indent=2))
     else:
@@ -408,7 +494,8 @@ def render(report: ManagementReport) -> str:
         return "Market closed; positions not touched."
     lines = [
         f"{report.positions_seen} open position(s): {report.tranches} tranche(s) sold, "
-        f"{report.raises} stop(s) raised, {report.unmanaged} unmanaged, {report.errors} error(s)."
+        f"{report.raises} stop(s) raised, {report.protected} protected, "
+        f"{report.unmanaged} unmanaged, {report.errors} error(s)."
     ]
     for a in report.actions:
         if a.action == TRANCHE_TAKEN:
@@ -420,15 +507,17 @@ def render(report: ManagementReport) -> str:
             lines.append(f"  {a.ticker}: +{a.gain_r:.2f}R -> stop {a.old_stop:.2f} -> {a.new_stop:.2f} ({a.reason})")
         elif a.action == HELD:
             lines.append(f"  {a.ticker}: {a.gain_r:+.2f}R, holding {a.remaining_qty}; stop {a.old_stop:.2f}")
+        elif a.action == PROTECTED:
+            lines.append(f"  {a.ticker}: no stop found -> placed at {a.new_stop:.2f} ({a.reason})")
         else:
             lines.append(f"  {a.ticker}: {a.action} -- {a.reason}")
     return "\n".join(lines)
 
 
 __all__ = [
-    "EVENT", "TRANCHE_TAKEN", "STOP_RAISED", "HELD", "UNMANAGED", "ERROR",
+    "EVENT", "TRANCHE_TAKEN", "STOP_RAISED", "HELD", "UNMANAGED", "PROTECTED", "ERROR",
     "ManagementAction", "ManagementReport", "LadderState", "PositionManager",
-    "ladder_history", "render", "main",
+    "ladder_history", "last_recorded_stop", "render", "main",
 ]
 
 

@@ -574,7 +574,7 @@ def render_positions(positions: dict | None) -> list[str]:
     out = [
         f"**Open positions:** {seen} checked · {positions.get('tranches', 0)} tranche(s) sold · "
         f"{positions.get('stops_raised', 0)} stop(s) raised · "
-        f"{positions.get('unmanaged', 0)} left alone (no stop) · {positions.get('errors', 0)} error(s)",
+        f"{positions.get('protected', 0)} given a stop · {positions.get('errors', 0)} error(s)",
         "",
     ]
     rows = []
@@ -851,11 +851,31 @@ def manage_positions(dispatcher: Dispatcher) -> dict | None:
         log.warning("position management reported an error: %s", outcome["error"])
     elif isinstance(outcome, dict):
         log.info(
-            "positions: %s seen, %s tranche(s) sold, %s stop(s) raised, %s unmanaged",
+            "positions: %s seen, %s tranche(s) sold, %s stop(s) raised, %s given a stop",
             outcome.get("positions_seen", 0), outcome.get("tranches", 0),
-            outcome.get("stops_raised", 0), outcome.get("unmanaged", 0),
+            outcome.get("stops_raised", 0), outcome.get("protected", 0),
         )
     return outcome
+
+
+def protect_positions(dispatcher: Dispatcher | None = None) -> dict:
+    """Give every open position that has no stop one back, and nothing else.
+
+    The one job that is worth running after the close: a GTC stop submitted
+    overnight is live at the open. Reports rather than raises, and the report
+    says whether anything is still unprotected, because the caller's exit
+    code has to.
+    """
+    dispatcher = dispatcher or build_dispatcher()
+    manage = getattr(dispatcher, "manage_positions", None)
+    if manage is None:
+        return {"error": "this dispatcher cannot manage positions"}
+    try:
+        return manage(protect_only=True)
+    except TypeError as exc:
+        return {"error": f"this dispatcher cannot protect positions: {exc}"}
+    except Exception as exc:  # noqa: BLE001
+        return {"error": f"{type(exc).__name__}: {exc}"}
 
 
 def run_cycle(dispatcher: Dispatcher | None = None) -> CycleReport:
@@ -930,9 +950,34 @@ def main(argv: list[str] | None = None) -> None:
             "process must terminate or the job never finishes."
         ),
     )
+    parser.add_argument(
+        "--protect-only",
+        action="store_true",
+        help=(
+            "Place a stop on every open position that has none, then exit. "
+            "No signals, no model, no new trades. Works after the close."
+        ),
+    )
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
+    if args.protect_only:
+        outcome = protect_positions()
+        print(json.dumps(outcome, indent=2))
+        summary = os.environ.get("GITHUB_STEP_SUMMARY")
+        if summary:
+            with open(summary, "a", encoding="utf-8") as handle:
+                handle.write(
+                    f"## Protect-only pass\n\n{outcome.get('positions_seen', 0)} position(s) seen, "
+                    f"{outcome.get('protected', 0)} given a stop, {outcome.get('errors', 0)} error(s)."
+                    + (f"\n\n**{outcome['error']}**" if outcome.get("error") else "") + "\n"
+                )
+        # Loud on purpose: the only reason to run this is that positions were
+        # unprotected, so a pass that could not protect one is a failure.
+        if outcome.get("error") or outcome.get("errors"):
+            raise SystemExit(1)
+        return
 
     if args.once:
         report = run_cycle()

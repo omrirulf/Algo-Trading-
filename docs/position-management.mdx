@@ -89,27 +89,38 @@ shaken out by an ordinary pullback.
 
 ## What it cannot do, by construction
 
-The manager reaches the broker through exactly three primitives:
+The manager reaches the broker through exactly four primitives:
 
 | Primitive | Alpaca call | Can it open or enlarge a position? |
 |---|---|---|
 | read the live stop | `get_orders` | no |
 | replace the stop | `replace_order_by_id` | no |
 | close *part* of a position | `close_position(qty=N)` | **no — close-only by the broker's definition** |
+| put a missing stop back | `submit_order(StopOrderRequest)` | **no — refused unless it can only reduce a position the book already holds** |
 
 `DELETE /v2/positions/{symbol}?qty=N` reduces the named position and cannot
 open, add to, or reverse one. That property is what lets a partial exit exist
 at all without weakening the rule that every *entry* is a bracket with a
 stop: a `MarketOrderRequest` without `stop_loss` is still never constructed
-anywhere in the codebase, and CI checks both that and that these three calls
+anywhere in the codebase, and CI checks both that and that these four calls
 exist in `app/broker_client.py` and nowhere else.
 
+A standalone stop is not close-only the way `close_position` is — a stop
+*sell* for a symbol nobody holds would open a short. So the broker client
+reads the book first and refuses the order unless the position exists, the
+side is the one that closes it, and the quantity is no more than it holds.
+
 <Warning>
-  **A position with no live stop is not managed.** It is reported as
-  *unmanaged* and left exactly as found. Acting on an unprotected position is
-  the one thing the ladder must never make worse, so it does nothing to it —
-  and the daily report says so, because a position in that state deserves a
-  human's eyes.
+  **A position with no live stop gets one back, and nothing else.** Until
+  17 Sep 2026 it was reported as *unmanaged* and left exactly as found. That
+  morning eleven of twelve open positions had no stop: the bracket's stop leg
+  had been a *day* order, the broker cancelled it at the close, and "leave it
+  alone" meant leaving it naked for the whole session. Now the manager places
+  a stop at the level the audit log last recorded for the trade — the entry
+  stop, or the last rung or trail that moved it — and, for a position with no
+  record at all, at the entry formula's ATR distance from the last price,
+  saying in the record that it was estimated. The ladder itself waits for the
+  next pass. Every stop, the bracket's leg included, is now good-till-cancelled.
 </Warning>
 
 ## Protect first, then sell
@@ -179,7 +190,15 @@ had never once run in live conditions.
 ```bash
 python -m app.position_manager          # one pass, in this process
 python -m app.position_manager --json
+python -m app.position_manager --protect-only   # only put missing stops back
 ```
+
+The protection pass is the one thing worth running after the close: a
+good-till-cancelled stop placed overnight is live at the open. It skips the
+market-hours gate, touches nothing that already has a stop, and exits
+non-zero if any position is still without one when it is done. On GitHub,
+run the **heartbeat** workflow by hand with `mode` set to `protect`; the
+audit log it writes is committed like a cycle's.
 
 Behind the webhook it is `POST /webhook/positions/manage`, same secret as the
 signal endpoint, no body — there is nothing a caller could say that should
@@ -193,6 +212,7 @@ from the same audit records, in plain words:
 ```
 | Eli Lilly (LLY) · Company | Sold part. Sold 1 of 4 shares at +1.02R, 3 still held. Stop-loss raised 1079.13 → 1142.29. |
 | Gold (GLD) · Commodity    | Holding. +0.31R, holding 12 shares. Stop-loss 310.50. |
+| Exxon (XOM) · Company     | Stop placed. Had no stop-loss order, so a new one was placed at 96.00 (from the trade's own record). |
 ```
 
 Sold and flagged rows come first; the merely-held ones after.

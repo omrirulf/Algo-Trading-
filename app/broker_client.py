@@ -165,13 +165,15 @@ class BrokerClient(Protocol):
         self, ticker: str, qty: int, side: str, stop_price: float
     ) -> SubmittedOrder: ...
 
-    # --- position management: the only three things the ladder may do ---
+    # --- position management: the only four things the ladder may do ---
 
     def get_open_stop_order(self, ticker: str) -> Optional[StopOrder]: ...
 
     def replace_stop_order(self, order_id: str, qty: int, stop_price: float) -> StopOrder: ...
 
     def close_position_partially(self, ticker: str, qty: int) -> str: ...
+
+    def submit_stop_order(self, ticker: str, qty: int, side: str, stop_price: float) -> StopOrder: ...
 
 
 def cli_config_dir() -> Path:
@@ -370,7 +372,14 @@ class AlpacaPaperBroker:
             qty=int(qty),
             side=OrderSide.BUY if side == "buy" else OrderSide.SELL,
             type=OrderType.MARKET,
-            time_in_force=TimeInForce.DAY,
+            # Good-till-cancelled, and the reason is a day's evidence: with
+            # DAY, Alpaca cancels the unfilled stop leg at the close, so every
+            # position opened before today woke up with no stop at all. The
+            # market parent fills at once either way; the TIF only ever
+            # governs the stop, and a stop that expires nightly protects
+            # nothing overnight -- which is the only time it cannot be
+            # watched.
+            time_in_force=TimeInForce.GTC,
             order_class=OrderClass.OTO,
             stop_loss=StopLossRequest(stop_price=stop_price),
             client_order_id=client_order_id,
@@ -505,3 +514,75 @@ class AlpacaPaperBroker:
         except Exception as exc:  # noqa: BLE001
             raise BrokerError(f"close_position failed for {symbol}: {exc}") from exc
         return str(getattr(order, "id", "") or "")
+
+    def submit_stop_order(self, ticker: str, qty: int, side: str, stop_price: float) -> StopOrder:
+        """Give a position that has no stop one back. Close-only by construction.
+
+        A stop order on its own is *not* close-only the way ``close_position``
+        is: a STOP sell for a symbol nobody holds would open a short. So the
+        book is read first and the order is refused unless it can only reduce
+        an existing position -- the position exists, ``side`` is the side that
+        closes it, and ``qty`` is no more than it holds. That check is what lets
+        a fourth primitive exist without weakening the rule that nothing here
+        opens, adds to, or reverses a position.
+
+        Good-till-cancelled, because a DAY stop is exactly how eleven of twelve
+        positions came to have none: the bracket's leg expired at the close and
+        nothing put one back. Idempotent within the heartbeat window through
+        the same client-order-id mechanism as an entry, so a retry after a lost
+        response finds the stop it already placed rather than placing a second.
+        """
+        from alpaca.trading.enums import OrderSide, TimeInForce
+        from alpaca.trading.requests import StopOrderRequest
+
+        symbol = ticker.strip().upper()
+        if qty < 1 or int(qty) != qty:
+            raise BrokerError(f"qty must be a positive whole number, got {qty}")
+        if stop_price <= 0:
+            raise BrokerError(f"stop_price must be positive, got {stop_price}")
+        if side not in ("buy", "sell"):
+            raise BrokerError(f"side must be 'buy' or 'sell', got {side!r}")
+
+        held = next((p for p in self.get_open_positions() if p.ticker == symbol), None)
+        if held is None:
+            raise BrokerError(f"refusing a stop for {symbol}: there is no open position to protect")
+        closing = "sell" if held.qty > 0 else "buy"
+        if side != closing:
+            raise BrokerError(
+                f"refusing a stop for {symbol}: side {side!r} would not close a "
+                f"{'long' if held.qty > 0 else 'short'} position"
+            )
+        if qty > abs(held.qty):
+            raise BrokerError(
+                f"refusing a stop for {symbol}: {int(qty)} exceeds the {int(abs(held.qty))} held"
+            )
+
+        client_order_id = build_client_order_id(symbol, f"protect-{side}")
+        request = StopOrderRequest(
+            symbol=symbol,
+            qty=int(qty),
+            side=OrderSide.SELL if side == "sell" else OrderSide.BUY,
+            time_in_force=TimeInForce.GTC,
+            stop_price=stop_price,
+            client_order_id=client_order_id,
+        )
+        try:
+            order = self._client.submit_order(request)
+        except Exception as exc:  # noqa: BLE001
+            if _is_duplicate_rejection(exc):
+                existing = self.get_open_stop_order(symbol)
+                if existing is not None:
+                    return existing
+                raise DuplicateOrderError(
+                    f"{symbol} protective stop was already submitted this window "
+                    f"(client_order_id {client_order_id}) but cannot be found: {exc}"
+                ) from exc
+            raise BrokerError(f"submit_order (stop) failed for {symbol}: {exc}") from exc
+        placed = getattr(order, "stop_price", None)
+        return StopOrder(
+            order_id=str(order.id),
+            ticker=symbol,
+            qty=int(qty),
+            stop_price=float(placed if placed is not None else stop_price),
+            side=side,
+        )

@@ -206,16 +206,21 @@ def test_the_stop_is_never_lowered(broker, market, audit):
     assert broker.closed == [{"ticker": "LLY", "qty": 3}]  # the tranche still goes
 
 
-def test_a_position_with_no_live_stop_is_left_exactly_as_found(broker, market, audit):
-    enter(broker, audit)
+def test_a_position_with_no_live_stop_is_given_one_and_nothing_else(broker, market, audit):
+    """17 Sep 2026: eleven positions woke up without a stop. The manager now
+    places one from the trade's own record instead of leaving it alone; the
+    ladder itself waits for the next pass, so nothing is sold or replaced."""
+    enter(broker, audit)  # entry stop 96.0 is in the audit log
     del broker.stop_orders["LLY"]
     market.price = 1000.0
     report = manager(broker, market, audit).manage()
     [action] = report.actions
-    assert action.action == pm.UNMANAGED
-    assert "no live stop" in action.reason
+    assert action.action == pm.PROTECTED
+    assert action.new_stop == 96.0 and action.r_estimated is False
+    assert broker.protected == [{"ticker": "LLY", "qty": 9, "side": "sell", "stop_price": 96.0}]
     assert broker.replaced == [] and broker.closed == []
     assert broker.positions[0].qty == 9
+    assert report.protected == 1 and report.unmanaged == 0
 
 
 def test_a_position_too_small_to_split_gets_the_ratchet_only(broker, market, audit):
