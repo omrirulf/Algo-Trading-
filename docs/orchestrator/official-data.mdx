@@ -52,6 +52,29 @@ sources publish what happened, and each needs a key:
     the number.
   </Accordion>
 
+  <Accordion title="PRICE OUTLOOK — orchestrator/outlook.py" icon="chart-line">
+    Where the official forecaster says the price is going. Every month the
+    EIA's Short-Term Energy Outlook forecasts the spot prices the energy
+    funds track — WTI and Brent crude, Henry Hub gas — about eighteen months
+    ahead. It is the number the trade quotes when it says "EIA sees oil at
+    sixty next year", and it uses the same key as the inventories.
+
+    The block reads, per series: this month's figure, three and six months
+    out, next calendar year's average, and the direction those imply in one
+    phrase — *seen to fall about 9% over six months*. Three horizons rather
+    than one because a forecast that dips and recovers and one that falls all
+    the way are different stories at the same six-month point.
+
+    Two limits, stated in the prompt: it is one agency's view and the market
+    has read it, so the direction and the gap to today's price are what to
+    weigh, never the level; and it is monthly, so it carries no "on the week"
+    figures. A payload without this month, or without any month ahead of it,
+    is no block at all — a forecast that cannot say "from here" is not one.
+
+    The same four funds see it as see the inventories (USO, UNG, XLE, DBC),
+    and for the same reason.
+  </Accordion>
+
   <Accordion title="CROP CONDITION — orchestrator/crops.py" icon="wheat-awn">
     A grain fund tracks one thing: how much of the crop there will be. The
     USDA publishes exactly that — weekly condition ratings through the
@@ -127,6 +150,31 @@ sources publish what happened, and each needs a key:
     </Note>
   </Accordion>
 </AccordionGroup>
+
+## The rate path
+
+The MACRO block gained a third official line on 17 Sep 2026, from one more
+FRED series on the same key: the **two-year Treasury yield** (`DGS2`). The
+two-year is, near enough, the market's average expected policy rate over the
+next two years; against the middle of the Fed's target range (from
+`DFEDTARU`, which already shipped) it says how many quarter-point moves the
+bond market has priced, and in which direction:
+
+```
+Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+```
+
+A bond fund and the dollar are bets on exactly this, and the prompt says so.
+Fewer than half a move either way reads as "roughly no change". The line
+needs both ends: with either series missing it is left out, not guessed.
+
+<Note>
+  Measured against the **target**, not the effective overnight rate. The
+  effective rate (`DFF`) was tried first, and on the day it was tried the
+  proof run returned it 37 basis points below the target's own floor and 34
+  below the three-month bill in the same block. A path measured from a number
+  the block itself contradicts is not a path, so the series was dropped.
+</Note>
 
 ## One module reads the keys
 

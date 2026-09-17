@@ -783,7 +783,7 @@ def test_the_four_numbers_sections_all_feed_the_same_score():
     the model will pick one at random."""
     prompt = hb.system_prompt_for("XLE").replace("\n", " ")
     assert ("score fundamental_score from FUND BASICS, COST OF HOLDING, ENERGY "
-            "INVENTORIES and CROP CONDITION, whichever of them are present") in prompt
+            "INVENTORIES, PRICE OUTLOOK and CROP CONDITION, whichever of them are present") in prompt
 
 
 def test_the_macro_block_says_what_the_official_releases_are_for():

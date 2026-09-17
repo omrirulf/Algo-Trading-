@@ -31,7 +31,7 @@ from config import settings as cfg
 from config.instruments import is_fund
 from orchestrator import (
     analysts, carry, crops, earnings, energy, flows, formatting as fmt, fred,
-    fundamentals, funds, holdings, insiders, macro, positioning, sources,
+    fundamentals, funds, holdings, insiders, macro, outlook, positioning, sources,
     technicals,
 )
 from orchestrator.technicals import TechnicalSnapshot
@@ -95,6 +95,8 @@ class RawMarketData:
     earnings_rows: list = field(default_factory=list)
     #: EIA weekly stocks, keyed by series label. Empty without an EIA key.
     energy_payloads: dict[str, Any] = field(default_factory=dict)
+    #: EIA monthly price outlook, keyed by series label. Same key.
+    outlook_payloads: dict[str, Any] = field(default_factory=dict)
     #: USDA condition rows for this season and last. Empty without a key.
     crop_rows: list = field(default_factory=list)
     crop_rows_last_year: list = field(default_factory=list)
@@ -121,6 +123,7 @@ class _SlowData:
     macro_releases: dict[str, Any]
     earnings_rows: list
     energy_payloads: dict[str, Any]
+    outlook_payloads: dict[str, Any]
     crop_rows: list
     crop_rows_last_year: list
     commodity_history: Any
@@ -190,6 +193,7 @@ class YFinanceContextProvider:
             macro_releases=slow.macro_releases,
             earnings_rows=slow.earnings_rows,
             energy_payloads=slow.energy_payloads,
+            outlook_payloads=slow.outlook_payloads,
             crop_rows=slow.crop_rows,
             crop_rows_last_year=slow.crop_rows_last_year,
             commodity_history=slow.commodity_history,
@@ -226,6 +230,7 @@ class YFinanceContextProvider:
                 [] if is_fund(ticker) else sources.fetch_earnings_rows(ticker)
             ),
             energy_payloads=sources.fetch_energy_payloads(ticker),
+            outlook_payloads=sources.fetch_outlook_payloads(ticker),
             crop_rows=sources.fetch_crop_rows(ticker, _this_year()),
             crop_rows_last_year=sources.fetch_crop_rows(ticker, _this_year() - 1),
             commodity_history=self._commodity_history(ticker, gaps),
@@ -504,6 +509,7 @@ ENRICHMENT_SECTIONS = (
     ("POSITIONING (CFTC, weekly)", "positioning"),
     ("COST OF HOLDING (the fund versus the commodity)", "carry"),
     ("ENERGY INVENTORIES (EIA, weekly)", "energy"),
+    ("PRICE OUTLOOK (EIA, official monthly forecast)", "outlook"),
     ("CROP CONDITION (USDA, weekly)", "crops"),
     ("FUND FLOWS (creations and redemptions)", "flows"),
 )
@@ -530,8 +536,8 @@ SINGLE_NAME_ONLY_SECTIONS = frozenset(
 #: and a single-country fund has no futures contract. A fetch that was
 #: attempted and failed still records a gap, so the two cases stay distinct.
 FUND_ONLY_SECTIONS = frozenset(
-    {"funds", "holdings", "macro", "positioning", "flows", "energy", "crops",
-     "carry"}
+    {"funds", "holdings", "macro", "positioning", "flows", "energy", "outlook",
+     "crops", "carry"}
 )
 
 
@@ -574,6 +580,8 @@ class TickerContext:
     earnings: Optional[earnings.EarningsSnapshot] = None
     #: What the United States is holding in tanks. Needs an EIA key.
     energy: Optional[energy.EnergySnapshot] = None
+    #: Where the official forecaster says the price is going. Same key.
+    outlook: Optional[outlook.OutlookSnapshot] = None
     #: How the crop is doing. Needs a USDA key, and a crop in the ground.
     crops: Optional[crops.CropSnapshot] = None
     #: What holding the fund has cost against the commodity itself.
@@ -601,6 +609,7 @@ class TickerContext:
             "macro": self.macro.as_dict() if self.macro else None,
             "earnings": self.earnings.as_dict() if self.earnings else None,
             "energy": self.energy.as_dict() if self.energy else None,
+            "outlook": self.outlook.as_dict() if self.outlook else None,
             "crops": self.crops.as_dict() if self.crops else None,
             "carry": self.carry.as_dict() if self.carry else None,
             "gaps": list(self.gaps),
@@ -717,6 +726,14 @@ def gather(
             gaps,
         )
 
+    outlook_snapshot = None
+    if raw.outlook_payloads:
+        outlook_snapshot = _attempt(
+            lambda: outlook.build_snapshot(ticker, raw.outlook_payloads),
+            "price outlook",
+            gaps,
+        )
+
     crop_snapshot = None
     if raw.crop_rows:
         crop_snapshot = _attempt(
@@ -805,6 +822,7 @@ def gather(
         macro=macro_snapshot,
         earnings=earnings_snapshot,
         energy=energy_snapshot,
+        outlook=outlook_snapshot,
         crops=crop_snapshot,
         carry=carry_snapshot,
         share_reading=raw.share_reading,

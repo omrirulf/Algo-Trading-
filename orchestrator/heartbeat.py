@@ -222,7 +222,11 @@ any of the rest is worth: the same signal is a different trade at a VIX of \
 inflation, unemployment, jobless claims, the Fed's target and what the market \
 expects inflation to be over ten years -- those are what actually happened \
 rather than what is priced, and a release well outside expectations is \
-exactly the "data surprise" this prompt asks you to wait for. This is context \
+exactly the "data surprise" this prompt asks you to wait for. Where the block \
+carries a RATE PATH line, that is what the bond market expects the Fed to do \
+over the next two years, read off the two-year yield against the overnight \
+rate: for a bond fund or the dollar it is the bet itself, and a week in which \
+the priced path moved matters more than the level. This is context \
 for every other dimension rather than a score of its own; where it drives the \
 call, say so in key_factors.
 - COST OF HOLDING, when present, is the most important fact about a \
@@ -247,6 +251,14 @@ bearish, a draw the reverse -- a rule of thumb, not a law. Weigh the weekly \
 change and how unusual the level is far above the level itself, and score it \
 into fundamental_score. Remember the market has already seen this number; \
 what it gives you is the direction of the supply picture, not an edge.
+- PRICE OUTLOOK, when present, is the Energy Information Administration's \
+official monthly forecast for the price the fund tracks: this month, three \
+and six months out, and next year's average. It is one agency's view and the \
+market has read it, so the level is not the signal; the direction, and the \
+gap between the forecast and today's price, are what to weigh. A forecast \
+that sees the price falling tempers a long and supports a short, and the \
+reverse; score it into fundamental_score and never let it set the direction \
+on its own.
 - CROP CONDITION, when present, is the share of the US crop rated good or \
 excellent, walked and reported weekly through the growing season. A better \
 crop means more supply, which reads bearish. The *trend* is the signal -- a \
@@ -287,8 +299,8 @@ analyst_score from ANALYST VIEW OF THE HOLDINGS when that section is present \
 and leave it null when it is not; score insider_score from POSITIONING, or \
 from FUND FLOWS when POSITIONING is absent, and leave it null only when \
 neither is present; score fundamental_score from FUND BASICS, COST OF \
-HOLDING, ENERGY INVENTORIES and CROP CONDITION, whichever of them are \
-present. \
+HOLDING, ENERGY INVENTORIES, PRICE OUTLOOK and CROP CONDITION, whichever of \
+them are present. \
 A section that is absent entirely was never on offer for this instrument -- \
 that is not the same as a source that failed, which DATA GAPS names -- and \
 neither is a reason to guess: both leave the score null. In \

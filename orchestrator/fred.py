@@ -53,7 +53,27 @@ SERIES = (
     ("ICSA", "jobless_claims", "lin", "thousands"),
     ("DFEDTARU", "policy_rate", "lin", "percent"),
     ("T10YIE", "breakeven", "lin", "percent"),
+    # The rate path. The two-year Treasury is, near enough, the market's
+    # average expected policy rate over the next two years; against the
+    # policy rate in force it says how many quarter-point moves the bond
+    # market has priced, and in which direction. A bond fund and the dollar
+    # are bets on exactly this, and a level alone cannot say it. Read against
+    # the target range (above), not the effective overnight rate: on the day
+    # this shipped FRED's effective rate came back 37 basis points below the
+    # target's own floor and 34 below the three-month bill, and a path
+    # measured from a number the block itself contradicts is not a path.
+    ("DGS2", "two_year", "lin", "percent"),
 )
+
+#: One policy move, in percentage points.
+QUARTER_POINT = 0.25
+
+#: The Fed's target is a range a quarter point wide; ``DFEDTARU`` is its
+#: upper bound. Policy sits at the middle.
+TARGET_RANGE_WIDTH = 0.25
+
+#: Fewer priced moves than this, either way, reads as "no change".
+NO_CHANGE_EDGE_MOVES = 0.5
 
 #: A release this old is not news, it is history: the series was discontinued
 #: or the fetch fell back to a stale cache. Monthly data can legitimately be
@@ -146,13 +166,58 @@ def as_lines(releases: Optional[dict]) -> list[str]:
                 f"market expects {releases['breakeven'].value:.1f}% inflation over 10 years"
             )
         lines.append("Policy and expectations: " + " | ".join(parts))
+    path = rate_path_line(releases.get("two_year"), releases.get("policy_rate"))
+    if path:
+        lines.append(path)
     return lines
+
+
+def policy_midpoint(target_upper: Optional[float]) -> Optional[float]:
+    """The middle of the target range, from its upper bound."""
+    if target_upper is None:
+        return None
+    return target_upper - TARGET_RANGE_WIDTH / 2
+
+
+def priced_moves(two_year: Optional[float], target_upper: Optional[float]) -> Optional[float]:
+    """Quarter-point moves the two-year prices against the policy rate.
+
+    Negative is cuts, positive is hikes. ``None`` when either side is
+    missing: a path needs both ends.
+    """
+    midpoint = policy_midpoint(target_upper)
+    if two_year is None or midpoint is None:
+        return None
+    return (two_year - midpoint) / QUARTER_POINT
+
+
+def rate_path_line(two_year: Optional[Release], policy_rate: Optional[Release]) -> str:
+    """One sentence on what the bond market expects the Fed to do, or nothing."""
+    if two_year is None or policy_rate is None:
+        return ""
+    moves = priced_moves(two_year.value, policy_rate.value)
+    if moves is None:
+        return ""
+    low = policy_rate.value - TARGET_RANGE_WIDTH
+    head = (f"Rate path: 2-year Treasury {two_year.value:.2f}% vs Fed target "
+            f"{low:.2f}-{policy_rate.value:.2f}% -- ")
+    if abs(moves) < NO_CHANGE_EDGE_MOVES:
+        verdict = "the bond market prices roughly no change over the next two years"
+    else:
+        count = round(abs(moves))
+        word = "cut" if moves < 0 else "hike"
+        verdict = (f"the bond market prices about {count} quarter-point "
+                   f"{word}{'s' if count != 1 else ''} over the next two years")
+    return head + verdict + " (a rough read: the 2-year also carries a term premium)"
 
 
 __all__ = [
     "Release",
     "as_lines",
     "build_releases",
+    "policy_midpoint",
+    "priced_moves",
+    "rate_path_line",
     "parse_release",
     "SERIES",
 ]

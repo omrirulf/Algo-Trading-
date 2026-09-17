@@ -900,3 +900,64 @@ def test_two_funds_on_the_same_commodity_fetch_it_once(monkeypatch):
     for _ in range(3):
         provider._commodity_history("USO", gaps)
     assert fetched == ["CL=F"]
+
+
+# --------------------------------------------------------------------------- #
+# The official price outlook reaches the energy funds, and only them
+# --------------------------------------------------------------------------- #
+
+
+def _steo(now, three, six):
+    from datetime import date
+
+    today = date.today()
+    y, m = today.year, today.month
+    def period(offset):
+        idx = y * 12 + (m - 1) + offset
+        return f"{idx // 12}-{idx % 12 + 1:02d}"
+    return {"response": {"data": [
+        {"period": period(6), "value": six}, {"period": period(3), "value": three},
+        {"period": period(0), "value": now},
+    ]}}
+
+
+STEO_PAYLOAD = {"wti": _steo(64.0, 61.0, 58.0), "brent": _steo(67.0, 64.0, 61.0)}
+
+
+def test_an_oil_fund_is_told_where_the_official_forecast_sees_the_price():
+    ctx = context.gather("USO", HEADLINES, provider=FakeProvider(
+        history=make_frame([100.0 + i * 0.1 for i in range(300)]),
+        outlook_payloads=STEO_PAYLOAD,
+    ))
+    prompt = ctx.as_prompt()
+    assert "PRICE OUTLOOK (EIA, official monthly forecast)" in prompt
+    assert "WTI crude ($/barrel): $64.00 this month" in prompt
+    assert "seen to fall about 9% over six months" in prompt
+    assert ctx.as_dict()["outlook"]["forecasts"][1]["name"] == "Brent crude"
+
+
+@pytest.mark.parametrize("ticker", ["GLD", "TLT", "MSFT", "XOM"])
+def test_the_outlook_never_reaches_a_ticker_with_no_energy_exposure(ticker):
+    ctx = context.gather(ticker, HEADLINES, provider=FakeProvider(
+        history=make_frame([100.0 + i * 0.1 for i in range(300)]),
+        info=INFO, outlook_payloads=STEO_PAYLOAD,
+    ))
+    assert ctx.outlook is None
+    assert "PRICE OUTLOOK" not in ctx.as_prompt()
+    assert ctx.as_dict()["outlook"] is None
+
+
+def test_without_a_payload_the_outlook_is_absent_not_a_gap():
+    ctx = context.gather("USO", HEADLINES, provider=FakeProvider(
+        history=make_frame([100.0 + i * 0.1 for i in range(300)]),
+    ))
+    assert ctx.outlook is None
+    assert "PRICE OUTLOOK" not in ctx.as_prompt()
+    assert not any("outlook" in gap for gap in ctx.gaps)
+
+
+def test_the_outlook_is_a_fund_only_section_shown_after_the_inventories():
+    attributes = [a for _, a in context.ENRICHMENT_SECTIONS]
+    assert attributes.index("outlook") == attributes.index("energy") + 1
+    assert "outlook" in context.FUND_ONLY_SECTIONS
+    assert "outlook" not in context.SINGLE_NAME_ONLY_SECTIONS
