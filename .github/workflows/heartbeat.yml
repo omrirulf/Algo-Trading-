@@ -147,6 +147,21 @@ jobs:
             echo "no journal lines to render; last report left in place"
           fi
 
+      - name: Write the book snapshot
+        # One JSON file the dashboard reads: positions against their stops,
+        # the risk caps and how full they are, today's funnel and cost, and
+        # the alarms. Derived from the journal and the audit log, never from
+        # the broker; committed beside them so a page can read it with no
+        # key. Never fails the job: a view of the record, not a second
+        # chance to break the cycle.
+        if: always() && steps.guard.outputs.ran != 'yes' && inputs.mode != 'protect'
+        run: |
+          if python -m analysis.book --json > "$RUNNER_TEMP/book.json"; then
+            mv "$RUNNER_TEMP/book.json" logs/book.json
+          else
+            echo "book snapshot not written; previous one left in place"
+          fi
+
       - name: Refit the blend weights
         # After the cycle, never before it: a cycle applies the weights the
         # previous run committed, and a signal whose horizon has not elapsed
@@ -265,7 +280,7 @@ jobs:
           # fund_size.log is the one series nobody publishes: it exists only
           # because every cycle appends to it, so an uncommitted one is a lost
           # day of history that cannot be backfilled.
-          git add -f logs/signal_journal.log logs/execution_audit.log logs/cycle_report.md logs/fund_size.log logs/blend_weights.json logs/score_report.md || true
+          git add -f logs/signal_journal.log logs/execution_audit.log logs/cycle_report.md logs/fund_size.log logs/blend_weights.json logs/score_report.md logs/book.json || true
           if git diff --cached --quiet; then
             echo "no journal changes"
             exit 0
