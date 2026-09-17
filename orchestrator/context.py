@@ -425,6 +425,45 @@ def _brief(exc: Exception) -> str:
     return text if len(text) <= MAX_GAP_DETAIL else text[: MAX_GAP_DETAIL - 1] + "…"
 
 
+#: Prefix of every gap this module records about the CFTC block, used to tell
+#: "a gap was already recorded" from "nothing was said at all".
+_POSITIONING_GAP = "CFTC positioning"
+
+
+def _note_a_mapped_contract_that_said_nothing(
+    ticker: str, snapshot: Any, gaps: list[str]
+) -> None:
+    """Record a gap when a ticker that *has* a contract produced no snapshot.
+
+    Absent is not failed, and the difference is decided by ``CONTRACTS``. A
+    ticker with no mapping has no futures contract to report on: the section
+    was never on offer and nothing is said about it. A ticker *with* one is a
+    promise that this block exists, so silence there is a failure and has to
+    read as one.
+
+    It was not reading as one. The two ways a mapping dies -- an exact name
+    that now matches no market, and a series whose newest row is too old --
+    both end here with no snapshot and no exception, so both produced an
+    omission indistinguishable from a fund that never had a contract. That is
+    how five mappings sat on names the CFTC retired in February 2022 without
+    anything saying so.
+
+    A no-op while every mapping reports, which is the point: it changes no
+    prompt today and speaks on the day one breaks.
+    """
+    if snapshot is not None:
+        return
+    contract = positioning.contract_for(ticker)
+    if contract is None:
+        return  # no contract to report on; the section was never on offer
+    if any(gap.startswith(_POSITIONING_GAP) for gap in gaps):
+        return  # the fetch already failed loudly; one gap is enough
+    gaps.append(
+        f"{_POSITIONING_GAP} unavailable: {contract[1]} is not reporting "
+        "(renamed, delisted, or too stale to use)"
+    )
+
+
 def _attempt(fetch: Any, label: str, gaps: list[str]) -> Any:
     """Run ``fetch``, recording a gap instead of propagating a failure."""
     try:
@@ -711,6 +750,7 @@ def gather(
             "CFTC positioning",
             gaps,
         )
+    _note_a_mapped_contract_that_said_nothing(ticker, positioning_snapshot, gaps)
 
     fundamental_snapshot = None
     analyst_snapshot = None
