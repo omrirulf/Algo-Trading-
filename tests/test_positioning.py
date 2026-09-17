@@ -14,6 +14,8 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
+from urllib.parse import unquote
+
 import httpx
 import pytest
 
@@ -179,7 +181,12 @@ def test_fetch_asks_the_right_dataset_for_the_right_contract():
     client = httpx.Client(transport=httpx.MockTransport(handler))
     out = pos.fetch_rows("USO", client=client)
     assert pos.DISAGGREGATED in seen["url"]
-    assert "CRUDE+OIL" in seen["url"] or "CRUDE%20OIL" in seen["url"]
+    # Exact, not a substring: "=" rather than "like", and no % wildcards. A
+    # substring pulls every market containing the name into one series.
+    asked = unquote(seen["url"])
+    assert "upper(market_and_exchange_names) = " in asked
+    assert "like" not in asked and "%" not in asked
+    assert "'WTI-PHYSICAL - NEW YORK MERCANTILE EXCHANGE'" in asked
     assert len(out) == 5
 
 
