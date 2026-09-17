@@ -1,0 +1,231 @@
+---
+title: "What a Fund Reads Instead"
+description: "An index has no P/E, no insiders and no analyst covering it — so it is asked six different questions instead of being handed a company's form with the answers blank"
+---
+
+Two thirds of the watchlist are funds. For a long time each one was described
+to the model in the company's form: sector, market cap, profit margin,
+revenue growth, next earnings date. An index has none of those, so the block
+rendered as seven lines of `n/a`.
+
+That was the better outcome. The worse one is that Yahoo sometimes fills a
+blank in with nonsense — the first 80-ticker cycle showed the model a
+**forward P/E of −4,036** for a Treasury bond fund, and the model duly scored
+that fund's fundamentals −0.1.
+
+<Note>
+  A number the model cannot use is worse than a stated blank, because it looks
+  usable. That sentence is the reason every section on this page exists.
+</Note>
+
+## The six sections
+
+A fund's prompt omits `FUNDAMENTALS`, `ANALYST & INSTITUTIONAL VIEW` and
+`INSIDER ACTIVITY` outright — not as "unavailable this cycle", which invites
+the model to wonder what it missed, but as questions never asked. In their
+place:
+
+<AccordionGroup>
+  <Accordion title="MACRO — orchestrator/macro.py" icon="cloud">
+    The weather every fund trades in. The Treasury curve at three months,
+    five, ten and thirty years; the slope of ten-year minus three-month; the
+    dollar index; and the VIX.
+
+    These are *prices*, so they say what traders think rather than what
+    somebody summarised. The slope is there because a level cannot give it:
+    an inverted curve is a regime, not a reading. Volatility is there because
+    the same signal means different things at a VIX of 12 and at 34.
+
+    The fund prompt tells the model to answer NEUTRAL unless something
+    specific changed — "a policy or rate surprise, a data release well
+    outside expectations" — and then used to hand it a day of headlines and
+    ask it to judge whether a rate surprise had happened. It had no rates.
+
+    With a FRED key configured the block carries two more lines: what the
+    economy actually *did*, rather than what it is priced at. See
+    [Official Data](/orchestrator/official-data).
+  </Accordion>
+
+  <Accordion title="FUND BASICS — orchestrator/funds.py" icon="layer-group">
+    What the fund is, in terms that apply to a fund. Three shapes, because
+    three kinds of fund answer three different questions:
+
+    | shape | what it carries |
+    | --- | --- |
+    | `equity` | weighted P/E, P/B and P/S of the holdings, earnings growth, yield, expense ratio, net assets, asset mix, top names, sector mix |
+    | `bond` | yield, credit-quality mix, share of government debt, three-year record, beta, cost and size |
+    | `none` | nothing — the section is omitted |
+
+    A 20-year Treasury fund and a high-yield credit fund are both "bonds" and
+    behave nothing alike; the ratings mix is that difference stated plainly.
+    A single commodity gets `none`: gold has no P/E, no yield and no balance
+    sheet, and inventing a form for it would be the original mistake in a new
+    costume.
+
+    <Warning>
+      **On trusting Yahoo.** The first live run returned a P/E of `0.06` for
+      an energy fund — an earnings yield wearing a P/E's name, because Yahoo
+      stores several holdings ratios inverted and lets its own formatter flip
+      them back, while the `raw` field yfinance reads keeps them inverted.
+
+      A suppression band written to catch *absurd* numbers does not catch
+      this: `0.06` is not absurd, it is merely wrong, which is worse. So the
+      parsing does not only reject — where the unit is knowable it converts,
+      and where it is not it says nothing.
+    </Warning>
+  </Accordion>
+
+  <Accordion title="ANALYST VIEW OF THE HOLDINGS — orchestrator/holdings.py" icon="users-viewfinder">
+    Nobody publishes a price target on XLE. But XLE *is* a few dozen
+    companies, every one of them covered — so the coverage is rolled up by
+    the fund's own weights, built entirely from data already being fetched.
+
+    The number that makes it honest is **coverage**: the share of the fund's
+    weight that could actually be analysed. Five names at 62% of the fund is
+    a statement about most of the fund; five names at 11% of a 500-stock
+    index is not. The prompt says which it is, so the model can discount it.
+
+    Top holdings only — fetching every constituent of a broad index would
+    cost hundreds of calls per cycle for a progressively weaker signal. And
+    the weights are the fund's while the ratings are the holdings': no
+    attempt is made here to model the fund's own tracking, fees or structure,
+    which is `funds.py`'s job.
+  </Accordion>
+
+  <Accordion title="POSITIONING — orchestrator/positioning.py" icon="scale-unbalanced">
+    A fund has no insiders. Nobody files a Form 4 on gold, and no director of
+    the Treasury sells bonds and discloses it. But every large trader must
+    report their futures position, and the CFTC publishes the aggregate every
+    Friday — what the professional speculators hold long and short in gold,
+    oil, wheat, Treasuries and the dollar.
+
+    Three numbers, because the level alone is not a signal: **net as a share
+    of open interest**, the **week-over-week change**, and its **percentile
+    over the past year**. A crowded extreme is where positioning stops being
+    confirmation and starts being a contrarian risk, and the model cannot
+    know that from the level.
+
+    The data is as of Tuesday and published Friday, so it is three to six
+    days stale by the time a cycle reads it. That is the dataset, not a bug,
+    and the prompt says so — along with the reminder that this is a crowding
+    measure and not a forecast.
+
+    <Warning>
+      **Two ways a contract mapping goes wrong, and both were live.**
+
+      *Dead.* A contract that stopped reporting is worse than one that never
+      reported. Five mappings — every Treasury and the dollar index — were
+      reading a series whose newest row was dated **February 2022**, printed
+      as "positions as of" with no hint it was not this week's. A series
+      whose newest row is older than a month is now treated as dead and the
+      section omitted.
+
+      *Mixed.* Worse, and invisible to that guard. The contract name used to
+      be matched as a **substring**, so `GOLD` matched COMEX gold, micro gold
+      and a Coinbase contract; the CFTC returned all three ordered by date;
+      and the parser read consecutive rows as consecutive weeks. GLD printed
+      "net long 0.0% of open interest" beside "change on the week −32.8%" —
+      that change was the gap between two different contracts, and those
+      12,246 contracts were Coinbase's open interest, not gold's. Nine of
+      nineteen mappings were doing this.
+
+      The name is matched **exactly** now. An exact name cannot interleave,
+      and the next time the CFTC renames something the mapping goes silent
+      and the staleness guard shows a gap — instead of quietly matching a
+      neighbour and printing a confident number.
+    </Warning>
+  </Accordion>
+
+  <Accordion title="COST OF HOLDING — orchestrator/carry.py" icon="arrow-trend-down">
+    For a commodity fund this is arguably the most important fact about the
+    instrument — more important than any forecast.
+
+    A commodity fund does not hold the commodity. It holds futures, and every
+    month it must sell the expiring contract and buy the next one. When the
+    next month costs more, that roll loses money, every month, for ever. USO
+    is the famous case: crude traded at the same price at both ends of a
+    stretch in which USO lost most of its value.
+
+    The measure is not the shape of the futures curve, which would have to be
+    assembled from dated contract symbols that differ by commodity and roll
+    under your feet. It is what the holder actually experiences:
+
+    > the fund's return, minus the commodity's own return, over the same window
+
+    Measured over three, six and twelve months. That gap *is* the cost of
+    holding — roll losses and fees together, measured rather than modelled —
+    and it works for a basket like DBC where no single pair of contracts
+    would.
+
+    Three limits, all stated in the prompt: it is **backward-looking** (it
+    says what the structure has been costing, not what it will); it is **not
+    a direction** (heavy carry is a reason to want a bigger move to justify a
+    long, and a tailwind for a short); and a **physically backed fund has
+    almost none of it** — GLD holds bullion, so its gap is roughly its fee,
+    which is a real and useful difference from USO.
+
+    <Note>
+      **When the reference itself is the problem.** Yahoo's `CL=F` and friends
+      are *continuous front-month* series: at each contract change the quoted
+      price becomes the next contract's, and where the two differ the series
+      steps without anyone having gained or lost.
+
+      Gold suggests this is small — GLD against `GC=F` came back at −0.1% a
+      year, about its fee, which could not happen if the steps were large.
+      Crude did not: USO against `CL=F` measured **+55.9% a year**, at the
+      very edge of what deep backwardation can produce and equally consistent
+      with the reference stepping down at every roll.
+
+      Faced with a number that could be either, the module does what the rest
+      of the project does with a number it cannot corroborate: it does not
+      show it. Past 25% a year the section is omitted and the prompt is
+      shorter. A 15% drag on a grain fund is ordinary and survives; a claimed
+      56% gain does not, because being wrong about that one would be worse
+      than saying nothing.
+    </Note>
+  </Accordion>
+
+  <Accordion title="FUND FLOWS — orchestrator/flows.py" icon="money-bill-transfer">
+    Who is actually buying, measured in money rather than opinion.
+
+    An ETF has no fixed share count: when demand exceeds supply an authorised
+    participant creates new shares against a basket of the underlying, and
+    when it falls away shares are redeemed and destroyed. **So the share
+    count is the flow.** A fund whose shares outstanding grew 8% in a month
+    had real money pushed into it by people who had to deliver the underlying
+    to get in — and unlike a rating or a target, it has already happened.
+
+    Three windows, because they answer different questions: a week is
+    positioning, a month is a trend, a quarter is a regime. Quoted in dollars
+    as well as percent, since 3% of a $70bn fund and 3% of a $400m fund are
+    not the same event.
+
+    <Note>
+      **This one keeps its own history, and starts empty.** Nowhere free
+      publishes a share-count *series* for an ETF — the live probe found
+      Yahoo's fundamentals timeseries returning an empty series for every
+      fund on this watchlist. What Yahoo does give is today's count.
+
+      So one reading per fund per cycle is appended to `logs/fund_size.log`,
+      which the heartbeat commits back to the repository alongside the
+      journal. The series is the project's own memory. Below three readings
+      the section is **absent** rather than present and saying nothing.
+    </Note>
+  </Accordion>
+</AccordionGroup>
+
+## Absent is not failed
+
+Every section above can be missing, and missing means two different things
+that the prompt keeps apart:
+
+- **Never on offer.** A bond fund has no crop condition, and an equity fund
+  has no futures contract. The section is omitted outright and nothing is
+  said about it.
+- **Tried and failed.** A fetch that errored records a **named gap** in the
+  prompt, so the model knows a thing it might have used is absent this cycle.
+
+The difference is not cosmetic. It also decides what the trainer may learn
+from: a score whose every source section was absent has nothing behind it,
+whatever number the model wrote there, so the cycle records `null` rather
+than the model's value. See [Scoring](/scoring).

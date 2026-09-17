@@ -44,6 +44,18 @@ per-request cost.**
     and will happily build a thesis on the wrong one.
   </Accordion>
 
+  <Accordion title="Earnings record — orchestrator/earnings.py" icon="receipt">
+    The surprise history, actual against estimate, for the last four
+    quarters. A business that has beaten four running and one that has missed
+    four are priced by the same consensus and are not the same bet.
+
+    Needs a Finnhub key, so a company's prompt carries five headings without
+    one and six with it — a heading of its own rather than extra lines hidden
+    inside `FUNDAMENTALS`, because a change to the input should be visible in
+    the shape of the question. Full treatment in
+    [Official Data](/orchestrator/official-data).
+  </Accordion>
+
   <Accordion title="Analyst & institutional view — orchestrator/analysts.py" icon="users">
     What professional money says:
 
@@ -195,16 +207,20 @@ source the same question 24 times a day.
 
 ## No credentials, structurally
 
-None of the context modules reads a setting, a key or a token, and CI greps
-them to keep it that way. The check names the three modules that *may* hold a
+None of the parsing modules reads a setting, a key or a token, and CI greps
+them to keep it that way. The check names the modules that *may* hold a
 credential and tests everything else in `orchestrator/`, so a context source
 added later is covered automatically:
 
 ```bash
 grep -rnE '(get_settings|os\.environ|getenv|\bsettings\.|\.[A-Za-z_]*(secret|api_key|_token|password)\b)' \
   orchestrator --include='*.py' \
-  | grep -vE '^orchestrator/(heartbeat|news|llm)\.py:'
+  | grep -vE '^orchestrator/(heartbeat|news|llm|dispatch|sources)\.py:'
 ```
+
+`sources.py` is on that list because the four keyed sources fetch through it
+rather than through four modules that each read the environment — one file to
+audit instead of four. See [Official Data](/orchestrator/official-data).
 
 ## Everything is testable without the network
 
@@ -213,6 +229,17 @@ parsing: they take a DataFrame or a dict and return plain data. `context.py`
 is the only module that touches yfinance, and it takes an injectable provider,
 so the whole pipeline — including every degradation path — is exercised in
 tests with no network access at all.
+
+<CardGroup cols={2}>
+  <Card title="What a fund reads instead" icon="layer-group" href="/orchestrator/fund-context">
+    An index has no P/E, no insiders and no analyst covering it, so it is
+    asked six different questions.
+  </Card>
+  <Card title="Official data" icon="landmark" href="/orchestrator/official-data">
+    Inventories, crop condition, the economy, and whether a company beats its
+    own guidance.
+  </Card>
+</CardGroup>
 
 <Card title="Next: the signal journal" icon="book" href="/orchestrator/journal">
   What the model saw, what it said, and whether it was any good.
