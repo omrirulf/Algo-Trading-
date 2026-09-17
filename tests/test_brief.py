@@ -77,7 +77,16 @@ def test_missing_equity_is_said_not_invented():
 def test_the_text_never_exceeds_a_notification():
     alarms = [{"severity": "critical", "title": "x" * 300}] + [{"severity": "warning", "title": "y" * 200}] * 3
     text = brief.compose(book(alarms=alarms, positions=[{"ticker": f"T{i}", "has_stop": False} for i in range(20)]), DAY)
-    assert len(text) <= brief.MAX_CHARS and text.endswith("…")
+    assert len(text) <= brief.MAX_CHARS
+    assert "…" in text and text.splitlines()[-1].endswith("2026-09-17")  # the cut spares the day
+
+
+def test_the_last_line_ends_with_the_snapshot_day_however_the_day_went():
+    assert brief.compose(book(), DAY).splitlines()[-1] == "Cycle 80 tickers, $3.91 · 2026-09-17"
+    stale = brief.compose(book(day="2026-09-16"), DAY).splitlines()
+    assert stale[0].startswith("⚠️") and stale[-1].endswith("2026-09-16")
+    no_cost = brief.compose(book(cycle={"tickers": 0, "accepted": [], "directional": []}), DAY)
+    assert no_cost.splitlines()[-1] == "Snapshot 2026-09-17"
 
 
 def test_the_cli_reads_the_snapshot_and_a_missing_one_is_loud(tmp_path, capsys):
