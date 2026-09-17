@@ -64,6 +64,20 @@ def test_a_dead_source_reaches_the_phone_as_a_warning():
     assert '"priority": 4' in step["run"]
 
 
+def test_the_phone_test_button_sends_one_message_and_nothing_else():
+    wf = yaml.safe_load((ROOT / ".github/workflows/phone-test.yml").read_text())
+    on = wf[True] if True in wf else wf["on"]
+    assert on == {"workflow_dispatch": None} or on == "workflow_dispatch" or list(on) == ["workflow_dispatch"]
+    assert wf["permissions"] == {"contents": "read"}
+    steps = {s.get("name"): s for s in wf["jobs"]["ping"]["steps"]}
+    assert list(steps) == ["Push a test message to the owner's phone"]
+    step = steps["Push a test message to the owner's phone"]
+    _is_a_safe_push(step)
+    assert "Phone connected" in step["run"]
+    for banned in ("actions/checkout", "pip install", "python -m orchestrator", "alpaca"):
+        assert banned not in (ROOT / ".github/workflows/phone-test.yml").read_text(), banned
+
+
 def test_the_topic_is_read_nowhere_in_the_code():
     # The workflows pass it to curl and nothing else; no module reads it.
     for path in ROOT.rglob("*.py"):
