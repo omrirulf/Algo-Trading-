@@ -8,10 +8,12 @@ prints a message short enough for a phone's notification tray: the status in
 the first line, then only what changed or what is wrong. A Routine in the
 owner's Claude account runs this after the cycle and pushes the text.
 
-Two rules keep it honest. The first line is the worst thing in the record:
+Three rules keep it honest. The first line is the worst thing in the record:
 a critical alarm beats a warning beats a clean day, and a day with no
-snapshot for today is itself the headline. And nothing is invented: a
-missing equity is "equity not recorded", not a number.
+snapshot for today is itself the headline. Nothing is invented: a missing
+equity is "equity not recorded", not a number. And the last line ends with
+the snapshot's day, so whoever reads the text later can tell whether it is
+today's or yesterday's without opening the snapshot.
 
 Read-only. Two files at most, no broker, no model, no network.
 """
@@ -90,12 +92,18 @@ def compose(book: dict, today: Optional[date] = None) -> str:
     if extra:
         lines.append("Also: " + "; ".join(str(t) for t in extra))
     cost = c.get("cost_usd")
+    stamp = str(book.get("day") or "undated")
     if isinstance(cost, (int, float)):
-        lines.append(f"Cycle {c.get('tickers', 0)} tickers, ${cost:.2f}")
-    text = "\n".join(lines)
-    if len(text) > MAX_CHARS:
-        text = text[: MAX_CHARS - 1].rstrip() + "…"
-    return text
+        tail = f"Cycle {c.get('tickers', 0)} tickers, ${cost:.2f} · {stamp}"
+    else:
+        tail = f"Snapshot {stamp}"
+    # The last line always ends with the snapshot's day, and survives the
+    # cut: a reader that only has this text can tell today's from stale.
+    body = "\n".join(lines)
+    budget = MAX_CHARS - len(tail) - 1
+    if len(body) > budget:
+        body = body[: budget - 1].rstrip() + "…"
+    return body + "\n" + tail
 
 
 def main(argv: Optional[list[str]] = None) -> int:
