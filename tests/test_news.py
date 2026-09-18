@@ -119,14 +119,52 @@ def test_provider_raises_on_http_error(status):
     assert str(status) in str(exc.value)
 
 
-def test_provider_raises_on_transport_error():
+def test_provider_raises_on_transport_error(monkeypatch):
+    monkeypatch.setattr(news.time, "sleep", lambda s: None)
+    calls = []
+
     def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(1)
         raise httpx.ConnectError("boom")
 
     with httpx.Client(transport=httpx.MockTransport(handler)) as client:
         provider = news.BrightDataNewsProvider("tok", "zone", client=client)
         with pytest.raises(news.NewsFetchError):
             provider.fetch("AAPL")
+    assert len(calls) == 2                       # one retry, then the error is real
+
+
+def test_a_timed_out_read_is_tried_once_more_and_the_second_answer_counts(monkeypatch):
+    slept = []
+    monkeypatch.setattr(news.time, "sleep", lambda s: slept.append(s))
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(1)
+        if len(calls) == 1:
+            raise httpx.ReadTimeout("The read operation timed out")
+        return httpx.Response(200, text=json.dumps(PARSED_NEWS))
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        provider = news.BrightDataNewsProvider("tok", "zone", client=client)
+        lines = provider.fetch("IGV")
+    assert len(calls) == 2 and len(lines) == 2
+    assert slept == [news.RETRY_PAUSE_SECONDS]
+
+
+def test_an_http_error_is_never_retried(monkeypatch):
+    monkeypatch.setattr(news.time, "sleep", lambda s: pytest.fail("slept on an HTTP error"))
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(1)
+        return httpx.Response(429, text="slow down")
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        provider = news.BrightDataNewsProvider("tok", "zone", client=client)
+        with pytest.raises(news.NewsFetchError):
+            provider.fetch("AAPL")
+    assert len(calls) == 1
 
 
 def test_heartbeat_fetch_news_uses_settings(monkeypatch):

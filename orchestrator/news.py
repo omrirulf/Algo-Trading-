@@ -21,6 +21,7 @@ import json
 import logging
 import os
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
@@ -46,6 +47,11 @@ GOOGLE_ORIGIN = "https://www.google.com"
 NEWS_LOOKBACK = "d"
 MAX_HEADLINES = 10
 REQUEST_TIMEOUT_SECONDS = 60.0
+#: One more try after a transport failure (a read timeout, a dropped
+#: connection), after this pause. On 17 Sep two names lost their day to a
+#: single timed-out read. An HTTP error is never retried: a 401 or a 429
+#: says the same thing twice.
+RETRY_PAUSE_SECONDS = 2.0
 
 #: Keys under which Bright Data's Google parser may put result items. ``news``
 #: is the news-tab list; ``organic`` is the fallback if the zone returns a
@@ -379,6 +385,14 @@ class BrightDataNewsProvider:
         with httpx.Client(timeout=REQUEST_TIMEOUT_SECONDS) as client:
             return client.post(BRIGHTDATA_REQUEST_URL, json=body, headers=headers)
 
+    def _post_with_one_retry(self, body: dict[str, Any]) -> httpx.Response:
+        try:
+            return self._post(body)
+        except httpx.TransportError as exc:
+            log.warning("Bright Data transport error (%s); retrying once", type(exc).__name__)
+            time.sleep(RETRY_PAUSE_SECONDS)
+            return self._post(body)
+
     def fetch_items(self, ticker: str) -> list[Headline]:
         """Headlines from the past 24 hours, with their links -- the live path."""
         return self._fetch_items(build_news_search_url(ticker))
@@ -400,7 +414,7 @@ class BrightDataNewsProvider:
     def _fetch_items(self, url: str) -> list[Headline]:
         body = {"zone": self._zone, "url": url, "format": "raw"}
         try:
-            resp = self._post(body)
+            resp = self._post_with_one_retry(body)
         except httpx.HTTPError as exc:
             raise NewsFetchError(f"Bright Data unreachable: {exc}") from exc
         if resp.status_code != 200:
