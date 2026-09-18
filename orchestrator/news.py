@@ -419,4 +419,20 @@ class BrightDataNewsProvider:
             raise NewsFetchError(f"Bright Data unreachable: {exc}") from exc
         if resp.status_code != 200:
             raise NewsFetchError(f"Bright Data HTTP {resp.status_code}: {resp.text[:300]}")
+        try:
+            return parse_news_items(resp.text)
+        except NewsFetchError as exc:
+            first_refusal = exc
+        # A 200 the parser refuses is an interstitial, a block page or an
+        # upstream error wrapped in a 200, and on 18 Sep one cost TM its
+        # day. Once more, after the same pause; a second one is real.
+        log.warning("Bright Data answered 200 with something the parser refused (%s); retrying once",
+                    str(first_refusal)[:80])
+        time.sleep(RETRY_PAUSE_SECONDS)
+        try:
+            resp = self._post(body)
+        except httpx.HTTPError as exc:
+            raise NewsFetchError(f"Bright Data unreachable: {exc}") from exc
+        if resp.status_code != 200:
+            raise NewsFetchError(f"Bright Data HTTP {resp.status_code}: {resp.text[:300]}")
         return parse_news_items(resp.text)
