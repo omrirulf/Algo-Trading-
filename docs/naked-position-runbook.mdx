@@ -1,0 +1,99 @@
+---
+title: "Runbook: a position with no stop"
+description: "What happened on 17 September, how it is caught automatically now, and how to fix it by hand if the automation cannot"
+---
+
+The stop is the only exit this system ever uses. A position with no working
+stop is not a small problem — it is the one failure mode everything else in
+`app/position_manager.py` and `analysis/health.py` exists to end. This page
+is what to do if it happens anyway.
+
+<Note>
+This is a **paper account**: no real money is ever at risk. The discipline
+below is kept exactly as strict as it would be with real money, because that
+is the only way the process is proven before it would ever need to be.
+</Note>
+
+## What happened on 17 September
+
+Every bracket order's stop leg was submitted as a **DAY** order. Alpaca
+cancels a DAY order at the close, so eleven of twelve open positions woke up
+the next morning with no protective stop at all — and nothing said so. The
+position manager recorded each one as `unmanaged` and moved on, because at
+the time an unmanaged position and a healthy one looked the same in the
+record.
+
+## How it's caught automatically now
+
+Three layers, from most routine to most urgent:
+
+<Steps>
+  <Step title="Every stop is good-till-cancelled">
+    The bracket's stop leg, and every replacement stop the ladder places, is
+    `TimeInForce.GTC`. CI fails the build if a `StopOrderRequest` anywhere
+    sets `TimeInForce.DAY`, or if `StopOrderRequest` is constructed outside
+    `app/broker_client.py` at all. This is what should make the rest of this
+    page unnecessary.
+  </Step>
+  <Step title="Every management pass re-checks, not just new entries">
+    `PositionManager._manage_one` checks for a live stop **before** doing any
+    ladder or trailing logic, on every position, every cycle. If one is
+    missing, protecting it is the whole of what that pass does for that
+    position — the daily cycle already closes this gap once a day on its own,
+    with no separate step needed.
+  </Step>
+  <Step title="A protect-only pass runs again, mid-cycle, same day">
+    `python -m orchestrator.heartbeat --protect-only` walks every open
+    position at the broker and places a stop for any with none, skipping the
+    market-hours gate so it can run any time. It touches nothing that already
+    has a stop, so running it twice a day is exactly as safe as running it
+    once. A Routine dispatches `heartbeat.yml` with `mode: protect` at 19:00
+    UTC on weekdays — a few hours after the normal cycle — so a stop
+    cancelled or rejected mid-day is caught the same afternoon instead of
+    waiting for tomorrow's cycle.
+  </Step>
+  <Step title="The record itself sounds the alarm">
+    `analysis/health.py` reads the day's journal and audit log after every
+    run. A position with no working stop is a **critical** alarm: the
+    workflow run fails, a `health-alarm` issue is opened and assigned to the
+    owner (or kept open and commented on if one already is), and the brief
+    pushed to the phone leads with it in red. The desk page marks the same
+    position "No stop on record."
+  </Step>
+</Steps>
+
+## How to fix it by hand
+
+Reach for this only if you get the phone alarm and do not want to wait for
+the next scheduled protection pass — the automation above runs on its own
+and usually needs nothing from you.
+
+<Steps>
+  <Step title="Run the protection pass on demand">
+    On the phone or a computer: open the repository's **Actions** tab →
+    **heartbeat** → **Run workflow** → set `mode` to `protect` → **Run
+    workflow**. This is the identical pass the schedule runs; it is safe to
+    run at any time and does nothing to a position that already has a stop.
+  </Step>
+  <Step title="Or ask Claude to do it">
+    Message the session watching this project and ask it to run the
+    protect-only pass. It dispatches the same workflow the same way.
+  </Step>
+  <Step title="Last resort: the broker directly">
+    If GitHub Actions itself is unreachable, open the
+    [Alpaca paper dashboard](https://app.alpaca.markets/paper/dashboard/overview),
+    find the position, and place a stop order by hand: the opposite side,
+    good-till-cancelled, sized to the full share count shown there. This is
+    the one step that bypasses the code, so treat it as temporary — the next
+    successful protect-only run leaves an existing stop alone, so it will not
+    undo what you placed, and the record will show the position as protected
+    again once it runs.
+  </Step>
+</Steps>
+
+## Confirming it worked
+
+The desk page (`https://omrirulf.github.io/Algo-Trading-/`) shows every open
+position against its stop; a position that was naked shows a stop again
+within a few minutes of a successful protection pass. The `health-alarm`
+issue closes itself on the next clean run.

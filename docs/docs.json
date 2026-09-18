@@ -29,6 +29,7 @@
           "guardrails",
           "decision-path",
           "position-management",
+          "naked-position-runbook",
           "currency-risk",
           "broker-evaluation",
           "portfolio-view",
