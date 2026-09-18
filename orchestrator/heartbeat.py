@@ -44,8 +44,8 @@ import httpx  # noqa: E402
 from apscheduler.schedulers.blocking import BlockingScheduler  # noqa: E402
 from pydantic import ValidationError  # noqa: E402
 
-from analysis.reader import SCORE_SOURCES  # noqa: E402
-from app.schemas import Bias, LLMSignal  # noqa: E402
+from analysis.reader import SCORE_FIELDS, SCORE_SOURCES  # noqa: E402
+from app.schemas import MAX_KEY_FACTORS, Bias, LLMSignal  # noqa: E402
 from config import settings as cfg  # noqa: E402
 from config.instruments import is_fund  # noqa: E402
 from orchestrator.fx import FxRate, fetch_rate as fetch_fx_rate  # noqa: E402
@@ -697,13 +697,62 @@ def scores_without_a_source(signal: LLMSignal, context: Any) -> LLMSignal:
     return signal.model_copy(update=missing)
 
 
+#: The longest rationale and key factor the schema accepts. Read from the
+#: schema so a change there is a change here.
+_RATIONALE_MAX = LLMSignal.model_fields["rationale"].metadata[1].max_length
+_KEY_FACTOR_MAX = 200
+
+
+def repair_transparency(payload: object) -> object:
+    """Mend the fields the risk engine never reads, so a bad read of one of
+    them does not cost the ticker its day.
+
+    On 17 Sep four names produced no signal because the model wrote an
+    analyst score of 10.0, or -999 for "unknown", or a seventh key factor,
+    or a rationale a few characters over the limit -- and the whole signal
+    was refused for it. Every one of those fields is transparency: the
+    engine sizes and stops on ``ticker``, ``bias`` and ``conviction`` alone
+    (CI enforces it), and those three are left exactly as the model wrote
+    them, to be validated as strictly as ever.
+
+    A score outside [-1, 1] becomes ``None`` -- unknown, not clamped: 10.0
+    was never "maximally bullish", it was a broken read. Too many key
+    factors are cut to the limit, an over-long one to its limit, a non-text
+    one dropped; an over-long rationale is cut. Nothing is added, nothing
+    is renamed, so a smuggled field is still refused by ``extra="forbid"``.
+    """
+    if not isinstance(payload, dict):
+        return payload
+    fixed = dict(payload)
+    ticker = fixed.get("ticker", "?")
+    for field in SCORE_FIELDS:
+        value = fixed.get(field)
+        if value is None:
+            continue
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not -1.0 <= value <= 1.0:
+            log.warning("%s: %s=%r is not a score in [-1, 1]; recorded as unknown", ticker, field, value)
+            fixed[field] = None
+    factors = fixed.get("key_factors")
+    if isinstance(factors, list):
+        kept = [f[:_KEY_FACTOR_MAX] for f in factors if isinstance(f, str) and f.strip()]
+        if len(kept) > MAX_KEY_FACTORS or len(kept) != len(factors) or kept != factors:
+            log.warning("%s: key_factors trimmed from %d to %d", ticker, len(factors), min(len(kept), MAX_KEY_FACTORS))
+        fixed["key_factors"] = kept[:MAX_KEY_FACTORS]
+    rationale = fixed.get("rationale")
+    if isinstance(rationale, str) and len(rationale) > _RATIONALE_MAX:
+        log.warning("%s: rationale cut from %d to %d characters", ticker, len(rationale), _RATIONALE_MAX)
+        fixed["rationale"] = rationale[:_RATIONALE_MAX]
+    return fixed
+
+
 def parse_signal(raw_json: str) -> LLMSignal:
     """Parse and validate the LLM output locally before sending it anywhere.
 
     The webhook re-validates on receipt; this is defence in depth and gives
-    a clearer error message at the source.
+    a clearer error message at the source. Transparency fields are mended
+    first (see ``repair_transparency``); the decision fields are not.
     """
-    return LLMSignal.model_validate(json.loads(raw_json))
+    return LLMSignal.model_validate(repair_transparency(json.loads(raw_json)))
 
 
 def post_signal(signal: LLMSignal, dispatcher: Dispatcher | None = None) -> dict:
