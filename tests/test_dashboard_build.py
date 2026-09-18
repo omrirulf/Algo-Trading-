@@ -54,11 +54,12 @@ def test_the_pages_workflow_deploys_the_site_after_every_snapshot():
     job = wf["jobs"]["deploy"]
     assert wf["permissions"] == {"contents": "write"}
     runs = [s.get("run", "") for s in job["steps"]]
-    assert any("dashboard/build.py --site _site" in r for r in runs)
-    publish = next(r for r in runs if "git push" in r)
-    assert "gh-pages" in publish and "git init -q -b gh-pages" in publish     # one commit, rewritten each time
-    assert "touch .nojekyll" in publish
-    assert "${GH_TOKEN}" in publish and "echo" not in publish.split("git push")[1]
+    assert any("bash dashboard/publish.sh" in r for r in runs)
+    script = (ROOT / "dashboard" / "publish.sh").read_text()
+    assert "dashboard/build.py --site" in script
+    assert "git init -q -b gh-pages" in script and "touch .nojekyll" in script   # one commit, rewritten each time
+    assert "${GH_TOKEN}" in script and "echo" not in script.split("git push")[1].split("\n")[0]
+    assert "set -euo pipefail" in script
 
 
 def test_the_build_embeds_the_snapshot_and_escapes_a_closing_tag(tmp_path):

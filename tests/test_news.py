@@ -152,6 +152,33 @@ def test_a_timed_out_read_is_tried_once_more_and_the_second_answer_counts(monkey
     assert slept == [news.RETRY_PAUSE_SECONDS]
 
 
+def test_a_block_page_with_status_200_is_tried_once_more(monkeypatch):
+    monkeypatch.setattr(news.time, "sleep", lambda s: None)
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(1)
+        if len(calls) == 1:
+            return httpx.Response(200, text="<html><body>Just a moment...</body></html>")
+        return httpx.Response(200, text=json.dumps(PARSED_NEWS))
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        provider = news.BrightDataNewsProvider("tok", "zone", client=client)
+        lines = provider.fetch("TM")
+    assert len(calls) == 2 and len(lines) == 2
+
+
+def test_a_second_block_page_is_the_real_answer(monkeypatch):
+    monkeypatch.setattr(news.time, "sleep", lambda s: None)
+    calls = []
+    handler = lambda request: (calls.append(1), httpx.Response(200, text="<html>blocked</html>"))[1]  # noqa: E731
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        provider = news.BrightDataNewsProvider("tok", "zone", client=client)
+        with pytest.raises(news.NewsFetchError) as exc:
+            provider.fetch("TM")
+    assert len(calls) == 2 and "JSON" in str(exc.value)
+
+
 def test_an_http_error_is_never_retried(monkeypatch):
     monkeypatch.setattr(news.time, "sleep", lambda s: pytest.fail("slept on an HTTP error"))
     calls = []

@@ -233,3 +233,11 @@ def test_the_workflow_writes_and_commits_the_snapshot():
     assert "python -m analysis.brief" in step["run"]
     assert "logs/book.json" in steps["Commit the journal"]["run"]
     assert "logs/brief.txt" in steps["Commit the journal"]["run"]
+    # The desk is published by the heartbeat itself, right after the commit:
+    # a push with the job's token starts no other workflow.
+    names = list(steps)
+    publish = steps["Publish the desk"]
+    assert names.index("Publish the desk") == names.index("Commit the journal") + 1
+    assert publish["if"] == step["if"]
+    assert "bash dashboard/publish.sh" in publish["run"] and "::warning::" in publish["run"]
+    assert publish["env"]["GH_TOKEN"] == "${{ github.token }}"

@@ -117,6 +117,17 @@ jobs:
           ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           BRIGHTDATA_API_TOKEN: ${{ secrets.BRIGHTDATA_API_TOKEN }}
+          # The four keyed sources (orchestrator/sources.py). Absent, each
+          # section is a stated blank, which is exactly what the model saw
+          # on 18 Sep: the keys were proven on the data-sources runner and
+          # never passed here, so no live cycle had ever read the energy
+          # inventories, the price outlook, the crop condition, the rate
+          # path or the earnings record. tests/test_workflow_keys.py keeps
+          # this list equal to the probe's.
+          EIA_API_KEY: ${{ secrets.EIA_API_KEY }}
+          USDA_NASS_KEY: ${{ secrets.USDA_NASS_KEY }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
           # No zone or watchlist variables: the watchlist lives in
           # config/watchlist.py and the Bright Data zone defaults to the one
           # `brightdata login` creates. Set BRIGHTDATA_SERP_ZONE as a
@@ -345,6 +356,19 @@ jobs:
             GIT_EDITOR=true git rebase --continue
           fi
           git push origin "HEAD:${GITHUB_REF_NAME}"
+
+      - name: Publish the desk
+        # The pages workflow cannot do this: a push made with the job's own
+        # token starts no other workflow, by GitHub's rule, so after the
+        # first real cycle the site still carried the previous day's built-in
+        # copy. Same script the pages workflow runs, right after the journal
+        # commit; never fails the job. The page reads the live snapshot
+        # anyway, so this only refreshes the copy it opens on before the
+        # first network read.
+        if: always() && steps.guard.outputs.ran != 'yes' && inputs.mode != 'protect'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash dashboard/publish.sh || echo "::warning::desk not published; the page still reads the live snapshot"
 
       - name: Sound the alarm on anything the record says went quietly wrong
         # The 17 Sep lesson: eleven positions spent a day with no stop, a
