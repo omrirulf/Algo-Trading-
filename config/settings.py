@@ -111,6 +111,20 @@ MAX_COMMODITY_FUND_PCT: Final[float] = 0.04
 #: plus an oil fund plus a gas fund is one energy bet made three times.
 MAX_EXPOSURE_GROUP_PCT: Final[float] = 0.25
 
+#: Per-group exceptions to MAX_EXPOSURE_GROUP_PCT, for a group whose members
+#: do not merely share a sector but move on the same single number.
+#:
+#: Duration is that case: SHY, IEF, TLT and TIP are four tickers priced off
+#: one thing, the level of US interest rates. The 25% general cap was sized
+#: for a diversified bucket -- eleven country funds, five chipmakers -- where
+#: a shared macro theme still leaves the members free to diverge day to day.
+#: Four points on one yield curve do not; they are one view taken four times,
+#: and 25% of the book behind a single view is a bet sized like five. 10%
+#: keeps it one conviction among several rather than the whole risk budget.
+EXPOSURE_GROUP_CAP_OVERRIDES: Final[dict[str, float]] = {
+    "Duration": 0.10,
+}
+
 #: Sleeve budgets. Funds are the core holding and single names the satellite,
 #: which is a deliberate statement about where the confidence is: a broad fund
 #: is diversified by construction, while a stock-picking edge is unproven here

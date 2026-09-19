@@ -200,6 +200,58 @@ def test_an_unknown_ticker_cannot_borrow_another_group_s_room(broker, market):
     assert group_for("ZZZZ") != group_for("MSFT")
 
 
+def test_duration_has_a_tighter_override_than_the_general_group_cap():
+    """Four tickers on one yield curve are one view, not a diversified bucket.
+
+    The general 25% group cap was sized for buckets whose members can diverge
+    day to day. SHY, IEF, TLT and TIP cannot -- they are the same interest-rate
+    bet at different maturities -- so Duration gets its own, tighter number.
+    """
+    assert cfg.EXPOSURE_GROUP_CAP_OVERRIDES["Duration"] < cfg.MAX_EXPOSURE_GROUP_PCT
+
+
+def test_the_duration_group_binds_below_a_single_fund_s_own_cap(broker, market):
+    """The override is tight enough to bind even before any one fund's cap does.
+
+    IEF alone is allowed 12% of the account under MAX_BROAD_FUND_PCT; the
+    Duration override caps the group at 10% regardless of how few tickers in
+    it are actually held. This is what "limit these bonds to 10%" means in
+    the risk engine: not 10% each, 10% total.
+    """
+    engine = ExecutionEngine(broker, market)
+    result = engine.execute(
+        LLMSignal(ticker="IEF", bias=Bias.BEARISH, conviction=0.9, rationale="x")
+    )
+    assert result.status is ExecutionStatus.ACCEPTED
+    held_pct = result.quantity * market.price / broker.equity
+    assert held_pct == pytest.approx(cfg.EXPOSURE_GROUP_CAP_OVERRIDES["Duration"], abs=1e-6)
+
+
+def test_shorting_the_curve_at_three_maturities_is_one_bet_not_three(broker, market):
+    """TLT, IEF and TIP short together is the concentration this closes.
+
+    Each leg passes its own single-fund cap; only the shared Duration group
+    stops the three from summing past 10% of the account.
+    """
+    rejected = []
+    for ticker in ("TLT", "IEF", "TIP"):
+        result = ExecutionEngine(broker, market).execute(
+            LLMSignal(ticker=ticker, bias=Bias.BEARISH, conviction=0.9, rationale="x")
+        )
+        if result.status is ExecutionStatus.ACCEPTED:
+            broker.positions.append(
+                OpenPosition(ticker=ticker, qty=result.quantity,
+                             market_value=result.quantity * market.price)
+            )
+        else:
+            rejected.append(result.reason)
+
+    held = sum(p.market_value for p in broker.positions) / broker.equity
+    assert held <= cfg.EXPOSURE_GROUP_CAP_OVERRIDES["Duration"] + 1e-9
+    assert rejected, "three legs of one rate bet should not all fit"
+    assert any("Duration" in r for r in rejected)
+
+
 # --- the sleeve budget ----------------------------------------------------- #
 
 

@@ -64,7 +64,7 @@ def exposure_group_headroom(
     equity: float,
     ticker: str,
     positions: Sequence[Any],
-    max_group_pct: float = cfg.MAX_EXPOSURE_GROUP_PCT,
+    max_group_pct: float | None = None,
 ) -> float:
     """Dollars still deployable into this ticker's exposure group.
 
@@ -73,13 +73,23 @@ def exposure_group_headroom(
     this does, and it spans both sleeves, so an oil driller and two energy
     funds count against the same group.
 
+    A group in ``cfg.EXPOSURE_GROUP_CAP_OVERRIDES`` -- currently just
+    Duration -- binds tighter than the general cap, because its members move
+    on one number rather than merely sharing a theme. ``max_group_pct``
+    overrides both when a caller passes one explicitly.
+
     ``positions`` is anything with ``.ticker`` and ``.market_value``.
     """
     group = group_for(ticker)
+    cap_pct = (
+        max_group_pct
+        if max_group_pct is not None
+        else cfg.EXPOSURE_GROUP_CAP_OVERRIDES.get(group, cfg.MAX_EXPOSURE_GROUP_PCT)
+    )
     used = sum(
         p.market_value for p in positions if group_for(p.ticker) == group
     )
-    return _headroom(equity, used, max_group_pct, f"group {group!r}")
+    return _headroom(equity, used, cap_pct, f"group {group!r}")
 
 
 def sleeve_headroom(

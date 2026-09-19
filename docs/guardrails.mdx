@@ -21,6 +21,7 @@ that last part works.
 | Max 7% per **focused fund** | One sector or one country. Above a single name, below a fund that spans the world. |
 | Max 4% per **single-commodity fund** | Tighter than a single stock: "fund" does no diversification work when it holds one commodity. |
 | Max 25% per **exposure group** | `risk_engine.exposure_group_headroom()` — spans every sleeve. |
+| Max 10% in **Duration** (`SHY`, `IEF`, `TLT`, `TIP`) | Same function, tighter cap from `config.settings.EXPOSURE_GROUP_CAP_OVERRIDES` — four maturities on one yield curve are one interest-rate view, not a diversified bucket. |
 | 45% funds / 15% single names | `risk_engine.sleeve_headroom()` — funds are the core holding. |
 | Max 95% of equity deployed **in total** | `risk_engine.check_gross_exposure_limit()` — the only check that sees every holding at once. |
 | Mandatory stop-loss on every order | `broker_client.submit_bracket_order()` — no code path submits an entry without a `StopLossRequest`. |
