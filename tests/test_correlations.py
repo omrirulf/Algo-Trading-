@@ -346,6 +346,78 @@ def test_cohesion_lists_the_least_coherent_group_first():
     assert [r["group"] for r in rows] == ["Loose", "Tight"]
 
 
+def test_cohesion_can_be_measured_inside_a_crisis():
+    """A group that looks diversified in calm markets and is one bet in a crash.
+
+    This is the whole reason the window is configurable: the recent number
+    is what would have set the cap, and the crisis number is what the cap
+    gets asked to survive.
+    """
+    n = 3000
+    rng = np.random.default_rng(61)
+    index = pd.bdate_range("2015-01-01", periods=n)
+    a, b = rng.normal(0, 0.01, n), rng.normal(0, 0.01, n)
+    inside = (index >= COVID.start) & (index <= COVID.end)
+    shared = rng.normal(0, 0.04, int(inside.sum()))
+    a[inside], b[inside] = shared, shared
+    returns = pd.DataFrame({"AAA": a, "BBB": b}, index=index)
+    groups = {"Pair": ("AAA", "BBB")}
+
+    [calm] = corr.cohesion(returns, groups)
+    [crash] = corr.cohesion(returns, groups, crisis=COVID)
+    assert calm["mean_pairwise"] < 0.3
+    assert crash["mean_pairwise"] > 0.9
+
+
+def test_crisis_cohesion_counts_members_by_data_not_by_definition():
+    """Regression: the grain funds are columns of NaN in a 2008 window.
+
+    Counting them would report a group whose members could not be compared
+    with each other -- an answer that looks measured and is not.
+    """
+    n = 4000
+    index = pd.bdate_range("2007-01-01", periods=n)
+    old_a = pd.Series(noise(n, 62), index=index)
+    old_b = pd.Series(noise(n, 63), index=index)
+    young = pd.Series(noise(n, 64), index=index)
+    young[index < "2011-01-01"] = np.nan
+    returns = pd.DataFrame({"OLD_A": old_a, "OLD_B": old_b, "NEW": young})
+    groups = {"Mixed": ("OLD_A", "OLD_B", "NEW")}
+
+    [gfc] = corr.cohesion(returns, groups, crisis=GFC)
+    assert gfc["members"] == 2                    # NEW did not exist
+    [covid] = corr.cohesion(returns, groups, crisis=COVID)
+    assert covid["members"] == 3
+
+
+def test_a_group_with_nobody_left_in_a_crisis_is_absent_not_zero():
+    n = 4000
+    index = pd.bdate_range("2007-01-01", periods=n)
+    young = pd.DataFrame(
+        {"A": noise(n, 65), "B": noise(n, 66)}, index=index
+    )
+    young[index < "2012-01-01"] = np.nan
+    assert corr.cohesion(young, {"Young": ("A", "B")}, crisis=GFC) == []
+
+
+def test_cohesion_by_crisis_lays_the_windows_side_by_side():
+    n = 4000
+    index = pd.bdate_range("2007-01-01", periods=n)
+    shared = noise(n, 67)
+    returns = pd.DataFrame(
+        {"AAA": shared, "BBB": shared * 1.05, "CCC": noise(n, 68)}, index=index
+    )
+    rows = corr.cohesion_by_crisis(
+        returns, {"Tight": ("AAA", "BBB"), "Loose": ("AAA", "CCC")}
+    )
+    by_group = {row["group"]: row for row in rows}
+    assert by_group["Tight"]["by_crisis"]["GFC'08"] > 0.9
+    assert by_group["Loose"]["by_crisis"]["GFC'08"] < 0.3
+    assert by_group["Tight"]["members_by_crisis"]["Covid'20"] == 2
+    # Least coherent first, so the caps doing least work are read first.
+    assert [r["group"] for r in rows] == ["Loose", "Tight"]
+
+
 def test_cross_group_measures_every_pair_of_groups():
     n = 300
     shared = noise(n, 19)
@@ -427,6 +499,19 @@ def test_the_report_carries_coverage_so_the_crisis_table_can_be_read():
     assert shorts == [c.short for c in corr.CRISES]
     gfc = next(c for c in data["coverage"]["crises"] if c["short"] == "GFC'08")
     assert gfc["tickers"] == 0                    # the fixture starts in 2010
+
+
+def test_render_shows_group_cohesion_through_the_crises():
+    n = 4000
+    index = pd.bdate_range("2007-01-01", periods=n)
+    returns = pd.DataFrame(
+        {"RSP": noise(n, 69), "IWM": noise(n, 70), "TLT": noise(n, 71),
+         "IEF": noise(n, 72)},
+        index=index,
+    )
+    text = corr.render(corr.report(returns))
+    assert "Did each group hold together *in* each crisis?" in text
+    assert "Duration" in text and "GFC'08" in text
 
 
 def test_render_shows_the_crisis_table_with_its_ticker_counts():

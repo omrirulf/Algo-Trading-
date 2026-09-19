@@ -470,7 +470,11 @@ def measure_pair(
     )
 
 
-def cohesion(returns: pd.DataFrame, groups: Optional[dict] = None) -> list[dict]:
+def cohesion(
+    returns: pd.DataFrame,
+    groups: Optional[dict] = None,
+    crisis: Optional[Crisis] = None,
+) -> list[dict]:
     """How tightly each existing exposure group actually moves together.
 
     The check nobody has run on ``EXPOSURE_GROUPS``. A group whose members
@@ -479,15 +483,32 @@ def cohesion(returns: pd.DataFrame, groups: Optional[dict] = None) -> list[dict]
     room on the table. A group near 1.0 is the opposite: Duration, measured,
     is the case that justified its own tighter cap.
 
-    Reported as the mean of every pairwise correlation inside the group, over
-    the long window, plus the loosest member -- the one whose correlation to
-    the rest is weakest, which is where a group tends to be wrong.
+    Reported as the mean of every pairwise correlation inside the group, plus
+    the loosest member -- the one whose correlation to the rest is weakest,
+    which is where a group tends to be wrong.
+
+    Over the last ``LONG_WINDOW`` days by default, or inside ``crisis`` when
+    one is given. The two answer different questions and can disagree
+    sharply: a group of equities that looks diversified in a calm year is
+    routinely one bet in a sell-off, and the calm number is the one that
+    would have set the cap.
+
+    Membership is counted by **data**, not by the group definition. In a 2008
+    window the grain funds are columns full of NaN, and counting them would
+    report a four-member Agriculture group whose members could not be
+    compared to each other -- an answer that looks measured and is not.
     """
     groups = EXPOSURE_GROUPS if groups is None else groups
-    window = returns.tail(LONG_WINDOW)
+    window = (
+        returns.loc[crisis.start:crisis.end] if crisis is not None
+        else returns.tail(LONG_WINDOW)
+    )
     out: list[dict] = []
     for group, tickers in groups.items():
-        present = [t for t in tickers if t in window.columns]
+        present = [
+            t for t in tickers
+            if t in window.columns and int(window[t].notna().sum()) >= MIN_OBSERVATIONS
+        ]
         if len(present) < 2:
             continue
         matrix = window[present].corr()
@@ -515,6 +536,50 @@ def cohesion(returns: pd.DataFrame, groups: Optional[dict] = None) -> list[dict]
             "loosest_member_r": round(to_rest[odd_one], 3) if odd_one else None,
         })
     return sorted(out, key=lambda row: row["mean_pairwise"])
+
+
+def cohesion_by_crisis(
+    returns: pd.DataFrame,
+    groups: Optional[dict] = None,
+    crises: Sequence[Crisis] = CRISES,
+) -> list[dict]:
+    """Each group's coherence in the recent window and inside each crisis.
+
+    The question the recent-window table cannot answer: a group capped as one
+    bet on the strength of a calm year may or may not have been one bet when
+    it mattered. Technology measuring 0.36 over the last twelve months says
+    nothing about what those eight tickers did together in 2008 -- and the
+    cap is there for days like 2008.
+
+    A group with fewer than two members holding data in a window is absent
+    from that column rather than reported as zero, which is why the row for
+    Agriculture is empty before 2011.
+    """
+    groups = EXPOSURE_GROUPS if groups is None else groups
+    recent = {row["group"]: row for row in cohesion(returns, groups)}
+    per_crisis = {
+        crisis.short: {
+            row["group"]: row for row in cohesion(returns, groups, crisis=crisis)
+        }
+        for crisis in crises
+    }
+    out: list[dict] = []
+    for group in groups:
+        out.append({
+            "group": group,
+            "recent": recent.get(group, {}).get("mean_pairwise"),
+            "by_crisis": {
+                short: rows.get(group, {}).get("mean_pairwise")
+                for short, rows in per_crisis.items()
+            },
+            "members_by_crisis": {
+                short: rows.get(group, {}).get("members", 0)
+                for short, rows in per_crisis.items()
+            },
+        })
+    # Least coherent first, on the recent number, so the groups whose caps
+    # are doing the least work are the ones read first.
+    return sorted(out, key=lambda row: (row["recent"] is None, row["recent"] or 0.0))
 
 
 def cross_group(returns: pd.DataFrame, stress: pd.Index,
@@ -603,6 +668,7 @@ def report(returns: pd.DataFrame) -> dict:
         "coverage": coverage(returns),
         "hypotheses": [p.as_dict() for p in named],
         "group_cohesion": cohesion(returns),
+        "group_cohesion_by_crisis": cohesion_by_crisis(returns),
         "cross_group": [p.as_dict() for p in crossed],
     }
 
@@ -699,6 +765,26 @@ def render(data: dict) -> str:
             f"{row['min_pairwise']:>7.2f}  {loose}"
         )
 
+    by_crisis = data.get("group_cohesion_by_crisis") or []
+    if by_crisis and crisis_cols:
+        lines += [
+            "",
+            "## Did each group hold together *in* each crisis? (mean pairwise r)",
+            "",
+            "The recent column is the last year; the rest are the drawdowns "
+            "themselves. A cap set on a calm year is a cap set on the first "
+            "column, and it is the later ones it will be asked to survive. "
+            "A dash means fewer than two members had data.",
+            "",
+            f"{'group':<26} {'recent':>7} " + " ".join(f"{c:>9}" for c in crisis_cols),
+            f"{'-' * 26} {'-' * 7} " + " ".join("-" * 9 for _ in crisis_cols),
+        ]
+        for row in by_crisis:
+            cells = " ".join(
+                f"{cell(row['by_crisis'].get(c)):>9}" for c in crisis_cols
+            )
+            lines.append(f"{row['group']:<26} {cell(row['recent']):>7} {cells}")
+
     def excess_of(row: dict) -> float:
         for key in ("excess_stress", "excess_long"):
             if isinstance(row.get(key), float):
@@ -771,8 +857,8 @@ __all__ = [
     "STABLE", "STRESS_ONLY", "FADES", "WEAK", "UNMEASURED",
     "HYPOTHESES", "CRISES", "Crisis", "CrisisResult", "PairResult",
     "daily_returns", "stress_index", "basket", "book_factor", "market_residual",
-    "correlation", "verdict", "measure_pair", "cohesion", "cross_group",
-    "coverage", "report",
+    "correlation", "verdict", "measure_pair", "cohesion", "cohesion_by_crisis",
+    "cross_group", "coverage", "report",
     "fetch_closes", "render", "main",
 ]
 
