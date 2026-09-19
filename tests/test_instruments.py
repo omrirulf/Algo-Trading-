@@ -252,6 +252,31 @@ def test_shorting_the_curve_at_three_maturities_is_one_bet_not_three(broker, mar
     assert any("Duration" in r for r in rejected)
 
 
+def test_groups_over_cap_is_empty_for_a_compliant_book():
+    """The read-only half of a group-cap trim: nothing to report when nothing is over."""
+    positions = [OpenPosition(ticker="TLT", qty=-50, market_value=5_000.0)]
+    assert risk_engine.groups_over_cap(100_000.0, positions) == {}
+
+
+def test_groups_over_cap_reports_duration_first_at_its_own_tighter_number():
+    """A book that was fine under the old 25% cap can already be over the new one.
+
+    $11,000 of Duration is under the old 25% cap (would need $25,000) but
+    over the new 10% override ($10,000) -- exactly the gap this closes.
+    """
+    positions = [
+        OpenPosition(ticker="TLT", qty=-60, market_value=6_000.0),
+        OpenPosition(ticker="IEF", qty=-50, market_value=5_000.0),
+    ]
+    excess = risk_engine.groups_over_cap(100_000.0, positions)
+    assert excess == {"Duration": pytest.approx(1_000.0)}
+
+
+def test_groups_over_cap_rejects_non_positive_equity():
+    with pytest.raises(risk_engine.RiskViolation):
+        risk_engine.groups_over_cap(0.0, [])
+
+
 # --- the sleeve budget ----------------------------------------------------- #
 
 

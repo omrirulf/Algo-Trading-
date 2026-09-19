@@ -544,6 +544,7 @@ Try adding `"quantity": 500` to that payload — it will be rejected with a
 | Funds are the core: 70% vs 25% for single names | `risk_engine.sleeve_headroom()` — a deliberate statement that a stock-picking edge is unproven here |
 | Max 95% of equity deployed in total | `risk_engine.check_gross_exposure_limit()` — the 5% buffer |
 | A winner is sold down in thirds and its stop walked up | `app/position_manager.py` — at +1R sell ⅓ and move the stop to breakeven; at +3R sell ⅓ and move it to +1R; the last third runs. The stop only tightens, and exits go through the broker's close-only endpoint, so nothing here can open a position |
+| A group-cap breach on an already-open position gets trimmed, not just blocked on new orders | `PositionManager._trim_over_cap_groups()` — every cap above is otherwise checked at entry and never again; a group that is over its cap (e.g. Duration's tightened to 10%) has every position in it sold pro-rata by market value, largest first, before the ladder runs |
 | Mandatory stop-loss on every order | `broker_client.submit_bracket_order()` — no code path submits without `StopLossRequest` (Alpaca OTO: market entry + attached stop) |
 | Stop distance from real volatility | `market_data.calculate_atr()` (Wilder ATR from yfinance OHLC), rejected if ATR is degenerate |
 | Conviction floor | `risk_engine.check_conviction_threshold()` |
