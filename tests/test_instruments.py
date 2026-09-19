@@ -277,6 +277,39 @@ def test_groups_over_cap_rejects_non_positive_equity():
         risk_engine.groups_over_cap(0.0, [])
 
 
+def test_the_farm_basket_is_grouped_with_the_crops_it_holds():
+    """DBA holds corn, wheat, soybeans and sugar -- the four funds beside it.
+
+    Grouped with DBC it was one agricultural bet spread across two ceilings.
+    This was the only one of 171 group pairs to clear |excess r| >= 0.6 over
+    2007-present, which is what sent someone looking.
+    """
+    assert group_for("DBA") == group_for("CORN") == "Agriculture"
+    assert group_for("DBA") != group_for("DBC")
+
+
+def test_the_farm_basket_is_still_sized_as_a_broad_fund():
+    """Grouping is about correlated risk; the cap is about what it holds.
+
+    Ten crops is genuinely more diversified than one, so the sizing is
+    unchanged -- only the ceiling it counts against moved.
+    """
+    assert kind_for("DBA") is InstrumentKind.BROAD_FUND
+    assert risk_engine.max_position_pct_for("DBA") == cfg.MAX_BROAD_FUND_PCT
+
+
+def test_every_watchlist_ticker_lands_in_exactly_one_group():
+    """A ticker in two groups would be counted against two ceilings."""
+    from config.instruments import EXPOSURE_GROUPS
+
+    seen: dict[str, str] = {}
+    for group, tickers in EXPOSURE_GROUPS.items():
+        for ticker in tickers:
+            assert ticker not in seen, f"{ticker} in {seen.get(ticker)} and {group}"
+            seen[ticker] = group
+    assert [t for t in SINGLE_NAMES + FUNDS if t not in seen] == []
+
+
 # --- the sleeve budget ----------------------------------------------------- #
 
 

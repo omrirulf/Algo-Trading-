@@ -129,6 +129,10 @@ DURATION: Final[tuple[str, ...]] = ("SHY", "IEF", "TLT", "TIP")
 CREDIT: Final[tuple[str, ...]] = ("LQD", "HYG", "EMB")
 #: Broad commodity baskets. These *are* diversified across commodities, so
 #: they are broad funds rather than commodity funds.
+#:
+#: That is a statement about *sizing* only. For exposure, DBA is grouped with
+#: the grains rather than with DBC -- it holds the same futures they do. See
+#: EXPOSURE_GROUPS below.
 BROAD_COMMODITY: Final[tuple[str, ...]] = ("DBC", "DBA")
 #: The dollar, as a basket against six developed currencies. Here because
 #: almost every other row on this list is priced in dollars, so the dollar is
@@ -484,12 +488,24 @@ EXPOSURE_GROUPS: Final[dict[str, tuple[str, ...]]] = {
     # net two opposite risks into one number.
     "Credit": CREDIT,
     "US dollar": CURRENCY,
-    "Broad commodities": BROAD_COMMODITY,
+    # DBC only. DBA is a broad fund for sizing -- it spans about ten crops --
+    # but it is not a *separate bet* from the grain funds below, because it
+    # holds the same futures: corn, wheat, soybeans and sugar are four of its
+    # largest positions, and the note on AGRICULTURE above already relies on
+    # that ("coffee exposure now comes through DBA"). Holding DBA alongside
+    # CORN, WEAT, SOYB and CANE was one agricultural bet spread across two
+    # groups, each with its own ceiling.
+    #
+    # Measured rather than assumed: of the 171 pairs of exposure groups,
+    # this was the only one to clear |excess r| >= 0.6 over 2007-present --
+    # 0.66 over the last year and 0.67 in the tail, after removing the
+    # factor every holding shares (analysis/correlations.py).
+    "Broad commodities": ("DBC",),
     # Miners with the metal: a gold miner is a levered bet on gold, not a
     # diversifier from it.
     "Precious metals": PRECIOUS_METALS + SECTOR_MINERS,
     "Industrial metals": INDUSTRIAL_METALS,
-    "Agriculture": AGRICULTURE,
+    "Agriculture": AGRICULTURE + ("DBA",),
 }
 
 _GROUP_OF: Final[dict[str, str]] = {

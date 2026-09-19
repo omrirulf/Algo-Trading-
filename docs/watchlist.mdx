@@ -50,6 +50,16 @@ single country, is a focused fund below and gets a smaller cap for it.
 | Broad commodities | DBC, DBA |
 | Currency | UUP |
 
+<Note>
+  **`DBA` is sized here and grouped with the crops.** Ten crops really are
+  more diversified than one, so it keeps the broad-fund cap. But it *holds*
+  corn, wheat, soybeans and sugar — the same four funds in sleeve 2c — so
+  for exposure it sits in the Agriculture group rather than beside `DBC`.
+  Left in "Broad commodities" it was one agricultural bet spread across two
+  ceilings, and it was the only one of 171 group pairs to show up in the
+  [correlation measurement](/guardrails) at |excess r| ≥ 0.6.
+</Note>
+
 `RSP` rather than `SPY`: a cap-weighted US index is a concentrated technology
 bet wearing a diversified label. Equal weight is the diversified version of
 the same market.
@@ -117,7 +127,7 @@ real estate is one sector; neither is a whole market.
 | Precious metals | GLD, SLV |
 | Industrial metals | CPER |
 | Energy commodities | USO, UNG |
-| Agriculture | CORN, WEAT, SOYB, CANE |
+| Agriculture | CORN, WEAT, SOYB, CANE (+ `DBA` for exposure, sized above) |
 
 Alpaca trades `us_equity`, `us_option` and `crypto` only, so futures are out
 of reach and physical metal is not something a brokerage account can hold.
