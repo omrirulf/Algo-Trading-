@@ -24,6 +24,17 @@ on:
       tickers:
         description: "Comma-separated override of the watchlist (default: all)"
         default: ""
+  # Also on a pull request that changes the measurement itself. Two reasons:
+  # a change to how correlation is computed should be reviewed against its
+  # own output rather than in the abstract, and workflow_dispatch does not
+  # exist until the file reaches the default branch -- so without this the
+  # first run could only happen after merge, which is the wrong order for
+  # something whose entire purpose is to inform a decision.
+  pull_request:
+    paths:
+      - "analysis/correlations.py"
+      - ".github/workflows/correlations.yml"
+      - "config/instruments.py"
 
 permissions:
   contents: read
@@ -41,11 +52,16 @@ jobs:
       - run: pip install -r requirements.txt
 
       - name: Measure
+        env:
+          # Defaulted here rather than in the `run` line so the pull_request
+          # trigger, which supplies no inputs at all, still has a sane span.
+          YEARS: ${{ inputs.years || '5' }}
+          TICKERS: ${{ inputs.tickers }}
         run: |
           set -o pipefail
-          ARGS="--years ${{ inputs.years }}"
-          if [ -n "${{ inputs.tickers }}" ]; then
-            ARGS="$ARGS --tickers ${{ inputs.tickers }}"
+          ARGS="--years $YEARS"
+          if [ -n "$TICKERS" ]; then
+            ARGS="$ARGS --tickers $TICKERS"
           fi
           python -m analysis.correlations $ARGS | tee correlations.txt
           python -m analysis.correlations $ARGS --json > correlations.json
