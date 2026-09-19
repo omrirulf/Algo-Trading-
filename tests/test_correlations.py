@@ -358,6 +358,90 @@ def test_cross_group_measures_every_pair_of_groups():
 
 
 # --------------------------------------------------------------------------- #
+# Named crises, and knowing which tickers were alive for them
+# --------------------------------------------------------------------------- #
+
+
+def dated(start: str, periods: int, **columns) -> pd.DataFrame:
+    return pd.DataFrame(columns, index=pd.bdate_range(start, periods=periods))
+
+
+COVID = next(c for c in corr.CRISES if c.short == "Covid'20")
+GFC = next(c for c in corr.CRISES if c.short == "GFC'08")
+
+
+def test_a_pair_is_measured_inside_each_crisis_window():
+    """A link that exists only during the Covid crash, and nowhere else."""
+    n = 2000
+    rng = np.random.default_rng(41)
+    index = pd.bdate_range("2019-01-01", periods=n)
+    a, b = rng.normal(0, 0.01, n), rng.normal(0, 0.01, n)
+    inside = (index >= COVID.start) & (index <= COVID.end)
+    shared = rng.normal(0, 0.03, int(inside.sum()))
+    a[inside], b[inside] = shared, shared
+    returns = pd.DataFrame({"AAA": a, "BBB": b}, index=index)
+
+    result = corr.measure_pair(returns, "x", ["AAA"], ["BBB"], pd.Index([]))
+    covid = result.crisis("Covid'20")
+    assert covid.raw == pytest.approx(1.0, abs=1e-9)
+    assert covid.days > corr.MIN_OBSERVATIONS
+    # Every other window sees two unrelated series.
+    others = [c for c in result.crises if c.short != "Covid'20" and c.raw is not None]
+    assert others, "the fixture should cover more than one crisis"
+    assert all(abs(c.raw) < 0.3 for c in others)
+
+
+def test_a_crisis_before_the_data_starts_is_a_dash_not_a_zero():
+    """CPER and the grain funds have no 2008. Saying '0.00' would be a lie."""
+    returns = dated("2015-01-01", 800, AAA=noise(800, 42), BBB=noise(800, 43))
+    result = corr.measure_pair(returns, "x", ["AAA"], ["BBB"], pd.Index([]))
+    gfc = result.crisis("GFC'08")
+    assert gfc.raw is None and gfc.excess is None and gfc.days == 0
+
+
+def test_coverage_counts_who_was_alive_for_each_crisis():
+    n = 5000
+    index = pd.bdate_range("2006-01-02", periods=n)
+    old = pd.Series(noise(n, 44), index=index)
+    young = pd.Series(noise(n, 45), index=index)
+    young[index < "2012-01-01"] = np.nan          # launched in 2012
+    returns = pd.DataFrame({"OLD": old, "NEW": young}, index=index)
+
+    data = corr.coverage(returns)
+    assert data["first_day"]["OLD"].startswith("2006")
+    assert data["first_day"]["NEW"].startswith("2012")
+    by_short = {c["short"]: c for c in data["crises"]}
+    assert by_short["GFC'08"]["tickers"] == 1     # only OLD existed
+    assert by_short["Covid'20"]["tickers"] == 2
+
+
+def test_the_report_carries_coverage_so_the_crisis_table_can_be_read():
+    n = 3000
+    index = pd.bdate_range("2010-01-04", periods=n)
+    returns = pd.DataFrame(
+        {"RSP": noise(n, 46), "UUP": noise(n, 47), "TLT": noise(n, 48)}, index=index
+    )
+    data = corr.report(returns)
+    assert "coverage" in data
+    shorts = [c["short"] for c in data["coverage"]["crises"]]
+    assert shorts == [c.short for c in corr.CRISES]
+    gfc = next(c for c in data["coverage"]["crises"] if c["short"] == "GFC'08")
+    assert gfc["tickers"] == 0                    # the fixture starts in 2010
+
+
+def test_render_shows_the_crisis_table_with_its_ticker_counts():
+    n = 3000
+    index = pd.bdate_range("2010-01-04", periods=n)
+    returns = pd.DataFrame(
+        {"RSP": noise(n, 49), "UUP": noise(n, 50), "TLT": noise(n, 51)}, index=index
+    )
+    text = corr.render(corr.report(returns))
+    assert "crisis by crisis" in text
+    assert "Covid'20" in text and "GFC'08" in text
+    assert "tickers with data" in text
+
+
+# --------------------------------------------------------------------------- #
 # The report and its rendering
 # --------------------------------------------------------------------------- #
 

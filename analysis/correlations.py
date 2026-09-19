@@ -2,7 +2,7 @@
 
     python -m analysis.correlations                  # the report, for a person
     python -m analysis.correlations --json           # the numbers, for a machine
-    python -m analysis.correlations --years 5
+    python -m analysis.correlations --start 2007-01-01
 
 ``config/instruments.py`` groups tickers by what they are assumed to correlate
 with. Every one of those groups is a *hypothesis* -- a plausible story about
@@ -53,6 +53,22 @@ The stress window is defined by equity, because a book that is 70% funds and
 25% single names is mostly an equity book. That is a choice, not a law, and a
 pair whose own tail sits elsewhere (a rates shock with equities flat) is one
 this window will understate. Said here rather than discovered later.
+
+Named crises, on top of that
+----------------------------
+The quantile window blends every bad day since the start date into one
+number, which buries the most useful comparison available: 2008 was a credit
+and solvency crisis, 2020 a liquidity scramble, 2022 a rates repricing, and
+they did not produce the same correlations. ``CRISES`` measures each one
+separately.
+
+That only works if the data reaches them, and for much of this watchlist it
+does not: the copper and grain funds, MCHI, INDA, KSA and XLC were all
+launched in the 2010s and have no 2008 at all. ``coverage()`` reports how
+many tickers each window actually had, and the crisis table prints a dash
+rather than a number for a pair that did not yet exist -- because the
+alternative is a reader comparing one pair's 2008 against another's 2020
+and believing they are the same measurement.
 """
 
 from __future__ import annotations
@@ -98,6 +114,50 @@ FADES = "fades-in-stress"
 EMERGING = "emerging"
 WEAK = "weak"
 UNMEASURED = "unmeasured"
+
+
+@dataclass(frozen=True)
+class Crisis:
+    """One named drawdown, measured on its own rather than blended in."""
+
+    label: str
+    short: str
+    start: str
+    end: str
+
+
+#: The regimes worth measuring separately, peak to trough.
+#:
+#: A single quantile-based stress window blends these together, which hides
+#: the thing most worth knowing: correlations that hold in one crisis often
+#: do not hold in the next, because each one has a different cause. 2008 was
+#: credit and bank solvency, 2020 was a liquidity scramble in which even
+#: Treasuries sold off for a week, 2022 was rates repricing and is the only
+#: one of the three where bonds and equities fell *together* for a year. A
+#: pair that co-moves in all of them is a different animal from one that
+#: co-moved in 2022 alone.
+#:
+#: Dates are index peaks and troughs rather than round months, so each
+#: window is the drawdown itself and not the recovery either side of it.
+CRISES: tuple[Crisis, ...] = (
+    Crisis("Global financial crisis", "GFC'08", "2007-10-09", "2009-03-09"),
+    Crisis("Euro sovereign debt", "Euro'11", "2011-07-01", "2011-10-04"),
+    Crisis("China and oil", "Oil'15", "2015-08-01", "2016-02-11"),
+    Crisis("Q4 2018 selloff", "Q4'18", "2018-10-01", "2018-12-24"),
+    Crisis("Covid crash", "Covid'20", "2020-02-19", "2020-03-23"),
+    Crisis("Rates repricing", "Rates'22", "2022-01-03", "2022-10-12"),
+)
+
+
+@dataclass(frozen=True)
+class CrisisResult:
+    """One pair through one crisis. ``days`` is why to believe it or not."""
+
+    label: str
+    short: str
+    raw: Optional[float]
+    excess: Optional[float]
+    days: int
 
 
 # --------------------------------------------------------------------------- #
@@ -307,12 +367,18 @@ class PairResult:
     #: groups this is the one worth reading: ``verdict`` can say "stable"
     #: about a pair whose entire co-movement is the market factor.
     excess_verdict: str = UNMEASURED
+    #: The pair through each named drawdown, in ``CRISES`` order.
+    crises: tuple[CrisisResult, ...] = ()
 
     def as_dict(self) -> dict:
         out = asdict(self)
         out["left"] = list(self.left)
         out["right"] = list(self.right)
+        out["crises"] = [asdict(c) for c in self.crises]
         return out
+
+    def crisis(self, short: str) -> Optional[CrisisResult]:
+        return next((c for c in self.crises if c.short == short), None)
 
     @property
     def rank_by(self) -> float:
@@ -328,6 +394,32 @@ class PairResult:
         return 0.0
 
 
+def _measure_crisis(
+    crisis: Crisis,
+    a: pd.Series,
+    b: pd.Series,
+    ra: Optional[pd.Series],
+    rb: Optional[pd.Series],
+) -> CrisisResult:
+    """One pair inside one named drawdown.
+
+    The excess figure slices residuals fitted over the **whole** sample
+    rather than re-fitting a beta inside the window. Covid'20 is 23 trading
+    days; a beta estimated from 23 points and then subtracted would remove
+    mostly noise, and the question being asked is anyway "given how these
+    two normally track the market, did they move together here" rather than
+    "what was their beta that month".
+    """
+    window_a, window_b = a.loc[crisis.start:crisis.end], b.loc[crisis.start:crisis.end]
+    raw, days = correlation(window_a, window_b)
+    excess = None
+    if ra is not None and rb is not None:
+        excess, _ = correlation(
+            ra.loc[crisis.start:crisis.end], rb.loc[crisis.start:crisis.end]
+        )
+    return CrisisResult(crisis.label, crisis.short, raw, excess, days)
+
+
 def measure_pair(
     returns: pd.DataFrame,
     label: str,
@@ -335,8 +427,9 @@ def measure_pair(
     right: Sequence[str],
     stress: pd.Index,
     market: Optional[pd.Series] = None,
+    crises: Sequence[Crisis] = CRISES,
 ) -> PairResult:
-    """One named pair, raw and market-adjusted, across all three windows."""
+    """One named pair, raw and market-adjusted, over every window and crisis."""
     a, b = basket(returns, left), basket(returns, right)
     if a is None or b is None:
         return PairResult(label, tuple(left), tuple(right),
@@ -350,6 +443,7 @@ def measure_pair(
     )
 
     excess_long = excess_stress = None
+    ra = rb = None
     if market is not None:
         ra, rb = market_residual(a, market), market_residual(b, market)
         if ra is not None and rb is not None:
@@ -358,6 +452,12 @@ def measure_pair(
                 excess_stress, _ = correlation(
                     ra.reindex(stress).dropna(), rb.reindex(stress).dropna()
                 )
+        else:
+            ra = rb = None
+
+    crisis_results = tuple(
+        _measure_crisis(crisis, a, b, ra, rb) for crisis in crises
+    )
 
     return PairResult(
         label=label, left=tuple(left), right=tuple(right),
@@ -366,6 +466,7 @@ def measure_pair(
         stress_days=stress_n, observations=n,
         verdict=verdict(recent_r, long_r, stress_r),
         excess_verdict=verdict(None, excess_long, excess_stress),
+        crises=crisis_results,
     )
 
 
@@ -442,6 +543,40 @@ def cross_group(returns: pd.DataFrame, stress: pd.Index,
     return sorted(results, key=lambda r: r.rank_by, reverse=True)
 
 
+def coverage(returns: pd.DataFrame, crises: Sequence[Crisis] = CRISES) -> dict:
+    """Which tickers existed when -- without this the crisis table lies.
+
+    Fetching from 2007 does not give 2007 data for eighty tickers. CPER,
+    CORN, WEAT, SOYB, CANE, MCHI, INDA, KSA and XLC all launched in the
+    2010s; the copper and grain funds did not exist in 2008 at all. A table
+    that simply prints a blank for them invites the reader to compare a
+    2008 number for one pair against a 2020 number for the next and treat
+    the two as the same measurement.
+
+    So the report says, per crisis, how many of the requested tickers had
+    prices then -- and names the ones that never see 2008, because they are
+    the reason a whole-history verdict is not available for every row.
+    """
+    first_day = {
+        str(ticker): str(returns[ticker].first_valid_index().date())
+        for ticker in returns.columns
+        if returns[ticker].first_valid_index() is not None
+    }
+    per_crisis = []
+    for crisis in crises:
+        window = returns.loc[crisis.start:crisis.end]
+        present = [c for c in window.columns if window[c].notna().any()]
+        per_crisis.append({
+            "label": crisis.label,
+            "short": crisis.short,
+            "start": crisis.start,
+            "end": crisis.end,
+            "days": int(len(window)),
+            "tickers": len(present),
+        })
+    return {"first_day": first_day, "crises": per_crisis}
+
+
 def report(returns: pd.DataFrame) -> dict:
     """Everything this module measures, as one structure."""
     stress = stress_index(returns)
@@ -465,6 +600,7 @@ def report(returns: pd.DataFrame) -> dict:
         "market_adjusted": market is not None,
         "windows": {"recent": SHORT_WINDOW, "long": LONG_WINDOW,
                     "strong_threshold": STRONG},
+        "coverage": coverage(returns),
         "hypotheses": [p.as_dict() for p in named],
         "group_cohesion": cohesion(returns),
         "cross_group": [p.as_dict() for p in crossed],
@@ -476,7 +612,7 @@ def report(returns: pd.DataFrame) -> dict:
 # --------------------------------------------------------------------------- #
 
 
-def fetch_closes(tickers: Sequence[str], years: int = 3) -> pd.DataFrame:
+def fetch_closes(tickers: Sequence[str], start: str = "2007-01-01") -> pd.DataFrame:
     """Daily adjusted closes, one column per ticker.
 
     The only function here that touches the network, and it is imported
@@ -489,7 +625,7 @@ def fetch_closes(tickers: Sequence[str], years: int = 3) -> pd.DataFrame:
     import yfinance as yf  # imported lazily so tests never need it
 
     frame = yf.download(
-        list(tickers), period=f"{years}y", interval="1d",
+        list(tickers), start=start, interval="1d",
         auto_adjust=True, progress=False, group_by="column",
     )
     if frame is None or frame.empty:
@@ -522,6 +658,31 @@ def render(data: dict) -> str:
             f"{row['label']:<40} {cell(row['recent']):>7} {cell(row['long']):>7} "
             f"{cell(row['stress']):>7} {cell(row['excess_stress']):>7}  {row['verdict']}"
         )
+
+    crisis_cols = [c["short"] for c in data["coverage"]["crises"]]
+    if crisis_cols:
+        lines += [
+            "",
+            "## The same pairs, crisis by crisis (excess r)",
+            "",
+            "Each drawdown measured on its own, because they had different "
+            "causes and a link that holds in one need not hold in the next. "
+            "A dash means one side did not exist yet.",
+            "",
+            f"{'pair':<40} " + " ".join(f"{c:>9}" for c in crisis_cols),
+            f"{'-' * 40} " + " ".join("-" * 9 for _ in crisis_cols),
+        ]
+        for row in data["hypotheses"]:
+            by_short = {c["short"]: c for c in row["crises"]}
+            cells = " ".join(
+                f"{cell(by_short.get(c, {}).get('excess')):>9}" for c in crisis_cols
+            )
+            lines.append(f"{row['label']:<40} {cells}")
+        lines += [
+            "",
+            f"{'tickers with data':<40} "
+            + " ".join(f"{c['tickers']:>9}" for c in data["coverage"]["crises"]),
+        ]
 
     lines += [
         "",
@@ -581,8 +742,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         description="Measure what actually moves together on this watchlist."
     )
-    parser.add_argument("--years", type=int, default=3,
-                        help="how much history to fetch (default: 3)")
+    parser.add_argument(
+        "--start", default="2007-01-01",
+        help="first day to fetch (default: 2007-01-01, to reach the 2008 crisis)",
+    )
     parser.add_argument("--json", action="store_true", dest="as_json")
     parser.add_argument("--tickers", default="",
                         help="comma-separated override of the watchlist")
@@ -592,7 +755,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         tuple(t.strip().upper() for t in args.tickers.split(",") if t.strip())
         or DEFAULT_WATCHLIST
     )
-    closes = fetch_closes(tickers, years=args.years)
+    closes = fetch_closes(tickers, start=args.start)
     data = report(daily_returns(closes))
     missing = sorted(set(tickers) - set(closes.columns))
     data["missing"] = missing
@@ -606,9 +769,10 @@ __all__ = [
     "SHORT_WINDOW", "LONG_WINDOW", "STRESS_QUANTILE", "STRESS_BENCHMARK",
     "STRONG", "MIN_OBSERVATIONS",
     "STABLE", "STRESS_ONLY", "FADES", "WEAK", "UNMEASURED",
-    "HYPOTHESES", "PairResult",
+    "HYPOTHESES", "CRISES", "Crisis", "CrisisResult", "PairResult",
     "daily_returns", "stress_index", "basket", "book_factor", "market_residual",
-    "correlation", "verdict", "measure_pair", "cohesion", "cross_group", "report",
+    "correlation", "verdict", "measure_pair", "cohesion", "cross_group",
+    "coverage", "report",
     "fetch_closes", "render", "main",
 ]
 

@@ -18,9 +18,9 @@ name: correlations
 on:
   workflow_dispatch:
     inputs:
-      years:
-        description: "How much history to fetch"
-        default: "3"
+      start:
+        description: "First day to fetch (2007-01-01 reaches the 2008 crisis)"
+        default: "2007-01-01"
       tickers:
         description: "Comma-separated override of the watchlist (default: all)"
         default: ""
@@ -54,12 +54,12 @@ jobs:
       - name: Measure
         env:
           # Defaulted here rather than in the `run` line so the pull_request
-          # trigger, which supplies no inputs at all, still has a sane span.
-          YEARS: ${{ inputs.years || '5' }}
+          # trigger, which supplies no inputs at all, still reaches 2008.
+          START: ${{ inputs.start || '2007-01-01' }}
           TICKERS: ${{ inputs.tickers }}
         run: |
           set -o pipefail
-          ARGS="--years $YEARS"
+          ARGS="--start $START"
           if [ -n "$TICKERS" ]; then
             ARGS="$ARGS --tickers $TICKERS"
           fi
