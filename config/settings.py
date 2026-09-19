@@ -111,19 +111,52 @@ MAX_COMMODITY_FUND_PCT: Final[float] = 0.04
 #: plus an oil fund plus a gas fund is one energy bet made three times.
 MAX_EXPOSURE_GROUP_PCT: Final[float] = 0.25
 
-#: Per-group exceptions to MAX_EXPOSURE_GROUP_PCT, for a group whose members
-#: do not merely share a sector but move on the same single number.
+#: Per-group exceptions to MAX_EXPOSURE_GROUP_PCT. Each carries the number
+#: that set it, measured on daily closes 2007-01-03 to 2026-09-18 (80 tickers,
+#: yfinance, closes.csv SHA-256 f3a98414...5c3c).
 #:
-#: Duration is that case: SHY, IEF, TLT and TIP are four tickers priced off
-#: one thing, the level of US interest rates. The 25% general cap was sized
-#: for a diversified bucket -- eleven country funds, five chipmakers -- where
-#: a shared macro theme still leaves the members free to diverge day to day.
-#: Four points on one yield curve do not; they are one view taken four times,
-#: and 25% of the book behind a single view is a bet sized like five. 10%
-#: keeps it one conviction among several rather than the whole risk budget.
+#: Duration: 30%. It holds LQD as well as the four Treasury maturities (see
+#: ``instruments.EXPOSURE_GROUPS``).
+#:
+#: The number is set by how much the bucket can *lose*, not by how tightly its
+#: members move together. They do move together -- that is why they are one
+#: group -- but a cap is a loss budget, and correlation alone does not say how
+#: large the loss is. As a basket Duration's worst fall was 18.9% (2022), so
+#: 30% of the account risks about 5.7% of it. One equity group at 25% already
+#: risks more: real estate fell 64% in the 2008 crisis, which is 16% of the
+#: account. A tighter number here would be buying less protection than the
+#: equity groups already give away, while forbidding the one asset that
+#: usually rallies when they fall.
+#:
+#: Read against what this replaces rather than against the general cap: 25% of
+#: Treasuries plus 25% of LQD through Credit was really a 50% ceiling on one
+#: rate view. 30% is a tightening of that.
 EXPOSURE_GROUP_CAP_OVERRIDES: Final[dict[str, float]] = {
-    "Duration": 0.10,
+    "Duration": 0.30,
 }
+
+#: Ceiling on *net* stock-market risk, across every equity group at once.
+#:
+#: The groups bound one sector or region each. They do not bound the thing
+#: those sectors share: on 20 years of weekly returns the 62 stock and
+#: stock-like tickers move together at 0.52 on average, rising to 0.72 in the
+#: 2008 crisis and 0.81 in the 2020 crash. Spread across eleven groups, that
+#: one bet could fill the whole 95% gross cap while every group cap was
+#: satisfied. This is the limit on it.
+#:
+#: Counted in beta-weighted dollars: each position's market value times its
+#: beta to the US market (``instruments.EQUITY_RISK_BETAS``), so a staples
+#: fund at beta 0.54 uses about half the room of a dollar of NVDA at 1.57.
+#: Longs add and shorts subtract -- inside this bucket only. Stocks fell
+#: together in every crash measured, so a short stock fund does offset a long
+#: one; bonds did not offset stocks in 2022, so nothing outside the bucket
+#: nets against it. The group, sleeve and gross caps stay sign-blind.
+#:
+#: What 60% would have meant, as a share of the account, for a book at the
+#: limit: about 25% lost in the 2008 crisis, 22% in the 2020 crash, 15% in
+#: 2022. With nothing but the gross cap the same book could have lost about
+#: 39%, 35% and 24%.
+MAX_EQUITY_RISK_PCT: Final[float] = 0.60
 
 #: Sleeve budgets. Funds are the core holding and single names the satellite,
 #: which is a deliberate statement about where the confidence is: a broad fund

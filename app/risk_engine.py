@@ -10,7 +10,7 @@ import math
 from typing import Any, Sequence
 
 from config import settings as cfg
-from config.instruments import InstrumentKind, group_for, kind_for
+from config.instruments import InstrumentKind, equity_risk_beta, group_for, kind_for
 
 
 class RiskViolation(ValueError):
@@ -60,6 +60,11 @@ def _headroom(equity: float, used: float, cap_pct: float, label: str) -> float:
     return max(0.0, equity * cap_pct - used)
 
 
+def group_cap_pct(group: str) -> float:
+    """The ceiling for one exposure group: its own override, or the general cap."""
+    return cfg.EXPOSURE_GROUP_CAP_OVERRIDES.get(group, cfg.MAX_EXPOSURE_GROUP_PCT)
+
+
 def exposure_group_headroom(
     equity: float,
     ticker: str,
@@ -73,23 +78,79 @@ def exposure_group_headroom(
     this does, and it spans both sleeves, so an oil driller and two energy
     funds count against the same group.
 
-    A group in ``cfg.EXPOSURE_GROUP_CAP_OVERRIDES`` -- currently just
-    Duration -- binds tighter than the general cap, because its members move
-    on one number rather than merely sharing a theme. ``max_group_pct``
-    overrides both when a caller passes one explicitly.
+    A group in ``cfg.EXPOSURE_GROUP_CAP_OVERRIDES`` has its own ceiling, set
+    by what that bucket can lose rather than by the general number.
+    ``max_group_pct`` overrides both when a caller passes one explicitly.
 
     ``positions`` is anything with ``.ticker`` and ``.market_value``.
     """
     group = group_for(ticker)
-    cap_pct = (
-        max_group_pct
-        if max_group_pct is not None
-        else cfg.EXPOSURE_GROUP_CAP_OVERRIDES.get(group, cfg.MAX_EXPOSURE_GROUP_PCT)
-    )
+    cap_pct = max_group_pct if max_group_pct is not None else group_cap_pct(group)
     used = sum(
         p.market_value for p in positions if group_for(p.ticker) == group
     )
     return _headroom(equity, used, cap_pct, f"group {group!r}")
+
+
+def _direction(position: Any) -> float:
+    """+1 for a long, -1 for a short. Read from ``qty``, negative when short."""
+    qty = getattr(position, "qty", None)
+    if qty is None:
+        return -1.0 if getattr(position, "side", "buy") == "sell" else 1.0
+    return -1.0 if qty < 0 else 1.0
+
+
+def net_equity_risk(positions: Sequence[Any]) -> float:
+    """Signed, beta-weighted dollars of stock-market risk in the book.
+
+    Longs add and shorts subtract, inside the stock-market bucket only.
+    Positions outside it -- bonds, commodities, gold, the dollar -- contribute
+    nothing: they are bounded by their own groups and never offset stocks.
+    That asymmetry is the point. Stocks fell together in every crash measured,
+    so one stock fund really does hedge another; bonds and stocks fell
+    together through 2022, so a bond position must not be allowed to buy room
+    for more equity.
+    """
+    total = 0.0
+    for p in positions:
+        beta = equity_risk_beta(p.ticker)
+        if beta is not None:
+            total += _direction(p) * abs(p.market_value) * beta
+    return total
+
+
+def equity_risk_headroom(
+    equity: float,
+    ticker: str,
+    side: str,
+    positions: Sequence[Any],
+    cap_pct: float = cfg.MAX_EQUITY_RISK_PCT,
+) -> float | None:
+    """Dollars of ``ticker`` still tradable on ``side`` under the stock limit.
+
+    ``None`` when the ticker is outside the bucket, so the limit does not
+    apply to it at all.
+
+    The limit is on the *net*: ``|longs - shorts|``, each weighted by beta,
+    may not exceed ``cap_pct`` of equity. An order moving the net towards zero
+    has room for the whole distance back to zero plus the entire limit on the
+    other side; one moving it away has only what is left. The answer is in
+    plain dollars of this ticker, so it compares directly with the other caps.
+    """
+    beta = equity_risk_beta(ticker)
+    if beta is None:
+        return None
+    if equity <= 0:
+        raise RiskViolation(f"equity must be positive, got {equity}")
+    if side not in ("buy", "sell"):
+        raise RiskViolation(f"side must be 'buy' or 'sell', got {side!r}")
+    if not 0 < cap_pct <= 1:
+        raise RiskViolation(f"stock-market cap must be in (0, 1], got {cap_pct}")
+    if beta <= 0:
+        raise RiskViolation(f"beta for {ticker} must be positive, got {beta}")
+    direction = 1.0 if side == "buy" else -1.0
+    room_in_beta_dollars = equity * cap_pct - direction * net_equity_risk(positions)
+    return max(0.0, room_in_beta_dollars) / beta
 
 
 def groups_over_cap(equity: float, positions: Sequence[Any]) -> dict[str, float]:
@@ -149,20 +210,25 @@ def sleeve_headroom(
 
 
 def budget_ceiling_for(
-    equity: float, ticker: str, positions: Sequence[Any]
+    equity: float, ticker: str, positions: Sequence[Any], side: str = "buy"
 ) -> tuple[float, str]:
-    """The tightest of the three portfolio limits, and which one it was.
+    """The tightest of the portfolio limits, and which one it was.
 
     Returned together so a rejection can name the limit that actually bound,
     rather than reporting the gross cap when it was really the energy group.
+    The stock-market limit joins only for tickers inside its bucket, and is
+    the one limit that depends on ``side``: a short there reduces the net.
     """
-    candidates = (
+    candidates = [
         ("gross exposure", gross_exposure_headroom(
             equity, sum(p.market_value for p in positions))),
         (f"{group_for(ticker)!r} group", exposure_group_headroom(
             equity, ticker, positions)),
         ("sleeve budget", sleeve_headroom(equity, ticker, positions)),
-    )
+    ]
+    stock_room = equity_risk_headroom(equity, ticker, side, positions)
+    if stock_room is not None:
+        candidates.append(("stock-market (by beta)", stock_room))
     label, room = min(candidates, key=lambda pair: pair[1])
     return room, label
 

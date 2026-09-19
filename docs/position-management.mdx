@@ -139,10 +139,10 @@ up. Two reasons, one practical and one principled:
 Every cap in `app/risk_engine.py` — single name, fund, exposure group — is
 checked when a position is **opened**, and never again. That is fine for a
 cap that has always applied: nothing legitimately opened could have crossed
-it. It is not fine for a cap that just got tighter. Duration's did, from 25%
-to 10% (see [Guardrails](/guardrails)), and three positions sized lawfully
-under the old number were left sitting at the old one under the new — an
-entry-time check has nothing to say about a position it never re-examines.
+it. It is not fine for a cap that just moved. Duration's has (see
+[Guardrails](/guardrails)), and positions sized lawfully under the old
+number were left sitting at the old one under the new — an entry-time check
+has nothing to say about a position it never re-examines.
 
 So before the ladder runs, every exposure group is checked against
 `risk_engine.groups_over_cap`. A group that is over its cap has every

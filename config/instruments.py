@@ -458,6 +458,27 @@ def sleeve_label(ticker: str) -> str:
 # drawdown that is what it trades like, and the point of a group is to bound
 # correlated risk rather than to reproduce a classification standard.
 
+
+def _without(tickers: tuple[str, ...], *drop: str) -> tuple[str, ...]:
+    return tuple(t for t in tickers if t not in drop)
+
+
+# Measured moves. The sleeve tuples above stay as they are -- they decide the
+# position cap and the prompt -- and only the group a ticker counts against
+# changes. Numbers are correlations of returns, 2007-01-03 to 2026-09-18,
+# weekly unless marked, from an independent study of the same price history.
+#
+# - HDB trades with India (INDA 0.70) more than with its own Financials group
+#   (0.52 on average), and MELI with Argentina (ARGT 0.61) more than with
+#   Consumer (0.31). Both now count against Emerging markets.
+# - LQD moves with Treasuries once the market is taken out (IEF 0.67, daily),
+#   and did so in 2022 (0.86, daily), while the rest of Credit came apart in
+#   crises (0.34 in 2008, 0.21 in 2011). It counts against Duration, whose
+#   ceiling rises to 30% to hold it (settings.EXPOSURE_GROUP_CAP_OVERRIDES).
+#
+# DBC and DBA moved for the same reasons an earlier pass here found
+# independently; the two studies agree on both, by different methods.
+
 EXPOSURE_GROUPS: Final[dict[str, tuple[str, ...]]] = {
     # Each sector fund sits with the single names it is a diversified version
     # of. This is the check that makes the focused sleeve safe to widen: NVDA
@@ -465,10 +486,10 @@ EXPOSURE_GROUPS: Final[dict[str, tuple[str, ...]]] = {
     # without this row every per-ticker cap would be satisfied while it
     # happened.
     "Technology": TECHNOLOGY + COMMUNICATION + SECTOR_TECHNOLOGY,
-    "Financials": FINANCIALS + SECTOR_FINANCIALS,
+    "Financials": _without(FINANCIALS, "HDB") + SECTOR_FINANCIALS,
     "Health care": HEALTH_CARE + SECTOR_HEALTH_CARE,
     "Industrials": INDUSTRIALS + SECTOR_INDUSTRIALS,
-    "Consumer": CONSUMER_DISCRETIONARY + CONSUMER_STAPLES + SECTOR_CONSUMER,
+    "Consumer": _without(CONSUMER_DISCRETIONARY, "MELI") + CONSUMER_STAPLES + SECTOR_CONSUMER,
     # One energy bet, whether taken through a driller, a sector fund, the
     # barrel -- or a "broad" commodity basket that is mostly oil. DBC is
     # roughly 55-60% energy futures by weight, and it measures 0.82 excess
@@ -490,12 +511,14 @@ EXPOSURE_GROUPS: Final[dict[str, tuple[str, ...]]] = {
     # them under one 25% ceiling would have made "the rest of the world" a
     # single position.
     "Developed international": ("VGK",) + COUNTRY_DEVELOPED,
-    "Emerging markets": ("VWO",) + COUNTRY_EMERGING,
-    "Duration": DURATION,
-    # Its own group rather than part of duration: credit sells off with
-    # equities, while government paper rallies. Putting them together would
-    # net two opposite risks into one number.
-    "Credit": CREDIT,
+    "Emerging markets": ("VWO",) + COUNTRY_EMERGING + ("HDB", "MELI"),
+    "Duration": DURATION + ("LQD",),
+    # Still its own group rather than part of duration: high yield and
+    # emerging debt sell off with equities while government paper rallies,
+    # and putting those together would net two opposite risks into one
+    # number. LQD is the exception the data found -- it tracks Treasuries,
+    # not its old group -- and sits with Duration (see above).
+    "Credit": _without(CREDIT, "LQD"),
     "US dollar": CURRENCY,
     # There is no "Broad commodities" exposure group, though the sizing
     # roster of that name survives in BROAD_FUND_ROLES: both its members are
@@ -532,6 +555,69 @@ def group_for(ticker: str) -> str:
     return _GROUP_OF.get(ticker.strip().upper(), UNGROUPED)
 
 
+# --------------------------------------------------------------------------- #
+# Stock-market risk (settings.MAX_EQUITY_RISK_PCT)
+# --------------------------------------------------------------------------- #
+# Every ticker whose risk is, at bottom, the stock market -- and how much of it
+# each carries. Beta is the slope of the ticker's weekly return on the US
+# market's (Ken French Mkt), 2007-01 to 2026-09: 1.57 means NVDA has usually
+# moved about 1.6% for each 1% the market moved.
+#
+# Betas drift -- NVDA's was 1.33 in the 2008 crisis and 2.13 in 2022 -- so
+# re-measure every January and after any sharp sell-off, and write the new
+# numbers here by hand. They are measured elsewhere and copied in; nothing in
+# this repository fits them, for the same reason no cap is fitted here.
+#
+# Membership is these keys: the eleven equity groups, the two oil *stocks*,
+# and the two credit funds that behave like stocks. Bonds, commodities, gold
+# and the dollar are not in it; each is bounded by its own group.
+
+EQUITY_RISK_BETAS: Final[dict[str, float]] = {
+    # Technology
+    "MSFT": 0.88, "NVDA": 1.57, "ASML": 1.24, "GOOGL": 1.01, "XLK": 1.03, "XLC": 0.92,
+    "SMH": 1.19, "IGV": 1.05,
+    # Financials
+    "JPM": 1.31, "RY": 0.92, "XLF": 1.26, "KRE": 1.25,
+    # Health care
+    "LLY": 0.66, "NVO": 0.73, "TEVA": 0.80, "XLV": 0.70, "XBI": 1.03,
+    # Industrials
+    "CAT": 1.22, "ESLT": 0.46, "XLI": 1.05, "ITA": 1.08, "IYT": 1.08,
+    # Consumer
+    "TM": 0.74, "PG": 0.47, "XLY": 1.10, "XLP": 0.54,
+    # Energy stocks only -- the barrel, gas and DBC are not stock-market risk
+    "XOM": 0.75, "XLE": 1.06,
+    # Utilities, materials, real estate
+    "XLU": 0.60, "XLB": 1.05, "VNQ": 1.04, "XHB": 1.38,
+    # US broad equity
+    "RSP": 1.04, "IWM": 1.16,
+    # Developed international
+    "VGK": 1.00, "EWJ": 0.74, "EIS": 0.86, "EWU": 0.94, "EWG": 1.08, "EWL": 0.79,
+    "EWN": 1.06, "EWI": 1.07, "EWP": 1.00, "EWD": 1.18, "EWC": 0.97, "EWA": 1.11,
+    # Emerging markets
+    "VWO": 0.96, "MCHI": 0.80, "INDA": 0.68, "EWY": 1.11, "EWT": 0.85, "EWZ": 1.16,
+    "EWW": 1.05, "KSA": 0.39, "TUR": 0.93, "EZA": 1.13, "EPOL": 0.97, "ARGT": 1.09,
+    "HDB": 1.07, "MELI": 1.53,
+    # Credit that trades like stocks (weekly correlation with RSP: HYG 0.76, EMB 0.58)
+    "HYG": 0.45, "EMB": 0.34,
+}
+
+
+def equity_risk_beta(ticker: str) -> float | None:
+    """The beta this ticker counts at in the stock-market limit, or ``None``.
+
+    ``None`` means the ticker is outside the bucket -- a bond, a commodity,
+    gold, the dollar -- so the limit does not apply to it. An unrecognised
+    ticker counts at 1.0 rather than escaping the limit: like ``kind_for`` and
+    ``group_for``, a mistake fails closed.
+    """
+    symbol = ticker.strip().upper()
+    if symbol in EQUITY_RISK_BETAS:
+        return EQUITY_RISK_BETAS[symbol]
+    if group_for(symbol) == UNGROUPED:
+        return 1.0
+    return None
+
+
 __all__ = [
     "InstrumentKind",
     "SINGLE_NAME_SECTORS",
@@ -549,6 +635,8 @@ __all__ = [
     "kind_for",
     "is_fund",
     "group_for",
+    "EQUITY_RISK_BETAS",
+    "equity_risk_beta",
     "DISPLAY_NAMES",
     "SLEEVE_LABELS",
     "name_for",

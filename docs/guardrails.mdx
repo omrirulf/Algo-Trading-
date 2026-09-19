@@ -21,7 +21,8 @@ that last part works.
 | Max 7% per **focused fund** | One sector or one country. Above a single name, below a fund that spans the world. |
 | Max 4% per **single-commodity fund** | Tighter than a single stock: "fund" does no diversification work when it holds one commodity. |
 | Max 25% per **exposure group** | `risk_engine.exposure_group_headroom()` — spans every sleeve. |
-| Max 10% in **Duration** (`SHY`, `IEF`, `TLT`, `TIP`) | Same function, tighter cap from `config.settings.EXPOSURE_GROUP_CAP_OVERRIDES` — four maturities on one yield curve are one interest-rate view, not a diversified bucket. |
+| Max 30% in **Duration** (`SHY`, `IEF`, `TLT`, `TIP`, `LQD`) | Same function, its own ceiling from `config.settings.EXPOSURE_GROUP_CAP_OVERRIDES`. Higher than the general cap on purpose: a cap is a loss budget, and this basket's worst fall was 18.9%. It replaces an effective 50% — 25% of Treasuries plus 25% of `LQD` through Credit. |
+| Max 60% **net stock-market risk**, by beta | `risk_engine.equity_risk_headroom()` — the eleven equity groups bound one sector or region each and none bounds what they share. Counted as market value × beta (`instruments.EQUITY_RISK_BETAS`); a short stock fund offsets a long one, a bond does not. |
 | A tightened group cap applies to what is already held, not just new orders | `PositionManager._trim_over_cap_groups()`, using `risk_engine.groups_over_cap()` — every exposure-group cap above is otherwise entry-time only. Sells pro-rata by market value, largest first, before the ladder runs — see [Position management](/position-management). |
 | 45% funds / 15% single names | `risk_engine.sleeve_headroom()` — funds are the core holding. |
 | Max 95% of equity deployed **in total** | `risk_engine.check_gross_exposure_limit()` — the only check that sees every holding at once. |
