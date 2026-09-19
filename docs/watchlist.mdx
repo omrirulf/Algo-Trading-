@@ -45,10 +45,30 @@ single country, is a focused fund below and gets a smaller cap for it.
 |---|---|
 | US broad equity | RSP, IWM |
 | International equity | VGK, VWO |
-| Duration | SHY, IEF, TLT, TIP |
-| Credit | LQD, HYG, EMB |
+| Duration | SHY, IEF, TLT, TIP (+ `LQD` for exposure, sized as credit) |
+| Credit | HYG, EMB (+ `LQD`, grouped with Duration) |
 | Broad commodities | DBC, DBA |
 | Currency | UUP |
+
+<Note>
+  **Both are sized here; neither is grouped here.** "Broad commodities" is
+  a sizing roster, not an exposure group — both members are broad funds,
+  and measurement showed neither is a broad *bet*.
+
+  `DBA` holds corn, wheat, soybeans and sugar, the same four funds in
+  sleeve 2c, so it counts against the **Agriculture** ceiling. `DBC` is
+  roughly 55–60% energy futures and measures 0.82 excess correlation
+  against the energy complex over 2007–present, so it counts against
+  **Energy**. Both keep the broad-fund cap: ten crops and a
+  three-sector basket genuinely are more diversified than one thing, and
+  sizing asks a different question from grouping.
+
+  Found the hard way, and worth knowing. Grouped together the two diluted
+  each other, and the pair showed up as the only one of 171 to breach
+  |excess r| ≥ 0.6 — against Agriculture. Separating `DBA` fixed that and
+  immediately revealed `DBC`'s energy character, which the averaging had
+  hidden from the same [measurement](/guardrails) one run earlier.
+</Note>
 
 `RSP` rather than `SPY`: a cap-weighted US index is a concentrated technology
 bet wearing a diversified label. Equal weight is the diversified version of
@@ -56,9 +76,14 @@ the same market.
 
 **Rates are no longer one point on the curve.** `TLT` alone made every rate
 story a bet on the long end. `SHY` is a cash proxy, `IEF` the belly, `TIP`
-prices inflation rather than growth — and credit is kept out of that group
-entirely, because `HYG` sells off with equities while government paper
-rallies. Netting those two into one number would have hidden both.
+prices inflation rather than growth.
+
+`LQD` sits in the **Duration** group with them, and `HYG` and `EMB` do not.
+That split is by behaviour, not by label. Investment-grade credit is mostly a
+rate instrument with a thin spread on top — it moves with the Treasury curve
+— while high yield sells off with equities while government paper rallies.
+Netting those two into one number would have hidden both. `LQD` is still
+*sized* as credit; grouping and sizing ask different questions.
 
 `UUP` is here because almost everything else on this list is priced in
 dollars, so the dollar is a factor inside all of them and otherwise
@@ -117,7 +142,7 @@ real estate is one sector; neither is a whole market.
 | Precious metals | GLD, SLV |
 | Industrial metals | CPER |
 | Energy commodities | USO, UNG |
-| Agriculture | CORN, WEAT, SOYB, CANE |
+| Agriculture | CORN, WEAT, SOYB, CANE (+ `DBA` for exposure, sized above) |
 
 Alpaca trades `us_equity`, `us_option` and `crypto` only, so futures are out
 of reach and physical metal is not something a brokerage account can hold.
@@ -238,7 +263,7 @@ median hides:
   value with spot flat, and no standard deviation captures that.
 - **Nor issuer risk.** `JO` proved that one.
 
-## Three portfolio limits
+## The portfolio limits
 
 Per-ticker caps bound one position. They say nothing about the shape of the
 book, and that gap was real: nothing stopped the engine opening MSFT, NVDA,
@@ -248,11 +273,13 @@ per-ticker cap satisfied.
 | Limit | Value | What it stops |
 |---|---|---|
 | Exposure group | 25% | A one-bet book. Spans every sleeve, so XOM + `XLE` + `USO` + `UNG` is one energy bet made four times. |
+| Duration group | 30% | Its own ceiling: a cap is a loss budget, and this basket's worst fall was 18.9%. |
+| Net stock-market risk | 60% | The eleven equity groups each bound one sector or region; none bounds what they all share. Counted by beta, so a short offsets a long. |
 | Single-name sleeve | 25% | Stock picking growing past its budget. |
 | Fund sleeve | 70% | — the core allocation. |
 | Gross exposure | 95% | Leverage, and nothing else. |
 
-All three run **before any market-data fetch**, so a full book costs no quote,
+They all run **before any market-data fetch**, so a full book costs no quote,
 and the tightest of them is passed into sizing as a ceiling — a partly-full
 book sizes the next position *down* rather than placing it and rejecting it
 after. A rejection names the limit that actually bound, so "no room under the
@@ -274,10 +301,10 @@ US broad equity          24%    Duration      9%
 Technology               20%    Financials    5%
 ```
 
-No group exceeds 25%, and filling the book **requires** at least four of them:
-being fully invested and being concentrated are now incompatible. Twenty
-exposure groups now exist rather than fourteen, so the four are easier to
-find — but none of them got bigger.
+No group exceeds its ceiling, and filling the book **requires** at least four
+of them: being fully invested and being concentrated are now incompatible.
+Eighteen exposure groups exist, so the four are easier to find — and the one
+limit that grew, Duration's, grew because its members can lose less.
 
 ## The instrument kind is a privilege boundary
 
@@ -292,7 +319,7 @@ enlarge its own position by claiming one.
   never the focused one either — so a misspelling can only size down. It also
   lands in its own exposure group, so it cannot consume another group's room.
 - CI invariants enforce the schema stays closed, the fund caps are readable
-  only where defined and applied, and all three portfolio limits reach the
+  only where defined and applied, and every portfolio limit reaches the
   execution path.
 
 ## What the funds read instead

@@ -111,14 +111,15 @@ class ExecutionEngine:
                 f"already holding {len(positions)} positions (max {cfg.MAX_OPEN_POSITIONS})"
             )
 
-        # 5b. Portfolio-level exposure. Three limits, not one: the gross cap
+        # 5b. Portfolio-level exposure. Four limits, not one: the gross cap
         #     bounds the whole account, the sleeve budget keeps funds as the
-        #     core and names as the satellite, and the exposure-group cap is
-        #     what stops a diversified watchlist producing a one-bet book --
-        #     five technology names, or a driller plus two energy funds. All
+        #     core and names as the satellite, the exposure-group cap is what
+        #     stops a diversified watchlist producing a one-bet book -- five
+        #     technology names, or a driller plus two energy funds -- and the
+        #     stock-market limit bounds what all the equity groups share. All
         #     run before any market-data fetch, so a full book costs no quote.
         headroom, binding_limit = risk_engine.budget_ceiling_for(
-            equity, signal.ticker, positions
+            equity, signal.ticker, positions, side
         )
         if headroom <= 0:
             return reject(f"no room under the {binding_limit} limit")

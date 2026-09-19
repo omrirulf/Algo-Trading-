@@ -43,7 +43,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from analysis import health  # noqa: E402
 from config import settings as cfg  # noqa: E402
 from config.instruments import (  # noqa: E402
-    InstrumentKind, group_for, kind_for, name_for, sleeve_label,
+    InstrumentKind, equity_risk_beta, group_for, kind_for, name_for, sleeve_label,
 )
 
 ENTRY_EVENT = "signal_processed"
@@ -220,11 +220,22 @@ def exposure_from(open_positions: list[dict], equity: Optional[float]) -> dict:
             "share": round(used / limit * 100, 1) if limit else None,
         }
 
+    # Net, beta-weighted: longs add and shorts subtract, stocks only
+    # (settings.MAX_EQUITY_RISK_PCT). Shown as the size of the net either way,
+    # since a big net short is as much a bet as a big net long.
+    stock_net = 0.0
+    for p in open_positions:
+        beta = equity_risk_beta(p["ticker"])
+        if beta is not None:
+            stock_net += (-1.0 if p["side"] == "sell" else 1.0) * p["market_value"] * beta
+
     caps = [cap("Whole account", gross, cfg.MAX_GROSS_EXPOSURE_PCT),
             cap("Funds", by_sleeve["funds"], cfg.MAX_FUND_SLEEVE_PCT),
-            cap("Single names", by_sleeve["single names"], cfg.MAX_SINGLE_NAME_SLEEVE_PCT)]
+            cap("Single names", by_sleeve["single names"], cfg.MAX_SINGLE_NAME_SLEEVE_PCT),
+            cap("Stock market (net, by beta)", abs(stock_net), cfg.MAX_EQUITY_RISK_PCT)]
     groups = sorted(
-        (cap(group, used, cfg.MAX_EXPOSURE_GROUP_PCT) for group, used in by_group.items()),
+        (cap(group, used, cfg.EXPOSURE_GROUP_CAP_OVERRIDES.get(group, cfg.MAX_EXPOSURE_GROUP_PCT))
+         for group, used in by_group.items()),
         key=lambda c: -c["used"],
     )
     return {

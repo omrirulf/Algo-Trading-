@@ -331,13 +331,13 @@ jobs:
           print("OK: no signal field can declare an instrument kind")
           PY
 
-      - name: Portfolio exposure is bounded on three axes
+      - name: Portfolio exposure is bounded on four axes
         # The per-ticker caps do not bound the portfolio, and the gross cap
         # alone does not bound *concentration*: five technology names were
         # five accepted positions and one bet, with every per-ticker cap
-        # satisfied. Three checks span every holding -- gross, exposure group,
-        # and sleeve budget -- and all three must run on the execution path,
-        # not merely exist in risk_engine.
+        # satisfied. Four checks span every holding -- gross, exposure group,
+        # sleeve budget, and net stock-market risk -- and all four must run on
+        # the execution path, not merely exist in risk_engine.
         run: |
           grep -q 'budget_ceiling_for' app/execution_engine.py || {
             echo "::error::execution engine does not call budget_ceiling_for"
@@ -358,10 +358,10 @@ jobs:
           called = {n.func.id for n in ast.walk(fn)
                     if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)}
           for required in ("gross_exposure_headroom", "exposure_group_headroom",
-                           "sleeve_headroom"):
+                           "sleeve_headroom", "equity_risk_headroom"):
               if required not in called:
                   sys.exit(f"::error::budget_ceiling_for does not apply {required}")
-          print("OK: all three exposure limits reach the execution path")
+          print("OK: all four exposure limits reach the execution path")
           PY
           # Stdlib only, and reading the literals rather than importing:
           # config/settings.py imports pydantic, which this job does not have.
@@ -369,7 +369,8 @@ jobs:
           import ast, sys
           WANTED = ("MAX_POSITION_PCT", "MAX_BROAD_FUND_PCT", "MAX_COMMODITY_FUND_PCT",
                     "MAX_EXPOSURE_GROUP_PCT", "MAX_SINGLE_NAME_SLEEVE_PCT",
-                    "MAX_FUND_SLEEVE_PCT", "MAX_GROSS_EXPOSURE_PCT")
+                    "MAX_FUND_SLEEVE_PCT", "MAX_GROSS_EXPOSURE_PCT",
+                    "MAX_EQUITY_RISK_PCT")
           tree = ast.parse(open("config/settings.py").read())
           caps = {n.target.id: n.value.value for n in tree.body
                   if isinstance(n, ast.AnnAssign) and isinstance(n.target, ast.Name)
@@ -377,8 +378,19 @@ jobs:
           missing = [name for name in WANTED if name not in caps]
           if missing:
               sys.exit(f"::error::cap constants not found as literals: {', '.join(missing)}")
-          single, broad, commodity, group, name_sleeve, fund_sleeve, gross = (
+          single, broad, commodity, group, name_sleeve, fund_sleeve, gross, equity = (
               caps[n] for n in WANTED)
+          # A group may be given its own ceiling, but not one that escapes the
+          # portfolio: an override is a different loss budget, never a bypass.
+          overrides = next((n.value for n in tree.body
+                            if isinstance(n, ast.AnnAssign)
+                            and isinstance(n.target, ast.Name)
+                            and n.target.id == "EXPOSURE_GROUP_CAP_OVERRIDES"), None)
+          if overrides is None:
+              sys.exit("::error::EXPOSURE_GROUP_CAP_OVERRIDES is not a literal")
+          for key, value in zip(overrides.keys, overrides.values):
+              if not isinstance(value, ast.Constant) or not 0 < value.value <= gross:
+                  sys.exit(f"::error::group override {key.value!r} is not inside the gross cap")
           if not 0 < gross < 1:
               sys.exit(f"::error::gross cap {gross} must leave a cash floor")
           if max(single, broad, commodity) > group:
@@ -402,9 +414,14 @@ jobs:
               sys.exit("::error::the fund sleeve must be the larger budget")
           if abs((name_sleeve + fund_sleeve) - gross) > 1e-9:
               sys.exit("::error::sleeve budgets must sum to the gross cap")
+          # Net stock-market risk spans several groups, so it must be the
+          # looser of the two -- and still inside the portfolio.
+          if not group <= equity <= gross:
+              sys.exit(f"::error::stock-market cap {equity} must sit between the "
+                       f"group cap {group} and the gross cap {gross}")
           print(f"OK: {single:.0%}/{broad:.0%}/{commodity:.0%} per position, "
-                f"{group:.0%} per group, {name_sleeve:.0%}+{fund_sleeve:.0%} sleeves, "
-                f"{gross:.0%} gross")
+                f"{group:.0%} per group, {equity:.0%} net stock market, "
+                f"{name_sleeve:.0%}+{fund_sleeve:.0%} sleeves, {gross:.0%} gross")
           PY
 
       - name: Market context carries no credentials

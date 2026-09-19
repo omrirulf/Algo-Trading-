@@ -466,6 +466,7 @@ def render_ticker(line: Line) -> list[str]:
 #: names are for code; these are for a person.
 _POSITION_ACTIONS = {
     "tranche_taken": "Sold part",
+    "group_cap_trimmed": "Trimmed",
     "stop_raised": "Stop raised",
     "held": "Holding",
     "protected": "Stop placed",
@@ -526,6 +527,10 @@ def _position_line(a: dict) -> str:
         total = int(a.get("qty_closed") or 0) + int(a.get("remaining_qty") or 0)
         return (f"Sold {a.get('qty_closed')} of {total} shares at {gain_text}, "
                 f"{a.get('remaining_qty')} still held. {stop_move}").strip()
+    if kind == "group_cap_trimmed":
+        total = int(a.get("qty_closed") or 0) + int(a.get("remaining_qty") or 0)
+        return (f"Sold {a.get('qty_closed')} of {total} shares to bring its exposure "
+                f"group back under its cap, {a.get('remaining_qty')} still held. {stop_move}").strip()
     if kind == "stop_raised":
         if "trailing" in str(a.get("reason") or ""):
             return f"At {gain_text}, following the price. {stop_move}".strip()
@@ -556,7 +561,7 @@ def render_positions(actions: list[dict]) -> list[str]:
         "| Position | What happened |",
         "| --- | --- |",
     ]
-    order = ("tranche_taken", "stop_raised", "protected", "unmanaged", "error", "held")
+    order = ("tranche_taken", "group_cap_trimmed", "stop_raised", "protected", "unmanaged", "error", "held")
     for a in sorted(actions, key=lambda x: (order.index(x.get("action")) if x.get("action") in order else 9, x.get("ticker", ""))):
         ticker = str(a.get("ticker"))
         label = f"{name_for(ticker)} ({ticker}) · {sleeve_label(ticker)}"

@@ -518,3 +518,126 @@ def test_render_says_trailing(broker, market, audit):
     market.price, market.atr = 102.0, 2.0
     text = pm.render(manager(broker, market, audit).manage())
     assert "LLY: +0.50R -> stop 96.00 -> 98.00 (trailing stop)" in text
+
+
+# --------------------------------------------------------------------------- #
+# Group-cap trim: a cap that tightens applies to what is already held, too
+# --------------------------------------------------------------------------- #
+
+
+def test_an_over_cap_group_is_trimmed_pro_rata(broker, market, audit):
+    """A group over its ceiling is trimmed back toward it on the very next
+    pass, largest exposure first.
+
+    Equity is 100k and Duration's ceiling is 30%, so the cap is $30,000. TLT
+    $18,300 + IEF $17,700 + TIP $6,000 = $42,000, a $12,000 excess split
+    pro-rata by each ticker's share of that $42,000 and floored to whole
+    shares at the $100 price.
+    """
+    enter(broker, audit, ticker="TLT", qty=183, entry=100.0, stop=104.0, side="sell")
+    enter(broker, audit, ticker="IEF", qty=177, entry=100.0, stop=104.0, side="sell")
+    enter(broker, audit, ticker="TIP", qty=60, entry=100.0, stop=104.0, side="sell")
+
+    report = manager(broker, market, audit).manage()
+
+    trims = {a.ticker: a for a in report.actions if a.action == pm.GROUP_CAP_TRIMMED}
+    assert set(trims) == {"TLT", "IEF", "TIP"}
+    assert trims["TLT"].qty_closed == 52 and trims["TLT"].remaining_qty == 131
+    assert trims["IEF"].qty_closed == 50 and trims["IEF"].remaining_qty == 127
+    assert trims["TIP"].qty_closed == 17 and trims["TIP"].remaining_qty == 43
+    assert report.group_trims == 3
+    assert all("'Duration' group" in a.reason for a in trims.values())
+    # The stop shrinks with the position, before the sell -- same order as a
+    # ladder tranche -- and the broker's own book reflects the smaller size.
+    tlt_replace = next(r for r in broker.replaced if r["ticker"] == "TLT")
+    assert tlt_replace["qty"] == 131 and tlt_replace["stop_price"] == 104.0 and tlt_replace["was"] == 104.0
+    assert {"ticker": "TLT", "qty": 52} in broker.closed
+    by_ticker = {p.ticker: abs(p.qty) for p in broker.positions}
+    assert by_ticker == {"TLT": 131, "IEF": 127, "TIP": 43}
+
+
+def test_a_group_within_its_cap_is_left_alone(broker, market, audit):
+    enter(broker, audit, ticker="TLT", qty=50, entry=100.0, stop=104.0, side="sell")  # 5% of equity
+    report = manager(broker, market, audit).manage()
+    assert report.group_trims == 0
+    assert all(a.action != pm.GROUP_CAP_TRIMMED for a in report.actions)
+
+
+def test_the_trim_never_takes_the_last_share(broker, market, audit):
+    """A position too small to leave a runner is skipped, not fully closed --
+    a forced trim is a reduction, never a liquidation."""
+    enter(broker, audit, ticker="TLT", qty=400, entry=100.0, stop=104.0, side="sell")
+    enter(broker, audit, ticker="IEF", qty=1, entry=100.0, stop=104.0, side="sell")
+    report = manager(broker, market, audit).manage()
+    trims = {a.ticker for a in report.actions if a.action == pm.GROUP_CAP_TRIMMED}
+    assert "IEF" not in trims
+    assert any(p.ticker == "IEF" and abs(p.qty) == 1 for p in broker.positions)
+
+
+def test_the_ladder_uses_post_trim_size_not_the_stale_snapshot(broker, market, audit):
+    """The positions list read before the trim is stale the moment it runs.
+
+    Both legs are at exactly +1R when the pass runs, due a ladder tranche
+    the same cycle the trim runs in. If the ladder sized that tranche off
+    the pre-trim qty instead of what the trim actually left behind, it
+    would try to sell a third of a position bigger than the one it is
+    holding -- silently wrong rather than a crash, since the broker still
+    has enough shares to permit the oversized sell.
+
+    The trim's own sizing uses today's price (96, not the $100 entry), so
+    TLT's $3,050 pro-rata share buys 31 shares at 96 and IEF's $2,950 buys
+    30 -- the dollar shares, not the share counts, are what the split is
+    pro-rata in.
+    """
+    enter(broker, audit, ticker="TLT", qty=183, entry=100.0, stop=104.0, side="sell")
+    enter(broker, audit, ticker="IEF", qty=177, entry=100.0, stop=104.0, side="sell")
+    market.price = 96.0  # short, entry 100, stop 104 -> R = 4; (100-96)/4 = +1R
+    report = manager(broker, market, audit).manage()
+
+    trims = {a.ticker: a for a in report.actions if a.action == pm.GROUP_CAP_TRIMMED}
+    assert trims["TLT"].qty_closed == 31 and trims["TLT"].remaining_qty == 152
+    assert trims["IEF"].qty_closed == 30 and trims["IEF"].remaining_qty == 147
+
+    rungs = {a.ticker: a for a in report.actions if a.action == pm.TRANCHE_TAKEN}
+    assert rungs["TLT"].qty_closed == 50 and rungs["TLT"].remaining_qty == 102
+    assert rungs["IEF"].qty_closed == 49 and rungs["IEF"].remaining_qty == 98
+    assert report.positions_seen == 2
+
+
+def test_one_broken_trim_does_not_stop_the_rest_of_the_group(broker, market, audit):
+    enter(broker, audit, ticker="TLT", qty=183, entry=100.0, stop=104.0, side="sell")
+    enter(broker, audit, ticker="IEF", qty=177, entry=100.0, stop=104.0, side="sell")
+
+    original = broker.replace_stop_order
+
+    def flaky(order_id, qty, stop_price):
+        if order_id == "stop-TLT":
+            raise BrokerError("TLT stop replace is broken")
+        return original(order_id, qty, stop_price)
+
+    broker.replace_stop_order = flaky
+    report = manager(broker, market, audit).manage()
+    by_ticker = {
+        a.ticker: a.action for a in report.actions
+        if a.action in (pm.GROUP_CAP_TRIMMED, pm.ERROR)
+    }
+    assert by_ticker.get("TLT") == pm.ERROR
+    assert by_ticker.get("IEF") == pm.GROUP_CAP_TRIMMED
+
+
+def test_group_trim_is_skipped_when_equity_is_not_positive(broker, market, audit):
+    enter(broker, audit, ticker="TLT", qty=183, entry=100.0, stop=104.0, side="sell")
+    enter(broker, audit, ticker="IEF", qty=177, entry=100.0, stop=104.0, side="sell")
+    broker.equity = 0.0
+    report = manager(broker, market, audit).manage()
+    assert report.group_trims == 0
+    assert not any(a.action == pm.ERROR for a in report.actions)
+
+
+def test_render_reports_group_trims(broker, market, audit):
+    enter(broker, audit, ticker="TLT", qty=183, entry=100.0, stop=104.0, side="sell")
+    enter(broker, audit, ticker="IEF", qty=177, entry=100.0, stop=104.0, side="sell")
+    enter(broker, audit, ticker="TIP", qty=60, entry=100.0, stop=104.0, side="sell")
+    text = pm.render(manager(broker, market, audit).manage())
+    assert "3 trimmed for a group cap" in text
+    assert "'Duration' group exposure over its cap; trimmed pro-rata" in text

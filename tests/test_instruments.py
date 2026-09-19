@@ -200,6 +200,148 @@ def test_an_unknown_ticker_cannot_borrow_another_group_s_room(broker, market):
     assert group_for("ZZZZ") != group_for("MSFT")
 
 
+def test_duration_has_its_own_ceiling_set_by_what_it_can_lose():
+    """The one group whose number is not the general 25%.
+
+    It is *higher*, which is the point: a cap is a loss budget, and the
+    general number was set for equity groups. Duration's worst fall as a
+    basket was 18.9% (2022), so 30% of the account risks about 5.7% of it --
+    still less than an equity group at 25% risked in 2008.
+    """
+    assert cfg.EXPOSURE_GROUP_CAP_OVERRIDES["Duration"] == pytest.approx(0.30)
+    assert risk_engine.group_cap_pct("Duration") == pytest.approx(0.30)
+
+
+def test_every_other_group_keeps_the_general_cap():
+    from config.instruments import EXPOSURE_GROUPS
+
+    for group in EXPOSURE_GROUPS:
+        if group != "Duration":
+            assert risk_engine.group_cap_pct(group) == cfg.MAX_EXPOSURE_GROUP_PCT
+
+
+def test_the_whole_curve_plus_credit_shares_one_ceiling(broker, market):
+    """Four maturities and LQD are one rate view, bounded once.
+
+    Each leg passes its own fund cap; only the shared Duration group stops
+    them summing past 30% of the account. Before this group existed, the
+    same five tickets could reach 50% -- 25% of Treasuries plus 25% of LQD
+    through Credit.
+    """
+    rejected = []
+    for ticker in ("TLT", "IEF", "TIP", "SHY", "LQD"):
+        result = ExecutionEngine(broker, market).execute(
+            LLMSignal(ticker=ticker, bias=Bias.BEARISH, conviction=0.9, rationale="x")
+        )
+        if result.status is ExecutionStatus.ACCEPTED:
+            broker.positions.append(
+                OpenPosition(ticker=ticker, qty=-result.quantity,
+                             market_value=result.quantity * market.price)
+            )
+        else:
+            rejected.append(result.reason)
+
+    held = sum(p.market_value for p in broker.positions) / broker.equity
+    assert held <= cfg.EXPOSURE_GROUP_CAP_OVERRIDES["Duration"] + 1e-9
+    assert rejected, "five legs of one rate bet should not all fit"
+    assert any("Duration" in r for r in rejected)
+
+
+def test_the_rate_bet_is_not_bounded_by_the_stock_limit(broker, market):
+    """Bonds are outside the stock bucket, so they never consume its room."""
+    from config.instruments import equity_risk_beta
+
+    for ticker in ("SHY", "IEF", "TLT", "TIP", "LQD"):
+        assert equity_risk_beta(ticker) is None
+
+
+def test_groups_over_cap_is_empty_for_a_compliant_book():
+    """The read-only half of a group-cap trim: nothing to report when nothing is over."""
+    positions = [OpenPosition(ticker="TLT", qty=-50, market_value=5_000.0)]
+    assert risk_engine.groups_over_cap(100_000.0, positions) == {}
+
+
+def test_groups_over_cap_measures_duration_against_its_own_ceiling():
+    """Not the general 25%: $32,000 of Duration is over its 30%, not its 25%."""
+    positions = [
+        OpenPosition(ticker="TLT", qty=-160, market_value=16_000.0),
+        OpenPosition(ticker="IEF", qty=-110, market_value=11_000.0),
+        OpenPosition(ticker="LQD", qty=-50, market_value=5_000.0),
+    ]
+    excess = risk_engine.groups_over_cap(100_000.0, positions)
+    assert excess == {"Duration": pytest.approx(2_000.0)}
+
+
+def test_lqd_counts_against_duration_not_credit_when_over_cap():
+    """The group move has to reach the trim pass, not just the entry check."""
+    positions = [
+        OpenPosition(ticker="LQD", qty=-320, market_value=32_000.0),
+    ]
+    assert risk_engine.groups_over_cap(100_000.0, positions) == {
+        "Duration": pytest.approx(2_000.0)
+    }
+
+
+def test_groups_over_cap_rejects_non_positive_equity():
+    with pytest.raises(risk_engine.RiskViolation):
+        risk_engine.groups_over_cap(0.0, [])
+
+
+def test_the_farm_basket_is_grouped_with_the_crops_it_holds():
+    """DBA holds corn, wheat, soybeans and sugar -- the four funds beside it.
+
+    Grouped with DBC it was one agricultural bet spread across two ceilings.
+    This was the only one of 171 group pairs to clear |excess r| >= 0.6 over
+    2007-present, which is what sent someone looking.
+    """
+    assert group_for("DBA") == group_for("CORN") == "Agriculture"
+    assert group_for("DBA") != group_for("DBC")
+
+
+def test_the_commodity_basket_is_grouped_with_the_oil_that_dominates_it():
+    """DBC is 55-60% energy futures and measures 0.82 excess against Energy.
+
+    Its metals and grain weight counts against the energy ceiling as a
+    result, which overstates that part -- the accepted cost of grouping by
+    what a thing trades like rather than by what its prospectus spans.
+    """
+    assert group_for("DBC") == group_for("USO") == group_for("XOM") == "Energy"
+
+
+def test_broad_commodities_is_a_sizing_roster_and_not_an_exposure_group():
+    """Both members are broad funds; neither is a broad bet.
+
+    DBA belongs with the crops it holds, DBC with the oil it mostly holds,
+    so there is nothing left for a group of that name to bound.
+    """
+    from config.instruments import BROAD_FUND_ROLES, EXPOSURE_GROUPS
+
+    assert BROAD_FUND_ROLES["Broad commodities"] == ("DBC", "DBA")
+    assert "Broad commodities" not in EXPOSURE_GROUPS
+
+
+def test_the_farm_basket_is_still_sized_as_a_broad_fund():
+    """Grouping is about correlated risk; the cap is about what it holds.
+
+    Ten crops is genuinely more diversified than one, so the sizing is
+    unchanged -- only the ceiling it counts against moved.
+    """
+    assert kind_for("DBA") is InstrumentKind.BROAD_FUND
+    assert risk_engine.max_position_pct_for("DBA") == cfg.MAX_BROAD_FUND_PCT
+
+
+def test_every_watchlist_ticker_lands_in_exactly_one_group():
+    """A ticker in two groups would be counted against two ceilings."""
+    from config.instruments import EXPOSURE_GROUPS
+
+    seen: dict[str, str] = {}
+    for group, tickers in EXPOSURE_GROUPS.items():
+        for ticker in tickers:
+            assert ticker not in seen, f"{ticker} in {seen.get(ticker)} and {group}"
+            seen[ticker] = group
+    assert [t for t in SINGLE_NAMES + FUNDS if t not in seen] == []
+
+
 # --- the sleeve budget ----------------------------------------------------- #
 
 
@@ -502,11 +644,16 @@ def test_a_gold_miner_groups_with_gold_not_with_materials():
 
 
 def test_credit_is_not_filed_with_government_duration():
-    """They move opposite ways in a sell-off; one group would net them to nothing."""
+    """High yield and emerging debt sell off with stocks while Treasuries rally.
+
+    LQD is the exception the data found: it moves with Treasuries (IEF 0.67
+    with the market taken out, 0.86 in 2022), so it counts against Duration.
+    """
     from config.instruments import group_for
 
-    assert group_for("HYG") == group_for("LQD") == group_for("EMB")
+    assert group_for("HYG") == group_for("EMB")
     assert group_for("HYG") != group_for("TLT")
+    assert group_for("LQD") == group_for("TLT")
 
 
 def test_developed_and_emerging_are_not_one_bet():

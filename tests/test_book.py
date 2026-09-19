@@ -140,11 +140,15 @@ def test_equity_is_the_newest_the_journal_recorded_and_fills_the_caps(logs):
           journal_line("XOM", "2026-09-17T15:49:00+00:00"))  # NEUTRAL: no equity read
     snap = book.build(audit, journal, DAY)
     assert snap["equity"] == 100_000.0 and snap["equity_at"] == "2026-09-17T15:48:00+00:00"
-    whole, funds, names = snap["exposure"]["caps"]
+    whole, funds, names, stocks = snap["exposure"]["caps"]
     assert whole["label"] == "Whole account" and whole["cap"] == 95_000.0 and whole["used"] == 10_000.0
     assert whole["headroom"] == 85_000.0 and whole["share"] == pytest.approx(10.5)
     assert names["used"] == 10_000.0 and names["cap"] == 100_000.0 * cfg.MAX_SINGLE_NAME_SLEEVE_PCT
     assert funds["used"] == 0.0
+    # LLY counts at its beta against the stock-market limit.
+    assert stocks["label"].startswith("Stock market")
+    assert stocks["used"] == pytest.approx(10_000.0 * 0.66)
+    assert stocks["cap"] == 100_000.0 * cfg.MAX_EQUITY_RISK_PCT
     [group] = snap["exposure"]["groups"]
     assert group["cap_pct"] == cfg.MAX_EXPOSURE_GROUP_PCT and group["used"] == 10_000.0
 

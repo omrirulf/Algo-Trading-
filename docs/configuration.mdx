@@ -195,6 +195,8 @@ detail on what each one prevents is in [Guardrails](/guardrails).
 | `MAX_FOCUSED_FUND_PCT` | `0.07` | Cap for a **focused fund** — one sector or one country. Measured 2026-09-15. |
 | `MAX_COMMODITY_FUND_PCT` | `0.04` | Cap for a **single-commodity** fund — tighter than a single stock. |
 | `MAX_EXPOSURE_GROUP_PCT` | `0.25` | Cap on any one exposure group, spanning every sleeve. |
+| `EXPOSURE_GROUP_CAP_OVERRIDES` | `{"Duration": 0.30}` | Per-group exceptions to `MAX_EXPOSURE_GROUP_PCT`. Duration holds the four Treasury maturities plus `LQD`, and its number is set by what the bucket can lose: worst fall 18.9% (2022), so 30% risks about 5.7% of the account — less than an equity group at 25% risked in 2008. |
+| `MAX_EQUITY_RISK_PCT` | `0.60` | Ceiling on **net** stock-market risk across every equity group at once, counted in beta-weighted dollars. Longs add and shorts subtract inside the stock bucket only; bonds and commodities never offset stocks. |
 | `MAX_SINGLE_NAME_SLEEVE_PCT` | `0.25` | Budget for the whole single-name sleeve. |
 | `MAX_FUND_SLEEVE_PCT` | `0.7` | Budget for the whole fund sleeve — the core allocation. |
 | `MAX_GROSS_EXPOSURE_PCT` | `0.95` | Ceiling on total deployed capital across every position. Leaves a 5% operational buffer. |

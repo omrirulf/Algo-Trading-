@@ -438,6 +438,24 @@ def test_a_trailing_raise_reads_as_following_the_price():
     assert "| Gold (GLD) · Commodity | **Stop raised.** At +0.50R, following the price. Stop-loss raised 310.50 → 314.20. |" in text
 
 
+def test_a_group_cap_trim_reads_as_a_sale_not_a_failure():
+    actions = [
+        {"ticker": "TLT", "action": "group_cap_trimmed",
+         "reason": "'Duration' group exposure over its cap; trimmed pro-rata",
+         "qty_closed": 17, "remaining_qty": 44, "old_stop": 104.0, "new_stop": 104.0},
+        {"ticker": "GLD", "action": "held", "gain_r": 0.31, "remaining_qty": 12,
+         "old_stop": 310.5, "new_stop": 310.5},
+    ]
+    text = cr.render([_line("LLY")], actions)
+    assert (
+        "**Trimmed.** Sold 17 of 61 shares to bring its exposure group back "
+        "under its cap, 44 still held. Stop-loss 104.00." in text
+    )
+    # Trims are a sale that needed acting on, so they sort with the other
+    # sold/flagged rows rather than with the merely-held ones.
+    assert text.index("(TLT)") < text.index("Gold")
+
+
 def test_the_opening_says_the_stop_follows_the_price():
     text = cr.render([_line("LLY")])
     assert "follows the price up" in text
