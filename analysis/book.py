@@ -224,7 +224,8 @@ def exposure_from(open_positions: list[dict], equity: Optional[float]) -> dict:
             cap("Funds", by_sleeve["funds"], cfg.MAX_FUND_SLEEVE_PCT),
             cap("Single names", by_sleeve["single names"], cfg.MAX_SINGLE_NAME_SLEEVE_PCT)]
     groups = sorted(
-        (cap(group, used, cfg.MAX_EXPOSURE_GROUP_PCT) for group, used in by_group.items()),
+        (cap(group, used, cfg.EXPOSURE_GROUP_CAP_OVERRIDES.get(group, cfg.MAX_EXPOSURE_GROUP_PCT))
+         for group, used in by_group.items()),
         key=lambda c: -c["used"],
     )
     return {

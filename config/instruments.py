@@ -129,6 +129,10 @@ DURATION: Final[tuple[str, ...]] = ("SHY", "IEF", "TLT", "TIP")
 CREDIT: Final[tuple[str, ...]] = ("LQD", "HYG", "EMB")
 #: Broad commodity baskets. These *are* diversified across commodities, so
 #: they are broad funds rather than commodity funds.
+#:
+#: That is a statement about *sizing* only. For exposure, DBA is grouped with
+#: the grains rather than with DBC -- it holds the same futures they do. See
+#: EXPOSURE_GROUPS below.
 BROAD_COMMODITY: Final[tuple[str, ...]] = ("DBC", "DBA")
 #: The dollar, as a basket against six developed currencies. Here because
 #: almost every other row on this list is priced in dollars, so the dollar is
@@ -465,9 +469,18 @@ EXPOSURE_GROUPS: Final[dict[str, tuple[str, ...]]] = {
     "Health care": HEALTH_CARE + SECTOR_HEALTH_CARE,
     "Industrials": INDUSTRIALS + SECTOR_INDUSTRIALS,
     "Consumer": CONSUMER_DISCRETIONARY + CONSUMER_STAPLES + SECTOR_CONSUMER,
-    # One energy bet, whether taken through a driller, a sector fund or the
-    # barrel.
-    "Energy": ENERGY_EQUITY + ENERGY_COMMODITY + SECTOR_ENERGY,
+    # One energy bet, whether taken through a driller, a sector fund, the
+    # barrel -- or a "broad" commodity basket that is mostly oil. DBC is
+    # roughly 55-60% energy futures by weight, and it measures 0.82 excess
+    # correlation against this group over 2007-present, 0.64 in the tail.
+    #
+    # Its remaining metals and agriculture weight does count against the
+    # energy ceiling as a result, which overstates that part. That is the
+    # deliberate trade: this file groups by what a thing trades like rather
+    # than by what its prospectus spans -- the same reasoning that puts
+    # housebuilders with property and a gold miner with gold -- and what DBC
+    # trades like is oil.
+    "Energy": ENERGY_EQUITY + ENERGY_COMMODITY + SECTOR_ENERGY + ("DBC",),
     "Utilities": SECTOR_UTILITIES,
     "Materials": SECTOR_MATERIALS,
     "Real estate": SECTOR_REAL_ESTATE,
@@ -484,12 +497,26 @@ EXPOSURE_GROUPS: Final[dict[str, tuple[str, ...]]] = {
     # net two opposite risks into one number.
     "Credit": CREDIT,
     "US dollar": CURRENCY,
-    "Broad commodities": BROAD_COMMODITY,
+    # There is no "Broad commodities" exposure group, though the sizing
+    # roster of that name survives in BROAD_FUND_ROLES: both its members are
+    # broad funds, and neither is a broad *bet*. Measured over 2007-present,
+    # DBA belongs with the crops it holds and DBC with the oil it mostly
+    # holds, so the pair was never one thing to bound.
+    #
+    # This was arrived at in two steps, and the second was a surprise worth
+    # recording. Grouping DBA and DBC together diluted each, and their
+    # combined series correlated 0.66 with Agriculture -- the only one of
+    # 171 group pairs to clear the bar. Moving DBA out fixed that and
+    # immediately exposed DBC's energy character, which the averaging had
+    # been masking: Energy against DBC alone measures 0.82. The first fix
+    # did not create the second problem, it revealed one that a diluted
+    # average had hidden from the same measurement a run earlier.
+    #
     # Miners with the metal: a gold miner is a levered bet on gold, not a
     # diversifier from it.
     "Precious metals": PRECIOUS_METALS + SECTOR_MINERS,
     "Industrial metals": INDUSTRIAL_METALS,
-    "Agriculture": AGRICULTURE,
+    "Agriculture": AGRICULTURE + ("DBA",),
 }
 
 _GROUP_OF: Final[dict[str, str]] = {

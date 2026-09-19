@@ -134,6 +134,37 @@ up. Two reasons, one practical and one principled:
 - There must never be a moment in which the position is naked. A replace is
   atomic; a cancel-then-resubmit is not.
 
+## Group-cap trim: a cap that tightens applies to what is already held, too
+
+Every cap in `app/risk_engine.py` — single name, fund, exposure group — is
+checked when a position is **opened**, and never again. That is fine for a
+cap that has always applied: nothing legitimately opened could have crossed
+it. It is not fine for a cap that just got tighter. Duration's did, from 25%
+to 10% (see [Guardrails](/guardrails)), and three positions sized lawfully
+under the old number were left sitting at the old one under the new — an
+entry-time check has nothing to say about a position it never re-examines.
+
+So before the ladder runs, every exposure group is checked against
+`risk_engine.groups_over_cap`. A group that is over its cap has every
+position in it sold down, largest exposure first, pro-rata by each
+position's own share of the group's total market value — there is no more
+principled way to decide which ticker gives back how much of a cut the
+whole group caused together.
+
+Two rules carried straight over from the ladder:
+
+- **Protect first, then sell.** Exactly the same order as a ladder tranche,
+  for the same reason: a stop still sized for the old position would reserve
+  the shares the exit needs.
+- **Never the last share.** A forced trim is a reduction, not a liquidation.
+  A group still over its cap after rounding — or because one ticker in it is
+  already bigger than the cap by itself — heals on the next cycle the same
+  way a crash mid-pass does anywhere else in this module.
+
+The book is re-read from the broker immediately after, so the ladder that
+runs right behind it sees what is actually held now rather than the
+snapshot taken before the trim.
+
 ## Where the state lives
 
 Nowhere new. The audit log — the system of record for what the engine did —
@@ -166,8 +197,8 @@ ladder frees cash.
 
 <Note>
   Diversity was never the slot count's job. It comes from the limits that
-  target concentration directly — 25% per exposure group across twenty
-  groups, the sleeve budgets, the per-kind caps — and those hold at 20
+  target concentration directly — 25% per exposure group across every
+  group, the sleeve budgets, the per-kind caps — and those hold at 20
   positions or 40. More slots can only make the book wider.
 </Note>
 
@@ -211,6 +242,7 @@ from the same audit records, in plain words:
 
 ```
 | Eli Lilly (LLY) · Company | Sold part. Sold 1 of 4 shares at +1.02R, 3 still held. Stop-loss raised 1079.13 → 1142.29. |
+| 20+ Year Treasuries (TLT) · Fund | Trimmed. Sold 17 of 61 shares to bring its exposure group back under its cap, 44 still held. Stop-loss 104.00. |
 | Gold (GLD) · Commodity    | Holding. +0.31R, holding 12 shares. Stop-loss 310.50. |
 | Exxon (XOM) · Company     | Stop placed. Had no stop-loss order, so a new one was placed at 96.00 (from the trade's own record). |
 ```

@@ -50,6 +50,26 @@ single country, is a focused fund below and gets a smaller cap for it.
 | Broad commodities | DBC, DBA |
 | Currency | UUP |
 
+<Note>
+  **Both are sized here; neither is grouped here.** "Broad commodities" is
+  a sizing roster, not an exposure group — both members are broad funds,
+  and measurement showed neither is a broad *bet*.
+
+  `DBA` holds corn, wheat, soybeans and sugar, the same four funds in
+  sleeve 2c, so it counts against the **Agriculture** ceiling. `DBC` is
+  roughly 55–60% energy futures and measures 0.82 excess correlation
+  against the energy complex over 2007–present, so it counts against
+  **Energy**. Both keep the broad-fund cap: ten crops and a
+  three-sector basket genuinely are more diversified than one thing, and
+  sizing asks a different question from grouping.
+
+  Found the hard way, and worth knowing. Grouped together the two diluted
+  each other, and the pair showed up as the only one of 171 to breach
+  |excess r| ≥ 0.6 — against Agriculture. Separating `DBA` fixed that and
+  immediately revealed `DBC`'s energy character, which the averaging had
+  hidden from the same [measurement](/guardrails) one run earlier.
+</Note>
+
 `RSP` rather than `SPY`: a cap-weighted US index is a concentrated technology
 bet wearing a diversified label. Equal weight is the diversified version of
 the same market.
@@ -117,7 +137,7 @@ real estate is one sector; neither is a whole market.
 | Precious metals | GLD, SLV |
 | Industrial metals | CPER |
 | Energy commodities | USO, UNG |
-| Agriculture | CORN, WEAT, SOYB, CANE |
+| Agriculture | CORN, WEAT, SOYB, CANE (+ `DBA` for exposure, sized above) |
 
 Alpaca trades `us_equity`, `us_option` and `crypto` only, so futures are out
 of reach and physical metal is not something a brokerage account can hold.

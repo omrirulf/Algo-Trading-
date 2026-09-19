@@ -64,7 +64,7 @@ def exposure_group_headroom(
     equity: float,
     ticker: str,
     positions: Sequence[Any],
-    max_group_pct: float = cfg.MAX_EXPOSURE_GROUP_PCT,
+    max_group_pct: float | None = None,
 ) -> float:
     """Dollars still deployable into this ticker's exposure group.
 
@@ -73,13 +73,56 @@ def exposure_group_headroom(
     this does, and it spans both sleeves, so an oil driller and two energy
     funds count against the same group.
 
+    A group in ``cfg.EXPOSURE_GROUP_CAP_OVERRIDES`` -- currently just
+    Duration -- binds tighter than the general cap, because its members move
+    on one number rather than merely sharing a theme. ``max_group_pct``
+    overrides both when a caller passes one explicitly.
+
     ``positions`` is anything with ``.ticker`` and ``.market_value``.
     """
     group = group_for(ticker)
+    cap_pct = (
+        max_group_pct
+        if max_group_pct is not None
+        else cfg.EXPOSURE_GROUP_CAP_OVERRIDES.get(group, cfg.MAX_EXPOSURE_GROUP_PCT)
+    )
     used = sum(
         p.market_value for p in positions if group_for(p.ticker) == group
     )
-    return _headroom(equity, used, max_group_pct, f"group {group!r}")
+    return _headroom(equity, used, cap_pct, f"group {group!r}")
+
+
+def groups_over_cap(equity: float, positions: Sequence[Any]) -> dict[str, float]:
+    """Dollars each exposure group is over its own cap, for groups that are.
+
+    ``exposure_group_headroom`` is an entry-time check: it stops a *new*
+    order from pushing a group over its cap, and has nothing to say about a
+    position already open. That is sufficient for a cap that has always
+    applied, since nothing legitimately opened could have crossed it. It is
+    not sufficient the day a cap tightens -- Duration's did, from 25% to
+    10% -- because a position sized lawfully under yesterday's number does
+    not shrink on its own just because today's is smaller. This is the
+    read-only half of that check: what the position manager's group-cap
+    trim acts on, and what a test can assert against without touching a
+    broker.
+
+    A group absent from the result is at or under its cap. Nothing here says
+    whether it got there by never being tested against a cap this tight or
+    by an entry-time rejection -- only that it is fine now.
+    """
+    if equity <= 0:
+        raise RiskViolation(f"equity must be positive, got {equity}")
+    used_by_group: dict[str, float] = {}
+    for p in positions:
+        group = group_for(p.ticker)
+        used_by_group[group] = used_by_group.get(group, 0.0) + p.market_value
+    excess_by_group: dict[str, float] = {}
+    for group, used in used_by_group.items():
+        cap_pct = cfg.EXPOSURE_GROUP_CAP_OVERRIDES.get(group, cfg.MAX_EXPOSURE_GROUP_PCT)
+        excess = used - equity * cap_pct
+        if excess > 0:
+            excess_by_group[group] = excess
+    return excess_by_group
 
 
 def sleeve_headroom(

@@ -34,6 +34,19 @@ unprotected, indefinitely". So a position found without a stop is now given
 one at the last level the record says it had, and only then managed. The
 stop is the only exit; a position without one is not being managed at all.
 
+A group-cap trim was added later, for a gap the other three do not cover:
+every cap in ``app/risk_engine.py`` is checked when a position is *opened*
+and never again. That is fine for a cap that has always applied -- nothing
+legitimately opened could have crossed it -- but not for one that just
+tightened. Duration's did, from 25% to 10%, and three positions opened
+lawfully under the old number were left sitting at the old one under the
+new. Before the ladder runs, every exposure group is checked against
+``risk_engine.groups_over_cap``; a group that is over its cap has every
+position in it trimmed pro-rata by market value, largest first, same stop-
+then-sell order as a ladder tranche and never the last share either -- a
+forced trim is still a reduction, not a liquidation, and a group still over
+after rounding heals on the next cycle the same way a crash mid-pass does.
+
 Where the state lives
 ---------------------
 Nowhere new. R comes from the audit log's own ``ACCEPTED`` record for the
@@ -59,18 +72,20 @@ from app.broker_client import BrokerClient, BrokerError, OpenPosition, StopOrder
 from app import logger as audit_log
 from app.market_data import MarketDataError, MarketDataProvider
 from config import settings as cfg
+from config.instruments import group_for
 
 log = logging.getLogger(__name__)
 
 #: Audit event name for everything this module does.
 EVENT = "position_managed"
 
-#: The four things that can happen to a position in one pass.
+#: The five things that can happen to a position in one pass.
 TRANCHE_TAKEN = "tranche_taken"   #: part of it sold, stop raised
 STOP_RAISED = "stop_raised"       #: a rung reached, stop raised, nothing sold (too small to split)
 HELD = "held"                     #: checked, no rung reached
 UNMANAGED = "unmanaged"           #: (historical) left alone -- no live stop; no longer emitted
 PROTECTED = "protected"           #: had no live stop; one was placed at the last recorded level
+GROUP_CAP_TRIMMED = "group_cap_trimmed"  #: sold to bring an over-cap exposure group back down
 ERROR = "error"                   #: the broker or market data refused; nothing was done
 
 #: Actions that mean "this rung has been dealt with", for counting on re-run.
@@ -128,6 +143,10 @@ class ManagementReport:
         return self._count(PROTECTED)
 
     @property
+    def group_trims(self) -> int:
+        return self._count(GROUP_CAP_TRIMMED)
+
+    @property
     def errors(self) -> int:
         return self._count(ERROR)
 
@@ -139,6 +158,7 @@ class ManagementReport:
             "stops_raised": self.raises,
             "unmanaged": self.unmanaged,
             "protected": self.protected,
+            "group_trims": self.group_trims,
             "errors": self.errors,
             "actions": [a.as_dict() for a in self.actions],
         }
@@ -285,6 +305,33 @@ class PositionManager:
             return ManagementReport(actions=(action,))
 
         actions: list[ManagementAction] = []
+        if not protect_only:
+            try:
+                trims = self._trim_over_cap_groups(positions)
+            except (BrokerError, MarketDataError, risk_engine.RiskViolation) as exc:
+                trims = [ManagementAction(ticker="*", action=ERROR, reason=f"{type(exc).__name__}: {exc}")]
+                _record(trims[0])
+            except Exception as exc:  # noqa: BLE001 - one bad group must not stop the ladder
+                log.exception("unexpected error trimming over-cap exposure groups")
+                trims = [ManagementAction(
+                    ticker="*", action=ERROR, reason=f"unexpected {type(exc).__name__}: {exc}"
+                )]
+                _record(trims[0])
+            if trims:
+                actions += trims
+                # Sizes just changed underneath the snapshot taken above; the
+                # ladder below must see what is actually held now, not what
+                # was held before the trim.
+                try:
+                    positions = self._broker.get_open_positions()
+                except BrokerError as exc:
+                    action = ManagementAction(
+                        ticker="*", action=ERROR, reason=f"{type(exc).__name__}: {exc}"
+                    )
+                    _record(action)
+                    actions.append(action)
+                    return ManagementReport(actions=tuple(actions))
+
         for position in positions:
             try:
                 if protect_only:
@@ -363,6 +410,110 @@ class PositionManager:
             ticker=ticker, action=PROTECTED, side=side, remaining_qty=qty,
             old_stop=None, new_stop=placed.stop_price, order_id=placed.order_id,
             r_estimated=estimated, reason=reason,
+        )
+        _record(action)
+        return action
+
+    def _trim_over_cap_groups(self, positions: list[OpenPosition]) -> list[ManagementAction]:
+        """Every exposure group over its cap, brought back under it.
+
+        Read-only math lives in ``risk_engine.groups_over_cap``; this is just
+        the broker side of acting on it. Skipped entirely when equity is not
+        positive rather than raising -- an account the broker cannot value
+        has nothing this can safely size a trim against, and the ladder pass
+        after this one already tolerates that the same way.
+        """
+        equity = self._broker.get_equity()
+        if equity <= 0:
+            return []
+        excess_by_group = risk_engine.groups_over_cap(equity, positions)
+        if not excess_by_group:
+            return []
+
+        members_by_group: dict[str, list[OpenPosition]] = {}
+        for p in positions:
+            members_by_group.setdefault(group_for(p.ticker), []).append(p)
+
+        actions: list[ManagementAction] = []
+        for group, excess in excess_by_group.items():
+            actions += self._trim_group(group, members_by_group[group], excess)
+        return actions
+
+    def _trim_group(
+        self, group: str, members: list[OpenPosition], excess: float
+    ) -> list[ManagementAction]:
+        """Sell down every position in one over-cap group, pro-rata by size.
+
+        The only reason a position is touched here is the group it belongs
+        to, not anything about the position itself, so there is no more
+        principled way to divide the cut than by each member's share of the
+        group's own dollar exposure -- the position that contributed most to
+        being over gives back most of it.
+
+        One broken ticker must not stop the rest of the group from being
+        trimmed, same as one broken ticker does not stop the ladder pass --
+        each position's own exceptions are caught and recorded here rather
+        than propagating out of the whole group.
+        """
+        used = sum(p.market_value for p in members)
+        actions: list[ManagementAction] = []
+        for position in sorted(members, key=lambda p: -p.market_value):
+            try:
+                action = self._trim_one(group, position, used, excess)
+            except (BrokerError, MarketDataError, risk_engine.RiskViolation) as exc:
+                action = ManagementAction(
+                    ticker=position.ticker, action=ERROR, side=position.side,
+                    reason=f"{type(exc).__name__}: {exc}",
+                )
+                _record(action)
+            except Exception as exc:  # noqa: BLE001 - one position must not stop the group
+                log.exception("unexpected error trimming %s for the %r group cap", position.ticker, group)
+                action = ManagementAction(
+                    ticker=position.ticker, action=ERROR, side=position.side,
+                    reason=f"unexpected {type(exc).__name__}: {exc}",
+                )
+                _record(action)
+            if action is not None:
+                actions.append(action)
+        return actions
+
+    def _trim_one(
+        self, group: str, position: OpenPosition, group_used: float, group_excess: float
+    ) -> Optional[ManagementAction]:
+        """This position's pro-rata share of its group's excess, sold off.
+
+        Never the last share, for the same reason the ladder never sells it:
+        a stop already placed always keeps a position to protect. A group
+        still over its cap after this either had one ticker at more than
+        the cap by itself, or rounding left a few dollars over -- both heal
+        on the next cycle the same way a crash mid-pass does elsewhere in
+        this module.
+        """
+        ticker, side = position.ticker, position.side
+        qty = int(abs(position.qty))
+        if qty < 2 or group_used <= 0:
+            return None
+        share = group_excess * (position.market_value / group_used)
+        price = self._market_data.get_latest_price(ticker)
+        if price <= 0:
+            return None
+        tranche = min(qty - 1, int(share // price))
+        if tranche < 1:
+            return None
+
+        stop = self._broker.get_open_stop_order(ticker)
+        remaining = qty - tranche
+        old_stop = stop.stop_price if stop is not None else None
+        # Protect first, same as a ladder tranche: a stop still sized for
+        # the old position would reserve the shares this exit needs.
+        if stop is not None:
+            self._broker.replace_stop_order(stop.order_id, remaining, stop.stop_price)
+        order_id = self._broker.close_position_partially(ticker, tranche)
+        action = ManagementAction(
+            ticker=ticker, action=GROUP_CAP_TRIMMED, side=side, price=price,
+            qty_closed=tranche, remaining_qty=remaining,
+            old_stop=old_stop, new_stop=old_stop, order_id=order_id,
+            reason=f"{group!r} group exposure over its cap; trimmed pro-rata",
         )
         _record(action)
         return action
@@ -495,6 +646,7 @@ def render(report: ManagementReport) -> str:
     lines = [
         f"{report.positions_seen} open position(s): {report.tranches} tranche(s) sold, "
         f"{report.raises} stop(s) raised, {report.protected} protected, "
+        f"{report.group_trims} trimmed for a group cap, "
         f"{report.unmanaged} unmanaged, {report.errors} error(s)."
     ]
     for a in report.actions:
@@ -509,13 +661,18 @@ def render(report: ManagementReport) -> str:
             lines.append(f"  {a.ticker}: {a.gain_r:+.2f}R, holding {a.remaining_qty}; stop {a.old_stop:.2f}")
         elif a.action == PROTECTED:
             lines.append(f"  {a.ticker}: no stop found -> placed at {a.new_stop:.2f} ({a.reason})")
+        elif a.action == GROUP_CAP_TRIMMED:
+            lines.append(
+                f"  {a.ticker}: {a.reason} -> sold {a.qty_closed}, {a.remaining_qty} left"
+            )
         else:
             lines.append(f"  {a.ticker}: {a.action} -- {a.reason}")
     return "\n".join(lines)
 
 
 __all__ = [
-    "EVENT", "TRANCHE_TAKEN", "STOP_RAISED", "HELD", "UNMANAGED", "PROTECTED", "ERROR",
+    "EVENT", "TRANCHE_TAKEN", "STOP_RAISED", "HELD", "UNMANAGED", "PROTECTED",
+    "GROUP_CAP_TRIMMED", "ERROR",
     "ManagementAction", "ManagementReport", "LadderState", "PositionManager",
     "ladder_history", "last_recorded_stop", "render", "main",
 ]
