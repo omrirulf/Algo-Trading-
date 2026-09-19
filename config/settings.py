@@ -238,8 +238,8 @@ PROFIT_LADDER: Final[tuple[LadderRung, ...]] = (
 #:
 #: Diversity is not this constant's job and never was. It comes from the
 #: limits that target concentration directly: MAX_EXPOSURE_GROUP_PCT across
-#: twenty groups, the sleeve budgets, and the per-kind caps. More slots can
-#: only make the book wider; they cannot make it more concentrated.
+#: every exposure group, the sleeve budgets, and the per-kind caps. More
+#: slots can only make the book wider; they cannot make it more concentrated.
 MAX_OPEN_POSITIONS: Final[int] = 40
 
 #: Wilder ATR lookback, in trading days.

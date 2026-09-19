@@ -469,9 +469,18 @@ EXPOSURE_GROUPS: Final[dict[str, tuple[str, ...]]] = {
     "Health care": HEALTH_CARE + SECTOR_HEALTH_CARE,
     "Industrials": INDUSTRIALS + SECTOR_INDUSTRIALS,
     "Consumer": CONSUMER_DISCRETIONARY + CONSUMER_STAPLES + SECTOR_CONSUMER,
-    # One energy bet, whether taken through a driller, a sector fund or the
-    # barrel.
-    "Energy": ENERGY_EQUITY + ENERGY_COMMODITY + SECTOR_ENERGY,
+    # One energy bet, whether taken through a driller, a sector fund, the
+    # barrel -- or a "broad" commodity basket that is mostly oil. DBC is
+    # roughly 55-60% energy futures by weight, and it measures 0.82 excess
+    # correlation against this group over 2007-present, 0.64 in the tail.
+    #
+    # Its remaining metals and agriculture weight does count against the
+    # energy ceiling as a result, which overstates that part. That is the
+    # deliberate trade: this file groups by what a thing trades like rather
+    # than by what its prospectus spans -- the same reasoning that puts
+    # housebuilders with property and a gold miner with gold -- and what DBC
+    # trades like is oil.
+    "Energy": ENERGY_EQUITY + ENERGY_COMMODITY + SECTOR_ENERGY + ("DBC",),
     "Utilities": SECTOR_UTILITIES,
     "Materials": SECTOR_MATERIALS,
     "Real estate": SECTOR_REAL_ESTATE,
@@ -488,19 +497,21 @@ EXPOSURE_GROUPS: Final[dict[str, tuple[str, ...]]] = {
     # net two opposite risks into one number.
     "Credit": CREDIT,
     "US dollar": CURRENCY,
-    # DBC only. DBA is a broad fund for sizing -- it spans about ten crops --
-    # but it is not a *separate bet* from the grain funds below, because it
-    # holds the same futures: corn, wheat, soybeans and sugar are four of its
-    # largest positions, and the note on AGRICULTURE above already relies on
-    # that ("coffee exposure now comes through DBA"). Holding DBA alongside
-    # CORN, WEAT, SOYB and CANE was one agricultural bet spread across two
-    # groups, each with its own ceiling.
+    # There is no "Broad commodities" exposure group, though the sizing
+    # roster of that name survives in BROAD_FUND_ROLES: both its members are
+    # broad funds, and neither is a broad *bet*. Measured over 2007-present,
+    # DBA belongs with the crops it holds and DBC with the oil it mostly
+    # holds, so the pair was never one thing to bound.
     #
-    # Measured rather than assumed: of the 171 pairs of exposure groups,
-    # this was the only one to clear |excess r| >= 0.6 over 2007-present --
-    # 0.66 over the last year and 0.67 in the tail, after removing the
-    # factor every holding shares (analysis/correlations.py).
-    "Broad commodities": ("DBC",),
+    # This was arrived at in two steps, and the second was a surprise worth
+    # recording. Grouping DBA and DBC together diluted each, and their
+    # combined series correlated 0.66 with Agriculture -- the only one of
+    # 171 group pairs to clear the bar. Moving DBA out fixed that and
+    # immediately exposed DBC's energy character, which the averaging had
+    # been masking: Energy against DBC alone measures 0.82. The first fix
+    # did not create the second problem, it revealed one that a diluted
+    # average had hidden from the same measurement a run earlier.
+    #
     # Miners with the metal: a gold miner is a levered bet on gold, not a
     # diversifier from it.
     "Precious metals": PRECIOUS_METALS + SECTOR_MINERS,

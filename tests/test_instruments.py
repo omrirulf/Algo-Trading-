@@ -288,6 +288,28 @@ def test_the_farm_basket_is_grouped_with_the_crops_it_holds():
     assert group_for("DBA") != group_for("DBC")
 
 
+def test_the_commodity_basket_is_grouped_with_the_oil_that_dominates_it():
+    """DBC is 55-60% energy futures and measures 0.82 excess against Energy.
+
+    Its metals and grain weight counts against the energy ceiling as a
+    result, which overstates that part -- the accepted cost of grouping by
+    what a thing trades like rather than by what its prospectus spans.
+    """
+    assert group_for("DBC") == group_for("USO") == group_for("XOM") == "Energy"
+
+
+def test_broad_commodities_is_a_sizing_roster_and_not_an_exposure_group():
+    """Both members are broad funds; neither is a broad bet.
+
+    DBA belongs with the crops it holds, DBC with the oil it mostly holds,
+    so there is nothing left for a group of that name to bound.
+    """
+    from config.instruments import BROAD_FUND_ROLES, EXPOSURE_GROUPS
+
+    assert BROAD_FUND_ROLES["Broad commodities"] == ("DBC", "DBA")
+    assert "Broad commodities" not in EXPOSURE_GROUPS
+
+
 def test_the_farm_basket_is_still_sized_as_a_broad_fund():
     """Grouping is about correlated risk; the cap is about what it holds.
 
