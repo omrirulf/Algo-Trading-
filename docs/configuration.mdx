@@ -33,7 +33,7 @@ being hard-coded.
 | `BRIGHTDATA_SERP_ZONE` | `orchestrator/news.py` only | Name of your Bright Data **SERP API** zone. Empty by default, so the unlocker fallback below can fire. |
 | `BRIGHTDATA_UNLOCKER_ZONE` | `orchestrator/news.py` only | Web Unlocker zone to use when no SERP zone is set — e.g. `cli_unlocker`, which `brightdata login` creates. |
 | `ANTHROPIC_API_KEY` | `orchestrator/llm.py` only | Claude API key, from the [Anthropic Console](https://console.anthropic.com). Optional if you use `ant auth login` instead — see below. |
-| `SCREENING_BASE_URL` | `orchestrator/heartbeat.py` | OpenAI-compatible endpoint to run the *screening* stage against, e.g. `http://10.0.0.5:11434/v1`. Blank screens with Claude Haiku as before. Cannot be a model on the hosted runner — see [cost](/cost#a-stage-that-is-not-billed-at-all). |
+| `SCREENING_BASE_URL` | `orchestrator/heartbeat.py` | OpenAI-compatible endpoint to run the *screening* stage against, e.g. `http://10.0.0.5:11434/v1`. Blank screens with Claude Haiku as before. Cannot be a model on the hosted runner — see [cost](/cost#a-stage-that-is-not-billed-at-all), and [concrete Gemini/Groq values](/cost#very-cheap-often-beats-free-for-this-workload) if you'd rather not self-host. |
 | `SCREENING_MODEL` | `orchestrator/heartbeat.py` | Model name to ask that endpoint for, e.g. `qwen2.5:14b`. Required alongside `SCREENING_BASE_URL`, ignored without it — on its own it would let an env var silently change which Claude model screens the watchlist. |
 | `SCREENING_API_KEY` | `orchestrator/heartbeat.py` | Bearer token for that endpoint, if it wants one. Blank sends no header at all. |
 

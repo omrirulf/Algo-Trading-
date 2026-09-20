@@ -19,6 +19,7 @@ from orchestrator import heartbeat as hb
 from orchestrator.context import TickerContext
 from orchestrator.llm import OpenAICompatibleProvider
 from replay import runner
+from replay.compare import SignalDiff
 
 
 def journal_line(
@@ -248,3 +249,160 @@ def test_missing_base_url_or_model_is_refused(tmp_path):
     journal = _write_journal(tmp_path, [journal_line()])
     args = cs.parse_args(["--journal", str(journal), "--model", "candidate"])
     assert cs.run(args) == 2
+
+
+# --- escalation recall: the asymmetric metric ------------------------------
+
+
+def _diff(before_bias, after_bias):
+    before = None if before_bias is None else LLMSignal(
+        ticker="AAPL", bias=Bias(before_bias), conviction=0.6, rationale="r"
+    )
+    after = None if after_bias is None else LLMSignal(
+        ticker="AAPL", bias=Bias(after_bias), conviction=0.6, rationale="r"
+    )
+    return SignalDiff(ticker="AAPL", before=before, after=after)
+
+
+def test_recall_is_none_when_haiku_never_escalated():
+    """Nothing to have missed, so 100% would flatter an untested candidate."""
+    diffs = [_diff("NEUTRAL", "NEUTRAL"), _diff("NEUTRAL", "BULLISH")]
+    recall, recalled, n = cs.escalation_recall(diffs)
+    assert recall is None and n == 0
+
+
+def test_a_directional_haiku_call_the_candidate_also_escalates_counts():
+    diffs = [_diff("BULLISH", "BEARISH")]  # disagrees on direction, but still escalated
+    recall, recalled, n = cs.escalation_recall(diffs)
+    assert (recall, recalled, n) == (1.0, 1, 1)
+
+
+def test_a_directional_haiku_call_the_candidate_calls_neutral_is_a_miss():
+    """The exact failure mode a symmetric agreement floor cannot see."""
+    diffs = [_diff("BULLISH", "NEUTRAL")]
+    recall, recalled, n = cs.escalation_recall(diffs)
+    assert (recall, recalled, n) == (0.0, 0, 1)
+
+
+def test_neutral_haiku_calls_never_enter_the_recall_denominator():
+    diffs = [_diff("BULLISH", "BULLISH"), _diff("NEUTRAL", "BULLISH"), _diff("NEUTRAL", "NEUTRAL")]
+    recall, recalled, n = cs.escalation_recall(diffs)
+    assert (recall, recalled, n) == (1.0, 1, 1)
+
+
+def test_recall_can_diverge_from_trade_agreement(tmp_path):
+    """The property the metric exists to catch: a candidate that scores well
+    on trade agreement overall while missing every one of Haiku's calls."""
+    journal = _write_journal(tmp_path, [
+        journal_line(ticker="AAPL", screen_bias="BULLISH", screen_conviction=0.6,
+                     final_bias="BULLISH", final_conviction=0.6),
+        journal_line(ticker="MSFT", screen_bias="NEUTRAL", screen_conviction=0.1,
+                     final_bias="NEUTRAL", final_conviction=0.1),
+    ])
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        ticker = "AAPL" if "AAPL" in body["messages"][1]["content"] else "MSFT"
+        # Agrees on the NEUTRAL line, misses the one directional call entirely.
+        bias = "NEUTRAL" if ticker == "AAPL" else "NEUTRAL"
+        return httpx.Response(200, json={
+            "choices": [{"message": {"content": json.dumps(
+                {"ticker": ticker, "bias": bias, "conviction": 0.1, "rationale": "r"}
+            )}}]
+        })
+
+    monkey_client = _server(handler)
+    real_init = OpenAICompatibleProvider.__init__
+
+    def patched_init(self, base_url, model, api_key="", client=None, timeout=120.0):
+        real_init(self, base_url, model, api_key=api_key, client=monkey_client, timeout=timeout)
+
+    OpenAICompatibleProvider.__init__ = patched_init
+    try:
+        args = cs.parse_args([
+            "--journal", str(journal), "--base-url", "http://local/v1",
+            "--model", "candidate", "--json",
+        ])
+        assert cs.run(args) == 0
+    finally:
+        OpenAICompatibleProvider.__init__ = real_init
+
+
+def test_the_verdict_is_gated_by_recall_not_by_trade_agreement(tmp_path):
+    """A candidate can clear the agreement floor and still fail the verdict."""
+    lines = [
+        journal_line(ticker="AAPL", screen_bias="BULLISH", screen_conviction=0.6,
+                     final_bias="BULLISH", final_conviction=0.6),
+    ] + [
+        journal_line(ticker="MSFT", ts=f"2026-09-{d:02d}T14:00:00+00:00",
+                     screen_bias="NEUTRAL", screen_conviction=0.1,
+                     final_bias="NEUTRAL", final_conviction=0.1)
+        for d in range(1, 10)
+    ]
+    journal = _write_journal(tmp_path, lines)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        content = body["messages"][1]["content"]
+        ticker = "AAPL" if "AAPL" in content else "MSFT"
+        # Agrees on all nine NEUTRAL lines (90%+ trade agreement) but misses
+        # the single directional one -- 0% recall.
+        return httpx.Response(200, json={
+            "choices": [{"message": {"content": json.dumps(
+                {"ticker": ticker, "bias": "NEUTRAL", "conviction": 0.1, "rationale": "r"}
+            )}}]
+        })
+
+    monkey_client = _server(handler)
+    real_init = OpenAICompatibleProvider.__init__
+
+    def patched_init(self, base_url, model, api_key="", client=None, timeout=120.0):
+        real_init(self, base_url, model, api_key=api_key, client=monkey_client, timeout=timeout)
+
+    OpenAICompatibleProvider.__init__ = patched_init
+    try:
+        import io
+        from contextlib import redirect_stdout
+
+        args = cs.parse_args([
+            "--journal", str(journal), "--base-url", "http://local/v1",
+            "--model", "candidate", "--json",
+        ])
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            assert cs.run(args) == 0
+        payload = json.loads(buf.getvalue())
+        assert payload["tradeable_agreement"] >= 0.9
+        assert payload["escalation_recall"] == 0.0
+        assert payload["verdict_pass"] is False
+    finally:
+        OpenAICompatibleProvider.__init__ = real_init
+
+
+def test_a_small_sample_is_flagged_but_not_refused(tmp_path, capsys):
+    journal = _write_journal(tmp_path, [
+        journal_line(ticker="AAPL", screen_bias="BULLISH", screen_conviction=0.6),
+    ])
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={
+            "choices": [{"message": {"content": json.dumps(
+                {"ticker": "AAPL", "bias": "BULLISH", "conviction": 0.5, "rationale": "r"}
+            )}}]
+        })
+
+    monkey_client = _server(handler)
+    real_init = OpenAICompatibleProvider.__init__
+
+    def patched_init(self, base_url, model, api_key="", client=None, timeout=120.0):
+        real_init(self, base_url, model, api_key=api_key, client=monkey_client, timeout=timeout)
+
+    OpenAICompatibleProvider.__init__ = patched_init
+    try:
+        args = cs.parse_args([
+            "--journal", str(journal), "--base-url", "http://local/v1", "--model", "candidate",
+        ])
+        assert cs.run(args) == 0
+        assert "not evidence yet" in capsys.readouterr().out
+    finally:
+        OpenAICompatibleProvider.__init__ = real_init

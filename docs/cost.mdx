@@ -115,19 +115,99 @@ An endpoint that is unreachable, errors, or answers in prose raises the same
 asking the full model. The worst a flaky local model can do is cost a cycle its
 saving; it cannot reach a trade.
 
+### Very cheap often beats free, for this workload
+
+Two independent reviews of this seam (one run in the session that built it,
+one run separately with no visibility into the first) landed on the same
+answer without comparing notes first: for ~80 calls/day of ~3,600-token
+prompts, a very cheap **paid** model is the better starting point over most
+free tiers, not a worse one. The volume is small in total but bursty --
+eighty multi-thousand-token calls fired close together in one job -- and that
+is exactly the shape free tiers cap hardest: Groq's free tier for its
+strict-JSON-capable models is 200,000 tokens/day and 8,000 tokens/minute,
+which this workload alone can exceed on the tokens-per-minute side. Google's
+free Gemini tier fits the volume but trains on free-tier prompts by default.
+Paying instead runs about **$0.60-$1.00/month** at this size and removes both
+problems.
+
+<Warning>
+  `OpenAICompatibleProvider` always sends `response_format` in OpenAI's
+  *strict* `json_schema` mode, with no fallback to loose JSON. A provider that
+  does not honour strict mode either 400s (the ticker falls through to the
+  full model -- safe, but the screen never ran) or returns best-effort JSON
+  that can miss the schema (`LLMError` -> same fallback). Confirm strict
+  support before trusting a candidate's number, not after.
+</Warning>
+
+**A starting point: Google Gemini `gemini-2.5-flash-lite`.** Cheapest paid
+text model in its lineup, a 1M-token context, honours strict `json_schema` on
+the normal (non-batch) request path, and does not reason by default -- which
+matters because of the caveat below.
+
+```bash
+SCREENING_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
+SCREENING_MODEL=gemini-2.5-flash-lite
+SCREENING_API_KEY=<your AI Studio key>
+```
+
+Get the key from [aistudio.google.com](https://aistudio.google.com) -> "Get
+API key", created in a project **with billing enabled** -- that's what moves
+prompts off the free tier's training-data policy and off its request caps.
+This is an account and billing action only you can take; nothing here can do
+it for you.
+
+**A fallback with a stronger strict-JSON guarantee: Groq's paid tier,
+`openai/gpt-oss-20b`.** Groq documents constrained decoding on exactly this
+model family, which is the highest-confidence strict-JSON story of the
+options surveyed.
+
+```bash
+SCREENING_BASE_URL=https://api.groq.com/openai/v1
+SCREENING_MODEL=openai/gpt-oss-20b
+SCREENING_API_KEY=<your Groq key>
+```
+
+<Note>
+  `gpt-oss-20b` reasons by default and has no true "off" -- only low, medium
+  or high effort. `orchestrator/llm.py`'s `NO_REASONING_INSTRUCTION` and best-
+  effort `reasoning_effort: "low"` (sent automatically whenever
+  `reasoning=False`, which the screen always asks with) cover this, but it is
+  worth knowing this model has to be *asked* to reason less, where Gemini
+  simply does not reason much to begin with.
+</Note>
+
+### Where the three values go
+
+Locally, `.env` — that is what `replay/compare_screening.py` and a local
+heartbeat read. For the scheduled cycle they have to be named in
+`.github/workflows/heartbeat.yml`'s env block as well, because a secret the
+workflow never passes to the step is a secret the cycle cannot read. They are
+wired there already, split by what is actually sensitive:
+
+| Value | Where it lives on GitHub |
+| --- | --- |
+| `SCREENING_BASE_URL` | repository **variable** (Settings -> Secrets and variables -> Actions -> Variables) |
+| `SCREENING_MODEL` | repository **variable** |
+| `SCREENING_API_KEY` | repository **secret** |
+
+All three unset is the supported default: the screen stays on Claude Haiku.
+`tests/test_workflow_keys.py` pins the list, so a fourth setting added to
+`config/settings.py` and forgotten in the workflow fails the suite rather
+than silently reading blank in production.
+
 ### Validating a candidate before flipping it on
 
 ```bash
 # Nothing calls the candidate; just say how many recorded lines are comparable
-python replay/compare_screening.py --limit 50 --dry-run
+python replay/compare_screening.py --limit 200 --dry-run
 
 # A local Ollama model
 python replay/compare_screening.py --base-url http://localhost:11434/v1 \
-    --model qwen2.5:14b --limit 50
+    --model qwen2.5:14b --limit 200
 
 # A hosted free/cheap tier
 python replay/compare_screening.py --base-url https://api.groq.com/openai/v1 \
-    --model llama-3.1-8b-instant --api-key "$GROQ_API_KEY" --limit 50
+    --model llama-3.1-8b-instant --api-key "$GROQ_API_KEY" --limit 200
 ```
 
 `compare_models.py` asks which Claude tier is cheapest; this asks a narrower
@@ -144,10 +224,29 @@ agree with what Haiku actually said on the same recorded lines.
   off, or the screen itself errored) is skipped, not counted as a pass.
 </Warning>
 
-Same pre-registered floor as the staircase walk (90% trade-agreement) and the
-same limits: agreement is not correctness, and a high failure rate silently
-reverts every one of those lines to the full model, which erases the saving
-without ever risking a bad trade.
+Two numbers are reported, and they are not interchangeable. **Trade
+agreement** (90% floor, same as the staircase walk) is symmetric: it counts a
+candidate that flips a NEUTRAL into a trade the same as one that flips a
+trade into NEUTRAL. **Escalation recall** (95% floor) is not, and is what
+actually gates the verdict: of the lines Haiku's screen called directional,
+the share the candidate also escalated. The reason is cost, not pedantry -- a
+candidate that quietly turns a tradeable name NEUTRAL costs a trade
+production's funnel can never recover, because the full model is never asked
+about a NEUTRAL screen. A candidate that escalates a name Haiku would have
+screened out costs one avoidable full-model call. A high trade-agreement
+score can still hide a candidate that is failing exactly the first way, which
+is what recall exists to catch.
+
+<Note>
+  The default sample is 200 lines, not 50: at 45/50 (90%) the 95% confidence
+  interval is roughly 78-96%, which cannot actually certify a 90% floor. A
+  run under 100 comparable lines is flagged in the output as a first look, not
+  evidence.
+</Note>
+
+Same limits as the staircase walk otherwise: agreement is not correctness,
+and a high failure rate silently reverts every one of those lines to the full
+model, which erases the saving without ever risking a bad trade.
 
 ## Stage zero: what the book already holds
 

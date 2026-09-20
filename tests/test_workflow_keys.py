@@ -14,6 +14,7 @@ from pathlib import Path
 
 import yaml
 
+from config.settings import Settings
 from orchestrator import sources
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -47,3 +48,17 @@ def test_the_probe_and_the_cycle_name_the_same_secrets():
     cycle = _step("heartbeat.yml", "cycle", "Run one cycle")["env"]
     for name in first_names:
         assert name in cycle, f"{name} is proven by the probe but never reaches the cycle"
+
+
+def test_the_cycle_receives_the_screening_endpoint_settings():
+    """A screening endpoint set only as a secret would never be read.
+
+    settings.py names the three fields; the scheduled cycle is the only
+    place they matter, and a field that is never passed to the step is a
+    field the cycle sees blank -- the 18 Sep failure again, one funnel
+    stage further down.
+    """
+    cycle = _step("heartbeat.yml", "cycle", "Run one cycle")["env"]
+    for field in ("screening_base_url", "screening_model", "screening_api_key"):
+        assert field in Settings.model_fields, field
+        assert field.upper() in cycle, f"{field} is configurable but never reaches the cycle"
