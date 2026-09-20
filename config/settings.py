@@ -163,6 +163,17 @@ EXPOSURE_GROUP_CAP_OVERRIDES: Final[dict[str, float]] = {
 #: limit: about 25% lost in the 2008 crisis, 22% in the 2020 crash, 15% in
 #: 2022. With nothing but the gross cap the same book could have lost about
 #: 39%, 35% and 24%.
+#:
+#: Known gap, measured and left open on purpose: this limit and Duration's
+#: ceiling are separate budgets that never look at each other, and they are
+#: not independent. ``analysis.correlations.risk_axis`` measures the raw
+#: correlation between the two baskets and finds the sign *changes* -- five
+#: of six drawdowns negative (bonds rallied as stocks fell), 2022 positive,
+#: the last year +0.55. So a long stock book held with a short duration leg
+#: is one bet made twice in a flight to quality, and a hedge in a rates
+#: shock, and no static rule is right in both. Nothing here nets the two;
+#: the docstring there says why, and what a conservative fix would look
+#: like.
 MAX_EQUITY_RISK_PCT: Final[float] = 0.60
 
 #: Sleeve budgets. Funds are the core holding and single names the satellite,

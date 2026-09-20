@@ -645,6 +645,34 @@ def risk_axis(
     every ticker in ``EQUITY_RISK_BETAS`` -- that is, exactly the two
     baskets the two caps bound, so the number answers the question actually
     being asked of the risk engine rather than a nearby one.
+
+    Measured 2007-01-03 to 2026-09-19, 80 tickers (run 35506712788)::
+
+        last year          +0.55
+        long (250d)        +0.43
+        equity stress days -0.02
+
+        GFC'08  -0.32 (356d)   Q4'18    -0.29 (59d)
+        Euro'11 -0.63 ( 66d)   Covid'20 -0.17 (24d)
+        Oil'15  -0.38 (134d)   Rates'22 +0.19 (196d)
+
+    **The sign is not stable, and that is the finding.** Five of the six
+    drawdowns are negative -- bonds rallied while stocks fell, the classic
+    flight to quality -- and 2022 alone is positive. So in five of the six
+    crises this book would most want protection from, a long stock position
+    held alongside a *short* duration position is one bet made twice, while
+    the two caps score it as two independent budgets.
+
+    The last year reads +0.55, the 2022-like regime, which inverts which
+    pairing is the dangerous one. No fixed rule relating the two caps can be
+    right in both, which is why this function reports and does not prescribe.
+    The conservative reading is that duration must never be allowed to
+    *reduce* measured stock risk, in either direction, since the sign that
+    would justify it is the one thing here that does not hold still.
+
+    The near-zero stress-days figure is not a third answer: that window
+    blends both regimes across twenty years, so the two signs cancel. It is
+    the reason the crises are measured one at a time.
     """
     duration = tuple(EXPOSURE_GROUPS.get("Duration", ())) if duration is None else tuple(duration)
     equity = tuple(EQUITY_RISK_BETAS) if equity is None else tuple(equity)
