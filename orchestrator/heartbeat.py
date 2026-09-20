@@ -35,7 +35,7 @@ import sys
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Final
 from dataclasses import dataclass
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -444,11 +444,55 @@ def screening_provider() -> tuple[SignalProvider, str]:
     )
 
 
+#: The efforts an OpenAI-compatible endpoint will accept. Anything else is a
+#: typo, and a typo that reached the endpoint would come back as a 400 per
+#: ticker -- every one of them falling through to the full model, which is
+#: safe and is also the whole saving gone, silently.
+SCREENING_EFFORTS: Final[frozenset[str]] = frozenset({"low", "medium", "high"})
+
+
+def screening_effort() -> str | None:
+    """How hard the screen is allowed to think, or ``None`` for not at all.
+
+    ``None`` is the default and the only value the Claude screen can be asked
+    with: Haiku 4.5 takes neither adaptive thinking nor an effort, so a value
+    set while no base URL is configured is ignored rather than sent. That is
+    deliberate asymmetry, not an oversight -- the setting exists for models
+    that have no true off switch, and Haiku is not one of them.
+
+    The reason it exists at all: asked the cheap way, gpt-oss-20b escalated 7
+    of the 64 names the Claude screen escalated. A model that reasons by
+    default and is told not to can fail the screen for want of thinking
+    rather than for want of ability, and those two have opposite fixes.
+    Whether this particular one is fixed by thinking is a
+    ``replay/compare_screening.py --effort`` run, not a guess, and nothing
+    here checks that such a run happened -- see the setting's own docstring.
+    """
+    settings = get_settings()
+    if not settings.screening_base_url:
+        return None
+    effort = (settings.screening_effort or "").strip().lower()
+    if not effort:
+        return None
+    if effort not in SCREENING_EFFORTS:
+        raise LLMError(
+            f"SCREENING_EFFORT={settings.screening_effort!r} is not one of "
+            f"{sorted(SCREENING_EFFORTS)}"
+        )
+    return effort
+
+
 def screen_signal(system_prompt: str, user_prompt: str, json_schema: dict) -> Completion:
-    """The first stage of the funnel: the same prompt, the cheap model, no reasoning."""
+    """The first stage of the funnel: the same prompt, the cheap model.
+
+    Reasoning off unless ``SCREENING_EFFORT`` says otherwise, which is what
+    has always made this stage cheap. See ``screening_effort``.
+    """
     provider, model = screening_provider()
+    effort = screening_effort()
     return provider.complete_detailed(
-        system_prompt, user_prompt, json_schema, model=model, reasoning=False
+        system_prompt, user_prompt, json_schema, model=model,
+        reasoning=effort is not None, effort=effort,
     )
 
 

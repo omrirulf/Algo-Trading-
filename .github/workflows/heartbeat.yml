@@ -159,6 +159,11 @@ jobs:
           # repository variables; only the key is a secret.
           SCREENING_BASE_URL: ${{ vars.SCREENING_BASE_URL }}
           SCREENING_MODEL: ${{ vars.SCREENING_MODEL }}
+          # Blank asks the screen with reasoning off, as it always has. A
+          # value here changes what decides which tickers reach the full
+          # model, so it belongs to a compare_screening.py run at the same
+          # effort, never to a guess.
+          SCREENING_EFFORT: ${{ vars.SCREENING_EFFORT }}
           # Every plausible spelling collapses onto the one name the code
           # reads. The obvious thing to call a Gemini key is GEMINI_API_KEY,
           # and a key stored under a name nothing reads is silent: the screen

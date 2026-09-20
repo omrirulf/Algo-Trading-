@@ -546,6 +546,22 @@ class Settings(BaseSettings):
             "endpoint usually does not, and blank sends no header at all"
         ),
     )
+    screening_effort: str = Field(
+        default="",
+        description=(
+            "Ask the screening endpoint WITH reasoning on, at this effort: "
+            "low, medium or high. Blank -- the default -- asks with reasoning "
+            "off, which is what 'screening' has always meant here and what "
+            "makes the stage cheap. Read only alongside screening_base_url, "
+            "because the Claude screen takes neither adaptive thinking nor an "
+            "effort and would be broken by one. It exists because a model "
+            "with no true off switch can fail the screen for want of "
+            "thinking rather than for want of ability: gpt-oss-20b scored 11% "
+            "escalation recall asked the cheap way. Never set this without a "
+            "compare_screening.py run at the same effort behind it -- a screen "
+            "that wrongly answers NEUTRAL loses the trade silently"
+        ),
+    )
     brightdata_api_token: str = Field(default="", description="Bright Data API token (orchestrator only)")
     brightdata_serp_zone: str = Field(
         default="",

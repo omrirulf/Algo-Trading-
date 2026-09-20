@@ -145,3 +145,12 @@ def test_the_screening_check_can_outlast_the_grading_it_runs():
         f"timeout-minutes={timeout_s // 60} cannot finish {default_limit} graded "
         f"calls; needs at least {needed // 60} minutes"
     )
+
+
+def test_the_screen_effort_reaches_the_cycle_too():
+    """It changes which tickers reach the full model, so a value set on GitHub
+    and never passed to the step would be a setting that looks applied and
+    is not -- the same silence this file exists to catch."""
+    cycle = _step("heartbeat.yml", "cycle", "Run one cycle")["env"]
+    assert "screening_effort" in Settings.model_fields
+    assert cycle["SCREENING_EFFORT"] == "${{ vars.SCREENING_EFFORT }}"

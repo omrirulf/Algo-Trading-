@@ -20,7 +20,7 @@ import pytest
 from config.settings import Settings
 from orchestrator import heartbeat as hb
 from orchestrator import llm
-from orchestrator.llm import LLMError, OpenAICompatibleProvider
+from orchestrator.llm import Completion, LLMError, OpenAICompatibleProvider
 
 SCHEMA = {"type": "object", "properties": {"bias": {"type": "string"}}}
 ANSWER = {"ticker": "AAPL", "bias": "NEUTRAL", "conviction": 0.2, "rationale": "r"}
@@ -214,3 +214,73 @@ def test_the_full_model_is_never_the_local_one():
     source = inspect.getsource(hb.call_llm)
     assert "AnthropicSignalProvider" in source
     assert "screening_provider" not in source
+
+
+# --- letting the screen think, when the endpoint needs it to ---------------
+
+
+def _settings(**kw):
+    base = dict(
+        screening_base_url="https://api.deepinfra.com/v1/openai",
+        screening_model="openai/gpt-oss-20b",
+        screening_api_key="k",
+    )
+    base.update(kw)
+    return Settings(**base)
+
+
+def test_no_effort_configured_still_asks_with_reasoning_off(monkeypatch):
+    """The default has to stay the cheap one: every existing deployment that
+    set only a base URL and a model must keep the screen it measured."""
+    monkeypatch.setattr(hb, "get_settings", lambda: _settings())
+    assert hb.screening_effort() is None
+
+
+def test_an_effort_is_honoured_when_an_endpoint_is_configured(monkeypatch):
+    monkeypatch.setattr(hb, "get_settings", lambda: _settings(screening_effort="high"))
+    assert hb.screening_effort() == "high"
+
+
+def test_an_effort_without_an_endpoint_is_ignored_not_obeyed(monkeypatch):
+    """Clearing the base URL is how you fall back to Claude in a hurry. If a
+    leftover effort followed you there it would break every screen instead."""
+    monkeypatch.setattr(hb, "get_settings", lambda: _settings(
+        screening_base_url="", screening_model="", screening_effort="high",
+    ))
+    assert hb.screening_effort() is None
+
+
+@pytest.mark.parametrize("value", ["High", " high ", "HIGH"])
+def test_an_effort_is_read_case_and_space_insensitively(monkeypatch, value):
+    monkeypatch.setattr(hb, "get_settings", lambda: _settings(screening_effort=value))
+    assert hb.screening_effort() == "high"
+
+
+@pytest.mark.parametrize("value", ["maximum", "hard", "true", "9"])
+def test_an_unusable_effort_is_refused_before_it_reaches_the_endpoint(monkeypatch, value):
+    """A typo sent to the endpoint is a 400 per ticker: every one falls
+    through to the full model, which is safe and is the whole saving gone
+    without a word."""
+    monkeypatch.setattr(hb, "get_settings", lambda: _settings(screening_effort=value))
+    with pytest.raises(LLMError) as exc:
+        hb.screening_effort()
+    assert value in str(exc.value)
+
+
+def test_the_screen_call_carries_the_effort_end_to_end(monkeypatch):
+    seen: dict = {}
+
+    class _Provider:
+        def __init__(self, **kw):
+            pass
+
+        def complete_detailed(self, s, u, j, **kw):
+            seen.update(kw)
+            return Completion(text=json.dumps(ANSWER), usage=None)
+
+    monkeypatch.setattr(hb, "get_settings", lambda: _settings(screening_effort="high"))
+    monkeypatch.setattr(hb, "OpenAICompatibleProvider", _Provider)
+    hb.screen_signal("s", "u", SCHEMA)
+    assert seen["reasoning"] is True
+    assert seen["effort"] == "high"
+    assert seen["model"] == "openai/gpt-oss-20b"

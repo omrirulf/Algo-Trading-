@@ -11,6 +11,7 @@ import json
 
 import pytest
 
+from config.settings import Settings
 from orchestrator import heartbeat as hb
 from orchestrator import llm
 from orchestrator.llm import Completion, LLMError
@@ -262,7 +263,31 @@ def test_screen_signal_asks_the_cheap_model_without_reasoning(monkeypatch):
 
     monkeypatch.setattr(hb, "AnthropicSignalProvider", _Provider)
     hb.screen_signal("s", "u", {})
-    assert seen == {"model": hb.SCREENING_MODEL, "reasoning": False}
+    assert seen == {"model": hb.SCREENING_MODEL, "reasoning": False, "effort": None}
+
+
+def test_the_claude_screen_is_never_given_an_effort(monkeypatch):
+    """Haiku 4.5 takes neither adaptive thinking nor an effort. SCREENING_EFFORT
+    exists for endpoints that reason by default, and a value left set while the
+    base URL is cleared must not reach Claude -- that would turn "fall back to
+    the safe default" into "break every screen"."""
+    seen: dict = {}
+
+    class _Provider:
+        def __init__(self, key):
+            pass
+
+        def complete_detailed(self, s, u, j, **kw):
+            seen.update(kw)
+            return _completion(_signal("NEUTRAL"), hb.SCREENING_MODEL)
+
+    monkeypatch.setattr(hb, "AnthropicSignalProvider", _Provider)
+    monkeypatch.setattr(hb, "get_settings", lambda: Settings(
+        screening_base_url="", screening_model="", screening_effort="high",
+    ))
+    hb.screen_signal("s", "u", {})
+    assert seen["reasoning"] is False
+    assert seen["effort"] is None
 
 
 def test_the_screening_model_is_priced():
