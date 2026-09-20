@@ -379,6 +379,47 @@ BATCH_DEADLINE_SECONDS: Final[int] = 35 * 60
 ATR_PERIOD: Final[int] = 14
 
 #: Stop-loss distance from entry, in multiples of ATR.
+#:
+#: Read this together with ``risk_engine.calculate_position_size``, because
+#: the two of them decide something neither one states, and it is deliberate.
+#:
+#: Size is a fixed share of equity and volatility is **nowhere** in that
+#: function; the stop is this multiple of ATR. So when volatility rises the
+#: book holds the *same dollar position* with a stop *further away*, and the
+#: dollars at risk per trade rise with ATR/price. That is constant-notional
+#: sizing: the position stays put and both the risk and the reward scale with
+#: the regime. The usual alternative -- constant-risk sizing, shrinking the
+#: position so each trade risks the same dollars -- would do the opposite and
+#: lean the book *out* of a volatile market.
+#:
+#: Measured on RSP, 2007-01 to 2026-09 (``analysis.volatility``, run
+#: 35537001841), by VIX band -- median daily true range, then what that means
+#: for one broad-fund trade and for a book at the gross cap:
+#:
+#:     band              daily range   per trade   whole book
+#:     calm (<15)              0.72%       0.17%         1.4%
+#:     normal (15-20)          1.05%       0.25%         2.0%
+#:     uneasy (20-30)          1.69%       0.41%         3.2%
+#:     afraid (30-40)          2.85%       0.68%         5.4%
+#:     panic (40+)             4.76%       1.14%         9.0%
+#:
+#: So a trade opened in a panic risks about **6.6x** what the same trade
+#: risks in a calm market, at an identical position size, and a fully
+#: deployed book risks about 9% of the account if every stop is hit at once.
+#: In a real crash that is the realistic case rather than the pessimistic
+#: one: ``analysis.correlations`` measures group cohesion rising from ~0.35
+#: in calm markets to 0.69-0.95 inside every drawdown since 2007, which is
+#: the stops clustering.
+#:
+#: **Kept on purpose.** The same study measures forward returns by band:
+#: +9.7% over three months from the panic band against +4.3% from the calm
+#: one, and a 79% win rate in the 30-40 band. Leaning into fear is what the
+#: data supports, and constant-notional sizing does it automatically. The
+#: 9% book figure is the price, and it is a survivable one.
+#:
+#: Do not "fix" the missing volatility term in ``calculate_position_size``.
+#: It is not an oversight; removing it would quietly convert the book to
+#: constant-risk sizing and reverse the lean this paragraph exists to keep.
 ATR_STOP_MULTIPLIER: Final[float] = 2.0
 
 #: Guard against a degenerate ATR (illiquid ticker, bad data). If ATR is less

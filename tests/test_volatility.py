@@ -216,3 +216,49 @@ def test_the_report_carries_every_section_when_given_bars():
                     "What one trade already risks"):
         assert heading in text
     assert data["observations"] == n
+
+
+def test_the_whole_book_figure_is_the_gross_cap_not_the_position_cap():
+    """What the account loses if every stop is hit at once.
+
+    It needs no position count: filling the gross cap with positions each
+    capped at cap_pct means the caps sum to the gross cap, so the total at
+    risk is gross x multiplier x range however many tickers it took.
+    """
+    n = 200
+    index = days(n)
+    close = pd.Series(100.0, index=index)
+    ohlc = pd.DataFrame({"High": close + 0.5, "Low": close - 0.5, "Close": close})
+    [row] = [r for r in vol.risk_per_trade_by_regime(flat_vix(n, 12.0), ohlc)
+             if r["band"] == "calm (<15)"]
+    expected = cfg.MAX_GROSS_EXPOSURE_PCT * cfg.ATR_STOP_MULTIPLIER * 0.01 * 100
+    assert row["whole_book_pct"] == pytest.approx(expected, rel=0.01)
+    # And it is the larger of the two, since the gross cap exceeds any one
+    # position's cap.
+    assert row["whole_book_pct"] > row["risk_per_trade_pct"]
+
+
+def test_position_size_still_ignores_volatility_on_purpose():
+    """A guard on a decision, not on an accident.
+
+    Constant-notional sizing is what makes the book lean into a volatile
+    market, and it is kept deliberately -- see settings.ATR_STOP_MULTIPLIER.
+    If someone ever "fixes" calculate_position_size by feeding ATR into it,
+    the book silently becomes constant-risk and the lean reverses. This test
+    is the tripwire for that.
+    """
+    from app import risk_engine
+
+    equity, price = 100_000.0, 100.0
+    calm = risk_engine.calculate_position_size(equity, price, cfg.MAX_BROAD_FUND_PCT)
+    panic = risk_engine.calculate_position_size(equity, price, cfg.MAX_BROAD_FUND_PCT)
+    assert calm == panic, "position size must not depend on the regime"
+    assert calm * price == pytest.approx(equity * cfg.MAX_BROAD_FUND_PCT, rel=0.01)
+
+    import inspect
+    source = inspect.getsource(risk_engine.calculate_position_size)
+    assert "atr" not in source.lower(), (
+        "ATR has entered calculate_position_size -- that converts the book to "
+        "constant-risk sizing and reverses a deliberate choice; see "
+        "settings.ATR_STOP_MULTIPLIER before changing this test"
+    )

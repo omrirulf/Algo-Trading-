@@ -191,8 +191,9 @@ def risk_per_trade_by_regime(
     multiplier: float = cfg.ATR_STOP_MULTIPLIER,
     bands: Sequence[tuple[str, float, float]] = VIX_BANDS,
     min_days: int = MIN_DAYS,
+    gross_pct: float = cfg.MAX_GROSS_EXPOSURE_PCT,
 ) -> list[dict]:
-    """What one trade stands to lose, by VIX band, as a share of the account.
+    """What one trade -- and the whole book -- stands to lose, by VIX band.
 
     The arithmetic the engine performs without anyone writing it down:
 
@@ -204,7 +205,16 @@ def risk_per_trade_by_regime(
     So risk per trade is proportional to ``ATR / price``, which is exactly
     what rises in a panic. The cap holds the *position* constant and lets the
     *risk* float, which is the opposite of what a cap is usually assumed to
-    do.
+    do. That is deliberate -- see ``settings.ATR_STOP_MULTIPLIER`` -- and this
+    function is what keeps the number it was chosen on honest.
+
+    ``whole_book_pct`` is the same arithmetic for a book filled to the gross
+    cap: what the account loses if *every* stop is hit at once. In calm
+    markets that is a pessimistic reading, because unrelated positions do not
+    all fail together. In a crash it is the realistic one:
+    ``analysis.correlations`` measures group cohesion rising from about 0.35
+    in a calm year to 0.69-0.95 inside every drawdown since 2007, and that
+    rise is the stops clustering.
     """
     tr = true_range(ohlc)
     aligned = pd.concat([vix.rename("vix"), tr.rename("tr")], axis=1).dropna()
@@ -212,8 +222,8 @@ def risk_per_trade_by_regime(
     for label, low, high in bands:
         window = aligned[(aligned["vix"] >= low) & (aligned["vix"] < high)]["tr"]
         if len(window) < min_days:
-            rows.append({"band": label, "days": len(window),
-                         "median_tr_pct": None, "risk_per_trade_pct": None})
+            rows.append({"band": label, "days": len(window), "median_tr_pct": None,
+                         "risk_per_trade_pct": None, "whole_book_pct": None})
             continue
         median_tr = float(window.median())
         rows.append({
@@ -221,6 +231,11 @@ def risk_per_trade_by_regime(
             "days": len(window),
             "median_tr_pct": round(median_tr * 100, 2),
             "risk_per_trade_pct": round(cap_pct * multiplier * median_tr * 100, 3),
+            # The book figure needs no position count: filling the gross cap
+            # with positions each capped at cap_pct means the caps sum to the
+            # gross cap, so the total at risk is gross x multiplier x range
+            # however many tickers it took to get there.
+            "whole_book_pct": round(gross_pct * multiplier * median_tr * 100, 2),
         })
     return rows
 
@@ -328,15 +343,18 @@ def render(data: dict) -> str:
             "dollars at risk per trade are whatever the band below says, and "
             "nobody chose them.",
             "",
-            f"{'band':<16} {'days':>6} {'daily range':>12} {'risk per trade':>15}",
-            f"{'-' * 16} {'-' * 6} {'-' * 12} {'-' * 15}",
+            f"{'band':<16} {'days':>6} {'daily range':>12} {'risk per trade':>15} {'whole book':>12}",
+            f"{'-' * 16} {'-' * 6} {'-' * 12} {'-' * 15} {'-' * 12}",
         ]
         for row in risk:
             tr = f"{row['median_tr_pct']:.2f}%".rjust(12) if isinstance(row["median_tr_pct"], float) else "--".rjust(12)
             rp = f"{row['risk_per_trade_pct']:.2f}%".rjust(15) if isinstance(row["risk_per_trade_pct"], float) else "--".rjust(15)
-            lines.append(f"{row['band']:<16} {row['days']:>6} {tr} {rp}")
+            bk = f"{row['whole_book_pct']:.1f}%".rjust(12) if isinstance(row.get("whole_book_pct"), float) else "--".rjust(12)
+            lines.append(f"{row['band']:<16} {row['days']:>6} {tr} {rp} {bk}")
         measured = [r["risk_per_trade_pct"] for r in risk
                     if isinstance(r.get("risk_per_trade_pct"), float)]
+        books = [r["whole_book_pct"] for r in risk
+                 if isinstance(r.get("whole_book_pct"), float)]
         if len(measured) >= 2:
             lines += [
                 "",
@@ -344,6 +362,15 @@ def render(data: dict) -> str:
                 f"{measured[-1]:.2f}% of the account per trade, "
                 f"about {measured[-1] / measured[0]:.1f}x, at the same position size.",
             ]
+            if len(books) >= 2:
+                lines.append(
+                    f"  A book at the gross cap: {books[0]:.1f}% -> {books[-1]:.1f}% "
+                    "if every stop is hit at once -- the realistic case in a crash, "
+                    "when the stops cluster."
+                )
+            lines.append(
+                "  Kept on purpose; see settings.ATR_STOP_MULTIPLIER for why."
+            )
 
     lines += [
         "",
