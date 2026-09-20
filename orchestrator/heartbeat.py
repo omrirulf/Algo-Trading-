@@ -32,9 +32,10 @@ import argparse
 import logging
 import os
 import sys
+from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime
 from typing import Any
-from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -1229,7 +1230,7 @@ def batch_answers(
         log.info("%s has no batch mode; calling it directly", type(provider).__name__)
 
     answers: dict[str, "Completion | BaseException"] = {}
-    fell_back = 0
+    needs_live: list[PreparedTicker] = []
     for item in prepared:
         answer = collected.get(item.custom_id)
         if isinstance(answer, Completion):
@@ -1237,10 +1238,38 @@ def batch_answers(
             continue
         if answer is not None:
             log.warning("%s: batch answer unusable (%s); asking live", item.ticker, answer)
-        answers[item.ticker] = _ask(live, item)
-        fell_back += 1
-    if fell_back and collected:
-        log.info("%d of %d ticker(s) fell back to a live call", fell_back, len(prepared))
+        needs_live.append(item)
+
+    # Concurrency only where there was never a batch to fall back *from*.
+    #
+    # A provider with no offline mode is called once per ticker, so
+    # sequentially the stage costs the whole watchlist times one answer's
+    # latency -- fine at the ~2.4s a screen takes with reasoning off, and not
+    # fine at all once it is asked to think. Starting the cycle earlier
+    # answers the average case; it does not answer every ticker running to
+    # REQUEST_TIMEOUT_SECONDS, which is the case that eats a session.
+    #
+    # When ``collected`` is non-empty a batch *did* run and these are its
+    # stragglers, which means the provider is Anthropic. Firing the whole
+    # watchlist at it at once there trades slow tickers for rate-limited ones,
+    # and a rate-limited ticker is lost where a slow one is only late. That
+    # stage already has batching as its answer to latency.
+    workers = 1 if collected else min(cfg.SCREEN_MAX_CONCURRENCY, len(needs_live))
+    if workers > 1:
+        log.info("asking %d ticker(s) live, %d at a time", len(needs_live), workers)
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            # Submitted in order and read back in order, so the answers do not
+            # depend on which call happened to finish first.
+            for item, answer in zip(
+                needs_live, pool.map(lambda i: _ask(live, i), needs_live)
+            ):
+                answers[item.ticker] = answer
+    else:
+        for item in needs_live:
+            answers[item.ticker] = _ask(live, item)
+
+    if needs_live and collected:
+        log.info("%d of %d ticker(s) fell back to a live call", len(needs_live), len(prepared))
     return answers
 
 

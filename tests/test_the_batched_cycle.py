@@ -13,9 +13,11 @@ The saving is easy; the safety is the part worth testing. Three properties:
 from __future__ import annotations
 
 import json
+import time
 
 import pytest
 
+from config import settings as cfg
 from config.settings import Settings
 from orchestrator import heartbeat as hb
 from orchestrator.llm import BatchTimeout, Completion, LLMError
@@ -372,3 +374,110 @@ def test_the_ladder_runs_even_if_every_batch_call_fails(batched, monkeypatch):
     report = hb.run_cycle(engine)
     assert report.positions is not None
     assert report.positions["positions_seen"] == 0
+
+
+# --- the live path is concurrent, the fallback is not ----------------------
+
+
+def _prepared(hb, tickers):
+    from orchestrator.context import TickerContext
+
+    return tuple(
+        hb.PreparedTicker(
+            ticker=name,
+            context=TickerContext(ticker=name, headlines=["h"]),
+            system_prompt="sys",
+            user_prompt=f"{name}\nbody",
+        )
+        for name in tickers
+    )
+
+
+class _NoBatchProvider:
+    """An OpenAI-compatible-shaped provider: no submit_batch attribute."""
+
+
+def test_a_provider_with_no_batch_mode_is_asked_concurrently(monkeypatch):
+    """Sequentially this stage is the whole watchlist times one answer's
+    latency, which is what makes a reasoning screen unaffordable in wall time
+    rather than in money."""
+    import threading
+
+    live_at_once, peak = [], []
+    lock = threading.Lock()
+
+    def slow(system_prompt, user_prompt, schema):
+        with lock:
+            live_at_once.append(1)
+            peak.append(len(live_at_once))
+        time.sleep(0.05)
+        with lock:
+            live_at_once.pop()
+        return _answer(user_prompt.split("\n")[0])
+
+    prepared = _prepared(hb, [f"T{i}" for i in range(16)])
+    answers = hb.batch_answers(prepared, slow, provider=_NoBatchProvider())
+
+    assert len(answers) == 16
+    assert max(peak) > 1, "the live stage is still sequential"
+    assert max(peak) <= cfg.SCREEN_MAX_CONCURRENCY
+
+
+def test_the_batch_fallback_stays_sequential(monkeypatch):
+    """These are an Anthropic batch's stragglers. Firing the watchlist at the
+    API at once trades slow tickers for rate-limited ones, and a rate-limited
+    ticker is lost where a slow one is only late."""
+    import threading
+
+    live_at_once, peak = [], []
+    lock = threading.Lock()
+
+    def slow(system_prompt, user_prompt, schema):
+        with lock:
+            live_at_once.append(1)
+            peak.append(len(live_at_once))
+        time.sleep(0.02)
+        with lock:
+            live_at_once.pop()
+        return _answer(user_prompt.split("\n")[0])
+
+    class Batching:
+        def submit_batch(self, requests):
+            return "batch-1"
+
+        def collect_batch(self, batch_id, model=None, timeout_seconds=None):
+            # One usable answer; the rest have to fall back.
+            return {hb.batch_custom_id("T0"): _answer("T0")}
+
+    prepared = _prepared(hb, [f"T{i}" for i in range(6)])
+    answers = hb.batch_answers(prepared, slow, provider=Batching())
+
+    assert len(answers) == 6
+    assert max(peak) == 1, "the Anthropic fallback must not fan out"
+
+
+def test_every_ticker_gets_its_own_answer_under_concurrency():
+    """Answers are keyed by ticker, so a race that crossed two of them would
+    put one ticker's signal on another ticker's name -- silent, and a trade."""
+    def echo(system_prompt, user_prompt, schema):
+        ticker = user_prompt.split("\n")[0]
+        time.sleep(0.01)
+        return _answer(ticker)
+
+    names = [f"T{i}" for i in range(24)]
+    answers = hb.batch_answers(_prepared(hb, names), echo, provider=_NoBatchProvider())
+    for name in names:
+        assert json.loads(answers[name].text)["ticker"] == name
+
+
+def test_one_failing_ticker_does_not_take_the_others_down():
+    def flaky(system_prompt, user_prompt, schema):
+        ticker = user_prompt.split("\n")[0]
+        if ticker == "T3":
+            raise LLMError("endpoint said no")
+        return _answer(ticker)
+
+    names = [f"T{i}" for i in range(8)]
+    answers = hb.batch_answers(_prepared(hb, names), flaky, provider=_NoBatchProvider())
+    assert isinstance(answers["T3"], LLMError)
+    assert all(isinstance(answers[n], Completion) for n in names if n != "T3")
