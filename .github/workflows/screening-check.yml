@@ -21,6 +21,11 @@ on:
       limit:
         description: "Journal lines to grade against"
         default: "200"
+      effort:
+        description: "Grade with reasoning ON at this effort (a proposal, not what the screen does today). Blank = as the cycle asks."
+        type: choice
+        options: ["", "low", "medium", "high"]
+        default: ""
 
 permissions:
   contents: read
@@ -28,14 +33,20 @@ permissions:
 jobs:
   screening:
     runs-on: ubuntu-latest
-    # Sized for the recall step, not the probe. The probe is one call and a
-    # few seconds; grading is one call per journal line, sequentially, and at
-    # the ~2.4s a hosted endpoint actually answers in, the default 200 lines
-    # is about eight minutes on its own. At 10 minutes -- which is what this
-    # carried from when it only ran the probe -- the first real grading run
-    # was killed at 9m29s, one step before printing the number, having paid
-    # for every call.
-    timeout-minutes: 60
+    # Sized for the slowest thing this job can be asked to do, which is a
+    # graded run at high effort -- not the probe, and not the cheap grading.
+    #
+    # The probe is one call and a few seconds. Grading is one call per journal
+    # line, sequentially: about eight minutes at the ~2.4s a hosted endpoint
+    # answers the screen in, and several times that once `effort` turns
+    # reasoning on and each answer carries thousands of thinking tokens.
+    #
+    # This has already been got wrong once in the cheap direction: at the 10
+    # minutes it carried from when it only ran the probe, the first real
+    # grading run was killed at 9m29s, one step before printing the number,
+    # having paid for every call. tests/test_workflow_keys.py pins the
+    # requirement to the slow case for that reason.
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
@@ -87,4 +98,5 @@ jobs:
             --model "$SCREENING_MODEL" \
             --api-key "$SCREENING_API_KEY" \
             --limit "${{ inputs.limit }}" \
+            ${{ inputs.effort && format('--effort {0}', inputs.effort) || '' }} \
             | tee -a "$GITHUB_STEP_SUMMARY"

@@ -657,8 +657,22 @@ class OpenAICompatibleProvider:
                 },
             },
         }
+        # Reasoning off: "low", because this family has no true off switch, so
+        # the floor is the least it will do. That is how the screen asks.
+        #
+        # Reasoning on: only what the caller named. ``effort`` used to be
+        # accepted here and dropped on the floor, which made the one question
+        # worth asking about a reasoning model -- does it get the screen right
+        # when it is allowed to think -- unaskable through the replay harness.
+        # gpt-oss-20b scored 11% escalation recall asked the cheap way, and
+        # whether that is the model or the handicap is a measurement rather
+        # than an opinion. An unspecified effort still sends nothing, leaving
+        # the endpoint's own default alone: imposing one here would silently
+        # change what every non-screen caller of this class asks for.
         if not reasoning:
             body["reasoning_effort"] = "low"
+        elif effort:
+            body["reasoning_effort"] = effort
         payload = self._post(body)
         try:
             text = payload["choices"][0]["message"]["content"]

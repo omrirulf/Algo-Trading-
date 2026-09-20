@@ -96,6 +96,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                              "Required unless --dry-run.")
     parser.add_argument("--model", type=str, default="",
                         help="Model name to ask that endpoint for. Required unless --dry-run.")
+    parser.add_argument("--effort", choices=("low", "medium", "high"), default=None,
+                        help="ask the candidate WITH reasoning on, at this effort. "
+                             "Off by default, because the production screen is asked "
+                             "with reasoning off and that is what a candidate has to "
+                             "be graded against. Use it to separate 'this model is "
+                             "weak' from 'the cheap setting crippled it' -- a "
+                             "reasoning model has no true off switch, so the screen's "
+                             "reasoning_effort=low is a real handicap. A result from "
+                             "this is a PROPOSAL for what the screen would have to "
+                             "become, not a measurement of what it does now, and the "
+                             "header says so.")
     parser.add_argument("--api-key", type=str, default="",
                         help="Bearer token for --base-url, if it wants one.")
     parser.add_argument("--floor", type=float, default=DEFAULT_FLOOR,
@@ -202,7 +213,7 @@ def run(args: argparse.Namespace) -> int:
         return 2
 
     provider = OpenAICompatibleProvider(base_url=args.base_url, model=args.model, api_key=args.api_key)
-    complete, usages = runner.screening_candidate_completer(provider, args.model)
+    complete, usages = runner.screening_candidate_completer(provider, args.model, args.effort)
 
     diffs: list[SignalDiff] = []
     errors: list[str] = []
@@ -219,7 +230,7 @@ def run(args: argparse.Namespace) -> int:
             after=result.replayed,
         ))
 
-    cell = Cell(model=args.model, effort="screen", usages=usages, diffs=diffs, errors=errors)
+    cell = Cell(model=args.model, effort=args.effort or "screen", usages=usages, diffs=diffs, errors=errors)
     agreement_verdict = clears_floor(cell, args.floor)
     recall, recalled, haiku_escalated = escalation_recall(diffs)
     recall_verdict = None if recall is None else recall >= args.recall_floor
@@ -261,6 +272,13 @@ def run(args: argparse.Namespace) -> int:
     print("SCREENING CANDIDATE VS THE RECORDED HAIKU SCREEN")
     print("=" * 72)
     print(f"Candidate         : {args.model}  ({args.base_url})")
+    if args.effort:
+        print(f"Asked with        : reasoning ON at effort={args.effort}  <- NOT how the "
+              f"screen asks today")
+        print( "                    A pass here is a proposal to change the screen, not")
+        print( "                    a green light for the current configuration.")
+    else:
+        print( "Asked with        : reasoning off (exactly as the cycle asks the screen)")
     print(f"Lines compared    : {cell.n}  ({skipped} skipped: no recorded screen)")
     if small_sample:
         print(f"                    ** fewer than {MIN_TRUSTWORTHY_SAMPLE} lines -- "
