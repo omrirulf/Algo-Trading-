@@ -139,14 +139,87 @@ problems.
   support before trusting a candidate's number, not after.
 </Warning>
 
-**A starting point: Google Gemini `gemini-2.5-flash-lite`.** Cheapest paid
-text model in its lineup, a 1M-token context, honours strict `json_schema` on
-the normal (non-batch) request path, and does not reason by default -- which
-matters because of the caveat below.
+### What the screen actually costs
+
+Measured from 465 recorded screening calls: 2,439 input tokens, 1,189 of them
+the cacheable prompt head, and 510 output tokens per call. At 68 screened
+tickers a cycle and 21 trading days:
+
+| Screening model | $/month | vs Haiku |
+| --- | --- | --- |
+| `claude-haiku-4-5`, cache working | $7.29 | — |
+| `openai/gpt-oss-20b` on DeepInfra | $0.26 | 28x cheaper |
+| `openai/gpt-oss-20b` on Groq | $0.61 | 12x cheaper |
+| `Qwen3.6-35B-A3B` on DeepInfra | $1.47 | 5x cheaper |
+| `gemini-3.5-flash-lite` | $3.37 | 2.2x cheaper |
+
+The Haiku row is the one to read first. It is *already* lower than the $9.25
+this stage used to cost, because the cache breakpoint fix landed — which
+means the cheap-screen argument is now being made against a smaller number
+than it was originally made against. What is left to save is single-digit
+dollars a month, and the recall floor below is what it has to be worth.
+
+### Strict JSON is a property of the host, not the model
+
+This is the constraint that eliminates most candidates, and it is easy to get
+wrong because it looks like a question about the model.
+`OpenAICompatibleProvider` sends strict `json_schema` with no fallback, so the
+*serving endpoint* is what has to do constrained decoding:
+
+- **DeepSeek's own API cannot.** It supports `json_object` but rejects
+  `response_format.type = "json_schema"` outright. Every screening call would
+  400 and every ticker would fall through to the full model -- more expensive
+  than changing nothing at all.
+- **Alibaba DashScope is partial**: only the newer Qwen3.7/3.8 series enforce
+  a schema rather than merely suggesting one.
+- **DeepInfra, Groq, Fireworks and Together do it server-side**, for whatever
+  weights they host.
+
+So choose the host first. The model is then a menu, including the Chinese
+open-weight ones -- served from US infrastructure, which also avoids sending
+every prompt to an endpoint whose terms permit training on it.
+
+**The cheapest reachable option: `openai/gpt-oss-20b` on DeepInfra**, at
+$0.03/$0.14 per Mtok.
+
+```bash
+SCREENING_BASE_URL=https://api.deepinfra.com/v1/openai
+SCREENING_MODEL=openai/gpt-oss-20b
+SCREENING_API_KEY=<your DeepInfra key>
+```
+
+Key from [deepinfra.com](https://deepinfra.com) -> Dashboard -> API Keys.
+
+<Warning>
+  Groq serves the same model and documents constrained decoding on exactly
+  this family, but as of 20 Sep 2026 its console answers "Developer tier
+  upgrades are temporarily unavailable due to high demand", so the paid tier
+  cannot be joined. The free tier's request caps and data-use policy both rule
+  it out for an 80-ticker daily cycle. The `openai/gpt-oss-20b` row in
+  `orchestrator/pricing.py` is therefore DeepInfra's: an open-weight model's
+  price belongs to whoever serves it, the journal records only the name, and
+  serving it from Groq instead makes that row wrong by about 2.4x with nothing
+  to detect it.
+</Warning>
+
+<Note>
+  Wanting a frontier Chinese model here is understandable and probably
+  misspent. The screen is a NEUTRAL-or-not call over a short context: it needs
+  schema compliance and calibration, not intelligence. GLM-4.6 costs 13x what
+  `gpt-oss-20b` does to answer a question neither struggles with. If you want
+  one regardless, `Qwen3.6-35B-A3B` on DeepInfra is the sensible pick -- still
+  5x under Haiku -- and `compare_screening.py` is what settles whether the
+  extra capability actually buys any recall.
+</Note>
+
+**The alternative: Google Gemini `gemini-3.5-flash-lite`.** $0.30/$2.50 per
+Mtok, a 1M-token context, honours strict `json_schema` on the normal
+(non-batch) request path, and does not reason by default -- which matters
+because of the caveat below.
 
 ```bash
 SCREENING_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
-SCREENING_MODEL=gemini-2.5-flash-lite
+SCREENING_MODEL=gemini-3.5-flash-lite
 SCREENING_API_KEY=<your AI Studio key>
 ```
 
@@ -156,16 +229,23 @@ prompts off the free tier's training-data policy and off its request caps.
 This is an account and billing action only you can take; nothing here can do
 it for you.
 
-**A fallback with a stronger strict-JSON guarantee: Groq's paid tier,
-`openai/gpt-oss-20b`.** Groq documents constrained decoding on exactly this
-model family, which is the highest-confidence strict-JSON story of the
-options surveyed.
+<Warning>
+  Model names expire. `gemini-2.5-flash-lite` was this page's recommendation
+  until 20 Sep 2026, when the endpoint began answering
+  `404 ... no longer available to new users`. That is a clean failure -- the
+  screen falls through to the full model, so it costs money rather than
+  making a bad trade -- but it is silent unless something asks. The
+  **screening check** workflow is what asks; run it after any change to
+  `SCREENING_MODEL`. The prices above were verified the same day and carry
+  the same expiry risk.
+</Warning>
 
-```bash
-SCREENING_BASE_URL=https://api.groq.com/openai/v1
-SCREENING_MODEL=openai/gpt-oss-20b
-SCREENING_API_KEY=<your Groq key>
-```
+<Note>
+  Both rows are in `orchestrator/pricing.py`, so the screening stage appears
+  in the measured bill instead of pricing as `None` and quietly leaving it. A
+  self-hosted endpoint has no row and still costs `None`, which is the honest
+  answer for someone else's GPU.
+</Note>
 
 <Note>
   `gpt-oss-20b` reasons by default and has no true "off" -- only low, medium

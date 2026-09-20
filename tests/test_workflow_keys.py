@@ -91,3 +91,19 @@ def test_the_screening_probe_is_offered_every_spelling_separately():
 def test_the_canonical_spelling_is_the_field_settings_declares():
     assert llm.SCREENING_KEY_ENV_VARS[0].lower() in Settings.model_fields
     assert llm.SCREENING_KEY_ENV_VARS[0] == "SCREENING_API_KEY"
+
+
+def test_the_recall_grading_step_gets_the_same_endpoint_the_probe_does():
+    """Grading a different endpoint than the one the cycle would use makes
+    the verdict meaningless, and the failure is invisible -- it still prints
+    a number."""
+    probe = _step("screening-check.yml", "screening",
+                  "Is the screening endpoint wired, and does it answer")["env"]
+    grade = _step("screening-check.yml", "screening",
+                  "Does it agree with the screen it would replace")["env"]
+    assert grade["SCREENING_BASE_URL"] == probe["SCREENING_BASE_URL"]
+    assert grade["SCREENING_MODEL"] == probe["SCREENING_MODEL"]
+    cycle = _step("heartbeat.yml", "cycle", "Run one cycle")["env"]
+    assert grade["SCREENING_API_KEY"] == cycle["SCREENING_API_KEY"], (
+        "the graded key must be the one the cycle resolves, spellings included"
+    )

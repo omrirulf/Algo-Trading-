@@ -40,11 +40,41 @@ class Price:
 
 #: Only the models this project would plausibly run. An unknown model costs
 #: ``None`` rather than zero -- see ``cost_usd``.
+#:
+#: The two non-Claude rows are the documented screening endpoints. They are
+#: here because a hosted API with a published price list is not the "someone
+#: else's hardware" case ``OpenAICompatibleProvider`` leaves unpriced: we do
+#: know what these cost, and without a row the whole screening stage prices as
+#: ``None`` and drops out of the measured bill -- the same silent hole that
+#: made the first 80-ticker cycle report $0.00 for 114 screening calls.
+#:
+#: A self-hosted endpoint still has no row, still costs ``None``, and that is
+#: still the honest answer.
 PRICES: Final[dict[str, Price]] = {
     "claude-opus-5": Price(5.00, 25.00),
     "claude-sonnet-5": Price(2.00, 10.00),
     "claude-haiku-4-5": Price(1.00, 5.00),
+    # Screening endpoints. Verified 20 Sep 2026 against the providers' public
+    # pricing; re-check before trusting a cost report months from now.
+    #
+    # A row is keyed by model name, but an open-weight model's price belongs to
+    # whoever serves it: gpt-oss-20b is $0.03/$0.14 on DeepInfra and
+    # $0.075/$0.30 on Groq, and the journal records only the name. The row
+    # below is DeepInfra's, because Groq's paid tier is closed to new signups
+    # ("Developer tier upgrades are temporarily unavailable"), which makes
+    # DeepInfra the host this model is actually reachable through. Serving it
+    # somewhere else makes this row wrong -- by a factor of about 2.4 for Groq
+    # -- and nothing detects that, so change it when you change host.
+    "gemini-3.5-flash-lite": Price(0.30, 2.50),
+    "openai/gpt-oss-20b": Price(0.03, 0.14),
 }
+
+#: The cache multipliers above are Anthropic's. Gemini's cache read happens to
+#: be the same 0.1x, Groq's is 0.5x, and neither is exercised today: the
+#: OpenAI-compatible path sends no ``cache_control`` and records no cache
+#: token counts, so those fields are zero on every non-Claude row and the
+#: multiplier never applies. Sending cache hints on that path would make this
+#: comment wrong before it made the bill smaller.
 
 
 @dataclass(frozen=True)

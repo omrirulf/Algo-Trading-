@@ -174,3 +174,32 @@ def test_a_dated_snapshot_now_has_a_cost_instead_of_none():
 def test_a_prefix_match_never_beats_an_exact_one():
     """A longer alias that happens to prefix-match must not shadow the real row."""
     assert pricing.price_for("claude-haiku-4-5") is pricing.PRICES["claude-haiku-4-5"]
+
+
+# --- the screening endpoints ---------------------------------------------
+
+
+def test_the_documented_screening_endpoints_price():
+    """Without a row the whole first stage of the funnel prices as None and
+    silently leaves the measured bill -- which is how the first 80-ticker
+    cycle reported $0.00 for 114 screening calls."""
+    for model in ("gemini-3.5-flash-lite", "openai/gpt-oss-20b"):
+        assert pricing.price_for(model) is pricing.PRICES[model]
+        assert cost_usd(Usage(model=model, input_tokens=1000, output_tokens=1000)) > 0
+
+
+def test_a_self_hosted_screening_model_is_still_unpriced():
+    """Adding hosted endpoints must not start guessing at someone's own GPU."""
+    assert pricing.price_for("qwen2.5:14b") is None
+    assert cost_usd(Usage(model="qwen2.5:14b", input_tokens=10_000)) is None
+
+
+def test_every_screening_endpoint_is_cheaper_than_the_claude_screen():
+    """The only reason to move the screen off Haiku is cost. A row that is
+    not cheaper on both axes means the table is wrong or the endpoint is not
+    worth documenting."""
+    haiku = pricing.PRICES["claude-haiku-4-5"]
+    for model in ("gemini-3.5-flash-lite", "openai/gpt-oss-20b"):
+        price = pricing.PRICES[model]
+        assert price.input_per_mtok < haiku.input_per_mtok, model
+        assert price.output_per_mtok < haiku.output_per_mtok, model
