@@ -176,6 +176,25 @@ SCREENING_API_KEY=<your Groq key>
   simply does not reason much to begin with.
 </Note>
 
+### Where the three values go
+
+Locally, `.env` — that is what `replay/compare_screening.py` and a local
+heartbeat read. For the scheduled cycle they have to be named in
+`.github/workflows/heartbeat.yml`'s env block as well, because a secret the
+workflow never passes to the step is a secret the cycle cannot read. They are
+wired there already, split by what is actually sensitive:
+
+| Value | Where it lives on GitHub |
+| --- | --- |
+| `SCREENING_BASE_URL` | repository **variable** (Settings -> Secrets and variables -> Actions -> Variables) |
+| `SCREENING_MODEL` | repository **variable** |
+| `SCREENING_API_KEY` | repository **secret** |
+
+All three unset is the supported default: the screen stays on Claude Haiku.
+`tests/test_workflow_keys.py` pins the list, so a fourth setting added to
+`config/settings.py` and forgotten in the workflow fails the suite rather
+than silently reading blank in production.
+
 ### Validating a candidate before flipping it on
 
 ```bash

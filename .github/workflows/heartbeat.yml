@@ -149,6 +149,17 @@ jobs:
           # `brightdata login` creates. Set BRIGHTDATA_SERP_ZONE as a
           # repository variable only if you have a real SERP API zone.
           BRIGHTDATA_SERP_ZONE: ${{ vars.BRIGHTDATA_SERP_ZONE }}
+          # The screening stage's optional endpoint -- the cheap first pass,
+          # never the call that decides a trade. All three blank (the default)
+          # and the screen stays on Claude Haiku, which is what
+          # ANTHROPIC_API_KEY above already pays for. Named here because a
+          # secret that is never passed to the step is a secret the cycle
+          # cannot read: that is exactly how the four source keys went unused
+          # until 18 Sep. The base URL and model are not secret, so they are
+          # repository variables; only the key is a secret.
+          SCREENING_BASE_URL: ${{ vars.SCREENING_BASE_URL }}
+          SCREENING_MODEL: ${{ vars.SCREENING_MODEL }}
+          SCREENING_API_KEY: ${{ secrets.SCREENING_API_KEY }}
         # --premarket on the first cron only. Batched, the model stages are
         # asked offline at half price, and the waiting for them has to happen
         # somewhere: before the session, or during it. Starting at 12:35 UTC
