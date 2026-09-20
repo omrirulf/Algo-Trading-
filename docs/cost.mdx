@@ -115,6 +115,40 @@ An endpoint that is unreachable, errors, or answers in prose raises the same
 asking the full model. The worst a flaky local model can do is cost a cycle its
 saving; it cannot reach a trade.
 
+### Validating a candidate before flipping it on
+
+```bash
+# Nothing calls the candidate; just say how many recorded lines are comparable
+python replay/compare_screening.py --limit 50 --dry-run
+
+# A local Ollama model
+python replay/compare_screening.py --base-url http://localhost:11434/v1 \
+    --model qwen2.5:14b --limit 50
+
+# A hosted free/cheap tier
+python replay/compare_screening.py --base-url https://api.groq.com/openai/v1 \
+    --model llama-3.1-8b-instant --api-key "$GROQ_API_KEY" --limit 50
+```
+
+`compare_models.py` asks which Claude tier is cheapest; this asks a narrower
+question -- does *this specific endpoint*, asked exactly as the screen is
+really asked (the same trimmed per-ticker system prompt, `reasoning=False`),
+agree with what Haiku actually said on the same recorded lines.
+
+<Warning>
+  The baseline is the recorded **screen**, never the recorded final signal. On
+  a line the screen escalated, those differ -- the screen's own
+  NEUTRAL-or-not call versus the full model's directional one -- and grading a
+  candidate against the full model would be grading it on a question
+  production never asked it. A line with no recorded screen (screening was
+  off, or the screen itself errored) is skipped, not counted as a pass.
+</Warning>
+
+Same pre-registered floor as the staircase walk (90% trade-agreement) and the
+same limits: agreement is not correctness, and a high failure rate silently
+reverts every one of those lines to the full model, which erases the saving
+without ever risking a bad trade.
+
 ## Stage zero: what the book already holds
 
 A ticker already in the book is asked nothing, by either model. It is

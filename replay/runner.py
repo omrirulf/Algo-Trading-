@@ -18,8 +18,9 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Callable, Iterator, Optional
 
-from app.schemas import LLMSignal
-from orchestrator.heartbeat import SIGNAL_JSON_SCHEMA, SYSTEM_PROMPT
+from app.schemas import Bias, LLMSignal
+from orchestrator.context import TickerContext
+from orchestrator.heartbeat import SIGNAL_JSON_SCHEMA, SYSTEM_PROMPT, system_prompt_for
 from orchestrator.llm import LLMError
 from replay.compare import ReplaySummary, SignalDiff
 from replay.rebuild import RebuildError, context_from_dict
@@ -38,6 +39,21 @@ class ReplayEntry:
     ts_utc: Optional[str]
     prompt: str
     original: Optional[LLMSignal]
+    #: The rebuilt context, kept alongside the rendered ``prompt`` string
+    #: rather than instead of it -- most callers only ever need the string,
+    #: but a caller comparing a *screening* candidate needs to know whether
+    #: this ticker is a fund and, for a fund, which sections it actually
+    #: carried, to pick the same system prompt production would have sent.
+    #: ``None`` on any line old enough to predate this field.
+    context: Optional[TickerContext] = None
+    #: The cheap first stage's own recorded answer, exactly as journalled --
+    #: ``{"model", "bias", "conviction", "usage"}`` on a normal line,
+    #: ``{"model", "error"}`` on a screen that failed, ``None`` when
+    #: screening was off or the line predates the funnel. This is what a
+    #: screening-candidate comparison must diff against; ``original`` is the
+    #: wrong baseline for it on any line that escalated, because on those
+    #: lines ``original`` is the *full model's* answer, not the screen's.
+    recorded_screen: Optional[dict] = None
 
 
 @dataclass(frozen=True)
@@ -74,7 +90,7 @@ def load_entries(lines: list[str], ticker: Optional[str] = None) -> Iterator[Rep
         if wanted and str(context.get("ticker", "")).upper() != wanted:
             continue
         try:
-            prompt = context_from_dict(context).as_prompt()
+            rebuilt = context_from_dict(context)
         except RebuildError as exc:
             log.warning("journal line %d cannot be rebuilt: %s", number, exc)
             continue
@@ -87,11 +103,15 @@ def load_entries(lines: list[str], ticker: Optional[str] = None) -> Iterator[Rep
             except Exception:  # noqa: BLE001 - an old line may predate a field
                 log.debug("journal line %d has an unparseable signal", number)
 
+        screen = record.get("screen")
+
         yield ReplayEntry(
             ticker=str(context.get("ticker", "")).upper(),
             ts_utc=record.get("ts_utc"),
-            prompt=prompt,
+            prompt=rebuilt.as_prompt(),
             original=original,
+            context=rebuilt,
+            recorded_screen=screen if isinstance(screen, dict) else None,
         )
 
 
@@ -119,6 +139,82 @@ def replay_all(
     entries: list[ReplayEntry], system_prompt: str, complete: Completer
 ) -> list[ReplayResult]:
     return [replay_one(entry, system_prompt, complete) for entry in entries]
+
+
+def system_prompt_for_entry(entry: ReplayEntry) -> str:
+    """The system prompt production would have sent for this exact line.
+
+    Differs from the single shared ``SYSTEM_PROMPT`` every other tool in this
+    module uses: a fund gets the macro prompt rather than the company one,
+    trimmed to the sections ``entry.context`` actually carried -- the same
+    rule ``orchestrator.heartbeat.system_prompt_for`` applies live. An entry
+    old enough to predate ``ReplayEntry.context`` falls back to whichever
+    prompt the ticker's *kind* alone implies, untrimmed -- still correct for
+    a single name, and for a fund closer than the one shared prompt every
+    other replay tool sends every ticker.
+    """
+    return system_prompt_for(entry.ticker, entry.context)
+
+
+def recorded_screen_signal(entry: ReplayEntry) -> Optional[LLMSignal]:
+    """The cheap first stage's own recorded call, as a comparable ``LLMSignal``.
+
+    ``None`` when there is nothing to compare against: screening was off,
+    the line predates the funnel, or the recorded screen itself failed (it
+    carries ``error`` rather than a ``bias``) -- a failed screen is a data
+    point about that day's screen, not a baseline call to hold a candidate
+    to. ``entry.original`` is deliberately not used for this: on a line the
+    screen escalated, ``original`` is the *full model's* answer, and diffing
+    a screening candidate against the full model would grade it on a
+    question production never asked it.
+
+    The rationale is a fixed placeholder rather than anything recorded --
+    the production screen's rationale was thrown away because the funnel
+    only kept ``bias`` and ``conviction`` (see ``orchestrator/heartbeat.py``,
+    ``apply_screen``) -- and every comparison here reads ``bias`` and
+    ``conviction`` only, so the placeholder is never inspected.
+    """
+    screen = entry.recorded_screen
+    if not screen or "bias" not in screen or screen.get("conviction") is None:
+        return None
+    try:
+        return LLMSignal(
+            ticker=entry.ticker,
+            bias=Bias(screen["bias"]),
+            conviction=float(screen["conviction"]),
+            rationale="(recorded production screen; not itself recorded)",
+        )
+    except (ValueError, KeyError):
+        return None
+
+
+def screening_candidate_completer(provider, model: str):
+    """A completer for a screening candidate, called exactly as production calls it.
+
+    ``reasoning=False`` is not optional here -- it is what "screening" means
+    in this codebase: the production screen is asked with reasoning off (see
+    ``orchestrator/heartbeat.py``'s ``screen_signal``), and comparing a
+    candidate answering *with* reasoning on would be comparing it against a
+    question nobody asks it in the cycle. ``provider`` is anything
+    implementing ``orchestrator.llm.SignalProvider`` -- in practice
+    ``OpenAICompatibleProvider`` for a candidate, or ``AnthropicSignalProvider``
+    to price the incumbent Haiku screen the same way for a side-by-side.
+
+    Returns ``(complete, usages)``, the same shape as ``measured_completer``,
+    for the same reason: a validation run should price itself from measured
+    tokens, and an unpriced local model is expected to report ``cost_usd`` of
+    ``None`` rather than a guessed number.
+    """
+    from orchestrator.pricing import Usage
+
+    usages: list[Usage] = []
+
+    def complete(system_prompt: str, user_prompt: str, schema: dict[str, Any]) -> str:
+        result = provider.complete_detailed(system_prompt, user_prompt, schema, model=model, reasoning=False)
+        usages.append(result.usage)
+        return result.text
+
+    return complete, usages
 
 
 def summarise(results: list[ReplayResult]) -> ReplaySummary:
@@ -173,4 +269,7 @@ __all__ = [
     "summarise",
     "default_completer",
     "measured_completer",
+    "system_prompt_for_entry",
+    "recorded_screen_signal",
+    "screening_candidate_completer",
 ]
