@@ -59,13 +59,21 @@ one usually finishes in minutes. Two things buy that back:
   do is cost what a cycle costs today. It cannot cost a session.
 
 <Warning>
-  Starting pre-market gives up the cheap market-closed gate, which would
-  otherwise refuse every early run. A holiday gathers context and pays for a
-  batch whose signals the engine then refuses — roughly ten cycles a year,
-  against a halved bill on the other 250. Only the run that is *meant* to
-  start early passes `--premarket`; every other caller still exits at once
-  when the market is shut.
+  Starting pre-market gives up the broker's own market-closed gate, which
+  would otherwise refuse every early run. `config.market_calendar.is_trading_day`
+  stands in for it instead: a weekend or a listed NYSE holiday is skipped
+  before anything is fetched, at zero cost. What that calendar cannot see — a
+  half day, or an unscheduled closure — still reaches the broker's own gate,
+  which refuses the orders either way.
 </Warning>
+
+The job's own timeout has to cover the worst case of both waits, not just
+context gathering: roughly 45 minutes to gather 80 tickers, plus up to
+`BATCH_DEADLINE_SECONDS` for the screen batch, plus up to the same again for
+whatever it escalates — about 115 minutes worst case, against a 180-minute
+ceiling. Position management is run immediately after the open book is read,
+before either batch is submitted, specifically so a run that dies during
+that wait has already protected and trimmed the book.
 
 ## The cache breakpoint has to be on the system prompt
 

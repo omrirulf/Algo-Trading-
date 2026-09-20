@@ -286,3 +286,89 @@ def test_an_unreadable_clock_does_not_stop_the_batch(batched, monkeypatch):
             raise BrokerError("clock unreachable")
 
     assert len(hb.run_cycle(_Broken()).completed) == 1
+
+
+# --- the weekend/holiday gate -----------------------------------------------
+
+
+def test_a_holiday_costs_nothing_at_all(batched, monkeypatch):
+    """The point of the calendar check: no broker call, no news fetch, no
+    context gathered, no batch submitted -- checked before any of it."""
+    from datetime import date
+
+    use, live = batched
+    use("AAPL")
+    monkeypatch.setattr(hb, "today_et", lambda: date(2026, 12, 25))  # Christmas
+
+    class _MustNotBeAsked(_Engine):
+        def is_market_open(self):
+            raise AssertionError("the clock must not be asked on a known holiday")
+
+        def open_tickers(self):
+            raise AssertionError("the book must not be read on a known holiday")
+
+    report = hb.run_cycle(_MustNotBeAsked(), premarket=True)
+    assert report.market_closed is True
+    assert report.results == ()
+    assert live == {"screen": [], "full": []}
+
+
+def test_a_holiday_is_caught_even_with_premarket_false(batched, monkeypatch):
+    """The calendar check runs before the broker-clock branch, not instead of
+    it, so the ordinary (non-premarket) catch-up cron gets it for free too."""
+    from datetime import date
+
+    use, _ = batched
+    use("AAPL")
+    monkeypatch.setattr(hb, "today_et", lambda: date(2026, 12, 25))
+
+    report = hb.run_cycle(_Engine(), premarket=False)
+    assert report.market_closed is True
+
+
+def test_an_ordinary_weekday_is_not_mistaken_for_a_holiday(batched, monkeypatch):
+    """The frozen test date itself must clear the gate, or every other test
+    in this file would be silently passing for the wrong reason."""
+    use, _ = batched
+    use("AAPL")
+    _provider(monkeypatch, _Batches())
+
+    assert hb.run_cycle(_Engine(), premarket=True).market_closed is False
+
+
+# --- the ladder is safe from a slow batch -----------------------------------
+
+
+def test_the_ladder_runs_before_either_batch_is_submitted(batched, monkeypatch):
+    """The safety property the reordering exists for: a run that dies during
+    the (much longer) batch waits below has already protected the book."""
+    use, _ = batched
+    use("AAPL")
+    order: list[str] = []
+
+    class _Ordered(_Batches):
+        def submit_batch(self, requests):
+            order.append("submit")
+            return super().submit_batch(requests)
+
+    class _Watched(_Engine):
+        def manage_positions(self, protect_only: bool = False):
+            order.append("ladder")
+            return super().manage_positions(protect_only)
+
+    _provider(monkeypatch, _Ordered())
+    hb.run_cycle(_Watched())
+    assert order == ["ladder", "submit", "submit"]
+
+
+def test_the_ladder_runs_even_if_every_batch_call_fails(batched, monkeypatch):
+    """Not just early -- unconditional. A batch that cannot even submit must
+    not have taken the ladder down with it, since by then it already ran."""
+    use, _ = batched
+    use("AAPL")
+    engine = _Engine()
+    _provider(monkeypatch, _Batches(submit_error=LLMError("down")))
+
+    report = hb.run_cycle(engine)
+    assert report.positions is not None
+    assert report.positions["positions_seen"] == 0

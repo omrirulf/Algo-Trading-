@@ -32,10 +32,12 @@ import argparse
 import logging
 import os
 import sys
+from datetime import date, datetime
 from typing import Any
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 # Allow ``python orchestrator/heartbeat.py`` from the repo root.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -66,8 +68,13 @@ from orchestrator.llm import (  # noqa: E402
     batch_custom_id,
 )
 from app.broker_client import BrokerError  # noqa: E402
+from config.market_calendar import is_trading_day  # noqa: E402
 from orchestrator.dispatch import Dispatcher, build_dispatcher  # noqa: E402
 from orchestrator.news import BrightDataNewsProvider, NewsFetchError  # noqa: E402
+
+#: US/Eastern, because the NYSE holiday calendar is defined in that timezone
+#: and a UTC "today" would occasionally name the wrong side of midnight.
+_MARKET_TZ = ZoneInfo("America/New_York")
 
 log = logging.getLogger("heartbeat")
 
@@ -1242,23 +1249,44 @@ def run_batched_cycle(
 ) -> CycleReport:
     """One cycle, with both model stages asked offline at half price.
 
-    The order differs from the live cycle in one way that matters. The open
-    book is read *before* the ladder walks it, because the prompts are built
-    before either can run and stage zero needs to know what to leave out. The
-    cost is a name the ladder closes today being skipped today and reviewed
-    tomorrow -- one cycle of lag on one ticker, against paying full funnel
-    price for every held name in every cycle.
+    Two orderings differ from the live cycle, and both are deliberate.
 
-    ``premarket`` gives up the cheap market-open gate, and is the whole point
-    of batching: the waiting has to happen in the hours before the session, or
-    it happens during it. It is a flag rather than the default because the
-    gate is what stops a holiday from gathering eighty contexts and paying for
-    a batch the engine will then refuse to trade -- roughly ten cycles a year.
-    Only the run that is *meant* to start early gives that up; every other
-    caller still refuses to start when the market is shut.
+    The open book is read *before* the ladder walks it -- the opposite of the
+    live cycle -- because the prompts are built before either can run and
+    stage zero needs to know what to leave out. The cost is a name the ladder
+    closes today being skipped today and reviewed tomorrow: one cycle of lag
+    on one ticker, against paying full funnel price for every held name in
+    every cycle.
+
+    The ladder itself runs immediately after that read, before either batch is
+    submitted -- and here the reason is safety, not stage zero. The two
+    batches can each wait up to ``BATCH_DEADLINE_SECONDS``, which dwarfs
+    everything else in the cycle; running the ladder first means a run that
+    times out during that wait still protected and trimmed the book before it
+    died, rather than risking the one thing in a cycle that must not be
+    skipped on the day a batch happens to be slow.
+
+    ``premarket`` gives up the broker's own market-open gate, and is the whole
+    point of batching: the waiting has to happen in the hours before the
+    session, or it happens during it. The weekend/holiday check above still
+    applies either way -- it is what stops a holiday from gathering eighty
+    contexts and paying for a batch the engine will then refuse to trade.
+    Only the run that is *meant* to start early gives up the broker gate on
+    top of it; every other caller still refuses to start when the market is
+    shut.
     """
     tickers = tuple(get_settings().watchlist_tickers)
     dispatcher = dispatcher or build_dispatcher()
+
+    # Free, and checked before the gate below rather than instead of it: a
+    # weekend or a listed holiday is known without asking the broker at all,
+    # which matters most here because the pre-market run below gives up that
+    # broker check entirely. A half day or an unscheduled closure is not
+    # caught by this and still relies on the broker's clock or its own
+    # rejection of the orders.
+    non_trading = skip_for_non_trading_day(tickers, batched=True)
+    if non_trading is not None:
+        return non_trading
 
     if not premarket:
         # The same cheap gate the live cycle uses, and for the same reason: a
@@ -1286,6 +1314,15 @@ def run_batched_cycle(
             len(held & set(tickers)), len(tickers), ", ".join(sorted(held & set(tickers))),
         )
 
+    # The ladder, right after the book is read and well before either batch is
+    # even submitted. Not for the live cycle's reason -- no new entry can
+    # compete with it for a slot yet, since nothing has been judged -- but so
+    # that a run which times out during the (much longer) waits below still
+    # protected and trimmed the book before it died. Moved here from after
+    # both batches on exactly that failure: a slow batch used to put position
+    # management at risk of never running at all on the day it mattered most.
+    positions = manage_positions(dispatcher)
+
     log.info("batched cycle start: gathering context for %d tickers", len(tickers))
     results: list[TickerResult] = []
     prepared: list[PreparedTicker] = []
@@ -1311,11 +1348,6 @@ def run_batched_cycle(
 
     answers = batch_answers(tuple(prepared), call_llm, model=MODEL) if prepared else {}
 
-    # The ladder, once the answers are in and the session is likely open: a
-    # winner is trimmed and its stop raised before any new entry competes for
-    # the same slot, which is the ordering the live cycle keeps too.
-    positions = manage_positions(dispatcher)
-
     for item in prepared:
         results.append(
             judge_answer(item, answers[item.ticker], screens.get(item.ticker), dispatcher, fx, weights)
@@ -1330,6 +1362,37 @@ def run_batched_cycle(
         ", ".join(f"{k}={v}" for k, v in sorted(report.stages.items())) or "nothing attempted",
     )
     return report
+
+
+def today_et() -> date:
+    """"Today", in the timezone the NYSE calendar is defined in.
+
+    A function rather than a call inlined at each use, so a test can freeze
+    it: real tests must not pass or fail depending on whether they happen to
+    run on a weekend or a listed holiday.
+    """
+    return datetime.now(_MARKET_TZ).date()
+
+
+def skip_for_non_trading_day(tickers: tuple[str, ...], batched: bool = False) -> CycleReport | None:
+    """A ``CycleReport`` if today is a weekend or a known NYSE holiday, else ``None``.
+
+    Checked before anything that costs money: no news fetch, no context
+    gathered, no model asked, and -- for the pre-market cycle -- no batch
+    submitted. This is what stands in for the broker's own market-hours gate
+    on the run that has to give that gate up to start before the open; see
+    ``run_batched_cycle``.
+
+    It is not a substitute for that gate on the runs that keep it: a half day
+    passes here (the market genuinely trades, just for fewer hours) and an
+    unscheduled closure does not appear here at all, both of which the
+    broker's own clock still catches downstream.
+    """
+    today = today_et()
+    if is_trading_day(today):
+        return None
+    log.info("%s is not a trading day (weekend or holiday); skipping cycle", today)
+    return CycleReport(tickers=tickers, market_closed=True, batched=batched)
 
 
 def open_tickers(dispatcher: Dispatcher) -> frozenset[str]:

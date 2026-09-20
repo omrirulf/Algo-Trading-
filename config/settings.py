@@ -263,19 +263,24 @@ SKIP_HELD_TICKERS: Final[bool] = True
 #: never cost a session.
 #:
 #: The catch worth stating: the market-open gate no longer guards the front of
-#: the cycle, because pre-market it would refuse every run. A holiday
-#: therefore gathers context and pays for a batch whose signals the engine
-#: then rejects -- about ten cycles a year. That is the price of not being
-#: late, and the engine's own gate still means none of them can trade.
+#: the cycle, because pre-market it would refuse every run. A weekend or a
+#: listed NYSE holiday is caught for free instead, by
+#: ``config.market_calendar.is_trading_day`` -- checked before anything is
+#: fetched, so those days cost nothing rather than a wasted batch. What that
+#: calendar cannot see -- a half day, or an unscheduled closure -- still
+#: reaches the engine's own gate, which refuses the orders either way.
 USE_BATCH_API: Final[bool] = True
 
-#: How long to wait on a batch before giving up on it and paying full price.
+#: How long to wait on ONE batch before giving up on it and paying full price.
 #:
-#: Sized against the job, not the API: the workflow gathers context for
-#: eighty tickers first, and what is left of its timeout after that is what
-#: there is to wait in. Too long and the job is killed mid-wait, which loses
-#: the answers *and* the fallback; the batch is still finished and still paid
-#: for, and only its id could get them back.
+#: Applied twice in a cycle -- once for the screen, once for whatever it
+#: escalates -- because the two stages are submitted one after the other, not
+#: together. The job's own timeout has to cover both waits in full, on top of
+#: gathering context for eighty tickers first; see the comment on
+#: ``timeout-minutes`` in ``heartbeat.yml``, which is sized against exactly
+#: this arithmetic. Too long here and the job is killed mid-wait, which loses
+#: the answers *and* the fallback -- the batch is still finished and still
+#: paid for, and only its id could get them back.
 BATCH_DEADLINE_SECONDS: Final[int] = 35 * 60
 
 #: Wilder ATR lookback, in trading days.

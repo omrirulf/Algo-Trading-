@@ -57,11 +57,13 @@ from orchestrator.news import absolute_url  # noqa: E402
 #: report looked complete and was missing sixteen companies.
 #:
 #: The right bound is structural rather than observed. A cycle cannot outlive
-#: the heartbeat job's `timeout-minutes` (45), and the next cycle cannot start
-#: before HEARTBEAT_INTERVAL_MINUTES (1440). Anything strictly between those
-#: is correct; 120 sits well clear of both ends, so neither a slow run nor a
-#: re-run an hour later is mis-grouped.
-CYCLE_WINDOW_MINUTES = 120
+#: the heartbeat job's `timeout-minutes` (180, sized for the pre-market cycle's
+#: two batch waits) -- that is the true floor this constant must clear, not
+#: the 1440-minute daily cadence: the catch-up cron can fire the same day, and
+#: at 12:35/17:35 UTC the two are only 300 minutes apart. Anything strictly
+#: between 180 and 300 is correct; 240 sits well clear of both ends, so
+#: neither a slow run nor a same-day catch-up is mis-grouped.
+CYCLE_WINDOW_MINUTES = 240
 
 #: The report is read from Israel, so it leads with Israel time and keeps UTC
 #: beside it -- the journal's own timestamps are UTC and have to stay

@@ -59,22 +59,28 @@ permissions:
 jobs:
   cycle:
     runs-on: ubuntu-latest
-    # Raised from 45, on measurement rather than guesswork. The 45 was sized
-    # when a ticker cost roughly 24 seconds; the nine context sections added on
-    # 16 Sep pushed that to 32. The 16 Sep cycle ran 42m48s over 80 names and
-    # finished with 2m12s to spare -- a 5% margin on a job that places trades.
-    # A cycle killed at the ceiling is the worst outcome available: it has
-    # already paid for every call it made, and may have placed orders whose
-    # journal entry never gets written, leaving positions with no record.
+    # Was 90, sized for the live cycle: the 16 Sep run took 42m48s gathering
+    # context for 80 names (roughly 32s/ticker, almost all waiting on other
+    # people's servers) and finished with a 5% margin. That number is
+    # unchanged by batching -- context is still gathered the same way -- but
+    # it is no longer the whole job.
     #
-    # 90 is twice the measured run. That is the margin a single slow provider
-    # needs, and no more; the runner is free on a public repository, so the
-    # cost of the headroom is nothing and the cost of not having it is a lost
-    # trading day. The real fix is fetching a ticker's sections concurrently
-    # instead of one after another -- 32 seconds is almost all waiting on other
-    # people's servers. Until that lands, this ceiling is what stands between a
-    # slow day and a dead cycle.
-    timeout-minutes: 90
+    # The batched cycle adds up to two full BATCH_DEADLINE_SECONDS waits, one
+    # after the other: the screen batch, then whatever it escalates. At 35
+    # minutes each that is 70 minutes on top of the ~45 for context, before a
+    # single order is dispatched -- 115 minutes in the worst case, which the
+    # old 90-minute ceiling would have killed partway through the second wait.
+    # A cycle killed there is the worst outcome available: both batches are
+    # already paid for, position management already ran (moved early in
+    # orchestrator/heartbeat.py for exactly this reason), but no answer this
+    # run received ever reaches the engine or the journal.
+    #
+    # 180 gives that worst case a genuine margin rather than a tight fit, and
+    # costs nothing to have: the runner is free on a public repository, and
+    # the cost of not having the headroom is a cycle that traded nothing and
+    # recorded nothing. Revisit this number if BATCH_DEADLINE_SECONDS changes
+    # -- it is sized against it, not against the API's own 24-hour allowance.
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
