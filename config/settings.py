@@ -375,6 +375,28 @@ USE_BATCH_API: Final[bool] = True
 #: paid for, and only its id could get them back.
 BATCH_DEADLINE_SECONDS: Final[int] = 35 * 60
 
+#: How many live model calls a stage may have in flight at once.
+#:
+#: Only ever applied to a provider with no offline mode -- in practice the
+#: OpenAI-compatible screening endpoint, which is called ticker by ticker
+#: because there is no batch to submit. Sequentially that is the whole
+#: watchlist times one answer's latency: measured at ~21s for a screening
+#: model asked with reasoning on, which is about 24 minutes for 68 tickers,
+#: and 136 minutes if every one of them runs to REQUEST_TIMEOUT_SECONDS.
+#: The second number is the one that matters, because it is the one that can
+#: eat a session rather than merely start earlier.
+#:
+#: Deliberately not applied to the Anthropic fallback. That path is reached
+#: when a batch times out, so it would fire the entire watchlist at the API
+#: at once; a rate-limited ticker there is a *lost* ticker, where a slow one
+#: is only slow. Batching is that stage's answer to latency, and it already
+#: has it.
+#:
+#: Eight rather than "all of them": enough that latency stops being the
+#: reason not to ask a better question, few enough that a small endpoint is
+#: not the thing that breaks.
+SCREEN_MAX_CONCURRENCY: Final[int] = 8
+
 #: Wilder ATR lookback, in trading days.
 ATR_PERIOD: Final[int] = 14
 
