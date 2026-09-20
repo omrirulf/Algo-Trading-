@@ -428,8 +428,10 @@ def test_the_cash_floor_holds_for_every_reachable_combination():
 
 
 def test_a_fund_gets_the_macro_prompt_and_a_company_does_not():
-    assert system_prompt_for("IWM") is ETF_SYSTEM_PROMPT
-    assert system_prompt_for("GLD") is ETF_SYSTEM_PROMPT
+    # Equality rather than identity: asked without a context the fund prompt is
+    # assembled from its paragraphs rather than handed out as one constant.
+    assert system_prompt_for("IWM") == ETF_SYSTEM_PROMPT
+    assert system_prompt_for("GLD") == ETF_SYSTEM_PROMPT
     assert system_prompt_for("MSFT") is SYSTEM_PROMPT
     assert system_prompt_for("ZZZZ") is SYSTEM_PROMPT
 

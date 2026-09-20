@@ -32,10 +32,12 @@ import argparse
 import logging
 import os
 import sys
+from datetime import date, datetime
 from typing import Any
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 # Allow ``python orchestrator/heartbeat.py`` from the repo root.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -57,12 +59,22 @@ from orchestrator.llm import (  # noqa: E402
     SCREENING_ENABLED,
     SCREENING_MODEL,
     AnthropicSignalProvider,
+    BatchRequest,
+    BatchTimeout,
     Completion,
     LLMError,
+    OpenAICompatibleProvider,
+    SignalProvider,
+    batch_custom_id,
 )
 from app.broker_client import BrokerError  # noqa: E402
+from config.market_calendar import is_trading_day  # noqa: E402
 from orchestrator.dispatch import Dispatcher, build_dispatcher  # noqa: E402
 from orchestrator.news import BrightDataNewsProvider, NewsFetchError  # noqa: E402
+
+#: US/Eastern, because the NYSE holiday calendar is defined in that timezone
+#: and a UTC "today" would occasionally name the wrong side of midnight.
+_MARKET_TZ = ZoneInfo("America/New_York")
 
 log = logging.getLogger("heartbeat")
 
@@ -145,7 +157,9 @@ conclusion. The scores and key factors are recorded for later evaluation and \
 are not read by the risk system."""
 
 
-ETF_SYSTEM_PROMPT = """\
+#: The part of the fund prompt every fund gets: what kind of instrument
+#: this is, and why the single-name dimensions are absent rather than missing.
+ETF_PROMPT_HEAD = """\
 You are a macro and cross-asset analyst. You produce exactly one directional \
 signal for one exchange-traded fund, as a JSON object matching the provided \
 schema.
@@ -172,7 +186,29 @@ the basket dilutes it. Do not build a thesis on one constituent.
 insiders who file Form 4. That is a property of the instrument, not a data \
 outage, and the two sections below are what stands in their place. Where \
 neither is present, leave the score null and do not speculate about what it \
-would have said.
+would have said."""
+
+#: Guidance for one optional context section, keyed by the ``TickerContext``
+#: attribute whose presence is what puts that section in the user prompt.
+#:
+#: Rendered only when the section is actually there, because most of them
+#: usually are not. Across 367 fund contexts, ``flows``, ``energy``,
+#: ``outlook`` and ``crops`` carried data on *none* of them, and their four
+#: paragraphs are 566 tokens -- 22% of this prompt -- spent teaching the model
+#: to read data that never arrives. ``positioning`` is present on a fifth of
+#: them and ``carry`` on a tenth. Funds are 77% of the calls in a cycle.
+#:
+#: The order is fixed rather than derived so that two tickers with the same
+#: sections produce a byte-identical prompt: this text is the cached prefix,
+#: and a prefix that varies in order would be a cache miss per ticker, which
+#: costs more than the paragraphs save.
+#:
+#: The wording still says "when present" inside each paragraph. That is now
+#: redundant, and deliberately left alone: dropping a whole paragraph is a
+#: subtraction this can be tested for, while rewriting the ones that remain
+#: would change what the model reads on every fund call at the same time.
+ETF_SECTION_GUIDANCE: tuple[tuple[str, str], ...] = (
+    ("holdings", """\
 - ANALYST VIEW OF THE HOLDINGS, when present, is the analyst coverage of the \
 fund's largest holdings, rolled up by the fund's own weights. Score \
 analyst_score from it. Read the coverage figure first: it says what share of \
@@ -180,14 +216,16 @@ the fund the roll-up actually covers, and a roll-up over 11% of a broad index \
 is a fact about eleven percent, not about the fund. Where it is thin, the \
 prompt says so and the right response is a smaller score, not a louder one. \
 When the section is absent -- a bond fund, a commodity -- leave analyst_score \
-null.
+null."""),
+    ("funds", """\
 - FUND BASICS, when present, is what this fund actually holds, in the terms \
 that apply to it: for an equity fund the valuation and growth of its \
 holdings, for a bond fund its yield and the credit quality of what it lends \
 to. It replaces \
 the company form, which described an index in terms it does not have. These \
 move slowly and rarely justify a change of view in one cycle; a single \
-commodity has none of them at all, and the section is simply absent.
+commodity has none of them at all, and the section is simply absent."""),
+    ("positioning", """\
 - POSITIONING, when present, is the CFTC weekly report: what large \
 speculators are actually holding in this contract. It is the nearest thing a \
 fund has to insider activity, and it is the one dimension here that is about \
@@ -199,7 +237,8 @@ positioning more than its level, and note the data is Tuesday's, published \
 Friday, so it is several days stale by the time you read it. When the section \
 is absent -- a basket spanning many contracts, or a country fund with no \
 future -- score insider_score from FUND FLOWS instead, and leave it null only \
-when neither section is present.
+when neither section is present."""),
+    ("flows", """\
 - FUND FLOWS, when present, is the fund's share count over time. An ETF \
 creates and destroys shares on demand, so a rising count is money that was \
 actually put in and a falling one is money taken out. Like POSITIONING it is \
@@ -208,7 +247,8 @@ it as conviction of flow rather than as a forecast -- a fund can bleed shares \
 through a rally -- and weigh the size in money as well as the percent. Where \
 POSITIONING is absent this is the behavioural dimension, so score \
 insider_score from it; where both are present, POSITIONING is the sharper \
-read and flows corroborate it.
+read and flows corroborate it."""),
+    ("macro", """\
 - MACRO is the backdrop, and it is the half of this instruction that used to \
 be missing: you are told to answer NEUTRAL unless a rate or policy surprise \
 has happened, so here are the rates. Treasury yields across the curve with \
@@ -228,7 +268,8 @@ over the next two years, read off the two-year yield against the overnight \
 rate: for a bond fund or the dollar it is the bet itself, and a week in which \
 the priced path moved matters more than the level. This is context \
 for every other dimension rather than a score of its own; where it drives the \
-call, say so in key_factors.
+call, say so in key_factors."""),
+    ("carry", """\
 - COST OF HOLDING, when present, is the most important fact about a \
 commodity fund and the one least visible on its chart. The fund does not \
 hold the metal or the barrel; it holds futures, and every month it sells the \
@@ -242,7 +283,8 @@ been costing while the curve stayed as it is, not what it will cost. And a \
 figure near zero is a finding rather than a blank -- it means the fund holds \
 the physical metal and you are paying only the fee. Score it into \
 fundamental_score, and let it temper conviction on a long rather than \
-setting the direction.
+setting the direction."""),
+    ("energy", """\
 - ENERGY INVENTORIES, when present, is what the United States is actually \
 holding in tanks, published every Wednesday. For an oil or gas fund this is \
 not background, it is the scheduled event of the week and the one release \
@@ -250,7 +292,8 @@ that reliably moves the price. A build is more supply than demand and reads \
 bearish, a draw the reverse -- a rule of thumb, not a law. Weigh the weekly \
 change and how unusual the level is far above the level itself, and score it \
 into fundamental_score. Remember the market has already seen this number; \
-what it gives you is the direction of the supply picture, not an edge.
+what it gives you is the direction of the supply picture, not an edge."""),
+    ("outlook", """\
 - PRICE OUTLOOK, when present, is the Energy Information Administration's \
 official monthly forecast for the price the fund tracks: this month, three \
 and six months out, and next year's average. It is one agency's view and the \
@@ -258,14 +301,19 @@ market has read it, so the level is not the signal; the direction, and the \
 gap between the forecast and today's price, are what to weigh. A forecast \
 that sees the price falling tempers a long and supports a short, and the \
 reverse; score it into fundamental_score and never let it set the direction \
-on its own.
+on its own."""),
+    ("crops", """\
 - CROP CONDITION, when present, is the share of the US crop rated good or \
 excellent, walked and reported weekly through the growing season. A better \
 crop means more supply, which reads bearish. The *trend* is the signal -- a \
 crop deteriorating three weeks running is a supply story whatever the level \
 -- and the comparison to the same week last year matters more than the \
 number. Score it into fundamental_score. Out of season the section is absent, \
-which means the crop is not in the ground, not that the data failed.
+which means the crop is not in the ground, not that the data failed."""),
+)
+
+#: The rest, which does not depend on what the context carried.
+ETF_PROMPT_TAIL = """\
 - NEWS here is macro and sector news: policy, rates, growth and inflation \
 data, currency moves, and flows into or out of the asset class. That is the \
 right frame. A roundup, a "best ETFs to buy" listicle, or a story about one \
@@ -310,15 +358,45 @@ conclusion. The scores and key factors are recorded for later evaluation and \
 are not read by the risk system."""
 
 
-def system_prompt_for(ticker: str) -> str:
+def etf_system_prompt(context: TickerContext | None = None) -> str:
+    """The fund prompt, carrying guidance only for the sections actually sent.
+
+    ``None`` means "every section", which is what a caller with no context in
+    hand gets and what ``ETF_SYSTEM_PROMPT`` is. Given a context, a paragraph
+    is included on exactly the rule that puts its section in the user prompt --
+    the attribute is not ``None`` -- so the model is never taught to read a
+    block it was not given, and never given a block nothing taught it to read.
+    """
+    if context is None:
+        keep = ETF_SECTION_GUIDANCE
+    else:
+        keep = tuple(
+            (attr, text)
+            for attr, text in ETF_SECTION_GUIDANCE
+            if getattr(context, attr, None) is not None
+        )
+    return "\n".join([ETF_PROMPT_HEAD, *(text for _, text in keep), ETF_PROMPT_TAIL])
+
+
+#: Every paragraph, for a caller that has no context to narrow them by.
+ETF_SYSTEM_PROMPT: str = etf_system_prompt()
+
+
+def system_prompt_for(ticker: str, context: TickerContext | None = None) -> str:
     """The prompt that matches the instrument, resolved from configuration.
 
     An index fund asked the single-name questions would answer three of five
     dimensions with speculation, which is worse than a named absence. The kind
     comes from ``config.instruments`` -- the same source the position cap uses,
     and never from anything the model said.
+
+    ``context`` narrows the fund prompt to the sections this ticker actually
+    has; left out, every paragraph is sent, which is what the cycle did before
+    and what a caller holding only a symbol still gets.
     """
-    return ETF_SYSTEM_PROMPT if is_fund(ticker) else SYSTEM_PROMPT
+    if not is_fund(ticker):
+        return SYSTEM_PROMPT
+    return etf_system_prompt(context)
 
 
 # --------------------------------------------------------------------------- #
@@ -337,11 +415,39 @@ def fetch_news(ticker: str) -> list:
     return provider.fetch_items(ticker)
 
 
+def screening_provider() -> tuple[SignalProvider, str]:
+    """Whoever answers the cheap stage, and the model to ask it for.
+
+    Claude Haiku unless ``SCREENING_BASE_URL`` is set, which points the screen
+    at anything serving the OpenAI chat-completions shape -- Ollama,
+    llama.cpp, vLLM. That is the one place in the cycle where a model billed
+    by nobody can stand in; the full model decides what actually trades, and
+    moving *that* is not a cost question.
+
+    ``SCREENING_MODEL`` is read only alongside a base URL. On its own it would
+    let an environment variable silently change which Claude model screens the
+    watchlist, and what the account trades on is meant to be a visible diff.
+    """
+    settings = get_settings()
+    if not settings.screening_base_url:
+        return AnthropicSignalProvider(settings.anthropic_api_key), SCREENING_MODEL
+    if not settings.screening_model:
+        raise LLMError("SCREENING_BASE_URL is set but SCREENING_MODEL is empty")
+    return (
+        OpenAICompatibleProvider(
+            base_url=settings.screening_base_url,
+            model=settings.screening_model,
+            api_key=settings.screening_api_key,
+        ),
+        settings.screening_model,
+    )
+
+
 def screen_signal(system_prompt: str, user_prompt: str, json_schema: dict) -> Completion:
     """The first stage of the funnel: the same prompt, the cheap model, no reasoning."""
-    provider = AnthropicSignalProvider(get_settings().anthropic_api_key)
+    provider, model = screening_provider()
     return provider.complete_detailed(
-        system_prompt, user_prompt, json_schema, model=SCREENING_MODEL, reasoning=False
+        system_prompt, user_prompt, json_schema, model=model, reasoning=False
     )
 
 
@@ -370,6 +476,9 @@ DISPATCH_FAILED = "dispatch"
 #: The cheap first stage called it NEUTRAL, so the full model was never asked.
 #: A judged outcome, not a failure: the funnel doing its job.
 SCREENED = "screened"
+#: Already in the book, so neither model was asked. The stage before the cheap
+#: one, and the only free stage there is.
+HELD = "held"
 COMPLETED = "done"
 
 #: Human labels, in the order a ticker would meet them.
@@ -377,12 +486,14 @@ STAGE_LABELS: dict[str, str] = {
     CONTEXT_FAILED: "context never gathered",
     MODEL_FAILED: "no usable signal from the model",
     DISPATCH_FAILED: "signal never reached the engine",
+    HELD: "already held; no model asked",
     SCREENED: "screened NEUTRAL; full model not asked",
     COMPLETED: "reached the engine",
 }
 
 #: The stages that mean something broke, in the order a ticker meets them.
-#: ``SCREENED`` is not among them: it is an answer, not a failure.
+#: Neither ``SCREENED`` nor ``HELD`` is among them: one is an answer, the
+#: other is a decision not to buy one.
 FAILURE_STAGES: tuple[str, ...] = (CONTEXT_FAILED, MODEL_FAILED, DISPATCH_FAILED)
 
 #: What to suspect first when every ticker died at the same stage. Names
@@ -430,6 +541,10 @@ class CycleReport:
     #: What the profit ladder did to the open book before any signal was
     #: judged; ``None`` when the dispatcher cannot manage positions.
     positions: dict | None = None
+    #: The model stages were asked offline, at half price. Recorded because a
+    #: batched cycle is allowed to take much longer than a live one, and a
+    #: summary that did not say so would read as a cycle that hung.
+    batched: bool = False
 
     @property
     def completed(self) -> tuple[TickerResult, ...]:
@@ -440,6 +555,11 @@ class CycleReport:
     def screened(self) -> tuple[TickerResult, ...]:
         """Tickers the cheap first stage called NEUTRAL, so the full model was skipped."""
         return tuple(r for r in self.results if r.stage == SCREENED)
+
+    @property
+    def held(self) -> tuple[TickerResult, ...]:
+        """Tickers already in the book, so no model was asked at all."""
+        return tuple(r for r in self.results if r.stage == HELD)
 
     @property
     def stages(self) -> Counter:
@@ -468,13 +588,16 @@ class CycleReport:
         A closed market is not this. Neither is an empty watchlist, which is a
         configuration choice rather than an outage. Nor is a cycle the screen
         ended for every ticker: a first stage that says "nothing today" is a
-        judgement, and one the journal recorded.
+        judgement, and one the journal recorded. Nor, for the same reason, is
+        a cycle that held everything it watches: a full book is a state, not
+        an outage, and the ladder still ran over it.
         """
         return (
             bool(self.tickers)
             and not self.market_closed
             and not self.completed
             and not self.screened
+            and not self.held
         )
 
 
@@ -509,6 +632,17 @@ def render_summary(report: CycleReport) -> str:
         ]
     else:
         out += [f"**{reached} of {attempted}** tickers reached the engine.", ""]
+
+    if report.held:
+        # Reported before the screen because it happens before it, and
+        # separately because it is the one stage that costs nothing: these
+        # tickers were managed by the ladder, not judged by a model.
+        out += [
+            f"**{len(report.held)} of {attempted}** already held; no model "
+            "asked. The open book is managed by the profit ladder and its "
+            "stops, not by a fresh signal.",
+            "",
+        ]
 
     if screened:
         # Reported apart from the failures: a first stage that says "nothing
@@ -765,20 +899,38 @@ def build_context(ticker: str) -> TickerContext:
     return context.gather(ticker, fetch_news(ticker))
 
 
-def process_ticker(
+@dataclass(frozen=True)
+class PreparedTicker:
+    """A ticker whose context is gathered and whose prompts are rendered.
+
+    The half of a cycle that costs no tokens, separated from the half that
+    asks a model. That split is what lets one implementation of each step
+    serve both a live call and a batched one -- and it is why the expensive
+    half can be deferred to a batch that answers later, while this half runs
+    before the market opens.
+    """
+
+    ticker: str
+    context: TickerContext
+    system_prompt: str
+    user_prompt: str
+    gaps: int = 0
+
+    @property
+    def custom_id(self) -> str:
+        """This ticker's key in a batch. Unique within a cycle, which is the scope."""
+        return batch_custom_id(self.ticker)
+
+
+def prepare_ticker(
     ticker: str,
-    dispatcher: Dispatcher | None = None,
     fx: FxRate | None = None,
-    weights: blend.LoadedWeights | None = None,
-) -> TickerResult:
-    """Run one ticker end to end, and report how far it got.
+    held: frozenset[str] = frozenset(),
+) -> PreparedTicker | TickerResult:
+    """Gather one ticker's context and render its prompts, or say why not.
 
-    Returns rather than raises on every failure, because one broken ticker
-    must not end the cycle for the other thirty-four. The return value is what
-    lets the cycle notice that *all* of them broke.
-
-    ``weights`` is the cycle's one read of the blend weights; left ``None``,
-    the file is read here, which is what a ticker run on its own gets.
+    A ``TickerResult`` back means the ticker is finished before any model was
+    asked: its context could not be gathered, or it is already in the book.
     """
     try:
         ticker_context = build_context(ticker)
@@ -800,13 +952,24 @@ def process_ticker(
         flows.record(ticker_context.ticker, shares, source, cfg.FUND_SIZE_LOG_PATH)
 
     gaps = len(ticker_context.gaps)
+
+    # Stage zero, and the only free one. A name already in the book is managed
+    # by the ladder and its stop, neither of which needs an opinion; what a
+    # fresh signal could add here is a top-up, at the price of the full funnel.
+    # The context above is gathered and journalled regardless, so the day is
+    # not a hole in the record and a replay can still price what was skipped.
+    if cfg.SKIP_HELD_TICKERS and ticker in held:
+        log.info("%s: already held; no model asked", ticker)
+        journal.record(ticker_context, fx=fx, held=True)
+        return TickerResult(ticker, HELD, gaps=gaps)
+
     if ticker_context.gaps:
         # Worth a warning, not an info: the model is being asked to judge on
         # less than the strategy assumes it has.
         log.warning("%s: context gaps: %s", ticker, "; ".join(ticker_context.gaps))
 
     try:
-        system_prompt = system_prompt_for(ticker_context.ticker)
+        system_prompt = system_prompt_for(ticker_context.ticker, ticker_context)
         user_prompt = build_user_prompt(ticker_context)
     except Exception as exc:  # noqa: BLE001
         # Rendering the gathered context into text is the last step of
@@ -818,34 +981,70 @@ def process_ticker(
         journal_context_failure(ticker, exc, ticker_context)
         return TickerResult(ticker, CONTEXT_FAILED, gaps=gaps)
 
-    # Stage one. The cheap model reads the same prompt; NEUTRAL ends the
-    # ticker here, journalled, without the expensive call. Any failure of the
-    # screen itself falls through -- a broken screen must not silence the
-    # system -- and the screen's answer is recorded either way so its
-    # false-negative rate is measurable from the journal.
-    screen: dict | None = None
-    if SCREENING_ENABLED:
-        try:
-            first = screen_signal(system_prompt, user_prompt, SIGNAL_JSON_SCHEMA)
-            first_signal = scores_without_a_source(parse_signal(first.text), ticker_context)
-            screen = {
-                "model": SCREENING_MODEL,
-                "bias": first_signal.bias.value,
-                "conviction": first_signal.conviction,
-                "usage": first.usage.as_dict() if first.usage else None,
-            }
-            if first_signal.bias is Bias.NEUTRAL:
-                log.info("%s: screened NEUTRAL by %s; full model not asked", ticker, SCREENING_MODEL)
-                journal.record(ticker_context, first_signal, usage=first.usage, fx=fx, screen=screen)
-                return TickerResult(ticker, SCREENED, gaps=gaps)
-        except (LLMError, json.JSONDecodeError, ValidationError) as exc:
-            log.warning("%s: screen failed (%s); asking the full model", ticker, exc)
-            screen = {"model": SCREENING_MODEL, "error": str(exc)}
+    return PreparedTicker(ticker, ticker_context, system_prompt, user_prompt, gaps)
 
+
+def apply_screen(
+    prepared: PreparedTicker,
+    answer: "Completion | BaseException",
+    fx: FxRate | None = None,
+) -> tuple[dict | None, TickerResult | None]:
+    """Record what the cheap stage said; a NEUTRAL ends the ticker here.
+
+    Returns the journal's screen record and, when the funnel stops, the
+    result that ends this ticker. A screen that *failed* returns a record
+    naming the error and no result -- a broken screen must not silence the
+    system, so the full model is asked anyway.
+
+    Takes the answer as a value, exception included, because a batched screen
+    arrives as one: there is no call to wrap in ``try`` by the time the
+    results come back.
+    """
     try:
-        completion = call_llm(system_prompt, user_prompt, SIGNAL_JSON_SCHEMA)
-        usage = completion.usage
-        signal = scores_without_a_source(parse_signal(completion.text), ticker_context)
+        if isinstance(answer, BaseException):
+            raise answer
+        first_signal = scores_without_a_source(parse_signal(answer.text), prepared.context)
+        # The model that actually answered, not the one configured: with a
+        # provider seam in front of this stage they are not always the same.
+        model = answer.usage.model if answer.usage and answer.usage.model else SCREENING_MODEL
+        screen = {
+            "model": model,
+            "bias": first_signal.bias.value,
+            "conviction": first_signal.conviction,
+            "usage": answer.usage.as_dict() if answer.usage else None,
+        }
+        if first_signal.bias is Bias.NEUTRAL:
+            log.info("%s: screened NEUTRAL by %s; full model not asked", prepared.ticker, model)
+            journal.record(
+                prepared.context, first_signal, usage=answer.usage, fx=fx, screen=screen
+            )
+            return screen, TickerResult(prepared.ticker, SCREENED, gaps=prepared.gaps)
+        return screen, None
+    except (LLMError, json.JSONDecodeError, ValidationError) as exc:
+        log.warning("%s: screen failed (%s); asking the full model", prepared.ticker, exc)
+        return {"model": SCREENING_MODEL, "error": str(exc)}, None
+
+
+def judge_answer(
+    prepared: PreparedTicker,
+    answer: "Completion | BaseException",
+    screen: dict | None = None,
+    dispatcher: Dispatcher | None = None,
+    fx: FxRate | None = None,
+    weights: blend.LoadedWeights | None = None,
+) -> TickerResult:
+    """Everything after the full model answered: parse, blend, dispatch, record.
+
+    Like ``apply_screen``, takes the answer as a value so a batched result and
+    a live one travel the same path from here on.
+    """
+    ticker, ticker_context = prepared.ticker, prepared.context
+    gaps = prepared.gaps
+    try:
+        if isinstance(answer, BaseException):
+            raise answer
+        usage = answer.usage
+        signal = scores_without_a_source(parse_signal(answer.text), ticker_context)
     except LLMError as exc:
         log.error("%s: %s", ticker, exc)
         journal.record(ticker_context, fx=fx, screen=screen, error=str(exc))
@@ -892,6 +1091,56 @@ def process_ticker(
     return TickerResult(ticker, COMPLETED, status=outcome.get("status"), gaps=gaps)
 
 
+def process_ticker(
+    ticker: str,
+    dispatcher: Dispatcher | None = None,
+    fx: FxRate | None = None,
+    weights: blend.LoadedWeights | None = None,
+    held: frozenset[str] = frozenset(),
+) -> TickerResult:
+    """Run one ticker end to end, live, and report how far it got.
+
+    Returns rather than raises on every failure, because one broken ticker
+    must not end the cycle for the other thirty-four. The return value is what
+    lets the cycle notice that *all* of them broke.
+
+    ``weights`` is the cycle's one read of the blend weights; left ``None``,
+    the file is read here, which is what a ticker run on its own gets.
+
+    ``held`` is the cycle's one read of the open book. A ticker in it is
+    journalled and dropped before either model is asked -- see
+    ``SKIP_HELD_TICKERS``. Empty by default, so a ticker run on its own is
+    reviewed whether or not it is held.
+    """
+    prepared = prepare_ticker(ticker, fx, held)
+    if isinstance(prepared, TickerResult):
+        return prepared
+
+    # Stage one. The cheap model reads the same prompt; NEUTRAL ends the
+    # ticker here, journalled, without the expensive call. The screen's answer
+    # is recorded either way so its false-negative rate is measurable from the
+    # journal.
+    screen: dict | None = None
+    if SCREENING_ENABLED:
+        screen, finished = apply_screen(prepared, _ask(screen_signal, prepared), fx)
+        if finished is not None:
+            return finished
+
+    return judge_answer(prepared, _ask(call_llm, prepared), screen, dispatcher, fx, weights)
+
+
+def _ask(call, prepared: PreparedTicker) -> "Completion | BaseException":
+    """Run one live call, handing back whatever came of it.
+
+    The exception is a return value rather than a raise so that a live answer
+    and a batched one are the same kind of thing to everything downstream.
+    """
+    try:
+        return call(prepared.system_prompt, prepared.user_prompt, SIGNAL_JSON_SCHEMA)
+    except (LLMError, json.JSONDecodeError, ValidationError) as exc:
+        return exc
+
+
 def manage_positions(dispatcher: Dispatcher) -> dict | None:
     """Walk the open book up the profit ladder. Never raises.
 
@@ -919,6 +1168,260 @@ def manage_positions(dispatcher: Dispatcher) -> dict | None:
     return outcome
 
 
+def batch_answers(
+    prepared: tuple[PreparedTicker, ...],
+    live,
+    provider: SignalProvider | None = None,
+    model: str | None = None,
+    reasoning: bool = True,
+    deadline_seconds: float = cfg.BATCH_DEADLINE_SECONDS,
+) -> dict[str, "Completion | BaseException"]:
+    """Ask a whole stage at half price, and pay full price for the stragglers.
+
+    Returns an answer per ticker, whatever it took to get one, so the caller
+    cannot tell a batched answer from a live one -- which is the point: the
+    saving must not change what the cycle does with what comes back.
+
+    The fallback is what makes the saving safe to take. A batch that fails to
+    submit, does not finish inside ``deadline_seconds``, or comes back missing
+    a ticker leaves that ticker to ``live``. The worst case is the bill the
+    cycle already pays today; there is no case where waiting loses a session.
+
+    A provider with no offline mode -- the OpenAI-compatible one -- goes
+    straight to live calls. Nothing is lost: it is there because its tokens
+    are not billed in the first place.
+    """
+    if not prepared:
+        return {}
+
+    provider = provider or AnthropicSignalProvider(get_settings().anthropic_api_key)
+    collected: dict[str, "Completion | LLMError"] = {}
+
+    if hasattr(provider, "submit_batch"):
+        requests = [
+            BatchRequest(
+                p.custom_id, p.system_prompt, p.user_prompt, SIGNAL_JSON_SCHEMA,
+                model=model, reasoning=reasoning,
+            )
+            for p in prepared
+        ]
+        try:
+            batch_id = provider.submit_batch(requests)
+            log.info(
+                "batch %s: %d prompts to %s, waiting up to %.0f min",
+                batch_id, len(requests), model or MODEL, deadline_seconds / 60,
+            )
+            collected = provider.collect_batch(
+                batch_id, model=model, timeout_seconds=deadline_seconds
+            )
+        except BatchTimeout as exc:
+            # The batch is still running and will still be paid for. Its id is
+            # the only way back to those answers, so it goes in the log before
+            # the cycle stops waiting for it.
+            log.warning(
+                "batch %s did not finish in %.0f min; paying full price for %d ticker(s). "
+                "Its answers can still be collected with --resume %s",
+                exc.batch_id, deadline_seconds / 60, len(prepared), exc.batch_id,
+            )
+        except LLMError as exc:
+            log.warning("batch could not be submitted (%s); calling live instead", exc)
+    else:
+        log.info("%s has no batch mode; calling it directly", type(provider).__name__)
+
+    answers: dict[str, "Completion | BaseException"] = {}
+    fell_back = 0
+    for item in prepared:
+        answer = collected.get(item.custom_id)
+        if isinstance(answer, Completion):
+            answers[item.ticker] = answer
+            continue
+        if answer is not None:
+            log.warning("%s: batch answer unusable (%s); asking live", item.ticker, answer)
+        answers[item.ticker] = _ask(live, item)
+        fell_back += 1
+    if fell_back and collected:
+        log.info("%d of %d ticker(s) fell back to a live call", fell_back, len(prepared))
+    return answers
+
+
+def run_batched_cycle(
+    dispatcher: Dispatcher | None = None, premarket: bool = False
+) -> CycleReport:
+    """One cycle, with both model stages asked offline at half price.
+
+    Two orderings differ from the live cycle, and both are deliberate.
+
+    The open book is read *before* the ladder walks it -- the opposite of the
+    live cycle -- because the prompts are built before either can run and
+    stage zero needs to know what to leave out. The cost is a name the ladder
+    closes today being skipped today and reviewed tomorrow: one cycle of lag
+    on one ticker, against paying full funnel price for every held name in
+    every cycle.
+
+    The ladder itself runs immediately after that read, before either batch is
+    submitted -- and here the reason is safety, not stage zero. The two
+    batches can each wait up to ``BATCH_DEADLINE_SECONDS``, which dwarfs
+    everything else in the cycle; running the ladder first means a run that
+    times out during that wait still protected and trimmed the book before it
+    died, rather than risking the one thing in a cycle that must not be
+    skipped on the day a batch happens to be slow.
+
+    ``premarket`` gives up the broker's own market-open gate, and is the whole
+    point of batching: the waiting has to happen in the hours before the
+    session, or it happens during it. The weekend/holiday check above still
+    applies either way -- it is what stops a holiday from gathering eighty
+    contexts and paying for a batch the engine will then refuse to trade.
+    Only the run that is *meant* to start early gives up the broker gate on
+    top of it; every other caller still refuses to start when the market is
+    shut.
+    """
+    tickers = tuple(get_settings().watchlist_tickers)
+    dispatcher = dispatcher or build_dispatcher()
+
+    # Free, and checked before the gate below rather than instead of it: a
+    # weekend or a listed holiday is known without asking the broker at all,
+    # which matters most here because the pre-market run below gives up that
+    # broker check entirely. A half day or an unscheduled closure is not
+    # caught by this and still relies on the broker's clock or its own
+    # rejection of the orders.
+    non_trading = skip_for_non_trading_day(tickers, batched=True)
+    if non_trading is not None:
+        return non_trading
+
+    if not premarket:
+        # The same cheap gate the live cycle uses, and for the same reason: a
+        # closed-market cycle wastes news fetches and model calls. An
+        # unreadable clock is not a reason to skip -- the engine fails closed
+        # on its own if it cannot tell either.
+        try:
+            if not dispatcher.is_market_open():
+                log.info("market is closed; skipping cycle")
+                return CycleReport(tickers=tickers, market_closed=True, batched=True)
+        except BrokerError as exc:
+            log.warning("could not read market clock (%s); continuing", exc)
+
+    fx = fetch_fx_rate()
+    if fx.ok:
+        log.info("USD/ILS %.4f", fx.rate)
+    else:
+        log.info("USD/ILS unavailable: %s", fx.gap)
+    weights = blend.load_weights(model=MODEL)
+
+    held = open_tickers(dispatcher) if cfg.SKIP_HELD_TICKERS else frozenset()
+    if held:
+        log.info(
+            "%d of %d already held; no model will be asked for them: %s",
+            len(held & set(tickers)), len(tickers), ", ".join(sorted(held & set(tickers))),
+        )
+
+    # The ladder, right after the book is read and well before either batch is
+    # even submitted. Not for the live cycle's reason -- no new entry can
+    # compete with it for a slot yet, since nothing has been judged -- but so
+    # that a run which times out during the (much longer) waits below still
+    # protected and trimmed the book before it died. Moved here from after
+    # both batches on exactly that failure: a slow batch used to put position
+    # management at risk of never running at all on the day it mattered most.
+    positions = manage_positions(dispatcher)
+
+    log.info("batched cycle start: gathering context for %d tickers", len(tickers))
+    results: list[TickerResult] = []
+    prepared: list[PreparedTicker] = []
+    for ticker in tickers:
+        outcome = prepare_ticker(ticker, fx, held)
+        (results if isinstance(outcome, TickerResult) else prepared).append(outcome)
+
+    # Stage one, offline. A NEUTRAL ends its ticker here exactly as it does
+    # live; the survivors are what stage two is asked about, so the expensive
+    # batch is only ever as large as the screen let through.
+    screens: dict[str, dict | None] = {}
+    if SCREENING_ENABLED and prepared:
+        provider, screen_model = screening_provider()
+        answered = batch_answers(
+            tuple(prepared), screen_signal, provider, screen_model, reasoning=False
+        )
+        survivors: list[PreparedTicker] = []
+        for item in prepared:
+            screens[item.ticker], finished = apply_screen(item, answered[item.ticker], fx)
+            (results.append(finished) if finished is not None else survivors.append(item))
+        prepared = survivors
+        log.info("%d ticker(s) escalated past the screen", len(prepared))
+
+    answers = batch_answers(tuple(prepared), call_llm, model=MODEL) if prepared else {}
+
+    for item in prepared:
+        results.append(
+            judge_answer(item, answers[item.ticker], screens.get(item.ticker), dispatcher, fx, weights)
+        )
+
+    report = CycleReport(
+        tickers=tickers, results=tuple(results), fx=fx, positions=positions, batched=True
+    )
+    log.info(
+        "batched cycle end: %d/%d reached the engine (%s)",
+        len(report.completed), len(tickers),
+        ", ".join(f"{k}={v}" for k, v in sorted(report.stages.items())) or "nothing attempted",
+    )
+    return report
+
+
+def today_et() -> date:
+    """"Today", in the timezone the NYSE calendar is defined in.
+
+    A function rather than a call inlined at each use, so a test can freeze
+    it: real tests must not pass or fail depending on whether they happen to
+    run on a weekend or a listed holiday.
+    """
+    return datetime.now(_MARKET_TZ).date()
+
+
+def skip_for_non_trading_day(tickers: tuple[str, ...], batched: bool = False) -> CycleReport | None:
+    """A ``CycleReport`` if today is a weekend or a known NYSE holiday, else ``None``.
+
+    Checked before anything that costs money: no news fetch, no context
+    gathered, no model asked, and -- for the pre-market cycle -- no batch
+    submitted. This is what stands in for the broker's own market-hours gate
+    on the run that has to give that gate up to start before the open; see
+    ``run_batched_cycle``.
+
+    It is not a substitute for that gate on the runs that keep it: a half day
+    passes here (the market genuinely trades, just for fewer hours) and an
+    unscheduled closure does not appear here at all, both of which the
+    broker's own clock still catches downstream.
+    """
+    today = today_et()
+    if is_trading_day(today):
+        return None
+    log.info("%s is not a trading day (weekend or holiday); skipping cycle", today)
+    return CycleReport(tickers=tickers, market_closed=True, batched=batched)
+
+
+def open_tickers(dispatcher: Dispatcher) -> frozenset[str]:
+    """What the book already holds. Never raises; empty when it cannot tell.
+
+    Empty on failure is the safe direction here, and the asymmetry is worth
+    stating: a book read as smaller than it is costs a model call on a name
+    already held, while a book read as larger than it is would skip a ticker
+    that could have been bought. The first is money, the second is a missed
+    trade, so anything short of a clear answer reviews the whole watchlist --
+    which is what the cycle did before this stage existed.
+
+    ``None`` is not returned for "cannot tell" because there is nothing a
+    caller could do with it that differs from reviewing everything; the log
+    line is what separates the two cases for a human reading the run.
+    """
+    read = getattr(dispatcher, "open_tickers", None)
+    if read is None:
+        # A test double, or webhook mode -- where the orchestrator holds no
+        # broker credentials by design and so has no book to read.
+        log.info("this dispatcher cannot read the open book; every ticker will be reviewed")
+        return frozenset()
+    try:
+        return frozenset(read())
+    except Exception as exc:  # noqa: BLE001 - never worth ending a cycle over
+        log.warning("could not read the open book (%s); every ticker will be reviewed", exc)
+        return frozenset()
+
+
 def protect_positions(dispatcher: Dispatcher | None = None) -> dict:
     """Give every open position that has no stop one back, and nothing else.
 
@@ -939,8 +1442,23 @@ def protect_positions(dispatcher: Dispatcher | None = None) -> dict:
         return {"error": f"{type(exc).__name__}: {exc}"}
 
 
-def run_cycle(dispatcher: Dispatcher | None = None) -> CycleReport:
-    """Run every ticker on the watchlist once, and report what came of it."""
+def run_cycle(
+    dispatcher: Dispatcher | None = None, premarket: bool = False
+) -> CycleReport:
+    """Run every ticker on the watchlist once, and report what came of it.
+
+    ``USE_BATCH_API`` picks which way. The batched cycle asks both model
+    stages offline at half price; this one asks them live, one ticker at a
+    time. They share every step except how the answer is fetched, and both
+    refuse to start into a closed market unless ``premarket`` says otherwise.
+    """
+    if cfg.USE_BATCH_API:
+        return run_batched_cycle(dispatcher, premarket=premarket)
+    if premarket:
+        # Nothing to wait for on the live path, so starting early would only
+        # mean judging on yesterday's close and dispatching into a shut market.
+        log.warning("--premarket has no effect with USE_BATCH_API off; gating on the clock")
+
     tickers = tuple(get_settings().watchlist_tickers)
     dispatcher = dispatcher or build_dispatcher()
     clock_unreadable = False
@@ -982,8 +1500,18 @@ def run_cycle(dispatcher: Dispatcher | None = None) -> CycleReport:
     # ladder one day, not the cycle.
     positions = manage_positions(dispatcher)
 
+    # Read after the ladder, because the ladder can close a position out of
+    # the book and a name it just exited is a candidate again today. One read
+    # per cycle, not one per ticker.
+    held = open_tickers(dispatcher) if cfg.SKIP_HELD_TICKERS else frozenset()
+    if held:
+        log.info(
+            "%d of %d already held; no model will be asked for them: %s",
+            len(held & set(tickers)), len(tickers), ", ".join(sorted(held & set(tickers))),
+        )
+
     log.info("heartbeat cycle start: %s", list(tickers))
-    results = tuple(process_ticker(ticker, dispatcher, fx, weights) for ticker in tickers)
+    results = tuple(process_ticker(ticker, dispatcher, fx, weights, held) for ticker in tickers)
     report = CycleReport(
         tickers=tickers,
         results=results,
@@ -1009,6 +1537,17 @@ def main(argv: list[str] | None = None) -> None:
             "Run a single cycle and exit, instead of scheduling. This is the "
             "mode for an external scheduler (cron, GitHub Actions): the "
             "process must terminate or the job never finishes."
+        ),
+    )
+    parser.add_argument(
+        "--premarket",
+        action="store_true",
+        help=(
+            "Start before the session opens, giving up the cheap "
+            "market-closed gate. Only useful with USE_BATCH_API: it is what "
+            "lets a batch be waited on in hours the strategy was not trading "
+            "in. A holiday run costs a cycle's spend and trades nothing, "
+            "which is why this is a flag and not the default."
         ),
     )
     parser.add_argument(
@@ -1041,7 +1580,7 @@ def main(argv: list[str] | None = None) -> None:
         return
 
     if args.once:
-        report = run_cycle()
+        report = run_cycle(premarket=args.premarket)
         write_step_summary(report)
         if report.produced_nothing:
             # The whole point of --once mode reporting an exit code. A cycle

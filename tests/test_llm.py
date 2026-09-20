@@ -179,7 +179,9 @@ def test_request_pins_model_schema_and_effort():
     sent = client.api.calls[0]
 
     assert sent["model"] == "claude-opus-5"
-    assert sent["system"] == "sys"
+    assert sent["system"] == [
+        {"type": "text", "text": "sys", "cache_control": {"type": "ephemeral"}}
+    ]
     assert sent["messages"] == [{"role": "user", "content": "user"}]
     assert sent["thinking"] == {"type": "adaptive"}
     assert sent["output_config"]["effort"] == llm.EFFORT
@@ -187,6 +189,34 @@ def test_request_pins_model_schema_and_effort():
     assert fmt["type"] == "json_schema"
     assert set(fmt["schema"]["properties"]) == set(LLMSignal.model_fields)
     assert "tools" not in sent  # the model has no tools; it can only answer
+
+
+def test_the_cache_breakpoint_sits_on_the_system_prompt_not_the_request():
+    """The volatile half of the request must fall outside the breakpoint.
+
+    Top-level ``cache_control`` caches the last cacheable block, which here is
+    the per-ticker user prompt -- so every call wrote a cache no later call
+    could hit. The journal measured it: 1.87M tokens written, zero read.
+    """
+    client = _ok_client()
+    _provider(client).complete("sys", "user", LLMSignal.model_json_schema())
+    sent = client.api.calls[0]
+
+    assert "cache_control" not in sent, "a top-level breakpoint caches the user prompt"
+    assert sent["system"][0]["cache_control"] == {"type": "ephemeral"}
+    # Nothing per-ticker may sit inside the cached prefix, or no two tickers
+    # in a cycle share it.
+    assert "user" not in json.dumps(sent["system"])
+
+
+def test_a_batch_request_caches_the_same_prefix_as_a_live_one():
+    """Otherwise the two paths cannot stand in for one another on price."""
+    live = _ok_client()
+    _provider(live).complete("sys", "user", LLMSignal.model_json_schema())
+    batch = _provider(_ok_client())._batch_params(
+        llm.BatchRequest("cid", "sys", "user", LLMSignal.model_json_schema())
+    )
+    assert batch["system"] == live.api.calls[0]["system"]
 
 
 def test_returned_json_round_trips_through_the_validator():

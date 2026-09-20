@@ -259,10 +259,20 @@ def test_the_alarm_step_runs_after_the_commit_on_every_cycle_run():
 def test_data_sources_runs_daily_before_the_cycle_and_a_dead_mapping_is_red():
     wf = yaml.safe_load((Path(__file__).resolve().parents[1] / ".github/workflows/data-sources.yml").read_text())
     [cron] = [e["cron"] for e in wf[True]["schedule"]]
-    assert cron == "20 14 * * 1-5"
+    assert cron == "50 11 * * 1-5"
     hb = _heartbeat()
     first_cycle_cron = hb[True]["schedule"][0]["cron"]
-    assert first_cycle_cron == "5 15 * * 1-5"  # the check lands before the cycle
+    assert first_cycle_cron == "35 12 * * 1-5"
+
+    # The property, rather than the two literals above: the probe has to land
+    # before the cycle, or a dead source is reported after the model was
+    # already fed blanks from it. Both moved back together when the cycle
+    # started running pre-market to wait on its batch.
+    def _minutes(expression: str) -> int:
+        minute, hour = expression.split()[:2]
+        return int(hour) * 60 + int(minute)
+
+    assert _minutes(cron) < _minutes(first_cycle_cron)
     steps = wf["jobs"]["probe"]["steps"]
     cftc = next(s for s in steps if s.get("name") == "CFTC positioning answers")
     assert "continue-on-error" not in cftc

@@ -59,6 +59,7 @@ def record(
     fx: Optional[FxRate] = None,
     screen: Optional[dict[str, Any]] = None,
     blend: Optional[dict[str, Any]] = None,
+    held: bool = False,
 ) -> None:
     """Write one journal line. Swallows its own failures by design."""
     try:
@@ -94,6 +95,12 @@ def record(
                 # scored against realised returns exactly as conviction is;
                 # nothing in the cycle reads it back.
                 "blend": blend,
+                # True when the ticker was already in the book and no model
+                # was asked. The context above was still gathered, so these
+                # lines are what a later replay would need to price what
+                # skipping held names cost -- and they are the reason a line
+                # with no signal is not automatically a failure.
+                "held": held,
             },
         )
     except Exception:  # noqa: BLE001 - journalling must not break the cycle

@@ -3,11 +3,34 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date
 
 import pytest
 
 from app.broker_client import BrokerError, OpenPosition, StopOrder, SubmittedOrder
 from app.execution_engine import ExecutionEngine
+
+
+#: An ordinary Wednesday, chosen only for being a weekday that is not in
+#: config.market_calendar.NYSE_HOLIDAYS. Frozen below so the calendar gate in
+#: orchestrator.heartbeat cannot make a test's outcome depend on which real
+#: calendar day happens to run it.
+_A_TRADING_DAY = date(2026, 9, 16)
+
+
+@pytest.fixture(autouse=True)
+def _a_real_trading_day(monkeypatch):
+    """Freeze "today" for the weekend/holiday gate.
+
+    Without this, a test suite that runs on an actual weekend or listed
+    holiday would have every cycle-running test skip before doing anything --
+    the gate working exactly as designed, and exactly wrong for a test that
+    wants to exercise the cycle it guards. A test for the gate itself
+    overrides this with its own date.
+    """
+    from orchestrator import heartbeat as hb
+
+    monkeypatch.setattr(hb, "today_et", lambda: _A_TRADING_DAY)
 
 
 @dataclass

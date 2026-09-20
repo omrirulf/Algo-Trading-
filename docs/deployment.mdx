@@ -77,6 +77,24 @@ closed-market cycle actually spends money.
   than a wasted cycle — and the engine re-checks anyway.
 </Warning>
 
+### The one path with no clock to ask
+
+The pre-market cycle (`--premarket`, used to wait on the Batch API before the
+open — see [cost](/cost#half-price-for-waiting)) starts before the market can
+possibly be open, so asking Alpaca's clock would refuse every run. There is a
+third gate for exactly that path: `config/market_calendar.py`'s
+`is_trading_day`, a version-controlled list of full-day NYSE closures checked
+before anything is fetched.
+
+It is deliberately narrower than the authority it stands in for. It knows
+weekday and listed holiday, and nothing else — a half day passes it, because
+the market genuinely trades then, and an unscheduled closure isn't in it at
+all. Both of those still reach the broker's own gate downstream, which is
+still what refuses the orders. The list needs a year added as each one
+approaches; a year with no entries doesn't stop the cycle, it just logs that
+it's guessing and defaults to running — the same wasted-cycle cost paying for
+a batch bought before this gate existed at all, not a missed session.
+
 ## Setting up the scheduled job
 
 <Steps>

@@ -275,6 +275,61 @@ PROFIT_LADDER: Final[tuple[LadderRung, ...]] = (
 #: slots can only make the book wider; they cannot make it more concentrated.
 MAX_OPEN_POSITIONS: Final[int] = 40
 
+#: Skip the model entirely on a ticker already in the book.
+#:
+#: Stage zero of the funnel, and the only free one: a held name is asked
+#: nothing, by either model. What that gives up is the top-up -- the engine
+#: sizes a fresh signal on a held name as an addition to the existing
+#: exposure -- and the flip block, which rejects a signal opposite to the side
+#: held. Neither is load-bearing. A position that has gone wrong is closed by
+#: its stop, and one that has gone right is trimmed up the ladder by
+#: ``PositionManager``; both run every cycle, on arithmetic, for nothing. So
+#: the daily re-read of a held name bought an averaging-in decision at full
+#: model price, on the one part of the book that is already being managed.
+#:
+#: The cost is real and the direction is deliberate: the watchlist is 80 names
+#: against MAX_OPEN_POSITIONS of 40, so a cycle's model spend should go to the
+#: names that could still become positions, not the ones that already are.
+#: Turn this off to restore the old behaviour -- every ticker reviewed, held
+#: or not -- and note that it degrades to that on its own if the open book
+#: cannot be read.
+SKIP_HELD_TICKERS: Final[bool] = True
+
+#: Ask the Message Batches API instead of calling the model directly.
+#:
+#: Half price for the same request, and the cycle is the ideal shape for it:
+#: eighty independent prompts, none of which needs an answer in the same
+#: second. What it costs is immediacy -- a batch is allowed up to 24 hours,
+#: though a small one usually finishes in minutes -- and immediacy is the one
+#: thing a trading cycle cannot simply give up. Two things buy it back.
+#:
+#: The cycle starts before the market opens, so the waiting happens in hours
+#: the strategy was not trading in anyway. And a batch that has not finished by
+#: BATCH_DEADLINE_SECONDS is abandoned for live calls, ticker by ticker, so the
+#: worst a slow batch can do is cost what today's cycle already costs. It can
+#: never cost a session.
+#:
+#: The catch worth stating: the market-open gate no longer guards the front of
+#: the cycle, because pre-market it would refuse every run. A weekend or a
+#: listed NYSE holiday is caught for free instead, by
+#: ``config.market_calendar.is_trading_day`` -- checked before anything is
+#: fetched, so those days cost nothing rather than a wasted batch. What that
+#: calendar cannot see -- a half day, or an unscheduled closure -- still
+#: reaches the engine's own gate, which refuses the orders either way.
+USE_BATCH_API: Final[bool] = True
+
+#: How long to wait on ONE batch before giving up on it and paying full price.
+#:
+#: Applied twice in a cycle -- once for the screen, once for whatever it
+#: escalates -- because the two stages are submitted one after the other, not
+#: together. The job's own timeout has to cover both waits in full, on top of
+#: gathering context for eighty tickers first; see the comment on
+#: ``timeout-minutes`` in ``heartbeat.yml``, which is sized against exactly
+#: this arithmetic. Too long here and the job is killed mid-wait, which loses
+#: the answers *and* the fallback -- the batch is still finished and still
+#: paid for, and only its id could get them back.
+BATCH_DEADLINE_SECONDS: Final[int] = 35 * 60
+
 #: Wilder ATR lookback, in trading days.
 ATR_PERIOD: Final[int] = 14
 
@@ -397,6 +452,33 @@ class Settings(BaseSettings):
         ),
     )
     anthropic_api_key: str = Field(default="", description="Claude API key (orchestrator only)")
+    screening_base_url: str = Field(
+        default="",
+        description=(
+            "OpenAI-compatible endpoint to run the screening stage against, "
+            "e.g. http://10.0.0.5:11434/v1 for Ollama. Blank -- the default -- "
+            "screens with Claude Haiku as before. It cannot be a model on the "
+            "GitHub-hosted runner: no GPU, and the disk is discarded between "
+            "runs, so this has to point at a self-hosted runner or a machine "
+            "on the network. A screen this endpoint fails to answer falls "
+            "through to the full model, so the worst case is the cycle's cost, "
+            "never a bad trade"
+        ),
+    )
+    screening_model: str = Field(
+        default="",
+        description=(
+            "Model name to ask that endpoint for, e.g. 'qwen2.5:14b'. Required "
+            "when screening_base_url is set; ignored otherwise"
+        ),
+    )
+    screening_api_key: str = Field(
+        default="",
+        description=(
+            "Bearer token for screening_base_url, if it wants one. A local "
+            "endpoint usually does not, and blank sends no header at all"
+        ),
+    )
     brightdata_api_token: str = Field(default="", description="Bright Data API token (orchestrator only)")
     brightdata_serp_zone: str = Field(
         default="",

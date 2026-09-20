@@ -6,10 +6,19 @@ name: heartbeat
 # seven times the cost. The holding horizon is days; one look after the open
 # captures the day.
 #
-# 15:05 UTC is 11:05 New York in summer and 10:05 in winter -- after the
-# 09:30 open in both, and past the first half-hour's noise. GitHub cron has no
-# timezone, so the job itself still asks Alpaca's clock and exits at once when
-# the market is shut, which also covers holidays that no cron can express.
+# 12:35 UTC is 08:35 New York in summer and 07:35 in winter -- before the
+# 09:30 open in both. It starts early because the cycle asks both model stages
+# through the Batch API at half price, and a batch answers when it answers:
+# the hour before the session is where that waiting belongs. Gathering eighty
+# contexts takes most of it, the batch is waited on for up to 35 minutes after
+# that, and anything still outstanding is asked live, so the session is never
+# what pays for the saving.
+#
+# The price of starting early is the cheap market-closed gate, which pre-market
+# would refuse every run. A holiday therefore gathers context and pays for a
+# batch that trades nothing -- the engine's own clock check still refuses the
+# orders -- which is roughly ten cycles a year against a halved bill on the
+# other 250.
 #
 # The second cron is a catch-up, and it exists because on 16 Sep the first one
 # never fired. Not late, not failed -- GitHub created no run at all, and
@@ -17,15 +26,16 @@ name: heartbeat
 # happened to look. A schedule that can silently skip is not a schedule you
 # can build a daily experiment on.
 #
-# 17:35 UTC is two and a half hours after the first cron: long enough that a
-# slow cycle has finished (the concurrency group below would queue it anyway),
+# 17:35 UTC is five hours after the first cron: long enough that even a cycle
+# that waited out its whole batch deadline has finished (the concurrency group
+# below would queue it anyway),
 # and still comfortably before the 20:00 close, so a rescued day is a real
 # trading day rather than a trade into the bell. It does nothing on the days
 # the first cron works, which is almost all of them.
 on:
   schedule:
-    - cron: "5 15 * * 1-5"
-    - cron: "35 17 * * 1-5"   # catch-up; exits at once if 15:05 already ran
+    - cron: "35 12 * * 1-5"   # pre-market: gather, then wait on the batch
+    - cron: "35 17 * * 1-5"   # catch-up; exits at once if 12:35 already ran
   workflow_dispatch:        # a manual run: a cycle, or just the protection pass
     inputs:
       mode:
@@ -49,22 +59,28 @@ permissions:
 jobs:
   cycle:
     runs-on: ubuntu-latest
-    # Raised from 45, on measurement rather than guesswork. The 45 was sized
-    # when a ticker cost roughly 24 seconds; the nine context sections added on
-    # 16 Sep pushed that to 32. The 16 Sep cycle ran 42m48s over 80 names and
-    # finished with 2m12s to spare -- a 5% margin on a job that places trades.
-    # A cycle killed at the ceiling is the worst outcome available: it has
-    # already paid for every call it made, and may have placed orders whose
-    # journal entry never gets written, leaving positions with no record.
+    # Was 90, sized for the live cycle: the 16 Sep run took 42m48s gathering
+    # context for 80 names (roughly 32s/ticker, almost all waiting on other
+    # people's servers) and finished with a 5% margin. That number is
+    # unchanged by batching -- context is still gathered the same way -- but
+    # it is no longer the whole job.
     #
-    # 90 is twice the measured run. That is the margin a single slow provider
-    # needs, and no more; the runner is free on a public repository, so the
-    # cost of the headroom is nothing and the cost of not having it is a lost
-    # trading day. The real fix is fetching a ticker's sections concurrently
-    # instead of one after another -- 32 seconds is almost all waiting on other
-    # people's servers. Until that lands, this ceiling is what stands between a
-    # slow day and a dead cycle.
-    timeout-minutes: 90
+    # The batched cycle adds up to two full BATCH_DEADLINE_SECONDS waits, one
+    # after the other: the screen batch, then whatever it escalates. At 35
+    # minutes each that is 70 minutes on top of the ~45 for context, before a
+    # single order is dispatched -- 115 minutes in the worst case, which the
+    # old 90-minute ceiling would have killed partway through the second wait.
+    # A cycle killed there is the worst outcome available: both batches are
+    # already paid for, position management already ran (moved early in
+    # orchestrator/heartbeat.py for exactly this reason), but no answer this
+    # run received ever reaches the engine or the journal.
+    #
+    # 180 gives that worst case a genuine margin rather than a tight fit, and
+    # costs nothing to have: the runner is free on a public repository, and
+    # the cost of not having the headroom is a cycle that traded nothing and
+    # recorded nothing. Revisit this number if BATCH_DEADLINE_SECONDS changes
+    # -- it is sized against it, not against the API's own 24-hour allowance.
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
@@ -133,7 +149,18 @@ jobs:
           # `brightdata login` creates. Set BRIGHTDATA_SERP_ZONE as a
           # repository variable only if you have a real SERP API zone.
           BRIGHTDATA_SERP_ZONE: ${{ vars.BRIGHTDATA_SERP_ZONE }}
-        run: python -m orchestrator.heartbeat --once
+        # --premarket on the first cron only. Batched, the model stages are
+        # asked offline at half price, and the waiting for them has to happen
+        # somewhere: before the session, or during it. Starting at 12:35 UTC
+        # puts it before, and gives up the cheap market-closed gate to do it,
+        # which is why only the run that is meant to start early passes the
+        # flag. The catch-up runs after the open and keeps the gate.
+        run: |
+          if [ "${{ github.event.schedule }}" = "35 12 * * 1-5" ]; then
+            python -m orchestrator.heartbeat --once --premarket
+          else
+            python -m orchestrator.heartbeat --once
+          fi
 
       - name: Render the cycle for a human
         # `always()` for the same reason the commit below is: a cycle that

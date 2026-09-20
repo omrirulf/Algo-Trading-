@@ -16,9 +16,10 @@ import time
 import logging
 import re
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, Optional, Protocol
 
 import anthropic
+import httpx
 
 from orchestrator.pricing import Usage, usage_from_response
 
@@ -246,6 +247,10 @@ class BatchRequest:
     json_schema: dict
     model: Optional[str] = None
     effort: Optional[str] = None
+    #: ``False`` omits adaptive thinking and effort, exactly as it does on the
+    #: live path. The screening stage needs it: Haiku 4.5 takes neither, so a
+    #: batch of screens built the other way is rejected for the whole batch.
+    reasoning: bool = True
 
     def __post_init__(self) -> None:
         if not CUSTOM_ID_PATTERN.match(self.custom_id):
@@ -276,6 +281,53 @@ class BatchTimeout(LLMError):
     def __init__(self, batch_id: str, message: str) -> None:
         super().__init__(message)
         self.batch_id = batch_id
+
+
+class SignalProvider(Protocol):
+    """What the cycle needs from whatever answers a prompt.
+
+    Narrow on purpose: one method, taking text and a schema and returning
+    text plus what it cost. The batch methods below it are not in here,
+    because they are the Message Batches API rather than a property of
+    "something that can answer a prompt" -- a second provider is not obliged
+    to have an offline mode, and the funnel does not require one of it.
+    """
+
+    def complete_detailed(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        json_schema: dict,
+        model: Optional[str] = None,
+        effort: Optional[str] = None,
+        reasoning: bool = True,
+    ) -> "Completion": ...
+
+
+def cached_system(system_prompt: str) -> list[dict]:
+    """The system prompt as one cacheable block, with the breakpoint on it.
+
+    Placement is the whole point, and getting it wrong is silent. Passing
+    ``cache_control`` as a top-level request parameter caches *the last
+    cacheable block*, which in this request is the per-ticker user prompt --
+    a different string every call. That is what the cycle did until now, and
+    the journal recorded the result exactly: across 934 calls,
+    1,869,345 tokens written to cache and **zero** ever read, with Opus
+    reporting 406 uncached input tokens in total because the entire request
+    was being billed as a cache write at 1.25x and then thrown away.
+
+    Attached here instead, the breakpoint sits after the system prompt --
+    byte-identical across every ticker in a cycle -- and the volatile user
+    prompt falls outside it. The first call of a cycle writes; the rest read
+    at 0.1x.
+
+    Two things bound the saving, and neither is a reason to move it back: the
+    cache is scoped per model, so the screen and the full model each pay one
+    write; and a prompt under the model's minimum cacheable prefix does not
+    cache at all. ``cache_read_input_tokens`` in the journal is how either
+    shows up, which is why it is recorded rather than assumed.
+    """
+    return [{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}]
 
 
 class AnthropicSignalProvider:
@@ -315,21 +367,23 @@ class AnthropicSignalProvider:
         the JSON-schema output format -- is identical, so a batch answer is
         priced and shaped like a live one and can stand in for it.
         """
-        return dict(
+        output_config: dict[str, Any] = {
+            "format": {
+                "type": "json_schema",
+                "schema": build_output_schema(request.json_schema),
+            },
+        }
+        params = dict(
             model=request.model or MODEL,
             max_tokens=MAX_TOKENS,
-            cache_control={"type": "ephemeral"},
-            system=request.system_prompt,
+            system=cached_system(request.system_prompt),
             messages=[{"role": "user", "content": request.user_prompt}],
-            thinking={"type": "adaptive"},
-            output_config={
-                "effort": request.effort or EFFORT,
-                "format": {
-                    "type": "json_schema",
-                    "schema": build_output_schema(request.json_schema),
-                },
-            },
+            output_config=output_config,
         )
+        if request.reasoning:
+            params["thinking"] = {"type": "adaptive"}
+            output_config["effort"] = request.effort or EFFORT
+        return params
 
     def submit_batch(self, prompts: list[BatchRequest]) -> str:
         """Create a batch and return its id without waiting."""
@@ -440,14 +494,7 @@ class AnthropicSignalProvider:
         kwargs: dict[str, Any] = dict(
             model=model or MODEL,
             max_tokens=MAX_TOKENS,
-            # Caches the last cacheable block -- here the system prompt,
-            # which is byte-identical across every ticker in a cycle. Whether
-            # it actually caches depends on the model's minimum cacheable
-            # prefix, so the journal records cache_read_input_tokens rather
-            # than assuming a saving: zero reads across a cycle means the
-            # prompt is under the threshold and this line is doing nothing.
-            cache_control={"type": "ephemeral"},
-            system=system_prompt,
+            system=cached_system(system_prompt),
             messages=[{"role": "user", "content": user_prompt}],
             output_config=output_config,
         )
@@ -474,3 +521,120 @@ class AnthropicSignalProvider:
         except json.JSONDecodeError as exc:
             raise LLMError(f"model returned non-JSON output: {exc}") from exc
         return Completion(text=text, usage=usage_from_response(response, model or MODEL))
+
+
+class OpenAICompatibleProvider:
+    """A second provider, for anything serving the OpenAI chat-completions shape.
+
+    That covers Ollama, llama.cpp's server, vLLM and LM Studio, which is what
+    makes this the seam for running the screening stage on a model that is not
+    billed per token. It implements ``SignalProvider`` and nothing else; it has
+    no batch mode and is never the provider for the full model.
+
+    Where it must not be run, and why this is a seam rather than a default:
+    the cycle's host is ``ubuntu-latest``, four CPUs with no GPU and a disk
+    that is discarded after every run, so weights would be re-downloaded each
+    cycle and eighty CPU inferences would not fit in the job's remaining time
+    -- it already spends 42 minutes of its 90-minute ceiling on I/O alone.
+    A model reached through this class has to be somewhere else: a self-hosted
+    runner, or a machine on the network serving the endpoint.
+
+    Three Anthropic-shaped request parts are dropped rather than translated,
+    because they have no counterpart here: adaptive thinking, ``effort``, and
+    the cache breakpoint. ``effort`` and ``reasoning`` are accepted and ignored
+    so the two providers remain substitutable at the call site.
+
+    A server that ignores ``response_format`` and answers in prose raises
+    ``LLMError`` like any other bad answer, which the funnel already treats as
+    "the screen failed, ask the full model". So the worst a flaky local model
+    can do is cost a cycle its saving -- never place a trade on a bad parse.
+    """
+
+    def __init__(
+        self,
+        base_url: str,
+        model: str,
+        api_key: str = "",
+        client: httpx.Client | None = None,
+        timeout: float = REQUEST_TIMEOUT_SECONDS,
+    ) -> None:
+        if not base_url:
+            raise LLMError("an OpenAI-compatible provider needs a base URL")
+        self._url = base_url.rstrip("/") + "/chat/completions"
+        self._model = model
+        self._api_key = api_key
+        self._client = client
+        self._timeout = timeout
+
+    def _post(self, body: dict) -> dict:
+        # A local endpoint usually wants no key at all, so the header is sent
+        # only when there is something to send: a bare "Bearer " is rejected
+        # by some servers that would otherwise have let the request through.
+        headers = {"Authorization": f"Bearer {self._api_key}"} if self._api_key else {}
+        try:
+            if self._client is None:
+                with httpx.Client(timeout=self._timeout) as client:
+                    response = client.post(self._url, json=body, headers=headers)
+            else:
+                response = self._client.post(self._url, json=body, headers=headers)
+        except httpx.HTTPError as exc:
+            raise LLMError(f"{self._url} unreachable: {exc}") from exc
+        if response.status_code != 200:
+            raise LLMError(f"{self._url} returned HTTP {response.status_code}: {response.text[:300]}")
+        try:
+            return response.json()
+        except ValueError as exc:
+            raise LLMError(f"{self._url} returned a non-JSON body: {exc}") from exc
+
+    def complete_detailed(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        json_schema: dict,
+        model: Optional[str] = None,
+        effort: Optional[str] = None,
+        reasoning: bool = True,
+    ) -> "Completion":
+        name = model or self._model
+        body = {
+            "model": name,
+            "max_tokens": MAX_TOKENS,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "signal",
+                    "strict": True,
+                    "schema": build_output_schema(json_schema),
+                },
+            },
+        }
+        payload = self._post(body)
+        try:
+            text = payload["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError) as exc:
+            raise LLMError(f"no answer in the response from {self._url}: {exc}") from exc
+        if not isinstance(text, str) or not text.strip():
+            raise LLMError(f"{self._url} answered with an empty message")
+        try:
+            json.loads(text)
+        except json.JSONDecodeError as exc:
+            raise LLMError(f"model returned non-JSON output: {exc}") from exc
+
+        # Counted the same way as a Claude call so one journal line means the
+        # same thing whoever answered. ``cost_usd`` comes back None, because
+        # the model is not in the price table -- which is the honest answer:
+        # this module cannot know what someone else's hardware costs to run,
+        # and None reads as "unpriced" rather than as "free".
+        usage = payload.get("usage") or {}
+        return Completion(
+            text=text,
+            usage=Usage(
+                model=name,
+                input_tokens=int(usage.get("prompt_tokens") or 0),
+                output_tokens=int(usage.get("completion_tokens") or 0),
+            ),
+        )

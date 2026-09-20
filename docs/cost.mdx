@@ -34,12 +34,150 @@ That ordering matters: **effort is a bigger lever than model tier.**
 
 | | Lever | Effect |
 |---|---|---|
-| 1 | `EFFORT` | Directly moves the 84% |
-| 2 | Model tier | Multiplies both halves |
-| 3 | The funnel (`SCREENING_ENABLED`) | Removes whole calls: the share of the watchlist the screen calls NEUTRAL |
-| 4 | Watchlist length | Linear in calls |
-| 5 | `HEARTBEAT_INTERVAL_MINUTES` | Linear in calls |
-| 6 | Prompt caching | Only touches the 16% |
+| 1 | `USE_BATCH_API` | Halves every call that is not in a hurry — which here is all of them |
+| 2 | `EFFORT` | Directly moves the 84% |
+| 3 | Model tier | Multiplies both halves |
+| 4 | The funnel (`SCREENING_ENABLED`) | Removes whole calls: the share of the watchlist the screen calls NEUTRAL |
+| 5 | `SKIP_HELD_TICKERS` | Removes whole calls: the share of the watchlist already in the book |
+| 6 | Watchlist length | Linear in calls |
+| 7 | `HEARTBEAT_INTERVAL_MINUTES` | Linear in calls |
+| 8 | Prompt caching | Only touches the 16% — and only when the breakpoint is placed correctly, see below |
+
+## Half price, for waiting
+
+The Message Batches API costs half of what the same request costs live. The
+cycle is the ideal shape for it: eighty independent prompts, none of which
+needs an answer in the same second.
+
+What it costs is immediacy — a batch may take up to 24 hours, though a small
+one usually finishes in minutes. Two things buy that back:
+
+- **The cycle starts pre-market.** The `12:35 UTC` cron gathers context, then
+  waits on the batch in hours the strategy was not trading in anyway.
+- **A deadline.** A batch that has not finished within `BATCH_DEADLINE_SECONDS`
+  is abandoned, ticker by ticker, for live calls. The worst a slow batch can
+  do is cost what a cycle costs today. It cannot cost a session.
+
+<Warning>
+  Starting pre-market gives up the broker's own market-closed gate, which
+  would otherwise refuse every early run. `config.market_calendar.is_trading_day`
+  stands in for it instead: a weekend or a listed NYSE holiday is skipped
+  before anything is fetched, at zero cost. What that calendar cannot see — a
+  half day, or an unscheduled closure — still reaches the broker's own gate,
+  which refuses the orders either way.
+</Warning>
+
+The job's own timeout has to cover the worst case of both waits, not just
+context gathering: roughly 45 minutes to gather 80 tickers, plus up to
+`BATCH_DEADLINE_SECONDS` for the screen batch, plus up to the same again for
+whatever it escalates — about 115 minutes worst case, against a 180-minute
+ceiling. Position management is run immediately after the open book is read,
+before either batch is submitted, specifically so a run that dies during
+that wait has already protected and trimmed the book.
+
+## The cache breakpoint has to be on the system prompt
+
+`cache_control` as a top-level request parameter caches *the last cacheable
+block*, and in this request that is the per-ticker user prompt — a different
+string every call. The cycle did that until 20 Sep, and the journal recorded
+what it cost: across 934 calls, **1,869,345 tokens written to cache and zero
+ever read**. Opus reported 406 uncached input tokens in total, because the
+whole request was billed as a cache write at 1.25× and then discarded. The
+premium came to 10.7% of spend for no benefit at all.
+
+The breakpoint now rides the system block, so the volatile half of the request
+falls outside it. Two bounds are worth knowing: the cache is scoped per model,
+so the screen and the full model each pay one write per cycle, and a prompt
+under the model's minimum cacheable prefix does not cache at all.
+`cache_read_input_tokens` in the journal is how either shows up — which is why
+it is recorded rather than assumed.
+
+## A stage that is not billed at all
+
+`SCREENING_BASE_URL` points the screening stage at any OpenAI-compatible
+endpoint — Ollama, llama.cpp, vLLM, LM Studio — so the cheap stage can run on
+a model nobody bills for. Set `SCREENING_MODEL` alongside it; unset, the screen
+is Claude Haiku exactly as before.
+
+Only the screen. The call that decides what trades stays Claude, and a test
+reads `call_llm`'s source to keep it that way.
+
+<Warning>
+  This cannot be a model on the GitHub-hosted runner: `ubuntu-latest` is four
+  CPUs with no GPU and a disk discarded between runs, so weights would be
+  re-downloaded every cycle and eighty CPU inferences would not fit in a job
+  that already spends 42 of its 90 minutes on I/O. It has to point at a
+  self-hosted runner or a machine on the network.
+</Warning>
+
+An endpoint that is unreachable, errors, or answers in prose raises the same
+`LLMError` a failed Claude screen does, and the funnel already handles that by
+asking the full model. The worst a flaky local model can do is cost a cycle its
+saving; it cannot reach a trade.
+
+### Validating a candidate before flipping it on
+
+```bash
+# Nothing calls the candidate; just say how many recorded lines are comparable
+python replay/compare_screening.py --limit 50 --dry-run
+
+# A local Ollama model
+python replay/compare_screening.py --base-url http://localhost:11434/v1 \
+    --model qwen2.5:14b --limit 50
+
+# A hosted free/cheap tier
+python replay/compare_screening.py --base-url https://api.groq.com/openai/v1 \
+    --model llama-3.1-8b-instant --api-key "$GROQ_API_KEY" --limit 50
+```
+
+`compare_models.py` asks which Claude tier is cheapest; this asks a narrower
+question -- does *this specific endpoint*, asked exactly as the screen is
+really asked (the same trimmed per-ticker system prompt, `reasoning=False`),
+agree with what Haiku actually said on the same recorded lines.
+
+<Warning>
+  The baseline is the recorded **screen**, never the recorded final signal. On
+  a line the screen escalated, those differ -- the screen's own
+  NEUTRAL-or-not call versus the full model's directional one -- and grading a
+  candidate against the full model would be grading it on a question
+  production never asked it. A line with no recorded screen (screening was
+  off, or the screen itself errored) is skipped, not counted as a pass.
+</Warning>
+
+Same pre-registered floor as the staircase walk (90% trade-agreement) and the
+same limits: agreement is not correctness, and a high failure rate silently
+reverts every one of those lines to the full model, which erases the saving
+without ever risking a bad trade.
+
+## Stage zero: what the book already holds
+
+A ticker already in the book is asked nothing, by either model. It is
+journalled with its context, counted in the cycle report as `held`, and
+dropped before the screen.
+
+The reasoning is that the open book is already managed, and not by an opinion.
+`PositionManager` walks it every cycle — profit-ladder tranches, stop raising,
+ATR trailing stops, re-protecting a naked stop — all arithmetic, all free. A
+fresh signal on a held name could only add a top-up, and it was being bought
+at the price of the full funnel.
+
+What this gives up is stated where it is configured: the top-up, and the flip
+block that rejected a signal opposite to the side held. Neither is
+load-bearing — a position that goes wrong is closed by its stop, and one that
+goes right is trimmed up the ladder.
+
+With 12 names held against a watchlist of 80, this is about 15% of a cycle's
+calls. The direction is the point: model spend goes to the names that could
+still become positions, against `MAX_OPEN_POSITIONS` of 40, rather than to the
+half of the book that already is one.
+
+<Note>
+  It degrades to the old behaviour on its own. If the open book cannot be read
+  — a broker error, or webhook mode, where the orchestrator holds no broker
+  credentials by design — every ticker is reviewed and the run log says why.
+  Skipping a ticker nobody holds is a missed trade; reviewing one that is held
+  is a wasted call, and the second is the cheaper mistake.
+</Note>
 
 ## The funnel
 
