@@ -139,14 +139,45 @@ problems.
   support before trusting a candidate's number, not after.
 </Warning>
 
-**A starting point: Google Gemini `gemini-2.5-flash-lite`.** Cheapest paid
-text model in its lineup, a 1M-token context, honours strict `json_schema` on
-the normal (non-batch) request path, and does not reason by default -- which
-matters because of the caveat below.
+### What the screen actually costs
+
+Measured from 465 recorded screening calls: 2,439 input tokens, 1,189 of them
+the cacheable prompt head, and 510 output tokens per call. At 68 screened
+tickers a cycle and 21 trading days:
+
+| Screening model | $/month | vs Haiku |
+| --- | --- | --- |
+| `claude-haiku-4-5`, cache working | $7.29 | — |
+| `gemini-3.5-flash-lite` | $3.37 | 2.2x cheaper |
+| `openai/gpt-oss-20b` (Groq) | $0.61 | 12x cheaper |
+
+The Haiku row is the one to read first. It is *already* lower than the $9.25
+this stage used to cost, because the cache breakpoint fix landed — which
+means the cheap-screen argument is now being made against a smaller number
+than it was originally made against.
+
+**The cheapest option: Groq's paid tier, `openai/gpt-oss-20b`.** $0.075/$0.30
+per Mtok, and Groq documents constrained decoding on exactly this model
+family, which is the strongest strict-JSON guarantee of the options surveyed.
+
+```bash
+SCREENING_BASE_URL=https://api.groq.com/openai/v1
+SCREENING_MODEL=openai/gpt-oss-20b
+SCREENING_API_KEY=<your Groq key>
+```
+
+Key from [console.groq.com/keys](https://console.groq.com/keys); add a card
+under billing to leave the free tier, whose request caps and data-use policy
+both matter here.
+
+**The alternative: Google Gemini `gemini-3.5-flash-lite`.** $0.30/$2.50 per
+Mtok, a 1M-token context, honours strict `json_schema` on the normal
+(non-batch) request path, and does not reason by default -- which matters
+because of the caveat below.
 
 ```bash
 SCREENING_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
-SCREENING_MODEL=gemini-2.5-flash-lite
+SCREENING_MODEL=gemini-3.5-flash-lite
 SCREENING_API_KEY=<your AI Studio key>
 ```
 
@@ -156,16 +187,23 @@ prompts off the free tier's training-data policy and off its request caps.
 This is an account and billing action only you can take; nothing here can do
 it for you.
 
-**A fallback with a stronger strict-JSON guarantee: Groq's paid tier,
-`openai/gpt-oss-20b`.** Groq documents constrained decoding on exactly this
-model family, which is the highest-confidence strict-JSON story of the
-options surveyed.
+<Warning>
+  Model names expire. `gemini-2.5-flash-lite` was this page's recommendation
+  until 20 Sep 2026, when the endpoint began answering
+  `404 ... no longer available to new users`. That is a clean failure -- the
+  screen falls through to the full model, so it costs money rather than
+  making a bad trade -- but it is silent unless something asks. The
+  **screening check** workflow is what asks; run it after any change to
+  `SCREENING_MODEL`. The prices above were verified the same day and carry
+  the same expiry risk.
+</Warning>
 
-```bash
-SCREENING_BASE_URL=https://api.groq.com/openai/v1
-SCREENING_MODEL=openai/gpt-oss-20b
-SCREENING_API_KEY=<your Groq key>
-```
+<Note>
+  Both rows are in `orchestrator/pricing.py`, so the screening stage appears
+  in the measured bill instead of pricing as `None` and quietly leaving it. A
+  self-hosted endpoint has no row and still costs `None`, which is the honest
+  answer for someone else's GPU.
+</Note>
 
 <Note>
   `gpt-oss-20b` reasons by default and has no true "off" -- only low, medium
