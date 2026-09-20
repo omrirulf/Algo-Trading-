@@ -599,7 +599,57 @@ EQUITY_RISK_BETAS: Final[dict[str, float]] = {
     "HDB": 1.07, "MELI": 1.53,
     # Credit that trades like stocks (weekly correlation with RSP: HYG 0.76, EMB 0.58)
     "HYG": 0.45, "EMB": 0.34,
+    # LQD is a rate instrument on a quiet day and an equity instrument on a
+    # bad one -- it is already a full Duration member (rates), and this is
+    # its second, smaller charge (crisis equity risk). NBER Working Paper
+    # 27168 (Haddad, Moreira & Muir, 2020) found investment-grade credit fell
+    # about 20% peak-to-trough in the three weeks of March 2020, "about the
+    # same for investment grade [as] high yield" -- roughly a stock's fall,
+    # not a bond's. 0.36 is iShares' own trailing-3-year beta for LQD against
+    # the US market. An independent review flagged this gap; not yet
+    # re-verified against this repo's own tooling -- see the January routine.
+    "LQD": 0.36,
 }
+
+
+# --------------------------------------------------------------------------- #
+# The interest-rate risk two "stock-bucket" credit funds also carry
+# --------------------------------------------------------------------------- #
+# HYG and EMB are correctly in EQUITY_RISK_BETAS -- they sell off with stocks
+# in a credit scare -- but a bond fund is also just a bond, and neither cap
+# sees that half of it: EQUITY_RISK_BETAS counts market value x equity beta,
+# and the Duration group cap only counts a ticker that is IN the Duration
+# group. A short position in either currently "creates room" against the
+# stock cap while adding real interest-rate exposure that nothing measures.
+#
+# This is that missing charge: the fraction of a position's market value
+# added to the *Duration group's own total*, on top of whatever the equity
+# bucket already charges it. Weight is effective duration in years divided by
+# ten -- ten because that is the order of IEF's, the Duration group's own
+# middle-of-the-curve member, so "one" here means "about as rate-sensitive as
+# the belly of the curve already in the group," not an arbitrary scale.
+#
+# HYG ~3yr effective duration -> 0.30. EMB ~6.5yr -> 0.65 (iShares fact
+# sheets, most recently reviewed 2025-12-31; these drift as bonds roll toward
+# maturity and are not measured by this repository -- refresh in January
+# alongside the betas). Existing full Duration members (SHY, IEF, TLT, TIP,
+# LQD) are not in this table: they already count at their full market value
+# through group membership, and this only adds a *second*, smaller charge for
+# tickers that are not already full members.
+DURATION_RATE_WEIGHT: Final[dict[str, float]] = {
+    "HYG": 0.30,
+    "EMB": 0.65,
+}
+
+
+def duration_rate_weight(ticker: str) -> float | None:
+    """Fraction of this ticker's market value also charged to the Duration cap.
+
+    ``None`` for anything not in ``DURATION_RATE_WEIGHT`` -- including every
+    existing Duration member, which is charged in full through group
+    membership already and must not be charged twice.
+    """
+    return DURATION_RATE_WEIGHT.get(ticker.strip().upper())
 
 
 def equity_risk_beta(ticker: str) -> float | None:
@@ -637,6 +687,8 @@ __all__ = [
     "group_for",
     "EQUITY_RISK_BETAS",
     "equity_risk_beta",
+    "DURATION_RATE_WEIGHT",
+    "duration_rate_weight",
     "DISPLAY_NAMES",
     "SLEEVE_LABELS",
     "name_for",

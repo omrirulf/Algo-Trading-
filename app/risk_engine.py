@@ -7,10 +7,16 @@ can be proven with unit tests (see ``tests/test_risk_engine.py``).
 from __future__ import annotations
 
 import math
-from typing import Any, Sequence
+from typing import Any, Final, Sequence
 
 from config import settings as cfg
-from config.instruments import InstrumentKind, equity_risk_beta, group_for, kind_for
+from config.instruments import (
+    InstrumentKind,
+    duration_rate_weight,
+    equity_risk_beta,
+    group_for,
+    kind_for,
+)
 
 
 class RiskViolation(ValueError):
@@ -65,6 +71,34 @@ def group_cap_pct(group: str) -> float:
     return cfg.EXPOSURE_GROUP_CAP_OVERRIDES.get(group, cfg.MAX_EXPOSURE_GROUP_PCT)
 
 
+#: The one group whose members are not the only source of its own exposure.
+#: HYG and EMB carry real interest-rate duration (see
+#: ``instruments.DURATION_RATE_WEIGHT``) that no other cap counts, so this
+#: group's total also picks up a fraction of their market value on top of its
+#: own five members.
+_DURATION_GROUP: Final[str] = "Duration"
+
+
+def _group_market_value(group: str, positions: Sequence[Any]) -> float:
+    """Dollars charged against ``group``'s cap: members, plus any rate charge.
+
+    A ticker outside the group can still owe it money. HYG and EMB are full
+    members of Credit and of the stock-market bucket, and they are ALSO a
+    fraction of a Duration position -- the interest-rate slice neither of
+    those two caps sees. That fraction is added here rather than by moving
+    the tickers, because moving them would drop the equity-risk and Credit
+    charges they correctly carry; a position can owe more than one cap.
+    """
+    used = sum(p.market_value for p in positions if group_for(p.ticker) == group)
+    if group == _DURATION_GROUP:
+        for p in positions:
+            if group_for(p.ticker) != _DURATION_GROUP:
+                weight = duration_rate_weight(p.ticker)
+                if weight is not None:
+                    used += p.market_value * weight
+    return used
+
+
 def exposure_group_headroom(
     equity: float,
     ticker: str,
@@ -86,9 +120,7 @@ def exposure_group_headroom(
     """
     group = group_for(ticker)
     cap_pct = max_group_pct if max_group_pct is not None else group_cap_pct(group)
-    used = sum(
-        p.market_value for p in positions if group_for(p.ticker) == group
-    )
+    used = _group_market_value(group, positions)
     return _headroom(equity, used, cap_pct, f"group {group!r}")
 
 
@@ -173,10 +205,11 @@ def groups_over_cap(equity: float, positions: Sequence[Any]) -> dict[str, float]
     """
     if equity <= 0:
         raise RiskViolation(f"equity must be positive, got {equity}")
-    used_by_group: dict[str, float] = {}
-    for p in positions:
-        group = group_for(p.ticker)
-        used_by_group[group] = used_by_group.get(group, 0.0) + p.market_value
+    groups = {group_for(p.ticker) for p in positions}
+    groups |= {_DURATION_GROUP} if any(
+        duration_rate_weight(p.ticker) is not None for p in positions
+    ) else set()
+    used_by_group = {group: _group_market_value(group, positions) for group in groups}
     excess_by_group: dict[str, float] = {}
     for group, used in used_by_group.items():
         cap_pct = cfg.EXPOSURE_GROUP_CAP_OVERRIDES.get(group, cfg.MAX_EXPOSURE_GROUP_PCT)

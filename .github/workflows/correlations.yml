@@ -63,6 +63,15 @@ jobs:
           if [ -n "$TICKERS" ]; then
             ARGS="$ARGS --tickers $TICKERS"
           fi
+          # logs/book.json is committed by the heartbeat after every cycle,
+          # so this adds the joint-stress section for the account that
+          # actually exists, on top of the watchlist-wide measurement. Its
+          # absence (a fresh checkout before the first cycle ever ran) is
+          # not an error -- the section is simply omitted, same as any other
+          # ticker this module could not get data for.
+          if [ -f logs/book.json ]; then
+            ARGS="$ARGS --book logs/book.json"
+          fi
           python -m analysis.correlations $ARGS | tee correlations.txt
           python -m analysis.correlations $ARGS --json > correlations.json
 

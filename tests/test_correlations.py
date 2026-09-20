@@ -572,3 +572,188 @@ def test_the_module_cannot_reach_a_broker_or_write_anything():
         text = fh.read()
     for forbidden in ("submit_order", "ExecutionEngine", "broker", ".write_text("):
         assert forbidden not in text, forbidden
+
+
+# --------------------------------------------------------------------------- #
+# The risk axis: do bonds and stocks move together?
+# --------------------------------------------------------------------------- #
+
+
+def test_the_risk_axis_reports_raw_correlation_not_excess():
+    """The one place the market factor must NOT be removed.
+
+    Everywhere else, a correlation is reported after each side's beta to the
+    watchlist average is taken out. Here the shared equity factor is the
+    question, so subtracting it would subtract the answer: two series built
+    to move together at +0.9 must come back near +0.9, not near zero.
+    """
+    n = 400
+    market = noise(n, 70, 0.012)
+    stocks = market + noise(n, 71, 0.004)
+    bonds = market * 0.5 + noise(n, 72, 0.002)     # same driver, half as much
+    returns = frame(RSP=stocks, IWM=stocks + noise(n, 73, 0.003),
+                    TLT=bonds, IEF=bonds + noise(n, 74, 0.001))
+    out = corr.risk_axis(returns, corr.stress_index(returns),
+                         duration=("TLT", "IEF"), equity=("RSP", "IWM"))
+    assert out["windows"]["long"] > 0.8
+    assert out["doubled_when_same_sign"] is True
+
+
+def test_a_flight_to_quality_regime_says_short_duration_doubles_a_long_book():
+    """r < 0 is the classic regime, and it is the one the caps get wrong.
+
+    Bonds rallying while stocks sell off means a book long stocks and SHORT
+    duration loses on both legs in a growth scare -- one bet made twice,
+    although the two caps score it as two independent budgets.
+    """
+    n = 400
+    stocks = noise(n, 80, 0.012)
+    bonds = -stocks * 0.6 + noise(n, 81, 0.002)    # rallies when stocks fall
+    returns = frame(RSP=stocks, IWM=stocks + noise(n, 82, 0.003),
+                    TLT=bonds, IEF=bonds + noise(n, 83, 0.001))
+    out = corr.risk_axis(returns, corr.stress_index(returns),
+                         duration=("TLT", "IEF"), equity=("RSP", "IWM"))
+    assert out["windows"]["long"] < -0.8
+    assert out["doubled_when_same_sign"] is False
+
+
+def test_a_sign_that_flips_between_crises_is_reported_as_unstable():
+    """The finding that would matter most, so it must not be averageable.
+
+    A pair negative in one drawdown and positive in another has no fixed
+    relationship for a cap to rely on. Averaging the two would report a
+    number near zero and call it 'no link', which is the opposite of the
+    truth: the link is strong and it changes sides.
+    """
+    crises = (corr.Crisis("First", "A", "2024-02-01", "2024-03-01"),
+              corr.Crisis("Second", "B", "2024-06-03", "2024-07-01"))
+    n = 400
+    index = days(n)
+    stocks = noise(n, 90, 0.012)
+    bonds = -stocks * 0.8 + noise(n, 91, 0.001)
+    bonds = pd.Series(bonds, index=index)
+    stocks = pd.Series(stocks, index=index)
+    # Inside the second window only, flip the relationship to positive.
+    window = (index >= "2024-06-03") & (index <= "2024-07-01")
+    bonds[window] = stocks[window] * 0.8 + noise(int(window.sum()), 92, 0.001)
+    returns = pd.DataFrame({"RSP": stocks, "TLT": bonds}, index=index)
+    out = corr.risk_axis(returns, corr.stress_index(returns, benchmark="RSP"),
+                         crises=crises, duration=("TLT",), equity=("RSP",))
+    assert out["by_crisis"]["A"]["raw"] < 0 < out["by_crisis"]["B"]["raw"]
+    assert out["sign_is_stable"] is False
+
+
+def test_the_axis_defaults_to_the_two_baskets_the_two_caps_actually_bound():
+    """Not a nearby basket: the Duration group and the beta table itself.
+
+    If the default drifted to, say, TLT alone or 'every bond fund', the
+    number would answer a question the risk engine is not asking.
+    """
+    from config.instruments import EQUITY_RISK_BETAS, EXPOSURE_GROUPS
+    n = 60
+    returns = frame(TLT=noise(n, 95), RSP=noise(n, 96))
+    out = corr.risk_axis(returns, corr.stress_index(returns))
+    assert tuple(out["duration"]) == tuple(EXPOSURE_GROUPS["Duration"])
+    assert tuple(out["equity"]) == tuple(EQUITY_RISK_BETAS)
+
+
+def test_the_report_carries_the_axis_and_the_render_prints_it():
+    n = 300
+    market = noise(n, 97, 0.012)
+    returns = frame(RSP=market, IWM=market + noise(n, 98, 0.003),
+                    TLT=-market * 0.5 + noise(n, 99, 0.002))
+    data = corr.report(returns)
+    assert "risk_axis" in data
+    text = corr.render(data)
+    assert "Do bonds and stocks move together?" in text
+    assert "raw" in text.lower()
+
+
+# --------------------------------------------------------------------------- #
+# The joint stress test: what today's book would lose if a crisis replayed
+# --------------------------------------------------------------------------- #
+
+
+def test_a_long_book_loses_the_realised_crisis_return_on_todays_dollars():
+    """Not a correlation: an actual compounded return, on actual position size."""
+    crises = (corr.Crisis("Test crash", "T", "2024-02-01", "2024-02-29"),)
+    index = days(60)
+    # A single -20% day inside the window -- total return is exactly -0.20,
+    # with no compounding arithmetic to get right in the test itself.
+    ret = pd.Series(0.0, index=index)
+    ret.loc["2024-02-15"] = -0.20
+    returns = pd.DataFrame({"XYZ": ret})
+    out = corr.joint_stress_loss(returns, [("XYZ", 10_000.0)], equity=100_000.0, crises=crises)
+    row = out["by_crisis"]["T"]
+    assert row["pnl_dollars"] == pytest.approx(-2_000.0)
+    assert row["pnl_pct_of_equity"] == pytest.approx(-2.0)
+
+
+def test_a_short_position_gains_when_the_underlying_falls():
+    crises = (corr.Crisis("Test crash", "T", "2024-02-01", "2024-02-29"),)
+    index = days(60)
+    ret = pd.Series(0.0, index=index)
+    ret.loc["2024-02-15"] = -0.20
+    returns = pd.DataFrame({"XYZ": ret})
+    # Short 10,000 -> signed exposure is negative.
+    out = corr.joint_stress_loss(returns, [("XYZ", -10_000.0)], equity=100_000.0, crises=crises)
+    assert out["by_crisis"]["T"]["pnl_dollars"] == pytest.approx(2_000.0)
+
+
+def test_a_position_with_no_data_over_the_window_is_skipped_and_named():
+    crises = (corr.Crisis("Test crash", "T", "2024-02-01", "2024-02-29"),)
+    returns = pd.DataFrame({"XYZ": pd.Series(0.0, index=days(60))})
+    out = corr.joint_stress_loss(
+        returns, [("XYZ", 5_000.0), ("NEWCO", 5_000.0)], equity=100_000.0, crises=crises,
+    )
+    row = out["by_crisis"]["T"]
+    assert row["matched"] == ["XYZ"]
+    assert row["skipped"] == ["NEWCO"]
+
+
+def test_the_worst_crisis_and_the_over_limit_flag_are_reported():
+    crises = (
+        corr.Crisis("Mild", "M", "2024-02-01", "2024-02-29"),
+        corr.Crisis("Severe", "S", "2024-06-03", "2024-06-28"),
+    )
+    index = days(200)
+    ret = pd.Series(0.0, index=index)
+    ret.loc["2024-02-15"] = -0.05
+    ret.loc["2024-06-14"] = -0.30
+    returns = pd.DataFrame({"XYZ": ret})
+    out = corr.joint_stress_loss(returns, [("XYZ", 60_000.0)], equity=100_000.0, crises=crises)
+    assert out["worst_crisis"] == "S"
+    assert out["by_crisis"]["S"]["over_limit"] is True
+    assert out["by_crisis"]["M"]["over_limit"] is False
+    assert out["any_over_limit"] is True
+
+
+def test_positions_from_book_reads_side_the_same_way_the_risk_engine_does():
+    book = {"equity": 50_000.0, "positions": [
+        {"ticker": "TLT", "market_value": 4_000.0, "side": "sell"},
+        {"ticker": "NVDA", "market_value": 3_000.0, "side": "buy"},
+    ]}
+    positions, equity = corr.positions_from_book(book)
+    assert equity == 50_000.0
+    assert dict(positions) == {"TLT": -4_000.0, "NVDA": 3_000.0}
+
+
+def test_report_carries_no_joint_stress_section_without_a_book():
+    n = 60
+    returns = frame(RSP=noise(n, 100), TLT=noise(n, 101))
+    data = corr.report(returns)
+    assert data["joint_stress"] is None
+    assert "If today's book" not in corr.render(data)
+
+
+def test_report_adds_the_joint_stress_section_when_a_book_is_supplied():
+    n = 300
+    index = days(n)
+    ret = pd.Series(noise(n, 102), index=index)
+    returns = pd.DataFrame({"RSP": ret, "TLT": noise(n, 103)}, index=index)
+    book = {"equity": 100_000.0, "positions": [
+        {"ticker": "RSP", "market_value": 20_000.0, "side": "buy"},
+    ]}
+    data = corr.report(returns, book=book)
+    assert data["joint_stress"] is not None
+    assert "If today's book" in corr.render(data)

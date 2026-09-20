@@ -121,12 +121,22 @@ MAX_EXPOSURE_GROUP_PCT: Final[float] = 0.25
 #: The number is set by how much the bucket can *lose*, not by how tightly its
 #: members move together. They do move together -- that is why they are one
 #: group -- but a cap is a loss budget, and correlation alone does not say how
-#: large the loss is. As a basket Duration's worst fall was 18.9% (2022), so
-#: 30% of the account risks about 5.7% of it. One equity group at 25% already
-#: risks more: real estate fell 64% in the 2008 crisis, which is 16% of the
-#: account. A tighter number here would be buying less protection than the
-#: equity groups already give away, while forbidding the one asset that
-#: usually rallies when they fall.
+#: large the loss is.
+#:
+#: Size it on the worst fill the caps actually *permit*, not on the basket
+#: average. This cap counts market value, so it is blind to the fact that TLT
+#: is roughly ten times as volatile as SHY -- $30 of each is the same number
+#: to it, and in 2022 one fell 31.2% and the other 3.9%. What stops that being
+#: a hole is the 12% per-position cap: 30% cannot be filled with TLT alone, it
+#: needs three funds. The worst reachable fill is TLT 12% + LQD 12% + IEF 6%,
+#: which on calendar-2022 returns loses **6.8% of the account** (peak to
+#: trough, somewhat more). The basket average -- an 18.9% fall, 5.7% of the
+#: account -- is the number an evenly-spread book gets, not the ceiling.
+#:
+#: One equity group at 25% still risks more: real estate fell 64% in the 2008
+#: crisis, which is 16% of the account. A tighter number here would be buying
+#: less protection than the equity groups already give away, while forbidding
+#: the one asset that usually rallies when they fall.
 #:
 #: Read against what this replaces rather than against the general cap: 25% of
 #: Treasuries plus 25% of LQD through Credit was really a 50% ceiling on one
@@ -149,13 +159,48 @@ EXPOSURE_GROUP_CAP_OVERRIDES: Final[dict[str, float]] = {
 #: fund at beta 0.54 uses about half the room of a dollar of NVDA at 1.57.
 #: Longs add and shorts subtract -- inside this bucket only. Stocks fell
 #: together in every crash measured, so a short stock fund does offset a long
-#: one; bonds did not offset stocks in 2022, so nothing outside the bucket
-#: nets against it. The group, sleeve and gross caps stay sign-blind.
+#: one; government paper rallied while stocks fell in 2022, so nothing outside
+#: the bucket nets against it. The group, sleeve and gross caps stay sign-blind.
+#:
+#: The bucket is whatever ``EQUITY_RISK_BETAS`` lists, which is not the same
+#: as whatever is called a stock: ``HYG`` (0.45) and ``EMB`` (0.34) are in it,
+#: because credit sells off with equities and counting it at a haircut is
+#: nearer the truth than counting it at zero. The Treasury maturities, the
+#: commodities and ``UUP`` are absent, so they can neither consume this room
+#: nor free any.
 #:
 #: What 60% would have meant, as a share of the account, for a book at the
 #: limit: about 25% lost in the 2008 crisis, 22% in the 2020 crash, 15% in
 #: 2022. With nothing but the gross cap the same book could have lost about
 #: 39%, 35% and 24%.
+#:
+#: Known gap, measured and partly closed: this limit and Duration's ceiling
+#: are separate budgets, and they are not independent.
+#: ``analysis.correlations.risk_axis`` measures the raw correlation between
+#: the two baskets and finds the sign *changes* -- five of six drawdowns
+#: negative (bonds rallied as stocks fell), 2022 positive, the last year
+#: +0.55. So a long stock book held with a short duration leg is one bet
+#: made twice in a flight to quality, and a hedge in a rates shock, and no
+#: static rule is right in both. Nothing here nets the two; the docstring
+#: there says why.
+#:
+#: Two of the leaks an independent review found are closed. LQD now also
+#: counts here (0.36, its crisis-only equity beta -- see
+#: ``instruments.EQUITY_RISK_BETAS``), on top of being a full Duration
+#: member, because it is a rate instrument on a quiet day and fell like a
+#: stock in March 2020. HYG and EMB's own rate duration, which neither this
+#: cap nor Credit's used to see, now also charges Duration -- see
+#: ``instruments.DURATION_RATE_WEIGHT`` and
+#: ``risk_engine._group_market_value``.
+#:
+#: Still open: whether the two sleeves should share one joint limit rather
+#: than two independent ones. ``analysis.correlations.joint_stress_loss``
+#: measures what today's actual book would lose if each named crisis
+#: replayed, against a 15% threshold -- but only as a report, not a live
+#: cap. Turning it into one needs a decision this repository has not made
+#: yet: whether it gates new orders, like the group caps, or trims what is
+#: already open, like Duration's -- see
+#: ``correlations.JOINT_STRESS_LIMIT_PCT``.
 MAX_EQUITY_RISK_PCT: Final[float] = 0.60
 
 #: Sleeve budgets. Funds are the core holding and single names the satellite,

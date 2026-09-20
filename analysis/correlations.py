@@ -76,12 +76,13 @@ from __future__ import annotations
 import argparse
 import json
 from dataclasses import asdict, dataclass
+from pathlib import Path
 from typing import Optional, Sequence
 
 import numpy as np
 import pandas as pd
 
-from config.instruments import EXPOSURE_GROUPS, name_for
+from config.instruments import EQUITY_RISK_BETAS, EXPOSURE_GROUPS, name_for
 from config.watchlist import DEFAULT_WATCHLIST
 
 #: Recent and long windows, in trading days. 60 is about a quarter, 250 about
@@ -608,6 +609,198 @@ def cross_group(returns: pd.DataFrame, stress: pd.Index,
     return sorted(results, key=lambda r: r.rank_by, reverse=True)
 
 
+def risk_axis(
+    returns: pd.DataFrame,
+    stress: pd.Index,
+    crises: Sequence[Crisis] = CRISES,
+    duration: Optional[Sequence[str]] = None,
+    equity: Optional[Sequence[str]] = None,
+) -> dict:
+    """Do bonds and stocks move together -- **raw**, by regime.
+
+    The one question in this module that the excess numbers cannot answer.
+    Everywhere else, correlation is reported after each side's beta to the
+    watchlist average is removed, because two equity groups correlating at
+    0.8 only says "both are equities". Here that common equity factor *is*
+    the question, so subtracting it would subtract the answer.
+
+    Why it is worth a section of its own: ``MAX_EQUITY_RISK_PCT`` and
+    Duration's own ceiling are two independent budgets, and neither looks at
+    the other. Whether that independence is real depends entirely on the sign
+    of this number, and the sign is not stable -- it was negative for most of
+    2000-2020 and positive through 2022.
+
+    Read it as variance, not as a story. For a book holding ``+E`` of stocks
+    and ``+D`` of duration the cross term is ``+2r``; flip either side's sign
+    and the cross term flips with it. So with
+
+    * ``r > 0`` (bonds and stocks fall together, the 2022 regime), a book
+      that is **the same way round** on both -- long/long, or short/short --
+      is one bet made twice, and an opposite-signed book is hedged;
+    * ``r < 0`` (the classic flight-to-quality regime), it is the other way
+      about: long stocks with **short** duration is the doubled bet, because
+      a growth scare rallies the bonds you are short while it sells the
+      stocks you are long.
+
+    ``duration`` defaults to the Duration exposure group and ``equity`` to
+    every ticker in ``EQUITY_RISK_BETAS`` -- that is, exactly the two
+    baskets the two caps bound, so the number answers the question actually
+    being asked of the risk engine rather than a nearby one.
+
+    Measured 2007-01-03 to 2026-09-19, 80 tickers (run 35506712788)::
+
+        last year          +0.55
+        long (250d)        +0.43
+        equity stress days -0.02
+
+        GFC'08  -0.32 (356d)   Q4'18    -0.29 (59d)
+        Euro'11 -0.63 ( 66d)   Covid'20 -0.17 (24d)
+        Oil'15  -0.38 (134d)   Rates'22 +0.19 (196d)
+
+    **The sign is not stable, and that is the finding.** Five of the six
+    drawdowns are negative -- bonds rallied while stocks fell, the classic
+    flight to quality -- and 2022 alone is positive. So in five of the six
+    crises this book would most want protection from, a long stock position
+    held alongside a *short* duration position is one bet made twice, while
+    the two caps score it as two independent budgets.
+
+    The last year reads +0.55, the 2022-like regime, which inverts which
+    pairing is the dangerous one. No fixed rule relating the two caps can be
+    right in both, which is why this function reports and does not prescribe.
+    The conservative reading is that duration must never be allowed to
+    *reduce* measured stock risk, in either direction, since the sign that
+    would justify it is the one thing here that does not hold still.
+
+    The near-zero stress-days figure is not a third answer: that window
+    blends both regimes across twenty years, so the two signs cancel. It is
+    the reason the crises are measured one at a time.
+
+    **Do not read "five of six negative" as the norm.** This sample starts in
+    2007, so it is almost entirely the post-2000 era, which is exactly the
+    stretch in which bonds hedged stocks. An independent review put the
+    longer record the other way about -- AQR and Russell both report the US
+    stock/bond correlation as positive more often than not across the
+    twentieth century. If that holds, the regime this function measures most
+    of is the anomaly, and 2022 is the reversion. Either way the conclusion
+    is the same and is the only one the data supports: the sign is a regime,
+    not a constant, and neither sign may be assumed.
+    """
+    duration = tuple(EXPOSURE_GROUPS.get("Duration", ())) if duration is None else tuple(duration)
+    equity = tuple(EQUITY_RISK_BETAS) if equity is None else tuple(equity)
+    # market=None on purpose: raw is the whole point here.
+    pair = measure_pair(returns, "Duration vs the stock bucket",
+                        duration, equity, stress, None, crises)
+    windows = {"recent": pair.recent, "long": pair.long, "stress": pair.stress}
+    by_crisis = {c.short: {"label": c.label, "raw": c.raw, "days": c.days}
+                 for c in pair.crises}
+    measured = [r for r in list(windows.values()) + [c["raw"] for c in by_crisis.values()]
+                if isinstance(r, float)]
+    return {
+        "duration": list(duration),
+        "equity": list(equity),
+        "observations": pair.observations,
+        "stress_days": pair.stress_days,
+        "windows": windows,
+        "by_crisis": by_crisis,
+        # Whether the sign holds is the finding. A number that changes sign
+        # across regimes means no fixed rule about the two caps can be right
+        # in all of them, which is itself the answer.
+        "sign_is_stable": (
+            None if len(measured) < 2
+            else all(r > 0 for r in measured) or all(r < 0 for r in measured)
+        ),
+        "doubled_when_same_sign": (
+            None if pair.long is None else pair.long > 0
+        ),
+    }
+
+
+#: A reporting threshold, not yet an enforced cap. It has not been given the
+#: same treatment MAX_EQUITY_RISK_PCT and EXPOSURE_GROUP_CAP_OVERRIDES have --
+#: a number hand-verified and written into config/settings.py -- because
+#: turning this into a live, order-blocking limit needs per-ticker crisis
+#: shocks sourced with that same rigor, and enforcing it would also mean
+#: deciding HOW: at entry, like the group caps, or as a retroactive trim,
+#: like Duration's. Both are open questions. Until then this prints a number
+#: for a person to act on, exactly like everything else in this module.
+JOINT_STRESS_LIMIT_PCT: float = 0.15
+
+
+def joint_stress_loss(
+    returns: pd.DataFrame,
+    positions: Sequence[tuple[str, float]],
+    equity: float,
+    crises: Sequence[Crisis] = CRISES,
+) -> dict:
+    """What TODAY's actual book would have lost, had each crisis happened to it now.
+
+    Unlike everything else in this module, this is not a correlation. It is
+    each ticker's *realised*, compounded return over the crisis window,
+    applied to *today's* position size. The crisis is historical; the book
+    is not -- this answers "what would this book lose", never "what did some
+    other book lose in 2008".
+
+    Answers the question Duration's own cap and the stock-market cap cannot
+    answer separately: not "is either sleeve over its own limit" but "if the
+    worst joint move on record happened today, how much of the account goes
+    at once". risk_axis() found the two sleeves' correlation changes sign
+    between regimes; this is what that means in dollars, for the book that
+    actually exists right now, rather than for a stylised basket.
+
+    ``positions`` is (ticker, signed dollar exposure) pairs in today's
+    dollars -- positive for long, negative for short. A ticker with no price
+    data over a window is skipped and named rather than assumed flat, so a
+    thin crisis (a ticker that did not exist yet) is visible as thin, not
+    silently treated as safe.
+    """
+    if equity <= 0:
+        raise ValueError(f"equity must be positive, got {equity}")
+    by_crisis: dict[str, dict] = {}
+    for crisis in crises:
+        pnl, matched, skipped = 0.0, [], []
+        for ticker, dollars in positions:
+            if ticker not in returns.columns:
+                skipped.append(ticker)
+                continue
+            window = returns[ticker].loc[crisis.start:crisis.end].dropna()
+            if window.empty:
+                skipped.append(ticker)
+                continue
+            total_return = float((1.0 + window).prod() - 1.0)
+            pnl += dollars * total_return
+            matched.append(ticker)
+        pct = pnl / equity * 100.0
+        by_crisis[crisis.short] = {
+            "label": crisis.label,
+            "pnl_dollars": round(pnl, 2),
+            "pnl_pct_of_equity": round(pct, 2),
+            "over_limit": pct <= -JOINT_STRESS_LIMIT_PCT * 100.0,
+            "matched": sorted(matched),
+            "skipped": sorted(skipped),
+        }
+    worst = min(by_crisis.items(), key=lambda kv: kv[1]["pnl_pct_of_equity"], default=(None, None))
+    return {
+        "limit_pct": JOINT_STRESS_LIMIT_PCT * 100.0,
+        "by_crisis": by_crisis,
+        "worst_crisis": worst[0],
+        "worst_pct_of_equity": worst[1]["pnl_pct_of_equity"] if worst[1] else None,
+        "any_over_limit": any(row["over_limit"] for row in by_crisis.values()),
+    }
+
+
+def positions_from_book(book: dict) -> tuple[list[tuple[str, float]], Optional[float]]:
+    """Adapt a ``logs/book.json`` snapshot into what ``joint_stress_loss`` wants.
+
+    Reads the same ``side``/``market_value`` fields ``risk_engine.net_equity_risk``
+    does, so a short reduces the signed exposure rather than adding to it.
+    """
+    positions = [
+        (p["ticker"], p["market_value"] * (-1.0 if p.get("side") == "sell" else 1.0))
+        for p in book.get("positions", [])
+    ]
+    return positions, book.get("equity")
+
+
 def coverage(returns: pd.DataFrame, crises: Sequence[Crisis] = CRISES) -> dict:
     """Which tickers existed when -- without this the crisis table lies.
 
@@ -642,8 +835,13 @@ def coverage(returns: pd.DataFrame, crises: Sequence[Crisis] = CRISES) -> dict:
     return {"first_day": first_day, "crises": per_crisis}
 
 
-def report(returns: pd.DataFrame) -> dict:
-    """Everything this module measures, as one structure."""
+def report(returns: pd.DataFrame, book: Optional[dict] = None) -> dict:
+    """Everything this module measures, as one structure.
+
+    ``book`` is an optional ``logs/book.json``-shaped snapshot. Supplying it
+    adds the one section here that is about a specific account rather than
+    the watchlist in general -- see ``joint_stress_loss``.
+    """
     stress = stress_index(returns)
     # Two different reference series, on purpose. The stress *window* is the
     # equity market's worst days, because "the day the book was hurting" is a
@@ -670,6 +868,12 @@ def report(returns: pd.DataFrame) -> dict:
         "group_cohesion": cohesion(returns),
         "group_cohesion_by_crisis": cohesion_by_crisis(returns),
         "cross_group": [p.as_dict() for p in crossed],
+        "risk_axis": risk_axis(returns, stress),
+        "joint_stress": (
+            joint_stress_loss(returns, *positions_from_book(book))
+            if book and book.get("equity")
+            else None
+        ),
     }
 
 
@@ -815,6 +1019,80 @@ def render(data: dict) -> str:
             "factor the gross cap already bounds)"
         )
 
+    axis = data.get("risk_axis")
+    if axis:
+        lines += [
+            "",
+            "## Do bonds and stocks move together? (raw r, not excess)",
+            "",
+            "The two caps that bound the most of this book -- Duration's own "
+            "ceiling and the net stock-market limit -- are separate budgets "
+            "that never look at each other. Whether that is sound depends on "
+            "the sign below, and only on the sign. This is the one table here "
+            "reported RAW: the common equity factor removed everywhere else "
+            "is exactly what is being asked about.",
+            "",
+            f"{'window':<26} {'raw r':>7}",
+            f"{'-' * 26} {'-' * 7}",
+        ]
+        for label, key in (("last year", "recent"), ("long (250d)", "long"),
+                           ("equity stress days", "stress")):
+            lines.append(f"{label:<26} {cell(axis['windows'].get(key)):>7}")
+        if axis["by_crisis"]:
+            lines += ["", f"{'crisis':<26} {'raw r':>7} {'days':>6}",
+                      f"{'-' * 26} {'-' * 7} {'-' * 6}"]
+            for short, row in axis["by_crisis"].items():
+                lines.append(f"{short:<26} {cell(row['raw']):>7} {row['days']:>6}")
+        lines += ["", "What it means for a book holding both:"]
+        if axis["sign_is_stable"] is False:
+            lines += [
+                "  The sign CHANGES between regimes. No fixed rule relating the",
+                "  two caps can then be right in all of them: a duration leg that",
+                "  hedges the stock book in one crisis doubles it in the next.",
+            ]
+        elif axis["doubled_when_same_sign"] is True:
+            lines += [
+                "  r > 0 throughout: long stocks with LONG duration is one bet",
+                "  made twice, and so is short with short. Opposite signs hedge.",
+            ]
+        elif axis["doubled_when_same_sign"] is False:
+            lines += [
+                "  r < 0 throughout: long stocks with SHORT duration is one bet",
+                "  made twice, and so is short with long. Same signs hedge.",
+            ]
+        else:
+            lines.append("  Not enough data to say.")
+
+    joint = data.get("joint_stress")
+    if joint:
+        lines += [
+            "",
+            f"## If today's book took each crisis's real move, right now (limit {joint['limit_pct']:.0f}%)",
+            "",
+            "Not a correlation: each ticker's realised return over the window,",
+            "compounded, applied to today's actual position size. The crisis is",
+            "historical; the book is not.",
+            "",
+            f"{'crisis':<26} {'P&L':>10} {'% of equity':>12}  {'held':>4} {'no data':>7}",
+            f"{'-' * 26} {'-' * 10} {'-' * 12}  {'-' * 4} {'-' * 7}",
+        ]
+        for short, row in joint["by_crisis"].items():
+            flag = "  OVER" if row["over_limit"] else ""
+            lines.append(
+                f"{short:<26} {row['pnl_dollars']:>+10,.0f} "
+                f"{row['pnl_pct_of_equity']:>+11.1f}%  {len(row['matched']):>4} "
+                f"{len(row['skipped']):>7}{flag}"
+            )
+        if joint["any_over_limit"]:
+            lines += [
+                "",
+                f"  Worst: {joint['worst_crisis']} at {joint['worst_pct_of_equity']:+.1f}% "
+                f"of equity -- past the {joint['limit_pct']:.0f}% limit. Not enforced yet;",
+                "  see JOINT_STRESS_LIMIT_PCT's docstring for what enforcing it needs.",
+            ]
+        else:
+            lines.append(f"\n  No named crisis, replayed on today's book, breaches {joint['limit_pct']:.0f}%.")
+
     lines += [
         "",
         "Nothing here changes a cap. A finding is promoted by editing",
@@ -835,14 +1113,22 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("--json", action="store_true", dest="as_json")
     parser.add_argument("--tickers", default="",
                         help="comma-separated override of the watchlist")
+    parser.add_argument(
+        "--book", default=None,
+        help="path to a logs/book.json snapshot, to add the joint-stress "
+             "section for that specific account (default: watchlist only)",
+    )
     args = parser.parse_args(argv)
 
     tickers = (
         tuple(t.strip().upper() for t in args.tickers.split(",") if t.strip())
         or DEFAULT_WATCHLIST
     )
+    book = json.loads(Path(args.book).read_text()) if args.book else None
+    if book:
+        tickers = tuple(sorted(set(tickers) | {p["ticker"] for p in book.get("positions", [])}))
     closes = fetch_closes(tickers, start=args.start)
-    data = report(daily_returns(closes))
+    data = report(daily_returns(closes), book=book)
     missing = sorted(set(tickers) - set(closes.columns))
     data["missing"] = missing
     print(json.dumps(data, indent=2) if args.as_json else render(data))
@@ -858,7 +1144,8 @@ __all__ = [
     "HYPOTHESES", "CRISES", "Crisis", "CrisisResult", "PairResult",
     "daily_returns", "stress_index", "basket", "book_factor", "market_residual",
     "correlation", "verdict", "measure_pair", "cohesion", "cohesion_by_crisis",
-    "cross_group", "coverage", "report",
+    "cross_group", "coverage", "report", "risk_axis",
+    "JOINT_STRESS_LIMIT_PCT", "joint_stress_loss", "positions_from_book",
     "fetch_closes", "render", "main",
 ]
 

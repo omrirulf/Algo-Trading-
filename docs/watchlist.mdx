@@ -273,7 +273,7 @@ per-ticker cap satisfied.
 | Limit | Value | What it stops |
 |---|---|---|
 | Exposure group | 25% | A one-bet book. Spans every sleeve, so XOM + `XLE` + `USO` + `UNG` is one energy bet made four times. |
-| Duration group | 30% | Its own ceiling: a cap is a loss budget, and this basket's worst fall was 18.9%. |
+| Duration group | 30% | Its own ceiling, sized on the worst fill the per-position caps actually allow (three funds, not one): 6.8% of the account, calendar-2022 returns. |
 | Net stock-market risk | 60% | The eleven equity groups each bound one sector or region; none bounds what they all share. Counted by beta, so a short offsets a long. |
 | Single-name sleeve | 25% | Stock picking growing past its budget. |
 | Fund sleeve | 70% | — the core allocation. |

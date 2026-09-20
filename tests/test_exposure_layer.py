@@ -89,22 +89,32 @@ def test_treasuries_and_lqd_share_the_30_percent():
 # --------------------------------------------------------------------------- #
 
 
-def test_the_stock_bucket_is_the_equity_groups_plus_four():
+def test_the_stock_bucket_is_the_equity_groups_plus_five():
+    """Plus XLE, XOM (energy stocks), HYG, EMB (credit) and LQD (a second, smaller charge).
+
+    LQD is also a full Duration member -- rates on a quiet day -- so its
+    presence here is not a move, it is a second cap seeing a second risk.
+    """
     equity_groups = (
         "Technology", "Financials", "Health care", "Industrials", "Consumer",
         "Utilities", "Materials", "Real estate", "US broad equity",
         "Developed international", "Emerging markets",
     )
     expected = {t for g in equity_groups for t in EXPOSURE_GROUPS[g]}
-    expected |= {"XLE", "XOM", "HYG", "EMB"}
+    expected |= {"XLE", "XOM", "HYG", "EMB", "LQD"}
     assert set(EQUITY_RISK_BETAS) == expected
     assert all(0 < beta < 3 for beta in EQUITY_RISK_BETAS.values())
 
 
-@pytest.mark.parametrize("outside", ["TLT", "LQD", "GLD", "USO", "DBC", "UNG", "CORN", "UUP", "CPER"])
+@pytest.mark.parametrize("outside", ["TLT", "SHY", "IEF", "TIP", "GLD", "USO", "DBC", "UNG", "CORN", "UUP", "CPER"])
 def test_bonds_commodities_gold_and_the_dollar_are_outside_it(outside):
     assert equity_risk_beta(outside) is None
     assert risk_engine.equity_risk_headroom(EQUITY, outside, "buy", []) is None
+
+
+def test_lqd_counts_small_against_the_stock_limit_too():
+    """The one Duration member with a second life as a credit instrument."""
+    assert equity_risk_beta("LQD") == pytest.approx(0.36)
 
 
 def test_an_unknown_ticker_counts_as_a_full_unit_of_market():
@@ -195,3 +205,51 @@ def test_the_engine_still_allows_a_bond_buy_when_stocks_are_full(broker, market)
         LLMSignal(ticker="IEF", bias=Bias.BULLISH, conviction=0.9, rationale="x")
     )
     assert result.status is ExecutionStatus.ACCEPTED
+
+
+# --------------------------------------------------------------------------- #
+# HYG and EMB's interest-rate risk, folded into the Duration group's own cap
+# --------------------------------------------------------------------------- #
+
+
+def test_hyg_and_emb_add_a_rate_charge_to_duration_on_top_of_their_own_group():
+    """A short in a credit fund creates room against the stock cap and adds
+
+    real rate exposure. That exposure is not free: it also owes the Duration
+    group cap, at its own duration-equivalent weight (HYG 0.30, EMB 0.65),
+    while HYG and EMB themselves are still charged in full to Credit.
+    """
+    book = [short("HYG", 10_000.0), short("EMB", 10_000.0)]
+    headroom = risk_engine.exposure_group_headroom(EQUITY, "TLT", book)
+    duration_cap = EQUITY * cfg.EXPOSURE_GROUP_CAP_OVERRIDES["Duration"]
+    expected_used = 10_000.0 * 0.30 + 10_000.0 * 0.65
+    assert headroom == pytest.approx(duration_cap - expected_used)
+
+    # And Credit still sees them at their own full value -- this is a second
+    # charge, not a move.
+    credit_headroom = risk_engine.exposure_group_headroom(EQUITY, "EMB", book)
+    credit_cap = EQUITY * cfg.MAX_EXPOSURE_GROUP_PCT
+    assert credit_headroom == pytest.approx(credit_cap - 20_000.0)
+
+
+def test_existing_duration_members_are_not_double_charged():
+    """LQD is a full Duration member: it must count once, not at 1.0 + 0.65."""
+    book = [long("LQD", 10_000.0)]
+    headroom = risk_engine.exposure_group_headroom(EQUITY, "TLT", book)
+    duration_cap = EQUITY * cfg.EXPOSURE_GROUP_CAP_OVERRIDES["Duration"]
+    assert headroom == pytest.approx(duration_cap - 10_000.0)
+
+
+def test_groups_over_cap_sees_the_hyg_emb_rate_charge_too():
+    """The trim pass must see the same total the entry-time check does."""
+    book = [short("HYG", 60_000.0), short("EMB", 40_000.0)]
+    # 60_000*0.30 + 40_000*0.65 = 18_000 + 26_000 = 44_000, over the 30_000 cap
+    over = risk_engine.groups_over_cap(EQUITY, book)
+    assert over["Duration"] == pytest.approx(44_000.0 - 30_000.0)
+
+
+def test_a_book_with_no_duration_and_no_credit_reports_no_duration_excess():
+    """The Duration key must not appear out of thin air for an unrelated book."""
+    book = [long("NVDA", 10_000.0)]
+    over = risk_engine.groups_over_cap(EQUITY, book)
+    assert "Duration" not in over
