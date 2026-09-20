@@ -265,3 +265,23 @@ def test_the_workflow_writes_and_commits_the_snapshot():
     assert publish["if"] == step["if"]
     assert "bash dashboard/publish.sh" in publish["run"] and "::warning::" in publish["run"]
     assert publish["env"]["GH_TOKEN"] == "${{ github.token }}"
+
+
+def test_the_duration_group_row_carries_hyg_and_embs_rate_charge_too(logs):
+    """The dashboard must show the same Duration total the risk engine enforces.
+
+    HYG and EMB are grouped with Credit, but each also owes Duration a
+    fraction of its market value for the interest-rate risk neither Credit
+    nor the stock-market limit measures.
+    """
+    audit, journal = logs
+    write(audit, entry("EMB", 100.0, 104.0, 100, side="sell"),
+          managed("EMB", "held", "2026-09-17 15:47:00,000", price=100.0, remaining=100, new_stop=104.0))
+    write(journal, journal_line("EMB", "2026-09-17T15:48:00+00:00", equity=100_000.0))
+    snap = book.build(audit, journal, DAY)
+    by_label = {g["label"]: g for g in snap["exposure"]["groups"]}
+    # EMB is charged in full to its own group (Credit) and, on top of that,
+    # a duration-equivalent slice (weight 0.65) against Duration -- a second
+    # charge, not a move.
+    assert by_label["Credit"]["used"] == pytest.approx(10_000.0)
+    assert by_label["Duration"]["used"] == pytest.approx(6_500.0)

@@ -76,6 +76,7 @@ from __future__ import annotations
 import argparse
 import json
 from dataclasses import asdict, dataclass
+from pathlib import Path
 from typing import Optional, Sequence
 
 import numpy as np
@@ -714,6 +715,92 @@ def risk_axis(
     }
 
 
+#: A reporting threshold, not yet an enforced cap. It has not been given the
+#: same treatment MAX_EQUITY_RISK_PCT and EXPOSURE_GROUP_CAP_OVERRIDES have --
+#: a number hand-verified and written into config/settings.py -- because
+#: turning this into a live, order-blocking limit needs per-ticker crisis
+#: shocks sourced with that same rigor, and enforcing it would also mean
+#: deciding HOW: at entry, like the group caps, or as a retroactive trim,
+#: like Duration's. Both are open questions. Until then this prints a number
+#: for a person to act on, exactly like everything else in this module.
+JOINT_STRESS_LIMIT_PCT: float = 0.15
+
+
+def joint_stress_loss(
+    returns: pd.DataFrame,
+    positions: Sequence[tuple[str, float]],
+    equity: float,
+    crises: Sequence[Crisis] = CRISES,
+) -> dict:
+    """What TODAY's actual book would have lost, had each crisis happened to it now.
+
+    Unlike everything else in this module, this is not a correlation. It is
+    each ticker's *realised*, compounded return over the crisis window,
+    applied to *today's* position size. The crisis is historical; the book
+    is not -- this answers "what would this book lose", never "what did some
+    other book lose in 2008".
+
+    Answers the question Duration's own cap and the stock-market cap cannot
+    answer separately: not "is either sleeve over its own limit" but "if the
+    worst joint move on record happened today, how much of the account goes
+    at once". risk_axis() found the two sleeves' correlation changes sign
+    between regimes; this is what that means in dollars, for the book that
+    actually exists right now, rather than for a stylised basket.
+
+    ``positions`` is (ticker, signed dollar exposure) pairs in today's
+    dollars -- positive for long, negative for short. A ticker with no price
+    data over a window is skipped and named rather than assumed flat, so a
+    thin crisis (a ticker that did not exist yet) is visible as thin, not
+    silently treated as safe.
+    """
+    if equity <= 0:
+        raise ValueError(f"equity must be positive, got {equity}")
+    by_crisis: dict[str, dict] = {}
+    for crisis in crises:
+        pnl, matched, skipped = 0.0, [], []
+        for ticker, dollars in positions:
+            if ticker not in returns.columns:
+                skipped.append(ticker)
+                continue
+            window = returns[ticker].loc[crisis.start:crisis.end].dropna()
+            if window.empty:
+                skipped.append(ticker)
+                continue
+            total_return = float((1.0 + window).prod() - 1.0)
+            pnl += dollars * total_return
+            matched.append(ticker)
+        pct = pnl / equity * 100.0
+        by_crisis[crisis.short] = {
+            "label": crisis.label,
+            "pnl_dollars": round(pnl, 2),
+            "pnl_pct_of_equity": round(pct, 2),
+            "over_limit": pct <= -JOINT_STRESS_LIMIT_PCT * 100.0,
+            "matched": sorted(matched),
+            "skipped": sorted(skipped),
+        }
+    worst = min(by_crisis.items(), key=lambda kv: kv[1]["pnl_pct_of_equity"], default=(None, None))
+    return {
+        "limit_pct": JOINT_STRESS_LIMIT_PCT * 100.0,
+        "by_crisis": by_crisis,
+        "worst_crisis": worst[0],
+        "worst_pct_of_equity": worst[1]["pnl_pct_of_equity"] if worst[1] else None,
+        "any_over_limit": any(row["over_limit"] for row in by_crisis.values()),
+    }
+
+
+def positions_from_book(book: dict) -> tuple[list[tuple[str, float]], Optional[float]]:
+    """Adapt a ``logs/book.json`` snapshot into what ``joint_stress_loss`` wants.
+
+    Reads the same ``side``/``market_value`` fields ``risk_engine.net_equity_risk``
+    does, so a short reduces the signed exposure rather than adding to it.
+    """
+    positions = [
+        (p["ticker"], p["market_value"] * (-1.0 if p.get("side") == "sell" else 1.0))
+        for p in book.get("positions", [])
+    ]
+    return positions, book.get("equity")
+
+
 def coverage(returns: pd.DataFrame, crises: Sequence[Crisis] = CRISES) -> dict:
     """Which tickers existed when -- without this the crisis table lies.
 
@@ -748,8 +835,13 @@ def coverage(returns: pd.DataFrame, crises: Sequence[Crisis] = CRISES) -> dict:
     return {"first_day": first_day, "crises": per_crisis}
 
 
-def report(returns: pd.DataFrame) -> dict:
-    """Everything this module measures, as one structure."""
+def report(returns: pd.DataFrame, book: Optional[dict] = None) -> dict:
+    """Everything this module measures, as one structure.
+
+    ``book`` is an optional ``logs/book.json``-shaped snapshot. Supplying it
+    adds the one section here that is about a specific account rather than
+    the watchlist in general -- see ``joint_stress_loss``.
+    """
     stress = stress_index(returns)
     # Two different reference series, on purpose. The stress *window* is the
     # equity market's worst days, because "the day the book was hurting" is a
@@ -777,6 +869,11 @@ def report(returns: pd.DataFrame) -> dict:
         "group_cohesion_by_crisis": cohesion_by_crisis(returns),
         "cross_group": [p.as_dict() for p in crossed],
         "risk_axis": risk_axis(returns, stress),
+        "joint_stress": (
+            joint_stress_loss(returns, *positions_from_book(book))
+            if book and book.get("equity")
+            else None
+        ),
     }
 
 
@@ -966,6 +1063,36 @@ def render(data: dict) -> str:
         else:
             lines.append("  Not enough data to say.")
 
+    joint = data.get("joint_stress")
+    if joint:
+        lines += [
+            "",
+            f"## If today's book took each crisis's real move, right now (limit {joint['limit_pct']:.0f}%)",
+            "",
+            "Not a correlation: each ticker's realised return over the window,",
+            "compounded, applied to today's actual position size. The crisis is",
+            "historical; the book is not.",
+            "",
+            f"{'crisis':<26} {'P&L':>10} {'% of equity':>12}  {'held':>4} {'no data':>7}",
+            f"{'-' * 26} {'-' * 10} {'-' * 12}  {'-' * 4} {'-' * 7}",
+        ]
+        for short, row in joint["by_crisis"].items():
+            flag = "  OVER" if row["over_limit"] else ""
+            lines.append(
+                f"{short:<26} {row['pnl_dollars']:>+10,.0f} "
+                f"{row['pnl_pct_of_equity']:>+11.1f}%  {len(row['matched']):>4} "
+                f"{len(row['skipped']):>7}{flag}"
+            )
+        if joint["any_over_limit"]:
+            lines += [
+                "",
+                f"  Worst: {joint['worst_crisis']} at {joint['worst_pct_of_equity']:+.1f}% "
+                f"of equity -- past the {joint['limit_pct']:.0f}% limit. Not enforced yet;",
+                "  see JOINT_STRESS_LIMIT_PCT's docstring for what enforcing it needs.",
+            ]
+        else:
+            lines.append(f"\n  No named crisis, replayed on today's book, breaches {joint['limit_pct']:.0f}%.")
+
     lines += [
         "",
         "Nothing here changes a cap. A finding is promoted by editing",
@@ -986,14 +1113,22 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("--json", action="store_true", dest="as_json")
     parser.add_argument("--tickers", default="",
                         help="comma-separated override of the watchlist")
+    parser.add_argument(
+        "--book", default=None,
+        help="path to a logs/book.json snapshot, to add the joint-stress "
+             "section for that specific account (default: watchlist only)",
+    )
     args = parser.parse_args(argv)
 
     tickers = (
         tuple(t.strip().upper() for t in args.tickers.split(",") if t.strip())
         or DEFAULT_WATCHLIST
     )
+    book = json.loads(Path(args.book).read_text()) if args.book else None
+    if book:
+        tickers = tuple(sorted(set(tickers) | {p["ticker"] for p in book.get("positions", [])}))
     closes = fetch_closes(tickers, start=args.start)
-    data = report(daily_returns(closes))
+    data = report(daily_returns(closes), book=book)
     missing = sorted(set(tickers) - set(closes.columns))
     data["missing"] = missing
     print(json.dumps(data, indent=2) if args.as_json else render(data))
@@ -1009,7 +1144,8 @@ __all__ = [
     "HYPOTHESES", "CRISES", "Crisis", "CrisisResult", "PairResult",
     "daily_returns", "stress_index", "basket", "book_factor", "market_residual",
     "correlation", "verdict", "measure_pair", "cohesion", "cohesion_by_crisis",
-    "cross_group", "coverage", "report",
+    "cross_group", "coverage", "report", "risk_axis",
+    "JOINT_STRESS_LIMIT_PCT", "joint_stress_loss", "positions_from_book",
     "fetch_closes", "render", "main",
 ]
 

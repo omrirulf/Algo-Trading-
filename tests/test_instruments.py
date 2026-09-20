@@ -248,11 +248,18 @@ def test_the_whole_curve_plus_credit_shares_one_ceiling(broker, market):
 
 
 def test_the_rate_bet_is_not_bounded_by_the_stock_limit(broker, market):
-    """Bonds are outside the stock bucket, so they never consume its room."""
+    """Pure-rate Treasuries are outside the stock bucket and never consume its room.
+
+    LQD is the deliberate exception: it is a rate instrument on a quiet day
+    and an equity instrument in a credit crisis (NBER WP 27168), so it counts
+    at a small beta against the stock limit *in addition to* being a full
+    Duration member -- both caps see it, at the size each actually risks.
+    """
     from config.instruments import equity_risk_beta
 
-    for ticker in ("SHY", "IEF", "TLT", "TIP", "LQD"):
+    for ticker in ("SHY", "IEF", "TLT", "TIP"):
         assert equity_risk_beta(ticker) is None
+    assert equity_risk_beta("LQD") == pytest.approx(0.36)
 
 
 def test_groups_over_cap_is_empty_for_a_compliant_book():

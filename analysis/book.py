@@ -43,7 +43,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from analysis import health  # noqa: E402
 from config import settings as cfg  # noqa: E402
 from config.instruments import (  # noqa: E402
-    InstrumentKind, equity_risk_beta, group_for, kind_for, name_for, sleeve_label,
+    InstrumentKind, duration_rate_weight, equity_risk_beta, group_for, kind_for,
+    name_for, sleeve_label,
 )
 
 ENTRY_EVENT = "signal_processed"
@@ -210,6 +211,17 @@ def exposure_from(open_positions: list[dict], equity: Optional[float]) -> dict:
     for p in open_positions:
         by_group[p["group"]] += p["market_value"]
         by_sleeve["single names" if p["kind"] == InstrumentKind.EQUITY.value else "funds"] += p["market_value"]
+    # HYG and EMB carry real interest-rate duration that neither their own
+    # group (Credit) nor the stock-market limit measures. That charge lands
+    # on Duration too, on top of its five members, at each ticker's
+    # duration-equivalent weight -- see risk_engine._group_market_value,
+    # which this mirrors so the dashboard shows the number the engine
+    # actually enforces.
+    for p in open_positions:
+        if p["group"] != "Duration":
+            weight = duration_rate_weight(p["ticker"])
+            if weight is not None:
+                by_group["Duration"] += p["market_value"] * weight
 
     def cap(label: str, used: float, pct: float) -> dict:
         limit = equity * pct if equity else None

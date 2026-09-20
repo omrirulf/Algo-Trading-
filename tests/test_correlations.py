@@ -667,3 +667,93 @@ def test_the_report_carries_the_axis_and_the_render_prints_it():
     text = corr.render(data)
     assert "Do bonds and stocks move together?" in text
     assert "raw" in text.lower()
+
+
+# --------------------------------------------------------------------------- #
+# The joint stress test: what today's book would lose if a crisis replayed
+# --------------------------------------------------------------------------- #
+
+
+def test_a_long_book_loses_the_realised_crisis_return_on_todays_dollars():
+    """Not a correlation: an actual compounded return, on actual position size."""
+    crises = (corr.Crisis("Test crash", "T", "2024-02-01", "2024-02-29"),)
+    index = days(60)
+    # A single -20% day inside the window -- total return is exactly -0.20,
+    # with no compounding arithmetic to get right in the test itself.
+    ret = pd.Series(0.0, index=index)
+    ret.loc["2024-02-15"] = -0.20
+    returns = pd.DataFrame({"XYZ": ret})
+    out = corr.joint_stress_loss(returns, [("XYZ", 10_000.0)], equity=100_000.0, crises=crises)
+    row = out["by_crisis"]["T"]
+    assert row["pnl_dollars"] == pytest.approx(-2_000.0)
+    assert row["pnl_pct_of_equity"] == pytest.approx(-2.0)
+
+
+def test_a_short_position_gains_when_the_underlying_falls():
+    crises = (corr.Crisis("Test crash", "T", "2024-02-01", "2024-02-29"),)
+    index = days(60)
+    ret = pd.Series(0.0, index=index)
+    ret.loc["2024-02-15"] = -0.20
+    returns = pd.DataFrame({"XYZ": ret})
+    # Short 10,000 -> signed exposure is negative.
+    out = corr.joint_stress_loss(returns, [("XYZ", -10_000.0)], equity=100_000.0, crises=crises)
+    assert out["by_crisis"]["T"]["pnl_dollars"] == pytest.approx(2_000.0)
+
+
+def test_a_position_with_no_data_over_the_window_is_skipped_and_named():
+    crises = (corr.Crisis("Test crash", "T", "2024-02-01", "2024-02-29"),)
+    returns = pd.DataFrame({"XYZ": pd.Series(0.0, index=days(60))})
+    out = corr.joint_stress_loss(
+        returns, [("XYZ", 5_000.0), ("NEWCO", 5_000.0)], equity=100_000.0, crises=crises,
+    )
+    row = out["by_crisis"]["T"]
+    assert row["matched"] == ["XYZ"]
+    assert row["skipped"] == ["NEWCO"]
+
+
+def test_the_worst_crisis_and_the_over_limit_flag_are_reported():
+    crises = (
+        corr.Crisis("Mild", "M", "2024-02-01", "2024-02-29"),
+        corr.Crisis("Severe", "S", "2024-06-03", "2024-06-28"),
+    )
+    index = days(200)
+    ret = pd.Series(0.0, index=index)
+    ret.loc["2024-02-15"] = -0.05
+    ret.loc["2024-06-14"] = -0.30
+    returns = pd.DataFrame({"XYZ": ret})
+    out = corr.joint_stress_loss(returns, [("XYZ", 60_000.0)], equity=100_000.0, crises=crises)
+    assert out["worst_crisis"] == "S"
+    assert out["by_crisis"]["S"]["over_limit"] is True
+    assert out["by_crisis"]["M"]["over_limit"] is False
+    assert out["any_over_limit"] is True
+
+
+def test_positions_from_book_reads_side_the_same_way_the_risk_engine_does():
+    book = {"equity": 50_000.0, "positions": [
+        {"ticker": "TLT", "market_value": 4_000.0, "side": "sell"},
+        {"ticker": "NVDA", "market_value": 3_000.0, "side": "buy"},
+    ]}
+    positions, equity = corr.positions_from_book(book)
+    assert equity == 50_000.0
+    assert dict(positions) == {"TLT": -4_000.0, "NVDA": 3_000.0}
+
+
+def test_report_carries_no_joint_stress_section_without_a_book():
+    n = 60
+    returns = frame(RSP=noise(n, 100), TLT=noise(n, 101))
+    data = corr.report(returns)
+    assert data["joint_stress"] is None
+    assert "If today's book" not in corr.render(data)
+
+
+def test_report_adds_the_joint_stress_section_when_a_book_is_supplied():
+    n = 300
+    index = days(n)
+    ret = pd.Series(noise(n, 102), index=index)
+    returns = pd.DataFrame({"RSP": ret, "TLT": noise(n, 103)}, index=index)
+    book = {"equity": 100_000.0, "positions": [
+        {"ticker": "RSP", "market_value": 20_000.0, "side": "buy"},
+    ]}
+    data = corr.report(returns, book=book)
+    assert data["joint_stress"] is not None
+    assert "If today's book" in corr.render(data)
