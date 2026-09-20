@@ -1,6 +1,6 @@
 ---
 title: "Testing"
-description: "1957 tests, zero network calls, zero credentials"
+description: "2062 tests, zero network calls, zero credentials"
 ---
 
 ```bash
@@ -101,7 +101,7 @@ before the fixture replaces it.
 | `test_compare_configs.py` | 20 | That agreement is measured against the incumbent and never reported as correctness, that an unjudgeable cell reports unknown rather than passing, that trade-agreement is stricter than bias agreement, and that the report states its own limits. |
 | `test_replay_rebuild.py` | 33 | That a replayed prompt is byte-identical to the one the model was shown — including the nested `InsiderTrade` objects `asdict()` flattens, which was proved load-bearing by removal — plus schema drift tolerated in both directions and a context without a ticker refused rather than invented. The section list is derived from `TickerContext`'s own annotations rather than hand-maintained, so all fourteen sections round-trip, not just the four a fund never had; one test replays all 364 real fund lines in the committed journal as a fixed point. |
 | `test_replay_runner.py` | 24 | Loading (a truncated line skipped, a no-signal cycle still replayable), every model failure reported rather than raised, and change graded by consequence: a bias flip and a floor crossing count, a 0.05 conviction move does not. |
-| `test_screening_replay.py` | 14 | That a screening candidate is validated against the recorded *screen*, never the recorded final signal — the two differ on any line the screen escalated, and grading a candidate against the full model's answer would be grading it on a question production never asked it. Also: the per-entry system prompt matches what production actually sent (trimmed fund prompt included), `reasoning=False` on every candidate call, an unpriced candidate reporting cost as `None` rather than `$0`, and a line with no recorded screen never reaching the candidate at all. |
+| `test_screening_replay.py` | 21 | That a screening candidate is validated against the recorded *screen*, never the recorded final signal — the two differ on any line the screen escalated, and grading a candidate against the full model's answer would be grading it on a question production never asked it. Also: the per-entry system prompt matches what production actually sent (trimmed fund prompt included), `reasoning=False` on every candidate call, an unpriced candidate reporting cost as `None` rather than `$0`, a line with no recorded screen never reaching the candidate at all, that escalation recall — not the symmetric trade-agreement floor — gates the pass/fail verdict, and that a sample under 100 lines is flagged rather than trusted. |
 | `test_analysis_scoring.py` | 20 | The scorer end to end on a synthetic price series, plus report honesty: small samples flagged, NEUTRAL excluded, an all-pending journal still rendering. |
 
 ## A test suite is only as good as its negative cases

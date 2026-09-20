@@ -119,15 +119,15 @@ saving; it cannot reach a trade.
 
 ```bash
 # Nothing calls the candidate; just say how many recorded lines are comparable
-python replay/compare_screening.py --limit 50 --dry-run
+python replay/compare_screening.py --limit 200 --dry-run
 
 # A local Ollama model
 python replay/compare_screening.py --base-url http://localhost:11434/v1 \
-    --model qwen2.5:14b --limit 50
+    --model qwen2.5:14b --limit 200
 
 # A hosted free/cheap tier
 python replay/compare_screening.py --base-url https://api.groq.com/openai/v1 \
-    --model llama-3.1-8b-instant --api-key "$GROQ_API_KEY" --limit 50
+    --model llama-3.1-8b-instant --api-key "$GROQ_API_KEY" --limit 200
 ```
 
 `compare_models.py` asks which Claude tier is cheapest; this asks a narrower
@@ -144,10 +144,29 @@ agree with what Haiku actually said on the same recorded lines.
   off, or the screen itself errored) is skipped, not counted as a pass.
 </Warning>
 
-Same pre-registered floor as the staircase walk (90% trade-agreement) and the
-same limits: agreement is not correctness, and a high failure rate silently
-reverts every one of those lines to the full model, which erases the saving
-without ever risking a bad trade.
+Two numbers are reported, and they are not interchangeable. **Trade
+agreement** (90% floor, same as the staircase walk) is symmetric: it counts a
+candidate that flips a NEUTRAL into a trade the same as one that flips a
+trade into NEUTRAL. **Escalation recall** (95% floor) is not, and is what
+actually gates the verdict: of the lines Haiku's screen called directional,
+the share the candidate also escalated. The reason is cost, not pedantry -- a
+candidate that quietly turns a tradeable name NEUTRAL costs a trade
+production's funnel can never recover, because the full model is never asked
+about a NEUTRAL screen. A candidate that escalates a name Haiku would have
+screened out costs one avoidable full-model call. A high trade-agreement
+score can still hide a candidate that is failing exactly the first way, which
+is what recall exists to catch.
+
+<Note>
+  The default sample is 200 lines, not 50: at 45/50 (90%) the 95% confidence
+  interval is roughly 78-96%, which cannot actually certify a 90% floor. A
+  run under 100 comparable lines is flagged in the output as a first look, not
+  evidence.
+</Note>
+
+Same limits as the staircase walk otherwise: agreement is not correctness,
+and a high failure rate silently reverts every one of those lines to the full
+model, which erases the saving without ever risking a bad trade.
 
 ## Stage zero: what the book already holds
 

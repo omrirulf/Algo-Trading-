@@ -26,6 +26,18 @@ production never put to it. A line with no recorded screen (screening was
 off, or the screen itself errored that day) has nothing honest to compare
 against and is skipped, not silently treated as a pass.
 
+Agreement is reported, and so is a second, stricter number: escalation
+*recall* -- of the lines where Haiku's screen was directional, the share the
+candidate also called directional. The two errors an agreement floor treats
+alike are not alike in cost. A candidate that quietly turns a tradeable name
+NEUTRAL costs a trade production's funnel can never recover, because the full
+model is never asked about a NEUTRAL screen. A candidate that escalates a
+name Haiku would have screened out costs one avoidable full-model call. A
+symmetric floor can pass a candidate that is quietly turning winners into
+NEUTRAL as long as it makes up the percentage elsewhere; recall cannot be
+fooled that way, which is why it -- not trade agreement -- is what gates the
+verdict below.
+
 Like ``compare_models.py``, this has no path to the execution engine and
 tells you agreement and cost, never correctness -- see that module's
 docstring for why, and ``analysis/score_journal.py`` for the only tool that
@@ -41,6 +53,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from app.schemas import Bias  # noqa: E402
 from config import settings as cfg  # noqa: E402
 from orchestrator.llm import AnthropicSignalProvider, OpenAICompatibleProvider  # noqa: E402
 from replay import runner  # noqa: E402
@@ -53,15 +66,31 @@ from replay.compare_configs import Cell, clears_floor  # noqa: E402
 #: different number.
 DEFAULT_FLOOR = 0.90
 
+#: What share of Haiku's directional calls the candidate must also escalate.
+#: Set apart from, and higher than, DEFAULT_FLOOR: a missed escalation is a
+#: silently lost trade, not a merely different one, so this is the number
+#: that gates the verdict -- see the module docstring for why the two are not
+#: interchangeable.
+DEFAULT_RECALL_FLOOR = 0.95
+
+#: Below this many compared lines, a passing number is not yet evidence. At
+#: 45/50 (90%) the 95% confidence interval is roughly 78-96% -- wide enough
+#: to certify nothing. This is a printed warning, not a refusal: a small
+#: sample is still the right first look, just not the last one.
+MIN_TRUSTWORTHY_SAMPLE = 100
+
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Compare a candidate screening endpoint against the recorded Haiku screen."
     )
     parser.add_argument("--journal", type=Path, default=cfg.SIGNAL_JOURNAL_PATH)
-    parser.add_argument("--limit", type=int, default=50,
-                        help="most recent journal lines to consider (default 50). "
-                             "Lines with no recorded screen are skipped, not padded back in.")
+    parser.add_argument("--limit", type=int, default=200,
+                        help="most recent journal lines to consider (default 200 -- "
+                             "raised from an earlier 50, which cannot actually certify "
+                             "a 90%% floor: at 45/50 the 95%% confidence interval is "
+                             "roughly 78-96%%). Lines with no recorded screen are "
+                             "skipped, not padded back in.")
     parser.add_argument("--base-url", type=str, default="",
                         help="OpenAI-compatible base URL, e.g. http://localhost:11434/v1. "
                              "Required unless --dry-run.")
@@ -70,7 +99,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--api-key", type=str, default="",
                         help="Bearer token for --base-url, if it wants one.")
     parser.add_argument("--floor", type=float, default=DEFAULT_FLOOR,
-                        help=f"agreement the candidate must clear to be acceptable (default {DEFAULT_FLOOR})")
+                        help=f"trade agreement the candidate must clear (default {DEFAULT_FLOOR}). "
+                             "Reported, but recall -- below -- is what gates the verdict.")
+    parser.add_argument("--recall-floor", type=float, default=DEFAULT_RECALL_FLOOR,
+                        help=f"share of Haiku's directional calls the candidate must also "
+                             f"escalate (default {DEFAULT_RECALL_FLOOR}). A miss here is a "
+                             f"silently lost trade, not just a different one -- see the "
+                             f"module docstring.")
     parser.add_argument("--tickers", type=int, default=0,
                         help="watchlist size to project a monthly bill for "
                              "(default: however many are configured)")
@@ -92,6 +127,34 @@ def _comparable_entries(journal: Path, limit: int) -> tuple[list, int]:
     loaded = list(runner.load_entries(lines))[-limit:]
     comparable = [e for e in loaded if runner.recorded_screen_signal(e) is not None]
     return comparable, len(loaded) - len(comparable)
+
+
+def escalation_recall(diffs: list[SignalDiff]) -> tuple[float | None, int, int]:
+    """Of Haiku's directional calls, the share the candidate also escalated.
+
+    Returns ``(recall, recalled, haiku_escalated)``. ``None`` when Haiku never
+    escalated on any compared line -- there is nothing to have missed, and
+    reporting 100% would flatter a candidate that was never actually tested
+    against this failure mode.
+
+    A candidate that answered ``NEUTRAL`` counts as a miss here exactly like
+    one that never answered at all would -- but a candidate that *errored* on
+    this line never reaches this function, because ``run()`` never builds a
+    diff for an errored call. That asymmetry is deliberate: an error falls
+    through to the full model in production (``apply_screen`` catches it and
+    asks anyway), so it costs one call, not a trade -- the same as an
+    incumbent Haiku screen that errors today. It belongs in ``failure_rate``,
+    not here.
+    """
+    haiku_escalated = [
+        d for d in diffs if d.before is not None and d.before.bias is not Bias.NEUTRAL
+    ]
+    if not haiku_escalated:
+        return None, 0, 0
+    recalled = sum(
+        1 for d in haiku_escalated if d.after is not None and d.after.bias is not Bias.NEUTRAL
+    )
+    return recalled / len(haiku_escalated), recalled, len(haiku_escalated)
 
 
 def _incumbent_reference_cost(entries: list) -> tuple[float | None, int]:
@@ -157,7 +220,14 @@ def run(args: argparse.Namespace) -> int:
         ))
 
     cell = Cell(model=args.model, effort="screen", usages=usages, diffs=diffs, errors=errors)
-    verdict = clears_floor(cell, args.floor)
+    agreement_verdict = clears_floor(cell, args.floor)
+    recall, recalled, haiku_escalated = escalation_recall(diffs)
+    recall_verdict = None if recall is None else recall >= args.recall_floor
+    # Recall gates the overall verdict; trade agreement is reported beside it
+    # but a candidate cannot pass on agreement alone -- see the module
+    # docstring for why the two errors it lumps together are not alike in cost.
+    verdict = recall_verdict if recall_verdict is not None else agreement_verdict
+    small_sample = cell.n < MIN_TRUSTWORTHY_SAMPLE
 
     if args.show_diffs:
         for diff in diffs:
@@ -169,12 +239,18 @@ def run(args: argparse.Namespace) -> int:
             "model": args.model,
             "base_url": args.base_url,
             "floor": args.floor,
+            "recall_floor": args.recall_floor,
             "n": cell.n,
+            "small_sample": small_sample,
             "skipped_no_baseline": skipped,
             "bias_agreement": cell.bias_agreement,
             "tradeable_agreement": cell.tradeable_agreement,
+            "clears_floor": agreement_verdict,
+            "escalation_recall": recall,
+            "escalation_recall_n": haiku_escalated,
+            "clears_recall_floor": recall_verdict,
             "failure_rate": cell.failure_rate,
-            "clears_floor": verdict,
+            "verdict_pass": verdict,
             "candidate_cost_per_call_usd": cell.cost_per_call,
             "candidate_monthly_usd": cell.monthly_usd(args.tickers),
             "incumbent_haiku_cost_per_call_usd": incumbent_cost,
@@ -186,8 +262,14 @@ def run(args: argparse.Namespace) -> int:
     print("=" * 72)
     print(f"Candidate         : {args.model}  ({args.base_url})")
     print(f"Lines compared    : {cell.n}  ({skipped} skipped: no recorded screen)")
+    if small_sample:
+        print(f"                    ** fewer than {MIN_TRUSTWORTHY_SAMPLE} lines -- "
+              f"a passing number here is a first look, not evidence yet **")
     print(f"Bias agreement    : {_pct(cell.bias_agreement)}")
-    print(f"Trade agreement   : {_pct(cell.tradeable_agreement)}  <- the number that matters")
+    print(f"Trade agreement   : {_pct(cell.tradeable_agreement)}  (reported for reference; "
+          f"see escalation recall below for the number that gates the verdict)")
+    print(f"Escalation recall : {_pct(recall)}  of {haiku_escalated} line(s) Haiku escalated, "
+          f"the candidate also escalated {recalled}  <- THE NUMBER THAT MATTERS")
     print(f"Failure rate      : {cell.failure_rate:.0%}  (bad JSON, unreachable, etc. -- "
           f"in production this falls through to the full model, never a bad trade)")
     print(f"Candidate cost    : {_usd(cell.cost_per_call)}/call, "
@@ -198,17 +280,22 @@ def run(args: argparse.Namespace) -> int:
     if verdict is None:
         print("VERDICT: unknown -- nothing comparable came back.")
     elif verdict:
-        print(f"VERDICT: clears the {args.floor:.0%} floor. Safe to point "
-              f"SCREENING_BASE_URL/SCREENING_MODEL at this in production.")
+        print(f"VERDICT: clears the {args.recall_floor:.0%} escalation-recall floor. Safe to "
+              f"point SCREENING_BASE_URL/SCREENING_MODEL at this in production"
+              f"{' once the sample is larger' if small_sample else ''}.")
     else:
-        print(f"VERDICT: below the {args.floor:.0%} floor. Do not flip this on yet.")
+        print(f"VERDICT: below the {args.recall_floor:.0%} escalation-recall floor -- this "
+              f"candidate is quietly turning some of Haiku's tradeable calls into NEUTRAL. "
+              f"Do not flip this on.")
     print()
     print("LIMITS")
     print("-" * 72)
     print("Agreement with Haiku is not correctness -- it says this candidate would")
     print("make the same funnel decisions Haiku did, not that either was right.")
     print("A high failure rate silently reverts every one of those lines to the full")
-    print("model, which erases the saving without ever risking a bad trade.")
+    print("model, which erases the saving without ever risking a bad trade. Recall only")
+    print("sees a candidate that answered; it cannot see a false-NEUTRAL production would")
+    print("have made on a line no recorded screen exists for.")
     return 0
 
 
