@@ -56,8 +56,17 @@ PRICES: Final[dict[str, Price]] = {
     "claude-haiku-4-5": Price(1.00, 5.00),
     # Screening endpoints. Verified 20 Sep 2026 against the providers' public
     # pricing; re-check before trusting a cost report months from now.
+    #
+    # A row is keyed by model name, but an open-weight model's price belongs to
+    # whoever serves it: gpt-oss-20b is $0.03/$0.14 on DeepInfra and
+    # $0.075/$0.30 on Groq, and the journal records only the name. The row
+    # below is DeepInfra's, because Groq's paid tier is closed to new signups
+    # ("Developer tier upgrades are temporarily unavailable"), which makes
+    # DeepInfra the host this model is actually reachable through. Serving it
+    # somewhere else makes this row wrong -- by a factor of about 2.4 for Groq
+    # -- and nothing detects that, so change it when you change host.
     "gemini-3.5-flash-lite": Price(0.30, 2.50),
-    "openai/gpt-oss-20b": Price(0.075, 0.30),
+    "openai/gpt-oss-20b": Price(0.03, 0.14),
 }
 
 #: The cache multipliers above are Anthropic's. Gemini's cache read happens to
