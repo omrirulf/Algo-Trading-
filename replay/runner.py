@@ -250,18 +250,42 @@ def default_completer() -> Completer:
     return complete
 
 
-def measured_completer(model: Optional[str] = None, effort: Optional[str] = None):
+def measured_completer(
+    model: Optional[str] = None,
+    effort: Optional[str] = None,
+    base_url: str = "",
+    api_key: str = "",
+):
     """A completer that also reports what each call cost.
 
     Returns ``(complete, usages)`` -- the list fills as calls are made, so a
     config comparison prices itself from measured tokens rather than an
     assumed output length.
+
+    ``base_url`` sends the question to an OpenAI-compatible endpoint instead
+    of Claude. That exists to ask the *full model's* question of something
+    that is not Claude, which is a much larger claim than moving the screen:
+    the screen only decides who gets asked, and this decides what is traded.
+    The harness takes no view on that -- it reports agreement and cost, and
+    agreement with the incumbent is not correctness. What it does guarantee
+    is that both sides answered the same recorded contexts.
+
+    Reasoning is on either way, because that is how the full model is asked
+    in the cycle. ``effort`` is passed through, so a reasoning model that has
+    no true off switch is compared at the setting it would really run at.
     """
     from config.settings import get_settings
-    from orchestrator.llm import AnthropicSignalProvider
+    from orchestrator.llm import AnthropicSignalProvider, OpenAICompatibleProvider
     from orchestrator.pricing import Usage
 
-    provider = AnthropicSignalProvider(get_settings().anthropic_api_key)
+    if base_url:
+        if not model:
+            raise ValueError("--base-url needs a model name to ask for")
+        provider = OpenAICompatibleProvider(
+            base_url=base_url, model=model, api_key=api_key
+        )
+    else:
+        provider = AnthropicSignalProvider(get_settings().anthropic_api_key)
     usages: list[Usage] = []
 
     def complete(system_prompt: str, user_prompt: str, schema: dict[str, Any]) -> str:

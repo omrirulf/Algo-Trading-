@@ -10,9 +10,24 @@
 Every cell replays the *same* journal contexts, so the only thing that varies
 is the configuration. Cost comes from the API's own token counts.
 
+    # A non-Claude candidate for the FULL model (see the warning below)
+    python replay/compare_models.py --limit 40 \
+        --base-url https://api.deepinfra.com/v1/openai \
+        --only openai/gpt-oss-120b:high --api-key "$KEY"
+
 This cannot tell you which model is *right* -- there is no ground truth for a
 trading signal until the market moves. It tells you what each costs and how
 differently each behaves against the incumbent.
+
+**The 90% floor was written for a choice between Claude tiers, and it does
+not transfer to ``--base-url``.** Moving the screen is a decision about who
+gets *asked*; its worst case is a trade not taken, which is why that tool
+gates on escalation recall. Moving the full model is a decision about what is
+*traded*, and its worst case is a position opened on the wrong side -- an
+actual loss rather than a missed gain. A 90% agreement there means one call in
+ten differs on the question that moves money, and the ten percent is not
+visible in this table as anything but a number. Treat a passing cell as
+permission to look harder, never as permission to switch.
 """
 
 from __future__ import annotations
@@ -54,6 +69,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                              "(default: however many are configured)")
     parser.add_argument("--dry-run", action="store_true",
                         help="print the plan and its call budget; make no calls")
+    parser.add_argument("--base-url", type=str, default="",
+                        help="ask an OpenAI-compatible endpoint instead of Claude, "
+                             "e.g. https://api.deepinfra.com/v1/openai. Use with "
+                             "--only MODEL:EFFORT naming that endpoint's model. This "
+                             "moves the call that DECIDES WHAT IS TRADED, not the "
+                             "screen that decides who gets asked -- read the floor "
+                             "note below before trusting an agreement number here.")
+    parser.add_argument("--api-key", type=str, default="",
+                        help="bearer token for --base-url, if it wants one")
     parser.add_argument("--json", action="store_true", dest="as_json")
     return parser.parse_args(argv)
 
@@ -70,9 +94,21 @@ def cells_to_probe(args: argparse.Namespace) -> list[tuple[str, str]]:
     return chosen
 
 
-def run_cell(entries, model: str, effort: str, baseline_by_key: dict) -> Cell:
-    complete, usages = runner.measured_completer(model=model, effort=effort)
-    results = runner.replay_all(entries, runner.SYSTEM_PROMPT, complete)
+def run_cell(
+    entries, model: str, effort: str, baseline_by_key: dict,
+    base_url: str = "", api_key: str = "",
+) -> Cell:
+    complete, usages = runner.measured_completer(
+        model=model, effort=effort, base_url=base_url, api_key=api_key
+    )
+    # Per-ticker system prompts, not the one shared string: a fund is sent the
+    # macro prompt trimmed to the sections it carried, and the recorded answer
+    # this is graded against was produced that way. Asking a candidate a
+    # different question than the baseline was asked is not a comparison.
+    results = [
+        runner.replay_one(entry, runner.system_prompt_for_entry(entry), complete)
+        for entry in entries
+    ]
     return Cell(
         model=model,
         effort=effort,
@@ -169,7 +205,7 @@ def main(argv: list[str] | None = None) -> int:
     cells: list[Cell] = []
     incumbent: Cell | None = None
     for model, effort in plan:
-        cell = run_cell(entries, model, effort, {})
+        cell = run_cell(entries, model, effort, {}, args.base_url, args.api_key)
         cells.append(cell)
         if clears_floor(cell, args.floor) and (
             incumbent is None

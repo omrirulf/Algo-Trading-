@@ -67,6 +67,13 @@ PRICES: Final[dict[str, Price]] = {
     # -- and nothing detects that, so change it when you change host.
     "gemini-3.5-flash-lite": Price(0.30, 2.50),
     "openai/gpt-oss-20b": Price(0.03, 0.14),
+    # A full-model candidate rather than a screening one, so it is priced
+    # here for the same reason: an unpriced row makes the stage it answers
+    # vanish from the measured bill. Sources disagreed on 20 Sep 2026 --
+    # $0.05/$0.45 and $0.04/$0.17 were both published for DeepInfra -- and
+    # the dearer pair is used, because understating what a replacement costs
+    # is the error that argues for making the swap.
+    "openai/gpt-oss-120b": Price(0.05, 0.45),
 }
 
 #: The cache multipliers above are Anthropic's. Gemini's cache read happens to

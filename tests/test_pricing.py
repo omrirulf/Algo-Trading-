@@ -203,3 +203,17 @@ def test_every_screening_endpoint_is_cheaper_than_the_claude_screen():
         price = pricing.PRICES[model]
         assert price.input_per_mtok < haiku.input_per_mtok, model
         assert price.output_per_mtok < haiku.output_per_mtok, model
+
+
+def test_the_full_model_candidate_prices():
+    assert pricing.price_for("openai/gpt-oss-120b") is pricing.PRICES["openai/gpt-oss-120b"]
+    assert cost_usd(Usage(model="openai/gpt-oss-120b", input_tokens=1000, output_tokens=1000)) > 0
+
+
+def test_a_full_model_candidate_is_cheaper_than_the_model_it_would_replace():
+    """The only reason to move this call is cost; it is not a capability
+    upgrade. A row that is not cheaper than Opus means the table is wrong."""
+    opus = pricing.PRICES["claude-opus-5"]
+    candidate = pricing.PRICES["openai/gpt-oss-120b"]
+    assert candidate.input_per_mtok < opus.input_per_mtok
+    assert candidate.output_per_mtok < opus.output_per_mtok

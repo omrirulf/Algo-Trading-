@@ -154,3 +154,22 @@ def test_the_screen_effort_reaches_the_cycle_too():
     cycle = _step("heartbeat.yml", "cycle", "Run one cycle")["env"]
     assert "screening_effort" in Settings.model_fields
     assert cycle["SCREENING_EFFORT"] == "${{ vars.SCREENING_EFFORT }}"
+
+
+def test_the_model_compare_workflow_is_read_only_about_trading():
+    """It replays recorded contexts against a candidate. Handing it broker
+    credentials would make a measurement tool able to move money."""
+    wf = yaml.safe_load((ROOT / ".github/workflows/model-compare.yml").read_text())
+    for step in wf["jobs"]["compare"]["steps"]:
+        env = step.get("env") or {}
+        for name in env:
+            assert "ALPACA" not in name.upper(), name
+            assert "WEBHOOK" not in name.upper(), name
+
+
+def test_the_model_compare_workflow_resolves_the_same_candidate_key():
+    """One DeepInfra account, one key, whichever spelling it was stored under."""
+    step = _step("model-compare.yml", "compare",
+                 "Could this answer the question Opus answers")["env"]
+    expected = " || ".join("secrets.%s" % n for n in llm.SCREENING_KEY_ENV_VARS)
+    assert step["CANDIDATE_KEY"] == "${{ %s }}" % expected
