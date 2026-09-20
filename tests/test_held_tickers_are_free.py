@@ -17,6 +17,7 @@ import json
 
 import pytest
 
+from config.settings import Settings
 from orchestrator import heartbeat as hb
 from orchestrator.llm import Completion, LLMError
 from orchestrator.pricing import Usage
@@ -34,28 +35,26 @@ def cycle(monkeypatch):
     monkeypatch.setattr(hb, "SCREENING_ENABLED", True)
     monkeypatch.setattr(hb, "fetch_news", lambda t: ["news"])
 
-    # Which ticker is in flight, so a faked answer is for the ticker that was
-    # asked: an answer for another one is dropped, which would read as a skip.
-    asked = {"ticker": ""}
-    build_context = hb.build_context
-
-    def tracked(ticker: str):
-        asked["ticker"] = ticker
-        return build_context(ticker)
-
-    monkeypatch.setattr(hb, "build_context", tracked)
+    # The answer has to name the ticker that was asked about, or it is
+    # dropped and reads as a skip. Taken from the prompt rather than from
+    # whichever context was built last: a batched cycle prepares every ticker
+    # before it asks about any of them, so there is no "current" one.
+    def asked_about(user_prompt: str) -> str:
+        return user_prompt.split("\n", 1)[0].removeprefix("TICKER:").strip()
 
     def screen(system_prompt, user_prompt, schema):
-        calls["screen"].append(asked["ticker"])
+        ticker = asked_about(user_prompt)
+        calls["screen"].append(ticker)
         return Completion(
-            text=json.dumps(_signal(asked["ticker"])),
+            text=json.dumps(_signal(ticker)),
             usage=Usage(model=hb.SCREENING_MODEL, input_tokens=4000, output_tokens=500),
         )
 
     def full(system_prompt, user_prompt, schema):
-        calls["full"].append(asked["ticker"])
+        ticker = asked_about(user_prompt)
+        calls["full"].append(ticker)
         return Completion(
-            text=json.dumps(_signal(asked["ticker"])),
+            text=json.dumps(_signal(ticker)),
             usage=Usage(model=hb.MODEL, input_tokens=4000, output_tokens=500),
         )
 
@@ -150,50 +149,86 @@ class _Book:
         return {"status": "ACCEPTED", "reason": "ok"}
 
 
-def test_the_book_is_read_once_and_its_names_are_skipped(cycle, monkeypatch):
-    monkeypatch.setattr(hb, "get_settings", lambda: type("S", (), {"watchlist_tickers": ("AAPL", "MSFT", "NVDA")})())
+@pytest.fixture
+def watchlist(monkeypatch):
+    """A real Settings object, so a field the cycle learns to read later does
+    not fail here as a missing attribute on a stub."""
+
+    def use(*tickers):
+        monkeypatch.setattr(
+            hb, "get_settings",
+            lambda: Settings(_env_file=None, watchlist=",".join(tickers)),
+        )
+
+    return use
+
+
+def test_the_book_is_read_once_and_its_names_are_skipped(cycle, watchlist):
+    watchlist("AAPL", "MSFT", "NVDA")
     report = hb.run_cycle(_Book(("AAPL", "NVDA")))
     assert {r.ticker for r in report.held} == {"AAPL", "NVDA"}
     assert [r.ticker for r in report.completed] == ["MSFT"]
     assert len(cycle["full"]) == 1
 
 
-def test_an_unreadable_book_reviews_everything(cycle, monkeypatch):
+def test_an_unreadable_book_reviews_everything(cycle, watchlist):
     """The safe direction: pay for the cycle rather than skip a candidate."""
-    monkeypatch.setattr(hb, "get_settings", lambda: type("S", (), {"watchlist_tickers": ("AAPL", "MSFT")})())
+    watchlist("AAPL", "MSFT")
     report = hb.run_cycle(_Book(("AAPL",), error=RuntimeError("broker down")))
     assert report.held == ()
     assert len(report.completed) == 2
 
 
-def test_a_dispatcher_that_cannot_read_a_book_reviews_everything(cycle, monkeypatch):
+def test_a_dispatcher_that_cannot_read_a_book_reviews_everything(cycle, watchlist):
     """Webhook mode holds no broker credentials, so it has no book to read."""
 
     class _NoBook(_Book):
         open_tickers = None
 
-    monkeypatch.setattr(hb, "get_settings", lambda: type("S", (), {"watchlist_tickers": ("AAPL",)})())
+    watchlist("AAPL")
     report = hb.run_cycle(_NoBook())
     assert report.held == ()
     assert len(report.completed) == 1
 
 
-def test_the_book_is_read_after_the_ladder_has_run(monkeypatch):
-    """A position the ladder just closed is a candidate again today."""
+class _Ordered(_Book):
+    """Records which of the two the cycle asked for first."""
+
     order: list[str] = []
 
-    class _Ordered(_Book):
-        def manage_positions(self, protect_only: bool = False):
-            order.append("ladder")
-            return {}
+    def manage_positions(self, protect_only: bool = False):
+        self.order.append("ladder")
+        return {}
 
-        def open_tickers(self):
-            order.append("book")
-            return frozenset()
+    def open_tickers(self):
+        self.order.append("book")
+        return frozenset()
 
-    monkeypatch.setattr(hb, "get_settings", lambda: type("S", (), {"watchlist_tickers": ()})())
-    hb.run_cycle(_Ordered())
-    assert order == ["ladder", "book"]
+
+def test_the_live_cycle_reads_the_book_after_the_ladder(watchlist, monkeypatch):
+    """A position the ladder just closed is a candidate again today."""
+    monkeypatch.setattr(hb.cfg, "USE_BATCH_API", False)
+    watchlist()
+    ordered = _Ordered()
+    ordered.order = []
+    hb.run_cycle(ordered)
+    assert ordered.order == ["ladder", "book"]
+
+
+def test_the_batched_cycle_reads_the_book_before_the_ladder(watchlist, monkeypatch):
+    """Inverted on purpose, and the only ordering a batch can have.
+
+    The prompts are built -- and so the held names dropped -- before either
+    model is asked, which is hours before the answers come back and the ladder
+    can trade. The cost is one cycle of lag: a name the ladder closes today was
+    skipped today and is reviewed tomorrow.
+    """
+    monkeypatch.setattr(hb.cfg, "USE_BATCH_API", True)
+    watchlist()
+    ordered = _Ordered()
+    ordered.order = []
+    hb.run_cycle(ordered)
+    assert ordered.order == ["book", "ladder"]
 
 
 # --- the report ------------------------------------------------------------

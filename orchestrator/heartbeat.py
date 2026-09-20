@@ -57,10 +57,13 @@ from orchestrator.llm import (  # noqa: E402
     SCREENING_ENABLED,
     SCREENING_MODEL,
     AnthropicSignalProvider,
+    BatchRequest,
+    BatchTimeout,
     Completion,
     LLMError,
     OpenAICompatibleProvider,
     SignalProvider,
+    batch_custom_id,
 )
 from app.broker_client import BrokerError  # noqa: E402
 from orchestrator.dispatch import Dispatcher, build_dispatcher  # noqa: E402
@@ -531,6 +534,10 @@ class CycleReport:
     #: What the profit ladder did to the open book before any signal was
     #: judged; ``None`` when the dispatcher cannot manage positions.
     positions: dict | None = None
+    #: The model stages were asked offline, at half price. Recorded because a
+    #: batched cycle is allowed to take much longer than a live one, and a
+    #: summary that did not say so would read as a cycle that hung.
+    batched: bool = False
 
     @property
     def completed(self) -> tuple[TickerResult, ...]:
@@ -885,26 +892,38 @@ def build_context(ticker: str) -> TickerContext:
     return context.gather(ticker, fetch_news(ticker))
 
 
-def process_ticker(
+@dataclass(frozen=True)
+class PreparedTicker:
+    """A ticker whose context is gathered and whose prompts are rendered.
+
+    The half of a cycle that costs no tokens, separated from the half that
+    asks a model. That split is what lets one implementation of each step
+    serve both a live call and a batched one -- and it is why the expensive
+    half can be deferred to a batch that answers later, while this half runs
+    before the market opens.
+    """
+
+    ticker: str
+    context: TickerContext
+    system_prompt: str
+    user_prompt: str
+    gaps: int = 0
+
+    @property
+    def custom_id(self) -> str:
+        """This ticker's key in a batch. Unique within a cycle, which is the scope."""
+        return batch_custom_id(self.ticker)
+
+
+def prepare_ticker(
     ticker: str,
-    dispatcher: Dispatcher | None = None,
     fx: FxRate | None = None,
-    weights: blend.LoadedWeights | None = None,
     held: frozenset[str] = frozenset(),
-) -> TickerResult:
-    """Run one ticker end to end, and report how far it got.
+) -> PreparedTicker | TickerResult:
+    """Gather one ticker's context and render its prompts, or say why not.
 
-    Returns rather than raises on every failure, because one broken ticker
-    must not end the cycle for the other thirty-four. The return value is what
-    lets the cycle notice that *all* of them broke.
-
-    ``weights`` is the cycle's one read of the blend weights; left ``None``,
-    the file is read here, which is what a ticker run on its own gets.
-
-    ``held`` is the cycle's one read of the open book. A ticker in it is
-    journalled and dropped before either model is asked -- see
-    ``SKIP_HELD_TICKERS``. Empty by default, so a ticker run on its own is
-    reviewed whether or not it is held.
+    A ``TickerResult`` back means the ticker is finished before any model was
+    asked: its context could not be gathered, or it is already in the book.
     """
     try:
         ticker_context = build_context(ticker)
@@ -928,11 +947,10 @@ def process_ticker(
     gaps = len(ticker_context.gaps)
 
     # Stage zero, and the only free one. A name already in the book is managed
-    # by the ladder and its stop, both of which ran before this loop and
-    # neither of which needs an opinion; what a fresh signal could add here is
-    # a top-up, at the price of the full funnel. The context above is gathered
-    # and journalled regardless, so the day is not a hole in the record and a
-    # replay can still price what was skipped.
+    # by the ladder and its stop, neither of which needs an opinion; what a
+    # fresh signal could add here is a top-up, at the price of the full funnel.
+    # The context above is gathered and journalled regardless, so the day is
+    # not a hole in the record and a replay can still price what was skipped.
     if cfg.SKIP_HELD_TICKERS and ticker in held:
         log.info("%s: already held; no model asked", ticker)
         journal.record(ticker_context, fx=fx, held=True)
@@ -956,34 +974,70 @@ def process_ticker(
         journal_context_failure(ticker, exc, ticker_context)
         return TickerResult(ticker, CONTEXT_FAILED, gaps=gaps)
 
-    # Stage one. The cheap model reads the same prompt; NEUTRAL ends the
-    # ticker here, journalled, without the expensive call. Any failure of the
-    # screen itself falls through -- a broken screen must not silence the
-    # system -- and the screen's answer is recorded either way so its
-    # false-negative rate is measurable from the journal.
-    screen: dict | None = None
-    if SCREENING_ENABLED:
-        try:
-            first = screen_signal(system_prompt, user_prompt, SIGNAL_JSON_SCHEMA)
-            first_signal = scores_without_a_source(parse_signal(first.text), ticker_context)
-            screen = {
-                "model": SCREENING_MODEL,
-                "bias": first_signal.bias.value,
-                "conviction": first_signal.conviction,
-                "usage": first.usage.as_dict() if first.usage else None,
-            }
-            if first_signal.bias is Bias.NEUTRAL:
-                log.info("%s: screened NEUTRAL by %s; full model not asked", ticker, SCREENING_MODEL)
-                journal.record(ticker_context, first_signal, usage=first.usage, fx=fx, screen=screen)
-                return TickerResult(ticker, SCREENED, gaps=gaps)
-        except (LLMError, json.JSONDecodeError, ValidationError) as exc:
-            log.warning("%s: screen failed (%s); asking the full model", ticker, exc)
-            screen = {"model": SCREENING_MODEL, "error": str(exc)}
+    return PreparedTicker(ticker, ticker_context, system_prompt, user_prompt, gaps)
 
+
+def apply_screen(
+    prepared: PreparedTicker,
+    answer: "Completion | BaseException",
+    fx: FxRate | None = None,
+) -> tuple[dict | None, TickerResult | None]:
+    """Record what the cheap stage said; a NEUTRAL ends the ticker here.
+
+    Returns the journal's screen record and, when the funnel stops, the
+    result that ends this ticker. A screen that *failed* returns a record
+    naming the error and no result -- a broken screen must not silence the
+    system, so the full model is asked anyway.
+
+    Takes the answer as a value, exception included, because a batched screen
+    arrives as one: there is no call to wrap in ``try`` by the time the
+    results come back.
+    """
     try:
-        completion = call_llm(system_prompt, user_prompt, SIGNAL_JSON_SCHEMA)
-        usage = completion.usage
-        signal = scores_without_a_source(parse_signal(completion.text), ticker_context)
+        if isinstance(answer, BaseException):
+            raise answer
+        first_signal = scores_without_a_source(parse_signal(answer.text), prepared.context)
+        # The model that actually answered, not the one configured: with a
+        # provider seam in front of this stage they are not always the same.
+        model = answer.usage.model if answer.usage and answer.usage.model else SCREENING_MODEL
+        screen = {
+            "model": model,
+            "bias": first_signal.bias.value,
+            "conviction": first_signal.conviction,
+            "usage": answer.usage.as_dict() if answer.usage else None,
+        }
+        if first_signal.bias is Bias.NEUTRAL:
+            log.info("%s: screened NEUTRAL by %s; full model not asked", prepared.ticker, model)
+            journal.record(
+                prepared.context, first_signal, usage=answer.usage, fx=fx, screen=screen
+            )
+            return screen, TickerResult(prepared.ticker, SCREENED, gaps=prepared.gaps)
+        return screen, None
+    except (LLMError, json.JSONDecodeError, ValidationError) as exc:
+        log.warning("%s: screen failed (%s); asking the full model", prepared.ticker, exc)
+        return {"model": SCREENING_MODEL, "error": str(exc)}, None
+
+
+def judge_answer(
+    prepared: PreparedTicker,
+    answer: "Completion | BaseException",
+    screen: dict | None = None,
+    dispatcher: Dispatcher | None = None,
+    fx: FxRate | None = None,
+    weights: blend.LoadedWeights | None = None,
+) -> TickerResult:
+    """Everything after the full model answered: parse, blend, dispatch, record.
+
+    Like ``apply_screen``, takes the answer as a value so a batched result and
+    a live one travel the same path from here on.
+    """
+    ticker, ticker_context = prepared.ticker, prepared.context
+    gaps = prepared.gaps
+    try:
+        if isinstance(answer, BaseException):
+            raise answer
+        usage = answer.usage
+        signal = scores_without_a_source(parse_signal(answer.text), ticker_context)
     except LLMError as exc:
         log.error("%s: %s", ticker, exc)
         journal.record(ticker_context, fx=fx, screen=screen, error=str(exc))
@@ -1030,6 +1084,56 @@ def process_ticker(
     return TickerResult(ticker, COMPLETED, status=outcome.get("status"), gaps=gaps)
 
 
+def process_ticker(
+    ticker: str,
+    dispatcher: Dispatcher | None = None,
+    fx: FxRate | None = None,
+    weights: blend.LoadedWeights | None = None,
+    held: frozenset[str] = frozenset(),
+) -> TickerResult:
+    """Run one ticker end to end, live, and report how far it got.
+
+    Returns rather than raises on every failure, because one broken ticker
+    must not end the cycle for the other thirty-four. The return value is what
+    lets the cycle notice that *all* of them broke.
+
+    ``weights`` is the cycle's one read of the blend weights; left ``None``,
+    the file is read here, which is what a ticker run on its own gets.
+
+    ``held`` is the cycle's one read of the open book. A ticker in it is
+    journalled and dropped before either model is asked -- see
+    ``SKIP_HELD_TICKERS``. Empty by default, so a ticker run on its own is
+    reviewed whether or not it is held.
+    """
+    prepared = prepare_ticker(ticker, fx, held)
+    if isinstance(prepared, TickerResult):
+        return prepared
+
+    # Stage one. The cheap model reads the same prompt; NEUTRAL ends the
+    # ticker here, journalled, without the expensive call. The screen's answer
+    # is recorded either way so its false-negative rate is measurable from the
+    # journal.
+    screen: dict | None = None
+    if SCREENING_ENABLED:
+        screen, finished = apply_screen(prepared, _ask(screen_signal, prepared), fx)
+        if finished is not None:
+            return finished
+
+    return judge_answer(prepared, _ask(call_llm, prepared), screen, dispatcher, fx, weights)
+
+
+def _ask(call, prepared: PreparedTicker) -> "Completion | BaseException":
+    """Run one live call, handing back whatever came of it.
+
+    The exception is a return value rather than a raise so that a live answer
+    and a batched one are the same kind of thing to everything downstream.
+    """
+    try:
+        return call(prepared.system_prompt, prepared.user_prompt, SIGNAL_JSON_SCHEMA)
+    except (LLMError, json.JSONDecodeError, ValidationError) as exc:
+        return exc
+
+
 def manage_positions(dispatcher: Dispatcher) -> dict | None:
     """Walk the open book up the profit ladder. Never raises.
 
@@ -1055,6 +1159,177 @@ def manage_positions(dispatcher: Dispatcher) -> dict | None:
             outcome.get("stops_raised", 0), outcome.get("protected", 0),
         )
     return outcome
+
+
+def batch_answers(
+    prepared: tuple[PreparedTicker, ...],
+    live,
+    provider: SignalProvider | None = None,
+    model: str | None = None,
+    reasoning: bool = True,
+    deadline_seconds: float = cfg.BATCH_DEADLINE_SECONDS,
+) -> dict[str, "Completion | BaseException"]:
+    """Ask a whole stage at half price, and pay full price for the stragglers.
+
+    Returns an answer per ticker, whatever it took to get one, so the caller
+    cannot tell a batched answer from a live one -- which is the point: the
+    saving must not change what the cycle does with what comes back.
+
+    The fallback is what makes the saving safe to take. A batch that fails to
+    submit, does not finish inside ``deadline_seconds``, or comes back missing
+    a ticker leaves that ticker to ``live``. The worst case is the bill the
+    cycle already pays today; there is no case where waiting loses a session.
+
+    A provider with no offline mode -- the OpenAI-compatible one -- goes
+    straight to live calls. Nothing is lost: it is there because its tokens
+    are not billed in the first place.
+    """
+    if not prepared:
+        return {}
+
+    provider = provider or AnthropicSignalProvider(get_settings().anthropic_api_key)
+    collected: dict[str, "Completion | LLMError"] = {}
+
+    if hasattr(provider, "submit_batch"):
+        requests = [
+            BatchRequest(
+                p.custom_id, p.system_prompt, p.user_prompt, SIGNAL_JSON_SCHEMA,
+                model=model, reasoning=reasoning,
+            )
+            for p in prepared
+        ]
+        try:
+            batch_id = provider.submit_batch(requests)
+            log.info(
+                "batch %s: %d prompts to %s, waiting up to %.0f min",
+                batch_id, len(requests), model or MODEL, deadline_seconds / 60,
+            )
+            collected = provider.collect_batch(
+                batch_id, model=model, timeout_seconds=deadline_seconds
+            )
+        except BatchTimeout as exc:
+            # The batch is still running and will still be paid for. Its id is
+            # the only way back to those answers, so it goes in the log before
+            # the cycle stops waiting for it.
+            log.warning(
+                "batch %s did not finish in %.0f min; paying full price for %d ticker(s). "
+                "Its answers can still be collected with --resume %s",
+                exc.batch_id, deadline_seconds / 60, len(prepared), exc.batch_id,
+            )
+        except LLMError as exc:
+            log.warning("batch could not be submitted (%s); calling live instead", exc)
+    else:
+        log.info("%s has no batch mode; calling it directly", type(provider).__name__)
+
+    answers: dict[str, "Completion | BaseException"] = {}
+    fell_back = 0
+    for item in prepared:
+        answer = collected.get(item.custom_id)
+        if isinstance(answer, Completion):
+            answers[item.ticker] = answer
+            continue
+        if answer is not None:
+            log.warning("%s: batch answer unusable (%s); asking live", item.ticker, answer)
+        answers[item.ticker] = _ask(live, item)
+        fell_back += 1
+    if fell_back and collected:
+        log.info("%d of %d ticker(s) fell back to a live call", fell_back, len(prepared))
+    return answers
+
+
+def run_batched_cycle(
+    dispatcher: Dispatcher | None = None, premarket: bool = False
+) -> CycleReport:
+    """One cycle, with both model stages asked offline at half price.
+
+    The order differs from the live cycle in one way that matters. The open
+    book is read *before* the ladder walks it, because the prompts are built
+    before either can run and stage zero needs to know what to leave out. The
+    cost is a name the ladder closes today being skipped today and reviewed
+    tomorrow -- one cycle of lag on one ticker, against paying full funnel
+    price for every held name in every cycle.
+
+    ``premarket`` gives up the cheap market-open gate, and is the whole point
+    of batching: the waiting has to happen in the hours before the session, or
+    it happens during it. It is a flag rather than the default because the
+    gate is what stops a holiday from gathering eighty contexts and paying for
+    a batch the engine will then refuse to trade -- roughly ten cycles a year.
+    Only the run that is *meant* to start early gives that up; every other
+    caller still refuses to start when the market is shut.
+    """
+    tickers = tuple(get_settings().watchlist_tickers)
+    dispatcher = dispatcher or build_dispatcher()
+
+    if not premarket:
+        # The same cheap gate the live cycle uses, and for the same reason: a
+        # closed-market cycle wastes news fetches and model calls. An
+        # unreadable clock is not a reason to skip -- the engine fails closed
+        # on its own if it cannot tell either.
+        try:
+            if not dispatcher.is_market_open():
+                log.info("market is closed; skipping cycle")
+                return CycleReport(tickers=tickers, market_closed=True, batched=True)
+        except BrokerError as exc:
+            log.warning("could not read market clock (%s); continuing", exc)
+
+    fx = fetch_fx_rate()
+    if fx.ok:
+        log.info("USD/ILS %.4f", fx.rate)
+    else:
+        log.info("USD/ILS unavailable: %s", fx.gap)
+    weights = blend.load_weights(model=MODEL)
+
+    held = open_tickers(dispatcher) if cfg.SKIP_HELD_TICKERS else frozenset()
+    if held:
+        log.info(
+            "%d of %d already held; no model will be asked for them: %s",
+            len(held & set(tickers)), len(tickers), ", ".join(sorted(held & set(tickers))),
+        )
+
+    log.info("batched cycle start: gathering context for %d tickers", len(tickers))
+    results: list[TickerResult] = []
+    prepared: list[PreparedTicker] = []
+    for ticker in tickers:
+        outcome = prepare_ticker(ticker, fx, held)
+        (results if isinstance(outcome, TickerResult) else prepared).append(outcome)
+
+    # Stage one, offline. A NEUTRAL ends its ticker here exactly as it does
+    # live; the survivors are what stage two is asked about, so the expensive
+    # batch is only ever as large as the screen let through.
+    screens: dict[str, dict | None] = {}
+    if SCREENING_ENABLED and prepared:
+        provider, screen_model = screening_provider()
+        answered = batch_answers(
+            tuple(prepared), screen_signal, provider, screen_model, reasoning=False
+        )
+        survivors: list[PreparedTicker] = []
+        for item in prepared:
+            screens[item.ticker], finished = apply_screen(item, answered[item.ticker], fx)
+            (results.append(finished) if finished is not None else survivors.append(item))
+        prepared = survivors
+        log.info("%d ticker(s) escalated past the screen", len(prepared))
+
+    answers = batch_answers(tuple(prepared), call_llm, model=MODEL) if prepared else {}
+
+    # The ladder, once the answers are in and the session is likely open: a
+    # winner is trimmed and its stop raised before any new entry competes for
+    # the same slot, which is the ordering the live cycle keeps too.
+    positions = manage_positions(dispatcher)
+
+    for item in prepared:
+        results.append(
+            judge_answer(item, answers[item.ticker], screens.get(item.ticker), dispatcher, fx, weights)
+        )
+
+    report = CycleReport(
+        tickers=tickers, results=tuple(results), fx=fx, positions=positions, batched=True
+    )
+    log.info(
+        "batched cycle end: %d/%d reached the engine (%s)",
+        len(report.completed), len(tickers),
+        ", ".join(f"{k}={v}" for k, v in sorted(report.stages.items())) or "nothing attempted",
+    )
+    return report
 
 
 def open_tickers(dispatcher: Dispatcher) -> frozenset[str]:
@@ -1104,8 +1379,23 @@ def protect_positions(dispatcher: Dispatcher | None = None) -> dict:
         return {"error": f"{type(exc).__name__}: {exc}"}
 
 
-def run_cycle(dispatcher: Dispatcher | None = None) -> CycleReport:
-    """Run every ticker on the watchlist once, and report what came of it."""
+def run_cycle(
+    dispatcher: Dispatcher | None = None, premarket: bool = False
+) -> CycleReport:
+    """Run every ticker on the watchlist once, and report what came of it.
+
+    ``USE_BATCH_API`` picks which way. The batched cycle asks both model
+    stages offline at half price; this one asks them live, one ticker at a
+    time. They share every step except how the answer is fetched, and both
+    refuse to start into a closed market unless ``premarket`` says otherwise.
+    """
+    if cfg.USE_BATCH_API:
+        return run_batched_cycle(dispatcher, premarket=premarket)
+    if premarket:
+        # Nothing to wait for on the live path, so starting early would only
+        # mean judging on yesterday's close and dispatching into a shut market.
+        log.warning("--premarket has no effect with USE_BATCH_API off; gating on the clock")
+
     tickers = tuple(get_settings().watchlist_tickers)
     dispatcher = dispatcher or build_dispatcher()
     clock_unreadable = False
@@ -1187,6 +1477,17 @@ def main(argv: list[str] | None = None) -> None:
         ),
     )
     parser.add_argument(
+        "--premarket",
+        action="store_true",
+        help=(
+            "Start before the session opens, giving up the cheap "
+            "market-closed gate. Only useful with USE_BATCH_API: it is what "
+            "lets a batch be waited on in hours the strategy was not trading "
+            "in. A holiday run costs a cycle's spend and trades nothing, "
+            "which is why this is a flag and not the default."
+        ),
+    )
+    parser.add_argument(
         "--protect-only",
         action="store_true",
         help=(
@@ -1216,7 +1517,7 @@ def main(argv: list[str] | None = None) -> None:
         return
 
     if args.once:
-        report = run_cycle()
+        report = run_cycle(premarket=args.premarket)
         write_step_summary(report)
         if report.produced_nothing:
             # The whole point of --once mode reporting an exit code. A cycle

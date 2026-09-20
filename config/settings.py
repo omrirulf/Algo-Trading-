@@ -248,6 +248,36 @@ MAX_OPEN_POSITIONS: Final[int] = 40
 #: cannot be read.
 SKIP_HELD_TICKERS: Final[bool] = True
 
+#: Ask the Message Batches API instead of calling the model directly.
+#:
+#: Half price for the same request, and the cycle is the ideal shape for it:
+#: eighty independent prompts, none of which needs an answer in the same
+#: second. What it costs is immediacy -- a batch is allowed up to 24 hours,
+#: though a small one usually finishes in minutes -- and immediacy is the one
+#: thing a trading cycle cannot simply give up. Two things buy it back.
+#:
+#: The cycle starts before the market opens, so the waiting happens in hours
+#: the strategy was not trading in anyway. And a batch that has not finished by
+#: BATCH_DEADLINE_SECONDS is abandoned for live calls, ticker by ticker, so the
+#: worst a slow batch can do is cost what today's cycle already costs. It can
+#: never cost a session.
+#:
+#: The catch worth stating: the market-open gate no longer guards the front of
+#: the cycle, because pre-market it would refuse every run. A holiday
+#: therefore gathers context and pays for a batch whose signals the engine
+#: then rejects -- about ten cycles a year. That is the price of not being
+#: late, and the engine's own gate still means none of them can trade.
+USE_BATCH_API: Final[bool] = True
+
+#: How long to wait on a batch before giving up on it and paying full price.
+#:
+#: Sized against the job, not the API: the workflow gathers context for
+#: eighty tickers first, and what is left of its timeout after that is what
+#: there is to wait in. Too long and the job is killed mid-wait, which loses
+#: the answers *and* the fallback; the batch is still finished and still paid
+#: for, and only its id could get them back.
+BATCH_DEADLINE_SECONDS: Final[int] = 35 * 60
+
 #: Wilder ATR lookback, in trading days.
 ATR_PERIOD: Final[int] = 14
 

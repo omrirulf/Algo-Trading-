@@ -247,6 +247,10 @@ class BatchRequest:
     json_schema: dict
     model: Optional[str] = None
     effort: Optional[str] = None
+    #: ``False`` omits adaptive thinking and effort, exactly as it does on the
+    #: live path. The screening stage needs it: Haiku 4.5 takes neither, so a
+    #: batch of screens built the other way is rejected for the whole batch.
+    reasoning: bool = True
 
     def __post_init__(self) -> None:
         if not CUSTOM_ID_PATTERN.match(self.custom_id):
@@ -363,20 +367,23 @@ class AnthropicSignalProvider:
         the JSON-schema output format -- is identical, so a batch answer is
         priced and shaped like a live one and can stand in for it.
         """
-        return dict(
+        output_config: dict[str, Any] = {
+            "format": {
+                "type": "json_schema",
+                "schema": build_output_schema(request.json_schema),
+            },
+        }
+        params = dict(
             model=request.model or MODEL,
             max_tokens=MAX_TOKENS,
             system=cached_system(request.system_prompt),
             messages=[{"role": "user", "content": request.user_prompt}],
-            thinking={"type": "adaptive"},
-            output_config={
-                "effort": request.effort or EFFORT,
-                "format": {
-                    "type": "json_schema",
-                    "schema": build_output_schema(request.json_schema),
-                },
-            },
+            output_config=output_config,
         )
+        if request.reasoning:
+            params["thinking"] = {"type": "adaptive"}
+            output_config["effort"] = request.effort or EFFORT
+        return params
 
     def submit_batch(self, prompts: list[BatchRequest]) -> str:
         """Create a batch and return its id without waiting."""

@@ -6,10 +6,19 @@ name: heartbeat
 # seven times the cost. The holding horizon is days; one look after the open
 # captures the day.
 #
-# 15:05 UTC is 11:05 New York in summer and 10:05 in winter -- after the
-# 09:30 open in both, and past the first half-hour's noise. GitHub cron has no
-# timezone, so the job itself still asks Alpaca's clock and exits at once when
-# the market is shut, which also covers holidays that no cron can express.
+# 12:35 UTC is 08:35 New York in summer and 07:35 in winter -- before the
+# 09:30 open in both. It starts early because the cycle asks both model stages
+# through the Batch API at half price, and a batch answers when it answers:
+# the hour before the session is where that waiting belongs. Gathering eighty
+# contexts takes most of it, the batch is waited on for up to 35 minutes after
+# that, and anything still outstanding is asked live, so the session is never
+# what pays for the saving.
+#
+# The price of starting early is the cheap market-closed gate, which pre-market
+# would refuse every run. A holiday therefore gathers context and pays for a
+# batch that trades nothing -- the engine's own clock check still refuses the
+# orders -- which is roughly ten cycles a year against a halved bill on the
+# other 250.
 #
 # The second cron is a catch-up, and it exists because on 16 Sep the first one
 # never fired. Not late, not failed -- GitHub created no run at all, and
@@ -17,15 +26,16 @@ name: heartbeat
 # happened to look. A schedule that can silently skip is not a schedule you
 # can build a daily experiment on.
 #
-# 17:35 UTC is two and a half hours after the first cron: long enough that a
-# slow cycle has finished (the concurrency group below would queue it anyway),
+# 17:35 UTC is five hours after the first cron: long enough that even a cycle
+# that waited out its whole batch deadline has finished (the concurrency group
+# below would queue it anyway),
 # and still comfortably before the 20:00 close, so a rescued day is a real
 # trading day rather than a trade into the bell. It does nothing on the days
 # the first cron works, which is almost all of them.
 on:
   schedule:
-    - cron: "5 15 * * 1-5"
-    - cron: "35 17 * * 1-5"   # catch-up; exits at once if 15:05 already ran
+    - cron: "35 12 * * 1-5"   # pre-market: gather, then wait on the batch
+    - cron: "35 17 * * 1-5"   # catch-up; exits at once if 12:35 already ran
   workflow_dispatch:        # a manual run: a cycle, or just the protection pass
     inputs:
       mode:
@@ -133,7 +143,18 @@ jobs:
           # `brightdata login` creates. Set BRIGHTDATA_SERP_ZONE as a
           # repository variable only if you have a real SERP API zone.
           BRIGHTDATA_SERP_ZONE: ${{ vars.BRIGHTDATA_SERP_ZONE }}
-        run: python -m orchestrator.heartbeat --once
+        # --premarket on the first cron only. Batched, the model stages are
+        # asked offline at half price, and the waiting for them has to happen
+        # somewhere: before the session, or during it. Starting at 12:35 UTC
+        # puts it before, and gives up the cheap market-closed gate to do it,
+        # which is why only the run that is meant to start early passes the
+        # flag. The catch-up runs after the open and keeps the gate.
+        run: |
+          if [ "${{ github.event.schedule }}" = "35 12 * * 1-5" ]; then
+            python -m orchestrator.heartbeat --once --premarket
+          else
+            python -m orchestrator.heartbeat --once
+          fi
 
       - name: Render the cycle for a human
         # `always()` for the same reason the commit below is: a cycle that

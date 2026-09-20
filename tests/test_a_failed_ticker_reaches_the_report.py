@@ -172,11 +172,12 @@ def test_every_context_failure_return_journals_first():
     """
     import ast
 
+    # Scanned over the whole module rather than one named function: these
+    # returns moved from process_ticker to prepare_ticker when the cycle
+    # learned to batch, and a test that follows the invariant instead of the
+    # function name does not have to move with them again.
     tree = ast.parse(Path(heartbeat.__file__).read_text())
-    func = next(
-        node for node in ast.walk(tree)
-        if isinstance(node, ast.FunctionDef) and node.name == "process_ticker"
-    )
+    func = tree
 
     def is_context_failed_return(node: ast.AST) -> bool:
         return (

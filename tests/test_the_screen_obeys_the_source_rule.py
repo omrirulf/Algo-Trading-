@@ -65,13 +65,22 @@ def test_the_screen_path_applies_it_before_journalling():
     """
     tree = ast.parse(Path(heartbeat.__file__).read_text())
 
+    # The screen's answer is whatever ``parse_signal`` is handed inside
+    # ``apply_screen`` -- named ``answer`` since a batched screen arrives as a
+    # value rather than a call. Matched by the function it sits in rather than
+    # by the variable name, so renaming the local does not silently disarm it.
+    screen_fn = next(
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef) and node.name == "apply_screen"
+    )
+
     def reads_the_screen(node: ast.AST) -> bool:
         return (
             isinstance(node, ast.Call)
             and isinstance(node.func, ast.Name) and node.func.id == "parse_signal"
             and bool(node.args)
             and isinstance(node.args[0], ast.Attribute) and node.args[0].attr == "text"
-            and isinstance(node.args[0].value, ast.Name) and node.args[0].value.id == "first"
+            and any(node is inner for inner in ast.walk(screen_fn))
         )
 
     screen_calls = [node for node in ast.walk(tree) if reads_the_screen(node)]

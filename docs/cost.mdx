@@ -34,13 +34,78 @@ That ordering matters: **effort is a bigger lever than model tier.**
 
 | | Lever | Effect |
 |---|---|---|
-| 1 | `EFFORT` | Directly moves the 84% |
-| 2 | Model tier | Multiplies both halves |
-| 3 | The funnel (`SCREENING_ENABLED`) | Removes whole calls: the share of the watchlist the screen calls NEUTRAL |
-| 4 | `SKIP_HELD_TICKERS` | Removes whole calls: the share of the watchlist already in the book |
-| 5 | Watchlist length | Linear in calls |
-| 6 | `HEARTBEAT_INTERVAL_MINUTES` | Linear in calls |
-| 7 | Prompt caching | Only touches the 16% |
+| 1 | `USE_BATCH_API` | Halves every call that is not in a hurry — which here is all of them |
+| 2 | `EFFORT` | Directly moves the 84% |
+| 3 | Model tier | Multiplies both halves |
+| 4 | The funnel (`SCREENING_ENABLED`) | Removes whole calls: the share of the watchlist the screen calls NEUTRAL |
+| 5 | `SKIP_HELD_TICKERS` | Removes whole calls: the share of the watchlist already in the book |
+| 6 | Watchlist length | Linear in calls |
+| 7 | `HEARTBEAT_INTERVAL_MINUTES` | Linear in calls |
+| 8 | Prompt caching | Only touches the 16% — and only when the breakpoint is placed correctly, see below |
+
+## Half price, for waiting
+
+The Message Batches API costs half of what the same request costs live. The
+cycle is the ideal shape for it: eighty independent prompts, none of which
+needs an answer in the same second.
+
+What it costs is immediacy — a batch may take up to 24 hours, though a small
+one usually finishes in minutes. Two things buy that back:
+
+- **The cycle starts pre-market.** The `12:35 UTC` cron gathers context, then
+  waits on the batch in hours the strategy was not trading in anyway.
+- **A deadline.** A batch that has not finished within `BATCH_DEADLINE_SECONDS`
+  is abandoned, ticker by ticker, for live calls. The worst a slow batch can
+  do is cost what a cycle costs today. It cannot cost a session.
+
+<Warning>
+  Starting pre-market gives up the cheap market-closed gate, which would
+  otherwise refuse every early run. A holiday gathers context and pays for a
+  batch whose signals the engine then refuses — roughly ten cycles a year,
+  against a halved bill on the other 250. Only the run that is *meant* to
+  start early passes `--premarket`; every other caller still exits at once
+  when the market is shut.
+</Warning>
+
+## The cache breakpoint has to be on the system prompt
+
+`cache_control` as a top-level request parameter caches *the last cacheable
+block*, and in this request that is the per-ticker user prompt — a different
+string every call. The cycle did that until 20 Sep, and the journal recorded
+what it cost: across 934 calls, **1,869,345 tokens written to cache and zero
+ever read**. Opus reported 406 uncached input tokens in total, because the
+whole request was billed as a cache write at 1.25× and then discarded. The
+premium came to 10.7% of spend for no benefit at all.
+
+The breakpoint now rides the system block, so the volatile half of the request
+falls outside it. Two bounds are worth knowing: the cache is scoped per model,
+so the screen and the full model each pay one write per cycle, and a prompt
+under the model's minimum cacheable prefix does not cache at all.
+`cache_read_input_tokens` in the journal is how either shows up — which is why
+it is recorded rather than assumed.
+
+## A stage that is not billed at all
+
+`SCREENING_BASE_URL` points the screening stage at any OpenAI-compatible
+endpoint — Ollama, llama.cpp, vLLM, LM Studio — so the cheap stage can run on
+a model nobody bills for. Set `SCREENING_MODEL` alongside it; unset, the screen
+is Claude Haiku exactly as before.
+
+Only the screen. The call that decides what trades stays Claude, and a test
+reads `call_llm`'s source to keep it that way.
+
+<Warning>
+  This cannot be a model on the GitHub-hosted runner: `ubuntu-latest` is four
+  CPUs with no GPU and a disk discarded between runs, so weights would be
+  re-downloaded every cycle and eighty CPU inferences would not fit in a job
+  that already spends 42 of its 90 minutes on I/O. It has to point at a
+  self-hosted runner or a machine on the network.
+</Warning>
+
+An endpoint that is unreachable, errors, or answers in prose raises the same
+`LLMError` a failed Claude screen does, and the funnel already handles that by
+asking the full model. The worst a flaky local model can do is cost a cycle its
+saving; it cannot reach a trade.
 
 ## Stage zero: what the book already holds
 
