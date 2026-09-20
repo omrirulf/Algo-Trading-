@@ -13,6 +13,14 @@ name: screening check
 
 on:
   workflow_dispatch:
+    inputs:
+      recall:
+        description: "Also grade the endpoint against the recorded Haiku screen (makes real calls)"
+        type: boolean
+        default: false
+      limit:
+        description: "Journal lines to grade against"
+        default: "200"
 
 permissions:
   contents: read
@@ -50,3 +58,26 @@ jobs:
         run: |
           set -o pipefail
           python backtest/probe_screening.py | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Does it agree with the screen it would replace
+        # The probe above proves the endpoint answers. This proves it answers
+        # the same way, which is the only question that decides whether the
+        # saving is real or is a quietly worse funnel. Opt-in because it makes
+        # one call per journal line -- a few cents at the documented rates,
+        # against the probe's one call.
+        #
+        # Gated on the probe passing: grading an endpoint that cannot answer
+        # produces a page of identical errors and no information.
+        if: inputs.recall
+        env:
+          SCREENING_BASE_URL: ${{ vars.SCREENING_BASE_URL }}
+          SCREENING_MODEL: ${{ vars.SCREENING_MODEL }}
+          SCREENING_API_KEY: ${{ secrets.SCREENING_API_KEY || secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY || secrets.GROQ_API_KEY }}
+        run: |
+          set -o pipefail
+          python replay/compare_screening.py \
+            --base-url "$SCREENING_BASE_URL" \
+            --model "$SCREENING_MODEL" \
+            --api-key "$SCREENING_API_KEY" \
+            --limit "${{ inputs.limit }}" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
