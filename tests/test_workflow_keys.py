@@ -130,9 +130,14 @@ def test_the_screening_check_can_outlast_the_grading_it_runs():
         re.search(r'"--limit".*?default=(\d+)',
                   (ROOT / "replay/compare_screening.py").read_text(), re.S).group(1)
     )
-    # Conservative: the probe was answered in 2.4s, and the graded prompt is
-    # the full per-ticker one rather than the probe's stub.
-    seconds_per_call = 5
+    # The bound has to be the slowest run the workflow can be asked for, not
+    # the typical one: `effort` turns reasoning on, and a reasoning answer is
+    # thousands of tokens where the screen's is a hundred. 2.4s measured for a
+    # screen-shaped call; 20s is the conservative reasoning case.
+    # YAML parses a bare `on:` key as the boolean True, not the string "on".
+    triggers = wf.get("on") or wf[True]
+    offers_effort = "effort" in (triggers["workflow_dispatch"]["inputs"] or {})
+    seconds_per_call = 20 if offers_effort else 5
     setup_s = 120  # checkout, python, pip install, and the probe itself
 
     needed = default_limit * seconds_per_call + setup_s

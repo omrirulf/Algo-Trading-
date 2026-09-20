@@ -188,17 +188,30 @@ def recorded_screen_signal(entry: ReplayEntry) -> Optional[LLMSignal]:
         return None
 
 
-def screening_candidate_completer(provider, model: str):
-    """A completer for a screening candidate, called exactly as production calls it.
+def screening_candidate_completer(provider, model: str, effort: Optional[str] = None):
+    """A completer for a screening candidate, called as production calls it.
 
-    ``reasoning=False`` is not optional here -- it is what "screening" means
-    in this codebase: the production screen is asked with reasoning off (see
-    ``orchestrator/heartbeat.py``'s ``screen_signal``), and comparing a
-    candidate answering *with* reasoning on would be comparing it against a
-    question nobody asks it in the cycle. ``provider`` is anything
-    implementing ``orchestrator.llm.SignalProvider`` -- in practice
-    ``OpenAICompatibleProvider`` for a candidate, or ``AnthropicSignalProvider``
-    to price the incumbent Haiku screen the same way for a side-by-side.
+    ``reasoning=False`` is the default because it is what "screening" means in
+    this codebase: the production screen is asked with reasoning off (see
+    ``orchestrator/heartbeat.py``'s ``screen_signal``), and a candidate
+    answering *with* reasoning on is being asked a question the cycle does not
+    ask it.
+
+    ``effort`` deliberately breaks that symmetry, and is the only reason to.
+    A reasoning model asked at the cheap setting may be failing the screen
+    because it is a weak model or because the setting crippled it, and those
+    have opposite conclusions: the first says pick another model, the second
+    says pay slightly more for the same one. Passing an effort asks the second
+    question -- reasoning on, at that level -- which is a *proposal* for what
+    production would then have to do, not a measurement of what it does today.
+    A run that used one says so in its own header, because a recall number
+    from a configuration the cycle does not use would otherwise read as a
+    verdict on the configuration it does.
+
+    ``provider`` is anything implementing ``orchestrator.llm.SignalProvider``
+    -- in practice ``OpenAICompatibleProvider`` for a candidate, or
+    ``AnthropicSignalProvider`` to price the incumbent Haiku screen the same
+    way for a side-by-side.
 
     Returns ``(complete, usages)``, the same shape as ``measured_completer``,
     for the same reason: a validation run should price itself from measured
@@ -210,7 +223,10 @@ def screening_candidate_completer(provider, model: str):
     usages: list[Usage] = []
 
     def complete(system_prompt: str, user_prompt: str, schema: dict[str, Any]) -> str:
-        result = provider.complete_detailed(system_prompt, user_prompt, schema, model=model, reasoning=False)
+        result = provider.complete_detailed(
+            system_prompt, user_prompt, schema, model=model,
+            reasoning=bool(effort), effort=effort,
+        )
         usages.append(result.usage)
         return result.text
 

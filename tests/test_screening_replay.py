@@ -17,7 +17,8 @@ import pytest
 from app.schemas import Bias, LLMSignal
 from orchestrator import heartbeat as hb
 from orchestrator.context import TickerContext
-from orchestrator.llm import OpenAICompatibleProvider
+from orchestrator import llm
+from orchestrator.llm import Completion, OpenAICompatibleProvider
 from replay import runner
 from replay.compare import SignalDiff
 
@@ -406,3 +407,79 @@ def test_a_small_sample_is_flagged_but_not_refused(tmp_path, capsys):
         assert "not evidence yet" in capsys.readouterr().out
     finally:
         OpenAICompatibleProvider.__init__ = real_init
+
+
+# --- asking a reasoning model to actually reason ---------------------------
+
+
+def test_the_screen_is_asked_with_reasoning_off_by_default():
+    """The default has to match production, or the verdict grades a question
+    the cycle never asks."""
+    seen = {}
+
+    class Recording:
+        def complete_detailed(self, s, u, schema, **kw):
+            seen.update(kw)
+            return Completion(text=json.dumps({"ticker": "AAPL", "bias": "NEUTRAL", "conviction": 0.1, "rationale": "r"}), usage=None)
+
+    complete, _ = runner.screening_candidate_completer(Recording(), "m")
+    complete("sys", "user", {"type": "object"})
+    assert seen["reasoning"] is False
+    assert seen["effort"] is None
+
+
+def test_an_effort_turns_reasoning_on():
+    """gpt-oss-20b has no true off switch, so the screen's low effort is a
+    handicap. Separating 'weak model' from 'crippled by the setting' needs
+    this to actually reach the provider."""
+    seen = {}
+
+    class Recording:
+        def complete_detailed(self, s, u, schema, **kw):
+            seen.update(kw)
+            return Completion(text=json.dumps({"ticker": "AAPL", "bias": "BULLISH", "conviction": 0.7, "rationale": "r"}), usage=None)
+
+    complete, _ = runner.screening_candidate_completer(Recording(), "m", "high")
+    complete("sys", "user", {"type": "object"})
+    assert seen["reasoning"] is True
+    assert seen["effort"] == "high"
+
+
+def test_the_provider_sends_the_effort_it_was_given():
+    """It used to accept ``effort`` and drop it, which made the experiment
+    unrunnable while looking like it ran."""
+    sent = {}
+
+    def handler(request):
+        sent.update(json.loads(request.content))
+        return httpx.Response(200, json={
+            "choices": [{"message": {"content": json.dumps({"ticker": "AAPL", "bias": "BULLISH", "conviction": 0.7, "rationale": "r"})}}]
+        })
+
+    transport = httpx.MockTransport(handler)
+    provider = llm.OpenAICompatibleProvider(
+        base_url="https://example.test/v1", model="m", api_key="k",
+        client=httpx.Client(transport=transport),
+    )
+    provider.complete_detailed("sys", "user", {"type": "object"}, reasoning=True, effort="high")
+    assert sent["reasoning_effort"] == "high"
+
+
+def test_reasoning_off_still_pins_the_floor_whatever_effort_says():
+    """The screen's request shape must not drift because an experiment exists."""
+    sent = {}
+
+    def handler(request):
+        sent.update(json.loads(request.content))
+        return httpx.Response(200, json={
+            "choices": [{"message": {"content": json.dumps({"ticker": "AAPL", "bias": "NEUTRAL", "conviction": 0.1, "rationale": "r"})}}]
+        })
+
+    transport = httpx.MockTransport(handler)
+    provider = llm.OpenAICompatibleProvider(
+        base_url="https://example.test/v1", model="m", api_key="k",
+        client=httpx.Client(transport=transport),
+    )
+    provider.complete_detailed("sys", "user", {"type": "object"}, reasoning=False, effort="high")
+    assert sent["reasoning_effort"] == "low", "an effort must not leak into the screen"
+    assert llm.NO_REASONING_INSTRUCTION in sent["messages"][0]["content"]
