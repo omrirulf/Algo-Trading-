@@ -195,6 +195,29 @@ All three unset is the supported default: the screen stays on Claude Haiku.
 `config/settings.py` and forgotten in the workflow fails the suite rather
 than silently reading blank in production.
 
+The key may also be stored under `GEMINI_API_KEY`, `GOOGLE_API_KEY` or
+`GROQ_API_KEY` — the workflow collapses those onto `SCREENING_API_KEY`, which
+is the only name the code itself reads. The alternatives exist because the
+obvious thing to call a Gemini key is `GEMINI_API_KEY`, and a key stored under
+a name nothing reads is silent: the screen just stays on Haiku.
+
+<Note>
+  Being silent is the whole problem with this configuration. A key under an
+  unread name, a key with no `SCREENING_BASE_URL` behind it, and an endpoint
+  that refuses strict `json_schema` all look exactly like "screening is off",
+  which is a legitimate state that raises nothing. Run the **screening check**
+  workflow (Actions -> screening check -> Run workflow) to make it say so out
+  loud: it reports which name carried the key, whether the base URL and model
+  are set, and makes one real call through the same provider the cycle uses.
+  It never prints a key, and it fails the run when the configuration is
+  incoherent. Locally the same check is
+  `python backtest/probe_screening.py`.
+</Note>
+
+Answering is not agreeing, and the probe only proves the first. A green
+screening check still has to be followed by the recall run below before the
+endpoint is worth trusting.
+
 ### Validating a candidate before flipping it on
 
 ```bash

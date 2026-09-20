@@ -45,6 +45,21 @@ MODEL = "claude-opus-5"
 SCREENING_ENABLED = True
 SCREENING_MODEL = "claude-haiku-4-5"
 
+#: Every name the screening endpoint's bearer token might plausibly have been
+#: stored under, in the order they are tried. ``SCREENING_API_KEY`` is the one
+#: ``config/settings.py`` declares and the only one the running code reads;
+#: the rest exist because the obvious thing to call a Gemini key is
+#: GEMINI_API_KEY, and a key stored under a name nothing reads is silent --
+#: the screen simply stays on Haiku and no error says why. The workflow maps
+#: the alternatives onto the canonical name, and
+#: ``tests/test_workflow_keys.py`` pins that mapping to this tuple.
+SCREENING_KEY_ENV_VARS: tuple[str, ...] = (
+    "SCREENING_API_KEY",
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY",
+    "GROQ_API_KEY",
+)
+
 #: Server-side refusal fallback. If a safety classifier declines the request,
 #: the API re-runs it on another model inside the same call and marks the
 #: switch with a ``fallback`` content block. ``"default"`` routes by refusal
