@@ -59,6 +59,8 @@ from orchestrator.llm import (  # noqa: E402
     AnthropicSignalProvider,
     Completion,
     LLMError,
+    OpenAICompatibleProvider,
+    SignalProvider,
 )
 from app.broker_client import BrokerError  # noqa: E402
 from orchestrator.dispatch import Dispatcher, build_dispatcher  # noqa: E402
@@ -403,11 +405,39 @@ def fetch_news(ticker: str) -> list:
     return provider.fetch_items(ticker)
 
 
+def screening_provider() -> tuple[SignalProvider, str]:
+    """Whoever answers the cheap stage, and the model to ask it for.
+
+    Claude Haiku unless ``SCREENING_BASE_URL`` is set, which points the screen
+    at anything serving the OpenAI chat-completions shape -- Ollama,
+    llama.cpp, vLLM. That is the one place in the cycle where a model billed
+    by nobody can stand in; the full model decides what actually trades, and
+    moving *that* is not a cost question.
+
+    ``SCREENING_MODEL`` is read only alongside a base URL. On its own it would
+    let an environment variable silently change which Claude model screens the
+    watchlist, and what the account trades on is meant to be a visible diff.
+    """
+    settings = get_settings()
+    if not settings.screening_base_url:
+        return AnthropicSignalProvider(settings.anthropic_api_key), SCREENING_MODEL
+    if not settings.screening_model:
+        raise LLMError("SCREENING_BASE_URL is set but SCREENING_MODEL is empty")
+    return (
+        OpenAICompatibleProvider(
+            base_url=settings.screening_base_url,
+            model=settings.screening_model,
+            api_key=settings.screening_api_key,
+        ),
+        settings.screening_model,
+    )
+
+
 def screen_signal(system_prompt: str, user_prompt: str, json_schema: dict) -> Completion:
     """The first stage of the funnel: the same prompt, the cheap model, no reasoning."""
-    provider = AnthropicSignalProvider(get_settings().anthropic_api_key)
+    provider, model = screening_provider()
     return provider.complete_detailed(
-        system_prompt, user_prompt, json_schema, model=SCREENING_MODEL, reasoning=False
+        system_prompt, user_prompt, json_schema, model=model, reasoning=False
     )
 
 

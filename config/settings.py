@@ -370,6 +370,33 @@ class Settings(BaseSettings):
         ),
     )
     anthropic_api_key: str = Field(default="", description="Claude API key (orchestrator only)")
+    screening_base_url: str = Field(
+        default="",
+        description=(
+            "OpenAI-compatible endpoint to run the screening stage against, "
+            "e.g. http://10.0.0.5:11434/v1 for Ollama. Blank -- the default -- "
+            "screens with Claude Haiku as before. It cannot be a model on the "
+            "GitHub-hosted runner: no GPU, and the disk is discarded between "
+            "runs, so this has to point at a self-hosted runner or a machine "
+            "on the network. A screen this endpoint fails to answer falls "
+            "through to the full model, so the worst case is the cycle's cost, "
+            "never a bad trade"
+        ),
+    )
+    screening_model: str = Field(
+        default="",
+        description=(
+            "Model name to ask that endpoint for, e.g. 'qwen2.5:14b'. Required "
+            "when screening_base_url is set; ignored otherwise"
+        ),
+    )
+    screening_api_key: str = Field(
+        default="",
+        description=(
+            "Bearer token for screening_base_url, if it wants one. A local "
+            "endpoint usually does not, and blank sends no header at all"
+        ),
+    )
     brightdata_api_token: str = Field(default="", description="Bright Data API token (orchestrator only)")
     brightdata_serp_zone: str = Field(
         default="",
