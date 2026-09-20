@@ -10,6 +10,7 @@ orchestrator/sources.py reads first.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import yaml
@@ -106,4 +107,36 @@ def test_the_recall_grading_step_gets_the_same_endpoint_the_probe_does():
     cycle = _step("heartbeat.yml", "cycle", "Run one cycle")["env"]
     assert grade["SCREENING_API_KEY"] == cycle["SCREENING_API_KEY"], (
         "the graded key must be the one the cycle resolves, spellings included"
+    )
+
+
+def test_the_screening_check_can_outlast_the_grading_it_runs():
+    """A job timeout sized for the probe silently truncates the recall run.
+
+    The probe is one call. Grading is one call per journal line, sequentially,
+    and a hosted endpoint answers in seconds -- so the default 200 lines is
+    minutes, not seconds. While this job's timeout was 10 minutes (what the
+    probe alone needed) the first grading run was cancelled at 9m29s, one step
+    before it printed the number: every call was paid for and nothing learned.
+
+    Derived from compare_screening.py's own default rather than from a number
+    typed here, so raising that default without raising the timeout fails
+    instead of truncating the next run.
+    """
+    wf = yaml.safe_load((ROOT / ".github/workflows/screening-check.yml").read_text())
+    timeout_s = wf["jobs"]["screening"]["timeout-minutes"] * 60
+
+    default_limit = int(
+        re.search(r'"--limit".*?default=(\d+)',
+                  (ROOT / "replay/compare_screening.py").read_text(), re.S).group(1)
+    )
+    # Conservative: the probe was answered in 2.4s, and the graded prompt is
+    # the full per-ticker one rather than the probe's stub.
+    seconds_per_call = 5
+    setup_s = 120  # checkout, python, pip install, and the probe itself
+
+    needed = default_limit * seconds_per_call + setup_s
+    assert timeout_s >= needed, (
+        f"timeout-minutes={timeout_s // 60} cannot finish {default_limit} graded "
+        f"calls; needs at least {needed // 60} minutes"
     )
