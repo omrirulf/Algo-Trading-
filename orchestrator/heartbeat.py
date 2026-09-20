@@ -145,7 +145,9 @@ conclusion. The scores and key factors are recorded for later evaluation and \
 are not read by the risk system."""
 
 
-ETF_SYSTEM_PROMPT = """\
+#: The part of the fund prompt every fund gets: what kind of instrument
+#: this is, and why the single-name dimensions are absent rather than missing.
+ETF_PROMPT_HEAD = """\
 You are a macro and cross-asset analyst. You produce exactly one directional \
 signal for one exchange-traded fund, as a JSON object matching the provided \
 schema.
@@ -172,7 +174,29 @@ the basket dilutes it. Do not build a thesis on one constituent.
 insiders who file Form 4. That is a property of the instrument, not a data \
 outage, and the two sections below are what stands in their place. Where \
 neither is present, leave the score null and do not speculate about what it \
-would have said.
+would have said."""
+
+#: Guidance for one optional context section, keyed by the ``TickerContext``
+#: attribute whose presence is what puts that section in the user prompt.
+#:
+#: Rendered only when the section is actually there, because most of them
+#: usually are not. Across 367 fund contexts, ``flows``, ``energy``,
+#: ``outlook`` and ``crops`` carried data on *none* of them, and their four
+#: paragraphs are 566 tokens -- 22% of this prompt -- spent teaching the model
+#: to read data that never arrives. ``positioning`` is present on a fifth of
+#: them and ``carry`` on a tenth. Funds are 77% of the calls in a cycle.
+#:
+#: The order is fixed rather than derived so that two tickers with the same
+#: sections produce a byte-identical prompt: this text is the cached prefix,
+#: and a prefix that varies in order would be a cache miss per ticker, which
+#: costs more than the paragraphs save.
+#:
+#: The wording still says "when present" inside each paragraph. That is now
+#: redundant, and deliberately left alone: dropping a whole paragraph is a
+#: subtraction this can be tested for, while rewriting the ones that remain
+#: would change what the model reads on every fund call at the same time.
+ETF_SECTION_GUIDANCE: tuple[tuple[str, str], ...] = (
+    ("holdings", """\
 - ANALYST VIEW OF THE HOLDINGS, when present, is the analyst coverage of the \
 fund's largest holdings, rolled up by the fund's own weights. Score \
 analyst_score from it. Read the coverage figure first: it says what share of \
@@ -180,14 +204,16 @@ the fund the roll-up actually covers, and a roll-up over 11% of a broad index \
 is a fact about eleven percent, not about the fund. Where it is thin, the \
 prompt says so and the right response is a smaller score, not a louder one. \
 When the section is absent -- a bond fund, a commodity -- leave analyst_score \
-null.
+null."""),
+    ("funds", """\
 - FUND BASICS, when present, is what this fund actually holds, in the terms \
 that apply to it: for an equity fund the valuation and growth of its \
 holdings, for a bond fund its yield and the credit quality of what it lends \
 to. It replaces \
 the company form, which described an index in terms it does not have. These \
 move slowly and rarely justify a change of view in one cycle; a single \
-commodity has none of them at all, and the section is simply absent.
+commodity has none of them at all, and the section is simply absent."""),
+    ("positioning", """\
 - POSITIONING, when present, is the CFTC weekly report: what large \
 speculators are actually holding in this contract. It is the nearest thing a \
 fund has to insider activity, and it is the one dimension here that is about \
@@ -199,7 +225,8 @@ positioning more than its level, and note the data is Tuesday's, published \
 Friday, so it is several days stale by the time you read it. When the section \
 is absent -- a basket spanning many contracts, or a country fund with no \
 future -- score insider_score from FUND FLOWS instead, and leave it null only \
-when neither section is present.
+when neither section is present."""),
+    ("flows", """\
 - FUND FLOWS, when present, is the fund's share count over time. An ETF \
 creates and destroys shares on demand, so a rising count is money that was \
 actually put in and a falling one is money taken out. Like POSITIONING it is \
@@ -208,7 +235,8 @@ it as conviction of flow rather than as a forecast -- a fund can bleed shares \
 through a rally -- and weigh the size in money as well as the percent. Where \
 POSITIONING is absent this is the behavioural dimension, so score \
 insider_score from it; where both are present, POSITIONING is the sharper \
-read and flows corroborate it.
+read and flows corroborate it."""),
+    ("macro", """\
 - MACRO is the backdrop, and it is the half of this instruction that used to \
 be missing: you are told to answer NEUTRAL unless a rate or policy surprise \
 has happened, so here are the rates. Treasury yields across the curve with \
@@ -228,7 +256,8 @@ over the next two years, read off the two-year yield against the overnight \
 rate: for a bond fund or the dollar it is the bet itself, and a week in which \
 the priced path moved matters more than the level. This is context \
 for every other dimension rather than a score of its own; where it drives the \
-call, say so in key_factors.
+call, say so in key_factors."""),
+    ("carry", """\
 - COST OF HOLDING, when present, is the most important fact about a \
 commodity fund and the one least visible on its chart. The fund does not \
 hold the metal or the barrel; it holds futures, and every month it sells the \
@@ -242,7 +271,8 @@ been costing while the curve stayed as it is, not what it will cost. And a \
 figure near zero is a finding rather than a blank -- it means the fund holds \
 the physical metal and you are paying only the fee. Score it into \
 fundamental_score, and let it temper conviction on a long rather than \
-setting the direction.
+setting the direction."""),
+    ("energy", """\
 - ENERGY INVENTORIES, when present, is what the United States is actually \
 holding in tanks, published every Wednesday. For an oil or gas fund this is \
 not background, it is the scheduled event of the week and the one release \
@@ -250,7 +280,8 @@ that reliably moves the price. A build is more supply than demand and reads \
 bearish, a draw the reverse -- a rule of thumb, not a law. Weigh the weekly \
 change and how unusual the level is far above the level itself, and score it \
 into fundamental_score. Remember the market has already seen this number; \
-what it gives you is the direction of the supply picture, not an edge.
+what it gives you is the direction of the supply picture, not an edge."""),
+    ("outlook", """\
 - PRICE OUTLOOK, when present, is the Energy Information Administration's \
 official monthly forecast for the price the fund tracks: this month, three \
 and six months out, and next year's average. It is one agency's view and the \
@@ -258,14 +289,19 @@ market has read it, so the level is not the signal; the direction, and the \
 gap between the forecast and today's price, are what to weigh. A forecast \
 that sees the price falling tempers a long and supports a short, and the \
 reverse; score it into fundamental_score and never let it set the direction \
-on its own.
+on its own."""),
+    ("crops", """\
 - CROP CONDITION, when present, is the share of the US crop rated good or \
 excellent, walked and reported weekly through the growing season. A better \
 crop means more supply, which reads bearish. The *trend* is the signal -- a \
 crop deteriorating three weeks running is a supply story whatever the level \
 -- and the comparison to the same week last year matters more than the \
 number. Score it into fundamental_score. Out of season the section is absent, \
-which means the crop is not in the ground, not that the data failed.
+which means the crop is not in the ground, not that the data failed."""),
+)
+
+#: The rest, which does not depend on what the context carried.
+ETF_PROMPT_TAIL = """\
 - NEWS here is macro and sector news: policy, rates, growth and inflation \
 data, currency moves, and flows into or out of the asset class. That is the \
 right frame. A roundup, a "best ETFs to buy" listicle, or a story about one \
@@ -310,15 +346,45 @@ conclusion. The scores and key factors are recorded for later evaluation and \
 are not read by the risk system."""
 
 
-def system_prompt_for(ticker: str) -> str:
+def etf_system_prompt(context: TickerContext | None = None) -> str:
+    """The fund prompt, carrying guidance only for the sections actually sent.
+
+    ``None`` means "every section", which is what a caller with no context in
+    hand gets and what ``ETF_SYSTEM_PROMPT`` is. Given a context, a paragraph
+    is included on exactly the rule that puts its section in the user prompt --
+    the attribute is not ``None`` -- so the model is never taught to read a
+    block it was not given, and never given a block nothing taught it to read.
+    """
+    if context is None:
+        keep = ETF_SECTION_GUIDANCE
+    else:
+        keep = tuple(
+            (attr, text)
+            for attr, text in ETF_SECTION_GUIDANCE
+            if getattr(context, attr, None) is not None
+        )
+    return "\n".join([ETF_PROMPT_HEAD, *(text for _, text in keep), ETF_PROMPT_TAIL])
+
+
+#: Every paragraph, for a caller that has no context to narrow them by.
+ETF_SYSTEM_PROMPT: str = etf_system_prompt()
+
+
+def system_prompt_for(ticker: str, context: TickerContext | None = None) -> str:
     """The prompt that matches the instrument, resolved from configuration.
 
     An index fund asked the single-name questions would answer three of five
     dimensions with speculation, which is worse than a named absence. The kind
     comes from ``config.instruments`` -- the same source the position cap uses,
     and never from anything the model said.
+
+    ``context`` narrows the fund prompt to the sections this ticker actually
+    has; left out, every paragraph is sent, which is what the cycle did before
+    and what a caller holding only a symbol still gets.
     """
-    return ETF_SYSTEM_PROMPT if is_fund(ticker) else SYSTEM_PROMPT
+    if not is_fund(ticker):
+        return SYSTEM_PROMPT
+    return etf_system_prompt(context)
 
 
 # --------------------------------------------------------------------------- #
@@ -848,7 +914,7 @@ def process_ticker(
         log.warning("%s: context gaps: %s", ticker, "; ".join(ticker_context.gaps))
 
     try:
-        system_prompt = system_prompt_for(ticker_context.ticker)
+        system_prompt = system_prompt_for(ticker_context.ticker, ticker_context)
         user_prompt = build_user_prompt(ticker_context)
     except Exception as exc:  # noqa: BLE001
         # Rendering the gathered context into text is the last step of
