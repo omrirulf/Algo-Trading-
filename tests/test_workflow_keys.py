@@ -15,7 +15,7 @@ from pathlib import Path
 import yaml
 
 from config.settings import Settings
-from orchestrator import sources
+from orchestrator import llm, sources
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -62,3 +62,32 @@ def test_the_cycle_receives_the_screening_endpoint_settings():
     for field in ("screening_base_url", "screening_model", "screening_api_key"):
         assert field in Settings.model_fields, field
         assert field.upper() in cycle, f"{field} is configurable but never reaches the cycle"
+
+
+def test_every_screening_key_spelling_reaches_the_canonical_name():
+    """A key under a name nothing reads is the same as no key.
+
+    GEMINI_API_KEY is the obvious thing to call a Gemini key, and nothing in
+    the code reads it: the cycle reads SCREENING_API_KEY only. The workflow
+    collapses the alternatives onto that one name, and this pins the chain to
+    the tuple, so adding a spelling to llm.py without wiring it fails here.
+    """
+    cycle = _step("heartbeat.yml", "cycle", "Run one cycle")["env"]
+    expected = " || ".join("secrets.%s" % n for n in llm.SCREENING_KEY_ENV_VARS)
+    assert cycle["SCREENING_API_KEY"] == "${{ %s }}" % expected
+
+
+def test_the_screening_probe_is_offered_every_spelling_separately():
+    """The probe's job is to say which name carried the key, so it cannot be
+    handed the collapsed value -- it needs them one by one."""
+    step = _step("screening-check.yml", "screening",
+                 "Is the screening endpoint wired, and does it answer")["env"]
+    for name in llm.SCREENING_KEY_ENV_VARS:
+        assert step[name] == "${{ secrets.%s }}" % name, name
+    assert step["SCREENING_BASE_URL"] == "${{ vars.SCREENING_BASE_URL }}"
+    assert step["SCREENING_MODEL"] == "${{ vars.SCREENING_MODEL }}"
+
+
+def test_the_canonical_spelling_is_the_field_settings_declares():
+    assert llm.SCREENING_KEY_ENV_VARS[0].lower() in Settings.model_fields
+    assert llm.SCREENING_KEY_ENV_VARS[0] == "SCREENING_API_KEY"

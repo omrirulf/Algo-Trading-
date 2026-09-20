@@ -159,7 +159,12 @@ jobs:
           # repository variables; only the key is a secret.
           SCREENING_BASE_URL: ${{ vars.SCREENING_BASE_URL }}
           SCREENING_MODEL: ${{ vars.SCREENING_MODEL }}
-          SCREENING_API_KEY: ${{ secrets.SCREENING_API_KEY }}
+          # Every plausible spelling collapses onto the one name the code
+          # reads. The obvious thing to call a Gemini key is GEMINI_API_KEY,
+          # and a key stored under a name nothing reads is silent: the screen
+          # just stays on Haiku. A secret that does not exist is an empty
+          # string here, which is falsy, so the chain picks the first one set.
+          SCREENING_API_KEY: ${{ secrets.SCREENING_API_KEY || secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY || secrets.GROQ_API_KEY }}
         # --premarket on the first cron only. Batched, the model stages are
         # asked offline at half price, and the waiting for them has to happen
         # somewhere: before the session, or during it. Starting at 12:35 UTC
