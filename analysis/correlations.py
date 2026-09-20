@@ -81,7 +81,7 @@ from typing import Optional, Sequence
 import numpy as np
 import pandas as pd
 
-from config.instruments import EXPOSURE_GROUPS, name_for
+from config.instruments import EQUITY_RISK_BETAS, EXPOSURE_GROUPS, name_for
 from config.watchlist import DEFAULT_WATCHLIST
 
 #: Recent and long windows, in trading days. 60 is about a quarter, 250 about
@@ -608,6 +608,74 @@ def cross_group(returns: pd.DataFrame, stress: pd.Index,
     return sorted(results, key=lambda r: r.rank_by, reverse=True)
 
 
+def risk_axis(
+    returns: pd.DataFrame,
+    stress: pd.Index,
+    crises: Sequence[Crisis] = CRISES,
+    duration: Optional[Sequence[str]] = None,
+    equity: Optional[Sequence[str]] = None,
+) -> dict:
+    """Do bonds and stocks move together -- **raw**, by regime.
+
+    The one question in this module that the excess numbers cannot answer.
+    Everywhere else, correlation is reported after each side's beta to the
+    watchlist average is removed, because two equity groups correlating at
+    0.8 only says "both are equities". Here that common equity factor *is*
+    the question, so subtracting it would subtract the answer.
+
+    Why it is worth a section of its own: ``MAX_EQUITY_RISK_PCT`` and
+    Duration's own ceiling are two independent budgets, and neither looks at
+    the other. Whether that independence is real depends entirely on the sign
+    of this number, and the sign is not stable -- it was negative for most of
+    2000-2020 and positive through 2022.
+
+    Read it as variance, not as a story. For a book holding ``+E`` of stocks
+    and ``+D`` of duration the cross term is ``+2r``; flip either side's sign
+    and the cross term flips with it. So with
+
+    * ``r > 0`` (bonds and stocks fall together, the 2022 regime), a book
+      that is **the same way round** on both -- long/long, or short/short --
+      is one bet made twice, and an opposite-signed book is hedged;
+    * ``r < 0`` (the classic flight-to-quality regime), it is the other way
+      about: long stocks with **short** duration is the doubled bet, because
+      a growth scare rallies the bonds you are short while it sells the
+      stocks you are long.
+
+    ``duration`` defaults to the Duration exposure group and ``equity`` to
+    every ticker in ``EQUITY_RISK_BETAS`` -- that is, exactly the two
+    baskets the two caps bound, so the number answers the question actually
+    being asked of the risk engine rather than a nearby one.
+    """
+    duration = tuple(EXPOSURE_GROUPS.get("Duration", ())) if duration is None else tuple(duration)
+    equity = tuple(EQUITY_RISK_BETAS) if equity is None else tuple(equity)
+    # market=None on purpose: raw is the whole point here.
+    pair = measure_pair(returns, "Duration vs the stock bucket",
+                        duration, equity, stress, None, crises)
+    windows = {"recent": pair.recent, "long": pair.long, "stress": pair.stress}
+    by_crisis = {c.short: {"label": c.label, "raw": c.raw, "days": c.days}
+                 for c in pair.crises}
+    measured = [r for r in list(windows.values()) + [c["raw"] for c in by_crisis.values()]
+                if isinstance(r, float)]
+    return {
+        "duration": list(duration),
+        "equity": list(equity),
+        "observations": pair.observations,
+        "stress_days": pair.stress_days,
+        "windows": windows,
+        "by_crisis": by_crisis,
+        # Whether the sign holds is the finding. A number that changes sign
+        # across regimes means no fixed rule about the two caps can be right
+        # in all of them, which is itself the answer.
+        "sign_is_stable": (
+            None if len(measured) < 2
+            else all(r > 0 for r in measured) or all(r < 0 for r in measured)
+        ),
+        "doubled_when_same_sign": (
+            None if pair.long is None else pair.long > 0
+        ),
+    }
+
+
 def coverage(returns: pd.DataFrame, crises: Sequence[Crisis] = CRISES) -> dict:
     """Which tickers existed when -- without this the crisis table lies.
 
@@ -670,6 +738,7 @@ def report(returns: pd.DataFrame) -> dict:
         "group_cohesion": cohesion(returns),
         "group_cohesion_by_crisis": cohesion_by_crisis(returns),
         "cross_group": [p.as_dict() for p in crossed],
+        "risk_axis": risk_axis(returns, stress),
     }
 
 
@@ -814,6 +883,50 @@ def render(data: dict) -> str:
             "(none -- every group pair's co-movement is explained by the market "
             "factor the gross cap already bounds)"
         )
+
+    axis = data.get("risk_axis")
+    if axis:
+        lines += [
+            "",
+            "## Do bonds and stocks move together? (raw r, not excess)",
+            "",
+            "The two caps that bound the most of this book -- Duration's own "
+            "ceiling and the net stock-market limit -- are separate budgets "
+            "that never look at each other. Whether that is sound depends on "
+            "the sign below, and only on the sign. This is the one table here "
+            "reported RAW: the common equity factor removed everywhere else "
+            "is exactly what is being asked about.",
+            "",
+            f"{'window':<26} {'raw r':>7}",
+            f"{'-' * 26} {'-' * 7}",
+        ]
+        for label, key in (("last year", "recent"), ("long (250d)", "long"),
+                           ("equity stress days", "stress")):
+            lines.append(f"{label:<26} {cell(axis['windows'].get(key)):>7}")
+        if axis["by_crisis"]:
+            lines += ["", f"{'crisis':<26} {'raw r':>7} {'days':>6}",
+                      f"{'-' * 26} {'-' * 7} {'-' * 6}"]
+            for short, row in axis["by_crisis"].items():
+                lines.append(f"{short:<26} {cell(row['raw']):>7} {row['days']:>6}")
+        lines += ["", "What it means for a book holding both:"]
+        if axis["sign_is_stable"] is False:
+            lines += [
+                "  The sign CHANGES between regimes. No fixed rule relating the",
+                "  two caps can then be right in all of them: a duration leg that",
+                "  hedges the stock book in one crisis doubles it in the next.",
+            ]
+        elif axis["doubled_when_same_sign"] is True:
+            lines += [
+                "  r > 0 throughout: long stocks with LONG duration is one bet",
+                "  made twice, and so is short with short. Opposite signs hedge.",
+            ]
+        elif axis["doubled_when_same_sign"] is False:
+            lines += [
+                "  r < 0 throughout: long stocks with SHORT duration is one bet",
+                "  made twice, and so is short with long. Same signs hedge.",
+            ]
+        else:
+            lines.append("  Not enough data to say.")
 
     lines += [
         "",
