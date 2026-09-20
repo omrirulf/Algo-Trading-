@@ -28,7 +28,14 @@ permissions:
 jobs:
   screening:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # Sized for the recall step, not the probe. The probe is one call and a
+    # few seconds; grading is one call per journal line, sequentially, and at
+    # the ~2.4s a hosted endpoint actually answers in, the default 200 lines
+    # is about eight minutes on its own. At 10 minutes -- which is what this
+    # carried from when it only ran the probe -- the first real grading run
+    # was killed at 9m29s, one step before printing the number, having paid
+    # for every call.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
