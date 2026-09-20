@@ -221,18 +221,21 @@ def exposure_from(open_positions: list[dict], equity: Optional[float]) -> dict:
         }
 
     # Net, beta-weighted: longs add and shorts subtract, stocks only
-    # (settings.MAX_EQUITY_RISK_PCT). Shown as the size of the net either way,
-    # since a big net short is as much a bet as a big net long.
+    # (settings.MAX_EQUITY_RISK_PCT). The cap is on the *size* of the net
+    # either way, since a big net short is as much a bet as a big net long --
+    # but the label carries the side, because this is the one row where the
+    # same number means opposite things and the bar cannot show it.
     stock_net = 0.0
     for p in open_positions:
         beta = equity_risk_beta(p["ticker"])
         if beta is not None:
             stock_net += (-1.0 if p["side"] == "sell" else 1.0) * p["market_value"] * beta
+    side = "flat" if round(stock_net, 2) == 0 else "net short" if stock_net < 0 else "net long"
 
     caps = [cap("Whole account", gross, cfg.MAX_GROSS_EXPOSURE_PCT),
             cap("Funds", by_sleeve["funds"], cfg.MAX_FUND_SLEEVE_PCT),
             cap("Single names", by_sleeve["single names"], cfg.MAX_SINGLE_NAME_SLEEVE_PCT),
-            cap("Stock market (net, by beta)", abs(stock_net), cfg.MAX_EQUITY_RISK_PCT)]
+            cap(f"Stock market ({side}, by beta)", abs(stock_net), cfg.MAX_EQUITY_RISK_PCT)]
     groups = sorted(
         (cap(group, used, cfg.EXPOSURE_GROUP_CAP_OVERRIDES.get(group, cfg.MAX_EXPOSURE_GROUP_PCT))
          for group, used in by_group.items()),

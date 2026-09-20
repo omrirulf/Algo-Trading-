@@ -149,8 +149,15 @@ EXPOSURE_GROUP_CAP_OVERRIDES: Final[dict[str, float]] = {
 #: fund at beta 0.54 uses about half the room of a dollar of NVDA at 1.57.
 #: Longs add and shorts subtract -- inside this bucket only. Stocks fell
 #: together in every crash measured, so a short stock fund does offset a long
-#: one; bonds did not offset stocks in 2022, so nothing outside the bucket
-#: nets against it. The group, sleeve and gross caps stay sign-blind.
+#: one; government paper rallied while stocks fell in 2022, so nothing outside
+#: the bucket nets against it. The group, sleeve and gross caps stay sign-blind.
+#:
+#: The bucket is whatever ``EQUITY_RISK_BETAS`` lists, which is not the same
+#: as whatever is called a stock: ``HYG`` (0.45) and ``EMB`` (0.34) are in it,
+#: because credit sells off with equities and counting it at a haircut is
+#: nearer the truth than counting it at zero. The Treasury maturities, the
+#: commodities and ``UUP`` are absent, so they can neither consume this room
+#: nor free any.
 #:
 #: What 60% would have meant, as a share of the account, for a book at the
 #: limit: about 25% lost in the 2008 crisis, 22% in the 2020 crash, 15% in

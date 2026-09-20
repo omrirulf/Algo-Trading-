@@ -145,12 +145,32 @@ def test_equity_is_the_newest_the_journal_recorded_and_fills_the_caps(logs):
     assert whole["headroom"] == 85_000.0 and whole["share"] == pytest.approx(10.5)
     assert names["used"] == 10_000.0 and names["cap"] == 100_000.0 * cfg.MAX_SINGLE_NAME_SLEEVE_PCT
     assert funds["used"] == 0.0
-    # LLY counts at its beta against the stock-market limit.
-    assert stocks["label"].startswith("Stock market")
+    # LLY counts at its beta against the stock-market limit, and the label
+    # says which way the book leans -- the bar cannot, since the cap is on
+    # the size of the net either way.
+    assert stocks["label"] == "Stock market (net long, by beta)"
     assert stocks["used"] == pytest.approx(10_000.0 * 0.66)
     assert stocks["cap"] == 100_000.0 * cfg.MAX_EQUITY_RISK_PCT
     [group] = snap["exposure"]["groups"]
     assert group["cap_pct"] == cfg.MAX_EXPOSURE_GROUP_PCT and group["used"] == 10_000.0
+
+
+def test_a_book_short_the_market_says_short_rather_than_showing_a_bare_size(logs):
+    """The cap is on the size of the net, so the bar reads the same either way.
+
+    A short book at 30% of the stock limit and a long book at 30% draw an
+    identical bar, and they are opposite bets. The label is the only place
+    the side can be shown, so it carries it.
+    """
+    audit, journal = logs
+    write(audit, entry("XBI", 100.0, 104.0, 100, side="sell"),
+          managed("XBI", "held", "2026-09-17 15:47:00,000", price=100.0, remaining=100, new_stop=104.0))
+    write(journal, journal_line("XBI", "2026-09-17T15:48:00+00:00", equity=100_000.0))
+    snap = book.build(audit, journal, DAY)
+    stocks = snap["exposure"]["caps"][3]
+    assert stocks["label"] == "Stock market (net short, by beta)"
+    # Size, not sign: the row shows how big the bet is, as the cap does.
+    assert stocks["used"] == pytest.approx(10_000.0 * 1.03)
 
 
 def test_without_equity_the_caps_say_so_rather_than_guess(logs):
