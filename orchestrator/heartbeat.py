@@ -370,6 +370,9 @@ DISPATCH_FAILED = "dispatch"
 #: The cheap first stage called it NEUTRAL, so the full model was never asked.
 #: A judged outcome, not a failure: the funnel doing its job.
 SCREENED = "screened"
+#: Already in the book, so neither model was asked. The stage before the cheap
+#: one, and the only free stage there is.
+HELD = "held"
 COMPLETED = "done"
 
 #: Human labels, in the order a ticker would meet them.
@@ -377,12 +380,14 @@ STAGE_LABELS: dict[str, str] = {
     CONTEXT_FAILED: "context never gathered",
     MODEL_FAILED: "no usable signal from the model",
     DISPATCH_FAILED: "signal never reached the engine",
+    HELD: "already held; no model asked",
     SCREENED: "screened NEUTRAL; full model not asked",
     COMPLETED: "reached the engine",
 }
 
 #: The stages that mean something broke, in the order a ticker meets them.
-#: ``SCREENED`` is not among them: it is an answer, not a failure.
+#: Neither ``SCREENED`` nor ``HELD`` is among them: one is an answer, the
+#: other is a decision not to buy one.
 FAILURE_STAGES: tuple[str, ...] = (CONTEXT_FAILED, MODEL_FAILED, DISPATCH_FAILED)
 
 #: What to suspect first when every ticker died at the same stage. Names
@@ -442,6 +447,11 @@ class CycleReport:
         return tuple(r for r in self.results if r.stage == SCREENED)
 
     @property
+    def held(self) -> tuple[TickerResult, ...]:
+        """Tickers already in the book, so no model was asked at all."""
+        return tuple(r for r in self.results if r.stage == HELD)
+
+    @property
     def stages(self) -> Counter:
         return Counter(r.stage for r in self.results)
 
@@ -468,13 +478,16 @@ class CycleReport:
         A closed market is not this. Neither is an empty watchlist, which is a
         configuration choice rather than an outage. Nor is a cycle the screen
         ended for every ticker: a first stage that says "nothing today" is a
-        judgement, and one the journal recorded.
+        judgement, and one the journal recorded. Nor, for the same reason, is
+        a cycle that held everything it watches: a full book is a state, not
+        an outage, and the ladder still ran over it.
         """
         return (
             bool(self.tickers)
             and not self.market_closed
             and not self.completed
             and not self.screened
+            and not self.held
         )
 
 
@@ -509,6 +522,17 @@ def render_summary(report: CycleReport) -> str:
         ]
     else:
         out += [f"**{reached} of {attempted}** tickers reached the engine.", ""]
+
+    if report.held:
+        # Reported before the screen because it happens before it, and
+        # separately because it is the one stage that costs nothing: these
+        # tickers were managed by the ladder, not judged by a model.
+        out += [
+            f"**{len(report.held)} of {attempted}** already held; no model "
+            "asked. The open book is managed by the profit ladder and its "
+            "stops, not by a fresh signal.",
+            "",
+        ]
 
     if screened:
         # Reported apart from the failures: a first stage that says "nothing
@@ -770,6 +794,7 @@ def process_ticker(
     dispatcher: Dispatcher | None = None,
     fx: FxRate | None = None,
     weights: blend.LoadedWeights | None = None,
+    held: frozenset[str] = frozenset(),
 ) -> TickerResult:
     """Run one ticker end to end, and report how far it got.
 
@@ -779,6 +804,11 @@ def process_ticker(
 
     ``weights`` is the cycle's one read of the blend weights; left ``None``,
     the file is read here, which is what a ticker run on its own gets.
+
+    ``held`` is the cycle's one read of the open book. A ticker in it is
+    journalled and dropped before either model is asked -- see
+    ``SKIP_HELD_TICKERS``. Empty by default, so a ticker run on its own is
+    reviewed whether or not it is held.
     """
     try:
         ticker_context = build_context(ticker)
@@ -800,6 +830,18 @@ def process_ticker(
         flows.record(ticker_context.ticker, shares, source, cfg.FUND_SIZE_LOG_PATH)
 
     gaps = len(ticker_context.gaps)
+
+    # Stage zero, and the only free one. A name already in the book is managed
+    # by the ladder and its stop, both of which ran before this loop and
+    # neither of which needs an opinion; what a fresh signal could add here is
+    # a top-up, at the price of the full funnel. The context above is gathered
+    # and journalled regardless, so the day is not a hole in the record and a
+    # replay can still price what was skipped.
+    if cfg.SKIP_HELD_TICKERS and ticker in held:
+        log.info("%s: already held; no model asked", ticker)
+        journal.record(ticker_context, fx=fx, held=True)
+        return TickerResult(ticker, HELD, gaps=gaps)
+
     if ticker_context.gaps:
         # Worth a warning, not an info: the model is being asked to judge on
         # less than the strategy assumes it has.
@@ -919,6 +961,33 @@ def manage_positions(dispatcher: Dispatcher) -> dict | None:
     return outcome
 
 
+def open_tickers(dispatcher: Dispatcher) -> frozenset[str]:
+    """What the book already holds. Never raises; empty when it cannot tell.
+
+    Empty on failure is the safe direction here, and the asymmetry is worth
+    stating: a book read as smaller than it is costs a model call on a name
+    already held, while a book read as larger than it is would skip a ticker
+    that could have been bought. The first is money, the second is a missed
+    trade, so anything short of a clear answer reviews the whole watchlist --
+    which is what the cycle did before this stage existed.
+
+    ``None`` is not returned for "cannot tell" because there is nothing a
+    caller could do with it that differs from reviewing everything; the log
+    line is what separates the two cases for a human reading the run.
+    """
+    read = getattr(dispatcher, "open_tickers", None)
+    if read is None:
+        # A test double, or webhook mode -- where the orchestrator holds no
+        # broker credentials by design and so has no book to read.
+        log.info("this dispatcher cannot read the open book; every ticker will be reviewed")
+        return frozenset()
+    try:
+        return frozenset(read())
+    except Exception as exc:  # noqa: BLE001 - never worth ending a cycle over
+        log.warning("could not read the open book (%s); every ticker will be reviewed", exc)
+        return frozenset()
+
+
 def protect_positions(dispatcher: Dispatcher | None = None) -> dict:
     """Give every open position that has no stop one back, and nothing else.
 
@@ -982,8 +1051,18 @@ def run_cycle(dispatcher: Dispatcher | None = None) -> CycleReport:
     # ladder one day, not the cycle.
     positions = manage_positions(dispatcher)
 
+    # Read after the ladder, because the ladder can close a position out of
+    # the book and a name it just exited is a candidate again today. One read
+    # per cycle, not one per ticker.
+    held = open_tickers(dispatcher) if cfg.SKIP_HELD_TICKERS else frozenset()
+    if held:
+        log.info(
+            "%d of %d already held; no model will be asked for them: %s",
+            len(held & set(tickers)), len(tickers), ", ".join(sorted(held & set(tickers))),
+        )
+
     log.info("heartbeat cycle start: %s", list(tickers))
-    results = tuple(process_ticker(ticker, dispatcher, fx, weights) for ticker in tickers)
+    results = tuple(process_ticker(ticker, dispatcher, fx, weights, held) for ticker in tickers)
     report = CycleReport(
         tickers=tickers,
         results=results,

@@ -74,6 +74,20 @@ class DirectDispatcher:
     def is_market_open(self) -> bool:
         return bool(self._get_engine().broker.is_market_open())
 
+    def open_tickers(self) -> frozenset[str]:
+        """Symbols currently in the book, for the caller that skips them.
+
+        Lets a ``BrokerError`` out rather than reporting an empty book: an
+        empty set is a real answer -- nothing is held, review everything --
+        and a caller that cannot tell it from a broker it failed to read
+        cannot say which of the two a quiet cycle was.
+        """
+        return frozenset(
+            p.ticker.strip().upper()
+            for p in self._get_engine().broker.get_open_positions()
+            if p.ticker
+        )
+
     def manage_positions(self, protect_only: bool = False) -> dict:
         # Same broker and feed the engine uses, so a tranche is priced off
         # the quote a new entry would be.

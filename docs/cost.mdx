@@ -37,9 +37,40 @@ That ordering matters: **effort is a bigger lever than model tier.**
 | 1 | `EFFORT` | Directly moves the 84% |
 | 2 | Model tier | Multiplies both halves |
 | 3 | The funnel (`SCREENING_ENABLED`) | Removes whole calls: the share of the watchlist the screen calls NEUTRAL |
-| 4 | Watchlist length | Linear in calls |
-| 5 | `HEARTBEAT_INTERVAL_MINUTES` | Linear in calls |
-| 6 | Prompt caching | Only touches the 16% |
+| 4 | `SKIP_HELD_TICKERS` | Removes whole calls: the share of the watchlist already in the book |
+| 5 | Watchlist length | Linear in calls |
+| 6 | `HEARTBEAT_INTERVAL_MINUTES` | Linear in calls |
+| 7 | Prompt caching | Only touches the 16% |
+
+## Stage zero: what the book already holds
+
+A ticker already in the book is asked nothing, by either model. It is
+journalled with its context, counted in the cycle report as `held`, and
+dropped before the screen.
+
+The reasoning is that the open book is already managed, and not by an opinion.
+`PositionManager` walks it every cycle — profit-ladder tranches, stop raising,
+ATR trailing stops, re-protecting a naked stop — all arithmetic, all free. A
+fresh signal on a held name could only add a top-up, and it was being bought
+at the price of the full funnel.
+
+What this gives up is stated where it is configured: the top-up, and the flip
+block that rejected a signal opposite to the side held. Neither is
+load-bearing — a position that goes wrong is closed by its stop, and one that
+goes right is trimmed up the ladder.
+
+With 12 names held against a watchlist of 80, this is about 15% of a cycle's
+calls. The direction is the point: model spend goes to the names that could
+still become positions, against `MAX_OPEN_POSITIONS` of 40, rather than to the
+half of the book that already is one.
+
+<Note>
+  It degrades to the old behaviour on its own. If the open book cannot be read
+  — a broker error, or webhook mode, where the orchestrator holds no broker
+  credentials by design — every ticker is reviewed and the run log says why.
+  Skipping a ticker nobody holds is a missed trade; reviewing one that is held
+  is a wasted call, and the second is the cheaper mistake.
+</Note>
 
 ## The funnel
 

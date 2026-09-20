@@ -228,6 +228,26 @@ PROFIT_LADDER: Final[tuple[LadderRung, ...]] = (
 #: only make the book wider; they cannot make it more concentrated.
 MAX_OPEN_POSITIONS: Final[int] = 40
 
+#: Skip the model entirely on a ticker already in the book.
+#:
+#: Stage zero of the funnel, and the only free one: a held name is asked
+#: nothing, by either model. What that gives up is the top-up -- the engine
+#: sizes a fresh signal on a held name as an addition to the existing
+#: exposure -- and the flip block, which rejects a signal opposite to the side
+#: held. Neither is load-bearing. A position that has gone wrong is closed by
+#: its stop, and one that has gone right is trimmed up the ladder by
+#: ``PositionManager``; both run every cycle, on arithmetic, for nothing. So
+#: the daily re-read of a held name bought an averaging-in decision at full
+#: model price, on the one part of the book that is already being managed.
+#:
+#: The cost is real and the direction is deliberate: the watchlist is 80 names
+#: against MAX_OPEN_POSITIONS of 40, so a cycle's model spend should go to the
+#: names that could still become positions, not the ones that already are.
+#: Turn this off to restore the old behaviour -- every ticker reviewed, held
+#: or not -- and note that it degrades to that on its own if the open book
+#: cannot be read.
+SKIP_HELD_TICKERS: Final[bool] = True
+
 #: Wilder ATR lookback, in trading days.
 ATR_PERIOD: Final[int] = 14
 

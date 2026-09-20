@@ -38,6 +38,7 @@ to settle: **are the signals any good?**
   },
   "outcome": { "http_status": 200, "status": "ACCEPTED", "quantity": 50, "order_id": "..." },
   "screen": { "model": "claude-haiku-4-5", "bias": "BULLISH", "conviction": 0.55, "usage": { "...": "..." } },
+  "held": false,
   "error": null
 }
 ```
@@ -51,6 +52,13 @@ so on those lines `signal` *is* the screen's answer, `outcome` is `null`, and
 the disagreement has to be estimated from a sample run with screening off. A
 screen that failed carries `{"model": ..., "error": ...}` instead; `null`
 means screening was disabled.
+
+`held` is `true` on a line where the ticker was already in the book and
+neither model was asked (see [cost](/cost#stage-zero-what-the-book-already-holds)).
+The context was still gathered, so the line carries everything a replay would
+need to price what the skip cost; `signal`, `usage` and `outcome` are all
+`null`, and — unlike a line with an `error` — that is not a failure to
+explain.
 
 `context.sources` is the same news as `context.headlines`, structured, with the
 URL each prompt line leaves out — so a signal can be checked against the story
