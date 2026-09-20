@@ -33,6 +33,7 @@ on:
   pull_request:
     paths:
       - "analysis/correlations.py"
+      - "analysis/volatility.py"
       - ".github/workflows/correlations.yml"
       - "config/instruments.py"
 
@@ -75,6 +76,17 @@ jobs:
           python -m analysis.correlations $ARGS | tee correlations.txt
           python -m analysis.correlations $ARGS --json > correlations.json
 
+      - name: Measure the VIX regimes
+        # Separate step, same job: it needs the same network and the same
+        # twenty years, but answers a different question -- whether leaning
+        # into fear pays, and what a trade already risks in that regime.
+        env:
+          START: ${{ inputs.start || '2007-01-01' }}
+        run: |
+          set -o pipefail
+          python -m analysis.volatility --start "$START" | tee volatility.txt
+          python -m analysis.volatility --start "$START" --json > volatility.json
+
       - name: Publish to the run summary
         if: always()
         run: |
@@ -83,6 +95,12 @@ jobs:
             echo
             echo '```'
             cat correlations.txt 2>/dev/null || echo "(did not run)"
+            echo '```'
+            echo
+            echo '## VIX regimes'
+            echo
+            echo '```'
+            cat volatility.txt 2>/dev/null || echo "(did not run)"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -93,3 +111,5 @@ jobs:
           path: |
             correlations.txt
             correlations.json
+            volatility.txt
+            volatility.json
