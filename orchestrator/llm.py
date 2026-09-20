@@ -278,6 +278,32 @@ class BatchTimeout(LLMError):
         self.batch_id = batch_id
 
 
+def cached_system(system_prompt: str) -> list[dict]:
+    """The system prompt as one cacheable block, with the breakpoint on it.
+
+    Placement is the whole point, and getting it wrong is silent. Passing
+    ``cache_control`` as a top-level request parameter caches *the last
+    cacheable block*, which in this request is the per-ticker user prompt --
+    a different string every call. That is what the cycle did until now, and
+    the journal recorded the result exactly: across 934 calls,
+    1,869,345 tokens written to cache and **zero** ever read, with Opus
+    reporting 406 uncached input tokens in total because the entire request
+    was being billed as a cache write at 1.25x and then thrown away.
+
+    Attached here instead, the breakpoint sits after the system prompt --
+    byte-identical across every ticker in a cycle -- and the volatile user
+    prompt falls outside it. The first call of a cycle writes; the rest read
+    at 0.1x.
+
+    Two things bound the saving, and neither is a reason to move it back: the
+    cache is scoped per model, so the screen and the full model each pay one
+    write; and a prompt under the model's minimum cacheable prefix does not
+    cache at all. ``cache_read_input_tokens`` in the journal is how either
+    shows up, which is why it is recorded rather than assumed.
+    """
+    return [{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}]
+
+
 class AnthropicSignalProvider:
     def __init__(self, api_key: str, client: Any | None = None) -> None:
         # ``api_key or None`` turns a blank ANTHROPIC_API_KEY into "let the
@@ -318,8 +344,7 @@ class AnthropicSignalProvider:
         return dict(
             model=request.model or MODEL,
             max_tokens=MAX_TOKENS,
-            cache_control={"type": "ephemeral"},
-            system=request.system_prompt,
+            system=cached_system(request.system_prompt),
             messages=[{"role": "user", "content": request.user_prompt}],
             thinking={"type": "adaptive"},
             output_config={
@@ -440,14 +465,7 @@ class AnthropicSignalProvider:
         kwargs: dict[str, Any] = dict(
             model=model or MODEL,
             max_tokens=MAX_TOKENS,
-            # Caches the last cacheable block -- here the system prompt,
-            # which is byte-identical across every ticker in a cycle. Whether
-            # it actually caches depends on the model's minimum cacheable
-            # prefix, so the journal records cache_read_input_tokens rather
-            # than assuming a saving: zero reads across a cycle means the
-            # prompt is under the threshold and this line is doing nothing.
-            cache_control={"type": "ephemeral"},
-            system=system_prompt,
+            system=cached_system(system_prompt),
             messages=[{"role": "user", "content": user_prompt}],
             output_config=output_config,
         )
