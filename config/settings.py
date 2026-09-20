@@ -121,12 +121,22 @@ MAX_EXPOSURE_GROUP_PCT: Final[float] = 0.25
 #: The number is set by how much the bucket can *lose*, not by how tightly its
 #: members move together. They do move together -- that is why they are one
 #: group -- but a cap is a loss budget, and correlation alone does not say how
-#: large the loss is. As a basket Duration's worst fall was 18.9% (2022), so
-#: 30% of the account risks about 5.7% of it. One equity group at 25% already
-#: risks more: real estate fell 64% in the 2008 crisis, which is 16% of the
-#: account. A tighter number here would be buying less protection than the
-#: equity groups already give away, while forbidding the one asset that
-#: usually rallies when they fall.
+#: large the loss is.
+#:
+#: Size it on the worst fill the caps actually *permit*, not on the basket
+#: average. This cap counts market value, so it is blind to the fact that TLT
+#: is roughly ten times as volatile as SHY -- $30 of each is the same number
+#: to it, and in 2022 one fell 31.2% and the other 3.9%. What stops that being
+#: a hole is the 12% per-position cap: 30% cannot be filled with TLT alone, it
+#: needs three funds. The worst reachable fill is TLT 12% + LQD 12% + IEF 6%,
+#: which on calendar-2022 returns loses **6.8% of the account** (peak to
+#: trough, somewhat more). The basket average -- an 18.9% fall, 5.7% of the
+#: account -- is the number an evenly-spread book gets, not the ceiling.
+#:
+#: One equity group at 25% still risks more: real estate fell 64% in the 2008
+#: crisis, which is 16% of the account. A tighter number here would be buying
+#: less protection than the equity groups already give away, while forbidding
+#: the one asset that usually rallies when they fall.
 #:
 #: Read against what this replaces rather than against the general cap: 25% of
 #: Treasuries plus 25% of LQD through Credit was really a 50% ceiling on one

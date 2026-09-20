@@ -673,6 +673,16 @@ def risk_axis(
     The near-zero stress-days figure is not a third answer: that window
     blends both regimes across twenty years, so the two signs cancel. It is
     the reason the crises are measured one at a time.
+
+    **Do not read "five of six negative" as the norm.** This sample starts in
+    2007, so it is almost entirely the post-2000 era, which is exactly the
+    stretch in which bonds hedged stocks. An independent review put the
+    longer record the other way about -- AQR and Russell both report the US
+    stock/bond correlation as positive more often than not across the
+    twentieth century. If that holds, the regime this function measures most
+    of is the anomaly, and 2022 is the reversion. Either way the conclusion
+    is the same and is the only one the data supports: the sign is a regime,
+    not a constant, and neither sign may be assumed.
     """
     duration = tuple(EXPOSURE_GROUPS.get("Duration", ())) if duration is None else tuple(duration)
     equity = tuple(EQUITY_RISK_BETAS) if equity is None else tuple(equity)
