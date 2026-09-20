@@ -523,6 +523,18 @@ class AnthropicSignalProvider:
         return Completion(text=text, usage=usage_from_response(response, model or MODEL))
 
 
+#: What ``reasoning=False`` becomes on a chat-completions endpoint, since that
+#: shape has no ``thinking: {type: "disabled"}`` of its own. Provider-agnostic
+#: by construction: it is plain text appended to the system prompt, not a
+#: field a specific API has to recognise, so it does something on every model
+#: that reads a system prompt -- which is every one of them -- rather than
+#: only the ones that happen to support a vendor-specific switch.
+NO_REASONING_INSTRUCTION = (
+    "\n\nAnswer directly and immediately: do not show your reasoning, chain "
+    "of thought, or an internal monologue before the final JSON object."
+)
+
+
 class OpenAICompatibleProvider:
     """A second provider, for anything serving the OpenAI chat-completions shape.
 
@@ -539,10 +551,26 @@ class OpenAICompatibleProvider:
     A model reached through this class has to be somewhere else: a self-hosted
     runner, or a machine on the network serving the endpoint.
 
-    Three Anthropic-shaped request parts are dropped rather than translated,
-    because they have no counterpart here: adaptive thinking, ``effort``, and
-    the cache breakpoint. ``effort`` and ``reasoning`` are accepted and ignored
-    so the two providers remain substitutable at the call site.
+    Two Anthropic-shaped request parts are dropped rather than translated,
+    because they have no counterpart here: adaptive thinking's own on/off
+    switch, and the cache breakpoint. ``effort`` has no counterpart either and
+    stays unused -- nothing in this codebase calls this class with
+    ``reasoning=True``, so there is nothing to tune the depth of.
+
+    ``reasoning=False`` is different: production's whole reason for asking
+    with reasoning off is that the screen is meant to be a fast, cheap read,
+    not a deliberation, and a candidate that reasons anyway is answering a
+    different question than Haiku was asked -- silently, since a chat
+    endpoint's response carries no flag saying it thought first. So this is
+    honoured two ways, because no single mechanism is honoured everywhere:
+    a plain-English instruction appended to the system prompt, which every
+    model that reads a system prompt at all will read, and a best-effort
+    ``reasoning_effort: "low"`` field, which several providers (Groq's
+    ``gpt-oss`` family, OpenAI's own o-series among them) read directly. A
+    server that does not recognise that field is expected to ignore an
+    unrecognised top-level key rather than reject the request -- the same
+    tolerance that lets ``response_format`` be sent at all without knowing in
+    advance whether the far end honours it.
 
     A server that ignores ``response_format`` and answers in prose raises
     ``LLMError`` like any other bad answer, which the funnel already treats as
@@ -596,7 +624,9 @@ class OpenAICompatibleProvider:
         reasoning: bool = True,
     ) -> "Completion":
         name = model or self._model
-        body = {
+        if not reasoning:
+            system_prompt = system_prompt + NO_REASONING_INSTRUCTION
+        body: dict[str, Any] = {
             "model": name,
             "max_tokens": MAX_TOKENS,
             "messages": [
@@ -612,6 +642,8 @@ class OpenAICompatibleProvider:
                 },
             },
         }
+        if not reasoning:
+            body["reasoning_effort"] = "low"
         payload = self._post(body)
         try:
             text = payload["choices"][0]["message"]["content"]

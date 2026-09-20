@@ -79,13 +79,55 @@ def test_the_request_carries_the_schema_and_nothing_anthropic_shaped():
         sent.update(json.loads(request.content))
         return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps(ANSWER)}}]})
 
-    _provider(_server(handler)).complete_detailed("sys", "user", SCHEMA, reasoning=False)
+    # reasoning=True: nothing rewrites the prompt, so this is the plain shape.
+    _provider(_server(handler)).complete_detailed("sys", "user", SCHEMA, reasoning=True)
     assert sent["messages"][0] == {"role": "system", "content": "sys"}
     assert sent["messages"][1] == {"role": "user", "content": "user"}
     assert sent["response_format"]["json_schema"]["schema"]["type"] == "object"
-    # These three have no counterpart here and are dropped, not translated.
-    for absent in ("thinking", "output_config", "cache_control", "betas", "fallbacks"):
+    # These have no counterpart here and are dropped, not translated.
+    for absent in ("thinking", "output_config", "cache_control", "betas", "fallbacks", "reasoning_effort"):
         assert absent not in sent
+
+
+# --- reasoning=False, which chat-completions has no native switch for -----
+
+
+def test_reasoning_off_appends_a_plain_instruction_to_the_system_prompt():
+    sent = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.update(json.loads(request.content))
+        return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps(ANSWER)}}]})
+
+    _provider(_server(handler)).complete_detailed("sys", "user", SCHEMA, reasoning=False)
+    system = sent["messages"][0]["content"]
+    assert system.startswith("sys")
+    assert "do not show your reasoning" in system.lower()
+    # The user turn is untouched -- only the system prompt carries the ask.
+    assert sent["messages"][1] == {"role": "user", "content": "user"}
+
+
+def test_reasoning_off_also_sends_a_best_effort_reasoning_effort_field():
+    sent = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.update(json.loads(request.content))
+        return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps(ANSWER)}}]})
+
+    _provider(_server(handler)).complete_detailed("sys", "user", SCHEMA, reasoning=False)
+    assert sent["reasoning_effort"] == "low"
+
+
+def test_reasoning_on_sends_neither():
+    sent = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.update(json.loads(request.content))
+        return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps(ANSWER)}}]})
+
+    _provider(_server(handler)).complete_detailed("sys", "user", SCHEMA, reasoning=True)
+    assert sent["messages"][0] == {"role": "system", "content": "sys"}
+    assert "reasoning_effort" not in sent
 
 
 def test_a_key_is_sent_only_when_there_is_one():
