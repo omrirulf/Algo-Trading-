@@ -218,8 +218,23 @@ def _agreement(run: ScoringRun) -> str:
         f"{_rho(check.dispersion_vs_conviction)} (negative is correct)"
     )
     lines.append(
-        "  Across several dimensions unanimity is rare and 'at least one dissents' is\n"
-        "  the common case — read the spread correlation as the finer measure."
+        f"    ...but spread vs loudest single score: "
+        f"{_rho(check.dispersion_vs_magnitude)} — the two are nearly the same series,"
+    )
+    lines.append(
+        "    so the raw number above mostly asks 'is something shouting?', and charges"
+    )
+    lines.append(
+        "    the model for being confident about a strong signal -- which the prompt asks for."
+    )
+    lines.append(
+        f"  holding magnitude fixed:               "
+        f"{_rho(check.dispersion_vs_conviction_controlled)} <- THE FINER MEASURE"
+    )
+    lines.append(
+        "  The instruction is directional ('bullish news on a technically broken,\n"
+        "  richly valued name'), so what counts is conviction falling when the\n"
+        "  dimensions CONFLICT, not when one of them is merely large."
     )
     if min(check.aligned_n, check.conflicted_n) < MIN_BUCKET:
         lines.append(f"  {_thin(min(check.aligned_n, check.conflicted_n))}")
