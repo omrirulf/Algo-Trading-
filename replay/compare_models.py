@@ -85,6 +85,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                              "sample large enough to separate 97%% from 90%% is hours "
                              "sequentially and minutes in parallel. Ignored for Claude, "
                              "which would just meet a rate limit.")
+    parser.add_argument("--timeout", type=float, default=0,
+                        help="per-call timeout in seconds, --base-url only. The "
+                             "default one decides WHICH contexts get graded: a call "
+                             "that runs long is one the model found hard, so cutting "
+                             "it drops the hard contexts and grades the candidate on "
+                             "the easy remainder. Raise it when the failure breakdown "
+                             "is mostly timeouts.")
     parser.add_argument("--json", action="store_true", dest="as_json")
     return parser.parse_args(argv)
 
@@ -104,9 +111,11 @@ def cells_to_probe(args: argparse.Namespace) -> list[tuple[str, str]]:
 def run_cell(
     entries, model: str, effort: str, baseline_by_key: dict,
     base_url: str = "", api_key: str = "", workers: int = 1,
+    timeout: float | None = None,
 ) -> Cell:
     complete, usages = runner.measured_completer(
-        model=model, effort=effort, base_url=base_url, api_key=api_key
+        model=model, effort=effort, base_url=base_url, api_key=api_key,
+        timeout=timeout,
     )
     # Per-ticker system prompts, not the one shared string: a fund is sent the
     # macro prompt trimmed to the sections it carried, and the recorded answer
@@ -219,7 +228,8 @@ def main(argv: list[str] | None = None) -> int:
         # Claude path would be firing a whole journal at a rate limit, and a
         # rate-limited context is a lost one where a slow one is only slow.
         workers = args.concurrency if args.base_url else 1
-        cell = run_cell(entries, model, effort, {}, args.base_url, args.api_key, workers)
+        cell = run_cell(entries, model, effort, {}, args.base_url, args.api_key,
+                        workers, args.timeout or None)
         cells.append(cell)
         if clears_floor(cell, args.floor) and (
             incumbent is None
