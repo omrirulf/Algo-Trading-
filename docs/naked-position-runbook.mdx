@@ -23,6 +23,34 @@ position manager recorded each one as `unmanaged` and moved on, because at
 the time an unmanaged position and a healthy one looked the same in the
 record.
 
+## What happened on 21 September
+
+A different cause, the same alarm. `TEVA` was a **one-share** position, which
+is below the three shares a tranche needs, so the trail was the only thing
+that ever ran on it -- and the trail failed every time with
+`42210000 qty cannot be changed for advanced orders`.
+
+Its stop was still the leg of the bracket that opened it, and Alpaca will not
+change the quantity of an order belonging to a bracket. The manager was
+sending a quantity on every replace, including a pure trail where the
+quantity was not changing at all, and Alpaca refuses on the *presence* of the
+field rather than its value. So the stop never ratcheted up, the manager
+recorded an error, and `analysis/health.py` -- which cannot tell a failed
+*move* from a missing stop -- called it critical.
+
+The position was never actually unprotected: a rejected replace changes
+nothing, so the original stop stayed live the whole time. The protection pass
+run that afternoon confirmed it, finding nothing to protect. The fix is in
+`broker_client.replace_stop_order`, which now leaves the quantity out of the
+request when it is not changing.
+
+<Note>
+A genuine resize on a bracket leg -- shrinking the stop before selling a
+ladder tranche -- is still refused by Alpaca, and deliberately still fails
+loudly. The way around it is to cancel and resubmit, which opens a window
+with no stop at all, and that is the one thing this module may never do.
+</Note>
+
 ## How it's caught automatically now
 
 Three layers, from most routine to most urgent:
