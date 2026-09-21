@@ -87,6 +87,17 @@ class JournalEntry:
     #: ATR(14) as a share of price at signal time, from the journalled
     #: technicals. What the trainer scales a return by.
     atr_pct: Optional[float] = None
+    #: The whole journalled technicals section, as written. The rule arms in
+    #: ``rules/`` are functions of exactly this, so keeping it on the entry is
+    #: what lets ``analysis/horse_race.py`` recompute what each arm would have
+    #: said on every line ever journalled -- including every line written
+    #: before the arms existed. Empty when the line carried no technicals.
+    technicals: dict[str, Any] = field(default_factory=dict)
+    #: True when the ticker was already in the book and no model was asked.
+    #: A race between arms has to leave these out of every arm alike: the
+    #: model did not decline the name, it was never offered it, and a
+    #: rule-based system holding the same book would not have been either.
+    held: bool = False
     #: Source sections the prompt actually carried, out of ``SOURCE_SECTIONS``.
     #: ``None`` on a line that journalled no context at all: an empty set says
     #: the prompt offered nothing, ``None`` says the line cannot tell us, and
@@ -251,6 +262,8 @@ def entry_from(payload: Any) -> Optional[JournalEntry]:
         blend=payload.get("blend") if isinstance(payload.get("blend"), dict) else {},
         model=_text(usage.get("model")),
         atr_pct=_number(technicals.get("atr_pct_of_price")),
+        technicals=dict(technicals),
+        held=bool(payload.get("held")),
         sections=_sections(payload),
     )
 

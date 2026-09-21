@@ -23,6 +23,7 @@ from app.schemas import LLMSignal
 from orchestrator.fx import FxRate
 from orchestrator.pricing import Usage
 from config import settings as cfg
+from orchestrator import arms
 from orchestrator.context import TickerContext
 
 log = logging.getLogger(__name__)
@@ -63,6 +64,7 @@ def record(
 ) -> None:
     """Write one journal line. Swallows its own failures by design."""
     try:
+        now = datetime.now(timezone.utc)
         get_journal_logger().info(
             "signal_generated",
             extra={
@@ -70,7 +72,7 @@ def record(
                 # is not enough to tell whether a signal fired before or after
                 # the session close -- and that decides which bar a scorer may
                 # honestly use as the entry price.
-                "ts_utc": datetime.now(timezone.utc).isoformat(),
+                "ts_utc": now.isoformat(),
                 "ticker": context.ticker,
                 "context": context.as_dict(),
                 "signal": signal.model_dump(mode="json") if signal else None,
@@ -95,6 +97,14 @@ def record(
                 # scored against realised returns exactly as conviction is;
                 # nothing in the cycle reads it back.
                 "blend": blend,
+                # What the rule arms in rules/ would have said, from the same
+                # technicals the model saw. Computed here rather than passed
+                # in, so it is on every line -- screened, held, failed -- and
+                # no call site can leave it off. The race in
+                # analysis/horse_race.py is only fair if the rule got to
+                # answer on every ticker the model did, not just the ones the
+                # model chose to. Nothing in the cycle reads it back.
+                "arms": arms.arms_record(context, now.date()),
                 # True when the ticker was already in the book and no model
                 # was asked. The context above was still gathered, so these
                 # lines are what a later replay would need to price what

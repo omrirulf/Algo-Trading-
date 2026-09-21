@@ -152,3 +152,38 @@ def test_the_model_and_the_atr_come_through_for_the_trainer():
     assert entry.atr_pct == pytest.approx(0.031)
     bare = reader.entry_from(FULL)
     assert bare.model is None and bare.atr_pct is None
+
+
+def test_the_whole_technicals_section_rides_on_the_entry():
+    """The rule arms are functions of this, so the harness needs all of it,
+    not the one ATR field the trainer happened to want."""
+    from analysis.reader import entry_from
+
+    payload = {
+        "ticker": "NVDA",
+        "ts_utc": "2026-09-21T14:00:00+00:00",
+        "context": {"technicals": {"return_63d": 0.07, "distance_sma50": 0.02,
+                                   "annualised_volatility": 0.25, "atr_pct_of_price": 0.02}},
+        "signal": {"bias": "BULLISH", "conviction": 0.5},
+    }
+    entry = entry_from(payload)
+    assert entry.technicals["return_63d"] == 0.07
+    assert entry.atr_pct == 0.02
+
+
+def test_a_line_with_no_technicals_has_an_empty_dict_not_none():
+    from analysis.reader import entry_from
+
+    entry = entry_from({"ticker": "NVDA", "ts_utc": "2026-09-21T14:00:00+00:00", "context": {}})
+    assert entry.technicals == {}
+
+
+def test_a_held_line_is_flagged_so_a_race_can_leave_it_out_of_every_arm():
+    from analysis.reader import entry_from
+
+    held = entry_from({"ticker": "NVDA", "ts_utc": "2026-09-21T14:00:00+00:00",
+                       "context": {}, "held": True})
+    asked = entry_from({"ticker": "NVDA", "ts_utc": "2026-09-21T14:00:00+00:00",
+                        "context": {}, "signal": {"bias": "NEUTRAL", "conviction": 0.1}})
+    assert held.held is True
+    assert asked.held is False
