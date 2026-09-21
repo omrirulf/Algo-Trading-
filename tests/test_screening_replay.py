@@ -666,3 +666,110 @@ def test_no_timeout_given_leaves_the_provider_default_alone():
     finally:
         _llm.OpenAICompatibleProvider = original
     assert "timeout" not in seen
+
+
+# --- asking which one was right, not which one agreed ----------------------
+
+
+def test_an_emitted_line_is_shaped_like_the_journal_the_scorer_reads():
+    """The whole point is to reuse analysis/score_journal.py rather than
+    reimplement realised returns. A line it cannot parse silently scores
+    nothing."""
+    from analysis.reader import read_journal
+    from app.schemas import LLMSignal
+
+    entry = runner.ReplayEntry(
+        ticker="AAPL", ts_utc="2026-09-12T14:00:00+00:00", prompt="p",
+        original=None, context=TickerContext(ticker="AAPL", headlines=["h"]),
+    )
+    signal = LLMSignal(ticker="AAPL", bias="BULLISH", conviction=0.7, rationale="r")
+
+    import tempfile
+    from pathlib import Path
+
+    with tempfile.TemporaryDirectory() as d:
+        path = Path(d) / "one.jsonl"
+        path.write_text(runner.as_journal_line(entry, signal) + "\n")
+        read = read_journal(path)
+    assert read.skipped == 0
+    assert len(read.entries) == 1
+    assert read.entries[0].ticker == "AAPL"
+
+
+def test_the_emitted_line_keeps_the_recorded_moment_and_ticker():
+    """Scoring a candidate at a different moment than the incumbent would
+    make the return difference partly a difference in which market each was
+    asked about."""
+    from app.schemas import LLMSignal
+
+    entry = runner.ReplayEntry(
+        ticker="MSFT", ts_utc="2026-08-01T13:45:00+00:00", prompt="p",
+        original=None, context=TickerContext(ticker="MSFT", headlines=["h"]),
+    )
+    line = json.loads(runner.as_journal_line(
+        entry, LLMSignal(ticker="MSFT", bias="BEARISH", conviction=0.5, rationale="r")))
+    assert line["ts_utc"] == "2026-08-01T13:45:00+00:00"
+    assert line["ticker"] == "MSFT"
+    assert line["signal"]["bias"] == "BEARISH"
+
+
+def test_only_contexts_both_answered_are_printed(capsys):
+    """A candidate scored on more days than the incumbent is being compared
+    on a different market, not a different model."""
+    from app.schemas import LLMSignal
+    from replay.compare_models import _print_pairs
+
+    def _entry(ticker, original):
+        return runner.ReplayEntry(
+            ticker=ticker, ts_utc="2026-09-12T14:00:00+00:00", prompt="p",
+            original=original, context=TickerContext(ticker=ticker, headlines=["h"]),
+        )
+
+    both = _entry("AAA", LLMSignal(ticker="AAA", bias="BULLISH", conviction=0.8, rationale="i"))
+    candidate_failed = _entry("BBB", LLMSignal(ticker="BBB", bias="BULLISH", conviction=0.8, rationale="i"))
+    no_incumbent = _entry("CCC", None)
+
+    results = [
+        runner.ReplayResult(entry=both, replayed=LLMSignal(
+            ticker="AAA", bias="BEARISH", conviction=0.6, rationale="c")),
+        runner.ReplayResult(entry=candidate_failed, replayed=None, error="boom"),
+        runner.ReplayResult(entry=no_incumbent, replayed=LLMSignal(
+            ticker="CCC", bias="BEARISH", conviction=0.6, rationale="c")),
+    ]
+
+    assert _print_pairs(results, []) == 1
+    records = [json.loads(l) for l in capsys.readouterr().out.splitlines() if l.strip()]
+    by_side = {r["_side"]: r["line"] for r in records}
+    assert set(by_side) == {"candidate", "incumbent"}
+    assert by_side["candidate"]["ticker"] == "AAA"
+    assert by_side["incumbent"]["ticker"] == "AAA"
+    assert by_side["candidate"]["signal"]["bias"] == "BEARISH"
+    assert by_side["incumbent"]["signal"]["bias"] == "BULLISH"
+
+
+def test_the_printed_records_are_parseable_by_the_real_scorer(capsys):
+    """The point is to reuse analysis/score_journal.py. A record it cannot
+    read would score nothing while looking like it worked."""
+    import tempfile
+    from pathlib import Path as _Path
+
+    from analysis.reader import read_journal
+    from app.schemas import LLMSignal
+    from replay.compare_models import _print_pairs
+
+    entry = runner.ReplayEntry(
+        ticker="AAPL", ts_utc="2026-09-12T14:00:00+00:00", prompt="p",
+        original=LLMSignal(ticker="AAPL", bias="BULLISH", conviction=0.8, rationale="i"),
+        context=TickerContext(ticker="AAPL", headlines=["h"]),
+    )
+    _print_pairs([runner.ReplayResult(entry=entry, replayed=LLMSignal(
+        ticker="AAPL", bias="BEARISH", conviction=0.6, rationale="c"))], [])
+    records = [json.loads(l) for l in capsys.readouterr().out.splitlines() if l.strip()]
+
+    with tempfile.TemporaryDirectory() as d:
+        for side in ("candidate", "incumbent"):
+            path = _Path(d) / f"{side}.jsonl"
+            path.write_text("".join(
+                json.dumps(r["line"]) + "\n" for r in records if r["_side"] == side))
+            read = read_journal(path)
+            assert read.skipped == 0 and len(read.entries) == 1, side
