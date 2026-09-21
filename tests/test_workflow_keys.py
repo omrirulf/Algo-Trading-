@@ -339,3 +339,33 @@ def test_the_determinism_check_workflow_passes_effort_even_when_blank():
         ["jobs"]["determinism"]["steps"]
     )
     assert "--effort" in run
+
+
+def test_the_baseline_compare_workflow_needs_no_credentials_at_all():
+    """Its whole cost argument is that it needs none: yfinance is
+    unauthenticated, the journal is already in the repo, and no model is
+    called. A secret wired in here later would quietly make a free, safe
+    measurement into something with a bill and a blast radius."""
+    text = (ROOT / ".github/workflows/baseline-compare.yml").read_text()
+    assert "secrets." not in text, "baseline-compare must stay credential-free"
+
+    wf = yaml.safe_load(text)
+    for step in wf["jobs"]["measure"]["steps"]:
+        for name in (step.get("env") or {}):
+            assert "ALPACA" not in name.upper(), name
+            assert "WEBHOOK" not in name.upper(), name
+            assert "API_KEY" not in name.upper(), name
+
+
+def test_the_baseline_compare_workflow_runs_before_it_is_merged():
+    """workflow_dispatch does not exist until the file reaches the default
+    branch. A measurement whose purpose is to inform a decision about the
+    code in its own PR has to be able to run on that PR -- the same
+    reasoning correlations.yml states for its own pull_request trigger."""
+    wf = yaml.safe_load((ROOT / ".github/workflows/baseline-compare.yml").read_text())
+    triggers = wf.get("on") or wf[True]
+    assert "pull_request" in triggers
+    watched = triggers["pull_request"]["paths"]
+    assert "analysis/baseline_compare.py" in watched
+    # The thing it actually measures with, not just its own entry point.
+    assert "backtest/simulate.py" in watched
