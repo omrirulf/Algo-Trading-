@@ -107,6 +107,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                              "this is a PROPOSAL for what the screen would have to "
                              "become, not a measurement of what it does now, and the "
                              "header says so.")
+    parser.add_argument("--concurrency", type=int, default=8,
+                        help="calls in flight at once (default 8). The endpoint is "
+                             "one we chose to point at, so this is a wall-time "
+                             "setting, not a correctness one.")
     parser.add_argument("--api-key", type=str, default="",
                         help="Bearer token for --base-url, if it wants one.")
     parser.add_argument("--floor", type=float, default=DEFAULT_FLOOR,
@@ -219,8 +223,9 @@ def run(args: argparse.Namespace) -> int:
     errors: list[str] = []
     print(f"Asking the candidate for {len(entries)} lines ({skipped} skipped: "
           f"no recorded screen to compare against)...", file=sys.stderr)
-    for entry in entries:
-        result = runner.replay_one(entry, runner.system_prompt_for_entry(entry), complete)
+    for entry, result in zip(entries, runner.replay_each(
+        entries, runner.system_prompt_for_entry, complete, args.concurrency
+    )):
         if result.error is not None:
             errors.append(result.error)
             continue

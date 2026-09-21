@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any, Callable, Iterator, Optional
 
@@ -139,6 +140,42 @@ def replay_all(
     entries: list[ReplayEntry], system_prompt: str, complete: Completer
 ) -> list[ReplayResult]:
     return [replay_one(entry, system_prompt, complete) for entry in entries]
+
+
+def replay_each(
+    entries: list[ReplayEntry],
+    prompt_for: Callable[[ReplayEntry], str],
+    complete: Completer,
+    max_workers: int = 1,
+) -> list[ReplayResult]:
+    """Replay every entry with its own system prompt, optionally in parallel.
+
+    Differs from ``replay_all`` in taking a prompt *per entry*, which is what
+    a faithful comparison needs: production sends a fund the macro prompt
+    trimmed to the sections it carried, so grading every line against one
+    shared string asks a question nobody was asked.
+
+    ``max_workers`` above one is what makes a large sample affordable in wall
+    time rather than in money. A reasoning model answers the full-model
+    question in ~97s, so 469 recorded contexts is twelve hours in a row and
+    about ninety minutes eight at a time -- and a sample small enough to
+    finish sequentially is a sample too small to separate 97% from 90%.
+
+    Left at one by default. Anthropic is the caller that would otherwise fire
+    a whole journal at a rate limit, and a rate-limited context is a *lost*
+    one, where a slow one is only slow. Callers that know their endpoint
+    tolerates it opt in.
+
+    Results come back in the order the entries were given, whatever order the
+    calls finished in, so a run is reproducible and a diff cannot be silently
+    attributed to the wrong ticker.
+    """
+    if max_workers > 1 and len(entries) > 1:
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            return list(pool.map(
+                lambda e: replay_one(e, prompt_for(e), complete), entries
+            ))
+    return [replay_one(entry, prompt_for(entry), complete) for entry in entries]
 
 
 def system_prompt_for_entry(entry: ReplayEntry) -> str:
@@ -305,6 +342,7 @@ __all__ = [
     "ReplayResult",
     "load_entries",
     "replay_one",
+    "replay_each",
     "replay_all",
     "summarise",
     "default_completer",
