@@ -199,16 +199,36 @@ def test_enrichment_outage_degrades_to_news_only(monkeypatch, caplog):
     assert "context gaps" in caplog.text
 
 
-def test_news_outage_skips_the_ticker(monkeypatch):
-    """Unlike enrichment: trading on technicals alone is a different strategy."""
+def test_a_news_outage_no_longer_costs_the_ticker_its_day(monkeypatch):
+    """Reversed on 21 Sep 2026 by issue #69, and the old reasoning is worth keeping.
+
+    This test used to assert the opposite, on the argument that "trading on
+    technicals alone is a different strategy". The objection is real but it
+    proves too much: a genuinely quiet news day already renders "none found"
+    and trades on, so a newsless signal was always inside the strategy --
+    only a *broken lookup* was fatal. TM lost a whole day on 18 Sep with
+    working technicals, fundamentals, analyst coverage and insider filings
+    in hand.
+
+    What answers the objection is that the degradation is not silent. The
+    model is told in DATA GAPS and can price its own uncertainty, the
+    journal keeps the gap, and ``analysis.health.news_gaps`` turns critical
+    once a tenth of the watchlist is affected -- so a vendor outage still
+    stops the cycle being trusted, while one flake costs one fifth of one
+    ticker's context.
+    """
     from orchestrator.news import NewsFetchError
 
     monkeypatch.setattr(hb, "fetch_news", lambda t: (_ for _ in ()).throw(NewsFetchError("down")))
-    called = []
-    monkeypatch.setattr(hb, "call_llm", lambda *a: called.append(a))
+    seen = {}
+    monkeypatch.setattr(hb, "call_llm", lambda s, u, j=None: seen.update(user=u) or completion(
+        {"ticker": "AAPL", "bias": "NEUTRAL", "conviction": 0.2, "rationale": "r"}))
 
     hb.process_ticker("AAPL")
-    assert called == []
+
+    assert seen, "the ticker must still reach the model on its other sections"
+    assert "- unavailable this cycle" in seen["user"], "the prompt must not claim a quiet day"
+    assert "DATA GAPS" in seen["user"], "the model must be told it is flying on four fifths"
 
 
 def test_successful_cycle_is_journalled(monkeypatch, _journal_to_tmp):
@@ -339,9 +359,14 @@ def test_one_survivor_keeps_the_cycle_green():
 # --- process_ticker reports where it stopped ------------------------------
 
 
-def test_a_news_outage_reports_a_context_failure(monkeypatch):
+def test_missing_news_credentials_no_longer_fail_the_context_stage(monkeypatch):
+    """With no Bright Data token the news is a gap, and the ticker walks on.
+
+    It then stops at the model for want of a Claude key, which is the next
+    real obstacle rather than this one. Before issue #69 it never got there.
+    """
     monkeypatch.setattr(hb, "get_settings", lambda: Settings(_env_file=None))
-    assert hb.process_ticker("AAPL").stage == hb.CONTEXT_FAILED
+    assert hb.process_ticker("AAPL").stage == hb.MODEL_FAILED
 
 
 def test_a_missing_llm_key_reports_a_model_failure(monkeypatch):

@@ -147,10 +147,22 @@ def _unwrap(payload: Any) -> dict[str, Any]:
                 "can serve search results (a SERP API or Web Unlocker zone) and "
                 "that brd_json=1 is on the URL"
             )
+        if not stripped:
+            # 18 Sep 2026: TM lost its day to this, and the message it left in
+            # the journal was "Expecting value: line 1 column 1 (char 0)" --
+            # json's way of saying the string was empty, which reads like a
+            # parser bug rather than an empty 200 from the vendor. Say what
+            # actually arrived.
+            raise NewsFetchError(
+                "Bright Data returned an empty body with its 200; nothing to parse"
+            )
         try:
             payload = json.loads(stripped)
         except json.JSONDecodeError as exc:
-            raise NewsFetchError(f"Bright Data response is not JSON: {exc}") from exc
+            raise NewsFetchError(
+                f"Bright Data response is not JSON ({len(stripped)} bytes, "
+                f"starts {stripped[:40]!r}): {exc}"
+            ) from exc
     if not isinstance(payload, dict):
         raise NewsFetchError(f"unexpected Bright Data response type: {type(payload).__name__}")
     if "body" in payload and "status_code" in payload:

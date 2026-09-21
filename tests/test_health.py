@@ -301,3 +301,59 @@ def test_the_commit_step_finishes_the_rebase_when_the_rendered_files_conflict():
     assert "git checkout --theirs -- logs/cycle_report.md logs/score_report.md logs/blend_weights.json" in run
     assert "GIT_EDITOR=true git rebase --continue" in run
     assert run.rstrip().endswith('git push origin "HEAD:${GITHUB_REF_NAME}"')
+
+
+# --------------------------------------------------------------------------- #
+# News that could not be fetched, now that it no longer stops the ticker (#69)
+# --------------------------------------------------------------------------- #
+
+NEWS_GAP = f"{health.NEWS_GAP_PREFIX}: Bright Data returned an empty body with its 200"
+
+
+def test_the_gap_prefix_is_the_same_string_both_sides_write():
+    """A contract split across two modules is a contract that drifts."""
+    from orchestrator import context
+
+    assert health.NEWS_GAP_PREFIX == context.NEWS_GAP_PREFIX
+
+
+def test_one_ticker_judged_without_news_is_a_warning():
+    """TM on 18 Sep: a flake, and the other four dimensions carried the day."""
+    today = [json.loads(journal_line("TM", gaps=[NEWS_GAP]))]
+    today += [json.loads(journal_line(f"T{i}")) for i in range(19)]
+    alarm = health.news_gaps(today)
+    assert alarm is not None and alarm.severity == health.WARNING
+    assert "TM" in alarm.detail
+    assert "still produced signals" in alarm.detail
+
+
+def test_a_tenth_of_the_watchlist_without_news_is_the_vendor_being_down():
+    """The reason this alarm exists: the failure is now silent without it."""
+    today = [json.loads(journal_line(f"T{i}", gaps=[NEWS_GAP])) for i in range(5)]
+    today += [json.loads(journal_line(f"U{i}")) for i in range(15)]
+    alarm = health.news_gaps(today)
+    assert alarm is not None and alarm.severity == health.CRITICAL
+
+
+def test_a_day_whose_news_all_arrived_raises_nothing():
+    today = [json.loads(journal_line(f"T{i}")) for i in range(20)]
+    assert health.news_gaps(today) is None
+
+
+def test_an_unrelated_gap_is_not_mistaken_for_a_news_outage():
+    today = [json.loads(journal_line("USO", gaps=["CFTC positioning unavailable: no rows"]))]
+    assert health.news_gaps(today) is None
+
+
+def test_the_alarm_reaches_the_report(tmp_path):
+    """Wired into check(), not merely defined beside it."""
+    journal = tmp_path / "journal.log"
+    audit = tmp_path / "audit.log"
+    journal.write_text(
+        "\n".join([journal_line("TM", gaps=[NEWS_GAP])]
+                  + [journal_line(f"T{i}") for i in range(19)]),
+        encoding="utf-8",
+    )
+    audit.write_text("", encoding="utf-8")
+    alarms = health.check(journal, audit, date(2026, 9, 17))
+    assert any("without news" in a.title for a in alarms)

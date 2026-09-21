@@ -434,6 +434,11 @@ def _brief(exc: Exception) -> str:
 #: "a gap was already recorded" from "nothing was said at all".
 _POSITIONING_GAP = "CFTC positioning"
 
+#: Prefix for the gap left when the news lookup itself failed. The contract
+#: between ``heartbeat.build_context``, ``_news_section`` below and
+#: ``analysis.health.news_gaps``; the test suite pins it from all three sides.
+NEWS_GAP_PREFIX = "news unavailable"
+
 
 def _note_a_mapped_contract_that_said_nothing(
     ticker: str, snapshot: Any, gaps: list[str]
@@ -638,7 +643,21 @@ class TickerContext:
         return "\n\n".join(sections)
 
     def _news_section(self) -> str:
-        body = "\n".join(f"- {headline}" for headline in self.headlines) or "- none found"
+        """The headlines, or -- carefully -- why there are none.
+
+        "none found" and "the lookup failed" are different statements and the
+        model must not be handed the first when the second is true. A quiet
+        news day is evidence: nothing happened, and a signal may lean on
+        that. A vendor returning an empty body is the absence of evidence,
+        and saying "none found" there would be the prompt asserting
+        something this cycle does not know.
+        """
+        if self.headlines:
+            body = "\n".join(f"- {headline}" for headline in self.headlines)
+        elif any(str(gap).startswith(NEWS_GAP_PREFIX) for gap in self.gaps):
+            body = "- unavailable this cycle"
+        else:
+            body = "- none found"
         return f"NEWS (past 24 hours)\n{body}"
 
     @staticmethod
@@ -666,6 +685,7 @@ def gather(
     ticker: str,
     headlines: Sequence[Any],
     provider: Optional[YFinanceContextProvider] = None,
+    news_gap: Optional[str] = None,
 ) -> TickerContext:
     """Build the full context for ``ticker``. Never raises.
 
@@ -673,10 +693,18 @@ def gather(
     records. Records additionally carry their URL into ``sources``; strings
     are accepted unchanged so the replay harnesses, which rebuild lines from
     a stored journal, need no change.
+
+    ``news_gap`` is how the caller says the headlines are absent because the
+    lookup failed, not because the day was quiet. It must start with
+    ``NEWS_GAP_PREFIX``: that prefix is what makes ``_news_section`` say
+    "unavailable" instead of "none found", and what ``analysis.health``
+    counts to notice a vendor outage.
     """
     lines, sources = _split_headlines(headlines)
     raw = (provider or get_provider()).fetch(ticker)
     gaps = list(raw.gaps)
+    if news_gap:
+        gaps.insert(0, news_gap)
 
     technical_snapshot = _build_technicals(raw, gaps)
     last_close = technical_snapshot.last_close if technical_snapshot else None

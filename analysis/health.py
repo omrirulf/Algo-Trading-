@@ -41,6 +41,13 @@ WARNING = "warning"
 #: this reader; the test suite pins it from both sides.
 CFTC_GAP_PREFIX = "CFTC positioning"
 
+#: The gap ``orchestrator.context`` leaves when the news lookup failed. Since
+#: 21 Sep 2026 that no longer costs the ticker its day -- it keeps its other
+#: four dimensions -- so nothing would otherwise report a news outage at all.
+#: This prefix is what makes it visible; ``orchestrator.context`` owns the
+#: other side of the contract and the test suite pins both.
+NEWS_GAP_PREFIX = "news unavailable"
+
 #: Position-management actions that leave a position without a working stop.
 #: ``unmanaged`` is history (the manager stopped writing it on 17 Sep 2026);
 #: ``error`` is a position the manager could not read or could not protect.
@@ -189,6 +196,40 @@ def cftc_gaps(today: list[dict]) -> Optional[Alarm]:
                  f"{', '.join(tickers)}. {quiet[tickers[0]][:200]}")
 
 
+def news_gaps(today: list[dict]) -> Optional[Alarm]:
+    """News that could not be fetched, now that it no longer stops the ticker.
+
+    Before 21 Sep 2026 a failed news lookup raised and the name produced no
+    signal, so ``failed_tickers`` caught it. Letting the ticker continue on
+    its other four dimensions (issue #69) removed that alarm's grip on the
+    case, and a silent degradation is worse than a loud failure: eighty names
+    judged on four fifths of their context, with nobody told.
+
+    Same shape as ``failed_tickers`` on purpose. One name is a flake and a
+    warning; a tenth of the watchlist is the vendor being down, and that is
+    critical whether or not the signals still came out.
+    """
+    quiet: dict[str, str] = {}
+    for line in today:
+        context = line.get("context") or {}
+        for gap in context.get("gaps") or []:
+            if str(gap).startswith(NEWS_GAP_PREFIX):
+                quiet[str(line.get("ticker"))] = str(gap)
+    if not quiet:
+        return None
+    tickers = sorted(quiet)
+    seen = {str(line.get("ticker")) for line in today}
+    share = len(tickers) / max(len(seen), 1)
+    severity = CRITICAL if share >= FAILED_SHARE_CRITICAL else WARNING
+    return Alarm(
+        severity,
+        f"{len(tickers)} of {len(seen)} ticker(s) were judged without news",
+        f"{', '.join(tickers[:12])}{' …' if len(tickers) > 12 else ''}. "
+        f"They still produced signals, on their other sections. "
+        f"First gap: {quiet[tickers[0]][:200]}",
+    )
+
+
 def duplicate_cycle(today: list[dict]) -> Optional[Alarm]:
     """16 and 17 Sep 2026: a cron delivered hours late ran the day twice."""
     counts = Counter(str(line.get("ticker")) for line in today)
@@ -211,6 +252,7 @@ def check(journal: Path, audit: Path, day: date) -> list[Alarm]:
         failed_tickers(today),
         screen_errors(today),
         cftc_gaps(today),
+        news_gaps(today),
         duplicate_cycle(today),
     ]
     alarms = [a for a in found if a is not None]

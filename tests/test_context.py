@@ -961,3 +961,50 @@ def test_the_outlook_is_a_fund_only_section_shown_after_the_inventories():
     assert attributes.index("outlook") == attributes.index("energy") + 1
     assert "outlook" in context.FUND_ONLY_SECTIONS
     assert "outlook" not in context.SINGLE_NAME_ONLY_SECTIONS
+
+
+# --------------------------------------------------------------------------- #
+# A failed news lookup: a gap, not the end of the ticker (issue #69)
+# --------------------------------------------------------------------------- #
+
+
+def test_a_news_gap_says_unavailable_rather_than_none_found():
+    """The prompt must not report an absence of evidence as evidence of absence.
+
+    "none found" is a claim about the world -- a quiet day, which a signal
+    may lean on. A vendor that returned nothing supports no such claim.
+    """
+    ctx = context.gather(
+        "TM", [], provider=full_provider(),
+        news_gap=f"{context.NEWS_GAP_PREFIX}: Bright Data returned an empty body",
+    )
+    assert "- unavailable this cycle" in ctx.as_prompt()
+    assert "none found" not in ctx.as_prompt()
+
+
+def test_a_genuinely_quiet_day_still_says_none_found():
+    """The other half of the same distinction, so the fix cannot blur it."""
+    ctx = context.gather("TM", [], provider=full_provider())
+    assert "- none found" in ctx.as_prompt()
+    assert "unavailable this cycle" not in ctx.as_prompt()
+
+
+def test_the_news_gap_is_recorded_first_so_the_journal_carries_it():
+    ctx = context.gather(
+        "TM", [], provider=full_provider(),
+        news_gap=f"{context.NEWS_GAP_PREFIX}: empty body",
+    )
+    assert ctx.gaps[0].startswith(context.NEWS_GAP_PREFIX)
+    assert ctx.as_dict()["gaps"][0].startswith(context.NEWS_GAP_PREFIX)
+
+
+def test_the_other_four_dimensions_survive_a_news_failure():
+    """The point of issue #69: four fifths of the context is not nothing."""
+    ctx = context.gather(
+        "NVDA", [], provider=full_provider(),
+        news_gap=f"{context.NEWS_GAP_PREFIX}: empty body",
+    )
+    assert ctx.technicals is not None
+    assert ctx.fundamentals is not None
+    assert ctx.analysts is not None
+    assert ctx.insiders is not None
