@@ -96,7 +96,22 @@ class AgreementCheck:
     aligned_mean_conviction: Optional[float]
     conflicted_n: int
     conflicted_mean_conviction: Optional[float]
+    #: Raw dispersion against conviction. Kept, but NOT the finer measure it
+    #: was once reported as: on this journal the spread correlates +0.80 with
+    #: the loudest single dimension, so it mostly asks "is something
+    #: shouting?" rather than "do these disagree?", and a model that is
+    #: confident about a strong signal scores as one that is confident about
+    #: a contradictory one.
     dispersion_vs_conviction: Correlation
+    #: How much of that is the confound: dispersion against the largest
+    #: absolute score. Printed so the raw number above can be read honestly.
+    dispersion_vs_magnitude: Correlation
+    #: Dispersion against conviction with magnitude partialled out -- the
+    #: question the prompt actually asks. The instruction is directional
+    #: ("bullish news on a technically broken, richly valued name"), so what
+    #: matters is whether conviction falls when the dimensions CONFLICT, not
+    #: when one of them is merely large.
+    dispersion_vs_conviction_controlled: Correlation
 
     @property
     def gap(self) -> Optional[float]:
@@ -239,6 +254,30 @@ def dimension_correlations(signals: Sequence[ScoredSignal]) -> dict[str, Correla
     return results
 
 
+def _partial_spearman(
+    xs: Sequence[float], ys: Sequence[float], control: Sequence[float]
+) -> Correlation:
+    """Rank correlation of ``xs`` and ``ys`` with ``control`` held fixed.
+
+    Exists because score dispersion and "one dimension is loud" are nearly
+    the same series: on the journal this was written against they correlate
+    +0.80. Reporting the raw dispersion/conviction number as evidence that
+    the model ignores its instruction charges it for being confident about a
+    strong signal, which is what the prompt asks for, not against it.
+    """
+    r_xy, r_xz, r_yz = (
+        spearman(xs, ys).rho, spearman(xs, control).rho, spearman(ys, control).rho
+    )
+    if None in (r_xy, r_xz, r_yz):
+        return Correlation(len(xs), None)
+    denominator = math.sqrt((1 - r_xz ** 2) * (1 - r_yz ** 2))
+    if denominator == 0:
+        # The control explains one of the series entirely; nothing is left to
+        # correlate, and a number here would be division noise.
+        return Correlation(len(xs), None)
+    return Correlation(len(xs), (r_xy - r_xz * r_yz) / denominator)
+
+
 def agreement_check(entries: Sequence[JournalEntry]) -> AgreementCheck:
     """Test the prompt's central instruction against what the model actually did.
 
@@ -248,6 +287,7 @@ def agreement_check(entries: Sequence[JournalEntry]) -> AgreementCheck:
     aligned: list[float] = []
     conflicted: list[float] = []
     dispersions: list[float] = []
+    magnitudes: list[float] = []
     convictions: list[float] = []
 
     for entry in entries:
@@ -258,6 +298,7 @@ def agreement_check(entries: Sequence[JournalEntry]) -> AgreementCheck:
             continue
 
         dispersions.append(max(scores) - min(scores))
+        magnitudes.append(max(abs(v) for v in scores))
         convictions.append(entry.conviction)
 
         signs = {_sign(v) for v in scores if _sign(v) != 0}
@@ -269,6 +310,10 @@ def agreement_check(entries: Sequence[JournalEntry]) -> AgreementCheck:
         conflicted_n=len(conflicted),
         conflicted_mean_conviction=(sum(conflicted) / len(conflicted)) if conflicted else None,
         dispersion_vs_conviction=spearman(dispersions, convictions),
+        dispersion_vs_magnitude=spearman(dispersions, magnitudes),
+        dispersion_vs_conviction_controlled=_partial_spearman(
+            dispersions, convictions, magnitudes
+        ),
     )
 
 
