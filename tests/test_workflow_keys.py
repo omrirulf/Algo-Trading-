@@ -10,6 +10,7 @@ orchestrator/sources.py reads first.
 
 from __future__ import annotations
 
+import fnmatch
 import math
 import re
 from pathlib import Path
@@ -410,3 +411,53 @@ def test_the_determinism_check_can_actually_reach_claude():
     assert "ANTHROPIC_API_KEY" in str(
         _step("determinism-check.yml", "determinism", "Does this model agree with itself")["env"]
     )
+
+
+def test_the_horse_race_workflow_needs_no_credentials_at_all():
+    """The rule arms are pure functions of the journal, yfinance is
+    unauthenticated, and no model is called. A key wired in later would
+    make a free, safe race into something with a bill -- and would hand an
+    arm information the model did not have."""
+    text = (ROOT / ".github/workflows/horse-race.yml").read_text()
+    assert "secrets." not in text, "horse-race must stay credential-free"
+
+    wf = yaml.safe_load(text)
+    for step in wf["jobs"]["race"]["steps"]:
+        for name in (step.get("env") or {}):
+            assert "ALPACA" not in name.upper(), name
+            assert "WEBHOOK" not in name.upper(), name
+            assert "API_KEY" not in name.upper(), name
+
+
+def test_the_horse_race_runs_before_it_is_merged_and_keeps_running_after():
+    """Before: workflow_dispatch does not exist until the file is on the
+    default branch, so the first race has to fire from its own PR. After: it
+    is the 'keep measuring' half of the experiment, so it runs on a schedule
+    rather than when someone remembers."""
+    wf = yaml.safe_load((ROOT / ".github/workflows/horse-race.yml").read_text())
+    triggers = wf.get("on") or wf[True]
+    assert "pull_request" in triggers
+    watched = triggers["pull_request"]["paths"]
+    assert "rules/**" in watched
+    assert "analysis/horse_race.py" in watched
+    # The arithmetic every arm's trade goes through, not just the entry point.
+    assert "backtest/simulate.py" in watched
+
+    crons = [entry["cron"] for entry in triggers["schedule"]]
+    assert len(crons) == 1
+    # Trading days only, and after both heartbeat crons and the US close, so
+    # the day's journal is committed and the day's closing bar exists.
+    minute, hour, _, _, dow = crons[0].split()
+    assert dow == "1-5"
+    assert int(hour) >= 21, "must run after the 20:00/21:00 UTC close"
+
+
+def test_the_horse_race_is_a_pull_request_check_on_every_arm_source():
+    """Each rule module must be able to see its own race before it merges."""
+    wf = yaml.safe_load((ROOT / ".github/workflows/horse-race.yml").read_text())
+    triggers = wf.get("on") or wf[True]
+    watched = triggers["pull_request"]["paths"]
+    for path in (ROOT / "rules").glob("*.py"):
+        assert any(
+            fnmatch.fnmatch(f"rules/{path.name}", pattern) for pattern in watched
+        ), f"a change to {path.name} would not run the race"

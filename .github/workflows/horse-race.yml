@@ -1,0 +1,104 @@
+name: horse race
+
+# Does the model's daily judgement beat a fixed rule reading only the price?
+#
+# Three arms on the same journal lines against the same realised returns:
+# the model as journalled, the time-series-momentum rule in rules/, and a
+# seeded coin flip. Every arm gets the same floor, the same stop and sizing
+# arithmetic, and prices fetched once. The coin flip is the row the other
+# two are really measured against.
+#
+# It runs here for the same boring reason correlations.yml and
+# baseline-compare.yml do: yfinance needs the open internet and a runner
+# has it. NO credential of any kind is used -- yfinance is unauthenticated,
+# the journal is committed to the repo by the heartbeat, and the rule arms
+# are pure functions of what is already on each line -- so this job cannot
+# trade, cannot call a model, and costs nothing. CI separately enforces
+# that analysis/ and rules/ can neither write a file nor reach an order
+# path.
+#
+# Nothing downstream consumes the output. It is read by a person, and it
+# does not move a parameter: the rule is judged here, never tuned here.
+on:
+  workflow_dispatch:
+    inputs:
+      horizon:
+        description: "Trading sessions held after entry"
+        default: "3"
+      floor:
+        description: "Conviction floor applied to every arm alike (blank: the engine's)"
+        default: ""
+      equity:
+        description: "Account size the position sizing is computed against"
+        default: "100000"
+  # Nightly on trading days, after the day's session has a closing bar and
+  # after both heartbeat crons (12:35 and 17:35 UTC) have committed the
+  # day's journal. This is the "keep measuring" half of the experiment: the
+  # race re-runs on its own as outcomes resolve, so the table grows without
+  # anyone remembering to ask for it.
+  schedule:
+    - cron: "35 22 * * 1-5"
+  # Also on a pull request that changes the race or an arm, for the reason
+  # correlations.yml states: workflow_dispatch does not exist until the file
+  # reaches the default branch, and a measurement whose purpose is to inform
+  # a decision has to be able to run before the decision is made.
+  pull_request:
+    paths:
+      - "rules/**"
+      - "analysis/horse_race.py"
+      - "analysis/baseline_compare.py"
+      - "analysis/returns.py"
+      - "backtest/simulate.py"
+      - ".github/workflows/horse-race.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  race:
+    runs-on: ubuntu-latest
+    # One close fetch and one OHLC fetch per journalled ticker, plus one per
+    # watchlist name for the buy-and-hold row. Minutes, not hours; no
+    # per-call model latency anywhere in it.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Race the model, the rule and the coin flip
+        env:
+          # Defaulted here rather than in the `run` line so the pull_request
+          # and schedule triggers, which supply no inputs, still run at the
+          # scorer's own defaults.
+          HORIZON: ${{ inputs.horizon || '3' }}
+          FLOOR: ${{ inputs.floor }}
+          EQUITY: ${{ inputs.equity || '100000' }}
+        run: |
+          set -o pipefail
+          ARGS="--horizon $HORIZON --equity $EQUITY"
+          # Blank means the engine's MIN_CONVICTION, applied to every arm.
+          if [ -n "$FLOOR" ]; then
+            ARGS="$ARGS --floor $FLOOR"
+          fi
+          python analysis/horse_race.py $ARGS | tee race.txt
+
+      - name: Publish to the run summary
+        if: always()
+        run: |
+          {
+            echo '## Model vs. rule vs. coin flip'
+            echo
+            echo '```'
+            cat race.txt 2>/dev/null || echo "(did not run)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: horse-race
+          path: race.txt

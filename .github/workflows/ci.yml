@@ -108,7 +108,7 @@ jobs:
           # only because broker_client.py reads the book and refuses anything
           # that is not a reduction. So it, too, may be built in one file only.
           stops=$(grep -rnE 'StopOrderRequest\(' \
-                    app orchestrator config analysis store backtest replay learn --include='*.py' \
+                    app orchestrator config analysis store backtest replay learn rules --include='*.py' \
                   | grep -v '^app/broker_client.py:' || true)
           if [ -n "$stops" ]; then
             echo "$stops"
@@ -226,6 +226,36 @@ jobs:
             exit 1
           fi
           echo "OK: the blend is shadow-only"
+
+      - name: The rule arms cannot trade, hold no key, and run in shadow
+        # rules/ is the coded thesis and its control -- the arms the model is
+        # raced against in analysis/horse_race.py. They are held to the same
+        # rules as the scorer: no order path, no file write, and no
+        # credential, because an arm that reads a key is an arm whose answer
+        # depends on something the model did not see. And like the blend,
+        # their output may be read only by the module that computes it and
+        # the journal that writes it down; the signal that reaches
+        # post_signal is the model's.
+        run: |
+          hits=$(grep -rnE '(submit_order|submit_bracket_order|ExecutionEngine|post_signal|AlpacaPaperBroker|\.write_text\(|open\([^)]*["'"'"'][wa]|get_settings|os\.environ|getenv|api_key|secret)' \
+                   rules --include='*.py' || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::rules/ must not place orders, write files, or read credentials"
+            exit 1
+          fi
+          hits=$(grep -rnE 'arms_record' orchestrator --include='*.py' \
+                 | grep -vE '^orchestrator/(arms|journal)\.py:' || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::the arms' output is read outside the modules that compute and journal it"
+            exit 1
+          fi
+          if grep -nE 'post_signal\([^)]*arms' orchestrator/heartbeat.py; then
+            echo "::error::an arm must not be handed to post_signal"
+            exit 1
+          fi
+          echo "OK: the rule arms are shadow-only"
 
       - name: The trainer writes one file and cannot trade
         # learn/ reads the journal and writes the weights the next cycle will

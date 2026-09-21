@@ -160,6 +160,13 @@ class TechnicalSnapshot:
     def as_dict(self) -> dict:
         return asdict(self)
 
+    @classmethod
+    def from_dict(cls, data: dict) -> "TechnicalSnapshot":
+        """The inverse of ``as_dict``, tolerant of a journal line written
+        before a field existed: anything missing reads as ``None``, exactly
+        as thin history would have set it, and anything unknown is ignored."""
+        return cls(**{name: data.get(name) for name in cls.__dataclass_fields__})
+
     def as_lines(self) -> list[str]:
         trend = (
             f"vs 20d SMA {fmt.num(self.sma20)} ({fmt.pct(self.distance_sma20)}), "
