@@ -19,8 +19,13 @@ on:
       effort:
         description: "Reasoning effort to ask it for (blank asks with reasoning off)"
         default: ""
+      provider:
+        description: "Which endpoint to ask. 'claude' uses ANTHROPIC_API_KEY and ignores base_url."
+        type: choice
+        options: ["openai-compatible", "claude"]
+        default: "openai-compatible"
       base_url:
-        description: "OpenAI-compatible endpoint. Blank asks Claude with ANTHROPIC_API_KEY."
+        description: "OpenAI-compatible endpoint (ignored when provider is 'claude')"
         default: "https://api.deepinfra.com/v1/openai"
       limit:
         description: "Distinct contexts to test. Total calls = limit x repeats."
@@ -65,8 +70,19 @@ jobs:
           CANDIDATE_KEY: ${{ secrets.SCREENING_API_KEY || secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY || secrets.GROQ_API_KEY }}
         run: |
           set -o pipefail
+          # An empty workflow_dispatch input is treated by GitHub as "not
+          # supplied" and replaced by the declared default, so passing
+          # base_url="" could not mean "ask Claude" -- it silently meant
+          # "ask DeepInfra". That sent a claude-* model name to an endpoint
+          # that does not serve it and failed all 100 calls of the first
+          # real run. The provider choice is what carries that intent now,
+          # because a choice input cannot collapse into a default this way.
+          BASE_URL=""
+          if [ "${{ inputs.provider }}" != "claude" ]; then
+            BASE_URL="${{ inputs.base_url }}"
+          fi
           python replay/determinism_check.py \
-            --base-url "${{ inputs.base_url }}" \
+            --base-url "$BASE_URL" \
             --model "${{ inputs.model }}" \
             --effort "${{ inputs.effort }}" \
             --api-key "$CANDIDATE_KEY" \
