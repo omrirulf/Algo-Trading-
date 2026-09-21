@@ -415,3 +415,98 @@ def test_the_cli_never_runs_a_cycle_in_protect_mode(monkeypatch, tmp_path):
 
     monkeypatch.setattr(hb, "run_cycle", no)
     hb.main(["--protect-only", "--once"])
+
+
+# --------------------------------------------------------------------------- #
+# A trail must not carry a quantity it is not changing (issue #93)
+# --------------------------------------------------------------------------- #
+
+
+class _ReplacingClient:
+    """Alpaca as it actually behaved on 21 Sep 2026, for a bracket leg.
+
+    The real endpoint refuses ``qty`` on an order that belongs to a bracket,
+    on the *presence* of the field rather than its value: an unchanged
+    quantity is rejected exactly as hard as a resize.
+    """
+
+    def __init__(self, *, advanced: bool = True, covers: int = 9):
+        self.advanced = advanced
+        self.covers = covers
+        self.requests: list = []
+
+    def replace_order_by_id(self, order_id, request):
+        self.requests.append(request)
+        sent = request.to_request_fields()
+        if self.advanced and "qty" in sent:
+            raise RuntimeError(
+                '{"code":42210000,"message":"qty cannot be changed for advanced orders"}'
+            )
+        return SimpleNamespace(
+            id=order_id, symbol="TEVA", side="sell",
+            qty=sent.get("qty", self.covers), stop_price=sent["stop_price"],
+        )
+
+
+def test_a_trail_that_changes_no_quantity_sends_no_quantity():
+    """The whole fix. TEVA was one share, so the trail was all that ever ran."""
+    client = _ReplacingClient(covers=1)
+    stop = real_broker(client).replace_stop_order(
+        "aae42775", qty=1, stop_price=37.20, current_qty=1,
+    )
+    [request] = client.requests
+    assert request.to_request_fields() == {"stop_price": 37.20}
+    assert request.qty is None, "a trail must not carry a qty at all"
+    assert stop.stop_price == 37.20 and stop.qty == 1
+
+
+def test_the_same_call_without_the_hint_is_the_bug_it_replaces():
+    """Proof the fix is load-bearing, not decoration.
+
+    Omitting ``current_qty`` is what every caller used to do, and against a
+    bracket leg it reproduces 42210000 exactly.
+    """
+    client = _ReplacingClient(covers=1)
+    with pytest.raises(BrokerError, match="qty cannot be changed for advanced orders"):
+        real_broker(client).replace_stop_order("aae42775", qty=1, stop_price=37.20)
+    assert client.requests[0].qty == 1, "the old shape sent a qty it never needed to"
+
+
+def test_a_genuine_resize_still_sends_the_quantity():
+    """Shrinking before a tranche is a real change and must still be asked for."""
+    client = _ReplacingClient(advanced=False, covers=9)
+    stop = real_broker(client).replace_stop_order(
+        "stop-1", qty=6, stop_price=100.0, current_qty=9,
+    )
+    [request] = client.requests
+    assert request.to_request_fields() == {"qty": 6, "stop_price": 100.0}
+    assert stop.qty == 6
+
+
+def test_a_resize_on_a_bracket_leg_still_fails_loudly():
+    """Deliberately not papered over.
+
+    Alpaca refuses this and the way round it -- cancel, then resubmit --
+    opens a window with no stop at all, which is the one thing this module
+    may never do. An untested guess does not belong on the order that bounds
+    the loss, so it stays an error a person is told about.
+    """
+    client = _ReplacingClient(advanced=True, covers=9)
+    with pytest.raises(BrokerError, match="42210000"):
+        real_broker(client).replace_stop_order(
+            "stop-1", qty=6, stop_price=100.0, current_qty=9,
+        )
+
+
+def test_a_reply_that_omits_the_quantity_keeps_the_one_we_know():
+    """A response carrying no qty must not become a stop covering None shares."""
+    class _Terse(_ReplacingClient):
+        def replace_order_by_id(self, order_id, request):
+            self.requests.append(request)
+            return SimpleNamespace(id=order_id, symbol="TEVA", side="sell",
+                                   qty=None, stop_price=37.20)
+
+    stop = real_broker(_Terse(covers=1)).replace_stop_order(
+        "aae42775", qty=1, stop_price=37.20, current_qty=1,
+    )
+    assert stop.qty == 1

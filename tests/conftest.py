@@ -89,13 +89,18 @@ class FakeBroker:
         self.stop_orders[ticker] = placed
         return placed
 
-    def replace_stop_order(self, order_id: str, qty: int, stop_price: float) -> StopOrder:
+    def replace_stop_order(self, order_id: str, qty: int, stop_price: float,
+                           current_qty: int | None = None) -> StopOrder:
         for ticker, current in self.stop_orders.items():
             if current.order_id == order_id:
                 updated = StopOrder(order_id, ticker, qty, stop_price, current.side)
                 self.stop_orders[ticker] = updated
                 self.replaced.append({"order_id": order_id, "ticker": ticker, "qty": qty,
-                                      "stop_price": stop_price, "was": current.stop_price})
+                                      "stop_price": stop_price, "was": current.stop_price,
+                                      # What the caller said the stop covers now. The
+                                      # real client uses this to decide whether to send
+                                      # a qty at all, so a test can assert on it.
+                                      "current_qty": current_qty})
                 return updated
         raise BrokerError(f"no open stop order {order_id}")
 

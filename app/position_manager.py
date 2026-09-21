@@ -507,7 +507,8 @@ class PositionManager:
         # Protect first, same as a ladder tranche: a stop still sized for
         # the old position would reserve the shares this exit needs.
         if stop is not None:
-            self._broker.replace_stop_order(stop.order_id, remaining, stop.stop_price)
+            self._broker.replace_stop_order(stop.order_id, remaining, stop.stop_price,
+                                            current_qty=stop.qty)
         order_id = self._broker.close_position_partially(ticker, tranche)
         action = ManagementAction(
             ticker=ticker, action=GROUP_CAP_TRIMMED, side=side, price=price,
@@ -556,7 +557,12 @@ class PositionManager:
 
         if not due:
             if trailed != broker_stop:
-                self._broker.replace_stop_order(stop.order_id, qty, trailed)
+                # qty is this position's current size and is not changing:
+                # passing what the stop already covers lets the broker client
+                # leave the field out, which is the only way a bracket leg
+                # will accept a trail at all. See replace_stop_order.
+                self._broker.replace_stop_order(stop.order_id, qty, trailed,
+                                                current_qty=stop.qty)
                 action = ManagementAction(
                     ticker=ticker, action=STOP_RAISED, side=side, gain_r=round(gain, 2),
                     price=price, remaining_qty=qty, rung=None,
@@ -591,7 +597,8 @@ class PositionManager:
             # Compared against what the broker actually holds, so a trail
             # that tightened above the rung's own target is still applied.
             if tranche > 0 or new_stop != broker_stop:
-                self._broker.replace_stop_order(stop.order_id, after, new_stop)
+                self._broker.replace_stop_order(stop.order_id, after, new_stop,
+                                                current_qty=stop.qty)
 
             if tranche > 0:
                 order_id = self._broker.close_position_partially(ticker, tranche)

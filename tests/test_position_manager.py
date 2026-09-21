@@ -50,9 +50,9 @@ class SequencedBroker(FakeBroker):
 
     calls: list[str] = field(default_factory=list)
 
-    def replace_stop_order(self, order_id, qty, stop_price):
+    def replace_stop_order(self, order_id, qty, stop_price, current_qty=None):
         self.calls.append("replace")
-        return super().replace_stop_order(order_id, qty, stop_price)
+        return super().replace_stop_order(order_id, qty, stop_price, current_qty)
 
     def close_position_partially(self, ticker, qty):
         self.calls.append("close")
@@ -114,8 +114,10 @@ def test_at_one_r_a_third_is_sold_and_the_stop_goes_to_breakeven(broker, market,
     assert action.qty_closed == 3 and action.remaining_qty == 6
     assert action.rung == 0
     assert broker.closed == [{"ticker": "LLY", "qty": 3}]
+    # A real resize: the stop covered 9 and must now cover 6, so the broker
+    # client sends a qty. current_qty is what it compares against.
     assert broker.replaced == [{"order_id": "stop-LLY", "ticker": "LLY", "qty": 6,
-                                "stop_price": 100.0, "was": 96.0}]
+                                "stop_price": 100.0, "was": 96.0, "current_qty": 9}]
     assert broker.stop_orders["LLY"].stop_price == 100.0  # breakeven
     assert broker.positions[0].qty == 6
 
@@ -334,10 +336,10 @@ def test_one_broken_position_does_not_stop_the_others(broker, market, audit):
 
     original = broker.replace_stop_order
 
-    def flaky(order_id, qty, stop_price):
+    def flaky(order_id, qty, stop_price, current_qty=None):
         if order_id == "stop-AAA":
             raise BrokerError("AAA is broken")
-        return original(order_id, qty, stop_price)
+        return original(order_id, qty, stop_price, current_qty)
 
     broker.replace_stop_order = flaky
     market.price = 100.0 + r
@@ -433,8 +435,11 @@ def test_the_stop_trails_the_price_up_with_no_rung_due(broker, market, audit):
     [action] = report.actions
     assert action.action == pm.STOP_RAISED and action.reason == "trailing stop"
     assert action.rung is None and action.qty_closed == 0
+    # Nothing is sold, so the stop still covers all 9 shares. The manager must
+    # say so -- qty == current_qty is what lets the broker client leave the
+    # field out, and a bracket leg refuses a trail that carries one (issue #93).
     assert broker.replaced == [{"order_id": "stop-LLY", "ticker": "LLY", "qty": 9,
-                                "stop_price": 98.0, "was": 96.0}]
+                                "stop_price": 98.0, "was": 96.0, "current_qty": 9}]
     assert broker.closed == []
 
 
@@ -610,10 +615,10 @@ def test_one_broken_trim_does_not_stop_the_rest_of_the_group(broker, market, aud
 
     original = broker.replace_stop_order
 
-    def flaky(order_id, qty, stop_price):
+    def flaky(order_id, qty, stop_price, current_qty=None):
         if order_id == "stop-TLT":
             raise BrokerError("TLT stop replace is broken")
-        return original(order_id, qty, stop_price)
+        return original(order_id, qty, stop_price, current_qty)
 
     broker.replace_stop_order = flaky
     report = manager(broker, market, audit).manage()

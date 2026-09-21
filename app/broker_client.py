@@ -169,7 +169,8 @@ class BrokerClient(Protocol):
 
     def get_open_stop_order(self, ticker: str) -> Optional[StopOrder]: ...
 
-    def replace_stop_order(self, order_id: str, qty: int, stop_price: float) -> StopOrder: ...
+    def replace_stop_order(self, order_id: str, qty: int, stop_price: float,
+                           current_qty: Optional[int] = None) -> StopOrder: ...
 
     def close_position_partially(self, ticker: str, qty: int) -> str: ...
 
@@ -464,7 +465,8 @@ class AlpacaPaperBroker:
                 )
         return None
 
-    def replace_stop_order(self, order_id: str, qty: int, stop_price: float) -> StopOrder:
+    def replace_stop_order(self, order_id: str, qty: int, stop_price: float,
+                           current_qty: Optional[int] = None) -> StopOrder:
         """Move a live stop and shrink it to the shares it still protects.
 
         One call, so there is no moment between "old stop cancelled" and "new
@@ -472,6 +474,26 @@ class AlpacaPaperBroker:
         replace atomically or refuses it. The position manager calls this
         *before* selling a tranche, for the same reason: a stop that still
         covers the old size would reserve shares the exit needs.
+
+        ``current_qty`` is what the live stop covers right now. When it equals
+        ``qty`` the field is left out of the request entirely, and that is not
+        a micro-optimisation -- it is the whole point.
+
+        A stop that is still the leg of the bracket that opened the position
+        is an *advanced* order to Alpaca, and Alpaca refuses to change the
+        quantity of one: ``42210000 qty cannot be changed for advanced
+        orders``. It refuses on the presence of the field, not on the value,
+        so sending an unchanged qty is rejected exactly as hard as a real
+        resize. Every trail on such a stop therefore failed, the stop never
+        ratcheted, and the manager recorded an error that read like a missing
+        stop. TEVA on 21 Sep 2026 (issue #93) was one share -- too small for
+        any tranche, so the trail was the only thing that ever ran on it, and
+        the only thing that ever failed.
+
+        A genuine resize on a bracket leg is still refused, and is meant to
+        be: that path is untested against this constraint, and guessing at
+        Alpaca's behaviour is not something to do with the one order that
+        stands between a position and an unbounded loss.
         """
         from alpaca.trading.requests import ReplaceOrderRequest
 
@@ -479,17 +501,21 @@ class AlpacaPaperBroker:
             raise BrokerError(f"qty must be a positive whole number, got {qty}")
         if stop_price <= 0:
             raise BrokerError(f"stop_price must be positive, got {stop_price}")
+        resizing = current_qty is None or int(current_qty) != int(qty)
+        request = (
+            ReplaceOrderRequest(qty=int(qty), stop_price=stop_price) if resizing
+            else ReplaceOrderRequest(stop_price=stop_price)
+        )
         try:
-            order = self._client.replace_order_by_id(
-                order_id, ReplaceOrderRequest(qty=int(qty), stop_price=stop_price)
-            )
+            order = self._client.replace_order_by_id(order_id, request)
         except Exception as exc:  # noqa: BLE001
             raise BrokerError(f"replace_order failed for {order_id}: {exc}") from exc
         side = getattr(order, "side", "")
+        returned_qty = getattr(order, "qty", None)
         return StopOrder(
             order_id=str(order.id),
             ticker=str(order.symbol).upper(),
-            qty=int(float(order.qty)),
+            qty=int(float(returned_qty)) if returned_qty is not None else int(qty),
             stop_price=float(order.stop_price if order.stop_price is not None else stop_price),
             side=str(getattr(side, "value", side)),
         )
