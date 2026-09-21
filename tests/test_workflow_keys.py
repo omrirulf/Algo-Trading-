@@ -187,3 +187,18 @@ def test_both_comparison_workflows_can_dial_concurrency_down():
         assert "concurrency" in inputs, workflow
         run = " ".join(s.get("run", "") for s in wf["jobs"][job]["steps"])
         assert "--concurrency" in run, workflow
+
+
+def test_the_model_compare_workflow_scores_both_sides():
+    """Emitting the pair and never scoring it would leave the question the
+    run exists to answer unasked, while looking complete."""
+    wf = yaml.safe_load((ROOT / ".github/workflows/model-compare.yml").read_text())
+    steps = wf["jobs"]["compare"]["steps"]
+    runs = " ".join(s.get("run", "") for s in steps)
+    assert "--emit-journal" in runs
+    assert "score_journal.py" in runs
+    # The filenames are built in a shell loop, so the sides are what to pin:
+    # scoring only one of them answers nothing, since the question is which
+    # of the two did better on the contexts where they differed.
+    assert "incumbent candidate" in runs or "candidate incumbent" in runs
+    assert "compare-$side.jsonl" in runs

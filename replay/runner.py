@@ -287,6 +287,33 @@ def default_completer() -> Completer:
     return complete
 
 
+def as_journal_line(entry: ReplayEntry, signal: LLMSignal, usage=None) -> str:
+    """One replayed answer, shaped like the journal line it would have been.
+
+    Exists so a candidate can be judged on what the market did rather than on
+    whether it agreed with the incumbent. Agreement says a model is
+    *interchangeable*; it cannot say either was right, and on the contexts
+    where two models differ it is silent about the only question that
+    matters. ``analysis/score_journal.py`` already joins journalled signals to
+    realised returns -- the shortest path to an answer is to hand it the
+    candidate's signals in the shape it already reads, rather than to
+    reimplement returns here or to ask a third model's opinion.
+
+    The context and the timestamp come from the recorded entry, so the
+    candidate's line sits at the same moment, on the same ticker, as the
+    incumbent's. Only the signal differs, which is the whole point.
+    """
+    return json.dumps({
+        "ts_utc": entry.ts_utc,
+        "ticker": entry.ticker,
+        "context": entry.context.as_dict() if entry.context else {"ticker": entry.ticker},
+        "signal": signal.model_dump(mode="json"),
+        "usage": usage.as_dict() if usage else None,
+        "outcome": None,
+        "error": None,
+    })
+
+
 def measured_completer(
     model: Optional[str] = None,
     effort: Optional[str] = None,
@@ -353,6 +380,7 @@ __all__ = [
     "load_entries",
     "replay_one",
     "replay_each",
+    "as_journal_line",
     "replay_all",
     "summarise",
     "default_completer",

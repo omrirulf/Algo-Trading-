@@ -92,6 +92,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                              "it drops the hard contexts and grades the candidate on "
                              "the easy remainder. Raise it when the failure breakdown "
                              "is mostly timeouts.")
+    parser.add_argument("--emit-journal", type=Path, default=None,
+                        help="write the candidate's answers and the incumbent's as "
+                             "two journal files under this path stem, over exactly "
+                             "the contexts where both answered. Feed them to "
+                             "analysis/score_journal.py to ask which was RIGHT -- "
+                             "agreement only says whether they are interchangeable, "
+                             "and says nothing at all about the lines where they "
+                             "were not.")
     parser.add_argument("--json", action="store_true", dest="as_json")
     return parser.parse_args(argv)
 
@@ -111,7 +119,7 @@ def cells_to_probe(args: argparse.Namespace) -> list[tuple[str, str]]:
 def run_cell(
     entries, model: str, effort: str, baseline_by_key: dict,
     base_url: str = "", api_key: str = "", workers: int = 1,
-    timeout: float | None = None,
+    timeout: float | None = None, emit_journal: Path | None = None,
 ) -> Cell:
     complete, usages = runner.measured_completer(
         model=model, effort=effort, base_url=base_url, api_key=api_key,
@@ -124,6 +132,8 @@ def run_cell(
     results = runner.replay_each(
         entries, runner.system_prompt_for_entry, complete, max_workers=workers
     )
+    if emit_journal:
+        _emit_pair(results, usages, emit_journal)
     return Cell(
         model=model,
         effort=effort,
@@ -131,6 +141,32 @@ def run_cell(
         diffs=[r.diff for r in results if r.error is None],
         errors=[r.error for r in results if r.error],
     )
+
+
+def _emit_pair(results, usages, stem: Path) -> None:
+    """Write the candidate's answers and the incumbent's, over the same lines.
+
+    Two files, not one, and restricted to the contexts where BOTH produced a
+    signal. Scoring a candidate against the full recorded journal would be
+    comparing it on a different set of days than the incumbent was scored on,
+    and the difference in realised return would then be partly a difference
+    in which market it was asked about.
+    """
+    candidate = stem.with_name(stem.name + "-candidate.jsonl")
+    incumbent = stem.with_name(stem.name + "-incumbent.jsonl")
+    paired = 0
+    with candidate.open("w", encoding="utf-8") as cand, \
+            incumbent.open("w", encoding="utf-8") as inc:
+        for result, usage in zip(results, list(usages) + [None] * len(results)):
+            if result.replayed is None or result.entry.original is None:
+                continue
+            cand.write(runner.as_journal_line(result.entry, result.replayed, usage) + "\n")
+            inc.write(runner.as_journal_line(result.entry, result.entry.original) + "\n")
+            paired += 1
+    print(f"wrote {paired} paired line(s) to {candidate} and {incumbent}", file=sys.stderr)
+    print("score both with analysis/score_journal.py --journal <file>: agreement "
+          "says whether the two are interchangeable, and only realised returns "
+          "say which was right where they were not.", file=sys.stderr)
 
 
 def render(cells: list[Cell], floor: float, tickers: int, incumbent: Cell | None) -> str:
@@ -229,7 +265,7 @@ def main(argv: list[str] | None = None) -> int:
         # rate-limited context is a lost one where a slow one is only slow.
         workers = args.concurrency if args.base_url else 1
         cell = run_cell(entries, model, effort, {}, args.base_url, args.api_key,
-                        workers, args.timeout or None)
+                        workers, args.timeout or None, args.emit_journal)
         cells.append(cell)
         if clears_floor(cell, args.floor) and (
             incumbent is None
