@@ -209,6 +209,18 @@ def test_the_model_compare_workflow_scores_both_sides():
     assert "compare-$side.jsonl" in runs
 
 
+def test_the_model_compare_workflow_saves_pairs_for_a_free_later_rescore():
+    """--limit takes the most recent recorded contexts, so most lines have not
+    aged past the horizon when the run finishes -- the first 400-context run
+    scored 5 lines on one side, 1 on the other. Without this, getting a real
+    returns verdict later means paying for the same calls twice."""
+    wf = yaml.safe_load((ROOT / ".github/workflows/model-compare.yml").read_text())
+    steps = wf["jobs"]["compare"]["steps"]
+    upload = next(s for s in steps if s.get("uses", "").startswith("actions/upload-artifact"))
+    assert upload.get("if") == "always()", "a failed or partial run still has pairs worth keeping"
+    assert "pairs.jsonl" in upload["with"]["path"]
+
+
 def test_replay_never_opens_a_file_for_writing():
     """The CI guardrail enforces this, and it is worth stating why in the
     suite too: compare_models.py runs often and casually while iterating, and

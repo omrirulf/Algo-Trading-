@@ -89,6 +89,20 @@ jobs:
           tee -a "$GITHUB_STEP_SUMMARY" < "$RUNNER_TEMP/report.txt"
           exit "${status:-0}"
 
+      - name: Save the pairs so a later re-score is free
+        # --limit takes the most recent N recorded contexts, so most of a
+        # run's lines have not aged past the horizon yet: the first run
+        # against 400 contexts scored 5 of them on one side, 1 on the other.
+        # Re-running the candidate later to get a returns verdict would mean
+        # paying for the same 400 calls twice. This is what score_journal.py
+        # reads, unchanged, so nothing here needs to know its schema.
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: model-compare-pairs-${{ github.run_id }}
+          path: ${{ runner.temp }}/pairs.jsonl
+          retention-days: 90
+
       - name: Which one was RIGHT, not which one agreed
         # Agreement says the two are interchangeable. It is silent on exactly
         # the contexts that matter -- the ones where they differed -- and a
