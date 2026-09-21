@@ -24,8 +24,11 @@ on:
         options: ["high", "medium", "low"]
         default: "high"
       limit:
-        description: "Journal lines to grade against"
-        default: "40"
+        description: "Journal lines to grade against (469 recorded; 40 cannot separate 97% from 90%)"
+        default: "250"
+      concurrency:
+        description: "Calls in flight at once"
+        default: "8"
       base_url:
         description: "OpenAI-compatible endpoint"
         default: "https://api.deepinfra.com/v1/openai"
@@ -63,4 +66,5 @@ jobs:
             --only "${{ inputs.model }}:${{ inputs.effort }}" \
             --api-key "$CANDIDATE_KEY" \
             --limit "${{ inputs.limit }}" \
+            --concurrency "${{ inputs.concurrency }}" \
             | tee -a "$GITHUB_STEP_SUMMARY"

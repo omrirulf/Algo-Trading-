@@ -21,6 +21,9 @@ on:
       limit:
         description: "Journal lines to grade against"
         default: "200"
+      concurrency:
+        description: "Calls in flight at once. Lower it if the report blames 429s on us."
+        default: "8"
       effort:
         description: "Grade with reasoning ON at this effort (a proposal, not what the screen does today). Blank = as the cycle asks."
         type: choice
@@ -98,5 +101,6 @@ jobs:
             --model "$SCREENING_MODEL" \
             --api-key "$SCREENING_API_KEY" \
             --limit "${{ inputs.limit }}" \
+            --concurrency "${{ inputs.concurrency }}" \
             ${{ inputs.effort && format('--effort {0}', inputs.effort) || '' }} \
             | tee -a "$GITHUB_STEP_SUMMARY"

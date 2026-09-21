@@ -46,6 +46,7 @@ from replay.compare_configs import (  # noqa: E402
     MODEL_TIERS,
     Cell,
     clears_floor,
+    error_kinds,
     staircase_order,
 )
 
@@ -78,6 +79,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                              "note below before trusting an agreement number here.")
     parser.add_argument("--api-key", type=str, default="",
                         help="bearer token for --base-url, if it wants one")
+    parser.add_argument("--concurrency", type=int, default=8,
+                        help="calls in flight at once, --base-url only (default 8). "
+                             "A reasoning model answers this question in ~97s, so a "
+                             "sample large enough to separate 97%% from 90%% is hours "
+                             "sequentially and minutes in parallel. Ignored for Claude, "
+                             "which would just meet a rate limit.")
     parser.add_argument("--json", action="store_true", dest="as_json")
     return parser.parse_args(argv)
 
@@ -96,7 +103,7 @@ def cells_to_probe(args: argparse.Namespace) -> list[tuple[str, str]]:
 
 def run_cell(
     entries, model: str, effort: str, baseline_by_key: dict,
-    base_url: str = "", api_key: str = "",
+    base_url: str = "", api_key: str = "", workers: int = 1,
 ) -> Cell:
     complete, usages = runner.measured_completer(
         model=model, effort=effort, base_url=base_url, api_key=api_key
@@ -105,10 +112,9 @@ def run_cell(
     # macro prompt trimmed to the sections it carried, and the recorded answer
     # this is graded against was produced that way. Asking a candidate a
     # different question than the baseline was asked is not a comparison.
-    results = [
-        runner.replay_one(entry, runner.system_prompt_for_entry(entry), complete)
-        for entry in entries
-    ]
+    results = runner.replay_each(
+        entries, runner.system_prompt_for_entry, complete, max_workers=workers
+    )
     return Cell(
         model=model,
         effort=effort,
@@ -148,6 +154,10 @@ def render(cells: list[Cell], floor: float, tickers: int, incumbent: Cell | None
             f"{mark}"
         )
 
+    for cell in cells:
+        if cell.errors:
+            out += ["", f"why {len(cell.errors)} call(s) failed in {cell.label}:"]
+            out += [f"  {n:>4}  {kind}" for kind, n in error_kinds(cell.errors)]
     out += ["", "HOW TO READ THIS", "-" * 82]
     out += [
         "trade-agree is the number that matters: the share of contexts where this",
@@ -205,7 +215,11 @@ def main(argv: list[str] | None = None) -> int:
     cells: list[Cell] = []
     incumbent: Cell | None = None
     for model, effort in plan:
-        cell = run_cell(entries, model, effort, {}, args.base_url, args.api_key)
+        # Concurrency only against an endpoint we chose to point at. The
+        # Claude path would be firing a whole journal at a rate limit, and a
+        # rate-limited context is a lost one where a slow one is only slow.
+        workers = args.concurrency if args.base_url else 1
+        cell = run_cell(entries, model, effort, {}, args.base_url, args.api_key, workers)
         cells.append(cell)
         if clears_floor(cell, args.floor) and (
             incumbent is None

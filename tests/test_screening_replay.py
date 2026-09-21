@@ -10,6 +10,7 @@ model would grade it on a question production never asked it.
 from __future__ import annotations
 
 import json
+import time
 
 import httpx
 import pytest
@@ -483,3 +484,139 @@ def test_reasoning_off_still_pins_the_floor_whatever_effort_says():
     provider.complete_detailed("sys", "user", {"type": "object"}, reasoning=False, effort="high")
     assert sent["reasoning_effort"] == "low", "an effort must not leak into the screen"
     assert llm.NO_REASONING_INSTRUCTION in sent["messages"][0]["content"]
+
+
+# --- grading a sample large enough to mean something -----------------------
+
+
+def _entries(n):
+    return [
+        runner.ReplayEntry(ticker=f"T{i}", ts_utc=None, prompt=f"T{i} body", original=None)
+        for i in range(n)
+    ]
+
+
+def test_replay_each_can_run_in_parallel():
+    """A reasoning model answers in ~97s, so a sample big enough to separate
+    97% from 90% is hours sequentially -- which is how a run ends up too small
+    to conclude anything from."""
+    import threading
+
+    inflight, peak = [], []
+    lock = threading.Lock()
+
+    def slow(system_prompt, user_prompt, schema):
+        with lock:
+            inflight.append(1)
+            peak.append(len(inflight))
+        time.sleep(0.03)
+        with lock:
+            inflight.pop()
+        return json.dumps(
+            {"ticker": user_prompt.split()[0], "bias": "NEUTRAL",
+             "conviction": 0.1, "rationale": "r"}
+        )
+
+    entries = _entries(16)
+    runner.replay_each(entries, lambda e: "sys", slow, max_workers=8)
+    assert max(peak) > 1
+    assert max(peak) <= 8
+
+
+def test_replay_each_is_sequential_by_default():
+    """Anthropic is the caller that would otherwise fire a whole journal at a
+    rate limit, and a rate-limited context is lost where a slow one is late."""
+    import threading
+
+    inflight, peak = [], []
+    lock = threading.Lock()
+
+    def slow(system_prompt, user_prompt, schema):
+        with lock:
+            inflight.append(1)
+            peak.append(len(inflight))
+        time.sleep(0.01)
+        with lock:
+            inflight.pop()
+        return json.dumps(
+            {"ticker": user_prompt.split()[0], "bias": "NEUTRAL",
+             "conviction": 0.1, "rationale": "r"}
+        )
+
+    runner.replay_each(_entries(8), lambda e: "sys", slow)
+    assert max(peak) == 1
+
+
+def test_results_keep_their_entry_order_under_concurrency():
+    """A diff attributed to the wrong ticker is silent and wrong, and the
+    whole point of the run is which tickers disagreed."""
+    def echo(system_prompt, user_prompt, schema):
+        ticker = user_prompt.split()[0]
+        time.sleep(0.02 if ticker.endswith("0") else 0.001)
+        return json.dumps(
+            {"ticker": ticker, "bias": "NEUTRAL", "conviction": 0.1, "rationale": "r"}
+        )
+
+    entries = _entries(20)
+    results = runner.replay_each(entries, lambda e: "sys", echo, max_workers=8)
+    assert [r.entry.ticker for r in results] == [e.ticker for e in entries]
+    for r in results:
+        assert r.replayed is not None
+        assert r.replayed.ticker == r.entry.ticker
+
+
+def test_each_entry_is_asked_its_own_prompt():
+    seen = {}
+
+    def record(system_prompt, user_prompt, schema):
+        ticker = user_prompt.split()[0]
+        seen[ticker] = system_prompt
+        return json.dumps(
+            {"ticker": ticker, "bias": "NEUTRAL", "conviction": 0.1, "rationale": "r"}
+        )
+
+    entries = _entries(6)
+    runner.replay_each(entries, lambda e: f"prompt-for-{e.ticker}", record, max_workers=4)
+    assert seen == {f"T{i}": f"prompt-for-T{i}" for i in range(6)}
+
+
+# --- a failure rate is only about the candidate if the failures were ------
+
+
+def test_our_own_rate_limiting_is_labelled_as_ours():
+    """Asking a hosted endpoint eight at a time can produce 429s. Counted as
+    'the model could not answer', that is the measurement blaming the model
+    for the harness -- and it would argue against a candidate that is fine."""
+    from replay.compare_configs import error_kinds
+
+    kinds = dict(error_kinds([
+        "https://x/v1 returned HTTP 429: Too Many Requests",
+        "https://x/v1 returned HTTP 429: rate limit exceeded",
+        "invalid output: Expecting value",
+    ]))
+    rate = [k for k in kinds if "429" in k]
+    assert rate and kinds[rate[0]] == 2
+    assert "OURS" in rate[0], "a 429 must not read as a verdict on the candidate"
+
+
+def test_a_model_failure_is_not_labelled_as_ours():
+    from replay.compare_configs import error_kinds
+
+    kinds = dict(error_kinds(["invalid output: Expecting value", "answered for MSFT"]))
+    assert not any("OURS" in k for k in kinds)
+
+
+def test_unrecognised_failures_are_still_counted():
+    """Silently dropping a cause we have no bucket for would understate the
+    failure rate, which is the direction that argues for switching."""
+    from replay.compare_configs import error_kinds
+
+    assert dict(error_kinds(["something nobody anticipated"])) == {"other": 1}
+
+
+def test_every_failure_lands_in_exactly_one_bucket():
+    from replay.compare_configs import error_kinds
+
+    errors = ["HTTP 429", "read timeout", "HTTP 503", "invalid output: x",
+              "answered for MSFT", "who knows"]
+    assert sum(n for _, n in error_kinds(errors)) == len(errors)

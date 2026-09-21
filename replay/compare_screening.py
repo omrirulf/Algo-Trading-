@@ -58,7 +58,7 @@ from config import settings as cfg  # noqa: E402
 from orchestrator.llm import AnthropicSignalProvider, OpenAICompatibleProvider  # noqa: E402
 from replay import runner  # noqa: E402
 from replay.compare import SignalDiff  # noqa: E402
-from replay.compare_configs import Cell, clears_floor  # noqa: E402
+from replay.compare_configs import Cell, clears_floor, error_kinds  # noqa: E402
 
 #: Same pre-registered bar ``compare_models.py`` uses, for the same reason:
 #: a floor read off the results afterwards is a story fitted to them, not
@@ -107,6 +107,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                              "this is a PROPOSAL for what the screen would have to "
                              "become, not a measurement of what it does now, and the "
                              "header says so.")
+    parser.add_argument("--concurrency", type=int, default=8,
+                        help="calls in flight at once (default 8). The endpoint is "
+                             "one we chose to point at, so this is a wall-time "
+                             "setting, not a correctness one.")
     parser.add_argument("--api-key", type=str, default="",
                         help="Bearer token for --base-url, if it wants one.")
     parser.add_argument("--floor", type=float, default=DEFAULT_FLOOR,
@@ -219,8 +223,9 @@ def run(args: argparse.Namespace) -> int:
     errors: list[str] = []
     print(f"Asking the candidate for {len(entries)} lines ({skipped} skipped: "
           f"no recorded screen to compare against)...", file=sys.stderr)
-    for entry in entries:
-        result = runner.replay_one(entry, runner.system_prompt_for_entry(entry), complete)
+    for entry, result in zip(entries, runner.replay_each(
+        entries, runner.system_prompt_for_entry, complete, args.concurrency
+    )):
         if result.error is not None:
             errors.append(result.error)
             continue
@@ -290,6 +295,8 @@ def run(args: argparse.Namespace) -> int:
           f"the candidate also escalated {recalled}  <- THE NUMBER THAT MATTERS")
     print(f"Failure rate      : {cell.failure_rate:.0%}  (bad JSON, unreachable, etc. -- "
           f"in production this falls through to the full model, never a bad trade)")
+    for kind, n in error_kinds(errors):
+        print(f"                    {n:>4}  {kind}")
     print(f"Candidate cost    : {_usd(cell.cost_per_call)}/call, "
           f"{_usd(cell.monthly_usd(args.tickers))}/month at {args.tickers} tickers")
     if incumbent_cost is not None:
