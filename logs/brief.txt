@@ -1,4 +1,5 @@
-🟡 1 warning: 1 of 80 ticker(s) produced no signal
-Equity $99,814 · 13 positions · $84,313 gross · $1,689 at risk · unrealised -$151
-Traded: TEVA, RSP
-Cycle 80 tickers, $2.54 · 2026-09-18
+🔴 1 position(s) without a working stop
+Equity $99,883 · 15 positions · $94,745 gross · $1,991 at risk · unrealised -$71
+Traded: MSFT, NVO
+No stop on record: TEVA
+Cycle 80 tickers, $1.57 · 2026-09-21
