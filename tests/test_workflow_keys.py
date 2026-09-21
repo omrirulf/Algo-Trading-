@@ -10,6 +10,7 @@ orchestrator/sources.py reads first.
 
 from __future__ import annotations
 
+import math
 import re
 from pathlib import Path
 
@@ -306,16 +307,30 @@ def test_the_determinism_check_can_outlast_the_calls_it_makes():
     default_repeats = int(re.search(r"DEFAULT_REPEATS\s*=\s*(\d+)", text).group(1))
     default_calls = default_limit * default_repeats
 
-    # Same conservative per-call estimate as screening-check.yml's own test:
-    # a reasoning answer is thousands of tokens where a screen's is a hundred.
-    seconds_per_call = 20
+    # This job is NOT sequential, and the first version of this test modelled
+    # it as if it were: it budgeted 20s per call and ignored --concurrency
+    # entirely, which is right for screening-check.yml (one call at a time)
+    # and wrong here. It under-estimated the real thing by about 1.6x and
+    # passed only because the ceiling happened to be generous -- it would
+    # have waved through a configuration that then died mid-run, losing every
+    # call already paid for, since the report only prints once all of them
+    # are back.
+    #
+    # Measured on the first real run: 150 calls at concurrency 4 finished in
+    # 80 minutes, i.e. ~127s of latency per call spread over 4 workers. 130
+    # is that rounded up.
+    triggers = wf.get("on") or wf[True]
+    inputs = triggers["workflow_dispatch"]["inputs"] or {}
+    default_concurrency = max(1, int(inputs["concurrency"]["default"]))
+    seconds_per_call = 130
     setup_s = 120
 
-    needed = default_calls * seconds_per_call + setup_s
+    rounds = math.ceil(default_calls / default_concurrency)
+    needed = rounds * seconds_per_call + setup_s
     assert timeout_s >= needed, (
         f"timeout-minutes={timeout_s // 60} cannot finish {default_calls} calls "
-        f"({default_limit} contexts x {default_repeats} repeats); needs at least "
-        f"{needed // 60} minutes"
+        f"({default_limit} contexts x {default_repeats} repeats, {default_concurrency} "
+        f"at a time); needs at least {needed // 60} minutes"
     )
 
 

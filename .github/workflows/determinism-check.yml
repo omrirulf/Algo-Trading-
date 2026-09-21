@@ -50,7 +50,13 @@ jobs:
     # same reasoning as screening-check.yml and model-compare.yml: a cheap
     # deadline on the JOB (as opposed to the per-call --timeout above) would
     # decide which contexts get graded by which ones finished in time.
-    timeout-minutes: 90
+    #
+    # 90 was too tight to be comfortable: the first real run of the defaults
+    # (150 calls, 4 at a time) took 80 minutes of it. The report prints only
+    # once every call is back, so overrunning loses the whole run rather than
+    # truncating it, and a 10-minute margin is not one. GitHub allows six
+    # hours; this takes a little under half of one.
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
