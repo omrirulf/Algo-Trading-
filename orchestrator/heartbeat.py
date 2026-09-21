@@ -940,8 +940,37 @@ def post_signal(signal: LLMSignal, dispatcher: Dispatcher | None = None) -> dict
 
 
 def build_context(ticker: str) -> TickerContext:
-    """Headlines plus the yfinance enrichment. Raises only if news is missing."""
-    return context.gather(ticker, fetch_news(ticker))
+    """Headlines plus the yfinance enrichment. Never raises for want of news.
+
+    News used to be the one mandatory source: every yfinance section degrades
+    to a gap through ``context._attempt``, and a failed news lookup alone
+    raised and cost the ticker its whole day. On 18 Sep 2026 that is what
+    happened to TM -- Bright Data answered 200 with an empty body, and a name
+    with working technicals, fundamentals, analyst coverage and insider
+    filings produced no signal at all (issue #69).
+
+    That asymmetry had no defence. Four of the five dimensions were in hand,
+    the prompt has always been able to render a newsless NEWS section, and a
+    ticker with *no* news that day was already handled without complaint --
+    only a ticker whose news lookup *broke* was killed. So a news failure is
+    now a gap like any other, and the gap is explicit: ``_news_section``
+    renders "unavailable this cycle" rather than "none found", because the
+    model must not be told nothing happened when the truth is nobody asked.
+
+    A single flake costing a fifth of one ticker's context is the right
+    price. A vendor outage costing it across the watchlist is not, and it is
+    no longer silent either: ``analysis.health.news_gaps`` counts these gaps
+    and escalates from warning to critical on the same one-tenth share that
+    governs outright failures.
+    """
+    try:
+        headlines = fetch_news(ticker)
+    except NewsFetchError as exc:
+        log.warning("%s: news unavailable, continuing on the other sections (%s)", ticker, exc)
+        return context.gather(
+            ticker, [], news_gap=f"{context.NEWS_GAP_PREFIX}: {exc}",
+        )
+    return context.gather(ticker, headlines)
 
 
 @dataclass(frozen=True)

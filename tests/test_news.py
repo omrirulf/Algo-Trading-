@@ -510,3 +510,40 @@ def test_the_prompt_line_never_shows_the_link():
     items = news.parse_news_items({"news": [{"title": "T", "link": "/goto?url=BLOB"}]})
     assert "goto" not in items[0].as_line()
     assert items[0].as_line() == "T"
+
+
+# --------------------------------------------------------------------------- #
+# The 18 Sep 2026 message that read like a parser bug (issue #69)
+# --------------------------------------------------------------------------- #
+
+
+def test_an_empty_two_hundred_says_so_instead_of_blaming_the_parser():
+    """What TM actually hit, and what its journal line should have said.
+
+    json.loads("") raises "Expecting value: line 1 column 1 (char 0)", which
+    reads like malformed JSON. The body was not malformed; there was no body.
+    """
+    with pytest.raises(news.NewsFetchError) as caught:
+        news._unwrap("")
+    assert "empty body" in str(caught.value)
+    assert "Expecting value" not in str(caught.value)
+
+
+def test_whitespace_only_counts_as_empty():
+    with pytest.raises(news.NewsFetchError, match="empty body"):
+        news._unwrap("   \n  ")
+
+
+def test_genuinely_broken_json_still_shows_what_arrived():
+    """A parse failure must hand the reader the evidence, not just the verdict."""
+    with pytest.raises(news.NewsFetchError) as caught:
+        news._unwrap("{'not': 'json'}")
+    message = str(caught.value)
+    assert "15 bytes" in message
+    assert "not" in message
+
+
+def test_html_keeps_its_own_clearer_message():
+    """The one failure mode that already explained itself must not regress."""
+    with pytest.raises(news.NewsFetchError, match="returned HTML"):
+        news._unwrap("<!doctype html><html>blocked</html>")
