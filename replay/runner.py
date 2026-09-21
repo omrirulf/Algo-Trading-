@@ -292,6 +292,7 @@ def measured_completer(
     effort: Optional[str] = None,
     base_url: str = "",
     api_key: str = "",
+    timeout: Optional[float] = None,
 ):
     """A completer that also reports what each call cost.
 
@@ -310,6 +311,14 @@ def measured_completer(
     Reasoning is on either way, because that is how the full model is asked
     in the cycle. ``effort`` is passed through, so a reasoning model that has
     no true off switch is compared at the setting it would really run at.
+
+    ``timeout`` exists because the default one silently decides *which*
+    contexts get graded. A 250-context run of gpt-oss-120b at high effort put
+    67 of its 68 failures down to timeouts, and a timeout is not a coin flip:
+    the calls that run long are the ones the model found hard, so cutting
+    them drops the hard contexts and grades the candidate on the easy
+    remainder. Raising it costs wall time and buys a number that is about the
+    candidate rather than about the deadline.
     """
     from config.settings import get_settings
     from orchestrator.llm import AnthropicSignalProvider, OpenAICompatibleProvider
@@ -318,9 +327,10 @@ def measured_completer(
     if base_url:
         if not model:
             raise ValueError("--base-url needs a model name to ask for")
-        provider = OpenAICompatibleProvider(
-            base_url=base_url, model=model, api_key=api_key
-        )
+        kwargs = {"base_url": base_url, "model": model, "api_key": api_key}
+        if timeout is not None:
+            kwargs["timeout"] = timeout
+        provider = OpenAICompatibleProvider(**kwargs)
     else:
         provider = AnthropicSignalProvider(get_settings().anthropic_api_key)
     usages: list[Usage] = []

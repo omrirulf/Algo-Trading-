@@ -620,3 +620,49 @@ def test_every_failure_lands_in_exactly_one_bucket():
     errors = ["HTTP 429", "read timeout", "HTTP 503", "invalid output: x",
               "answered for MSFT", "who knows"]
     assert sum(n for _, n in error_kinds(errors)) == len(errors)
+
+
+def test_the_per_call_timeout_reaches_the_provider():
+    """The default one silently decides which contexts get graded: a call
+    that runs long is one the model found hard, so cutting it grades the
+    candidate on the easy remainder. A --timeout that never arrived would
+    look exactly like one that did."""
+    seen = {}
+
+    class Recording:
+        def __init__(self, **kw):
+            seen.update(kw)
+
+        def complete_detailed(self, *a, **k):
+            return Completion(text="{}", usage=None)
+
+    import replay.runner as r
+    import orchestrator.llm as _llm
+    original = _llm.OpenAICompatibleProvider
+    _llm.OpenAICompatibleProvider = Recording
+    try:
+        r.measured_completer(model="m", base_url="https://x/v1", api_key="k", timeout=300)
+    finally:
+        _llm.OpenAICompatibleProvider = original
+    assert seen["timeout"] == 300
+
+
+def test_no_timeout_given_leaves_the_provider_default_alone():
+    seen = {}
+
+    class Recording:
+        def __init__(self, **kw):
+            seen.update(kw)
+
+        def complete_detailed(self, *a, **k):
+            return Completion(text="{}", usage=None)
+
+    import replay.runner as r
+    import orchestrator.llm as _llm
+    original = _llm.OpenAICompatibleProvider
+    _llm.OpenAICompatibleProvider = Recording
+    try:
+        r.measured_completer(model="m", base_url="https://x/v1", api_key="k")
+    finally:
+        _llm.OpenAICompatibleProvider = original
+    assert "timeout" not in seen

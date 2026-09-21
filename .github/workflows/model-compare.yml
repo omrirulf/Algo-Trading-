@@ -27,8 +27,11 @@ on:
         description: "Journal lines to grade against (469 recorded; 40 cannot separate 97% from 90%)"
         default: "250"
       concurrency:
-        description: "Calls in flight at once"
+        description: "Calls in flight at once. Lower it if the report blames timeouts or 429s on us."
         default: "8"
+      timeout:
+        description: "Per-call timeout, seconds. Raise it with concurrency lowered -- a timeout picks which contexts get graded."
+        default: "120"
       base_url:
         description: "OpenAI-compatible endpoint"
         default: "https://api.deepinfra.com/v1/openai"
@@ -41,7 +44,11 @@ jobs:
     runs-on: ubuntu-latest
     # Same reasoning as the screening check: one call per journal line at a
     # reasoning effort, which is minutes per dozen rather than seconds.
-    timeout-minutes: 180
+    # 250 contexts three or four at a time, each allowed several minutes, is
+    # hours -- and that combination is the point: a cheap deadline decides
+    # which contexts get graded, so buying an honest sample means paying the
+    # wall time. Six hours is the ceiling GitHub allows a hosted job.
+    timeout-minutes: 350
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
@@ -67,4 +74,5 @@ jobs:
             --api-key "$CANDIDATE_KEY" \
             --limit "${{ inputs.limit }}" \
             --concurrency "${{ inputs.concurrency }}" \
+            --timeout "${{ inputs.timeout }}" \
             | tee -a "$GITHUB_STEP_SUMMARY"
