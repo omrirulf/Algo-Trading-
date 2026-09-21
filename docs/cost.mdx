@@ -117,6 +117,15 @@ saving; it cannot reach a trade.
 
 ### Very cheap often beats free, for this workload
 
+<Warning>
+  **Every candidate measured so far fails the escalation-recall floor, and the
+  screen is still Claude Haiku.** The numbers are in [what the candidates
+  actually scored](#what-the-candidates-actually-scored) below. Read the rest
+  of this section as how to wire and grade a candidate, not as a
+  recommendation to flip one on: the prices are real and the recall is not
+  there. Nothing here is a setting to copy into production today.
+</Warning>
+
 Two independent reviews of this seam (one run in the session that built it,
 one run separately with no visibility into the first) landed on the same
 answer without comparing notes first: for ~80 calls/day of ~3,600-token
@@ -350,6 +359,51 @@ is what recall exists to catch.
 Same limits as the staircase walk otherwise: agreement is not correctness,
 and a high failure rate silently reverts every one of those lines to the full
 model, which erases the saving without ever risking a bad trade.
+
+### What the candidates actually scored
+
+Three endpoints have been graded against the recorded Haiku screen on the same
+journal. None passed.
+
+| Candidate | Asked as | Lines | Escalation recall | Failure rate | $/month |
+| --- | --- | --- | --- | --- | --- |
+| `claude-haiku-4-5` | production's own screen | — | 100% by construction | — | $7.29 |
+| `gemini-3.5-flash-lite` | reasoning off | 195 | **41%** (32 of 79) | 0% | $2.34 |
+| `openai/gpt-oss-20b` (DeepInfra) | reasoning off | 156 | **11%** (7 of 64) | 20% | $0.22 |
+| `openai/gpt-oss-20b` (DeepInfra) | `effort=high` | 156 | **5%** (3 of 62) | 20% | $1.46 |
+
+The `$/month` column is what each run measured from its own token usage at 80
+tickers, so it will not match the projected table above to the cent — that one
+prices every model on Haiku's measured token profile at 68 tickers. A model
+that answers more tersely than Haiku comes out cheaper than its projection.
+
+Read the recall column, not the price column. At 41%, Gemini would silently
+turn three of every five names Haiku wanted looked at into NEUTRAL — and the
+full model is never asked about a NEUTRAL screen, so those trades are not
+recoverable further down the funnel. The $4.95/month it saves buys that.
+
+Two things in this table are worth more than the verdict:
+
+- **Gemini's failure rate is 0%.** Every one of its 195 calls answered in the
+  schema, so 41% is the model disagreeing, not the endpoint breaking. The
+  `gpt-oss-20b` rows are 20%, which means a fifth of those lines never
+  produced an answer at all and its recall is measured only on the survivors.
+  A cleaner run of that model would very likely score differently; it would
+  have to score about nine times better to matter.
+- **More thinking made `gpt-oss-20b` worse**, 11% to 5%. That is the opposite
+  of the intuition that bought the experiment, and it is why `--effort` exists
+  in the check: reasoning is a variable to measure here, not a lever that only
+  goes one way. The plausible mechanism is that a reasoning model talks itself
+  out of a marginal name, and every name this screen exists to catch is
+  marginal.
+
+What none of these numbers say is that Haiku was *right* on the lines it
+escalated. Recall measures interchangeability with the incumbent, and on
+exactly the lines where two models differ it is silent about which one was
+correct. It is the right gate anyway, because the cost of the two errors is
+not symmetric — see the floor's reasoning above — but a candidate that scored
+95% would still only have earned the right to be tried, not a claim to be
+better.
 
 ## Stage zero: what the book already holds
 
