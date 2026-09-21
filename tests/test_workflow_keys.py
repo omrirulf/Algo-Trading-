@@ -173,3 +173,17 @@ def test_the_model_compare_workflow_resolves_the_same_candidate_key():
                  "Could this answer the question Opus answers")["env"]
     expected = " || ".join("secrets.%s" % n for n in llm.SCREENING_KEY_ENV_VARS)
     assert step["CANDIDATE_KEY"] == "${{ %s }}" % expected
+
+
+def test_both_comparison_workflows_can_dial_concurrency_down():
+    """The failure report tells the reader to lower --concurrency when it
+    blames 429s on us. Advice you cannot follow from where you read it is
+    not advice."""
+    for workflow, job in (("screening-check.yml", "screening"),
+                          ("model-compare.yml", "compare")):
+        wf = yaml.safe_load((ROOT / ".github/workflows" / workflow).read_text())
+        triggers = wf.get("on") or wf[True]
+        inputs = triggers["workflow_dispatch"]["inputs"] or {}
+        assert "concurrency" in inputs, workflow
+        run = " ".join(s.get("run", "") for s in wf["jobs"][job]["steps"])
+        assert "--concurrency" in run, workflow
