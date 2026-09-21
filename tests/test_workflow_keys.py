@@ -369,3 +369,29 @@ def test_the_baseline_compare_workflow_runs_before_it_is_merged():
     assert "analysis/baseline_compare.py" in watched
     # The thing it actually measures with, not just its own entry point.
     assert "backtest/simulate.py" in watched
+
+
+def test_the_determinism_check_can_actually_reach_claude():
+    """The incumbent is a Claude model, so a self-agreement check that cannot
+    ask Claude cannot measure the thing that matters most.
+
+    It could not. base_url defaulted to a DeepInfra URL, and GitHub replaces
+    an EMPTY workflow_dispatch input with the declared default rather than
+    passing the empty string -- so dispatching base_url="" to mean "ask
+    Claude" silently asked DeepInfra for a claude-* model instead, and all
+    100 calls of the first real run failed. A choice input cannot collapse
+    into a default that way, so the intent rides on that instead.
+    """
+    wf = yaml.safe_load((ROOT / ".github/workflows/determinism-check.yml").read_text())
+    triggers = wf.get("on") or wf[True]
+    inputs = triggers["workflow_dispatch"]["inputs"] or {}
+    assert "claude" in inputs["provider"]["options"]
+
+    run = " ".join(s.get("run", "") for s in wf["jobs"]["determinism"]["steps"])
+    # There must be a path that hands the script an EMPTY --base-url, which
+    # is what routes it to the Anthropic provider.
+    assert 'BASE_URL=""' in run
+    assert '--base-url "$BASE_URL"' in run
+    assert "ANTHROPIC_API_KEY" in str(
+        _step("determinism-check.yml", "determinism", "Does this model agree with itself")["env"]
+    )
