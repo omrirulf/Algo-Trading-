@@ -92,14 +92,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                              "it drops the hard contexts and grades the candidate on "
                              "the easy remainder. Raise it when the failure breakdown "
                              "is mostly timeouts.")
-    parser.add_argument("--emit-journal", type=Path, default=None,
-                        help="write the candidate's answers and the incumbent's as "
-                             "two journal files under this path stem, over exactly "
-                             "the contexts where both answered. Feed them to "
-                             "analysis/score_journal.py to ask which was RIGHT -- "
-                             "agreement only says whether they are interchangeable, "
-                             "and says nothing at all about the lines where they "
-                             "were not.")
+    parser.add_argument("--emit-pairs", action="store_true",
+                        help="print the candidate's answers and the incumbent's to "
+                             "stdout as {_side, line} records, over exactly the "
+                             "contexts where both answered. Split by _side and feed "
+                             "each to analysis/score_journal.py to ask which was "
+                             "RIGHT -- agreement only says whether they are "
+                             "interchangeable, and says nothing about the lines "
+                             "where they were not. Printed rather than written "
+                             "because replay/ must not open a file for writing: a "
+                             "path argument aimed at the real journal would destroy "
+                             "the record this whole harness reads.")
     parser.add_argument("--json", action="store_true", dest="as_json")
     return parser.parse_args(argv)
 
@@ -119,7 +122,7 @@ def cells_to_probe(args: argparse.Namespace) -> list[tuple[str, str]]:
 def run_cell(
     entries, model: str, effort: str, baseline_by_key: dict,
     base_url: str = "", api_key: str = "", workers: int = 1,
-    timeout: float | None = None, emit_journal: Path | None = None,
+    timeout: float | None = None, emit_pairs: bool = False,
 ) -> Cell:
     complete, usages = runner.measured_completer(
         model=model, effort=effort, base_url=base_url, api_key=api_key,
@@ -132,8 +135,8 @@ def run_cell(
     results = runner.replay_each(
         entries, runner.system_prompt_for_entry, complete, max_workers=workers
     )
-    if emit_journal:
-        _emit_pair(results, usages, emit_journal)
+    if emit_pairs:
+        _print_pairs(results, usages)
     return Cell(
         model=model,
         effort=effort,
@@ -143,30 +146,39 @@ def run_cell(
     )
 
 
-def _emit_pair(results, usages, stem: Path) -> None:
-    """Write the candidate's answers and the incumbent's, over the same lines.
+def _print_pairs(results, usages) -> int:
+    """Print the candidate's answers and the incumbent's, to stdout.
 
-    Two files, not one, and restricted to the contexts where BOTH produced a
-    signal. Scoring a candidate against the full recorded journal would be
-    comparing it on a different set of days than the incumbent was scored on,
-    and the difference in realised return would then be partly a difference
-    in which market it was asked about.
+    Printed rather than written, because replay/ is forbidden from opening a
+    file for writing and that rule is right: this tool runs often and
+    casually while iterating, and an --emit-journal pointed at
+    logs/signal_journal would destroy the only record of what the model
+    actually said. Handing the lines to the caller removes the failure mode
+    instead of guarding against it.
+
+    Only contexts where BOTH produced a signal are printed, on either side. A
+    candidate scored on more days than the incumbent is being compared on a
+    different market rather than a different model, and the difference in
+    realised return would then be partly that.
     """
-    candidate = stem.with_name(stem.name + "-candidate.jsonl")
-    incumbent = stem.with_name(stem.name + "-incumbent.jsonl")
-    paired = 0
-    with candidate.open("w", encoding="utf-8") as cand, \
-            incumbent.open("w", encoding="utf-8") as inc:
-        for result, usage in zip(results, list(usages) + [None] * len(results)):
-            if result.replayed is None or result.entry.original is None:
-                continue
-            cand.write(runner.as_journal_line(result.entry, result.replayed, usage) + "\n")
-            inc.write(runner.as_journal_line(result.entry, result.entry.original) + "\n")
-            paired += 1
-    print(f"wrote {paired} paired line(s) to {candidate} and {incumbent}", file=sys.stderr)
-    print("score both with analysis/score_journal.py --journal <file>: agreement "
-          "says whether the two are interchangeable, and only realised returns "
-          "say which was right where they were not.", file=sys.stderr)
+    printed = 0
+    for result, usage in zip(results, list(usages) + [None] * len(results)):
+        if result.replayed is None or result.entry.original is None:
+            continue
+        for side, signal, used in (
+            ("candidate", result.replayed, usage),
+            ("incumbent", result.entry.original, None),
+        ):
+            print(json.dumps({
+                "_side": side,
+                "line": json.loads(runner.as_journal_line(result.entry, signal, used)),
+            }))
+        printed += 1
+    print(f"printed {printed} paired context(s); split by _side and score each with "
+          f"analysis/score_journal.py. Agreement says whether the two are "
+          f"interchangeable; only realised returns say which was right where they "
+          f"were not.", file=sys.stderr)
+    return printed
 
 
 def render(cells: list[Cell], floor: float, tickers: int, incumbent: Cell | None) -> str:
@@ -265,7 +277,7 @@ def main(argv: list[str] | None = None) -> int:
         # rate-limited context is a lost one where a slow one is only slow.
         workers = args.concurrency if args.base_url else 1
         cell = run_cell(entries, model, effort, {}, args.base_url, args.api_key,
-                        workers, args.timeout or None, args.emit_journal)
+                        workers, args.timeout or None, args.emit_pairs)
         cells.append(cell)
         if clears_floor(cell, args.floor) and (
             incumbent is None
@@ -293,7 +305,12 @@ def main(argv: list[str] | None = None) -> int:
             "cheapest_acceptable": incumbent.label if incumbent else None,
         }, indent=2))
     else:
-        print(render(cells, args.floor, args.tickers, incumbent))
+        # With --emit-pairs, stdout carries the records and nothing else:
+        # mixing a human report into the stream the caller is about to split
+        # would corrupt it. Diagnostics go to stderr, which is where the rest
+        # of this tool's progress already goes.
+        print(render(cells, args.floor, args.tickers, incumbent),
+              file=sys.stderr if args.emit_pairs else sys.stdout)
     return 0
 
 

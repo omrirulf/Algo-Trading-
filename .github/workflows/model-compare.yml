@@ -82,8 +82,12 @@ jobs:
             --limit "${{ inputs.limit }}" \
             --concurrency "${{ inputs.concurrency }}" \
             --timeout "${{ inputs.timeout }}" \
-            --emit-journal "$RUNNER_TEMP/compare" \
-            | tee -a "$GITHUB_STEP_SUMMARY"
+            --emit-pairs \
+            > "$RUNNER_TEMP/pairs.jsonl" 2> "$RUNNER_TEMP/report.txt" || status=$?
+          # The report is on stderr so stdout can carry only the records the
+          # next step splits. Show it either way, then fail if the run did.
+          tee -a "$GITHUB_STEP_SUMMARY" < "$RUNNER_TEMP/report.txt"
+          exit "${status:-0}"
 
       - name: Which one was RIGHT, not which one agreed
         # Agreement says the two are interchangeable. It is silent on exactly
@@ -92,9 +96,27 @@ jobs:
         # behind it. Prices are the ground truth, and score_journal.py already
         # knows how to join signals to them, so it is handed both sides over
         # the identical contexts and asked the question directly.
+        #
+        # The splitting happens here rather than in replay/, which must not
+        # open a file for writing: that rule is what stops a path argument
+        # aimed at the real journal from destroying the record.
         if: inputs.score_returns
         run: |
           set -o pipefail
+          python - <<'SPLIT'
+          import json, os
+          tmp = os.environ["RUNNER_TEMP"]
+          sides = {s: open(f"{tmp}/compare-{s}.jsonl", "w") for s in ("candidate", "incumbent")}
+          with open(f"{tmp}/pairs.jsonl") as stream:
+              for raw in stream:
+                  raw = raw.strip()
+                  if not raw:
+                      continue
+                  record = json.loads(raw)
+                  sides[record["_side"]].write(json.dumps(record["line"]) + "\n")
+          for handle in sides.values():
+              handle.close()
+          SPLIT
           for side in incumbent candidate; do
             echo "===== $side ====="
             python analysis/score_journal.py \

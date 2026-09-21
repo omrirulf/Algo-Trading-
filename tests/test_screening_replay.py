@@ -713,14 +713,11 @@ def test_the_emitted_line_keeps_the_recorded_moment_and_ticker():
     assert line["signal"]["bias"] == "BEARISH"
 
 
-def test_only_contexts_both_answered_are_emitted():
+def test_only_contexts_both_answered_are_printed(capsys):
     """A candidate scored on more days than the incumbent is being compared
     on a different market, not a different model."""
-    import tempfile
-    from pathlib import Path
-
     from app.schemas import LLMSignal
-    from replay.compare_models import _emit_pair
+    from replay.compare_models import _print_pairs
 
     def _entry(ticker, original):
         return runner.ReplayEntry(
@@ -740,15 +737,39 @@ def test_only_contexts_both_answered_are_emitted():
             ticker="CCC", bias="BEARISH", conviction=0.6, rationale="c")),
     ]
 
-    with tempfile.TemporaryDirectory() as d:
-        stem = Path(d) / "run"
-        _emit_pair(results, [], stem)
-        cand = [json.loads(l) for l in
-                (stem.with_name("run-candidate.jsonl")).read_text().splitlines()]
-        inc = [json.loads(l) for l in
-               (stem.with_name("run-incumbent.jsonl")).read_text().splitlines()]
+    assert _print_pairs(results, []) == 1
+    records = [json.loads(l) for l in capsys.readouterr().out.splitlines() if l.strip()]
+    by_side = {r["_side"]: r["line"] for r in records}
+    assert set(by_side) == {"candidate", "incumbent"}
+    assert by_side["candidate"]["ticker"] == "AAA"
+    assert by_side["incumbent"]["ticker"] == "AAA"
+    assert by_side["candidate"]["signal"]["bias"] == "BEARISH"
+    assert by_side["incumbent"]["signal"]["bias"] == "BULLISH"
 
-    assert [r["ticker"] for r in cand] == ["AAA"]
-    assert [r["ticker"] for r in inc] == ["AAA"]
-    assert cand[0]["signal"]["bias"] == "BEARISH"
-    assert inc[0]["signal"]["bias"] == "BULLISH"
+
+def test_the_printed_records_are_parseable_by_the_real_scorer(capsys):
+    """The point is to reuse analysis/score_journal.py. A record it cannot
+    read would score nothing while looking like it worked."""
+    import tempfile
+    from pathlib import Path as _Path
+
+    from analysis.reader import read_journal
+    from app.schemas import LLMSignal
+    from replay.compare_models import _print_pairs
+
+    entry = runner.ReplayEntry(
+        ticker="AAPL", ts_utc="2026-09-12T14:00:00+00:00", prompt="p",
+        original=LLMSignal(ticker="AAPL", bias="BULLISH", conviction=0.8, rationale="i"),
+        context=TickerContext(ticker="AAPL", headlines=["h"]),
+    )
+    _print_pairs([runner.ReplayResult(entry=entry, replayed=LLMSignal(
+        ticker="AAPL", bias="BEARISH", conviction=0.6, rationale="c"))], [])
+    records = [json.loads(l) for l in capsys.readouterr().out.splitlines() if l.strip()]
+
+    with tempfile.TemporaryDirectory() as d:
+        for side in ("candidate", "incumbent"):
+            path = _Path(d) / f"{side}.jsonl"
+            path.write_text("".join(
+                json.dumps(r["line"]) + "\n" for r in records if r["_side"] == side))
+            read = read_journal(path)
+            assert read.skipped == 0 and len(read.entries) == 1, side
