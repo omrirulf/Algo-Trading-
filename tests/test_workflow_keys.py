@@ -180,12 +180,13 @@ def test_the_model_compare_workflow_resolves_the_same_candidate_key():
     assert step["CANDIDATE_KEY"] == "${{ %s }}" % expected
 
 
-def test_both_comparison_workflows_can_dial_concurrency_down():
+def test_every_comparison_workflow_can_dial_concurrency_down():
     """The failure report tells the reader to lower --concurrency when it
     blames 429s on us. Advice you cannot follow from where you read it is
     not advice."""
     for workflow, job in (("screening-check.yml", "screening"),
-                          ("model-compare.yml", "compare")):
+                          ("model-compare.yml", "compare"),
+                          ("determinism-check.yml", "determinism")):
         wf = yaml.safe_load((ROOT / ".github/workflows" / workflow).read_text())
         triggers = wf.get("on") or wf[True]
         inputs = triggers["workflow_dispatch"]["inputs"] or {}
@@ -267,3 +268,74 @@ def test_naming_a_key_sends_only_that_one():
         expression = probe[name]
         assert f"inputs.key == '{name}'" in expression, name
         assert "inputs.key == ''" in expression, f"{name} must still pass when none is named"
+
+
+def test_the_determinism_check_workflow_is_read_only_about_trading():
+    """It repeats recorded contexts against one configuration. Handing it
+    broker credentials would make a measurement tool able to move money."""
+    wf = yaml.safe_load((ROOT / ".github/workflows/determinism-check.yml").read_text())
+    for step in wf["jobs"]["determinism"]["steps"]:
+        env = step.get("env") or {}
+        for name in env:
+            assert "ALPACA" not in name.upper(), name
+            assert "WEBHOOK" not in name.upper(), name
+
+
+def test_the_determinism_check_workflow_resolves_the_same_candidate_key():
+    """One DeepInfra account, one key, whichever spelling it was stored under
+    -- the same chain model-compare.yml resolves, since both may be asked to
+    test the same non-Claude candidate."""
+    step = _step("determinism-check.yml", "determinism", "Does this model agree with itself")["env"]
+    expected = " || ".join("secrets.%s" % n for n in llm.SCREENING_KEY_ENV_VARS)
+    assert step["CANDIDATE_KEY"] == "${{ %s }}" % expected
+
+
+def test_the_determinism_check_can_outlast_the_calls_it_makes():
+    """A job timeout sized for the default --limit/--repeats would truncate a
+    larger run silently: every call paid for, some of them never counted.
+
+    Derived from determinism_check.py's own defaults rather than a number
+    typed here, so raising a default without raising the timeout fails
+    instead of truncating the next run.
+    """
+    wf = yaml.safe_load((ROOT / ".github/workflows/determinism-check.yml").read_text())
+    timeout_s = wf["jobs"]["determinism"]["timeout-minutes"] * 60
+
+    text = (ROOT / "replay/determinism_check.py").read_text()
+    default_limit = int(re.search(r"DEFAULT_LIMIT\s*=\s*(\d+)", text).group(1))
+    default_repeats = int(re.search(r"DEFAULT_REPEATS\s*=\s*(\d+)", text).group(1))
+    default_calls = default_limit * default_repeats
+
+    # Same conservative per-call estimate as screening-check.yml's own test:
+    # a reasoning answer is thousands of tokens where a screen's is a hundred.
+    seconds_per_call = 20
+    setup_s = 120
+
+    needed = default_calls * seconds_per_call + setup_s
+    assert timeout_s >= needed, (
+        f"timeout-minutes={timeout_s // 60} cannot finish {default_calls} calls "
+        f"({default_limit} contexts x {default_repeats} repeats); needs at least "
+        f"{needed // 60} minutes"
+    )
+
+
+def test_the_determinism_check_workflow_can_dial_concurrency_down():
+    wf = yaml.safe_load((ROOT / ".github/workflows/determinism-check.yml").read_text())
+    triggers = wf.get("on") or wf[True]
+    inputs = triggers["workflow_dispatch"]["inputs"] or {}
+    assert "concurrency" in inputs
+    run = " ".join(s.get("run", "") for s in wf["jobs"]["determinism"]["steps"])
+    assert "--concurrency" in run
+
+
+def test_the_determinism_check_workflow_passes_effort_even_when_blank():
+    """A workflow_dispatch text input left blank arrives as '', not absent,
+    so the step must still pass --effort with whatever value it has --
+    determinism_check.py is what turns '' back into 'no effort asked'
+    (tests/test_determinism_check.py pins that half)."""
+    run = " ".join(
+        s.get("run", "") for s in
+        yaml.safe_load((ROOT / ".github/workflows/determinism-check.yml").read_text())
+        ["jobs"]["determinism"]["steps"]
+    )
+    assert "--effort" in run
