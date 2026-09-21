@@ -84,9 +84,10 @@ def test_the_screening_probe_is_offered_every_spelling_separately():
     step = _step("screening-check.yml", "screening",
                  "Is the screening endpoint wired, and does it answer")["env"]
     for name in llm.SCREENING_KEY_ENV_VARS:
-        assert step[name] == "${{ secrets.%s }}" % name, name
-    assert step["SCREENING_BASE_URL"] == "${{ vars.SCREENING_BASE_URL }}"
-    assert step["SCREENING_MODEL"] == "${{ vars.SCREENING_MODEL }}"
+        assert f"secrets.{name}" in step[name], name
+    # Each still falls back to what production reads when nothing is named.
+    assert "vars.SCREENING_BASE_URL" in step["SCREENING_BASE_URL"]
+    assert "vars.SCREENING_MODEL" in step["SCREENING_MODEL"]
 
 
 def test_the_canonical_spelling_is_the_field_settings_declares():
@@ -104,10 +105,14 @@ def test_the_recall_grading_step_gets_the_same_endpoint_the_probe_does():
                   "Does it agree with the screen it would replace")["env"]
     assert grade["SCREENING_BASE_URL"] == probe["SCREENING_BASE_URL"]
     assert grade["SCREENING_MODEL"] == probe["SCREENING_MODEL"]
+    # The grading step resolves one key rather than the four spellings the
+    # probe is handed, because compare_screening.py reads a single value. It
+    # must still fall back to every spelling the cycle would, so a run with
+    # no override grades the endpoint production would actually have used.
     cycle = _step("heartbeat.yml", "cycle", "Run one cycle")["env"]
-    assert grade["SCREENING_API_KEY"] == cycle["SCREENING_API_KEY"], (
-        "the graded key must be the one the cycle resolves, spellings included"
-    )
+    for name in llm.SCREENING_KEY_ENV_VARS:
+        assert f"secrets.{name}" in grade["SCREENING_API_KEY"], name
+        assert f"secrets.{name}" in cycle["SCREENING_API_KEY"], name
 
 
 def test_the_screening_check_can_outlast_the_grading_it_runs():
@@ -218,3 +223,35 @@ def test_replay_never_opens_a_file_for_writing():
         if re.search(r'\.write_text\(|open\([^)]*["\'][wa]', text):
             offenders.append(path.name)
     assert not offenders, f"replay/ must not write files: {offenders}"
+
+
+def test_a_candidate_can_be_graded_without_touching_production_config():
+    """Editing the live SCREENING_* variables to run a test is how a screen
+    later measured at 5% escalation recall came within hours of deciding real
+    trades. A test must be able to name its own endpoint."""
+    wf = yaml.safe_load((ROOT / ".github/workflows/screening-check.yml").read_text())
+    triggers = wf.get("on") or wf[True]
+    inputs = triggers["workflow_dispatch"]["inputs"] or {}
+    for name in ("base_url", "model", "key"):
+        assert name in inputs, name
+        assert inputs[name].get("default") == "", f"{name} must default to production"
+
+    for step in wf["jobs"]["screening"]["steps"]:
+        env = step.get("env") or {}
+        for setting in ("SCREENING_BASE_URL", "SCREENING_MODEL"):
+            if setting in env:
+                assert "inputs." + setting.split("SCREENING_")[1].lower() in env[setting], setting
+                assert "vars." + setting in env[setting], f"{setting} must still fall back"
+
+
+def test_naming_a_key_sends_only_that_one():
+    """The probe's job is to say WHICH spelling carried the key. Passing all
+    of them while a specific one was asked for would send whichever the chain
+    prefers and report the wrong name -- against the wrong endpoint."""
+    wf = yaml.safe_load((ROOT / ".github/workflows/screening-check.yml").read_text())
+    probe = _step("screening-check.yml", "screening",
+                  "Is the screening endpoint wired, and does it answer")["env"]
+    for name in llm.SCREENING_KEY_ENV_VARS:
+        expression = probe[name]
+        assert f"inputs.key == '{name}'" in expression, name
+        assert "inputs.key == ''" in expression, f"{name} must still pass when none is named"

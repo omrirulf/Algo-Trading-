@@ -24,6 +24,17 @@ on:
       concurrency:
         description: "Calls in flight at once. Lower it if the report blames 429s on us."
         default: "8"
+      base_url:
+        description: "Endpoint to test. Blank uses the SCREENING_BASE_URL variable."
+        default: ""
+      model:
+        description: "Model to ask it for. Blank uses the SCREENING_MODEL variable."
+        default: ""
+      key:
+        description: "Which stored secret to send. Blank resolves the usual chain."
+        type: choice
+        options: ["", "SCREENING_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "GROQ_API_KEY"]
+        default: ""
       effort:
         description: "Grade with reasoning ON at this effort (a proposal, not what the screen does today). Blank = as the cycle asks."
         type: choice
@@ -70,12 +81,20 @@ jobs:
         # onto SCREENING_API_KEY; here they stay separate so the report can
         # name the one that is actually set.
         env:
-          SCREENING_API_KEY: ${{ secrets.SCREENING_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          SCREENING_BASE_URL: ${{ vars.SCREENING_BASE_URL }}
-          SCREENING_MODEL: ${{ vars.SCREENING_MODEL }}
+          # An input overrides the variable, so a candidate can be graded
+          # without touching what production reads. Editing the live variables
+          # to run a test is how a screen measured at 5% recall came within
+          # hours of deciding real trades.
+          SCREENING_BASE_URL: ${{ inputs.base_url != '' && inputs.base_url || vars.SCREENING_BASE_URL }}
+          SCREENING_MODEL: ${{ inputs.model != '' && inputs.model || vars.SCREENING_MODEL }}
+          # Naming a key passes that one alone, so the probe still reports
+          # which spelling carried it. Blank passes all four and lets the
+          # usual chain decide -- which is what production does, and what a
+          # run with no override should therefore measure.
+          SCREENING_API_KEY: ${{ (inputs.key == '' || inputs.key == 'SCREENING_API_KEY') && secrets.SCREENING_API_KEY || '' }}
+          GEMINI_API_KEY: ${{ (inputs.key == '' || inputs.key == 'GEMINI_API_KEY') && secrets.GEMINI_API_KEY || '' }}
+          GOOGLE_API_KEY: ${{ (inputs.key == '' || inputs.key == 'GOOGLE_API_KEY') && secrets.GOOGLE_API_KEY || '' }}
+          GROQ_API_KEY: ${{ (inputs.key == '' || inputs.key == 'GROQ_API_KEY') && secrets.GROQ_API_KEY || '' }}
         run: |
           set -o pipefail
           python backtest/probe_screening.py | tee -a "$GITHUB_STEP_SUMMARY"
@@ -91,9 +110,9 @@ jobs:
         # produces a page of identical errors and no information.
         if: inputs.recall
         env:
-          SCREENING_BASE_URL: ${{ vars.SCREENING_BASE_URL }}
-          SCREENING_MODEL: ${{ vars.SCREENING_MODEL }}
-          SCREENING_API_KEY: ${{ secrets.SCREENING_API_KEY || secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY || secrets.GROQ_API_KEY }}
+          SCREENING_BASE_URL: ${{ inputs.base_url != '' && inputs.base_url || vars.SCREENING_BASE_URL }}
+          SCREENING_MODEL: ${{ inputs.model != '' && inputs.model || vars.SCREENING_MODEL }}
+          SCREENING_API_KEY: ${{ inputs.key == 'GEMINI_API_KEY' && secrets.GEMINI_API_KEY || inputs.key == 'GOOGLE_API_KEY' && secrets.GOOGLE_API_KEY || inputs.key == 'GROQ_API_KEY' && secrets.GROQ_API_KEY || secrets.SCREENING_API_KEY || secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY || secrets.GROQ_API_KEY }}
         run: |
           set -o pipefail
           python replay/compare_screening.py \
