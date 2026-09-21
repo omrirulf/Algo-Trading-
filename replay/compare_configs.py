@@ -124,6 +124,41 @@ def clears_floor(cell: Cell, floor: float) -> Optional[bool]:
     return None if agreement is None else agreement >= floor
 
 
+#: Error signatures worth telling apart, most specific first. A failure rate
+#: is only a fact about the candidate if the failures came from the
+#: candidate: asking a hosted endpoint eight at a time can produce 429s, and
+#: a 429 counted as "the model could not answer" is the measurement blaming
+#: the model for the harness. Same for a timeout.
+_ERROR_KINDS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("rate limited (429) -- OURS, lower --concurrency", ("429", "rate limit", "too many requests")),
+    ("timed out -- OURS if it only happens under load", ("timeout", "timed out", "read timeout")),
+    ("refused the request (4xx)", ("http 4", "400", "401", "403", "404", "422")),
+    ("endpoint error (5xx)", ("http 5", "500", "502", "503", "529")),
+    ("answered off-schema", ("invalid output", "non-json", "validation")),
+    ("answered for the wrong ticker", ("answered for",)),
+)
+
+
+def error_kinds(errors: list[str]) -> list[tuple[str, int]]:
+    """Group failures by cause, commonest first.
+
+    An undifferentiated failure rate cannot be acted on: "20% failed" reads
+    as a verdict on the model, and it is only that if none of the 20% were
+    our own rate limiting or our own timeout. Those two are labelled OURS so
+    a run that measured its own concurrency is not mistaken for a run that
+    measured a candidate.
+    """
+    counts: dict[str, int] = {}
+    for error in errors:
+        low = (error or "").lower()
+        label = next(
+            (name for name, needles in _ERROR_KINDS if any(n in low for n in needles)),
+            "other",
+        )
+        counts[label] = counts.get(label, 0) + 1
+    return sorted(counts.items(), key=lambda kv: -kv[1])
+
+
 def staircase_order(
     models: Sequence[str] = MODEL_TIERS, efforts: Sequence[str] = EFFORT_NOTCHES
 ) -> list[tuple[str, str]]:
@@ -142,5 +177,6 @@ __all__ = [
     "MODEL_TIERS",
     "Cell",
     "clears_floor",
+    "error_kinds",
     "staircase_order",
 ]

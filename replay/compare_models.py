@@ -46,6 +46,7 @@ from replay.compare_configs import (  # noqa: E402
     MODEL_TIERS,
     Cell,
     clears_floor,
+    error_kinds,
     staircase_order,
 )
 
@@ -153,6 +154,10 @@ def render(cells: list[Cell], floor: float, tickers: int, incumbent: Cell | None
             f"{mark}"
         )
 
+    for cell in cells:
+        if cell.errors:
+            out += ["", f"why {len(cell.errors)} call(s) failed in {cell.label}:"]
+            out += [f"  {n:>4}  {kind}" for kind, n in error_kinds(cell.errors)]
     out += ["", "HOW TO READ THIS", "-" * 82]
     out += [
         "trade-agree is the number that matters: the share of contexts where this",

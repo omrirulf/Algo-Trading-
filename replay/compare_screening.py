@@ -58,7 +58,7 @@ from config import settings as cfg  # noqa: E402
 from orchestrator.llm import AnthropicSignalProvider, OpenAICompatibleProvider  # noqa: E402
 from replay import runner  # noqa: E402
 from replay.compare import SignalDiff  # noqa: E402
-from replay.compare_configs import Cell, clears_floor  # noqa: E402
+from replay.compare_configs import Cell, clears_floor, error_kinds  # noqa: E402
 
 #: Same pre-registered bar ``compare_models.py`` uses, for the same reason:
 #: a floor read off the results afterwards is a story fitted to them, not
@@ -295,6 +295,8 @@ def run(args: argparse.Namespace) -> int:
           f"the candidate also escalated {recalled}  <- THE NUMBER THAT MATTERS")
     print(f"Failure rate      : {cell.failure_rate:.0%}  (bad JSON, unreachable, etc. -- "
           f"in production this falls through to the full model, never a bad trade)")
+    for kind, n in error_kinds(errors):
+        print(f"                    {n:>4}  {kind}")
     print(f"Candidate cost    : {_usd(cell.cost_per_call)}/call, "
           f"{_usd(cell.monthly_usd(args.tickers))}/month at {args.tickers} tickers")
     if incumbent_cost is not None:

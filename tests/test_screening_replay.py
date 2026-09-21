@@ -578,3 +578,45 @@ def test_each_entry_is_asked_its_own_prompt():
     entries = _entries(6)
     runner.replay_each(entries, lambda e: f"prompt-for-{e.ticker}", record, max_workers=4)
     assert seen == {f"T{i}": f"prompt-for-T{i}" for i in range(6)}
+
+
+# --- a failure rate is only about the candidate if the failures were ------
+
+
+def test_our_own_rate_limiting_is_labelled_as_ours():
+    """Asking a hosted endpoint eight at a time can produce 429s. Counted as
+    'the model could not answer', that is the measurement blaming the model
+    for the harness -- and it would argue against a candidate that is fine."""
+    from replay.compare_configs import error_kinds
+
+    kinds = dict(error_kinds([
+        "https://x/v1 returned HTTP 429: Too Many Requests",
+        "https://x/v1 returned HTTP 429: rate limit exceeded",
+        "invalid output: Expecting value",
+    ]))
+    rate = [k for k in kinds if "429" in k]
+    assert rate and kinds[rate[0]] == 2
+    assert "OURS" in rate[0], "a 429 must not read as a verdict on the candidate"
+
+
+def test_a_model_failure_is_not_labelled_as_ours():
+    from replay.compare_configs import error_kinds
+
+    kinds = dict(error_kinds(["invalid output: Expecting value", "answered for MSFT"]))
+    assert not any("OURS" in k for k in kinds)
+
+
+def test_unrecognised_failures_are_still_counted():
+    """Silently dropping a cause we have no bucket for would understate the
+    failure rate, which is the direction that argues for switching."""
+    from replay.compare_configs import error_kinds
+
+    assert dict(error_kinds(["something nobody anticipated"])) == {"other": 1}
+
+
+def test_every_failure_lands_in_exactly_one_bucket():
+    from replay.compare_configs import error_kinds
+
+    errors = ["HTTP 429", "read timeout", "HTTP 503", "invalid output: x",
+              "answered for MSFT", "who knows"]
+    assert sum(n for _, n in error_kinds(errors)) == len(errors)
