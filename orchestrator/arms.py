@@ -29,27 +29,37 @@ import logging
 from datetime import date
 from typing import Any, Optional
 
+from app.schemas import LLMSignal
 from orchestrator.context import TickerContext
-from rules import ARMS
+from rules import ARMS, Seen
 
 log = logging.getLogger("arms")
 
 
-def arms_record(context: TickerContext, day: Optional[date]) -> dict[str, Any]:
+def arms_record(
+    context: TickerContext, day: Optional[date], signal: Optional[LLMSignal] = None,
+) -> dict[str, Any]:
     """Every arm's call for one line. Never raises.
 
     ``day`` is the calendar day the line is written on, which is what seeds
     the control arm -- so the harness, reading the day back off the line's
-    own timestamp, recomputes the identical coin flip.
+    own timestamp, recomputes the identical coin flip. ``signal`` is the
+    model's answer on the line, if there was one: the hybrid arm reads its
+    news score, and nothing else of it.
     """
+    seen = Seen(
+        ticker=context.ticker, day=day, technicals=context.technicals,
+        insiders=context.insiders,
+        news_score=signal.news_score if signal is not None else None,
+    )
     record: dict[str, Any] = {}
     for name, arm in ARMS.items():
         try:
-            signal = arm(context.ticker, context.technicals, day)
+            call = arm(seen)
             record[name] = {
-                "bias": signal.bias.value,
-                "conviction": signal.conviction,
-                "rationale": signal.rationale,
+                "bias": call.bias.value,
+                "conviction": call.conviction,
+                "rationale": call.rationale,
             }
         except Exception as exc:  # noqa: BLE001 - one arm's failure is one arm's line
             log.exception("%s: %s arm failed", context.ticker, name)

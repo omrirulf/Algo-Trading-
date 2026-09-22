@@ -81,8 +81,9 @@ from backtest.sweep import MIN_TRADES  # noqa: E402
 from config import settings as cfg  # noqa: E402
 from config.instruments import FUNDS, SINGLE_NAMES, is_fund  # noqa: E402
 from config.watchlist import DEFAULT_WATCHLIST  # noqa: E402
+from orchestrator.insiders import InsiderSnapshot  # noqa: E402
 from orchestrator.technicals import TechnicalSnapshot  # noqa: E402
-from rules import ARMS, control, momentum  # noqa: E402
+from rules import ARMS, EXPLORATORY, MAIN_ARMS, Seen, control, hybrid, insider_buying, momentum  # noqa: E402
 
 DEFAULT_HORIZON = 3
 
@@ -98,9 +99,24 @@ BAND = (5.0, 95.0)
 #: Arm A's name in the report. The rule arms report under their own.
 MODEL_ARM = "model"
 
-#: Report order. The model first because it is the incumbent; the coin flip
-#: last because it is the floor everything above it has to clear.
-ARM_ORDER = (MODEL_ARM, momentum.NAME, control.NAME)
+#: Report order of the main tables. The model first because it is the
+#: incumbent; the coin flip last because it is the floor everything above it
+#: has to clear. Exploratory arms are not in here: they are raced apart,
+#: on their own lines only.
+ARM_ORDER = (MODEL_ARM, *MAIN_ARMS)
+
+#: The two comparisons the pre-registration decides on, model first.
+PAIRED = ((MODEL_ARM, momentum.NAME), (MODEL_ARM, hybrid.NAME))
+
+#: The second horizon an exploratory arm is scored at: the insider effect is
+#: measured in months in the literature, and a three-session test alone
+#: would test the wrong thing.
+EXPLORATORY_HORIZON = 20
+
+#: An exploratory arm reports "too few" below this many scored trades on
+#: this many distinct entry days. Pre-registered; not a decision threshold.
+EXPLORATORY_MIN_TRADES = 20
+EXPLORATORY_MIN_DAYS = 20
 
 #: The two halves of the watchlist, raced separately as well as together:
 #: a fund has no analysts, insiders or earnings, so a model reading all of
@@ -177,10 +193,20 @@ def entries_for_arm(name: str, lines: Sequence[JournalEntry]) -> list[JournalEnt
     arm = ARMS[name]
     out: list[JournalEntry] = []
     for entry in lines:
-        technicals = TechnicalSnapshot.from_dict(entry.technicals) if entry.technicals else None
-        signal = arm(entry.ticker, technicals, _line_day(entry))
+        signal = arm(seen_on(entry))
         out.append(replace(entry, bias=signal.bias.value, conviction=signal.conviction, scores={}, blend={}))
     return out
+
+
+def seen_on(entry: JournalEntry) -> Seen:
+    """What the arms are shown for one journalled line: what the model was."""
+    return Seen(
+        ticker=entry.ticker,
+        day=_line_day(entry),
+        technicals=TechnicalSnapshot.from_dict(entry.technicals) if entry.technicals else None,
+        insiders=InsiderSnapshot.from_dict(entry.insiders) if entry.insiders else None,
+        news_score=entry.scores.get("news_score"),
+    )
 
 
 def direction_agreement(
@@ -627,6 +653,21 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     sides = both_sides(lines, **common)
 
+    # The exploratory arms, on their own lines only, at both horizons. The
+    # longer horizon needs more history than prewarm fetched for the main
+    # race, so its sources are fresh ones, cut to the same final closes.
+    long_source = YFinancePriceSource(final_through=final_through)
+    long_fetcher = OhlcFetcher(final_through=final_through)
+    prewarm(lines, long_source, long_fetcher, EXPLORATORY_HORIZON, today)
+    exploratory = [
+        race_exploratory(name, lines, floor=args.floor, horizons=(
+            (args.horizon, source, fetcher), (EXPLORATORY_HORIZON, long_source, long_fetcher),
+        ), entry_rule=args.entry, today=today, equity=args.equity,
+           stop_multiplier=args.stop_multiplier, max_position_pct=args.max_position_pct,
+           cost_per_side=args.cost_per_side)
+        for name in sorted(EXPLORATORY)
+    ]
+
     # Buy-and-hold over the union of every arm's trades, on final closes too.
     everything = [t for r in results for t in r.trades]
     window_start = min(t.entry_day for t in everything)
@@ -654,7 +695,7 @@ def main(argv: list[str] | None = None) -> int:
     breakdown = agreement_breakdown(model_lines, momentum_lines)
 
     print(render(
-        read=read, lines=lines, results=results, reports=reports,
+        read=read, lines=lines, results=results, reports=reports, exploratory=exploratory,
         floor=args.floor, horizon=args.horizon, cost_per_side=args.cost_per_side,
         seeds=args.seeds, final_through=final_through, now=now,
         window_start=window_start, window_end=window_end,
@@ -665,6 +706,75 @@ def main(argv: list[str] | None = None) -> int:
 
 
 # --------------------------------------------------------------------------- #
+# Exploratory arms: on their own lines, paired, at two horizons
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True)
+class PairedRow:
+    """One arm's trades on exactly the lines another arm took a side on."""
+
+    name: str
+    trades: tuple[ScoredTrade, ...]
+
+
+@dataclass(frozen=True)
+class ExploratoryResult:
+    name: str
+    horizon: int
+    offered: int
+    directional: int
+    #: The arm itself, then the model and the momentum rule on the arm's lines.
+    rows: tuple[PairedRow, ...]
+
+    @property
+    def own(self) -> PairedRow:
+        return self.rows[0]
+
+    @property
+    def entry_days(self) -> int:
+        return len({t.entry_day for t in self.own.trades})
+
+    @property
+    def enough(self) -> bool:
+        return len(self.own.trades) >= EXPLORATORY_MIN_TRADES and self.entry_days >= EXPLORATORY_MIN_DAYS
+
+
+def race_exploratory(
+    name: str, lines: Sequence[JournalEntry], *, floor: float,
+    horizons: Sequence[tuple[int, PriceSource, OhlcFetcher]], entry_rule: str, today: date,
+    equity: float, stop_multiplier: float, max_position_pct: float, cost_per_side: float,
+) -> list[ExploratoryResult]:
+    """An exploratory arm on the lines it took a side on, paired, per horizon.
+
+    The comparison is on the arm's own lines only: the model's and the
+    momentum rule's trades on exactly those tickers on exactly those days,
+    through the same arithmetic. Where the model or the rule was NEUTRAL or
+    below the floor on such a line, it has no trade there and the pairing
+    says so in its n.
+    """
+    arm_lines = entries_for_arm(name, lines)
+    took_a_side = [e for e in arm_lines if e.is_directional]
+    keys = {(e.ticker, e.timestamp) for e in took_a_side}
+    same_lines = [e for e in lines if (e.ticker, e.timestamp) in keys]
+    out: list[ExploratoryResult] = []
+    for horizon, source, fetcher in horizons:
+        common = dict(
+            floor=floor, horizon=horizon, entry_rule=entry_rule, today=today, source=source,
+            fetcher=fetcher, equity=equity, stop_multiplier=stop_multiplier,
+            max_position_pct=max_position_pct, cost_per_side=cost_per_side,
+        )
+        rows = [PairedRow(name, race_arm(name, same_lines, **common).trades)]
+        for other in (MODEL_ARM, momentum.NAME):
+            rows.append(PairedRow(other, race_arm(other, same_lines, **common).trades))
+        out.append(ExploratoryResult(
+            name=name, horizon=horizon, offered=len(arm_lines), directional=len(took_a_side),
+            rows=tuple(rows),
+        ))
+    return out
+
+
+# --------------------------------------------------------------------------- #
 # Rendering
 # --------------------------------------------------------------------------- #
 
@@ -672,6 +782,7 @@ def main(argv: list[str] | None = None) -> int:
 def render(
     *, read: JournalRead, lines: Sequence[JournalEntry], results: Sequence[ArmResult],
     reports: Sequence[GroupReport], floor: float, horizon: int, cost_per_side: float,
+    exploratory: Sequence[Sequence[ExploratoryResult]] = (),
     seeds: int, final_through: date, now: datetime, window_start: date, window_end: date,
     agreement: Optional[float], agreed_on: int, breakdown: Sequence[AgreementDay],
     per_trade: bool = False,
@@ -696,8 +807,9 @@ def render(
         "hit          a trade whose net return is strictly greater than zero",
         "daily return the equal-weighted mean net return of the trades an arm opened",
         "             on one entry day; a day it opened none is 0 (it sat in cash)",
-        "primary test paired daily difference, model minus momentum, Newey-West",
-        f"             standard error at lag {horizon}; checked on every {_ordinal(horizon)} day alone",
+        "primary test paired daily difference, model minus momentum and model minus",
+        f"             hybrid, Newey-West standard error at lag {horizon}; checked on every",
+        f"             {_ordinal(horizon)} day alone",
         "",
         "COVERAGE AND RECONCILIATION",
         "-" * 78,
@@ -725,6 +837,9 @@ def render(
 
     for report in reports:
         out += _render_group(report, horizon, seeds)
+
+    for per_horizon in exploratory:
+        out += _render_exploratory(per_horizon)
 
     out += [
         "",
@@ -811,21 +926,23 @@ def _render_group(report: GroupReport, horizon: int, seeds: int) -> list[str]:
     )
     out.append(f"{'SPY':<10}{'':>6}{'':>7}{'':>10}{'':>8}{_pct(report.spy_return):>12}")
 
-    model_series = series.get(MODEL_ARM, [])
-    rule_series = series.get(momentum.NAME, [])
-    out += ["", f"Paired difference, {MODEL_ARM} minus {momentum.NAME}, day by day",
-            f"{'entry day':<12}{MODEL_ARM:>9}{momentum.NAME:>10}{'diff':>9}"]
-    diffs = [m - r for m, r in zip(model_series, rule_series)]
-    for day, m, r, d in zip(grid, model_series, rule_series, diffs):
-        out.append(f"{day.isoformat():<12}{_pct(m, 2):>9}{_pct(r, 2):>10}{_pct(d, 2):>9}")
-    sparse = every_nth(grid, horizon)
-    sparse_diffs = [d for day, d in zip(grid, diffs) if day in set(sparse)]
+    sparse = set(every_nth(grid, horizon))
+    for first, second in PAIRED:
+        a_series, b_series = series.get(first, []), series.get(second, [])
+        out += ["", f"Paired difference, {first} minus {second}, day by day",
+                f"{'entry day':<12}{first:>9}{second:>10}{'diff':>9}"]
+        diffs = [a - b for a, b in zip(a_series, b_series)]
+        for day, a, b, d in zip(grid, a_series, b_series, diffs):
+            out.append(f"{day.isoformat():<12}{_pct(a, 2):>9}{_pct(b, 2):>10}{_pct(d, 2):>9}")
+        sparse_diffs = [d for day, d in zip(grid, diffs) if day in sparse]
+        out += [
+            f"mean diff {_pct(statistics.fmean(diffs) if diffs else None, 2)} | "
+            f"t (Newey-West, lag {horizon}) {_num(newey_west_t(diffs, horizon))} | n={len(diffs)} days",
+            f"non-overlapping, every {_ordinal(horizon)} entry day: mean diff "
+            f"{_pct(statistics.fmean(sparse_diffs) if sparse_diffs else None, 2)} | "
+            f"t {_num(newey_west_t(sparse_diffs, 0))} | n={len(sparse_diffs)} days",
+        ]
     out += [
-        f"mean diff {_pct(statistics.fmean(diffs) if diffs else None, 2)} | "
-        f"t (Newey-West, lag {horizon}) {_num(newey_west_t(diffs, horizon))} | n={len(diffs)} days",
-        f"non-overlapping, every {_ordinal(horizon)} entry day: mean diff "
-        f"{_pct(statistics.fmean(sparse_diffs) if sparse_diffs else None, 2)} | "
-        f"t {_num(newey_west_t(sparse_diffs, 0))} | n={len(sparse_diffs)} days",
         "",
         "SECONDARY: per-trade, through the real stop and sizing, sorted by mean net",
         "-" * 78,
@@ -848,6 +965,33 @@ def _render_group(report: GroupReport, horizon: int, seeds: int) -> list[str]:
             out.append(
                 f"{r.name:<10}{band.metric:<10}{_pct(band.value, digits):>9}{_pct(band.low, digits):>9}"
                 f"{_pct(band.high, digits):>9}{_num(band.percentile, 0):>8}"
+            )
+    return out
+
+
+def _render_exploratory(per_horizon: Sequence[ExploratoryResult]) -> list[str]:
+    if not per_horizon:
+        return []
+    first = per_horizon[0]
+    out = [
+        "",
+        f"== EXPLORATORY: {first.name} (secondary; cannot change the main decision) ==",
+        f"offered {first.offered} lines, took a side on {first.directional}. Scored on those lines",
+        "only, paired against the model and the momentum rule on the same lines.",
+        f"'too few' until {EXPLORATORY_MIN_TRADES} trades on {EXPLORATORY_MIN_DAYS} distinct entry days.",
+    ]
+    for result in per_horizon:
+        flag = "" if result.enough else f"  <- too few ({len(result.own.trades)} trades, {result.entry_days} days)"
+        out += [
+            "",
+            f"horizon {result.horizon} session(s){flag}",
+            f"{'arm':<10}{'n':>5}{'mean net':>10}{'median':>9}{'hit rate':>10}{'stopped':>9}",
+        ]
+        for row in result.rows:
+            out.append(
+                f"{row.name:<10}{len(row.trades):>5}{_pct(mean_net(row.trades), 2):>10}"
+                f"{_pct(median_net(row.trades), 2):>9}{_pct(hit_rate(row.trades)):>10}"
+                f"{_pct(stop_rate(row.trades)):>9}"
             )
     return out
 

@@ -104,7 +104,7 @@ def record(
                 # analysis/horse_race.py is only fair if the rule got to
                 # answer on every ticker the model did, not just the ones the
                 # model chose to. Nothing in the cycle reads it back.
-                "arms": arms.arms_record(context, now.date()),
+                "arms": arms.arms_record(context, now.date(), signal),
                 # True when the ticker was already in the book and no model
                 # was asked. The context above was still gathered, so these
                 # lines are what a later replay would need to price what

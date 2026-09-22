@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import statistics
+from dataclasses import replace
 from datetime import date, datetime, timedelta, timezone
 
 import pandas as pd
@@ -40,7 +41,7 @@ from analysis.horse_race import (
 from analysis.reader import JournalEntry
 from analysis.returns import PriceSeries, final_bars
 from backtest.simulate import MIN_WARMUP_BARS, Trade
-from rules import control, momentum
+from rules import control, hybrid, momentum
 from tests.test_backtest_simulate import flat, frame
 from tests.test_baseline_compare import FakeFetcher, _at, _warm_frame
 
@@ -418,3 +419,66 @@ def test_every_arm_pays_the_same_cost_and_the_header_says_so(tmp_path, monkeypat
     # Flat bars: every arm's gross is 0, so every arm's net is exactly -1.00%.
     for row in rows.values():
         assert "-1.00%" in row
+
+
+# --- the hybrid and the exploratory arm ---------------------------------------------
+
+
+def test_seen_on_hands_each_arm_exactly_what_the_line_carried():
+    entry = replace(line(), scores={"news_score": -0.4},
+                    insiders={"buys": [{"when": "2026-02-20", "who": "Ann", "role": "Director",
+                                        "shares": 10.0, "value": None}], "sells": []})
+    seen = horse_race.seen_on(entry)
+    assert seen.ticker == "NVDA" and seen.day == STAMP.date()
+    assert seen.technicals.return_63d == 0.10
+    assert seen.insiders.buys[0].who == "Ann"
+    assert seen.news_score == -0.4
+    bare = horse_race.seen_on(line(technicals=None))
+    assert bare.technicals is None and bare.insiders is None and bare.news_score is None
+
+
+def test_the_hybrid_arm_is_momentum_vetoed_by_the_lines_own_news_score():
+    agree = replace(line(), scores={"news_score": 0.6})
+    veto = replace(line(), scores={"news_score": -0.6})
+    arm = entries_for_arm(hybrid.NAME, [agree, veto])
+    assert arm[0].bias == "BULLISH" and arm[0].conviction == pytest.approx(0.55)
+    assert arm[1].bias == "NEUTRAL"
+
+
+def _insider_journal_line(ticker, stamp, buyers):
+    buys = [{"when": (stamp - timedelta(days=10)).date().isoformat(), "who": who, "role": "Director",
+             "shares": 100.0, "value": None} for who in buyers]
+    return {"ts_utc": stamp.isoformat(), "ticker": ticker,
+            "context": {"technicals": UPTREND, "insiders": {"buys": buys, "sells": []}},
+            "signal": {"bias": "BEARISH", "conviction": 0.72, "news_score": 0.1}}
+
+
+def test_the_exploratory_arm_is_raced_on_its_own_lines_only_and_paired(tmp_path, monkeypatch, capsys):
+    warm = _warm_frame()
+    signal_day = warm.index[MIN_WARMUP_BARS].date()
+    stamp = _at(signal_day) + timedelta(hours=15)
+    lines = [
+        _insider_journal_line("CAT", stamp, ["Ann", "Bob"]),      # the arm takes a side here
+        _insider_journal_line("LLY", stamp, ["Ann"]),             # and not here
+        _journal_line("NVDA", stamp),                             # no insider section at all
+    ]
+    frames = {t: warm for t in ("CAT", "LLY", "NVDA")}
+    now = datetime.combine(warm.index[-1].date(), datetime.min.time(), tzinfo=timezone.utc) + timedelta(days=1)
+    code, out = _race(tmp_path, monkeypatch, capsys, frames, lines, now)
+    assert code == 0
+    assert "== EXPLORATORY: insiders" in out
+    assert "took a side on 1" in out
+    assert "cannot change the main decision" in out
+    section = out[out.index("== EXPLORATORY"):out.index("AGREEMENT")]
+    # Both horizons are printed, each paired with the model and the rule.
+    assert "horizon 3 session(s)" in section and f"horizon {horse_race.EXPLORATORY_HORIZON} session(s)" in section
+    assert "<- too few" in section
+    rows = [l for l in section.splitlines() if l.startswith(("insiders", "model", "momentum"))]
+    assert len(rows) == 6
+    # On the one line it took a side on, the arm has one trade at horizon 3
+    # and the model (BEARISH there, above the floor) has one too: paired.
+    assert rows[0].split()[1] == "1" and rows[1].split()[1] == "1"
+    # The main tables carry the hybrid as a main arm, not the insider arm.
+    main = out[:out.index("== EXPLORATORY")]
+    assert hybrid.NAME in main and "insiders" not in main
+    assert "Paired difference, model minus hybrid" in main

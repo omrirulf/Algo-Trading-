@@ -20,7 +20,7 @@ import pytest
 
 from app.schemas import Bias, LLMSignal
 from orchestrator import arms, context, journal
-from rules import control, momentum
+from rules import ARMS, control, hybrid, insider_buying, momentum
 from tests.test_context import HEADLINES, full_provider
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -41,10 +41,10 @@ def ctx():
 # --- on every line ------------------------------------------------------------
 
 
-def test_a_full_model_line_carries_both_arms(_journal_to_tmp, ctx):
+def test_a_full_model_line_carries_every_arm(_journal_to_tmp, ctx):
     journal.record(ctx, SIGNAL, outcome={"status": "ACCEPTED"})
     (line,) = read_lines(_journal_to_tmp)
-    assert set(line["arms"]) == {momentum.NAME, control.NAME}
+    assert set(line["arms"]) == set(ARMS) == {momentum.NAME, hybrid.NAME, control.NAME, insider_buying.NAME}
     # The model said BEARISH; the momentum arm, reading the same climb, did
     # not. That disagreement is the whole point of recording both.
     assert line["signal"]["bias"] == "BEARISH"
@@ -95,7 +95,7 @@ def test_the_journalled_coin_flip_is_the_one_the_line_seeds(_journal_to_tmp, ctx
 
 
 def test_an_arm_that_raises_costs_only_its_own_field(_journal_to_tmp, ctx, monkeypatch, caplog):
-    def kaboom(ticker, technicals, day):
+    def kaboom(seen):
         raise RuntimeError("kaboom")
 
     monkeypatch.setitem(arms.ARMS, "broken", kaboom)
