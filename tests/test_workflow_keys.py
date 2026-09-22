@@ -17,6 +17,8 @@ from pathlib import Path
 
 import yaml
 
+from replay import news_ablation
+
 from config.settings import Settings
 from orchestrator import llm, sources
 
@@ -461,3 +463,47 @@ def test_the_horse_race_is_a_pull_request_check_on_every_arm_source():
         assert any(
             fnmatch.fnmatch(f"rules/{path.name}", pattern) for pattern in watched
         ), f"a change to {path.name} would not run the race"
+
+
+def test_the_news_ablation_workflow_is_read_only_about_trading():
+    """It asks the full model about recorded contexts. Handing it broker
+    credentials would make a measurement tool able to move money."""
+    wf = yaml.safe_load((ROOT / ".github/workflows/news-ablation.yml").read_text())
+    for step in wf["jobs"]["ablate"]["steps"]:
+        for name in (step.get("env") or {}):
+            assert "ALPACA" not in name.upper(), name
+            assert "WEBHOOK" not in name.upper(), name
+
+
+def test_the_news_ablation_costs_money_so_it_never_runs_on_a_schedule():
+    """The only workflow here that asks the FULL model rather than reading
+    the journal. A cron on it would spend real money every night with nobody
+    having asked a question."""
+    wf = yaml.safe_load((ROOT / ".github/workflows/news-ablation.yml").read_text())
+    triggers = wf.get("on") or wf[True]
+    assert set(triggers) == {"workflow_dispatch"}
+
+
+def test_the_news_ablation_keeps_the_record_stream_off_the_report():
+    """stdout is split into journal lines by a later step; a human report
+    mixed into it would corrupt the split."""
+    step = _step("news-ablation.yml", "ablate", "Ask each context with the news and without it")
+    assert "--emit-pairs" in step["run"]
+    assert '> "$RUNNER_TEMP/pairs.jsonl" 2> "$RUNNER_TEMP/ablation.txt"' in step["run"]
+
+
+def test_the_news_ablation_can_outlast_the_calls_it_makes():
+    """Every call is paid for whether or not it is counted, so a timeout
+    sized under the default sample would burn money for a truncated answer.
+
+    Derived from the script's own default rather than a number typed here,
+    so raising the default without raising the timeout fails this test.
+    """
+    wf = yaml.safe_load((ROOT / ".github/workflows/news-ablation.yml").read_text())
+    calls = news_ablation.DEFAULT_LIMIT * 2
+    # Measured: 100 sequential Opus calls at low effort took ~15 minutes.
+    seconds_per_call = 9
+    minutes = math.ceil(calls * seconds_per_call / 60)
+    assert wf["jobs"]["ablate"]["timeout-minutes"] >= minutes * 2, (
+        f"{calls} calls need about {minutes} minutes; leave room for a slower model"
+    )
