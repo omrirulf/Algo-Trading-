@@ -81,13 +81,14 @@ import statistics
 import sys
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Sequence
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.schemas import LLMSignal  # noqa: E402
 from config import settings as cfg  # noqa: E402
 from replay import runner  # noqa: E402
+from replay.compare_configs import error_kinds  # noqa: E402
 from replay.runner import ReplayEntry, ReplayResult  # noqa: E402
 
 DEFAULT_LIMIT = 100
@@ -346,6 +347,14 @@ class Summary:
     n_asked: int
     n_assessable: int
     failures: int
+    #: Calls actually made. NOT n_asked x 2: the repeat arm makes it x 3, and
+    #: a failure rate over the wrong denominator is how a 95%-failed run
+    #: reads as "286/200", which is what the first gpt-oss dry run printed.
+    calls: int
+    #: Failures grouped by cause, commonest first. An undifferentiated rate
+    #: cannot be acted on -- our own timeout and the model giving up are
+    #: opposite findings.
+    errors: tuple[tuple[str, int], ...]
     direction_changed: int
     trade_decision_changed: int
     self_comparable: int
@@ -400,7 +409,8 @@ class Summary:
         return self.flip_rate > self.self_flip_rate
 
 
-def summarise(pairs: list[Ablation], floor: float, failures: int) -> Summary:
+def summarise(pairs: list[Ablation], floor: float, failures: int,
+              calls: int = 0, errors: Sequence[str] = ()) -> Summary:
     good = [p for p in pairs if p.assessable]
     repeats = [p for p in pairs if p.repeat_flipped is not None]
     # The repeat is the better floor wherever it exists, and mixing the two
@@ -414,6 +424,8 @@ def summarise(pairs: list[Ablation], floor: float, failures: int) -> Summary:
         n_asked=len(pairs),
         n_assessable=len(good),
         failures=failures,
+        calls=calls or len(pairs) * 2,
+        errors=tuple(error_kinds(list(errors))),
         direction_changed=sum(1 for p in good if p.direction_changed),
         trade_decision_changed=sum(1 for p in good if p.trade_decision_changed(floor)),
         self_comparable=len(comparable),
@@ -449,9 +461,11 @@ def render(summary: Summary, pairs: list[Ablation], floor: float, label: str) ->
         "THE NEWS SECTION, TAKEN AWAY",
         "=" * 78,
         f"Configuration : {label}",
-        f"Contexts      : {summary.n_asked} asked both ways "
-        f"({summary.n_asked * 2} calls), {summary.n_assessable} answered twice",
-        f"Failure rate  : {summary.failures}/{summary.n_asked * 2} calls",
+        f"Contexts      : {summary.n_asked} asked, {summary.calls} calls, "
+        f"{summary.n_assessable} answered both ways",
+        f"Failure rate  : {summary.failures}/{summary.calls} calls"
+        + (f"  ({_pct(summary.failures / summary.calls)})" if summary.calls else ""),
+        *([f"                  {kind}: {count}" for kind, count in summary.errors]),
         "",
         "DID THE NEWS MOVE THE ANSWER?",
         "-" * 78,
@@ -575,6 +589,7 @@ def as_json(summary: Summary, pairs: list[Ablation], floor: float, label: str) -
         "calls": summary.n_asked * 2,
         "assessable": summary.n_assessable,
         "failures": summary.failures,
+        "error_kinds": dict(summary.errors),
         "direction_flip_rate": summary.flip_rate,
         "self_flip_rate": summary.self_flip_rate,
         "floor_source": summary.floor_source,
@@ -660,7 +675,8 @@ def main(argv: list[str] | None = None) -> int:
     pairs, results = ablate(entries, complete, workers, asked_model=args.model,
                             repeat_with_news=args.repeat_with_news)
     failures = sum(1 for r in results if r.error)
-    summary = summarise(pairs, args.floor, failures)
+    summary = summarise(pairs, args.floor, failures, calls=len(results),
+                        errors=[r.error for r in results if r.error])
 
     if args.emit_pairs:
         print_pairs(entries, pairs)

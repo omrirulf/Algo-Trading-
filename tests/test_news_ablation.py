@@ -494,3 +494,37 @@ def test_main_counts_three_arms_when_repeating(tmp_path, monkeypatch, capsys):
     assert na.main(["--journal", str(journal), "--model", "m", "--repeat-with-news"]) == 0
     assert calls["n"] == 3
     assert "1 context(s) x 3 = 3 calls" in capsys.readouterr().err
+
+
+# --- a run that mostly failed must say so, over the right denominator ----------
+
+
+def test_the_failure_rate_counts_the_calls_actually_made():
+    """The first gpt-oss dry run printed 'Failure rate: 286/200 calls' --
+    the denominator assumed two arms while three had been asked. A rate over
+    the wrong denominator is not a rate."""
+    pairs = [na.Ablation("AAPL", None, None, None, None) for _ in range(100)]
+    summary = na.summarise(pairs, 0.30, failures=286, calls=300,
+                           errors=["timed out"] * 286)
+    assert summary.calls == 300
+    text = na.render(summary, pairs, 0.30, "m")
+    assert "286/300 calls" in text
+    assert "286/200" not in text
+
+
+def test_a_run_that_mostly_failed_says_what_failed():
+    """Our own timeout and the model giving up are opposite findings: one
+    says raise the deadline, the other says pick another model."""
+    pairs = [na.Ablation("AAPL", None, None, None, None) for _ in range(10)]
+    summary = na.summarise(pairs, 0.30, failures=9, calls=30,
+                           errors=["timed out after 120s"] * 8 + ["invalid output: x"])
+    kinds = dict(summary.errors)
+    assert sum(kinds.values()) == 9
+    text = na.render(summary, pairs, 0.30, "m")
+    for kind in kinds:
+        assert kind in text
+
+
+def test_the_denominator_falls_back_to_two_arms_when_not_told():
+    summary = na.summarise([pair()], 0.30, failures=0)
+    assert summary.calls == 2
