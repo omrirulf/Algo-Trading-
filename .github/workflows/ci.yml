@@ -92,7 +92,7 @@ jobs:
         # one file, and a market order without a stop_loss is still never
         # constructed anywhere.
         run: |
-          hits=$(grep -rnE '\.(close_position|replace_order_by_id|close_all_positions|cancel_orders)\(' \
+          hits=$(grep -rnE '\.(close_position|replace_order_by_id|close_all_positions|cancel_orders|cancel_order_by_id)\(' \
                    app orchestrator config analysis store backtest replay --include='*.py' \
                  | grep -v '^app/broker_client.py:' || true)
           if [ -n "$hits" ]; then
@@ -102,6 +102,23 @@ jobs:
           fi
           if grep -rnE 'close_all_positions|cancel_orders' app/broker_client.py; then
             echo "::error::broker_client.py must not be able to flatten the book or cancel every order"
+            exit 1
+          fi
+          # Cancelling exists for exactly one reason: a stop Alpaca refuses to
+          # resize, because it is still a bracket leg (42210000). That cancel
+          # names one order id and is followed immediately by a replacement
+          # stop. A cancel that names anything broader -- a symbol, a side, the
+          # whole book -- would be a liquidation path, so only cancel-by-id may
+          # appear at all.
+          cancels=$(grep -rnoE '\.cancel[A-Za-z_]*\(' app/broker_client.py \
+                    | grep -v '\.cancel_order_by_id($' || true)
+          if [ -n "$cancels" ]; then
+            echo "$cancels"
+            echo "::error::broker_client.py may only cancel a single order by its id"
+            exit 1
+          fi
+          if ! grep -q '_is_advanced_order_qty_rejection(exc)' app/broker_client.py; then
+            echo "::error::the cancel-and-replace fallback must stay gated on the one rejection that needs it"
             exit 1
           fi
           # A standalone stop is the fourth primitive, and it is close-only

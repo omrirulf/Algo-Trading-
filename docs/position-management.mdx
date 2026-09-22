@@ -134,6 +134,25 @@ up. Two reasons, one practical and one principled:
 - There must never be a moment in which the position is naked. A replace is
   atomic; a cancel-then-resubmit is not.
 
+There is exactly one exception, and it exists because the alternative was
+worse. Alpaca refuses to change the quantity of a stop that is still a leg
+of the bracket that opened the position, so such a stop can never be shrunk
+— it stays sized for shares the position no longer holds, and an order for
+shares that are not held cannot execute. TEVA sat behind a 127-share stop on
+a 1-share position for six days that way. Only on that one rejection does
+the broker client cancel the single stuck order and place a correctly sized
+stop in its place; see the
+[naked-position runbook](/naked-position-runbook) for the four bounds on it.
+
+## A stop is protection only if it can execute
+
+Presence is not enough. Both passes compare what the live stop covers
+against what the position holds and resize a mismatch before anything else
+happens to that position, so the trail and the rungs are measured against a
+stop that can actually fill. Every managed action records `stop_qty` — the
+share count the stop covers when the pass is done with it — beside
+`remaining_qty`, and the health check reads the two as an invariant.
+
 ## Group-cap trim: a cap that tightens applies to what is already held, too
 
 Every cap in `app/risk_engine.py` — single name, fund, exposure group — is

@@ -20,6 +20,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from analysis import health
 from app import broker_client as bc
 from app import position_manager as pm
 from app.broker_client import BrokerError, OpenPosition, StopOrder
@@ -220,6 +221,96 @@ def test_the_report_counts_protected_separately(broker, market, audit):
 
 
 # --------------------------------------------------------------------------- #
+# A stop that exists but covers the wrong number of shares
+# --------------------------------------------------------------------------- #
+
+
+def _missize(broker, ticker, covers):
+    """Leave the live stop covering a share count the position no longer holds."""
+    stop = broker.stop_orders[ticker]
+    broker.stop_orders[ticker] = StopOrder(stop.order_id, ticker, covers,
+                                           stop.stop_price, stop.side)
+    return stop.stop_price
+
+
+def test_the_protection_pass_resizes_a_stop_that_covers_more_than_is_held(
+    broker, market, audit
+):
+    """TEVA: 1 share held, 127 covered. Present, live, and unable to execute."""
+    enter(broker, audit, ticker="TEVA", qty=1, entry=40.0, stop=37.0)
+    level = _missize(broker, "TEVA", covers=127)
+
+    report = manager(broker, market, audit).manage(protect_only=True)
+
+    [action] = report.actions
+    assert action.action == "stop_resized"
+    assert action.remaining_qty == 1 and action.stop_qty == 1
+    assert "127" in action.reason and "1 held" in action.reason
+    assert broker.stop_orders["TEVA"].qty == 1
+    assert [r["qty"] for r in broker.replaced] == [1]
+    assert broker.stop_orders["TEVA"].stop_price == level, "size only; the ladder moves it"
+
+
+def test_a_stop_of_the_right_size_is_still_left_completely_alone(broker, market, audit):
+    enter(broker, audit, ticker="XOM", qty=7)
+    assert manager(broker, market, audit).manage(protect_only=True).actions == ()
+    assert broker.replaced == [] and broker.protected == []
+
+
+def test_a_stop_covering_less_than_is_held_is_resized_too(broker, market, audit):
+    """The uncovered shares are the ones with no protection at all."""
+    enter(broker, audit, ticker="LLY", qty=9)
+    _missize(broker, "LLY", covers=4)
+
+    [action] = manager(broker, market, audit).manage(protect_only=True).actions
+    assert action.action == "stop_resized" and action.stop_qty == 9
+
+
+def test_the_full_pass_resizes_first_and_then_manages_the_position(broker, market, audit):
+    """A wrong-sized stop is fixed *and* the ladder still runs the same cycle.
+
+    Only the order matters: every later step reads the stop it just
+    corrected, so the trail is measured against a stop that can actually
+    execute.
+    """
+    enter(broker, audit, ticker="TEVA", qty=1, entry=40.0, stop=37.0)
+    _missize(broker, "TEVA", covers=127)
+    market.price = 41.0
+
+    actions = manager(broker, market, audit).manage().actions
+    assert [a.action for a in actions] == ["stop_resized", "held"]
+    assert actions[0].stop_qty == 1 and actions[1].stop_qty == 1
+    assert [r["qty"] for r in broker.replaced] == [1]
+
+
+def test_a_resize_that_fails_is_recorded_as_an_error_and_alarms(broker, market, audit):
+    enter(broker, audit, ticker="TEVA", qty=1, entry=40.0, stop=37.0)
+    _missize(broker, "TEVA", covers=127)
+
+    def refuse(*_args, **_kwargs):
+        raise BrokerError("42210000 qty cannot be changed for advanced orders")
+
+    broker.replace_stop_order = refuse
+    [action] = manager(broker, market, audit).manage(protect_only=True).actions
+    assert action.action == "error" and "42210000" in action.reason
+    assert action.action in health.NAKED_ACTIONS
+
+
+def test_a_cancelled_stop_with_no_replacement_is_recorded_as_no_stop(broker, market, audit):
+    """Worse than an error, so it must not read like one in the record."""
+    enter(broker, audit, ticker="TEVA", qty=1, entry=40.0, stop=37.0)
+    _missize(broker, "TEVA", covers=127)
+
+    def naked(*_args, **_kwargs):
+        raise bc.UnprotectedPositionError("TEVA has NO live stop: ...")
+
+    broker.replace_stop_order = naked
+    [action] = manager(broker, market, audit).manage(protect_only=True).actions
+    assert action.action == "no_stop"
+    assert action.action in health.NAKED_ACTIONS
+
+
+# --------------------------------------------------------------------------- #
 # The broker primitive: close-only by construction, GTC, one place
 # --------------------------------------------------------------------------- #
 
@@ -395,8 +486,28 @@ def test_the_cli_exits_non_zero_when_a_position_stays_naked(monkeypatch, tmp_pat
     with pytest.raises(SystemExit) as exc:
         hb.main(["--protect-only"])
     assert exc.value.code == 1
-    assert "12 position(s) seen, 10 given a stop, 1 error(s)" in summary.read_text()
+    assert "12 position(s) seen, 10 given a stop, 0 stop(s) resized, 1 error(s)" in summary.read_text()
     assert '"protected": 10' in capsys.readouterr().out
+
+
+def test_the_cli_exits_non_zero_when_a_stop_was_cancelled_and_not_replaced(
+    monkeypatch, tmp_path, capsys
+):
+    """The loudest failure there is, and it is counted apart from ``errors``.
+
+    A pass that cancels a stop and cannot place its replacement leaves the
+    position with nothing. Without this it would exit green, because
+    ``errors`` is zero.
+    """
+    summary = tmp_path / "summary.md"
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+    monkeypatch.setattr(hb, "protect_positions",
+                        lambda dispatcher=None: {"positions_seen": 3, "protected": 0,
+                                                 "errors": 0, "unprotected": 1})
+    with pytest.raises(SystemExit) as exc:
+        hb.main(["--protect-only"])
+    assert exc.value.code == 1
+    assert "1 position(s) have NO stop at all" in summary.read_text()
 
 
 def test_the_cli_exits_zero_when_every_position_is_protected(monkeypatch, tmp_path):
@@ -483,19 +594,182 @@ def test_a_genuine_resize_still_sends_the_quantity():
     assert stop.qty == 6
 
 
-def test_a_resize_on_a_bracket_leg_still_fails_loudly():
-    """Deliberately not papered over.
+# --------------------------------------------------------------------------- #
+# A resize the broker refuses: cancel that one order, place the right stop
+# --------------------------------------------------------------------------- #
 
-    Alpaca refuses this and the way round it -- cancel, then resubmit --
-    opens a window with no stop at all, which is the one thing this module
-    may never do. An untested guess does not belong on the order that bounds
-    the loss, so it stays an error a person is told about.
+
+class _StuckBracketClient(_ReplacingClient):
+    """A bracket leg Alpaca will not resize, over a real book.
+
+    The one case the replace cannot serve: TEVA held 1 share behind the
+    127-share stop leg of the bracket that opened it. Alpaca refuses to
+    change that quantity, so the only way to make the stop the right size is
+    to cancel it and place a new one.
     """
-    client = _ReplacingClient(advanced=True, covers=9)
-    with pytest.raises(BrokerError, match="42210000"):
-        real_broker(client).replace_stop_order(
-            "stop-1", qty=6, stop_price=100.0, current_qty=9,
-        )
+
+    def __init__(self, *, positions=(("TEVA", 1),), symbol="TEVA", side="sell",
+                 covers=127, submit_fails=None, cancel_fails=None, readable=True):
+        super().__init__(advanced=True, covers=covers)
+        self._positions = list(positions)
+        self._symbol = symbol
+        self._side = side
+        self._submit_fails = submit_fails
+        self._cancel_fails = cancel_fails
+        self._readable = readable
+        self.cancelled: list[str] = []
+        self.submitted: list = []
+        self.calls: list[str] = []
+
+    def replace_order_by_id(self, order_id, request):
+        self.calls.append("replace")
+        return super().replace_order_by_id(order_id, request)
+
+    def get_order_by_id(self, order_id):
+        self.calls.append("read")
+        if not self._readable:
+            raise RuntimeError("order not found")
+        return SimpleNamespace(id=order_id, symbol=self._symbol, side=self._side,
+                               qty=self.covers, stop_price=37.0)
+
+    def get_all_positions(self):
+        self.calls.append("book")
+        return [SimpleNamespace(symbol=t, qty=q, market_value=abs(q) * 100.0,
+                                avg_entry_price=100.0)
+                for t, q in self._positions]
+
+    def cancel_order_by_id(self, order_id):
+        self.calls.append("cancel")
+        if self._cancel_fails is not None:
+            raise self._cancel_fails
+        self.cancelled.append(order_id)
+
+    def submit_order(self, request):
+        self.calls.append("submit")
+        if self._submit_fails is not None:
+            raise self._submit_fails
+        self.submitted.append(request)
+        return SimpleNamespace(id="ord-new", stop_price=request.stop_price)
+
+    def get_orders(self, _request):
+        return []
+
+
+def test_a_resize_the_broker_refuses_cancels_that_one_stop_and_places_a_right_sized_one():
+    """TEVA, exactly. 1 share held, 127 covered, and no way to edit the number.
+
+    A 127-share sell-stop on a 1-share position cannot execute, so the
+    position was unprotected for six days while every check said it had a
+    stop. A second of exposure, once, beats that.
+    """
+    from alpaca.trading.enums import TimeInForce
+
+    client = _StuckBracketClient()
+    stop = real_broker(client).replace_stop_order(
+        "aae42775", qty=1, stop_price=37.20, current_qty=127,
+    )
+
+    assert client.cancelled == ["aae42775"]
+    [request] = client.submitted
+    assert request.symbol == "TEVA" and request.qty == 1
+    assert request.stop_price == 37.20
+    assert request.time_in_force == TimeInForce.GTC, "a DAY stop is how this started"
+    assert stop == StopOrder("ord-new", "TEVA", 1, 37.20, "sell")
+
+
+def test_the_replacement_is_placed_the_instant_the_old_stop_is_gone():
+    """Order of operations is the whole safety argument.
+
+    Everything that can be refused is refused while the old stop is still
+    live: the order is read, the book is read, the reduction is checked.
+    Only then is anything cancelled, and nothing but placing the new stop
+    happens after that -- ``submit_stop_order`` reads the book once more of
+    its own accord, which is the check that makes it close-only whoever
+    calls it, and is the only thing standing between the cancel and the
+    replacement.
+    """
+    client = _StuckBracketClient()
+    real_broker(client).replace_stop_order("aae42775", qty=1, stop_price=37.20,
+                                           current_qty=127)
+    cut = client.calls.index("cancel")
+    assert client.calls[:cut] == ["replace", "read", "book"]
+    assert client.calls[cut:] == ["cancel", "book", "submit"]
+
+
+def test_nothing_is_cancelled_when_the_replacement_would_not_be_a_reduction():
+    """The close-only rule outranks the fix. A stop still live protects something."""
+    client = _StuckBracketClient(positions=(("TEVA", 1),))
+    with pytest.raises(BrokerError, match="not cancelling it either"):
+        real_broker(client).replace_stop_order("aae42775", qty=5, stop_price=37.20,
+                                               current_qty=127)
+    assert client.cancelled == [] and client.submitted == []
+
+
+def test_nothing_is_cancelled_when_the_position_is_already_gone():
+    client = _StuckBracketClient(positions=())
+    with pytest.raises(BrokerError, match="no open position"):
+        real_broker(client).replace_stop_order("aae42775", qty=1, stop_price=37.20,
+                                               current_qty=127)
+    assert client.cancelled == []
+
+
+def test_nothing_is_cancelled_when_the_stuck_order_cannot_be_read():
+    client = _StuckBracketClient(readable=False)
+    with pytest.raises(BrokerError, match="could not be read"):
+        real_broker(client).replace_stop_order("aae42775", qty=1, stop_price=37.20,
+                                               current_qty=127)
+    assert client.cancelled == []
+
+
+def test_a_cancelled_stop_whose_replacement_is_refused_says_the_position_is_naked():
+    """The one failure that is worse than an error, and it gets its own type.
+
+    Every other failure in this module happens before the live stop is
+    touched, so a BrokerError there means "nothing happened". This one means
+    the opposite, and the message has to be actionable by a person.
+    """
+    client = _StuckBracketClient(submit_fails=RuntimeError("market closed"))
+    with pytest.raises(bc.UnprotectedPositionError) as caught:
+        real_broker(client).replace_stop_order("aae42775", qty=1, stop_price=37.20,
+                                               current_qty=127)
+    assert client.cancelled == ["aae42775"]
+    message = str(caught.value)
+    assert "TEVA has NO live stop" in message
+    assert "37.2" in message and "1 share" in message
+
+
+def test_a_failed_cancel_is_an_ordinary_error_because_the_stop_is_still_there():
+    client = _StuckBracketClient(cancel_fails=RuntimeError("already filled"))
+    with pytest.raises(BrokerError, match="could not be cancelled") as caught:
+        real_broker(client).replace_stop_order("aae42775", qty=1, stop_price=37.20,
+                                               current_qty=127)
+    assert not isinstance(caught.value, bc.UnprotectedPositionError)
+    assert client.submitted == []
+
+
+def test_an_ordinary_rejection_never_reaches_the_cancel_path():
+    """The fallback is gated on one rejection code, not on failure in general."""
+
+    class _Refuses(_StuckBracketClient):
+        def replace_order_by_id(self, order_id, request):
+            self.calls.append("replace")
+            raise RuntimeError("stop price must be below the last trade")
+
+    client = _Refuses()
+    with pytest.raises(BrokerError, match="must be below the last trade"):
+        real_broker(client).replace_stop_order("aae42775", qty=1, stop_price=37.20,
+                                               current_qty=127)
+    assert client.calls == ["replace"], "nothing was read and nothing was cancelled"
+
+
+def test_a_trail_that_is_refused_never_cancels_anything():
+    """A trail sends no qty, so 42210000 cannot be about the quantity it sent."""
+    client = _StuckBracketClient()
+    client.advanced = False  # the request carries no qty, so it would succeed
+
+    stop = real_broker(client).replace_stop_order("aae42775", qty=127, stop_price=37.20,
+                                                  current_qty=127)
+    assert client.cancelled == [] and stop.qty == 127
 
 
 def test_a_reply_that_omits_the_quantity_keeps_the_one_we_know():

@@ -765,7 +765,10 @@ def render_positions(positions: dict | None) -> list[str]:
     out = [
         f"**Open positions:** {seen} checked · {positions.get('tranches', 0)} tranche(s) sold · "
         f"{positions.get('stops_raised', 0)} stop(s) raised · "
-        f"{positions.get('protected', 0)} given a stop · {positions.get('errors', 0)} error(s)",
+        f"{positions.get('protected', 0)} given a stop · "
+        f"{positions.get('resized', 0)} stop(s) resized · {positions.get('errors', 0)} error(s)"
+        + (f" · **{positions['unprotected']} LEFT WITH NO STOP**"
+           if positions.get("unprotected") else ""),
         "",
     ]
     rows = []
@@ -1235,10 +1238,18 @@ def manage_positions(dispatcher: Dispatcher) -> dict | None:
         log.warning("position management reported an error: %s", outcome["error"])
     elif isinstance(outcome, dict):
         log.info(
-            "positions: %s seen, %s tranche(s) sold, %s stop(s) raised, %s given a stop",
+            "positions: %s seen, %s tranche(s) sold, %s stop(s) raised, %s given a stop, "
+            "%s stop(s) resized",
             outcome.get("positions_seen", 0), outcome.get("tranches", 0),
             outcome.get("stops_raised", 0), outcome.get("protected", 0),
+            outcome.get("resized", 0),
         )
+        if outcome.get("unprotected"):
+            log.error(
+                "%s position(s) have NO live stop: the stop was cancelled to resize it "
+                "and the replacement was refused. Place one by hand.",
+                outcome["unprotected"],
+            )
     return outcome
 
 
@@ -1672,12 +1683,20 @@ def main(argv: list[str] | None = None) -> None:
             with open(summary, "a", encoding="utf-8") as handle:
                 handle.write(
                     f"## Protect-only pass\n\n{outcome.get('positions_seen', 0)} position(s) seen, "
-                    f"{outcome.get('protected', 0)} given a stop, {outcome.get('errors', 0)} error(s)."
+                    f"{outcome.get('protected', 0)} given a stop, "
+                    f"{outcome.get('resized', 0)} stop(s) resized, "
+                    f"{outcome.get('errors', 0)} error(s)."
+                    + (f"\n\n**{outcome['unprotected']} position(s) have NO stop at all "
+                       f"and need one placed by hand now.**"
+                       if outcome.get("unprotected") else "")
                     + (f"\n\n**{outcome['error']}**" if outcome.get("error") else "") + "\n"
                 )
         # Loud on purpose: the only reason to run this is that positions were
-        # unprotected, so a pass that could not protect one is a failure.
-        if outcome.get("error") or outcome.get("errors"):
+        # unprotected, so a pass that could not protect one is a failure. That
+        # includes the one failure worse than an error -- a stop cancelled to
+        # resize it whose replacement was refused -- which is counted apart
+        # from ``errors`` and would otherwise exit green.
+        if outcome.get("error") or outcome.get("errors") or outcome.get("unprotected"):
             raise SystemExit(1)
         return
 
