@@ -340,6 +340,20 @@ jobs:
               print()
           EOF
 
+      - name: Could earnings surprises be backfilled without look-ahead
+        # The Finnhub rows the cycle reads carry a fiscal quarter but no
+        # announcement date, so they cannot be placed against a journal line
+        # on their own. Yahoo's calendar carries the timestamp. This prints
+        # what each returns for every company -- shape and coverage only --
+        # so the question "can a past surprise be joined to a line honestly"
+        # is answered by data rather than by assumption. Builds nothing.
+        continue-on-error: true
+        env:
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+        run: |
+          set -o pipefail
+          python backtest/probe_earnings_dates.py | tee earnings-dates.txt
+
       - name: Publish to the run summary
         if: always()
         run: |
@@ -384,6 +398,11 @@ jobs:
             echo '```'
             cat macro.txt 2>/dev/null || echo "(did not run)"
             echo '```'
+            echo '## Earnings dates'
+            echo
+            echo '```'
+            cat earnings-dates.txt 2>/dev/null || echo "(did not run)"
+            echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -398,6 +417,7 @@ jobs:
             positioning.txt
             contracts.txt
             funds.txt
+            earnings-dates.txt
             funds-raw.txt
             macro.txt
           if-no-files-found: ignore
