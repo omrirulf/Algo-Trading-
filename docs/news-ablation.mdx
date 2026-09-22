@@ -1,0 +1,150 @@
+---
+title: "The News Ablation"
+description: "Ask the same recorded context twice, once with the headlines and once without, and find out what the news section is actually doing"
+---
+
+The scorer reports the model's `news_score` correlating **negatively** with
+the return that followed — `-0.25` over `n=48` on the first week's journal,
+in the "which dimension actually carried information?" table of
+`logs/score_report.md`.
+
+That is a fact about a number the model emits. It is not yet a fact about
+whether reading the headlines helped or hurt. The score is one of five
+dimensions the model is asked to weigh; it may be discounting it, inverting
+it deliberately (sentiment is often contrarian), or using the headlines for
+something the score does not capture at all. The only way to find out what
+the news section is doing is to take it away and ask again.
+
+```bash
+python replay/news_ablation.py --limit 100 --model claude-opus-5 --effort low \
+    --repeat-with-news
+python replay/news_ablation.py --limit 100 --model claude-opus-5 --dry-run
+```
+
+It runs on manual dispatch only (**Actions → news ablation**). It is the one
+workflow here that asks the *full* model rather than reading the journal, so
+it is the one workflow here that costs money.
+
+## What it does
+
+For each recorded context, the model is asked the identical question twice
+**in the same run**:
+
+| Arm | The `NEWS` block it sees |
+| --- | --- |
+| `with-news` | exactly what production sent that day |
+| `without-news` | `NEWS (past 24 hours)` / `- none found` |
+
+The system prompt, the technicals, the fundamentals, the model and the effort
+are all held fixed. The only difference between the two answers is the news.
+
+## The noise floor, and why it is most of the tool
+
+A model answers the same context differently some of the time for no reason
+at all; the determinism check measured 90% self-agreement for Opus over 20
+contexts. So a flip rate means nothing until you know how much the model
+flips on its own. Getting that floor right is most of this tool.
+
+`--repeat-with-news` asks the with-news prompt a **third** time and takes the
+floor from that: same model, same prompt, same run, nothing between the two
+answers but the model's own sampling. It costs 50% more calls, it is on by
+default in the workflow, and it is the only floor worth acting on.
+
+<Warning>
+**The journalled answer is a trap as a floor, and the journal proves it.**
+The log is written by a *funnel*: a line the screen ended carries Haiku's
+answer, a line it escalated carries the full model's. On the most recent 100
+eligible lines the journalled answers split 46 Haiku, 43 Opus, 11 with no
+model recorded. Diffing a fresh Opus answer against that mix is a self
+comparison on fewer than half the lines and a cross-model comparison on the
+rest — and a cross-model rate is *larger*, so it inflates the floor and can
+report a real ablation effect as nothing.
+</Warning>
+
+The fallback therefore counts only the lines the same model wrote, and the
+report says how many it dropped. Point the tool at a candidate the journal
+never ran — gpt-oss-120b, say — and the fallback has nothing left at all, so
+the report **withholds its verdict** and names the flag that would fix it
+rather than printing a flip rate with nothing to read it against.
+
+| Floor source | How it is measured | When it applies |
+| --- | --- | --- |
+| `repeat` | the with-news prompt asked twice in this run | `--repeat-with-news` |
+| `journal` | this run's answer against the journalled one, same model only | fallback |
+| none | — | verdict withheld |
+
+## What "without news" means, and what it does not
+
+"Without news" is the recorded context with `headlines` emptied, re-rendered
+through the real `TickerContext.as_prompt()`. It comes out as `- none found`
+— a shape production already sends whenever a quiet ticker returns nothing,
+and one this model has answered many times.
+
+Two alternatives were considered and rejected:
+
+- **Cutting the heading out entirely** would be a truer "no news source at
+  all", and would hand the model a prompt shape it has never seen. The
+  ablation would then be measuring novelty as well as news.
+- **`- unavailable this cycle`** asserts that a lookup failed, which is a
+  different claim from a quiet day. The prompt must not assert something the
+  cycle does not know (see `TickerContext._news_section`).
+
+A system that genuinely fetched no news would also drop the news dimension
+from the system prompt and from the schema. This does not measure that, and
+the report says so under LIMITS.
+
+Only contexts that actually carry headlines are eligible. Blanking a line
+whose news block already reads "none found" costs two calls to prove that an
+empty list stayed empty.
+
+## Which side was right
+
+Agreement and conviction say whether the news *moved* the answer. They cannot
+say which answer the market rewarded.
+
+`--emit-pairs` prints both sides as journal-shaped lines, which the workflow
+splits by `_side` and hands to `analysis/score_journal.py` — the same route
+[compare_models](/replay) takes, for the same reason: prices are the ground
+truth, and that tool already knows how to join signals to them. Only contexts
+where both sides answered are printed, so the two are scored over identical
+days and no part of the difference is just a difference in which market each
+side was in.
+
+The pairs are kept as a 90-day artifact. Most of a run's contexts have not
+aged past the horizon yet, so a later re-score costs nothing rather than
+paying for the same calls twice.
+
+## What it costs
+
+Measured from the journal's own `usage` blocks, not estimated. With the
+repeat arm on, a run is three calls per context.
+
+| Model | Contexts | Calls | Cost |
+| --- | --- | --- | --- |
+| `claude-opus-5` | 100 | 300 | ~$12.90 |
+| `claude-opus-5` | 50 | 150 | ~$6.40 |
+| `openai/gpt-oss-120b` | 100 | 300 | under $1 |
+
+Opus is priced at `$0.0429` a call, the mean measured cost over 227 real
+cycles — most of which is the 4,555 cache-creation tokens each call writes,
+not the 184 input and 540 output tokens it shows. Claude is asked
+sequentially on purpose: a rate-limited context is a lost one, where a slow
+one is only slow. An OpenAI-compatible endpoint is asked `--concurrency` at
+a time.
+
+gpt-oss-120b is cheap enough to be worth a **dry run of the machinery**
+before spending the rest: it proves the pipeline end to end and gives a
+directional hint. It cannot replace the Opus run, because production runs
+Opus and the two models already disagree on roughly a fifth of trade
+decisions — "does news help gpt-oss" is a different question.
+
+## What it cannot decide
+
+This is **not** a registered arm and it cannot move the
+[pre-registration](/horse-race-preregistration)'s decision. That file is
+locked, and a result here is a hypothesis for a future registration, not
+evidence in the current one.
+
+What it can do is tell you whether a news-free variant is worth the nine
+months and the ongoing cost of running one as a live shadow arm — before
+committing to either.

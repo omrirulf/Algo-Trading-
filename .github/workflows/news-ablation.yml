@@ -1,0 +1,180 @@
+name: news ablation
+
+# Does the news section change what the model says -- and for the better?
+#
+# The scorer reports the model's news_score correlating NEGATIVELY with the
+# return that followed. That is a fact about a number the model emits, not
+# about whether reading the headlines helped: the score is one of five
+# dimensions and the model may be discounting or inverting it. The only way
+# to find out what the news is doing is to take it away and ask again.
+#
+# Each recorded context is asked twice in the same run -- once with the NEWS
+# block as production sent it, once with the headlines removed -- with the
+# system prompt, the model and the effort held fixed. Both answers are fresh,
+# because the journalled one would contribute the model's own ~10%
+# self-disagreement to the ablation's flip rate. That self-flip rate is
+# measured here too, on these same contexts, so the report carries its own
+# noise floor.
+#
+# This one costs money: it is the only workflow here that asks the FULL model
+# rather than reading the journal. At the measured $0.043 a call, 100
+# contexts is 300 calls with the repeat arm and about $13 on Opus -- or
+# under a dollar against gpt-oss-120b, which is worth a dry run of the
+# machinery before spending the rest. Manual dispatch only.
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Contexts to ask (each is asked twice: calls = 2x this)"
+        default: "100"
+      model:
+        description: "The model to ablate, e.g. claude-opus-5 or openai/gpt-oss-120b"
+        default: "claude-opus-5"
+      effort:
+        description: "Reasoning effort (blank for none)"
+        type: choice
+        options: ["low", "medium", "high", ""]
+        default: "low"
+      provider:
+        description: "Which endpoint to ask. 'claude' uses ANTHROPIC_API_KEY and ignores base_url."
+        type: choice
+        options: ["claude", "openai-compatible"]
+        default: "claude"
+      base_url:
+        description: "OpenAI-compatible endpoint (ignored when provider is 'claude')"
+        default: "https://api.deepinfra.com/v1/openai"
+      repeat_with_news:
+        description: "Ask the with-news prompt twice, so the noise floor is the model against ITSELF (+50% calls)"
+        type: boolean
+        default: true
+      concurrency:
+        description: "Calls in flight at once, openai-compatible only"
+        default: "4"
+      timeout:
+        description: "Per-call timeout, seconds"
+        default: "120"
+      score_returns:
+        description: "Also score both sides against realised returns"
+        type: boolean
+        default: true
+      horizon:
+        description: "Trading sessions held, for the returns scoring"
+        default: "3"
+
+permissions:
+  contents: read
+
+jobs:
+  ablate:
+    runs-on: ubuntu-latest
+    # 200 sequential Opus calls at low effort measured ~9s each, so ~30
+    # minutes for the default sample, plus the price fetch. Generous, because
+    # the expensive half is already paid by the time a timeout would bite.
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Ask each context with the news and without it
+        # ANTHROPIC_API_KEY only. No broker key reaches this job: the harness
+        # cannot trade, and a workflow that asks the model does not need to
+        # be able to. stdout carries the journal-shaped records and nothing
+        # else, so the report goes to stderr and is captured separately.
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CANDIDATE_KEY: ${{ secrets.SCREENING_API_KEY || secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY || secrets.GROQ_API_KEY }}
+          LIMIT: ${{ inputs.limit }}
+          MODEL: ${{ inputs.model }}
+          EFFORT: ${{ inputs.effort }}
+        run: |
+          set -o pipefail
+          ARGS="--limit $LIMIT --model $MODEL --emit-pairs"
+          # A blank choice input is a real empty string, which must mean "no
+          # effort asked" rather than reasoning at effort ''.
+          if [ -n "$EFFORT" ]; then
+            ARGS="$ARGS --effort $EFFORT"
+          fi
+          # Same lesson determinism-check.yml learned the expensive way: an
+          # empty workflow_dispatch input is replaced by the declared
+          # default, so base_url="" could never have meant "ask Claude". The
+          # provider choice carries that intent, because a choice input
+          # cannot collapse into a default.
+          if [ "${{ inputs.provider }}" != "claude" ]; then
+            ARGS="$ARGS --base-url ${{ inputs.base_url }} --api-key $CANDIDATE_KEY"
+            ARGS="$ARGS --concurrency ${{ inputs.concurrency }} --timeout ${{ inputs.timeout }}"
+          fi
+          # The floor is the whole point: without it the report withholds its
+          # verdict rather than printing a flip rate with nothing to read it
+          # against. Mandatory for any model the journal never ran.
+          if [ "${{ inputs.repeat_with_news }}" = "true" ]; then
+            ARGS="$ARGS --repeat-with-news"
+          fi
+          # Split rather than piped: stdout is the record stream the next
+          # steps split, stderr is the report a person reads. Process
+          # substitution would make the exit status of a run that already
+          # cost money depend on a tee.
+          status=0
+          python replay/news_ablation.py $ARGS \
+            > "$RUNNER_TEMP/pairs.jsonl" 2> "$RUNNER_TEMP/ablation.txt" || status=$?
+          cat "$RUNNER_TEMP/ablation.txt"
+          exit $status
+
+      - name: Publish the ablation to the run summary
+        if: always()
+        run: |
+          {
+            echo '## The news section, taken away'
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/ablation.txt" 2>/dev/null || echo "(did not run)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Save the pairs so a later re-score is free
+        # Most of a run's contexts have not aged past the horizon yet, so the
+        # returns half below scores only the resolved ones. Re-running later
+        # to score the rest would mean paying for the same calls twice.
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: news-ablation-pairs-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/pairs.jsonl
+            ${{ runner.temp }}/ablation.txt
+          retention-days: 90
+
+      - name: Which side was RIGHT, not which side moved
+        # A moved answer is not a better answer. Prices are the ground truth
+        # and score_journal.py already knows how to join signals to them, so
+        # it is handed both sides over the identical contexts.
+        #
+        # The splitting happens here rather than in replay/, which must not
+        # open a file for writing: that rule is what stops a path argument
+        # aimed at the real journal from destroying the record.
+        if: always() && inputs.score_returns
+        run: |
+          set -o pipefail
+          python - <<'SPLIT'
+          import json, os
+          tmp = os.environ["RUNNER_TEMP"]
+          sides = {s: open(f"{tmp}/ablation-{s}.jsonl", "w") for s in ("with-news", "without-news")}
+          with open(f"{tmp}/pairs.jsonl") as stream:
+              for raw in stream:
+                  raw = raw.strip()
+                  if not raw:
+                      continue
+                  record = json.loads(raw)
+                  sides[record["_side"]].write(json.dumps(record["line"]) + "\n")
+          for handle in sides.values():
+              handle.close()
+          SPLIT
+          for side in with-news without-news; do
+            echo "===== $side ====="
+            python analysis/score_journal.py \
+              --journal "$RUNNER_TEMP/ablation-$side.jsonl" \
+              --horizon "${{ inputs.horizon }}" || echo "(nothing resolved yet on this side)"
+          done | tee -a "$GITHUB_STEP_SUMMARY"

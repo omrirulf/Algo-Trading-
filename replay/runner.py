@@ -55,6 +55,13 @@ class ReplayEntry:
     #: wrong baseline for it on any line that escalated, because on those
     #: lines ``original`` is the *full model's* answer, not the screen's.
     recorded_screen: Optional[dict] = None
+    #: Which model produced ``original``, as the API reported it. A tool that
+    #: diffs a fresh answer against the journalled one is measuring the
+    #: model's disagreement with ITSELF only when these are the same model;
+    #: point the same arithmetic at a candidate and it silently becomes a
+    #: cross-model comparison. Carrying the name is what lets a report say
+    #: which of the two it is. ``None`` on a line that recorded no usage.
+    model: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -105,6 +112,7 @@ def load_entries(lines: list[str], ticker: Optional[str] = None) -> Iterator[Rep
                 log.debug("journal line %d has an unparseable signal", number)
 
         screen = record.get("screen")
+        usage = record.get("usage")
 
         yield ReplayEntry(
             ticker=str(context.get("ticker", "")).upper(),
@@ -113,6 +121,7 @@ def load_entries(lines: list[str], ticker: Optional[str] = None) -> Iterator[Rep
             original=original,
             context=rebuilt,
             recorded_screen=screen if isinstance(screen, dict) else None,
+            model=(usage or {}).get("model") if isinstance(usage, dict) else None,
         )
 
 
