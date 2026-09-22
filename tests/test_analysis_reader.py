@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 import pytest
 
 from analysis import reader
-from analysis.reader import read_journal, read_lines
+from analysis.reader import entry_from, read_journal, read_lines
 
 FULL = {
     "ts": "2026-03-02 14:00:02,331",
@@ -187,3 +187,22 @@ def test_a_held_line_is_flagged_so_a_race_can_leave_it_out_of_every_arm():
                         "context": {}, "signal": {"bias": "NEUTRAL", "conviction": 0.1}})
     assert held.held is True
     assert asked.held is False
+
+
+def test_the_insider_section_rides_on_the_entry_for_the_insider_arm():
+    payload = {
+        "ts_utc": "2026-09-21T15:00:00+00:00", "ticker": "CAT",
+        "context": {"insiders": {"buys": [{"when": "2026-09-01", "who": "Ann", "role": "Director",
+                                           "shares": 250.0, "value": 1.0}],
+                                 "sells": [], "distinct_buyers": 1}},
+        "signal": {"bias": "BULLISH", "conviction": 0.5},
+    }
+    entry = entry_from(payload)
+    assert entry.insiders["buys"][0]["who"] == "Ann"
+    assert entry.insiders["distinct_buyers"] == 1
+
+
+def test_a_fund_line_without_an_insider_section_has_an_empty_dict():
+    entry = entry_from({"ts_utc": "2026-09-21T15:00:00+00:00", "ticker": "XLE",
+                        "context": {"insiders": None}, "signal": {"bias": "NEUTRAL", "conviction": 0.0}})
+    assert entry.insiders == {}

@@ -100,6 +100,25 @@ class InsiderSnapshot:
     def as_dict(self) -> dict:
         return asdict(self)
 
+    @classmethod
+    def from_dict(cls, data: dict) -> "InsiderSnapshot":
+        """The inverse of ``as_dict``, for a snapshot read back off a journal line.
+
+        What lets ``rules/insider_buying.py`` be recomputed over every line
+        ever journalled: the arm reads the section the model was shown, and
+        the journal is where that section is kept.
+        """
+        fields = {name: data.get(name) for name in cls.__dataclass_fields__}
+        for side in ("buys", "sells"):
+            fields[side] = [
+                InsiderTrade(**{k: t.get(k) for k in InsiderTrade.__dataclass_fields__})
+                for t in (fields.get(side) or []) if isinstance(t, dict)
+            ]
+        for name in ("distinct_buyers", "distinct_sellers", "non_market_count"):
+            fields[name] = int(fields[name] or 0)
+        fields["window_days"] = int(fields["window_days"] or WINDOW_DAYS)
+        return cls(**fields)
+
     def as_lines(self) -> list[str]:
         if not self.has_activity:
             return [f"No insider transactions reported in the last {self.window_days} days."]

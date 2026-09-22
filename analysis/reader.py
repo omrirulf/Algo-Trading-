@@ -93,6 +93,10 @@ class JournalEntry:
     #: said on every line ever journalled -- including every line written
     #: before the arms existed. Empty when the line carried no technicals.
     technicals: dict[str, Any] = field(default_factory=dict)
+    #: The journalled INSIDER ACTIVITY section, as written, for the same
+    #: reason: the insider arm is a function of exactly this. Empty on a
+    #: fund, and on any line that carried none.
+    insiders: dict[str, Any] = field(default_factory=dict)
     #: True when the ticker was already in the book and no model was asked.
     #: A race between arms has to leave these out of every arm alike: the
     #: model did not decline the name, it was never offered it, and a
@@ -247,6 +251,7 @@ def entry_from(payload: Any) -> Optional[JournalEntry]:
     outcome = payload.get("outcome") if isinstance(payload.get("outcome"), dict) else {}
     usage = payload.get("usage") if isinstance(payload.get("usage"), dict) else {}
     technicals = context.get("technicals") if isinstance(context.get("technicals"), dict) else {}
+    insider_section = context.get("insiders") if isinstance(context.get("insiders"), dict) else {}
 
     return JournalEntry(
         ticker=ticker.strip().upper(),
@@ -263,6 +268,7 @@ def entry_from(payload: Any) -> Optional[JournalEntry]:
         model=_text(usage.get("model")),
         atr_pct=_number(technicals.get("atr_pct_of_price")),
         technicals=dict(technicals),
+        insiders=dict(insider_section),
         held=bool(payload.get("held")),
         sections=_sections(payload),
     )

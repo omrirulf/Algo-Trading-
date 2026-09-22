@@ -18,15 +18,22 @@ python analysis/horse_race.py --per-trade      # list every scored trade
 It runs on its own, credential-free, every trading night after the close
 (**Actions → horse race**), and on any pull request that touches an arm. It
 reads the journal, fetches prices, and prints. It cannot trade and it cannot
-move a parameter.
+move a parameter. What it is allowed to decide, and when, is written down in
+the [pre-registration](/horse-race-preregistration) before the numbers.
 
-## The three arms
+## The arms
 
-| Arm | What it is | Where it comes from |
-| --- | --- | --- |
-| **model** | The full model's answer, exactly as journalled | `logs/signal_journal.log` |
-| **momentum** | Time-series momentum with the textbook parameters | `rules/momentum.py`, recomputed from the line's own technicals |
-| **random** | A coin flip, seeded from the ticker and the day | `rules/control.py`, recomputed the same way |
+| Arm | Role | What it is | Where it comes from |
+| --- | --- | --- | --- |
+| **model** | incumbent | The full model's answer, exactly as journalled | `logs/signal_journal.log` |
+| **momentum** | main comparator | Time-series momentum with the textbook parameters | `rules/momentum.py`, recomputed from the line's own technicals |
+| **hybrid** | second main comparator | Momentum, with the line's own news score allowed one veto | `rules/hybrid.py`, recomputed from the technicals and the journalled `news_score` |
+| **random** | floor | A coin flip, seeded from the ticker and the day | `rules/control.py`, recomputed the same way |
+| **insiders** | exploratory | Cluster buying by officers and directors | `rules/insider_buying.py`, recomputed from the journalled INSIDER ACTIVITY section |
+
+The main tables race the model against the two main comparators and the
+floor. The exploratory arm is raced apart, on its own lines only, and can
+never change the main decision — see [Exploratory arms](#exploratory-arms).
 
 Each arm is put through the identical conviction floor, the identical stop and
 sizing arithmetic (`backtest.simulate.simulate_trade`, the code that actually
@@ -71,11 +78,11 @@ the arm. So the race's primary series is daily: one equal-weighted number per
 arm per entry day, over the calendar of every entry day any arm traded.
 
 The primary test is the **paired difference, model minus momentum, day by
-day**. Its mean is reported with a Newey-West standard error at
-`lag = horizon`, which is the overlap a three-session hold creates between
-consecutive days. As a check, the same difference is reported over every
-third entry day only — trades that cannot overlap at all — with a plain
-standard error.
+day**, and beside it the same difference, model minus hybrid. Each mean is
+reported with a Newey-West standard error at `lag = horizon`, which is the
+overlap a three-session hold creates between consecutive days. As a check,
+the same difference is reported over every third entry day only — trades
+that cannot overlap at all — with a plain standard error.
 
 ```
 # illustrative numbers; the real ones are in the latest run's summary
@@ -184,6 +191,52 @@ of Financial Studies*, 2022):
   start. The cost per side and the horizon are fixed the same way, before the
   numbers, in the pre-registration.
 </Warning>
+
+## The hybrid: momentum that listens to the news
+
+The momentum arm reads strictly less than the model. The hybrid reads one
+thing more: the `news_score` the model call on that line already produced,
+a number in [-1, 1] for how the headlines read. It is on every line the
+journal has a signal for, so the arm is recomputable over the whole history
+and makes **no new model call**. In the live loop the score would be the
+screening model's, the cheap first stage of the funnel, so the hybrid costs
+the screen and not the full model.
+
+The rule: momentum decides the direction; the score can only stand the arm
+aside. When the score points against the trend the hybrid is NEUTRAL; when it
+does not, the hybrid takes momentum's side with conviction equal to the mean
+of momentum's conviction and the score's magnitude. A score of exactly zero is
+"no view" and does not veto. Equal weights is the only weighting that involves
+no fitting, and a sign test has no parameter to tune.
+
+The question it asks is the second one the pre-registration decides on: is
+the full model's judgement worth more than a trend rule that merely listens
+to the news?
+
+## Exploratory arms
+
+`rules/insider_buying.py` is BULLISH when, in the 180 days before the line,
+two or more distinct insiders made open-market purchases and the open-market
+shares bought exceed the shares sold; otherwise NEUTRAL, never BEARISH,
+because selling carries almost no information. The window is the six-month
+aggregation of Lakonishok and Lee (2001) and is also the window the prompt's
+own snapshot carries. The parsing in `orchestrator/insiders.py` already
+excludes stock awards, option exercises, gifts and tax withholding, with
+tests; the arm further excludes the issuer buying back its own shares and
+ten-per-cent holders, because the thesis is about people.
+
+Four in five names are funds, which have no insiders, and a cluster is rare
+on the rest: on the first week's journal the arm took a side on 8 of 539
+lines, all one company. So it is raced apart:
+
+- **on its own lines only**, paired against the model and the momentum rule
+  on exactly those tickers on exactly those days;
+- **at two horizons**, the race's 3 sessions and 20 sessions, because the
+  effect it is named after plays out over months;
+- marked **too few** until it has 20 scored trades on 20 distinct entry days;
+- and it **cannot change the main decision**, whatever it shows. An
+  exploratory arm is a hypothesis for the next registration, not evidence in
+  this one.
 
 ## The agreement, split
 
