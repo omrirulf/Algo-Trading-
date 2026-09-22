@@ -609,7 +609,8 @@ class _StuckBracketClient(_ReplacingClient):
     """
 
     def __init__(self, *, positions=(("TEVA", 1),), symbol="TEVA", side="sell",
-                 covers=127, submit_fails=None, cancel_fails=None, readable=True):
+                 covers=127, submit_fails=None, cancel_fails=None, readable=True,
+                 settles_after=0, refuse_submits=0):
         super().__init__(advanced=True, covers=covers)
         self._positions = list(positions)
         self._symbol = symbol
@@ -617,6 +618,11 @@ class _StuckBracketClient(_ReplacingClient):
         self._submit_fails = submit_fails
         self._cancel_fails = cancel_fails
         self._readable = readable
+        #: How many polls the cancelled order keeps reporting pending_cancel.
+        self.settles_after = settles_after
+        #: How many submits are refused for want of shares before one lands.
+        self.refuse_submits = refuse_submits
+        self._polls = 0
         self.cancelled: list[str] = []
         self.submitted: list = []
         self.calls: list[str] = []
@@ -626,11 +632,19 @@ class _StuckBracketClient(_ReplacingClient):
         return super().replace_order_by_id(order_id, request)
 
     def get_order_by_id(self, order_id):
+        # Read once to learn the symbol and side, then polled after the cancel
+        # until the order reports terminal. ``still_held_for`` is how many
+        # polls it keeps saying "pending_cancel" -- Alpaca settles a cancel a
+        # moment after accepting it, and that moment is what stranded TEVA.
         self.calls.append("read")
         if not self._readable:
             raise RuntimeError("order not found")
+        status = "new"
+        if order_id in self.cancelled:
+            self._polls += 1
+            status = "pending_cancel" if self._polls <= self.settles_after else "canceled"
         return SimpleNamespace(id=order_id, symbol=self._symbol, side=self._side,
-                               qty=self.covers, stop_price=37.0)
+                               qty=self.covers, stop_price=37.0, status=status)
 
     def get_all_positions(self):
         self.calls.append("book")
@@ -648,6 +662,13 @@ class _StuckBracketClient(_ReplacingClient):
         self.calls.append("submit")
         if self._submit_fails is not None:
             raise self._submit_fails
+        if self.refuse_submits > 0:
+            self.refuse_submits -= 1
+            raise RuntimeError(
+                '{"available":"1","code":40310000,"existing_qty":"128",'
+                '"held_for_orders":"127","message":"insufficient qty available '
+                'for order (requested: 128, available: 1)","symbol":"TEVA"}'
+            )
         self.submitted.append(request)
         return SimpleNamespace(id="ord-new", stop_price=request.stop_price)
 
@@ -682,18 +703,121 @@ def test_the_replacement_is_placed_the_instant_the_old_stop_is_gone():
 
     Everything that can be refused is refused while the old stop is still
     live: the order is read, the book is read, the reduction is checked.
-    Only then is anything cancelled, and nothing but placing the new stop
-    happens after that -- ``submit_stop_order`` reads the book once more of
-    its own accord, which is the check that makes it close-only whoever
-    calls it, and is the only thing standing between the cancel and the
-    replacement.
+    Only then is anything cancelled. After it, exactly two things stand
+    between the cancel and the replacement, and both earn their place: one
+    poll confirming the cancelled order is really gone (it holds the shares
+    until it is), and ``submit_stop_order`` reading the book of its own
+    accord, which is the check that makes it close-only whoever calls it.
     """
     client = _StuckBracketClient()
     real_broker(client).replace_stop_order("aae42775", qty=1, stop_price=37.20,
                                            current_qty=127)
     cut = client.calls.index("cancel")
     assert client.calls[:cut] == ["replace", "read", "book"]
-    assert client.calls[cut:] == ["cancel", "book", "submit"]
+    assert client.calls[cut:] == ["cancel", "read", "book", "submit"]
+
+
+def test_the_replacement_waits_for_the_cancelled_stop_to_let_go_of_the_shares(monkeypatch):
+    """The 22 Sep 2026 regression, pinned.
+
+    Alpaca accepted the cancel and then went on reserving TEVA's 127 shares
+    for the order it was cancelling, so the 128-share replacement was refused
+    for want of shares the position plainly held -- and the position was left
+    bare. The cancelled order is now polled until it reports terminal before
+    the replacement is asked for at all.
+    """
+    slept: list[float] = []
+    monkeypatch.setattr(bc.time, "sleep", slept.append)
+    client = _StuckBracketClient(positions=(("TEVA", 128),), covers=127,
+                                 settles_after=3)
+
+    stop = real_broker(client).replace_stop_order("aae42775", qty=128,
+                                                  stop_price=36.63, current_qty=127)
+
+    assert stop.qty == 128 and client.submitted, "the replacement was placed"
+    assert len(slept) == 3, "it waited out each pending_cancel poll and no longer"
+    # The submit came after the polls, not racing them.
+    assert client.calls.index("submit") > len(client.calls) - 4
+
+
+def test_a_replacement_refused_for_want_of_shares_is_tried_once_more(monkeypatch):
+    """Belt and braces for the same race, seen from the other side.
+
+    If the poll says terminal but the shares are still spoken for, one
+    refusal is not a reason to leave the position bare: wait out another full
+    window and ask again.
+    """
+    monkeypatch.setattr(bc.time, "sleep", lambda _s: None)
+    client = _StuckBracketClient(positions=(("TEVA", 128),), covers=127,
+                                 refuse_submits=1)
+
+    stop = real_broker(client).replace_stop_order("aae42775", qty=128,
+                                                  stop_price=36.63, current_qty=127)
+
+    assert stop.qty == 128
+    assert client.calls.count("submit") == 2, "refused once, placed on the retry"
+
+
+def test_a_second_refusal_for_want_of_shares_is_reported_as_naked(monkeypatch):
+    """One retry, not an unbounded loop. After that a person has to be told."""
+    monkeypatch.setattr(bc.time, "sleep", lambda _s: None)
+    client = _StuckBracketClient(positions=(("TEVA", 128),), covers=127,
+                                 refuse_submits=5)
+
+    with pytest.raises(bc.UnprotectedPositionError) as caught:
+        real_broker(client).replace_stop_order("aae42775", qty=128,
+                                               stop_price=36.63, current_qty=127)
+    assert client.calls.count("submit") == 2
+    message = str(caught.value)
+    assert "TEVA has NO live stop" in message
+    assert "128 share(s) at 36.63" in message
+
+
+def test_a_cancel_that_never_settles_still_gets_a_replacement_attempted(monkeypatch):
+    """A wait that gave up must not become a position with no stop placed.
+
+    The patience is bounded, and when it runs out the right move is to ask
+    for the stop anyway: a stop that is refused is no worse than a stop that
+    was never requested, and it might well be accepted.
+    """
+    monkeypatch.setattr(bc.time, "sleep", lambda _s: None)
+    client = _StuckBracketClient(positions=(("TEVA", 128),), covers=127,
+                                 settles_after=10_000)
+
+    stop = real_broker(client).replace_stop_order("aae42775", qty=128,
+                                                  stop_price=36.63, current_qty=127)
+
+    assert stop.qty == 128
+    assert client.calls.count("read") == 1 + bc.CANCEL_SETTLE_ATTEMPTS
+
+
+def test_an_unreadable_cancelled_order_is_treated_as_gone(monkeypatch):
+    """A stop nobody can find is not holding any shares; do not wait for it."""
+    monkeypatch.setattr(bc.time, "sleep", lambda _s: None)
+
+    class _VanishesAfterCancel(_StuckBracketClient):
+        def get_order_by_id(self, order_id):
+            if order_id in self.cancelled:
+                self.calls.append("read")
+                raise RuntimeError("order not found")
+            return super().get_order_by_id(order_id)
+
+    client = _VanishesAfterCancel(positions=(("TEVA", 128),), covers=127)
+    stop = real_broker(client).replace_stop_order("aae42775", qty=128,
+                                                  stop_price=36.63, current_qty=127)
+    assert stop.qty == 128 and client.calls.count("read") == 2
+
+
+def test_a_refusal_that_is_not_about_shares_is_not_retried(monkeypatch):
+    """Only the race is worth another attempt. Everything else is told at once."""
+    monkeypatch.setattr(bc.time, "sleep", lambda _s: None)
+    client = _StuckBracketClient(positions=(("TEVA", 128),), covers=127,
+                                 submit_fails=RuntimeError("market is closed"))
+
+    with pytest.raises(bc.UnprotectedPositionError, match="market is closed"):
+        real_broker(client).replace_stop_order("aae42775", qty=128,
+                                               stop_price=36.63, current_qty=127)
+    assert client.calls.count("submit") == 1
 
 
 def test_nothing_is_cancelled_when_the_replacement_would_not_be_a_reduction():

@@ -75,6 +75,22 @@ replaces normally forever after. It is bounded four ways:
   `error`, and the health check treats it as critical with the exact stop to
   place by hand.
 
+### The wait in the middle
+
+That path's first live run, on the evening of 22 September, stranded TEVA
+anyway — and the reason is worth keeping written down. Alpaca **accepts a
+cancel before the order is actually gone**, and until it is gone it goes on
+reserving the shares it covered. The replacement went out inside that moment
+and was refused: 128 shares held, 127 of them still `held_for_orders` by the
+stop that had just been cancelled, 1 available.
+
+So the cancelled order is now polled until it reports a terminal state
+before the replacement is asked for at all, and a refusal that still blames
+the share count buys one more full window and one more attempt. The patience
+is bounded at four seconds; when it runs out the stop is requested anyway,
+because a stop that is refused is no worse than a stop that was never asked
+for.
+
 ## Size is now checked, not just presence
 
 Every check used to ask "is there a stop?". None asked "can it execute?".
