@@ -472,8 +472,10 @@ _POSITION_ACTIONS = {
     "stop_raised": "Stop raised",
     "held": "Holding",
     "protected": "Stop placed",
+    "stop_resized": "Stop resized",
     "unmanaged": "Left alone",
     "error": "Problem",
+    "no_stop": "NO STOP",
 }
 
 
@@ -544,8 +546,15 @@ def _position_line(a: dict) -> str:
         how = "estimated from today's volatility" if a.get("r_estimated") else "from the trade's own record"
         at = f" at {float(new):.2f}" if isinstance(new, (int, float)) else ""
         return f"Had no stop-loss order, so a new one was placed{at} ({how})."
+    if kind == "stop_resized":
+        return (f"Its stop-loss order was for {a.get('stop_qty_before')} shares but only "
+                f"{a.get('remaining_qty')} are held, so an order that size could never "
+                f"have filled. Resized to {a.get('remaining_qty')}. {stop_move}").strip()
     if kind == "unmanaged":
         return f"No stop-loss order found, so it was not touched. Worth a look: {a.get('reason', '')}".strip()
+    if kind == "no_stop":
+        return (f"**This position has no stop-loss order at all and needs one placed by "
+                f"hand now.** {a.get('reason', '')}").strip()
     return f"Could not be managed: {a.get('reason', '')}".strip()
 
 
@@ -563,7 +572,8 @@ def render_positions(actions: list[dict]) -> list[str]:
         "| Position | What happened |",
         "| --- | --- |",
     ]
-    order = ("tranche_taken", "group_cap_trimmed", "stop_raised", "protected", "unmanaged", "error", "held")
+    order = ("no_stop", "tranche_taken", "group_cap_trimmed", "stop_raised", "protected",
+             "stop_resized", "unmanaged", "error", "held")
     for a in sorted(actions, key=lambda x: (order.index(x.get("action")) if x.get("action") in order else 9, x.get("ticker", ""))):
         ticker = str(a.get("ticker"))
         label = f"{name_for(ticker)} ({ticker}) · {sleeve_label(ticker)}"

@@ -57,6 +57,13 @@ MAX_CLIENT_ORDER_ID = 128
 # an ordinary submit failure, never swallowed as a benign duplicate.
 _DUPLICATE_MARKERS = ("client_order_id", "duplicate", "already exists")
 
+# Alpaca's refusal to change the quantity of an *advanced* order -- which is
+# what a stop that is still a leg of the bracket that opened the position is.
+# The code is the reliable half; the wording is matched too in case a future
+# message drops it. Anything that does not match is an ordinary rejection and
+# is reported as one: the fallback below is narrow on purpose.
+_ADVANCED_QTY_MARKERS = ("42210000", "qty cannot be changed for advanced")
+
 
 class BrokerError(RuntimeError):
     """Raised when the broker rejects a request or is unreachable."""
@@ -68,6 +75,19 @@ class DuplicateOrderError(BrokerError):
     A subclass of ``BrokerError`` so nothing that catches broker failures
     stops catching this -- but a distinct type, because it means the opposite
     of a failure. The order exists; the guardrail worked.
+    """
+
+
+class UnprotectedPositionError(BrokerError):
+    """The one failure that leaves a position with no stop at all.
+
+    Raised only from the cancel-and-replace fallback in
+    ``replace_stop_order``, and only when the old stop was cancelled and the
+    replacement could not be placed. Everything else in this module fails
+    *before* touching the live stop, so a plain ``BrokerError`` there means
+    "nothing happened". This one means the opposite, and it is a distinct
+    type so the position manager can say so in the record rather than
+    reporting it as one more broker refusal.
     """
 
 
@@ -95,6 +115,12 @@ def build_client_order_id(ticker: str, side: str, now: datetime | None = None) -
 def _is_duplicate_rejection(exc: Exception) -> bool:
     message = str(exc).lower()
     return any(marker in message for marker in _DUPLICATE_MARKERS)
+
+
+def _is_advanced_order_qty_rejection(exc: Exception) -> bool:
+    """True only for "you may not change the quantity of an advanced order"."""
+    message = str(exc).lower()
+    return any(marker in message for marker in _ADVANCED_QTY_MARKERS)
 
 
 @dataclass(frozen=True)
@@ -487,13 +513,28 @@ class AlpacaPaperBroker:
         resize. Every trail on such a stop therefore failed, the stop never
         ratcheted, and the manager recorded an error that read like a missing
         stop. TEVA on 21 Sep 2026 (issue #93) was one share -- too small for
-        any tranche, so the trail was the only thing that ever ran on it, and
-        the only thing that ever failed.
+        any tranche, so the trail was the only thing that ever ran on it.
 
-        A genuine resize on a bracket leg is still refused, and is meant to
-        be: that path is untested against this constraint, and guessing at
-        Alpaca's behaviour is not something to do with the one order that
-        stands between a position and an unbounded loss.
+        Leaving the field out fixes the trail. It cannot fix a *genuine*
+        resize, and that was first left to fail loudly. It was the wrong
+        call. TEVA's live stop still covered the 127 shares of its original
+        bracket against the 1 share left; a 127-share sell-stop on a 1-share
+        position cannot execute, so the position was effectively unprotected
+        and no amount of failing loudly was going to change its size. A stop
+        that is permanently the wrong size is worse than a stop that is
+        briefly absent.
+
+        So a genuine resize the broker refuses falls back, and only then, to
+        cancelling that one order by its id and placing a standalone stop in
+        its place. The window is real -- roughly a second, once per stuck
+        stop, after which the stop is an ordinary order that replaces
+        normally forever after. It is bounded four ways: nothing else in this
+        module or the codebase can cancel an order; the fallback runs only on
+        that one rejection code; the book is read and the replacement is
+        validated *before* the cancel, so every foreseeable refusal happens
+        while the old stop is still live; and if the placement fails anyway
+        the failure is an ``UnprotectedPositionError``, which the health
+        check treats as critical rather than as one more broker refusal.
         """
         from alpaca.trading.requests import ReplaceOrderRequest
 
@@ -509,6 +550,8 @@ class AlpacaPaperBroker:
         try:
             order = self._client.replace_order_by_id(order_id, request)
         except Exception as exc:  # noqa: BLE001
+            if resizing and _is_advanced_order_qty_rejection(exc):
+                return self._resize_by_replacing_the_order(order_id, qty, stop_price, exc)
             raise BrokerError(f"replace_order failed for {order_id}: {exc}") from exc
         side = getattr(order, "side", "")
         returned_qty = getattr(order, "qty", None)
@@ -519,6 +562,75 @@ class AlpacaPaperBroker:
             stop_price=float(order.stop_price if order.stop_price is not None else stop_price),
             side=str(getattr(side, "value", side)),
         )
+
+    def _resize_by_replacing_the_order(self, order_id: str, qty: int, stop_price: float,
+                                       refusal: Exception) -> StopOrder:
+        """Cancel one stuck stop by its id and place a correctly sized one.
+
+        The only path in this system that cancels anything, reached only from
+        the one Alpaca rejection that makes a resize impossible. Everything
+        that can be checked is checked first, while the old stop is still
+        live: which symbol and side the order belongs to, that the position
+        is still open, and that the new size is a reduction of it. Only then
+        is the old order cancelled, and the replacement goes in immediately
+        after through ``submit_stop_order``, which is close-only by
+        construction and good-till-cancelled.
+        """
+        try:
+            stuck = self._client.get_order_by_id(order_id)
+        except Exception as exc:  # noqa: BLE001
+            raise BrokerError(
+                f"replace_order failed for {order_id} ({refusal}), and the order "
+                f"itself could not be read to resize it another way: {exc}"
+            ) from exc
+
+        symbol = str(getattr(stuck, "symbol", "")).upper()
+        raw_side = getattr(stuck, "side", "")
+        side = str(getattr(raw_side, "value", raw_side)).lower()
+        if not symbol or side not in ("buy", "sell"):
+            raise BrokerError(
+                f"replace_order failed for {order_id} ({refusal}), and the order "
+                f"does not name a symbol and side to resize it another way"
+            )
+
+        # Everything submit_stop_order would refuse, refused here -- while the
+        # old stop is still live and the position is still protected.
+        held = next((p for p in self.get_open_positions() if p.ticker == symbol), None)
+        if held is None:
+            raise BrokerError(
+                f"replace_order failed for {symbol} ({refusal}); not cancelling it "
+                f"either, because there is no open position it would protect"
+            )
+        closing = "sell" if held.qty > 0 else "buy"
+        if side != closing or qty > abs(held.qty):
+            raise BrokerError(
+                f"replace_order failed for {symbol} ({refusal}); not cancelling it "
+                f"either, because a {side} stop for {int(qty)} would not be a "
+                f"reduction of the {int(held.qty)} held"
+            )
+
+        try:
+            self._client.cancel_order_by_id(order_id)
+        except Exception as exc:  # noqa: BLE001
+            raise BrokerError(
+                f"replace_order failed for {symbol} ({refusal}) and the stop could "
+                f"not be cancelled to replace it: {exc}"
+            ) from exc
+
+        logger.warning(
+            "%s stop %s could not be resized to %d shares (%s); cancelled it and "
+            "placing a standalone stop in its place",
+            symbol, order_id, int(qty), refusal,
+        )
+        try:
+            return self.submit_stop_order(symbol, int(qty), side, stop_price)
+        except Exception as exc:  # noqa: BLE001
+            raise UnprotectedPositionError(
+                f"{symbol} has NO live stop: the {int(qty)}-share replacement for "
+                f"cancelled order {order_id} was refused ({exc}). Place a "
+                f"good-till-cancelled {side} stop for {int(qty)} share(s) at "
+                f"{stop_price} now."
+            ) from exc
 
     def close_position_partially(self, ticker: str, qty: int) -> str:
         """Sell (or cover) ``qty`` shares of an open position. Returns the order id.

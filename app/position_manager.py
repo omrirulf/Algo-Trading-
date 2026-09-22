@@ -24,6 +24,20 @@ that has none -- and every one of them can only reduce a position. There is
 no path here that opens, adds to, or reverses one, so the rule that every
 entry is a bracket with a stop is not weakened by the existence of exits.
 
+A fifth was considered and refused: nothing here may cancel an order. The
+one cancel in the system lives inside ``replace_stop_order`` and is reached
+only where Alpaca refuses to resize a stop that is still a bracket leg; from
+this module it is still one call that either moves the stop or fails.
+
+Nor is a stop protection merely because it exists. It is protection because
+it can execute, and an order for shares the position no longer holds cannot:
+TEVA's stop still covered the 127 shares of its original bracket against the
+1 share left, for six days, while every check that asked "is there a stop?"
+said yes. So both passes compare the live stop's size against the position's
+and resize a mismatch before anything else touches that position, and every
+action records ``stop_qty`` -- what the stop covers once this pass is done
+with it -- so ``analysis/health.py`` can read the two as an invariant.
+
 The fourth was added on 17 Sep, and it reversed an earlier rule. This module
 used to leave a position with no live stop exactly as found, on the grounds
 that acting on an unprotected position could only make things worse. That
@@ -68,7 +82,9 @@ from pathlib import Path
 from typing import Any, Optional
 
 from app import risk_engine
-from app.broker_client import BrokerClient, BrokerError, OpenPosition, StopOrder
+from app.broker_client import (
+    BrokerClient, BrokerError, OpenPosition, StopOrder, UnprotectedPositionError,
+)
 from app import logger as audit_log
 from app.market_data import MarketDataError, MarketDataProvider
 from config import settings as cfg
@@ -79,14 +95,16 @@ log = logging.getLogger(__name__)
 #: Audit event name for everything this module does.
 EVENT = "position_managed"
 
-#: The five things that can happen to a position in one pass.
+#: The things that can happen to a position in one pass.
 TRANCHE_TAKEN = "tranche_taken"   #: part of it sold, stop raised
 STOP_RAISED = "stop_raised"       #: a rung reached, stop raised, nothing sold (too small to split)
 HELD = "held"                     #: checked, no rung reached
 UNMANAGED = "unmanaged"           #: (historical) left alone -- no live stop; no longer emitted
 PROTECTED = "protected"           #: had no live stop; one was placed at the last recorded level
+STOP_RESIZED = "stop_resized"     #: had a live stop covering the wrong number of shares; resized
 GROUP_CAP_TRIMMED = "group_cap_trimmed"  #: sold to bring an over-cap exposure group back down
 ERROR = "error"                   #: the broker or market data refused; nothing was done
+NO_STOP = "no_stop"               #: the stop was cancelled and its replacement refused -- naked now
 
 #: Actions that mean "this rung has been dealt with", for counting on re-run.
 _RUNG_COMPLETING = frozenset({TRANCHE_TAKEN, STOP_RAISED})
@@ -106,6 +124,17 @@ class ManagementAction:
     rung: Optional[int] = None
     old_stop: Optional[float] = None
     new_stop: Optional[float] = None
+    #: How many shares the live stop covers *after* this action. ``None`` only
+    #: where no stop was read or placed. The invariant the health check reads
+    #: is that it equals ``remaining_qty``: a stop sized for shares that are
+    #: no longer held cannot execute, so the position is unprotected however
+    #: live the order looks. TEVA's stop still covered its original 127
+    #: against the 1 share left, for six days, and nothing said so.
+    stop_qty: Optional[int] = None
+    #: What it covered *before*, set only by a resize. Kept as a field rather
+    #: than left in ``reason`` so the report reads a number instead of parsing
+    #: a sentence.
+    stop_qty_before: Optional[int] = None
     order_id: str = ""
     r: float = 0.0
     r_estimated: bool = False
@@ -147,8 +176,22 @@ class ManagementReport:
         return self._count(GROUP_CAP_TRIMMED)
 
     @property
+    def resized(self) -> int:
+        return self._count(STOP_RESIZED)
+
+    @property
     def errors(self) -> int:
         return self._count(ERROR)
+
+    @property
+    def unprotected(self) -> int:
+        """Positions whose stop was cancelled and whose replacement was refused.
+
+        Counted apart from ``errors`` because it means the opposite of the
+        rest: not "nothing was done" but "the stop is gone". Anything above
+        zero needs a person, today.
+        """
+        return self._count(NO_STOP)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -158,8 +201,10 @@ class ManagementReport:
             "stops_raised": self.raises,
             "unmanaged": self.unmanaged,
             "protected": self.protected,
+            "resized": self.resized,
             "group_trims": self.group_trims,
             "errors": self.errors,
+            "unprotected": self.unprotected,
             "actions": [a.as_dict() for a in self.actions],
         }
 
@@ -339,8 +384,14 @@ class PositionManager:
                 else:
                     actions += self._manage_one(position)
             except (BrokerError, MarketDataError, risk_engine.RiskViolation) as exc:
+                # Almost every failure here happens *before* the live stop is
+                # touched, so the position is still protected and `error` says
+                # so. The one exception says the opposite and gets its own
+                # name, so the record does not read the same either way.
                 action = ManagementAction(
-                    ticker=position.ticker, action=ERROR, side=position.side,
+                    ticker=position.ticker,
+                    action=NO_STOP if isinstance(exc, UnprotectedPositionError) else ERROR,
+                    side=position.side,
                     reason=f"{type(exc).__name__}: {exc}",
                 )
                 _record(action)
@@ -384,9 +435,14 @@ class PositionManager:
 
     def _protect_if_naked(self, position: OpenPosition) -> list[ManagementAction]:
         qty = int(abs(position.qty))
-        if qty < 1 or self._broker.get_open_stop_order(position.ticker) is not None:
+        if qty < 1:
             return []
-        return [self._protect(position, qty)]
+        stop = self._broker.get_open_stop_order(position.ticker)
+        if stop is None:
+            return [self._protect(position, qty)]
+        if stop.qty != qty:
+            return [self._resize(position, stop, qty)]
+        return []
 
     def _protect(self, position: OpenPosition, qty: int) -> ManagementAction:
         """Place the stop the record says this position should have."""
@@ -408,8 +464,36 @@ class PositionManager:
         placed = self._broker.submit_stop_order(ticker, qty, closing, stop)
         action = ManagementAction(
             ticker=ticker, action=PROTECTED, side=side, remaining_qty=qty,
-            old_stop=None, new_stop=placed.stop_price, order_id=placed.order_id,
-            r_estimated=estimated, reason=reason,
+            old_stop=None, new_stop=placed.stop_price, stop_qty=qty,
+            order_id=placed.order_id, r_estimated=estimated, reason=reason,
+        )
+        _record(action)
+        return action
+
+    def _resize(self, position: OpenPosition, stop: StopOrder, qty: int) -> ManagementAction:
+        """A live stop that covers a share count the position no longer holds.
+
+        A stop is not protection because it exists; it is protection because
+        it can execute. A 127-share sell-stop against 1 share held cannot,
+        and that is exactly what TEVA carried from 16 to 22 Sep 2026 while
+        every check said it had a stop. So size is now compared, not just
+        presence, and a mismatch is corrected the same way a trail is --
+        through ``replace_stop_order``, which falls back to cancel-and-place
+        only where the broker refuses the resize outright.
+
+        The stop is left exactly where it is. Where it *should* be is the
+        ladder's business, and it runs straight after this on the resized
+        stop; moving price and size at once would make a failure ambiguous.
+        """
+        placed = self._broker.replace_stop_order(
+            stop.order_id, qty, stop.stop_price, current_qty=stop.qty
+        )
+        action = ManagementAction(
+            ticker=position.ticker, action=STOP_RESIZED, side=position.side,
+            remaining_qty=qty, stop_qty=placed.qty, stop_qty_before=stop.qty,
+            old_stop=stop.stop_price, new_stop=placed.stop_price,
+            order_id=placed.order_id,
+            reason=f"live stop covered {stop.qty} share(s) against {qty} held; resized",
         )
         _record(action)
         return action
@@ -461,8 +545,13 @@ class PositionManager:
             try:
                 action = self._trim_one(group, position, used, excess)
             except (BrokerError, MarketDataError, risk_engine.RiskViolation) as exc:
+                # Same distinction the ladder pass makes: one of these means
+                # the stop is gone, and the record must not read like the
+                # rest, which mean nothing was done.
                 action = ManagementAction(
-                    ticker=position.ticker, action=ERROR, side=position.side,
+                    ticker=position.ticker,
+                    action=NO_STOP if isinstance(exc, UnprotectedPositionError) else ERROR,
+                    side=position.side,
                     reason=f"{type(exc).__name__}: {exc}",
                 )
                 _record(action)
@@ -506,13 +595,15 @@ class PositionManager:
         old_stop = stop.stop_price if stop is not None else None
         # Protect first, same as a ladder tranche: a stop still sized for
         # the old position would reserve the shares this exit needs.
+        covered: Optional[int] = None
         if stop is not None:
-            self._broker.replace_stop_order(stop.order_id, remaining, stop.stop_price,
-                                            current_qty=stop.qty)
+            covered = self._broker.replace_stop_order(
+                stop.order_id, remaining, stop.stop_price, current_qty=stop.qty
+            ).qty
         order_id = self._broker.close_position_partially(ticker, tranche)
         action = ManagementAction(
             ticker=ticker, action=GROUP_CAP_TRIMMED, side=side, price=price,
-            qty_closed=tranche, remaining_qty=remaining,
+            qty_closed=tranche, remaining_qty=remaining, stop_qty=covered,
             old_stop=old_stop, new_stop=old_stop, order_id=order_id,
             reason=f"{group!r} group exposure over its cap; trimmed pro-rata",
         )
@@ -531,6 +622,17 @@ class PositionManager:
             # not being managed at all, and putting the stop back is the whole
             # of what this pass owes it.
             return [self._protect(position, qty)]
+
+        before: list[ManagementAction] = []
+        if stop.qty != qty:
+            # Same principle one step further: a stop sized for shares that
+            # are no longer held protects nothing either. Fix it first, then
+            # manage the position normally against the corrected stop.
+            before.append(self._resize(position, stop, qty))
+            stop = StopOrder(
+                order_id=before[-1].order_id, ticker=ticker,
+                qty=qty, stop_price=stop.stop_price, side=stop.side,
+            )
 
         state = self._state_for(position, qty)
         price = self._market_data.get_latest_price(ticker)
@@ -566,7 +668,7 @@ class PositionManager:
                 action = ManagementAction(
                     ticker=ticker, action=STOP_RAISED, side=side, gain_r=round(gain, 2),
                     price=price, remaining_qty=qty, rung=None,
-                    old_stop=broker_stop, new_stop=trailed,
+                    old_stop=broker_stop, new_stop=trailed, stop_qty=qty,
                     r=round(state.r, 4), r_estimated=state.r_estimated,
                     reason="trailing stop",
                 )
@@ -574,14 +676,22 @@ class PositionManager:
                 action = ManagementAction(
                     ticker=ticker, action=HELD, side=side, gain_r=round(gain, 2), price=price,
                     remaining_qty=qty, old_stop=broker_stop, new_stop=broker_stop,
+                    stop_qty=stop.qty,
                     r=round(state.r, 4), r_estimated=state.r_estimated,
                 )
             _record(action)
-            return [action]
+            return before + [action]
 
-        actions: list[ManagementAction] = []
+        actions: list[ManagementAction] = list(before)
         current_stop = trailed
         remaining = qty
+        # What the live stop covers, and which order it is, as they change
+        # under the loop. A second rung in the same pass must compare against
+        # what the first one left behind, not against the size the stop had
+        # when the pass began -- and a replace that had to be made by placing
+        # a new order hands back a different id.
+        covered = stop.qty
+        stop_order_id = stop.order_id
         for index in due:
             rung = self._ladder[index]
             tranche = risk_engine.tranche_size(state.base_qty, rung.take_fraction)
@@ -596,23 +706,25 @@ class PositionManager:
             # with no stop at all is the one thing this must not create.
             # Compared against what the broker actually holds, so a trail
             # that tightened above the rung's own target is still applied.
-            if tranche > 0 or new_stop != broker_stop:
-                self._broker.replace_stop_order(stop.order_id, after, new_stop,
-                                                current_qty=stop.qty)
+            if tranche > 0 or new_stop != broker_stop or covered != after:
+                replaced = self._broker.replace_stop_order(stop_order_id, after, new_stop,
+                                                           current_qty=covered)
+                stop_order_id, covered = replaced.order_id, replaced.qty
 
             if tranche > 0:
                 order_id = self._broker.close_position_partially(ticker, tranche)
                 action = ManagementAction(
                     ticker=ticker, action=TRANCHE_TAKEN, side=side, gain_r=round(gain, 2),
                     price=price, qty_closed=tranche, remaining_qty=after, rung=index,
-                    old_stop=broker_stop, new_stop=new_stop, order_id=order_id,
+                    old_stop=broker_stop, new_stop=new_stop, stop_qty=covered,
+                    order_id=order_id,
                     r=round(state.r, 4), r_estimated=state.r_estimated,
                 )
             else:
                 action = ManagementAction(
                     ticker=ticker, action=STOP_RAISED, side=side, gain_r=round(gain, 2),
                     price=price, remaining_qty=after, rung=index,
-                    old_stop=broker_stop, new_stop=new_stop,
+                    old_stop=broker_stop, new_stop=new_stop, stop_qty=covered,
                     r=round(state.r, 4), r_estimated=state.r_estimated,
                     reason="too small to split; stop ratcheted only",
                 )

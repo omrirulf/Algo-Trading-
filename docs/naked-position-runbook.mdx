@@ -44,12 +44,44 @@ run that afternoon confirmed it, finding nothing to protect. The fix is in
 `broker_client.replace_stop_order`, which now leaves the quantity out of the
 request when it is not changing.
 
-<Note>
-A genuine resize on a bracket leg -- shrinking the stop before selling a
-ladder tranche -- is still refused by Alpaca, and deliberately still fails
-loudly. The way around it is to cancel and resubmit, which opens a window
-with no stop at all, and that is the one thing this module may never do.
-</Note>
+## What happened next: TEVA again, 22 September
+
+Leaving the quantity out fixes a *trail*. It cannot fix a real resize, and
+that was first left to fail loudly on the argument that the way around it —
+cancel, then resubmit — opens a window with no stop at all, which is the one
+thing this module may never do.
+
+That was the wrong call, and TEVA showed why within a day. Its live stop
+still covered the **127 shares** of the original bracket while the position
+had been trimmed to **1 share**. A 127-share sell order against 1 share held
+cannot execute, so the position was unprotected the whole time — and no
+amount of failing loudly was ever going to change the number on that order.
+A stop that is permanently the wrong size is worse than a stop that is
+briefly absent.
+
+So a resize the broker refuses now falls back to cancelling that one order
+and placing a correctly sized stop in its place. The window is about a
+second, once per stuck stop, after which the stop is an ordinary order that
+replaces normally forever after. It is bounded four ways:
+
+- it runs only on that one rejection code (`42210000`), never on failure in
+  general;
+- nothing else in the codebase can cancel an order, and the only cancel that
+  exists names a single order id — CI fails the build if that changes;
+- the order and the book are read, and the replacement checked as a
+  reduction, **before** anything is cancelled, so every foreseeable refusal
+  happens while the old stop is still live;
+- if the replacement is refused anyway, the record says `no_stop` rather than
+  `error`, and the health check treats it as critical with the exact stop to
+  place by hand.
+
+## Size is now checked, not just presence
+
+Every check used to ask "is there a stop?". None asked "can it execute?".
+Both passes now compare the live stop's share count against the position's
+and correct a mismatch, and the record carries `stop_qty` — what the stop
+covers once the manager is finished with the position — next to
+`remaining_qty`. The health check alarms, critically, when they differ.
 
 ## How it's caught automatically now
 

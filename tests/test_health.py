@@ -30,9 +30,11 @@ def journal_line(ticker, when="2026-09-17T15:48:00+00:00", error=None, gaps=(), 
     })
 
 
-def audit_line(ticker, action, reason="", when="2026-09-17 15:47:41,444"):
+def audit_line(ticker, action, reason="", when="2026-09-17 15:47:41,444",
+               stop_qty=None, remaining_qty=0):
     return json.dumps({
-        "action": {"ticker": ticker, "action": action, "reason": reason, "new_stop": 96.0},
+        "action": {"ticker": ticker, "action": action, "reason": reason, "new_stop": 96.0,
+                   "stop_qty": stop_qty, "remaining_qty": remaining_qty},
         "ts": when, "level": "INFO", "event": "position_managed",
     })
 
@@ -128,6 +130,64 @@ def test_a_book_that_could_not_be_read_is_critical(logs):
     write(audit, audit_line("*", "error", "BrokerError: get_all_positions failed"))
     [alarm] = health.check(journal, audit, DAY)
     assert alarm.is_critical and alarm.title == "The open book could not be read"
+
+
+# --------------------------------------------------------------------------- #
+# 22 Sep: a stop that was live, and sized for shares that were not held
+# --------------------------------------------------------------------------- #
+
+
+def test_a_stop_sized_for_shares_that_are_not_held_is_critical(logs):
+    """TEVA: 1 share behind a 127-share stop, for six days, reported healthy.
+
+    Every check asked whether a stop existed. None asked whether it could
+    execute, and a sell order for 127 shares against 1 share held cannot.
+    """
+    journal, audit = logs
+    write(journal, journal_line("AAPL"))
+    write(audit, audit_line("TEVA", "held", stop_qty=127, remaining_qty=1))
+    [alarm] = health.check(journal, audit, DAY)
+    assert alarm.is_critical
+    assert alarm.title == "1 stop(s) sized for shares that are not held"
+    assert "TEVA: stop covers 127 against 1 held" in alarm.detail
+
+
+def test_a_stop_that_matches_the_position_raises_nothing(logs):
+    journal, audit = logs
+    write(journal, journal_line("AAPL"))
+    write(audit, audit_line("TEVA", "held", stop_qty=1, remaining_qty=1))
+    assert health.check(journal, audit, DAY) == []
+
+
+def test_a_stop_resized_later_in_the_day_is_no_longer_an_alarm(logs):
+    """The last word counts, same as the naked-position rule."""
+    journal, audit = logs
+    write(journal, journal_line("AAPL"))
+    write(audit,
+          audit_line("TEVA", "held", stop_qty=127, remaining_qty=1,
+                     when="2026-09-17 15:47:41,444"),
+          audit_line("TEVA", "stop_resized", stop_qty=1, remaining_qty=1,
+                     when="2026-09-17 19:40:02,000"))
+    assert health.check(journal, audit, DAY) == []
+
+
+def test_an_action_that_read_no_stop_cannot_look_like_a_mismatch(logs):
+    """``stop_qty`` is absent, not zero, when nothing was read or placed."""
+    journal, audit = logs
+    write(journal, journal_line("AAPL"))
+    write(audit, audit_line("TEVA", "error", "MarketDataError: no price", remaining_qty=0))
+    assert titles(health.check(journal, audit, DAY)) == [
+        "1 position(s) without a working stop"
+    ]
+
+
+def test_a_cancelled_stop_whose_replacement_failed_is_counted_as_naked(logs):
+    journal, audit = logs
+    write(journal, journal_line("AAPL"))
+    write(audit, audit_line("TEVA", "no_stop", "UnprotectedPositionError: TEVA has NO live stop"))
+    [alarm] = health.check(journal, audit, DAY)
+    assert alarm.is_critical and alarm.title == "1 position(s) without a working stop"
+    assert "NO live stop" in alarm.detail
 
 
 # --------------------------------------------------------------------------- #

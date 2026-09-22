@@ -50,8 +50,10 @@ NEWS_GAP_PREFIX = "news unavailable"
 
 #: Position-management actions that leave a position without a working stop.
 #: ``unmanaged`` is history (the manager stopped writing it on 17 Sep 2026);
-#: ``error`` is a position the manager could not read or could not protect.
-NAKED_ACTIONS = frozenset({"unmanaged", "error"})
+#: ``error`` is a position the manager could not read or could not protect;
+#: ``no_stop`` is the one failure that is worse than an error -- the old stop
+#: was cancelled to resize it and the replacement was refused (22 Sep 2026).
+NAKED_ACTIONS = frozenset({"unmanaged", "error", "no_stop"})
 
 #: Share of the day's tickers that may fail before a warning becomes
 #: critical. One ticker failing is a bad afternoon; a tenth of the watchlist
@@ -153,6 +155,39 @@ def naked_positions(actions: list[dict]) -> Optional[Alarm]:
                  f"{', '.join(naked)}. Last word from the manager -- {reasons}")
 
 
+def missized_stops(actions: list[dict]) -> Optional[Alarm]:
+    """22 Sep 2026: TEVA held 1 share behind a stop for 127, for six days.
+
+    A stop is protection because it can execute, not because it exists. The
+    stop leg of TEVA's original bracket was never resized when the position
+    shrank to a single share, so every check that asked "is there a stop?"
+    said yes while a 127-share sell order sat against 1 share held -- an
+    order that could never fill. Nothing compared the two numbers.
+
+    This does. The manager records ``stop_qty`` -- what the live stop covers
+    once it is finished with a position -- alongside ``remaining_qty``, what
+    is actually held. They must be equal. Judged on the last thing said about
+    each position today, so one corrected later in the day is not an alarm.
+    """
+    last: dict[str, dict] = {}
+    for action in actions:
+        if action.get("stop_qty") is None:
+            continue
+        last[str(action["ticker"]).upper()] = action
+    wrong = sorted(t for t, a in last.items()
+                   if int(a["stop_qty"]) != int(a.get("remaining_qty") or 0))
+    if not wrong:
+        return None
+    detail = "; ".join(
+        f"{t}: stop covers {int(last[t]['stop_qty'])} against "
+        f"{int(last[t].get('remaining_qty') or 0)} held"
+        for t in wrong[:6]
+    )
+    return Alarm(CRITICAL, f"{len(wrong)} stop(s) sized for shares that are not held",
+                 f"A stop for the wrong number of shares cannot execute, so the "
+                 f"position is unprotected however live the order looks. {detail}")
+
+
 def failed_tickers(today: list[dict]) -> Optional[Alarm]:
     """A ticker that produced no signal is journalled with its error (PR #56).
 
@@ -249,6 +284,7 @@ def check(journal: Path, audit: Path, day: date) -> list[Alarm]:
     found = [
         no_cycle(today),
         naked_positions(actions),
+        missized_stops(actions),
         failed_tickers(today),
         screen_errors(today),
         cftc_gaps(today),
@@ -263,7 +299,8 @@ def render(alarms: list[Alarm], day: date) -> str:
     """The alarms as Markdown for a job summary or an issue. Plain words."""
     out = [f"## Health of the record for {day.isoformat()}", ""]
     if not alarms:
-        out += ["Clean. Every position has a stop, every ticker was judged once, every mapped source answered.", ""]
+        out += ["Clean. Every position has a stop for the shares it holds, every ticker "
+                "was judged once, every mapped source answered.", ""]
         return "\n".join(out)
     critical = [a for a in alarms if a.is_critical]
     out.append(f"**{len(critical)} critical, {len(alarms) - len(critical)} warning(s).**")
