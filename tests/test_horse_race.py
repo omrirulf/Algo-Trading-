@@ -482,3 +482,32 @@ def test_the_exploratory_arm_is_raced_on_its_own_lines_only_and_paired(tmp_path,
     main = out[:out.index("== EXPLORATORY")]
     assert hybrid.NAME in main and "insiders" not in main
     assert "Paired difference, model minus hybrid" in main
+
+
+# --- the pre-registration and the code say the same numbers -----------------------
+
+
+def test_the_registered_parameters_are_the_ones_the_code_runs():
+    """docs/horse-race-preregistration.md is locked; if a constant here has
+    to change, the file needs a dated amendment first, not the other way
+    round. This is the mirror that keeps the two from drifting."""
+    from pathlib import Path
+
+    from config import settings as cfg
+    from rules import insider_buying, momentum
+
+    raw = (Path(__file__).resolve().parents[1] / "docs/horse-race-preregistration.md").read_text()
+    text = " ".join(raw.split())  # the file wraps lines; the phrases must not care
+    assert "IN FORCE" in text
+    assert horse_race.DEFAULT_COST_PER_SIDE == 0.001 and "0.10% per side" in text
+    assert horse_race.DEFAULT_HORIZON == 3 and "3 sessions for every arm" in text
+    assert horse_race.DEFAULT_SEEDS == 1000 and "1000 seeds" in text
+    assert horse_race.EXPLORATORY_HORIZON == 20 and "20 sessions" in text
+    assert (horse_race.EXPLORATORY_MIN_TRADES, horse_race.EXPLORATORY_MIN_DAYS) == (20, 20)
+    assert "20 scored trades on at least 20 distinct entry days" in text
+    assert "60 non-overlapping entry days" in text
+    assert cfg.MIN_CONVICTION == 0.30 and "0.30" in text
+    assert momentum.LOOKBACK_BARS == 63 and momentum.CONFIRMATION_SMA == 50
+    assert insider_buying.WINDOW_DAYS == 180 and insider_buying.MIN_DISTINCT_BUYERS == 2
+    assert "180 calendar days" in text and "two or more distinct insiders" in text
+    assert [pair[1] for pair in horse_race.PAIRED] == ["momentum", "hybrid"]
