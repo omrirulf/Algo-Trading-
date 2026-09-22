@@ -51,8 +51,8 @@ on:
         description: "Calls in flight at once, openai-compatible only"
         default: "4"
       timeout:
-        description: "Per-call timeout, seconds"
-        default: "120"
+        description: "Per-call timeout, seconds. A reasoning model at high effort needs minutes, not seconds -- see the dry run that lost 286 of 300 calls to a 120s deadline."
+        default: "300"
       score_returns:
         description: "Also score both sides against realised returns"
         type: boolean
