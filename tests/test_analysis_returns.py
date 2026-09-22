@@ -162,3 +162,65 @@ def test_a_non_positive_entry_price_is_refused():
     series = PriceSeries("X", [(date(2026, 3, 2), 0.0), (date(2026, 3, 3), 10.0)])
     lookup = forward_return(series, at(1), horizon=1, timestamp_is_exact=True)
     assert lookup.status == STATUS_NO_ENTRY_BAR
+
+
+# --------------------------------------------------------------------------- #
+# Finality: a bar is a close only once the session that made it is over
+# --------------------------------------------------------------------------- #
+
+from datetime import datetime as _dt, timezone as _tz  # noqa: E402
+
+from analysis.returns import (  # noqa: E402
+    MARKET_TZ,
+    YFinancePriceSource,
+    final_bars,
+    last_final_session,
+)
+
+
+def test_before_the_close_the_last_final_session_is_yesterday():
+    # 14:27 New York on Monday 21 Sep 2026 (18:27 UTC under EDT): the day's
+    # bar is an intraday print. The 37.0% run was made at exactly this time.
+    now = _dt(2026, 9, 21, 18, 27, tzinfo=_tz.utc)
+    assert now.astimezone(MARKET_TZ).hour == 14
+    assert last_final_session(now) == date(2026, 9, 20)
+
+
+def test_after_the_close_and_the_grace_the_last_final_session_is_today():
+    # 17:05 New York (21:05 UTC): the 32.6% run.
+    assert last_final_session(_dt(2026, 9, 21, 21, 5, tzinfo=_tz.utc)) == date(2026, 9, 21)
+
+
+def test_the_minutes_right_after_the_bell_are_not_final_yet():
+    # 16:10 New York: the closing auction has printed but the vendor's bar
+    # may still be settling. Yesterday is the last bar trusted.
+    assert last_final_session(_dt(2026, 9, 21, 20, 10, tzinfo=_tz.utc)) == date(2026, 9, 20)
+    assert last_final_session(_dt(2026, 9, 21, 20, 30, tzinfo=_tz.utc)) == date(2026, 9, 21)
+
+
+def test_finality_is_judged_on_the_exchange_clock_not_utc():
+    # 01:06 UTC on Tuesday 22 Sep is still Monday evening in New York, and
+    # Monday's bar is final. A UTC-date rule would have said Sunday.
+    assert last_final_session(_dt(2026, 9, 22, 1, 6, tzinfo=_tz.utc)) == date(2026, 9, 21)
+
+
+def test_a_naive_clock_is_refused():
+    with pytest.raises(ValueError):
+        last_final_session(_dt(2026, 9, 21, 18, 0))
+
+
+def test_final_bars_drops_everything_after_the_cutoff_and_keeps_all_without_one():
+    bars = [(date(2026, 9, 18), 1.0), (date(2026, 9, 21), 2.0), (date(2026, 9, 22), 3.0)]
+    assert final_bars(bars, date(2026, 9, 21)) == bars[:2]
+    assert final_bars(bars, None) == bars
+
+
+def test_the_price_source_never_hands_out_a_bar_after_its_cutoff():
+    source = YFinancePriceSource(final_through=date(2026, 9, 21))
+    source._fetch = lambda ticker, start, end: [
+        (date(2026, 9, 18), 1.0), (date(2026, 9, 21), 2.0), (date(2026, 9, 22), 3.0),
+    ]
+    series = source.closes("NVDA", date(2026, 9, 1), date(2026, 9, 30))
+    assert [b[0] for b in series.bars] == [date(2026, 9, 18), date(2026, 9, 21)]
+    # And the cache holds the truncated series, so a later call cannot see more.
+    assert source.closes("NVDA", date(2026, 9, 1), date(2026, 9, 30)).bars == series.bars

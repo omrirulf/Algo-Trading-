@@ -252,3 +252,37 @@ def test_render_handles_no_watchlist_or_spy_data():
         watchlist_missing=80, spy_return=None,
     )
     assert "n/a" in text
+
+
+# --------------------------------------------------------------------------- #
+# Finality and the incomplete horizon
+# --------------------------------------------------------------------------- #
+
+
+def test_ohlc_fetcher_drops_bars_after_its_cutoff_before_caching():
+    df = frame(flat(5), start="2026-03-02")  # Mon 2 .. Fri 6 Mar
+    fetcher = OhlcFetcher(final_through=date(2026, 3, 4))
+    fetcher._fetch = lambda ticker, start, end: df
+    got = fetcher.ohlc("NVDA", date(2026, 3, 1), date(2026, 3, 10))
+    assert [ts.date() for ts in got.index] == [date(2026, 3, 2), date(2026, 3, 3), date(2026, 3, 4)]
+    assert len(fetcher.ohlc("NVDA", date(2026, 3, 1), date(2026, 3, 10))) == 3
+
+
+def test_a_trade_whose_horizon_has_not_elapsed_is_not_scored_on_the_last_bar():
+    """simulate_trade exits on the last bar it has; here that would score a
+    two-session-old trade as a resolved three-session one, and the answer
+    would change with the clock."""
+    warm = _warm_frame()
+    signal_date = warm.index[MIN_WARMUP_BARS].date()
+    short = warm.iloc[: MIN_WARMUP_BARS + 3]  # signal bar + 2 forward bars only
+    trades, matched, dropped = simulate_model_trades(
+        [signal(timestamp=_at(signal_date))], equity=100_000.0, horizon_days=3,
+        stop_multiplier=2.0, max_position_pct=0.05, fetcher=FakeFetcher({"NVDA": short}),
+    )
+    assert trades == [] and dropped == 1
+    full = warm.iloc[: MIN_WARMUP_BARS + 4]  # exactly the horizon
+    trades, _, dropped = simulate_model_trades(
+        [signal(timestamp=_at(signal_date))], equity=100_000.0, horizon_days=3,
+        stop_multiplier=2.0, max_position_pct=0.05, fetcher=FakeFetcher({"NVDA": full}),
+    )
+    assert len(trades) == 1 and dropped == 0

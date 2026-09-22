@@ -1,6 +1,6 @@
 ---
 title: "The Horse Race"
-description: "The model, a coded rule and a coin flip, on the same lines against the same realised returns"
+description: "The model, a coded rule and a coin flip, on the same lines against the same realised returns, after costs"
 ---
 
 Every signal this system has ever traded on came from a model. The question
@@ -11,7 +11,8 @@ asks it, and `rules/` is the rule.
 
 ```bash
 python analysis/horse_race.py
-python analysis/horse_race.py --horizon 5 --floor 0.5
+python analysis/horse_race.py --horizon 5 --floor 0.5 --cost-per-side 0.0015
+python analysis/horse_race.py --per-trade      # list every scored trade
 ```
 
 It runs on its own, credential-free, every trading night after the close
@@ -29,15 +30,131 @@ move a parameter.
 
 Each arm is put through the identical conviction floor, the identical stop and
 sizing arithmetic (`backtest.simulate.simulate_trade`, the code that actually
-trades), and scored against the identical price history. The only thing that
-differs between the rows is the judgement.
+trades), the identical round-trip cost, and scored against the identical price
+history. The only thing that differs between the rows is the judgement.
 
-**The random row is the number the other two are really measured against.**
-It is what taking a side with no information scores on these names over these
-windows. In a week the index rose 2%, "always long" hit 78% of the time
-without knowing anything about anything — so an arm that cannot beat the coin
-flip is not reading the market, it is being carried by it. The buy-and-hold
-rows say what the direction of the market alone was worth.
+## What the numbers mean
+
+These definitions are printed at the top of every run, so a table can never be
+read without them.
+
+<Note>
+**Net return** is a trade's signed return through the real ATR stop and
+sizing, gap fills included, minus a fixed round-trip cost — `0.10%` per side,
+`0.20%` a round trip, by default (`--cost-per-side`). The cost is charged to
+every trade of every arm alike. It is a pre-registered assumption, not a
+measurement of this broker.
+
+**A hit** is a trade whose net return is strictly greater than zero. A gross
+gain smaller than the round trip is a miss. A return of exactly zero is a miss.
+There is no other threshold.
+
+**A daily return** is the equal-weighted mean net return of the trades an arm
+opened on one entry day. A day it opened none is `0` — it sat in cash.
+
+**Final closes only.** Every price source is cut to the last session whose bar
+was final at the moment the race ran (`analysis.returns.last_final_session`:
+after 16:30 New York, today; before that, the previous session). A trade whose
+exit bar is still being traded is *pending*, never scored on an intraday
+print. Two runs on the same journal therefore agree on every resolved trade.
+This is the fix for the day the same 46 trades scored a 37.0% hit rate at
+14:27 New York and 32.6% at 17:05: the earlier run's 21 September "close" was
+a price from the middle of the afternoon.
+</Note>
+
+## Why the daily table comes first
+
+The per-trade table has an `n` column that overstates what it knows. Twenty
+trades opened on the same Tuesday all held for the same three sessions of the
+same market; they are one observation about that Tuesday, not twenty about
+the arm. So the race's primary series is daily: one equal-weighted number per
+arm per entry day, over the calendar of every entry day any arm traded.
+
+The primary test is the **paired difference, model minus momentum, day by
+day**. Its mean is reported with a Newey-West standard error at
+`lag = horizon`, which is the overlap a three-session hold creates between
+consecutive days. As a check, the same difference is reported over every
+third entry day only — trades that cannot overlap at all — with a plain
+standard error.
+
+```
+# illustrative numbers; the real ones are in the latest run's summary
+PRIMARY: daily equal-weighted net return, sorted by mean per day (5 entry days)
+arm         days traded  mean/day  t (NW)  cumulative
+random         5      5    -0.12%   -1.10      -0.60%
+momentum       5      5    -0.55%   -2.31      -2.72%
+model          5      2    -0.35%   -1.02      -1.74%
+buy & hold                                     +0.70%  watchlist (80/80 priced)
+SPY                                            +2.10%
+
+Paired difference, model minus momentum, day by day
+entry day     model  momentum     diff
+2026-09-16   -0.41%    -0.92%   +0.51%
+...
+mean diff +0.20% | t (Newey-West, lag 3) 0.61 | n=5 days
+non-overlapping, every 3rd entry day: mean diff +0.12% | t 0.40 | n=2 days
+```
+
+The rows are sorted by mean net return, and the cumulative column compounds
+the daily series so it can sit beside buy-and-hold of the watchlist and of SPY
+over the same days.
+
+## Funds and companies, separately
+
+About four in five names on the watchlist are funds. A fund has no analysts,
+no insiders and no earnings, so a model that reads all of those may behave
+differently on the two halves, and one table over both would hide it. Every
+table is printed three times: all names, funds only, companies only. The
+buy-and-hold row of each split is that split's own basket.
+
+## The coin flip, a thousand times
+
+One coin flip per line is one draw. The race draws a thousand (`--seeds`),
+keeping the journalled flip as seed 0, and reports the 5th–95th percentile
+band of mean net return, hit rate and mean daily return — and where each arm
+sits inside that band, as a percentile.
+
+The band is drawn on **each arm's own lines**, not on every line. The null for
+"did the model read anything" is not "a coin flip on the whole watchlist"; it
+is "a coin flip on the lines the model chose to trade". Selection stays the
+arm's; only the direction is replaced. An arm at the 60th percentile of its own
+band did what chance does on those lines.
+
+The band also answers a question the first race left open: the coin flip
+scored a 45.7% hit rate, not 50%. Nothing in the definition penalises it — a
+hit was, and is, simply a net return above zero — but two mechanical things
+push a coin flip below half. The stop is asymmetric: a stopped trade is a loss
+whichever way the coin fell, and 7% of the coin's trades were stopped. And the
+round trip is now charged, so a coin that lands on a name that barely moved is
+a miss on both sides. The rest is the width of the band at that `n`: with a
+few hundred overlapping trades, 45.7% is inside the 5th–95th range chance
+draws for itself.
+
+## Who gets asked
+
+Every arm is offered every line, except the lines no arm was offered: a
+ticker already in the book, where the model was never asked and a rule
+holding the same book would not have been either. Those are excluded from
+every arm alike.
+
+The model then answers on **fewer** lines than the rules, and the coverage
+table reconciles every line so nothing goes missing:
+
+```
+COVERAGE AND RECONCILIATION
+journal lines 552 | unparseable 0 | held, offered to no arm 80 | no timestamp 0 | offered to every arm 472
+arm        offered neutral a side < floor pending resolved dropped scored
+model          456     385     71       0      23       48       2     46
+momentum       472      73    399     278       0      121       3    118
+random         472       0    472       0     211      261       3    258
+```
+
+`offered = neutral + a side`; `a side = below floor + pending + resolved`;
+`resolved = dropped + scored`, and the run says in words whether every
+resolved line is scored or named as dropped. The asymmetry between the model
+and the rules is by design: the screen drops lines before the model sees them,
+and the model fails on some it does see; both are the model's to own, because
+the funnel is part of the design being raced.
 
 ## What the rule reads, and why that is the point
 
@@ -48,119 +165,58 @@ the rule; it is the experiment. The model sees all of those too. If the model
 does not beat a rule that sees strictly less, then reading the rest bought
 nothing.
 
-Because both arms read the same snapshot at the same instant, there is no
-look-ahead to worry about: the rule cannot know anything the model did not
-also know at that moment, by construction.
-
 The rule itself, from Moskowitz, Ooi and Pedersen (*Journal of Financial
 Economics*, 2012) and its short-horizon form in Medhat and Schmeling (*Review
 of Financial Studies*, 2022):
 
 - **BULLISH** when the 63-bar return is positive *and* price is above its
   50-day average; **BEARISH** when both are negative; **NEUTRAL** when they
-  disagree. Requiring both is the standard trend-confirmation filter.
-- **Conviction** is the quarter's return in units of volatility, so a 10%
-  move in a 15%-vol fund counts for more than the same move in a 60%-vol
-  single name. Full conviction is a two-quarterly-sigma move — and since
+  disagree.
+- **Conviction** is the quarter's return in units of volatility: since
   2·√(63/252) = 1, that is simply `|return_63d| / annualised_volatility`,
   clamped to [0, 1].
 
 <Warning>
   **Nothing in the rule is fitted to this journal, and nothing will be.** 63
   bars is a quarter. 50 is the confirmation average the literature uses. Two
-  sigmas is the choice that leaves no leftover constant. None of them was
-  picked by looking at what this journal would then say, and the race judges
-  the rule rather than tuning it. A rule re-fitted on the returns it is then
-  scored against is the overfitting machine the second opinion warned about,
-  and this is the one place in the project where *leave it alone* is the
-  whole method. A good number in the race is not a reason to start.
+  sigmas is the choice that leaves no leftover constant. The race judges the
+  rule rather than tuning it, and a good number in the race is not a reason to
+  start. The cost per side and the horizon are fixed the same way, before the
+  numbers, in the pre-registration.
 </Warning>
 
-## Who gets asked
+## The agreement, split
 
-Every arm is offered every line, except the lines no arm was offered: a
-ticker already in the book, where the model was never asked and a rule
-holding the same book would not have been either. Those are excluded from
-every arm alike.
-
-The model then answers on **fewer** lines than the rules, and the coverage
-table says so:
-
-```
-arm         offered  took a side  acted on  simulated  dropped
-model           413           52        48         46        2
-momentum        413          171        97         95        2
-random          413          413       413        409        4
-```
-
-That asymmetry is by design, not an unfairness to correct. The screen drops
-lines before the model sees them, and the model fails on some it does see;
-both are the model's to own, because the funnel is part of the design being
-raced. A race that only ran on the lines the model chose to answer would be
-handing the model the choice of battlefield.
+On the first week's journal the model and the momentum rule agreed on 100% of
+the 60 lines where both took a side. The race now splits that number into
+longs and shorts, day by day, and says in words whether the agreement was
+automatic. It was not one-sided: 23 of the 60 agreements were long and 37
+short, with shorts dominating on 16 September and longs on 17 September. What
+the split does show is that the model has not yet once called against the
+trend. Whatever it adds is selectivity — which lines to trade — not direction.
 
 ## The arms are on every journal line
 
-Since this page's PR merged, every line the heartbeat writes carries an
-`arms` field beside the model's signal — on screened lines, held lines and
-failed lines too, computed inside `journal.record` itself so no call site can
-leave it off:
+Every line the heartbeat writes carries an `arms` field beside the model's
+signal — on screened lines, held lines and failed lines too, computed inside
+`journal.record` itself so no call site can leave it off. Nothing in the cycle
+reads it back. The signal handed to the engine is the model's, untouched, and
+CI pins that: `rules/` cannot reach an order path, write a file or read a
+credential.
 
-```json
-"arms": {
-  "momentum": {"bias": "BULLISH", "conviction": 0.41, "rationale": "63d return +8.2% is 0.41x annual vol 20.1%; price +3.1% vs 50d SMA"},
-  "random":   {"bias": "BEARISH", "conviction": 0.5,  "rationale": "random: coin flip seeded from ticker and day"}
-}
-```
-
-Nothing in the cycle reads it back. The signal handed to the engine is the
-model's, untouched, and CI pins that the same way it pins the learned blend:
-`rules/` cannot reach an order path, write a file or read a credential, and
-the arms' output may be read only by the module that computes it and the
-journal that writes it down.
-
-The harness does not trust that field, though. It recomputes both rule arms
-from the `technicals` on each line, which is what lets it race the model over
-every line ever journalled — including everything written before the arms
-existed — and is why the coin flip is seeded from the day rather than a
-clock: two runs of the race disagree only when the journal or the prices did.
-
-## Reading the table
-
-```
-arm             n   hit rate    median      mean  stopped out
-model          46     +37.0%     -0.1%     -0.1%        +2.2%
-momentum       95     +54.7%     +0.4%     +0.5%        +3.2%
-random        409     +51.1%     +0.2%     +0.2%        +2.9%  
-
-Direction agreement, model vs momentum, where both took a side: +48.0% (n=25)
-```
-
-Read it in this order:
-
-1. **Does anything beat `random`?** If not, nothing is reading the market.
-2. **Does `model` beat `momentum`?** If not, the daily model call is buying
-   nothing a fixed rule does not already give — which is the whole question.
-3. **Direction agreement** says whether the two are even making different
-   calls. High agreement with a worse result means the model is momentum
-   plus noise; low agreement means it is genuinely doing something else, for
-   better or worse.
-
-The numbers above are illustrative. The real ones are in the latest run's
-summary, and they change nightly as outcomes resolve.
+The harness does not trust that field. It recomputes both rule arms from the
+`technicals` on each line, which is what lets it race the model over every
+line ever journalled, and is why the coin flip is seeded from the day rather
+than a clock.
 
 ## Limits
 
-This is per-trade, not a portfolio, for the same reason
-[baseline_compare](/scoring) is: no overlapping positions, no cash
-constraints, no compounding. It cannot say what an account following each arm
-would be worth today; building that means choosing a position-sizing and
-overlap policy that would shape the answer as much as measure it.
+The per-trade rows are not a portfolio: no overlapping positions, no cash
+constraint, no compounding. The daily rows equal-weight each day's trades and
+compound the days, which is a portfolio only if it rebalances to equal weight
+every morning — a stated assumption, not a claim about the live account.
 
-Anything marked *too few* is arithmetic, not evidence. And a week's worth of
-trades all inside one market regime is far fewer independent observations
-than the `n` column suggests — the second opinion's arithmetic on this was
-that separating a real 55% from a coin flip takes on the order of 800
-independent trades, and this system takes a few dozen a week. The race is
-built to run nightly for as long as that takes, which is the point of
-running it on a schedule rather than when someone remembers to ask.
+Anything marked *too few* is arithmetic, not evidence. A few weeks inside one
+market regime are fewer independent observations than any `n` here suggests,
+which is why the pre-registration counts entry days rather than trades, and
+why the race runs nightly rather than when someone remembers to ask.

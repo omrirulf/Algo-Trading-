@@ -40,7 +40,7 @@ import argparse
 import logging
 import statistics
 import sys
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional, Sequence
 
@@ -51,7 +51,12 @@ import pandas as pd  # noqa: E402
 
 from analysis.metrics import ScoredSignal  # noqa: E402
 from analysis.reader import read_journal  # noqa: E402
-from analysis.returns import ENTRY_AUTO, ENTRY_RULES, YFinancePriceSource  # noqa: E402
+from analysis.returns import (  # noqa: E402
+    ENTRY_AUTO,
+    ENTRY_RULES,
+    YFinancePriceSource,
+    last_final_session,
+)
 from analysis.scoring import build_run  # noqa: E402
 from backtest.simulate import Trade, simulate_trade  # noqa: E402
 from backtest.sweep import MIN_TRADES, Outcome  # noqa: E402
@@ -104,18 +109,30 @@ class OhlcFetcher:
     price a gap -- the daily closes ``YFinancePriceSource`` keeps are not
     enough for that, which is why this exists alongside it rather than
     reusing it.
+
+    ``final_through`` is the last date whose bar is a final close (see
+    ``analysis.returns.last_final_session``). Later bars are dropped before
+    caching, for the same reason the closes source drops them: a stop
+    checked against today's High/Low at 14:30 is checked against half a day.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, final_through: Optional[date] = None) -> None:
         self._cache: dict[str, pd.DataFrame] = {}
+        self.final_through = final_through
 
     def ohlc(self, ticker: str, start: date, end: date) -> pd.DataFrame:
         cached = self._cache.get(ticker)
         if cached is not None:
             return cached
-        frame = self._fetch(ticker, start, end)
+        frame = self.final_only(self._fetch(ticker, start, end))
         self._cache[ticker] = frame
         return frame
+
+    def final_only(self, frame: pd.DataFrame) -> pd.DataFrame:
+        """``frame`` without any bar dated after ``final_through``."""
+        if self.final_through is None or frame.empty:
+            return frame
+        return frame[[_as_date(ts) <= self.final_through for ts in frame.index]]
 
     def _fetch(self, ticker: str, start: date, end: date) -> pd.DataFrame:
         try:
@@ -167,6 +184,19 @@ def _signal_index(ohlc: pd.DataFrame, signal_date: date) -> Optional[int]:
     return at_or_before[-1] if at_or_before else None
 
 
+def _horizon_complete(ohlc: pd.DataFrame, signal_index: int, horizon_days: int) -> bool:
+    """True when every bar of the holding period is in the frame.
+
+    ``simulate_trade`` exits on the last bar it has when the horizon runs
+    past the end of the frame, which is right for a backtest over a fixed
+    history and wrong here: a trade opened two sessions ago is not a
+    resolved three-session trade, and scoring it as one lets the answer
+    change with the clock. The closes side already calls such a signal
+    pending; this keeps the OHLC side from disagreeing with it.
+    """
+    return signal_index + horizon_days <= len(ohlc) - 1
+
+
 def simulate_model_trades(
     signals: Sequence[ScoredSignal],
     equity: float,
@@ -203,7 +233,7 @@ def simulate_model_trades(
             continue
         for signal in group:
             index = _signal_index(ohlc, signal.entry.timestamp.date())
-            if index is None:
+            if index is None or not _horizon_complete(ohlc, index, horizon_days):
                 dropped += 1
                 continue
             side = "buy" if signal.entry.direction > 0 else "sell"
@@ -266,7 +296,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{args.journal} has no usable entries.", file=sys.stderr)
         return 1
 
-    price_source = YFinancePriceSource()
+    final_through = last_final_session(datetime.now(timezone.utc))
+    price_source = YFinancePriceSource(final_through=final_through)
     run = build_run(read=read, source=price_source, horizon=args.horizon,
                      floor=args.floor, entry_rule=args.entry)
 
@@ -296,7 +327,7 @@ def main(argv: list[str] | None = None) -> int:
     # window on a cache hit, and price_source above may already hold a
     # narrower per-ticker range from build_run. Reusing it here would risk
     # silently answering from a shorter window than the one asked for.
-    basket_source = YFinancePriceSource()
+    basket_source = YFinancePriceSource(final_through=final_through)
     watchlist_return, watchlist_n, watchlist_missing = watchlist_buy_and_hold(
         DEFAULT_WATCHLIST, window_start, window_end, basket_source,
     )

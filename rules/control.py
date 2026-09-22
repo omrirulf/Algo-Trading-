@@ -34,13 +34,17 @@ NAME = "random"
 CONVICTION = 0.50
 
 
-def signal_for(ticker: str, day: Optional[date]) -> LLMSignal:
-    """A seeded coin flip for one ticker on one day. Never NEUTRAL."""
-    seed = int.from_bytes(
-        hashlib.sha256(f"{ticker}|{day.isoformat() if day else ''}".encode()).digest()[:8],
-        "big",
-    )
-    bias = random.Random(seed).choice((Bias.BULLISH, Bias.BEARISH))
+def signal_for(ticker: str, day: Optional[date], seed: int = 0) -> LLMSignal:
+    """A seeded coin flip for one ticker on one day. Never NEUTRAL.
+
+    ``seed`` 0 is the flip the journal records. The harness draws the
+    others -- a thousand of them -- to put a band around what chance alone
+    scores on the same lines; the journalled flip is one draw from that
+    band, not a special one.
+    """
+    salt = "" if seed == 0 else f"|{seed}"
+    digest = hashlib.sha256(f"{ticker}|{day.isoformat() if day else ''}{salt}".encode()).digest()
+    bias = random.Random(int.from_bytes(digest[:8], "big")).choice((Bias.BULLISH, Bias.BEARISH))
     return LLMSignal(
         ticker=ticker,
         bias=bias,
