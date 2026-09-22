@@ -1,5 +1,6 @@
 🔴 1 position(s) without a working stop
-Equity $99,883 · 15 positions · $94,745 gross · $1,991 at risk · unrealised -$71
-Traded: MSFT, NVO
+Equity $100,048 · 16 positions · $93,885 gross · $1,978 at risk · unrealised +$253
+Traded: KRE, EWT
+Closed: XBI
 No stop on record: TEVA
-Cycle 80 tickers, $1.57 · 2026-09-21
+Cycle 80 tickers, $1.49 · 2026-09-22

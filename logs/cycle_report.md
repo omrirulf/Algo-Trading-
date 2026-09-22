@@ -1,13 +1,13 @@
 # Daily report
 
-**21 Sep 2026, 18:34 Israel time (15:34 UTC)** · 80 names checked · 2 traded · 0 with a problem
+**22 Sep 2026, 18:45 Israel time (15:45 UTC)** · 80 names checked · 2 traded · 0 with a problem
 
 | Group | Looked at | Took a side | No clear view | Problems |
 | --- | --- | --- | --- | --- |
-| Companies | 16 | 2 | 14 | 0 |
+| Companies | 16 | 1 | 15 | 0 |
 | Whole-market funds | 14 | 0 | 14 | 0 |
-| Sector and country funds | 41 | 3 | 38 | 0 |
-| Commodities | 9 | 0 | 9 | 0 |
+| Sector and country funds | 41 | 2 | 39 | 0 |
+| Commodities | 9 | 1 | 8 | 0 |
 
 ## Open positions
 
@@ -15,22 +15,23 @@ Checked before any new trade. R is what the trade risked at entry; the ladder se
 
 | Position | What happened |
 | --- | --- |
-| Alphabet (Google) (GOOGL) · Company | **Stop raised.** At +0.50R, following the price. Stop-loss raised 330.44 → 338.00. |
-| Eli Lilly (LLY) · Company | **Stop raised.** At +0.28R, following the price. Stop-loss raised 1085.29 → 1105.32. |
-| Nvidia (NVDA) · Company | **Stop raised.** At +0.79R, following the price. Stop-loss raised 206.79 → 212.84. |
-| US dollar (UUP) · Index fund | **Stop raised.** At +0.23R, following the price. Stop-loss raised 28.21 → 28.23. |
-| US government bonds, 7-10 years (IEF) · Index fund | **Problem.** Could not be managed: BrokerError: close_position failed for IEF: {"available":"0","code":40310000,"existing_qty":"131","held_for_orders":"131","message":"insufficient qty available for order (requested: 14, available: 0)","symbol":"IEF"} |
+| Nvidia (NVDA) · Company | **Sold part.** Sold 7 of 23 shares at +1.04R, 16 still held. Stop-loss raised 212.84 → 216.23. |
+| Alphabet (Google) (GOOGL) · Company | **Stop raised.** At +0.74R, following the price. Stop-loss raised 338.00 → 341.79. |
+| Eli Lilly (LLY) · Company | **Stop raised.** At +0.43R, following the price. Stop-loss raised 1105.32 → 1113.34. |
+| Microsoft (MSFT) · Company | **Stop raised.** At +0.23R, following the price. Stop-loss raised 471.19 → 474.94. |
+| Novo Nordisk (NVO) · Company | **Stop raised.** At +0.09R, following the price. Stop-loss raised 42.61 → 42.26. |
+| US dollar (UUP) · Index fund | **Stop raised.** At +0.56R, following the price. Stop-loss raised 28.23 → 28.30. |
+| US government bonds, 7-10 years (IEF) · Index fund | **Problem.** Could not be managed: BrokerError: replace_order failed for 32c29f09-baec-438c-8305-6a67e9ec01b1: {"code":42210000,"message":"order parameters are not changed"} |
 | Teva Pharmaceutical (TEVA) · Company | **Problem.** Could not be managed: BrokerError: replace_order failed for aae42775-8f36-4d39-8228-5fe42162cef5: {"code":42210000,"message":"qty cannot be changed for advanced orders"} |
-| US inflation-linked bonds (TIP) · Index fund | **Problem.** Could not be managed: BrokerError: close_position failed for TIP: {"available":"0","code":40310000,"existing_qty":"10","held_for_orders":"10","message":"insufficient qty available for order (requested: 1, available: 0)","symbol":"TIP"} |
-| US government bonds, 20+ years (TLT) · Index fund | **Problem.** Could not be managed: BrokerError: close_position failed for TLT: {"available":"0","code":40310000,"existing_qty":"147","held_for_orders":"147","message":"insufficient qty available for order (requested: 16, available: 0)","symbol":"TLT"} |
-| Developing country bonds (EMB) · Index fund | **Holding.** -0.40R, holding 128 shares. Stop-loss 94.05. |
-| Gold (GLD) · Commodity | **Holding.** -0.60R, holding 10 shares. Stop-loss 404.87. |
-| US government bonds, 7-10 years (IEF) · Index fund | **Holding.** +0.05R, holding 131 shares. Stop-loss 91.61. |
-| S&P 500, equal weight (RSP) · Index fund | **Holding.** -0.07R, holding 14 shares. Stop-loss 215.78. |
-| US inflation-linked bonds (TIP) · Index fund | **Holding.** +0.63R, holding 10 shares. Stop-loss 106.08. |
-| US government bonds, 20+ years (TLT) · Index fund | **Holding.** -0.41R, holding 147 shares. Stop-loss 82.41. |
-| Biotech (XBI) · Sector or country | **Holding.** -0.65R, holding 45 shares. Stop-loss 161.15. |
-| US shopping and leisure (XLY) · Sector or country | **Holding.** -0.43R, holding 63 shares. Stop-loss 113.36. |
+| US inflation-linked bonds (TIP) · Index fund | **Problem.** Could not be managed: BrokerError: replace_order failed for 1f8497f7-ba59-40ac-8e2c-7506f8fd35e0: {"code":42210000,"message":"order parameters are not changed"} |
+| US government bonds, 20+ years (TLT) · Index fund | **Problem.** Could not be managed: BrokerError: replace_order failed for 63f75c03-a0f4-40d6-8e7f-75dec0e75a06: {"code":42210000,"message":"order parameters are not changed"} |
+| Developing country bonds (EMB) · Index fund | **Holding.** -0.54R, holding 128 shares. Stop-loss 94.05. |
+| Gold (GLD) · Commodity | **Holding.** -0.51R, holding 10 shares. Stop-loss 404.87. |
+| US government bonds, 7-10 years (IEF) · Index fund | **Holding.** -0.03R, holding 131 shares. Stop-loss 91.61. |
+| S&P 500, equal weight (RSP) · Index fund | **Holding.** -0.16R, holding 14 shares. Stop-loss 215.78. |
+| US inflation-linked bonds (TIP) · Index fund | **Holding.** +0.48R, holding 10 shares. Stop-loss 106.08. |
+| US government bonds, 20+ years (TLT) · Index fund | **Holding.** -0.51R, holding 147 shares. Stop-loss 82.41. |
+| US shopping and leisure (XLY) · Sector or country | **Holding.** -0.67R, holding 63 shares. Stop-loss 113.36. |
 
 ## How to read this
 
@@ -46,412 +47,82 @@ Under each name you will find the five scores. Click a grey line to open it and 
 
 ## Companies
 
-### Microsoft (MSFT) · Company — BULLISH, confidence 0.55
+### ASML (ASML) · Company — BULLISH, confidence 0.55
 
-**Result:** ACCEPTED · 10 shares · submitted buy 10 MSFT @ ~491.78, stop 471.19
-
-**In the model's own words:**
-
-> Fundamentals are strong and improving: 17.7% revenue and 31.7% earnings growth, 45% operating margins, forward P/E ~21, and four straight beats including +10% last quarter. Analyst consensus is strong buy with ~16% upside to target and a fresh Redburn target raise to $440 (still below spot, so modest). Technicals are the offset: price is 5.7% above the 50d and 14% above the 200d but has pulled back below the 20d with a negative MACD histogram and very thin volume, suggesting near-term consolidation after a +34% three-month run. News flow is mostly recycled valuation/dividend commentary rather than a fresh catalyst. Insider transactions are routine scheduled sales by Hood/Nadella with no open-market buys, which I read as close to neutral. Net: constructive but not a high-conviction few-day setup.
-
-**Main reasons it gave:**
-- Four consecutive earnings beats, last quarter +10% vs consensus
-- Revenue +17.7%, earnings +31.7% YoY with 45.1% operating margin, forward P/E 20.9
-- Strong buy consensus (1.36, 52 analysts), mean target 572.92 = +16.1% upside
-- MACD below signal and price -0.9% vs 20d SMA after +34% 3-month run; volume 0.28x average
-- Insider net share count positive but 0 distinct open-market buyers; only scheduled sales by CFO/CEO
-
-<details><summary><b>News</b> — score +0.25</summary>
-
-- [Microsoft (NASDAQ:MSFT) Dividend Quality Backs Income Investors](https://www.chartmill.com/news/MSFT/Chartmill-55097-Microsoft-NASDAQMSFT-Dividend-Quality-Backs-Income-Investors)  
-  <sub>ChartMill, 3 hours ago</sub>  
-  MSFT dividend: Microsoft's low yield is backed by strong profitability, health, and growth, making it a quality income pick for long-term investors.
-- [MSFT Stock Jumps 3% After-Hours — Lower-Than-Expected Q4 Capex, Strong Azure Sales Boost Sentiment](https://stocktwits.com/news-articles/markets/equity/msft-stock-jumps-3-after-hours-lower-than-expected-q4-capex-strong-azure-sales-boost-sentiment/cZNT9ukRJTF)  
-  <sub>Stocktwits, 15 hours ago</sub>  
-  The social media giant generated $60.80 billion in revenue for the quarter ended June 30, up slightly from analyst estimates of around $60.28 billion. However,...
-- [MSFT Looks 15.7% Undervalued on GF Value™](https://www.gurufocus.com/news/9089987/msft-looks-157-undervalued-on-gf-value)  
-  <sub>GuruFocus, 1 hour ago</sub>  
-  On September 21, 2026, Microsoft Corp (NASDAQ: MSFT) CEO Satya Nadella joined a state dinner hosted by President Trump, alongside other leading tech...
-- [Microsoft To Rally Over 23%? Here Are 10 Top Analyst Forecasts For Monday](https://www.benzinga.com/news/26/09/61893682/microsoft-to-rally-over-23-here-are-10-top-analyst-forecasts-for-monday)  
-  <sub>Benzinga, 2 hours ago</sub>  
-  Analysts raised targets for INSP, SECZ, CLF and WAT, while cutting targets for CRDO, CL and TTMI; ratings remained unchanged.
-- [This Artificial Intelligence (AI) Stock Has Raised Its Dividend by Over 150% in 10 Years](https://www.theglobeandmail.com/investing/markets/stocks/MSFT-Q/pressreleases/4708489/this-artificial-intelligence-ai-stock-has-raised-its-dividend-by-over-150-in-10-years/)  
-  <sub>The Globe and Mail, 3 hours ago</sub>  
-  Detailed price information for Microsoft Corp (MSFT-Q) from The Globe and Mail including charting and trades.
-- [The Week That Proved AI Is Real: MSFT +16%, AMZN +10%, META -10%, AAPL -4% - Winners, Losers and Key Takeaways](https://www.tradingkey.com/analysis/stocks/us-stocks/262067343-week-review-july-28-31-2026-microsoft-amazon-apple-meta-earnings-ai-tradingkey)  
-  <sub>TradingKey, 14 hours ago</sub>  
-  Microsoft surged 16% adding $450B in a single day. Amazon jumped 10%. Meta crashed 10%. Apple fell 4%. The KOSPI gained 17.9% — the largest one-day gain in...
-- [Microsoft's price target raised to $440 amid st...](https://pluang.com/en/news-feed/analisis-saham-msft-naikkan-target-harga-dan-laporan-keuangan-kuat)  
-  <sub>Pluang, 1 hour ago</sub>  
-  Rothschild & Co Redburn raised Microsoft's price target from $400 to $440 following strong fiscal 2026 results, with revenue up 18% to $331.8 billion and...
-- [Microsoft AI chief urges guardrails as White House resists broad regulation (MSFT:NASDAQ)](https://seekingalpha.com/news/4644588-microsoft-ai-chief-urges-guardrails-as-white-house-resists-broad-regulation)  
-  <sub>Seeking Alpha, 21 hours ago</sub>  
-  Microsoft (MSFT) AI chief Mustafa Suleyman said competition with China should not prevent the United States from establishing safeguards for artificial...
-- [MSFT Looks 15.5% Undervalued on GF Value™](https://www.gurufocus.com/news/9090065/msft-looks-155-undervalued-on-gf-value)  
-  <sub>GuruFocus, 25 minutes ago</sub>  
-  On September 21, 2026, reports surfaced that Microsoft Corp (NASDAQ: MSFT) is exploring a strategic partnership with OpenAI and Anthropic to collaboratively...
-- [SBUX Stock Set For Best Day In Two Months — Starbucks Steps Up AI Push To Cut Reliance On MSFT, IBM](https://stocktwits.com/news-articles/markets/equity/sbux-stock-set-for-best-day-in-two-months-steps-up-ai-push/cZmY55FR7nN)  
-  <sub>Stocktwits, 8 hours ago</sub>  
-  Starbucks (SBUX) shares gained about 3% on Thursday as the coffee chain is turning to AI to build its own business applications, aiming to reduce its reliance...
-
-</details>
-
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.25</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Price and chart</b> — score +0.05</summary>
-
-```text
-Last close 493.35 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 498.02 (-0.9%), 50d 466.85 (+5.7%), 200d 431.62 (+14.3%); 50d above 200d
-Momentum: RSI(14) 52.9 | MACD 6.122 vs signal 9.236 (histogram -3.114)
-Returns: 1d -0.1% | 5d -2.4% | 1m +2.5% | 3m +34.3%
-52-week range: 352.83 - 542.07 (now 74.3% of the way up)
-Volatility: ATR(14) 10.28 (2.1% of price) | annualised 20d 22.0%
-Volume: 0.28x the 20-day average
-```
-
-</details>
-
-<details><summary><b>Company numbers</b> — score +0.70</summary>
-
-```text
-Sector: Technology / Software - Infrastructure | market cap 3.66T
-Valuation: trailing P/E 27.45 | forward P/E 20.91 | P/B 8.28 | PEG 1.60
-Profitability: profit margin 40.3% | operating margin 45.1% | ROE 34.0%
-Growth (YoY): revenue +17.7% | earnings +31.7%
-Balance sheet: debt/equity 29.1% | free cash flow 16.55B
-Risk: beta 1.11 | short interest 1.0% of float
-Next earnings: 2026-10-28
-```
-
-</details>
-
-<details><summary><b>What this fund holds</b> — score +0.70</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Does this company beat its own forecasts</b> — score +0.70</summary>
-
-```text
-Earnings record, last 4 quarters: 4 beats
-  2026-06-30 beat by 10% | 2026-03-31 beat by 3% | 2025-12-31 beat by 3% | 2025-09-30 beat by 10%
-```
-
-</details>
-
-<details><summary><b>What holding this fund costs you</b> — score +0.70</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How much oil and gas is in storage</b> — score +0.70</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How the crop is growing</b> — score +0.70</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts and big funds say</b> — score +0.50</summary>
-
-```text
-Consensus: strong_buy (mean 1.36 on a 1=strong buy to 5=strong sell scale, 52 analysts)
-Ratings: 14 strong buy, 38 buy, 3 hold, 0 sell, 0 strong sell
-Price target: mean 572.92 (+16.1% vs last close), range 400.00 - 870.00
-Recent rating changes:
-  - 2026-09-21 Cantor Fitzgerald: main, Overweight -> Overweight
-  - 2026-09-15 Citizens: reit, Market Outperform -> Market Outperform
-  - 2026-09-04 Stifel: main, Hold -> Hold
-  - 2026-09-01 B of A Securities: main, Buy -> Buy
-  - 2026-08-12 Wells Fargo: main, Overweight -> Overweight
-  - 2026-08-05 Tigress Financial: main, Buy -> Buy
-Institutional ownership: 75.8%
-Largest holders: Blackrock Inc. (8.2%), Vanguard Capital Management LLC (6.5%), State Street Corporation (4.2%), Geode Capital Management, LLC (2.5%), FMR, LLC (2.5%)
-```
-
-</details>
-
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.50</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Buying and selling by company insiders</b> — score -0.10</summary>
-
-```text
-Last 180 days: bought 513,644 shares in 16 transaction(s) | sold 242,344 shares in 9
-Net: +271,300 shares (+4.2% of insider holdings) | insiders hold 6,757,246 shares
-Distinct insiders: 0 buying, 5 selling
-Sales — weak evidence on their own; often scheduled 10b5-1 plans, tax on vesting, or diversification:
-  - 2026-09-14 HOOD AMY E (Chief Financial Officer): 41,674 shares, 20.76M
-  - 2026-09-01 NADELLA SATYA (Chief Executive Officer): 86,525 shares, 43.39M
-  - 2026-08-05 ALTHOFF JUDSON (Officer): 10,000 shares, 4.88M
-  - 2026-08-04 NUMOTO TAKESHI (Officer): 4,810 shares, 2.39M
-(15 grant/option/gift transaction(s) excluded — compensation, not a view on the price)
-```
-
-</details>
-
-<details><summary><b>Who is positioned how</b> — score -0.10</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Money going into and out of this fund</b> — score -0.10</summary>
-
-_Not available today._
-
-</details>
-
-### Novo Nordisk (NVO) · Company — BEARISH, confidence 0.55
-
-**Result:** ACCEPTED · 123 shares · submitted sell 123 NVO @ ~39.77, stop 42.61
+**Result:** REJECTED · no room under the sleeve budget limit
 
 **In the model's own words:**
 
-> Capital Markets Day guidance disappointed and the stock broke down 8% on 2.3x volume to near 52-week lows, with price well below all major moving averages and MACD deteriorating. Sentiment is negative and the analyst prior has been ratcheting lower (Morgan Stanley to Underweight on 9/11). Valuation is genuinely cheap (9.9x trailing, 35% margins, huge FCF) and RSI ~31 with a wide price-target gap argues against chasing, so conviction is moderate; post-event drift after a disappointing strategy day plus competitive fears from Lilly favours continued weakness near term.
+> News is mostly generic AI-ecosystem commentary, but the tape is firm: +8.5% over 5 days, 50d above 200d, MACD histogram turning positive, and Samsung High-NA EUV plus a \u20ac12bn buyback give a real company-specific support. Fundamentals are strong (21% revenue growth, 54% ROE, low leverage) though richly valued at 59x trailing, and earnings on 2026-10-14 is close enough to add event risk. Consensus is strong buy with ~23% upside to target, but that prior is already priced and there are no fresh rating changes. Volume at 0.29x average and an 8.5% weekly run argue for modest conviction rather than chasing.
 
 **Main reasons it gave:**
-- Capital Markets Day 2030 targets underwhelmed; stock -8.2% on 2.33x average volume
-- Price 15% below 50d and 14% below 200d SMA, near 52-week low of 35.29
-- Morgan Stanley downgrade to Underweight on 2026-09-11; consensus hold (2.71)
-- Earnings -20.6% YoY, 2 misses in last 4 quarters despite 9.9x trailing P/E
-- RSI 30.9 and mean target +17.7% above price limit downside conviction
+- +8.5% 5-day return, price above 20d/50d/200d with 50d>200d golden-cross structure
+- MACD histogram positive (+5.36) while RSI still neutral at 53.5
+- Samsung High-NA EUV plans and \u20ac12bn buyback cited as company-specific support
+- Revenue +21.3%, earnings +28.5% YoY, ROE 53.9%, debt/equity 9.1%
+- Earnings 2026-10-14 approaching; record is 2 beats, 1 in line, 1 miss
+- Volume only 0.29x 20-day average and trailing P/E 59 limit conviction
 
-<details><summary><b>News</b> — score -0.60</summary>
+<details><summary><b>News</b> — score +0.30</summary>
 
-- [Novo shares slide as drugmaker lays out post-Wegovy growth strategy](https://www.cnbc.com/2026/09/21/novo-nordisk-stock-sales-target-obesity-drugs.html)  
-  <sub>CNBC, 7 hours ago</sub>  
-  Novo stock fell after the company laid out plans to revive growth in the anti-obesity market. CEO Mike Doustdar laid out plans to diversify the company at...
-- [Novo Nordisk stock falls after 2030 strategy disappoints investors](https://finance.yahoo.com/markets/stocks/articles/novo-nordisk-stock-falls-2030-111924503.html)  
-  <sub>Yahoo Finance, 4 hours ago</sub>  
-  The Danish drugmaker pledged to launch 5 multi-blockbuster drugs by 2030 and grow revenue in line with peers, but investors wanted more.
-- [A healthcare company holds 48 million of its own shares. Novo Nordisk expects to buy back more.](https://www.stocktitan.net/news/NVO/novo-nordisk-a-s-share-repurchase-dagaubj8r4f6.html)  
-  <sub>Stock Titan, 3 hours ago</sub>  
-  Novo Nordisk (NVO) reports continued execution of its 2026 share repurchase programme, detailing B share buybacks completed through 18 September 2026.
-- [Novo Nordisk Slides as Strategy Targets Underwhelm Investors](https://www.quiverquant.com/news/Novo+Nordisk+Slides+as+Strategy+Targets+Underwhelm+Investors)  
-  <sub>Quiver Quantitative, 20 minutes ago</sub>  
-  Novo Nordisk A/S (NVO) is down 8.1% today. Here is some analysis on what might have caused this pric.
-- [Novo Shares Slip as Growth Plan Disappoints Investors](https://www.schaeffersresearch.com/content/news/2026/09/21/novo-shares-slip-as-growth-plan-disappoints-investors)  
-  <sub>Schaeffer's Investment Research, 23 minutes ago</sub>  
-  Novo Nordisk (NVO) shares are lower as investors worry about the drugmaker pipeline.
-- [Novo Nordisk Falls 7% as Post-Wegovy Growth Plan Fails to Ease Competition Fears; Eli Lilly Slips, Viking Therapeutics Edges Higher](https://247wallst.com/investing/2026/09/21/novo-nordisk-falls-7-as-post-wegovy-growth-plan-fails-to-ease-competition-fears-eli-lilly-slips-viking-therapeutics-edges-higher/)  
-  <sub>24/7 Wall St., 1 hour ago</sub>  
-  Novo Nordisk took the stage at its own capital markets day and said something that sent its stock tumbling 7%, yet its closest rivals barely flinched.
-- [Novo Nordisk (NVO) Faces Stock Drop Amid New Growth Targets Anno](https://www.gurufocus.com/news/9089443/novo-nordisk-nvo-faces-stock-drop-amid-new-growth-targets-announcement)  
-  <sub>GuruFocus, 5 hours ago</sub>  
-  On September 21, 2026, Novo Nordisk AS (NVO) faced a notable pre-market stock decline of up to 7% following the announcement of its ambitious growth targets...
-- [Novo Nordisk says CagriSema bests Eli Lilly's Zepbound (NVO:NYSE)](https://seekingalpha.com/news/4644774-novo-nordisk-says-cagrisema-bests-eli-lilly-zepbound)  
-  <sub>Seeking Alpha, 39 minutes ago</sub>  
-  Novo Nordisk (NVO) said that results from a phase 3 trial found that its experimental, once-weekly obesity treatment CagriSema (cagrilintide and...
-- [Novo Nordisk Targets Over Five New Blockbusters By 2030, But NVO Stock Slides On Growth Concerns](https://finance.yahoo.com/healthcare/articles/novo-nordisk-targets-over-five-113108107.html)  
-  <sub>Yahoo Finance, 4 hours ago</sub>  
-  Novo Nordisk's long-term growth targets failed to ease investor concerns over Eli Lilly's obesity-drug lead, CagriSema's comparative performance and...
-- [Novo Nordisk A/S Stock (NVO) Moved Down by 7.86% on Sep 21: A Full Analysis](https://www.tradingkey.com/news/market-movers/262178564-market-movers-nvo-20260921)  
-  <sub>TradingKey, 54 minutes ago</sub>  
-  Novo Nordisk faced downward pressure after its Capital Markets Day strategic update.Eli Lilly competition and patent expirations raised concerns over market...
+- [Nvidia and AMD Can't Make AI Chips Without This Growth Stock. Here's Why It Could Soar.](https://finance.yahoo.com/technology/ai/articles/nvidia-amd-cant-ai-chips-123500916.html)  
+  <sub>Yahoo Finance, 3 hours ago</sub>  
+  ASML is one of the most important companies in the AI semiconductor ecosystem.
+- [ASML (ASML) Surpasses Market Returns: Some Facts Worth Knowing](https://finance.yahoo.com/markets/stocks/articles/asml-asml-surpasses-market-returns-214505850.html)  
+  <sub>Yahoo Finance, 17 hours ago</sub>  
+  In the latest close session, ASML (ASML) was up +1.87% at $1,711.32. The stock outperformed the S&P 500, which registered a daily gain of 1.49%.
+- [ASML Watch: What ASML Holding's Latest Moves Mean for Technology Stocks Investors](https://kalkinemedia.com/us/stocks/technology/asml-watch-what-asml-holdings-latest-moves-mean-for-technology-stocks-investors)  
+  <sub>Kalkine Media, 9 hours ago</sub>  
+  Chip-spending caution brought critical equipment suppliers into focus. ASML Holding brings a company-specific advanced semiconductor manufacturing equipment...
+- [S&P 500, Dow Edge Higher As Bank Earnings Offset Middle East Oil Concerns — AAPL, SKHY, ASML, PYPL In Focus](https://www.google.com/goto?url=CAES4gEB6zswFX0uiOQ-ibSpj4fT9BYQZL9twfyjn4QY8hG6bxgF92VlgkQLWPC9IoPtuQhpj4_HsZu-_rAxEIzJjBWdqiwXVEfnYJh0-RUn-zUh9oegHhFSGxz4rJUwjRcM9dtJONb1nluUT5Bf7BEax6a4ptL9J4P2j5f0RXjLcbHTQoO68gnwgoDjU_TE7YfjZRb09IfF_zT_s5pA05FO9HsJieOtGZ-lNZwM40SgUwE-T9you7iM4kXWiHg_UFAUVdvbUAPCmHiyCJVqNXtsO7c75qJX6t2xYmqtUJa5NWAl_ttI)  
+  <sub>Stocktwits, 20 hours ago</sub>  
+  Cooler-than-expected producer prices contributed to hopes for easing inflation on Wednesday.
+- [Here's How Much $1000 Invested In ASML Holding 15 Years Ago Would Be Worth Today](https://www.benzinga.com/news/26/09/61899618/here-s-how-much-1000-invested-asml-holding-15-years-ago-would-be-worth-today)  
+  <sub>Benzinga, 24 hours ago</sub>  
+  ASML Holding (NASDAQ:ASML) has outperformed the market over the past 15 years by 13.41% on an annualized basis producing an average annual return of 26.75%.
+- [ASML stock ends the day 3.08 percent higher at USD 1,679.92](https://www.ad-hoc-news.de/boerse/news/nebenwerte/asml-stock-ends-the-day-3-08-percent-higher-at-usd-1-679-92/70147430)  
+  <sub>AD HOC NEWS, 18 hours ago</sub>  
+  At the close on September 21, 2026, ASML stock finished at USD 1679.92 on Nasdaq, up 3.08 percent. The shares traded between USD 1635.00 and USD 1684.80 on...
+- [ASML Stock Rises on AI Rally and Samsung EUV Plans](https://www.markets.com/news/asml-stock-rises-ai-rally-samsung-high-na-euv)  
+  <sub>Markets.com, 23 hours ago</sub>  
+  ASML stock rose 3% as semiconductor shares rallied. Samsung's High-NA EUV plans, stronger chip demand and a €12 billion buyback support the outlook.
+- [AMD, TER Stocks Jump After Goldman Sachs Lifts Price Targets](https://stocktwits.com/news-articles/markets/equity/amd-ter-stocks-jump-after-goldman-sachs-lifts-price-targets/cZm18P6R7lx)  
+  <sub>Stocktwits, 17 hours ago</sub>  
+  Shares of Teradyne, Inc. (TER) and Advanced Micro Devices Inc. (AMD) jumped on Monday after Goldman Sachs raised its price targets on both semiconductor...
+- [ASML Adds 1% as 110 EUV Tools Test Factory Throughput](https://finance.yahoo.com/technology/articles/asml-adds-1-110-euv-194501828.html)  
+  <sub>Yahoo Finance, 19 hours ago</sub>  
+  This article first appeared on GuruFocus. ASML Holding (NASDAQ:ASML), the advanced-lithography equipment leader, faced a very different AI-chip bottleneck:...
+- [ASML Holding stock gains 1.87 percent as earnings near](https://www.ad-hoc-news.de/boerse/news/corporate-news/asml-holding-stock-gains-1-87-percent-as-earnings-near/70153396)  
+  <sub>AD HOC NEWS, 6 hours ago</sub>  
+  ASML Holding stock closed at USD 1711.32 on September 21, 2026, up 1.87 percent. Zacks expects USD 12.59 EPS for Q3 2026.
 
 </details>
 
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score -0.60</summary>
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.30</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>Price and chart</b> — score -0.70</summary>
+<details><summary><b>Price and chart</b> — score +0.45</summary>
 
 ```text
-Last close 39.71 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 44.83 (-11.4%), 50d 46.71 (-15.0%), 200d 46.11 (-13.9%); 50d above 200d
-Momentum: RSI(14) 30.9 | MACD -1.375 vs signal -0.981 (histogram -0.394)
-Returns: 1d -8.2% | 5d -8.6% | 1m -13.9% | 3m -13.5%
-52-week range: 35.29 - 63.98 (now 15.4% of the way up)
-Volatility: ATR(14) 1.42 (3.6% of price) | annualised 20d 43.5%
-Volume: 2.33x the 20-day average
+Last close 1,727.28 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 1,686.13 (+2.4%), 50d 1,720.45 (+0.4%), 200d 1,515.41 (+14.0%); 50d above 200d
+Momentum: RSI(14) 53.5 | MACD -16.766 vs signal -22.121 (histogram 5.356)
+Returns: 1d +0.9% | 5d +8.5% | 1m -2.1% | 3m -2.9%
+52-week range: 936.19 - 1,989.44 (now 75.1% of the way up)
+Volatility: ATR(14) 54.44 (3.2% of price) | annualised 20d 40.2%
+Volume: 0.29x the 20-day average
 ```
 
 </details>
 
-<details><summary><b>Company numbers</b> — score -0.10</summary>
+<details><summary><b>Company numbers</b> — score +0.40</summary>
 
 ```text
-Sector: Healthcare / Drug Manufacturers - General | market cap 175.41B
-Valuation: trailing P/E 9.85 | forward P/E 11.91 | P/B 5.14 | PEG 3.10
-Profitability: profit margin 35.3% | operating margin 42.5% | ROE 59.8%
-Growth (YoY): revenue +2.1% | earnings -20.6%
-Balance sheet: debt/equity 63.3% | free cash flow 37.67B
-Risk: beta 0.34 | short interest 1.0% of float
-Next earnings: 2026-11-04
-```
-
-</details>
-
-<details><summary><b>What this fund holds</b> — score -0.10</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Does this company beat its own forecasts</b> — score -0.10</summary>
-
-```text
-Earnings record, last 4 quarters: 1 beat, 1 in line, 2 missed
-  2026-06-30 missed by 6% | 2026-03-31 beat by 23% | 2025-12-31 in line | 2025-09-30 missed by 7%
-```
-
-</details>
-
-<details><summary><b>What holding this fund costs you</b> — score -0.10</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How much oil and gas is in storage</b> — score -0.10</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How the crop is growing</b> — score -0.10</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts and big funds say</b> — score -0.40</summary>
-
-```text
-Consensus: hold (mean 2.71 on a 1=strong buy to 5=strong sell scale, 12 analysts)
-Ratings: 0 strong buy, 3 buy, 10 hold, 1 sell, 0 strong sell
-Price target: mean 46.74 (+17.7% vs last close), range 39.54 - 63.32
-Recent rating changes:
-  - 2026-09-11 Morgan Stanley: down, Equal-Weight -> Underweight
-  - 2026-03-02 Goldman Sachs: down, Buy -> Neutral
-  - 2026-02-24 JP Morgan: down, Overweight -> Neutral
-  - 2026-01-09 CICC: init, ? -> Outperform
-  - 2025-12-08 Argus Research: down, Buy -> Hold
-  - 2025-11-28 Goldman Sachs: main, Buy -> Buy
-Institutional ownership: 9.9%
-Largest holders: Dodge & Cox Inc. (0.6%), LOOMIS SAYLES & CO L P (0.5%), Franklin Resources, Inc. (0.4%), Price (T.Rowe) Associates Inc (0.3%), Morgan Stanley (0.3%)
-```
-
-</details>
-
-<details><summary><b>What analysts say about what this fund holds</b> — score -0.40</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
-
-```text
-Last 180 days: bought 0 shares in 0 transaction(s) | sold n/a shares in 0
-Net: +0 shares | insiders hold 132,841 shares
-Distinct insiders: 0 buying, 0 selling
-```
-
-</details>
-
-<details><summary><b>Who is positioned how</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-### ASML (ASML) · Company — NEUTRAL, confidence 0.40
-
-**Result:** REJECTED · bias is NEUTRAL; no trade
-
-**In the model's own words:**
-
-> News is mostly routine buyback disclosures and comparison listicles; the one ticker-specific negative (CXMT mass-producing DRAM without EUV) is modest. Technicals are neutral-to-soft: RSI 50, MACD below signal, below 50d SMA, -12% over 3 months but +7.5% over 5 days on thin volume (0.42x). Fundamentals are strong (21% revenue growth, 54% ROE, low leverage) but richly valued, and earnings on Oct 14 is the real catalyst. Strong-buy consensus with +26% target gap is already priced and rating changes are stale reiterations. No insider transactions. Mild upward tilt insufficient for a directional call.
-
-**Main reasons it gave:**
-- Buyback disclosure (€124M/day) is routine MAR reporting, not a new catalyst
-- CXMT mass-producing G5 DRAM without EUV tools — mild structural negative
-- MACD below signal and price -1.5% vs 50d SMA, RSI 50, volume 0.42x average
-- Consensus strong_buy with mean target +26.1%, but rating changes are July reiterations
-- Revenue +21.3%, earnings +28.5% YoY, D/E 9.1%; earnings 2026-10-14 likely dominates
-
-<details><summary><b>News</b> — score +0.05</summary>
-
-- [A company that helps make computer chips spent €124M buying back shares in one day](https://www.stocktitan.net/news/ASML/asml-reports-transactions-under-its-current-share-buyback-jfoqn09hbqc3.html)  
-  <sub>Stock Titan, 3 hours ago</sub>  
-  Another 65000 shares cost €90.3M on Sept. 15, one of five transactions ASML disclosed under the Market Abuse Regulation.
-- [Better Artificial Intelligence Stock: Arm Holdings vs. ASML](https://finance.yahoo.com/markets/stocks/articles/better-artificial-intelligence-stock-arm-015219848.html)  
-  <sub>Yahoo Finance, 13 hours ago</sub>  
-  Arm trades at a 125x forward P/E versus ASML's 27.9x, yet both command premium valuations for their monopolistic positions in mobile and chip manufacturing,...
-- [ASML Holding N.V. - New York Registry Shares Price Today | xASML Live Price, Chart & Market Cap](https://www.okx.com/en-eu/price/asml-holding-n-v----new-york-registry-shares-xasml)  
-  <sub>OKX, 5 hours ago</sub>  
-  ASML Holding N.V. - New York Registry Shares price today. ASML Holding N.V. - New York Registry Shares price today is €1,493.15, marking a -- over the past 24...
-- [ASML (NasdaqGS:ASML) Stock May Trade At A Premium Despite High NA EUV News](https://simplywall.st/stocks/us/semiconductors/nasdaq-asml/asml-holding/news/asml-nasdaqgsasml-stock-may-trade-at-a-premium-despite-high)  
-  <sub>Simply Wall Street, 19 hours ago</sub>  
-  ASML Holding has delivered a powerful share price run in recent years, and that kind of move naturally puts the focus on whether the current valuation is...
-- [European Semiconductor Stocks Surge Amid AI Investment Interest](https://www.gurufocus.com/news/9089519/european-semiconductor-stocks-surge-amid-ai-investment-interest)  
-  <sub>GuruFocus, 4 hours ago</sub>  
-  On September 21, 2026, European semiconductor stocks opened higher, buoyed by ongoing investor enthusiasm for artificial intelligence-related stocks.
-- [What company Is ASML? Between ASML and AMD, Which Is a Better Investment?](https://www.tradingkey.com/analysis/stocks/us-stocks/261749862-asml-amd-investment-tradingkey)  
-  <sub>TradingKey, 14 hours ago</sub>  
-  TradingKey - ASML Holding N.V. (NASDAQ: ASML) is not a chip designer; instead, it's best understood as a supplier of equipment for producing semiconductors...
-- [ASML reports transactions under its current share buyback program](https://www.marketscreener.com/news/asml-reports-transactions-under-its-current-share-buyback-program-ce785adbdd80f221)  
-  <sub>www.marketscreener.com, 3 hours ago</sub>  
-  ASML reports transactions under its current share buyback program VELDHOVEN, the Netherlands – ASML Holding N.V. reports the following transactions,...
-- [ASML stock heads into the open after a 3.08 percent rise](https://www.ad-hoc-news.de/boerse/news/corporate-news/asml-stock-heads-into-the-open-after-a-3-08-percent-rise/70142390)  
-  <sub>AD HOC NEWS, 9 hours ago</sub>  
-  At the close on September 19, 2026, ASML stock finished at USD 1679.92 on Nasdaq, up 3.08 percent. The move came as investors focused on stronger guidance,...
-- [China's CXMT Starts Mass-Producing Advanced DRAM Chips Without ASML's Tools](https://startupfortune.com/chinas-cxmt-starts-mass-producing-advanced-dram-chips-without-asmls-tools/)  
-  <sub>Startup Fortune, 10 hours ago</sub>  
-  CXMT's G5 DRAM chips enter mass production without ASML's banned EUV lithography tools, pushing China's chipmaker to roughly 10% of global DRAM share.
-
-</details>
-
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.05</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Price and chart</b> — score -0.05</summary>
-
-```text
-Last close 1,693.44 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 1,685.88 (+0.4%), 50d 1,720.07 (-1.5%), 200d 1,512.39 (+12.0%); 50d above 200d
-Momentum: RSI(14) 50.0 | MACD -24.459 vs signal -23.745 (histogram -0.714)
-Returns: 1d +0.8% | 5d +7.5% | 1m -3.2% | 3m -12.2%
-52-week range: 932.15 - 1,989.44 (now 72.0% of the way up)
-Volatility: ATR(14) 53.44 (3.2% of price) | annualised 20d 39.7%
-Volume: 0.42x the 20-day average
-```
-
-</details>
-
-<details><summary><b>Company numbers</b> — score +0.35</summary>
-
-```text
-Sector: Technology / Semiconductor Equipment & Materials | market cap 650.45B
-Valuation: trailing P/E 58.27 | forward P/E 28.52 | P/B 1,442.82 | PEG 1.52
+Sector: Technology / Semiconductor Equipment & Materials | market cap 663.45B
+Valuation: trailing P/E 59.38 | forward P/E 29.10 | P/B 1,471.33 | PEG 1.54
 Profitability: profit margin 30.1% | operating margin 37.1% | ROE 53.9%
 Growth (YoY): revenue +21.3% | earnings +28.5%
 Balance sheet: debt/equity 9.1% | free cash flow 8.44B
@@ -461,13 +132,13 @@ Next earnings: 2026-10-14
 
 </details>
 
-<details><summary><b>What this fund holds</b> — score +0.35</summary>
+<details><summary><b>What this fund holds</b> — score +0.40</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>Does this company beat its own forecasts</b> — score +0.35</summary>
+<details><summary><b>Does this company beat its own forecasts</b> — score +0.40</summary>
 
 ```text
 Earnings record, last 4 quarters: 2 beats, 1 in line, 1 missed
@@ -476,30 +147,30 @@ Earnings record, last 4 quarters: 2 beats, 1 in line, 1 missed
 
 </details>
 
-<details><summary><b>What holding this fund costs you</b> — score +0.35</summary>
+<details><summary><b>What holding this fund costs you</b> — score +0.40</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>How much oil and gas is in storage</b> — score +0.35</summary>
+<details><summary><b>How much oil and gas is in storage</b> — score +0.40</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>How the crop is growing</b> — score +0.35</summary>
+<details><summary><b>How the crop is growing</b> — score +0.40</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What analysts and big funds say</b> — score +0.30</summary>
+<details><summary><b>What analysts and big funds say</b> — score +0.45</summary>
 
 ```text
 Consensus: strong_buy (mean 1.40 on a 1=strong buy to 5=strong sell scale, 16 analysts)
 Ratings: 7 strong buy, 31 buy, 3 hold, 1 sell, 0 strong sell
-Price target: mean 2,134.93 (+26.1% vs last close), range 887.81 - 2,842.92
+Price target: mean 2,129.07 (+23.3% vs last close), range 885.37 - 2,835.12
 Recent rating changes:
   - 2026-07-16 JP Morgan: main, Overweight -> Overweight
   - 2026-07-16 Wells Fargo: main, Overweight -> Overweight
@@ -513,7 +184,7 @@ Largest holders: FMR, LLC (1.4%), Fisher Asset Management, LLC (1.2%), Capital W
 
 </details>
 
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.30</summary>
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.45</summary>
 
 _Not available today._
 
@@ -541,54 +212,22 @@ _Not available today._
 
 </details>
 
-### Caterpillar (CAT) · Company — NEUTRAL, confidence 0.35
-
-**Result:** REJECTED · bias is NEUTRAL; no trade
+### Elbit Systems (ESLT) · Company — NEUTRAL, confidence 0.42
 
 **In the model's own words:**
 
-> News flow is almost entirely noise — 'cat' keyword contamination, a DCF opinion piece and a rate-sensitivity roundup — with no ticker-specific catalyst. Technicals are mixed: above 20d and 200d but below 50d, RSI ~51, MACD histogram turning up, yet 3-month return is -19.8% and volume is a quarter of average, so the +4.6% 5-day bounce is unconfirmed. Fundamentals are strong operationally (24% revenue growth, 68% earnings growth, 57% ROE, four straight beats) but valuation is rich at 35x trailing/19x book with 233% debt/equity and beta 1.59. Consensus buy is already priced, with a large hold contingent and stale rating changes; insider net buying is a single 250-share director purchase against executive sales. No dimension corroborates another strongly enough for a directional call ahead of the 10/29 print.
+> ESLT presents conflicting signals that argue for a neutral stance. The fundamental picture is attractive: strong 34.2% YoY earnings growth, consistent 4-quarter beat streak, modest leverage (19.3% debt/equity), and solid 15.2% ROE support the business quality. However, the valuation is stretched at 55.5x trailing P/E and 40.2x forward P/E for an aerospace & defense name, leaving limited margin for error. Technicals show a stock below both its 50d and 200d moving averages (-3.2% and -3.5% respectively), with momentum deteriorating (RSI at 48.9, MACD histogram positive but from deeply negative levels). The analyst consensus of Hold with a mean target 10.6% above the current price reflects cautious optimism, but no fresh rating changes suggest conviction is absent; the wide target range (518-960) indicates disagreement. Insider activity is mixed and weak: April sales by the CEO and officers were likely related to compensation vesting or planned diversification rather than a bearish signal, but the lack of any buying in the past 180 days offers no countervailing support. Volume is running 0.75x average, suggesting thin conviction even from long holders. The lack of any news catalyst and the proximity of earnings (60+ days out) mean near-term price action will be driven by technicals and sentiment rather than fresh information. Low conviction reflects the conflicting dimensions and lack of a clear directional catalyst.
 
 **Main reasons it gave:**
-- News set dominated by irrelevant 'cat' keyword matches; no ticker-specific catalyst
-- Price below 50d SMA (-2.1%) but above 200d (+4.4%); RSI 51, MACD histogram +3.65
-- 3-month return -19.8% while 5-day +4.6% on 0.25x average volume
-- Four consecutive earnings beats (31%, 19%, 9%, 8%) with +24% revenue and +68% earnings growth
-- Rich valuation: 35x trailing P/E, 19.4x book, debt/equity 233%
-- Mean target 975.61 (+19%) but 12 of 26 analysts at hold and no rating changes since 2024
+- Stretched trailing P/E of 55.5x despite 34% earnings growth limits upside room
+- Four consecutive earnings beats suggest execution capability but gains already priced in
+- Trading below 50d and 200d moving averages with deteriorating momentum signals
+- Hold consensus with modest 10.6% mean upside implies limited near-term catalyst
+- No insider buying in 180 days while officers sold in April, neutral rather than bullish signal
 
 <details><summary><b>News</b> — score +0.00</summary>
 
-- [What Higher Interest Rates Mean for Caterpillar, GE Vernova, and Vertiv](https://finance.yahoo.com/markets/stocks/articles/higher-interest-rates-mean-caterpillar-085500295.html)  
-  <sub>Yahoo Finance, 6 hours ago</sub>  
-  It's important not to panic over the impact of rising rates on industrial stocks, not least because they are likely to affect different stocks in varied...
-- [Is CAT Overvalued? DCF Says Worth $621](https://www.gurufocus.com/news/9089603/is-cat-overvalued-dcf-says-worth-621)  
-  <sub>GuruFocus, 3 hours ago</sub>  
-  On September 21, 2026, we conducted a DCF analysis for Caterpillar Inc (CAT), a company that has shown impressive price performance over the past year,...
-- [Tracking bacterial growth in response to nutrients and antibiotics](https://www.news-medical.net/whitepaper/20260921/Tracking-bacterial-growth-in-response-to-nutrients-and-antibiotics.aspx)  
-  <sub>News-Medical, 6 hours ago</sub>  
-  Measuring the wavelength-specific absorbance of light by cultures over time can provide insights about microbial growth. Bacterial growth curves performed...
-- [Skater Makes A Strong Super Stock Statement](https://www.powerboatnation.com/skater-makes-a-strong-super-stock-statement/)  
-  <sub>Powerboat Nation, 1 hour ago</sub>  
-  Though the Skater 388 catamaran model remains dominant in offshore racing's Super Cat class, the brand had all but vanished from the Super Stock ranks...
-- [Jason Calacanis Calls Bitcoin a 'Dead Cat' Which Continues to Bounce—Cathie Wood Argues BTC Has 'Many Liv](https://www.benzinga.com/crypto/cryptocurrency/26/09/61887673/jason-calacanis-bitcoin-dead-cat-cathie-wood-many-lives-ahead)  
-  <sub>Benzinga, 8 hours ago</sub>  
-  Ark Invest CEO Cathie Wood on Saturday, September 19, rebutted the argument that Bitcoin is an outdated and "boring" store of value.
-- [Caterpillar stock gains as valuation eases after recent correction](https://www.ad-hoc-news.de/boerse/news/corporate-news/caterpillar-stock-gains-as-valuation-eases-after-recent-correction/70144654)  
-  <sub>AD HOC NEWS, 2 hours ago</sub>  
-  Caterpillar stock closed at USD 808.99 on September 20, 2026, about 1.30% higher on the day and near its recent trading range. Recent analysis highlights a...
-- [Why Caterpillar Inc. (NYSE:CAT) Is In Focus Now?](https://kalkinemedia.com/us/stocks/bluechip/why-caterpillar-inc-nysecat-is-in-focus-now)  
-  <sub>Kalkine Media, 6 hours ago</sub>  
-  Caterpillar Inc. (CAT) draws attention after a current business development reshapes the market discussion around operations, customers, competition,...
-- [Michael Saylor Hints at More MicroStrategy Bitcoin Buys After “Dead Cat Bounce” Debate](https://www.mitrade.com/au/insights/stock-analysis/us-stocks/beincrypto-BTCUSD-202609210933)  
-  <sub>Mitrade, 13 hours ago</sub>  
-  MicroStrategy has not bought Bitcoin (BTC) in two weeks, its most recent regulatory filing shows. In his latest post, however, Executive Chairman Michael...
-- [Drone Stocks Are Back In Play: Why RCAT, AVAV, KTOS, UMAC Stocks Are Climbing](https://stocktwits.com/news-articles/markets/equity/drone-stocks-are-back-in-play-why-rcat-avav-ktos-umac-stocks-are-climbing/cZZbZqyR7pc)  
-  <sub>Stocktwits, 12 hours ago</sub>  
-  Red Cat Holdings (RCAT), AeroVironment (AVAV), Kratos Defense & Security Solutions (KTOS) and Unusual Machines (UMAC) stocks gained overnight as investors...
-- [Portage Girl Scouts build pet pantry for dogs, cats](https://www.chicagotribune.com/2026/09/20/portage-girl-scouts-build-pet-pantry/)  
-  <sub>Chicago Tribune, 18 hours ago</sub>  
-  Girl Scout Troop 35579 used the Little Free Library concept to build a pet pantry for dogs and cats. It now stands outside Portage's Woodland Park dog park.
+_No news found for this one today._
 
 </details>
 
@@ -598,25 +237,363 @@ _Not available today._
 
 </details>
 
-<details><summary><b>Price and chart</b> — score +0.10</summary>
+<details><summary><b>Price and chart</b> — score -0.35</summary>
 
 ```text
-Last close 819.80 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 804.19 (+1.9%), 50d 837.49 (-2.1%), 200d 785.30 (+4.4%); 50d above 200d
-Momentum: RSI(14) 51.1 | MACD -10.597 vs signal -14.249 (histogram 3.652)
-Returns: 1d +1.3% | 5d +4.6% | 1m +0.5% | 3m -19.8%
-52-week range: 463.72 - 1,064.90 (now 59.2% of the way up)
-Volatility: ATR(14) 24.56 (3.0% of price) | annualised 20d 26.9%
+Last close 738.10 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 722.27 (+2.2%), 50d 762.20 (-3.2%), 200d 765.16 (-3.5%); 50d below 200d
+Momentum: RSI(14) 48.9 | MACD -4.964 vs signal -11.114 (histogram 6.151)
+Returns: 1d -1.7% | 5d +0.9% | 1m -0.4% | 3m -4.4%
+52-week range: 454.95 - 1,014.33 (now 50.6% of the way up)
+Volatility: ATR(14) 16.87 (2.3% of price) | annualised 20d 15.8%
+Volume: 0.75x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.55</summary>
+
+```text
+Sector: Industrials / Aerospace & Defense | market cap 34.59B
+Valuation: trailing P/E 55.54 | forward P/E 40.20 | P/B 7.83 | PEG n/a
+Profitability: profit margin 7.4% | operating margin 9.6% | ROE 15.2%
+Growth (YoY): revenue +15.9% | earnings +34.2%
+Balance sheet: debt/equity 19.3% | free cash flow -38.48M
+Risk: beta -0.30 | short interest 0.8% of float
+Next earnings: 2026-11-24
+```
+
+</details>
+
+<details><summary><b>What this fund holds</b> — score +0.55</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Does this company beat its own forecasts</b> — score +0.55</summary>
+
+```text
+Earnings record, last 4 quarters: 4 beats
+  2026-06-30 beat by 10% | 2026-03-31 beat by 16% | 2025-12-31 beat by 16% | 2025-09-30 beat by 21%
+```
+
+</details>
+
+<details><summary><b>What holding this fund costs you</b> — score +0.55</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How much oil and gas is in storage</b> — score +0.55</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How the crop is growing</b> — score +0.55</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.15</summary>
+
+```text
+Consensus: hold (mean 2.67 on a 1=strong buy to 5=strong sell scale, 6 analysts)
+Ratings: 0 strong buy, 1 buy, 5 hold, 0 sell, 0 strong sell
+Price target: mean 816.33 (+10.6% vs last close), range 518.00 - 960.00
+Recent rating changes:
+  - 2026-08-19 JP Morgan: main, Neutral -> Neutral
+  - 2026-06-24 Jefferies: main, Hold -> Hold
+  - 2026-05-27 Jefferies: main, Hold -> Hold
+  - 2026-05-27 JP Morgan: main, Neutral -> Neutral
+  - 2026-04-13 JP Morgan: main, Neutral -> Neutral
+  - 2026-03-22 Jefferies: main, Hold -> Hold
+Institutional ownership: 23.0%
+Largest holders: Clal Insurance Enterprises Holdings Ltd (3.5%), Vanguard Capital Management LLC (1.6%), Van Eck Associates Corporation (1.2%), Y.D. More Investments Ltd (1.0%), Altshuler Shaham Ltd (1.0%)
+```
+
+</details>
+
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.15</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score -0.10</summary>
+
+```text
+Last 180 days: bought 82,000 shares in 7 transaction(s) | sold 69,736 shares in 7
+Net: +12,264 shares (+0.1% of insider holdings) | insiders hold 19,278,816 shares
+Distinct insiders: 0 buying, 5 selling
+Sales — weak evidence on their own; often scheduled 10b5-1 plans, tax on vesting, or diversification:
+  - 2026-04-09 DELMAR HAIM DANIEL (Officer): 7,654 shares, 6.79M
+  - 2026-04-09 MACHLIS BEZHALEL (Chief Executive Officer): 25,514 shares, 22.64M
+  - 2026-04-09 VERED YEHUDA (Officer): 5,953 shares, 5.28M
+  - 2026-04-09 KRIL RAN (Officer): 6,803 shares, 6.04M
+(5 grant/option/gift transaction(s) excluded — compensation, not a view on the price)
+```
+
+</details>
+
+<details><summary><b>Who is positioned how</b> — score -0.10</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Money going into and out of this fund</b> — score -0.10</summary>
+
+_Not available today._
+
+</details>
+
+### JPMorgan Chase (JPM) · Company — NEUTRAL, confidence 0.42
+
+**In the model's own words:**
+
+> JPM presents a complex near-term picture. Fundamentally, the bank is in excellent shape: 4 consecutive earnings beats, strong YoY growth (revenue +30.4%, earnings +46.9%), attractive valuation (forward P/E 13.59), and a 17.8% ROE. The $20B QIA partnership for asset management is a positive strategic catalyst. However, technicals are deteriorating: the stock has fallen 3.6% in one day and 3.7% over 5 days, trading 4% below both its 20-day and 50-day moving averages, with RSI at 35 (oversold territory) and a negative MACD histogram of -1.529. Volume is light at 0.45x the 20-day average, suggesting the selloff lacks conviction but also lacks buying support. The analyst consensus is solidly bullish (mean 2.12, 10.6% upside to target), yet this prior is already reflected in the price and provides limited edge. Insider activity shows net buying of 738,651 shares but this came from 22 transactions spread over 6 months—not a concentrated, urgent signal. The recent news is mixed: the QIA deal is positive, but today's decline appears tactical (Dow weakness, sector headwinds) rather than fundamental. With earnings not due until October 13, the near-term driver is technicals, which argue for caution. The conflicting signals—solid fundamentals and analyst backing versus technical weakness and light volume—warrant a neutral stance with moderate conviction until either the technical picture stabilizes or new catalysts emerge.
+
+**Main reasons it gave:**
+- 4 consecutive earnings beats and +46.9% YoY earnings growth
+- RSI 35 and price 4% below 20d/50d SMA, suggesting technical weakness
+- Forward P/E 13.59 and 17.8% ROE support valuation strength
+- $20B QIA partnership expands asset management footprint
+- Volume 0.45x 20-day average indicates light conviction behind selloff
+
+<details><summary><b>News</b> — score +0.30</summary>
+
+- [Dow Falls 134 Points On Losses For Shares Of Cisco, JPMorgan Chase](https://www.moomoo.com/news/post/1000033490/dow-falls-134-points-on-losses-for-shares-of-cisco)  
+  <sub>Moomoo, 57 minutes ago</sub>  
+  Thisarticle was automatically generated by MarketWatch using technology from Automated Insights. The Dow Jones Industrial Average is falling Tuesday morning...
+- [Will JPM's $20B QIA Partnership Strengthen Asset Management Business?](https://www.zacks.com/stock/news/2993826/will-jpms-20b-qia-partnership-strengthen-asset-management-business)  
+  <sub>Zacks Investment Research, 34 minutes ago</sub>  
+  JPM will manage a $15 billion public equities mandate and launch a $5 billion private-markets initiative. The partnership could expand JPMAM's institutional...
+- [Is JPMorgan Chase (NYSE:JPM) Stock Worth Watching Today?](https://kalkinemedia.com/us/stocks/bluechip/is-jpmorgan-chase-nysejpm-stock-worth-watching-today)  
+  <sub>Kalkine Media, 2 hours ago</sub>  
+  JPMorgan Chase (NYSE:JPM) enters Monday with banking activity as regulators examine trading-firm exposures.
+- [JPMorgan Raises its Dividend: A Look at Yield, Capital, and Shareholder Returns](https://finance.yahoo.com/markets/stocks/articles/jpmorgan-raises-dividend-look-yield-015332265.html)  
+  <sub>Yahoo Finance, 13 hours ago</sub>  
+  JPMorgan Chase & Co. (NYSE:JPM)'s latest dividend increase gives shareholders another reason to focus on the bank's ability to return capital while...
+- [Brazil stocks break electoral pattern amid tighter race, J.P. Morgan says](https://valorinternational.globo.com/markets/news/2026/09/22/brazil-stocks-break-electoral-pattern-amid-tighter-race-jp-morgan-says.ghtml)  
+  <sub>Valor International, 4 hours ago</sub>  
+  Since July 1, when Flávio Bolsonaro reached his lowest point on betting platforms, MSCI Brazil has risen by an average of 0.20% on each day the candidate...
+- [Why Did IMAX, JPM, CSX Stocks Surge To 52-Week Highs Last Week?](https://stocktwits.com/news-articles/markets/equity/imax-jpm-csx-stocks-52-week-highs-last-week/cZZxcQ3R7C3)  
+  <sub>Stocktwits, 21 hours ago</sub>  
+  Citi raised the price target on CSX to $54 from $53 and maintained a Neutral rating on the shares, implying an upside of about 1.5% from its last close.
+- [Bcwm LLC Sells 3,763 Shares of JPMorgan Chase & Co. $JPM](https://www.marketbeat.com/instant-alerts/filing-bcwm-llc-sells-3763-shares-of-jpmorgan-chase-co-jpm-2026-09-22/)  
+  <sub>MarketBeat, 8 hours ago</sub>  
+  Bcwm LLC reduced its position in shares of JPMorgan Chase & Co. (NYSE:JPM - Free Report) by 13.5% in the 2nd quarter, according to its most recent filing...
+- [JPM: AI Investment Surge May Reach $1 Trillion, Says JPMorgan CE](https://www.gurufocus.com/news/9091131/jpm-ai-investment-surge-may-reach-1-trillion-says-jpmorgan-ceo-jamie-dimon)  
+  <sub>GuruFocus, 8 hours ago</sub>  
+  On September 22, 2026, JPMorgan CEO Jamie Dimon highlighted the ongoing surge in artificial intelligence (AI) investments, predicting that spending within...
+- [JP Morgan Sees Brent Staying in Low $100s Even if Hormuz Reopens in June](https://energynow.com/2026/05/jp-morgan-sees-brent-staying-in-low-100s-even-if-hormuz-reopens-in-june/)  
+  <sub>EnergyNow.com, 12 hours ago</sub>  
+  (Reuters) - JP Morgan expects Brent crude to remain in the low-$100s for much of…
+- [A lithium producer plans to reach 830,000 tonnes of capacity](https://www.stocktitan.net/news/SGML/sigma-lithium-announces-j-p-morgan-initiated-equity-research-le3evuou77nu.html)  
+  <sub>Stock Titan, 17 hours ago</sub>  
+  J.P. Morgan sees a lithium deficit through 2029 as Sigma expects 240000 tonnes of concentrate within 12 months and 330000 tonnes in FY27.
+
+</details>
+
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.30</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Price and chart</b> — score -0.55</summary>
+
+```text
+Last close 339.50 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 353.65 (-4.0%), 50d 353.61 (-4.0%), 200d 320.89 (+5.8%); 50d above 200d
+Momentum: RSI(14) 35.0 | MACD -1.834 vs signal -0.305 (histogram -1.529)
+Returns: 1d -3.6% | 5d -3.7% | 1m -3.4% | 3m +1.6%
+52-week range: 282.84 - 365.18 (now 68.8% of the way up)
+Volatility: ATR(14) 7.13 (2.1% of price) | annualised 20d 18.1%
+Volume: 0.45x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.75</summary>
+
+```text
+Sector: Financial Services / Banks - Diversified | market cap 902.45B
+Valuation: trailing P/E 14.55 | forward P/E 13.59 | P/B 2.55 | PEG 1.63
+Profitability: profit margin 34.9% | operating margin 50.4% | ROE 17.8%
+Growth (YoY): revenue +30.4% | earnings +46.9%
+Balance sheet: debt/equity n/a | free cash flow n/a
+Risk: beta 0.97 | short interest 1.0% of float
+Next earnings: 2026-10-13
+```
+
+</details>
+
+<details><summary><b>What this fund holds</b> — score +0.75</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Does this company beat its own forecasts</b> — score +0.75</summary>
+
+```text
+Earnings record, last 4 quarters: 4 beats
+  2026-06-30 beat by 4% | 2026-03-31 beat by 8% | 2025-12-31 beat by 3% | 2025-09-30 beat by 4%
+```
+
+</details>
+
+<details><summary><b>What holding this fund costs you</b> — score +0.75</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How much oil and gas is in storage</b> — score +0.75</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How the crop is growing</b> — score +0.75</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.65</summary>
+
+```text
+Consensus: buy (mean 2.12 on a 1=strong buy to 5=strong sell scale, 21 analysts)
+Ratings: 4 strong buy, 9 buy, 10 hold, 0 sell, 1 strong sell
+Price target: mean 375.38 (+10.6% vs last close), range 305.00 - 436.00
+Recent rating changes:
+  - 2026-08-14 Wells Fargo: main, Overweight -> Overweight
+  - 2026-08-03 UBS: main, Buy -> Buy
+  - 2026-07-20 Citigroup: main, Neutral -> Neutral
+  - 2026-07-17 Evercore ISI Group: main, Outperform -> Outperform
+  - 2026-07-16 B of A Securities: main, Buy -> Buy
+  - 2026-07-15 Baird: main, Neutral -> Neutral
+Institutional ownership: 75.7%
+Largest holders: Blackrock Inc. (7.8%), Vanguard Capital Management LLC (6.1%), State Street Corporation (4.7%), Bank of America Corporation (2.6%), Morgan Stanley (2.5%)
+```
+
+</details>
+
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.65</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.15</summary>
+
+```text
+Last 180 days: bought 969,320 shares in 22 transaction(s) | sold 230,669 shares in 20
+Net: +738,651 shares (+7.7% of insider holdings) | insiders hold 10,393,508 shares
+Distinct insiders: 0 buying, 10 selling
+Sales — weak evidence on their own; often scheduled 10b5-1 plans, tax on vesting, or diversification:
+  - 2026-09-10 LEOPOLD ROBIN (Officer): 2,500 shares, 882.03K
+  - 2026-08-11 LEOPOLD ROBIN (Officer): 2,500 shares, 903.52K
+  - 2026-06-22 FRIEDMAN STACEY R. (General Counsel): 5,467 shares, 1.81M
+  - 2026-05-20 FRIEDMAN STACEY R. (General Counsel): 5,468 shares, 1.64M
+(11 grant/option/gift transaction(s) excluded — compensation, not a view on the price)
+```
+
+</details>
+
+<details><summary><b>Who is positioned how</b> — score +0.15</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Money going into and out of this fund</b> — score +0.15</summary>
+
+_Not available today._
+
+</details>
+
+### Caterpillar (CAT) · Company — NEUTRAL, confidence 0.40
+
+**Result:** REJECTED · bias is NEUTRAL; no trade
+
+**In the model's own words:**
+
+> CAT has a strong fundamental story — 4 straight beats, +24% revenue, data-center power demand past a $72B backlog — but the tape is soft: -18% over three months, below the 50d SMA, RSI 47, volume a quarter of normal. News flow is mostly filler (a cat-names listicle, a Red Cat insider story, unrelated MRNA), and the only fresh analyst action is a Bernstein Hold reiteration. Valuation is rich (34.7x trailing, 19x book, 233% debt/equity) and insider flow is 8 sellers vs 1 token director buy. Bullish fundamentals against a broken short-term trend equals low conviction; no tradable edge for the next few days.
+
+**Main reasons it gave:**
+- 4 consecutive EPS beats, most recent by 31%; revenue +24% YoY
+- CEO cites demand exceeding $72B backlog on data-center power
+- Price -18.1% over 3 months, below 50d SMA, RSI 47, volume 0.25x average
+- Bernstein maintains Hold; consensus mean target +21% but ratings split 14 buy/12 hold-or-worse
+- CEO sold $26.2M in August; only insider buy is a 250-share director purchase
+
+<details><summary><b>News</b> — score +0.15</summary>
+
+- [Get Paid 8.0% A Year To Wait For CAT Stock To Go On Sale](https://www.trefis.com/data/companies/CAT/no-login-required/vnCbjr6I/Get-Paid-8-0-A-Year-To-Wait-For-CAT-Stock-To-Go-On-Sale)  
+  <sub>Trefis, 9 hours ago</sub>  
+  Get paid a hefty income stream today for simply agreeing to buy a global industrial powerhouse at a deep discount, a payment you keep no matter what happens...
+- [Caterpillar’s CEO Says Demand Runs Past Its $72B Backlog. Here’s What That Means for the Stock](https://finance.yahoo.com/markets/stocks/articles/caterpillar-ceo-says-demand-runs-235023123.html)  
+  <sub>Yahoo Finance, 15 hours ago</sub>  
+  Caterpillar (CAT) supplies the engines and turbines increasingly running data centers as permanent power plants, not backup, and its CEO just told investors...
+- [Is Caterpillar (NYSE:CAT) Stock Worth Watching Today?](https://kalkinemedia.com/us/stocks/industrial/is-caterpillar-nysecat-stock-worth-watching-today)  
+  <sub>Kalkine Media, 2 hours ago</sub>  
+  Highlights. Caterpillar enters Monday with equipment demand as manufacturing signals stay mixed. Industrial Stocks remains shaped by rates, energy moves and...
+- [Bernstein Sticks to Its Hold Rating for Caterpillar (CAT)](https://www.google.com/goto?url=CAESxAEB6zswFUZbV5xVJoEeFSp3riy5tKkWAlYSGf_I-zYiRhu9vo3jiTfzJSBTFCXDqAm5bYxEHFsq46rLT9l0dY8TIFQ9BcmnJvoM5nvJ1D63Uv1ANoAmFtDBwfpKBvqswPR08DtTomZ8so8THRtgwbZjw4rzhmvqJfBXKaoshiJDxrlzQDB2kLOxKWbe2lMjYWgrwYBUaJKN-eVr48SF5gHlS_gMNIsckIeWy2S_O7DNrVvNhJUo5rZb5A6o-ozNcihaI2kY)  
+  <sub>The Globe and Mail, 4 hours ago</sub>  
+  Bernstein analyst Chad Dillard maintained a Hold rating on Caterpillar today and set a price target of $1,002.00. Dillard covers the Industrials sector,...
+- [These are the 10 most popular cat names in America](https://www.wgrz.com/article/news/nation-world/most-popular-cat-names-2026/507-6a575dcf-2812-4e65-89fe-14b7e6b7c931)  
+  <sub>WGRZ, 3 hours ago</sub>  
+  WASHINGTON — If you have a cat named Luna, you're in good company. The name has held the top spot on U.S. News & World Report's annual list of the most...
+- [MRNA Stock Rallies Over 40% In June: Moderna Bets Its Future On Cancer, Autoimmune Disease And AI-Powered mRNA](https://stocktwits.com/news-articles/markets/equity/mrna-bets-on-cancer-autoimmune-ai-powered-mrna/cZ1Bz9FR7h4)  
+  <sub>Stocktwits, 9 hours ago</sub>  
+  Cancer was a key focus, with programs targeting solid tumors, Lynch syndrome, melanoma, and non-small cell lung cancer.
+- [3 Stocks That Pay Dividends and Offer AI Exposure](https://www.tradingview.com/news/zacks:f30bb8cf2094b:0-3-stocks-that-pay-dividends-and-offer-ai-exposure/)  
+  <sub>TradingView, 16 hours ago</sub>  
+  Dividends come with many great perks, with the payouts essentially reflecting a form of 'payday' in the market. Technology sector stocks are often...
+- [Chasing A National Championship—Opportunity Still Knocks In Clearwater And Englewood Beach](https://www.powerboatnation.com/chasing-a-national-championship-opportunity-still-knocks-in-clearwater-and-englewood-beach/)  
+  <sub>Powerboat Nation, 2 hours ago</sub>  
+  If the American Power Boat Association Offshore National Championship ended today—as in before this weekend's Clearwater 'Nationals'—results would rest on...
+- [Caterpillar stock gains 0.93 percent as earnings top estimates](https://www.ad-hoc-news.de/boerse/news/corporate-news/caterpillar-stock-gains-0-93-percent-as-earnings-top-estimates/70153685)  
+  <sub>AD HOC NEWS, 5 hours ago</sub>  
+  Caterpillar stock closed at USD 816.50 on September 21, 2026, while Q2 EPS reached USD 8.17. Revenue rose 23.7 percent year over year.
+- [Red Cat CEO Just Sold $1.6 Million of Stock. Wall Street Sees 144% Rally Ahead.](https://www.barchart.com/story/news/4714038/red-cat-ceo-just-sold-1-6-million-of-stock-wall-street-sees-144-rally-ahead)  
+  <sub>Barchart.com, 23 hours ago</sub>  
+  Red Cat shares have tumbled from their 52-week high as CEO Jeffrey Thompson sells $1.6 million worth of stock, putting insider activity in focus.
+
+</details>
+
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.15</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Price and chart</b> — score -0.20</summary>
+
+```text
+Last close 805.66 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 803.75 (+0.2%), 50d 834.91 (-3.5%), 200d 786.35 (+2.5%); 50d above 200d
+Momentum: RSI(14) 47.0 | MACD -9.932 vs signal -13.428 (histogram 3.496)
+Returns: 1d -1.3% | 5d +2.8% | 1m -2.7% | 3m -18.1%
+52-week range: 463.72 - 1,064.90 (now 56.9% of the way up)
+Volatility: ATR(14) 23.99 (3.0% of price) | annualised 20d 26.0%
 Volume: 0.25x the 20-day average
 ```
 
 </details>
 
-<details><summary><b>Company numbers</b> — score +0.35</summary>
+<details><summary><b>Company numbers</b> — score +0.45</summary>
 
 ```text
-Sector: Industrials / Farm & Heavy Construction Machinery | market cap 376.84B
-Valuation: trailing P/E 35.31 | forward P/E 25.32 | P/B 19.43 | PEG 1.42
+Sector: Industrials / Farm & Heavy Construction Machinery | market cap 370.34B
+Valuation: trailing P/E 34.74 | forward P/E 24.88 | P/B 19.09 | PEG 1.42
 Profitability: profit margin 14.5% | operating margin 22.2% | ROE 57.0%
 Growth (YoY): revenue +24.0% | earnings +68.2%
 Balance sheet: debt/equity 232.8% | free cash flow 5.05B
@@ -626,13 +603,13 @@ Next earnings: 2026-10-29
 
 </details>
 
-<details><summary><b>What this fund holds</b> — score +0.35</summary>
+<details><summary><b>What this fund holds</b> — score +0.45</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>Does this company beat its own forecasts</b> — score +0.35</summary>
+<details><summary><b>Does this company beat its own forecasts</b> — score +0.45</summary>
 
 ```text
 Earnings record, last 4 quarters: 4 beats
@@ -641,19 +618,19 @@ Earnings record, last 4 quarters: 4 beats
 
 </details>
 
-<details><summary><b>What holding this fund costs you</b> — score +0.35</summary>
+<details><summary><b>What holding this fund costs you</b> — score +0.45</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>How much oil and gas is in storage</b> — score +0.35</summary>
+<details><summary><b>How much oil and gas is in storage</b> — score +0.45</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>How the crop is growing</b> — score +0.35</summary>
+<details><summary><b>How the crop is growing</b> — score +0.45</summary>
 
 _Not available today._
 
@@ -664,7 +641,7 @@ _Not available today._
 ```text
 Consensus: buy (mean 2.14 on a 1=strong buy to 5=strong sell scale, 26 analysts)
 Ratings: 1 strong buy, 13 buy, 12 hold, 1 sell, 1 strong sell
-Price target: mean 975.61 (+19.0% vs last close), range 575.00 - 1,225.00
+Price target: mean 975.61 (+21.1% vs last close), range 575.00 - 1,225.00
 Recent rating changes:
   - 2024-10-14 JP Morgan: main, Overweight -> Overweight
   - 2024-10-14 Morgan Stanley: down, Equal-Weight -> Underweight
@@ -684,7 +661,7 @@ _Not available today._
 
 </details>
 
-<details><summary><b>Buying and selling by company insiders</b> — score -0.10</summary>
+<details><summary><b>Buying and selling by company insiders</b> — score -0.15</summary>
 
 ```text
 Last 180 days: bought 169,246 shares in 20 transaction(s) | sold 128,174 shares in 10
@@ -702,157 +679,13 @@ Sales — weak evidence on their own; often scheduled 10b5-1 plans, tax on vesti
 
 </details>
 
-<details><summary><b>Who is positioned how</b> — score -0.10</summary>
+<details><summary><b>Who is positioned how</b> — score -0.15</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>Money going into and out of this fund</b> — score -0.10</summary>
-
-_Not available today._
-
-</details>
-
-### Elbit Systems (ESLT) · Company — NEUTRAL, confidence 0.35
-
-**In the model's own words:**
-
-> Elbit Systems shows mixed signals that don't cohere into a directional conviction. The rebranding of its U.S. segment as Twenty-Six Defense is corporate repositioning that may improve market access, but it is a structural change not a catalyst with near-term margin impact. Fundamentals are strong: four consecutive earnings beats, 34% YoY earnings growth, and healthy 15.2% ROE. However, the valuation is stretched—a 56x trailing P/E and 41x forward P/E on a defense industrials name trades at a significant premium. Technicals show modest momentum with RSI at 54.7 and MACD histogram positive, but the stock is 1.5-1.7% below its 50d and 200d moving averages, with volume at 0.14x the 20-day average, suggesting positioning is thin and conviction among participants is low. The analyst consensus is 'hold' with a mean target of 816 (+8.7%), implying limited upside. Insider selling in April—including the CEO's substantial 25k share sale—was clustered and substantial, though without buys to counter it, the signal remains ambiguous and may reflect scheduled diversification rather than conviction. The rebranding announcement is news-cycle fodder, not a material catalyst. Near-term earnings are not until late November, leaving a long period of data vacuum. The absence of independent corroboration across dimensions—bullish earnings history undercut by expensive valuation and analyst skepticism, weak volume, and lack of insider buying conviction—does not support a high-conviction directional call.
-
-**Main reasons it gave:**
-- Four consecutive quarterly earnings beats; 34% YoY earnings growth
-- Valuation stretched at 56x trailing P/E; analyst consensus 'hold' with modest +8.7% upside
-- Rebranding announcement is structural repositioning, not near-term catalyst
-- Volume at 0.14x 20d average and price below both 50d and 200d SMAs suggest weak positioning
-- CEO and officer sales in April aggregating ~45k shares with no offsetting insider buys
-
-<details><summary><b>News</b> — score +0.20</summary>
-
-- [Elbit Systems (TASE:ESLT) Just Gave Investors Something To Think About](https://simplywall.st/stocks/il/capital-goods/tase-eslt/elbit-systems-shares/news/elbit-systems-taseeslt-just-gave-investors-something-to-thin/amp)  
-  <sub>Simply Wall Street, 9 hours ago</sub>  
-  Elbit Systems (TASE:ESLT) just reshaped its U.S. presence by rebranding its American operating segment as Twenty-Six Defense. This move puts domestic design...
-- [Why Is Elbit Systems (TASE:ESLT) Rebranding Its U.S. Business As Twenty Six Defense?](https://finance.yahoo.com/markets/stocks/articles/why-elbit-systems-tase-eslt-171034248.html)  
-  <sub>Yahoo Finance, 22 hours ago</sub>  
-  Elbit Systems (TASE:ESLT) has rebranded its U.S. operating segment as Twenty-Six Defense, targeting the domestic American defense market.
-
-</details>
-
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Price and chart</b> — score +0.15</summary>
-
-```text
-Last close 750.72 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 721.88 (+4.0%), 50d 762.15 (-1.5%), 200d 763.87 (-1.7%); 50d below 200d
-Momentum: RSI(14) 54.7 | MACD -5.690 vs signal -12.652 (histogram 6.962)
-Returns: 1d +1.0% | 5d +3.6% | 1m +0.9% | 3m -3.1%
-52-week range: 454.95 - 1,014.33 (now 52.9% of the way up)
-Volatility: ATR(14) 16.19 (2.2% of price) | annualised 20d 15.5%
-Volume: 0.14x the 20-day average
-```
-
-</details>
-
-<details><summary><b>Company numbers</b> — score +0.35</summary>
-
-```text
-Sector: Industrials / Aerospace & Defense | market cap 35.18B
-Valuation: trailing P/E 56.49 | forward P/E 40.88 | P/B 7.96 | PEG n/a
-Profitability: profit margin 7.4% | operating margin 9.6% | ROE 15.2%
-Growth (YoY): revenue +15.9% | earnings +34.2%
-Balance sheet: debt/equity 19.3% | free cash flow -38.48M
-Risk: beta -0.30 | short interest 0.8% of float
-Next earnings: 2026-11-24
-```
-
-</details>
-
-<details><summary><b>What this fund holds</b> — score +0.35</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Does this company beat its own forecasts</b> — score +0.35</summary>
-
-```text
-Earnings record, last 4 quarters: 4 beats
-  2026-06-30 beat by 10% | 2026-03-31 beat by 16% | 2025-12-31 beat by 16% | 2025-09-30 beat by 21%
-```
-
-</details>
-
-<details><summary><b>What holding this fund costs you</b> — score +0.35</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How much oil and gas is in storage</b> — score +0.35</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How the crop is growing</b> — score +0.35</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts and big funds say</b> — score -0.15</summary>
-
-```text
-Consensus: hold (mean 2.67 on a 1=strong buy to 5=strong sell scale, 6 analysts)
-Ratings: 0 strong buy, 1 buy, 5 hold, 0 sell, 0 strong sell
-Price target: mean 816.33 (+8.7% vs last close), range 518.00 - 960.00
-Recent rating changes:
-  - 2026-08-19 JP Morgan: main, Neutral -> Neutral
-  - 2026-06-24 Jefferies: main, Hold -> Hold
-  - 2026-05-27 Jefferies: main, Hold -> Hold
-  - 2026-05-27 JP Morgan: main, Neutral -> Neutral
-  - 2026-04-13 JP Morgan: main, Neutral -> Neutral
-  - 2026-03-22 Jefferies: main, Hold -> Hold
-Institutional ownership: 23.0%
-Largest holders: Clal Insurance Enterprises Holdings Ltd (3.5%), Vanguard Capital Management LLC (1.6%), Van Eck Associates Corporation (1.2%), Y.D. More Investments Ltd (1.0%), Altshuler Shaham Ltd (1.0%)
-```
-
-</details>
-
-<details><summary><b>What analysts say about what this fund holds</b> — score -0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Buying and selling by company insiders</b> — score -0.20</summary>
-
-```text
-Last 180 days: bought 82,000 shares in 7 transaction(s) | sold 69,736 shares in 7
-Net: +12,264 shares (+0.1% of insider holdings) | insiders hold 19,278,816 shares
-Distinct insiders: 0 buying, 5 selling
-Sales — weak evidence on their own; often scheduled 10b5-1 plans, tax on vesting, or diversification:
-  - 2026-04-09 DELMAR HAIM DANIEL (Officer): 7,654 shares, 6.79M
-  - 2026-04-09 MACHLIS BEZHALEL (Chief Executive Officer): 25,514 shares, 22.64M
-  - 2026-04-09 VERED YEHUDA (Officer): 5,953 shares, 5.28M
-  - 2026-04-09 KRIL RAN (Officer): 6,803 shares, 6.04M
-(5 grant/option/gift transaction(s) excluded — compensation, not a view on the price)
-```
-
-</details>
-
-<details><summary><b>Who is positioned how</b> — score -0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Money going into and out of this fund</b> — score -0.20</summary>
+<details><summary><b>Money going into and out of this fund</b> — score -0.15</summary>
 
 _Not available today._
 
@@ -860,79 +693,77 @@ _Not available today._
 
 ### HDFC Bank (HDB) · Company — NEUTRAL, confidence 0.35
 
-**Result:** REJECTED · bias is NEUTRAL; no trade
-
 **In the model's own words:**
 
-> News is mostly noise (HDB Financial Services items are a different entity, plus generic roundups); the only ticker-specific piece is a balanced Seeking Alpha note on margin pressure. Technically the stock is below its 200d with a bearish 50/200 cross and sits near the bottom of its 52-week range, though short-term momentum has improved on very thin volume (0.23x). Fundamentals are solid (16-18% growth, 27% margins) but P/B 9.5 is rich and ROE 13.8% is subdued. Analyst targets imply +30% upside, but the coverage set is small and stale. No insider transactions. Nothing here justifies a directional bet ahead of Oct 17 earnings.
+> HDB faces conflicting signals that warrant a neutral stance. The technical picture is weakly positive (RSI 52, MACD histogram positive, price above 20d SMA) but volume is below average at 0.26x, and the stock trades 15.5% below its 200d MA in a downtrend structure. Fundamentals are solid: 16.3x trailing P/E with 18% earnings growth, 33.3% operating margins, and a 2-beat, 2-in-line earnings record showing resilience though recent quarters have aligned with consensus rather than surprised. Analyst consensus is buy with a +32% mean price target, but recent rating changes (JP Morgan downgrade to Neutral in July 2024) and the wide dispersion (26.10-35.00 range) suggest disagreement. The news block contains material noise: multiple shareholder lawsuit alerts and a vague reference to 'CEO search' supporting shares, but these are neither fresh catalysts nor independently corroborated; the lawsuit items appear boilerplate and lack specificity. No insider buying or selling over 180 days is neutral, not bullish. With earnings scheduled for Oct 17 (25 days out), near-term catalysts are limited. The stock's 52-week positioning (9.6% from lows, 38% below highs) and elevated volatility (37.6% annualized) reflect uncertainty rather than conviction. Positive momentum and valuation do not overcome thin volume, technical breakdown structure, and absence of a clear, material, ticker-specific catalyst.
 
 **Main reasons it gave:**
-- Price -14.4% vs 200d SMA with 50d below 200d, only 11.9% up the 52-week range
-- Volume 0.23x 20-day average limits signal value of the +2.2% day
-- Most headlines refer to HDB Financial Services or are generic market roundups, not HDB itself
-- Revenue +16.6%/earnings +18.1% but P/B 9.46 and ROE 13.8% with margin pressure flagged
-- Consensus buy with mean target 30.77 (+30%), but only 4 analysts and no recent rating changes
+- Stock 15.5% below 200-day MA with 50d below 200d, indicating medium-term weakness
+- Trailing P/E 16.3x with 18% earnings growth supports valuation, but recent beats have given way to in-line results
+- Analyst consensus buy with +32% price target, but JP Morgan downgrade and wide target range (26.10-35.00) signal disagreement
+- Volume at 0.26x average creates timing risk despite positive RSI and MACD structure
+- No insider activity and multiple lawsuit alerts lacking specificity do not provide directional conviction
 
-<details><summary><b>News</b> — score +0.05</summary>
+<details><summary><b>News</b> — score +0.10</summary>
 
-- [HDFC Bank: Growth Is Back, But The Margin Recovery Matters More (NYSE:HDB)](https://seekingalpha.com/article/4948335-hdfc-bank-growth-is-back-but-the-margin-recovery-matters-more)  
-  <sub>Seeking Alpha, 38 minutes ago</sub>  
-  HDFC Bank (HDB) shows strong loan growth and asset quality, but margins/ROE lag.
-- [HDB: HDFC Bank Limited - Stock Price, Quote and News | NYSE](https://techgraph.co/stock-market/quote/hdb/)  
-  <sub>TechGraph, 4 hours ago</sub>  
-  HDB: HDFC Bank Limited stock price, quote and news on NYSE. Live HDB chart, volume, 52-week range and coverage on TechGraph.
-- [MCAT - Price, Charts & Blockchain Insights](https://intellectia.ai/crypto/MCAT)  
-  <sub>Intellectia AI, 6 hours ago</sub>  
-  PAGE NOT FOUND. Oops! It seems the page you are looking for does not exist... Back to Homepage. Blog. Get What You Are Looking For Here. oil prices,stock...
-- [Benchmarks trade near the day's high; metal shares tumble on profit booking](https://www.business-standard.com/markets/capital-market-news/benchmarks-trade-near-the-day-s-high-metal-shares-tumble-on-profit-booking-126092100577_1.html)  
-  <sub>Business Standard, 6 hours ago</sub>  
-  The domestic equity barometers traded with strong gains and hit fresh intraday high in afternoon trade, supported by easing crude oil prices and positive...
-- [HDB Financial Services - Positive Breakout: These 12 midcap stocks cross above their 200 DMAs](https://m.economictimes.com/markets/stocks/news/positive-breakout-these-12-midcap-stocks-cross-above-their-200-dmas/hdb-financial-services/slideshow/134378054.cms)  
-  <sub>The Economic Times, 13 hours ago</sub>  
-  200 DMA: Rs 696.53| LTP: Rs 698.4 HDB Financial Services.
-- [688187.SH Technical Analysis & Stock Price Forecast](https://intellectia.ai/en/stock/688187.SH/technical)  
-  <sub>Intellectia AI, 15 hours ago</sub>  
-  Get realtime 688187.SH technical analysis, moving averages, RSI, and MACD indicators. View professional stock forecasts and buy/sell signals.
-- [HDB Financial Services ESOP Allotment: 29,480 Shares Issued](https://www.kalkine.co.in/article/announcements/hdb-financial-services-nsehdbfs-what-triggered-the-allotment-of-29480-equity-shares-under-esop)  
-  <sub>Kalkine India, 8 hours ago</sub>  
-  HDB Financial Services (NSE:HDBFS) allotted 29480 equity shares under its ESOP on 21 Sep 2026, raising paid-up capital. Here is what investors should know.
-- [HDB Financial Services allots 29,480 equity shares under ESOS](https://www.business-standard.com/markets/capital-market-news/hdb-financial-services-allots-29-480-equity-shares-under-esos-126092100526_1.html)  
-  <sub>Business Standard, 6 hours ago</sub>  
-  HDB Financial Services has allotted 29480 equity shares to the employees of the company pursuant to exercise of options under its Employees Stock Option...
-- [Which NBFCs will gain the most from rate hike cycle? JM Financial lists top picks](https://m.economictimes.com/markets/stocks/news/which-nbfcs-will-gain-the-most-from-rate-hike-cycle-jm-financial-lists-top-picks/amp_articleshow/134386955.cms)  
-  <sub>The Economic Times, 5 hours ago</sub>  
-  Soaring bond yields and rate hike worries have led to a downturn in Indian NBFC stocks, with JM Financial noting that investors must juxtapose the NIM...
-- [688187.SH Earning Date, Earning Analysis and Earning Prediction](https://intellectia.ai/en/stock/688187.SH/earnings)  
-  <sub>Intellectia AI, 15 hours ago</sub>  
-  Explore 688187.SH earnings with our in-depth analysis, covering revenue trends, EPS, earnings surprises, and market reactions. Get detailed insights into...
+- [HDFC BANK LIMITED (HDB) SHAREHOLDER ALERT Bernstein](https://www.google.com/goto?url=CAES-AEB6zswFSfTaNtkVhD3clbp8ZH9h9zYGIRU7-XTkm4lyMPTaGBgZ-np6cglSIbqOORQq-0LCjI8weV5ULgF5HJkOBeGytBXp168V5-5pW3DIZyc8zqXrEnhauz95vXIqfAy49fA3nYiKx_IwsuD6zgJ3zOYYGpKyuNqXzLqgNNKJ_3sc0SWRwzYWcPsRdTJZJkHQy_4Zs9UISlz7EoWc7frcKmIJCEQ23ADJXhuOItJMTlkPDjsye2qDeLzmbTwpkLfIuV9tr9j_MHaJBaarlCmo2Ak1ygkbqHwhWUFxPZCgB1Xcsc3C31LGIQw9lJBeMAosxmrRqePeA)  
+  <sub>GlobeNewswire, 23 minutes ago</sub>  
+  HDFC Bank Shareholders Between July 17, 2023 and May 26, 2026 - Contact Bernstein Liebhard For More Information Regarding Lawsuit...
+- [Avoiding Lag: Real-Time Signals in (HDB) Movement](https://news.stocktradersdaily.com/news_release/134/Avoiding_Lag:_Real-Time_Signals_in_HDB_Movement_092126055002_1790027402.html)  
+  <sub>Stock Traders Daily, 21 hours ago</sub>  
+  Key findings for Hdfc Bank Limited (NYSE: HDB). Positive Near-Term Sentiment May Begin to Shift Broader Weak Alignment; Resistance is being tested.
+- [NSE’s ₹226 billion IPO gets subdued demand from retail crowd](https://www.tradingview.com/news/moodys:f660a36026eeb:0-nse-s-226-billion-ipo-gets-subdued-demand-from-retail-crowd/)  
+  <sub>TradingView, 8 hours ago</sub>  
+  National Stock Exchange of India Ltd.'s ₹226 billion ($2.4 billion) initial public offering drew subdued demand particularly from retail investors as...
+- [HDFC Bank stock gains as CEO search supports shares](https://www.ad-hoc-news.de/boerse/news/nebenwerte/hdfc-bank-stock-gains-as-ceo-search-supports-shares/70151734)  
+  <sub>AD HOC NEWS, 9 hours ago</sub>  
+  HDB, US40415F1012. HDFC Bank stock gains as CEO search supports shares. Published on 09/22/2026 at 08:17 | Editorial responsibility: Rafael Müller,...
+- [Short-term headwinds, long-term calm: 6 mid-cap stocks from different sectors with upside potential of up](https://economictimes.indiatimes.com/markets/stocks/news/short-term-headwinds-long-term-calm-6-mid-cap-stocks-from-different-sectors-with-upside-potential-of-up-to-22/articleshow/134407728.cms)  
+  <sub>The Economic Times, 6 hours ago</sub>  
+  This is not the time to expect that every stock you own will do well; or that you will make quick and easy gains. If you are entering the market,...
+- [Firefighter, 2 others taken to hospital after fire at Ang Mo Kio HDB flat, Singapore News](https://www.asiaone.com/singapore/ang-mo-kio-hdb-fire-firefighter-2-taken-hospital)  
+  <sub>AsiaOne, 3 hours ago</sub>  
+  A firefighter and two people were taken to the hospital after a fire broke out at a HDB unit in Ang Mo Kio.The incident occurred at Blk 254 Ang Mo Kio...
+- [HDB Financial Services - Negative Breakout: These 9 stocks cross below their 200 DMAs](https://m.economictimes.com/markets/stocks/news/negative-breakout-these-9-stocks-cross-below-their-200-dmas/hdb-financial-services/slideshow/134400522.cms)  
+  <sub>The Economic Times, 12 hours ago</sub>  
+  In the Nifty500 pack, nine stocks' closing prices crossed below their 200-day moving averages (DMA) on September 21, according to technical scan data from...
+- [Deadline Alert: HDFC Bank Limited (HDB) Shareholders Who](https://www.globenewswire.com/news-release/2026/09/21/3365830/0/en/deadline-alert-hdfc-bank-limited-hdb-shareholders-who-lost-money-urged-to-contact-glancy-prongay-wolke-rotter-llp-about-securities-fraud-lawsuit.html)  
+  <sub>GlobeNewswire, 20 hours ago</sub>  
+  LOS ANGELES, Sept. 21, 2026 (GLOBE NEWSWIRE) -- Glancy Prongay Wolke & Rotter LLP reminds investors of the upcoming October 13, 2026 deadline to file...
+- [Vietnam stocks fall below 1,800 on first day as emerging market](https://www.google.com/goto?url=CAESnQEB6zswFeXEmxgNvYDCGMd8-rCz9OfLuSKlIPM5fWErSYz4fmAg03WX-ej6lXKfhKburaF8R-wLJwgYZP8b5-CYBynDKWNAX4l-Bg5UZhy5d00aP-OoIVuCs4XFgZsP4YRY-bqEVgKTMrMqraHuWnooXOmVr8aF6_7LVl9aU3BdQuBdG0aKdcoDcorvstWNjRwEHiysJDNXOMNsDAJE)  
+  <sub>Báo VietNamNet, 22 hours ago</sub>  
+  Vietnamese stocks fell 0.88% on the day the market officially joined FTSE Russell's secondary emerging-market category, with the VN-Index slipping below...
+- [HDBank interest rates today, deposit 500 million and receive 75 million VND in interest](https://news.laodong.vn/kinh-doanh/lai-suat-hdbank-hom-nay-gui-500-trieu-nhan-75-trieu-dong-tien-lai-1771084.ldo)  
+  <sub>Laodong.vn, 2 hours ago</sub>  
+  According to records on September 22, 2026 at Ho Chi Minh City Development Joint Stock Commercial Bank (HDBank), online deposit products have higher listed...
 
 </details>
 
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.05</summary>
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.10</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>Price and chart</b> — score -0.15</summary>
+<details><summary><b>Price and chart</b> — score +0.20</summary>
 
 ```text
-Last close 23.67 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 22.91 (+3.3%), 50d 23.55 (+0.5%), 200d 27.65 (-14.4%); 50d below 200d
-Momentum: RSI(14) 55.8 | MACD -0.151 vs signal -0.270 (histogram 0.119)
-Returns: 1d +2.2% | 5d +3.4% | 1m +1.4% | 3m -5.7%
-52-week range: 21.84 - 37.18 (now 11.9% of the way up)
-Volatility: ATR(14) 0.56 (2.4% of price) | annualised 20d 37.3%
-Volume: 0.23x the 20-day average
+Last close 23.31 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 22.90 (+1.8%), 50d 23.48 (-0.8%), 200d 27.58 (-15.5%); 50d below 200d
+Momentum: RSI(14) 52.0 | MACD -0.111 vs signal -0.238 (histogram 0.127)
+Returns: 1d -1.5% | 5d +3.2% | 1m -1.3% | 3m -6.9%
+52-week range: 21.84 - 37.18 (now 9.6% of the way up)
+Volatility: ATR(14) 0.55 (2.4% of price) | annualised 20d 37.6%
+Volume: 0.26x the 20-day average
 ```
 
 </details>
 
-<details><summary><b>Company numbers</b> — score +0.25</summary>
+<details><summary><b>Company numbers</b> — score +0.45</summary>
 
 ```text
-Sector: Financial Services / Banks - Regional | market cap 121.61B
-Valuation: trailing P/E 16.55 | forward P/E 17.01 | P/B 9.46 | PEG n/a
+Sector: Financial Services / Banks - Regional | market cap 119.76B
+Valuation: trailing P/E 16.30 | forward P/E 16.75 | P/B 9.31 | PEG n/a
 Profitability: profit margin 26.8% | operating margin 33.3% | ROE 13.8%
 Growth (YoY): revenue +16.6% | earnings +18.1%
 Balance sheet: debt/equity n/a | free cash flow n/a
@@ -942,13 +773,13 @@ Next earnings: 2026-10-17
 
 </details>
 
-<details><summary><b>What this fund holds</b> — score +0.25</summary>
+<details><summary><b>What this fund holds</b> — score +0.45</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>Does this company beat its own forecasts</b> — score +0.25</summary>
+<details><summary><b>Does this company beat its own forecasts</b> — score +0.45</summary>
 
 ```text
 Earnings record, last 4 quarters: 2 beats, 2 in line
@@ -957,19 +788,19 @@ Earnings record, last 4 quarters: 2 beats, 2 in line
 
 </details>
 
-<details><summary><b>What holding this fund costs you</b> — score +0.25</summary>
+<details><summary><b>What holding this fund costs you</b> — score +0.45</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>How much oil and gas is in storage</b> — score +0.25</summary>
+<details><summary><b>How much oil and gas is in storage</b> — score +0.45</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>How the crop is growing</b> — score +0.25</summary>
+<details><summary><b>How the crop is growing</b> — score +0.45</summary>
 
 _Not available today._
 
@@ -980,7 +811,7 @@ _Not available today._
 ```text
 Consensus: buy (mean 1.75 on a 1=strong buy to 5=strong sell scale, 4 analysts)
 Ratings: 1 strong buy, 2 buy, 1 hold, 0 sell, 0 strong sell
-Price target: mean 30.77 (+30.0% vs last close), range 26.10 - 35.00
+Price target: mean 30.77 (+32.1% vs last close), range 26.10 - 35.00
 Recent rating changes:
   - 2024-07-22 JP Morgan: down, Overweight -> Neutral
   - 2019-09-09 Bernstein: down, Outperform -> Market Perform
@@ -1022,220 +853,223 @@ _Not available today._
 
 </details>
 
-### JPMorgan Chase (JPM) · Company — NEUTRAL, confidence 0.35
+### MercadoLibre (MELI) · Company — NEUTRAL, confidence 0.35
 
 **Result:** REJECTED · bias is NEUTRAL; no trade
 
 **In the model's own words:**
 
-> The $20B QIA asset-management partnership is real but immaterial to near-term earnings for a $935B bank, and much of the remaining flow is Zacks/listicle noise. Technicals are flat-to-soft: price below 20d and 50d, MACD negative, RSI 47, volume 0.19x average, though the 50d>200d uptrend and +9.6% vs 200d remain intact. Fundamentals are sound (15x forward, 17.8% ROE, four straight beats) but earnings are three weeks out on 10/13. Consensus is a lukewarm buy with only 6.8% upside and no fresh rating changes; insider net share count is positive only via grants, with 10 distinct sellers and zero open-market buyers. No corroborated catalyst for the next few days.
+> News flow is generic filler (price recaps, comparison listicles, FCF-yield blurb) with no ticker-specific catalyst. Technicals are weak: price below 20/50/200d SMAs, MACD deeply negative, RSI 40, -6.4% over a month, though 50d still above 200d and volume is thin. Fundamentals are mixed: 49.8% revenue growth and 27.5% ROE against declining earnings, 168% debt/equity, 48x trailing P/E, and a poor record of 3 misses in the last 4 quarters. Analysts remain constructive with a ~26% target gap, but recent actions are reiterations, not fresh upgrades. Two small open-market insider buys months ago are mildly positive but stale. Conflicting inputs with no catalyst argue for no directional call.
 
 **Main reasons it gave:**
-- $20B QIA partnership is fee-business scale, not near-term EPS mover
-- Price below 20d/50d SMAs, MACD histogram -0.96, RSI 47.5
-- Volume 0.19x 20-day average — thin, low-information tape
-- 4 consecutive earnings beats; earnings 2026-10-13, outside window
-- Consensus buy but only +6.8% to mean target; no recent rating changes
-- 10 distinct insider sellers, zero open-market buyers
+- Price below 20d (-5.6%), 50d (-4.0%) and 200d SMA with MACD histogram -18.5
+- 3 misses in last 4 quarters vs consensus
+- Revenue +49.8% YoY but earnings -10.9%, trailing P/E 48.9, D/E 168.6%
+- Analyst mean target 2,264.88 (+25.8%) but only reiterations recently
+- News items are price recaps and comparison listicles, no catalyst
 
-<details><summary><b>News</b> — score +0.15</summary>
+<details><summary><b>News</b> — score +0.05</summary>
 
-- [Investors Heavily Search JPMorgan Chase & Co. (JPM): Here is What You Need to Know](https://finance.yahoo.com/markets/stocks/articles/investors-heavily-search-jpmorgan-chase-130003199.html)  
-  <sub>Yahoo Finance, 2 hours ago</sub>  
-  JPMorgan Chase & Co. (JPM) is one of the stocks most watched by Zacks.com visitors lately. So, it might be a good idea to review some of the factors that...
-- [J.P. Morgan and Qatar’s investment authority plan $20B for stocks and U.S. businesses](https://www.stocktitan.net/news/JPM/qia-and-j-p-morgan-asset-management-announce-20-billion-strategic-lvu4iu9e7ix1.html)  
-  <sub>Stock Titan, 3 hours ago</sub>  
-  J.P. Morgan Asset Management (JPM) and Qatar Investment Authority have signed a Memorandum of Understanding for a USD 20 billion strategic investment...
-- [J.P. Morgan and Qatar Investment Authority ink $20B partnership (JPM:NYSE)](https://seekingalpha.com/news/4644742-j-p-morgan-and-qatar-investment-authority-ink-20b-partnership)  
-  <sub>Seeking Alpha, 2 hours ago</sub>  
-  JPMorgan Asset Management and Qatar Investment Authority launch a $20B partnership spanning public equities and private credit.
-- [Zacks Market Edge Highlights: ExxonMobil, JPMorgan Chase and NVIDIA](https://www.tradingview.com/news/zacks:84adcc7ce094b:0-zacks-market-edge-highlights-exxonmobil-jpmorgan-chase-and-nvidia/)  
-  <sub>TradingView, 2 hours ago</sub>  
-  For Immediate ReleaseChicago, IL – September 21, 2026 – Zacks Market Edge is a podcast hosted weekly by Zacks Stock Strategist Tracey Ryniec.
-- [JPM Looks 15.1% Overvalued on GF Value™ as Dividend Sustainabili](https://www.gurufocus.com/news/9090048/jpm-looks-151-overvalued-on-gf-value-as-dividend-sustainability-takes-center-stage)  
-  <sub>GuruFocus, 25 minutes ago</sub>  
-  On September 21, 2026, JPMorgan Chase & Co (NYSE: JPM) announced a $20 billion strategic partnership with the Qatar Investment Authority (QIA),...
-- [Fed Rate Hike Fails to Lift Bank Stocks as Market Reprices the Rally](https://www.aol.com/articles/fed-rate-hike-fails-lift-132042000.html)  
-  <sub>AOL.com, 2 hours ago</sub>  
-  The Fed raised rates for the first time in three years, and bank stocks promptly sold off. What looks like a contradiction might be a warning about where...
-- [Apple: JPM says iPhone 18 lead times increase in second week](https://www.investing.com/news/stock-market-news/apple-jpm-says-iphone-18-lead-times-increase-in-second-week-4908259)  
-  <sub>Investing.com, 9 hours ago</sub>  
-  Investing.com-- Apple Inc's (NASDAQ:AAPL) new iPhone 18 Pro lineup saw increased lead times in its second week of orders and now broadly matches those seen...
-- [JPMorgan Chase & Co. $JPM Shares Sold by Palisade Capital Management LP](https://www.marketbeat.com/instant-alerts/filing-jpmorgan-chase-co-jpm-shares-sold-by-palisade-capital-management-lp-2026-09-21/)  
-  <sub>MarketBeat, 7 hours ago</sub>  
-  Palisade Capital Management LP reduced its position in JPMorgan Chase & Co. (NYSE:JPM) by 8.2% during the 2nd quarter, according to its most recent filing...
-- [Will JPMorgan's Selective M&A Strategy Expand Growth Runway?](https://www.tradingview.com/news/zacks:ce228a5e2094b:0-will-jpmorgan-s-selective-m-a-strategy-expand-growth-runway/)  
-  <sub>TradingView, 2 hours ago</sub>  
-  JPMorgan Chase JPM does not need acquisitions to fuel growth, but that may be exactly what gives it an edge when the right opportunity emerges.
-- [JPM, Jamie Dimon to Boost Investment in India's Thriving Market](https://www.gurufocus.com/news/9089744/jpm-jamie-dimon-to-boost-investment-in-indias-thriving-market)  
-  <sub>GuruFocus, 2 hours ago</sub>  
-  On September 21, 2026, JPMorgan Chase CEO Jamie Dimon is set to visit India as the firm intensifies its focus on the local market. The stock ticker for...
+- [Is MercadoLibre Stock As Cheap As Its Cash Says?](https://www.trefis.com/stock/meli/articles/615992/is-mercadolibre-stock-as-cheap-as-its-cash-says/2026-09-21)  
+  <sub>Trefis, 20 hours ago</sub>  
+  MercadoLibre (MELI) produced free cash flow worth 13.7% of its market value over the past twelve months, about three times the 4.5% yield of the median S&P...
+- [Alibaba vs. MercadoLibre: Which Consumer Stock Is a Better Buy in 2026?](https://www.fool.com/coverage/better-buy/2026/09/21/alibaba-vs-mercadolibre-which-consumer-stock-is-a-better-buy-in-2026/)  
+  <sub>The Motley Fool, 14 hours ago</sub>  
+  Alibaba trades at a steep valuation discount while MercadoLibre sustains 39% revenue growth, a classic value-versus-growth showdown with starkly different...
+- [MELI stock ends the day 2.07 percent lower at the close](https://www.ad-hoc-news.de/boerse/news/nebenwerte/meli-stock-ends-the-day-2-07-percent-lower-at-the-close/70147349)  
+  <sub>AD HOC NEWS, 18 hours ago</sub>  
+  On September 21, 2026, MELI stock closed at USD 1787.39 on the Nasdaq, down 2.07 percent from the prior session, while the Nasdaq 100 slipped modestly.
+- [MercadoLibre stock gains 3.53 percent as valuation stays elevated](https://www.ad-hoc-news.de/boerse/news/corporate-news/mercadolibre-stock-gains-3-53-percent-as-valuation-stays-elevated/70155036)  
+  <sub>AD HOC NEWS, 3 hours ago</sub>  
+  MercadoLibre stock traded at USD 1824.00 on September 22, 2026, with a market value of USD 92.292 billion. Revenue reached USD 28.9 billion in fiscal 2025.
+- [MercadoLibre stock heads into the open after a 1.6 percent gain](https://www.ad-hoc-news.de/boerse/news/corporate-news/mercadolibre-stock-heads-into-the-open-after-a-1-6-percent-gain/70150484)  
+  <sub>AD HOC NEWS, 11 hours ago</sub>  
+  MELI, US58733R1023. MercadoLibre stock heads into the open after a 1.6 percent gain. Published on 09/22/2026 at 06:34 | Editorial responsibility: Rafael...
+- [Here's How Much $1000 Invested In MercadoLibre 10 Years Ago Would Be Worth Today](https://www.benzinga.com/news/26/09/61923556/here-s-how-much-1000-invested-mercadolibre-10-years-ago-would-be-worth-today)  
+  <sub>Benzinga, 25 minutes ago</sub>  
+  MercadoLibre (NASDAQ:MELI) has outperformed the market over the past 10 years by 11.73% on an annualized basis producing an average annual return of 25.36%.
 
 </details>
 
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.15</summary>
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.05</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>Price and chart</b> — score -0.15</summary>
+<details><summary><b>Price and chart</b> — score -0.45</summary>
 
 ```text
-Last close 351.62 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 354.47 (-0.8%), 50d 353.50 (-0.5%), 200d 320.75 (+9.6%); 50d above 200d
-Momentum: RSI(14) 47.5 | MACD -0.892 vs signal 0.071 (histogram -0.963)
-Returns: 1d +0.6% | 5d +0.4% | 1m +0.0% | 3m +6.1%
-52-week range: 282.84 - 365.18 (now 83.5% of the way up)
-Volatility: ATR(14) 6.62 (1.9% of price) | annualised 20d 14.0%
-Volume: 0.19x the 20-day average
+Last close 1,800.49 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 1,906.44 (-5.6%), 50d 1,875.50 (-4.0%), 200d 1,849.93 (-2.7%); 50d above 200d
+Momentum: RSI(14) 40.6 | MACD -20.039 vs signal -1.533 (histogram -18.506)
+Returns: 1d -1.1% | 5d -1.6% | 1m -6.4% | 3m +13.7%
+52-week range: 1,546.81 - 2,510.97 (now 26.3% of the way up)
+Volatility: ATR(14) 59.57 (3.3% of price) | annualised 20d 29.1%
+Volume: 0.17x the 20-day average
 ```
 
 </details>
 
-<details><summary><b>Company numbers</b> — score +0.45</summary>
+<details><summary><b>Company numbers</b> — score +0.00</summary>
 
 ```text
-Sector: Financial Services / Banks - Diversified | market cap 934.68B
-Valuation: trailing P/E 15.08 | forward P/E 14.07 | P/B 2.64 | PEG 1.63
-Profitability: profit margin 34.9% | operating margin 50.4% | ROE 17.8%
-Growth (YoY): revenue +30.4% | earnings +46.9%
-Balance sheet: debt/equity n/a | free cash flow n/a
-Risk: beta 0.97 | short interest 1.0% of float
-Next earnings: 2026-10-13
+Sector: Consumer Cyclical / Internet Retail | market cap 91.28B
+Valuation: trailing P/E 48.90 | forward P/E 31.90 | P/B 11.65 | PEG 0.98
+Profitability: profit margin 5.3% | operating margin 6.7% | ROE 27.5%
+Growth (YoY): revenue +49.8% | earnings -10.9%
+Balance sheet: debt/equity 168.6% | free cash flow 353.38M
+Risk: beta 1.31 | short interest 1.6% of float
+Next earnings: 2026-11-04
 ```
 
 </details>
 
-<details><summary><b>What this fund holds</b> — score +0.45</summary>
+<details><summary><b>What this fund holds</b> — score +0.00</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>Does this company beat its own forecasts</b> — score +0.45</summary>
+<details><summary><b>Does this company beat its own forecasts</b> — score +0.00</summary>
 
 ```text
-Earnings record, last 4 quarters: 4 beats
-  2026-06-30 beat by 4% | 2026-03-31 beat by 8% | 2025-12-31 beat by 3% | 2025-09-30 beat by 4%
+Earnings record, last 4 quarters: 1 beat, 3 missed
+  2026-06-30 beat by 4% | 2026-03-31 missed by 7% | 2025-12-31 missed by 6% | 2025-09-30 missed by 13%
 ```
 
 </details>
 
-<details><summary><b>What holding this fund costs you</b> — score +0.45</summary>
+<details><summary><b>What holding this fund costs you</b> — score +0.00</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>How much oil and gas is in storage</b> — score +0.45</summary>
+<details><summary><b>How much oil and gas is in storage</b> — score +0.00</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>How the crop is growing</b> — score +0.45</summary>
+<details><summary><b>How the crop is growing</b> — score +0.00</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What analysts and big funds say</b> — score +0.15</summary>
+<details><summary><b>What analysts and big funds say</b> — score +0.35</summary>
 
 ```text
-Consensus: buy (mean 2.12 on a 1=strong buy to 5=strong sell scale, 21 analysts)
-Ratings: 4 strong buy, 9 buy, 10 hold, 0 sell, 1 strong sell
-Price target: mean 375.38 (+6.8% vs last close), range 305.00 - 436.00
+Consensus: buy (mean 1.58 on a 1=strong buy to 5=strong sell scale, 24 analysts)
+Ratings: 4 strong buy, 15 buy, 5 hold, 0 sell, 0 strong sell
+Price target: mean 2,264.88 (+25.8% vs last close), range 1,750.00 - 2,800.00
 Recent rating changes:
-  - 2026-08-14 Wells Fargo: main, Overweight -> Overweight
-  - 2026-08-03 UBS: main, Buy -> Buy
-  - 2026-07-20 Citigroup: main, Neutral -> Neutral
-  - 2026-07-17 Evercore ISI Group: main, Outperform -> Outperform
-  - 2026-07-16 B of A Securities: main, Buy -> Buy
-  - 2026-07-15 Baird: main, Neutral -> Neutral
-Institutional ownership: 75.7%
-Largest holders: Blackrock Inc. (7.8%), Vanguard Capital Management LLC (6.1%), State Street Corporation (4.7%), Bank of America Corporation (2.6%), Morgan Stanley (2.5%)
+  - 2026-09-03 BTIG: reit, Buy -> Buy
+  - 2026-08-11 JP Morgan: main, Neutral -> Neutral
+  - 2026-08-06 Cantor Fitzgerald: main, Overweight -> Overweight
+  - 2026-08-06 BTIG: reit, Buy -> Buy
+  - 2026-07-15 Citigroup: main, Neutral -> Neutral
+  - 2026-06-02 BTIG: reit, Buy -> Buy
+Institutional ownership: 80.3%
+Largest holders: Capital Research Global Investors (6.2%), BAILLIE GIFFORD & CO (6.0%), Capital International Investors (3.7%), Capital World Investors (3.5%), Morgan Stanley (2.9%)
 ```
 
 </details>
 
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.15</summary>
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.35</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>Buying and selling by company insiders</b> — score -0.10</summary>
+<details><summary><b>Buying and selling by company insiders</b> — score +0.15</summary>
 
 ```text
-Last 180 days: bought 969,320 shares in 22 transaction(s) | sold 230,669 shares in 20
-Net: +738,651 shares (+7.7% of insider holdings) | insiders hold 10,393,508 shares
-Distinct insiders: 0 buying, 10 selling
-Sales — weak evidence on their own; often scheduled 10b5-1 plans, tax on vesting, or diversification:
-  - 2026-09-10 LEOPOLD ROBIN (Officer): 2,500 shares, 882.03K
-  - 2026-08-11 LEOPOLD ROBIN (Officer): 2,500 shares, 903.52K
-  - 2026-06-22 FRIEDMAN STACEY R. (General Counsel): 5,467 shares, 1.81M
-  - 2026-05-20 FRIEDMAN STACEY R. (General Counsel): 5,468 shares, 1.64M
-(22 grant/option/gift transaction(s) excluded — compensation, not a view on the price)
+Last 180 days: bought 0 shares in 0 transaction(s) | sold n/a shares in 0
+Net: +0 shares | insiders hold 3,529,511 shares
+Distinct insiders: 2 buying, 0 selling
+Open-market purchases — insiders spending their own money:
+  - 2026-06-11 MELAMUD MARCELO (Officer): 124 shares, 200.00K
+  - 2026-05-22 AGUZIN ALEJANDRO NICOLAS (Director): 600 shares, 993.56K
+(4 grant/option/gift transaction(s) excluded — compensation, not a view on the price)
 ```
 
 </details>
 
-<details><summary><b>Who is positioned how</b> — score -0.10</summary>
+<details><summary><b>Who is positioned how</b> — score +0.15</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>Money going into and out of this fund</b> — score -0.10</summary>
+<details><summary><b>Money going into and out of this fund</b> — score +0.15</summary>
 
 _Not available today._
 
 </details>
 
-### MercadoLibre (MELI) · Company — NEUTRAL, confidence 0.35
+### Procter & Gamble (PG) · Company — NEUTRAL, confidence 0.35
 
 **In the model's own words:**
 
-> MELI presents conflicting signals that warrant caution. The technical picture is genuinely weak: price is 4.8% below the 20-day SMA, RSI at 42.9 is approaching oversold, MACD has turned negative, and volume is 28% of average—all suggesting near-term downward pressure. The stock has declined 5.2% over one month despite broader strength. News flow is mixed, with recent commentary citing 'earnings outlook' concerns, which aligns with the earnings record showing 3 misses in the last 4 quarters (most recently 13% miss in Sept 2025). Fundamentals are expensive: forward P/E of 32.3 and trailing P/E of 49.5 sit well above tech peers, on a company with high leverage (debt/equity 168.6%) and declining earnings growth (-10.9% YoY) despite strong revenue growth. Analyst consensus (buy, 24 analysts, target +24.3%) is decidedly bullish and fully reflected in the current price, reducing its informational value. Insider activity shows two isolated buying transactions in May-June 2026—meaningful but not recent. The next catalyst (earnings Nov 4) is 44 days away, well beyond our short-term horizon. The company's profitability metrics (27.5% ROE, 6.7% operating margin) are solid, but a richly valued, high-beta name in a correction with deteriorating technicals and a history of missing guidance does not justify conviction above neutral. Short-term technicals argue for a bounce risk, but current setup is tentative.
+> Procter & Gamble presents a mixed picture with conflicting signals across dimensions. The news flow is generic sector commentary and product updates lacking material catalysts—a product refresh and dividend mentions are routine for a defensive name. Technicals show modest positive momentum (RSI 55.4, MACD positive, stock above key moving averages) but also concerning weakness: volume is 0.15x average (well below normal), the stock sits only 32% up from its 52-week low, and the 3-month return is negative despite recent strength. Fundamentals reveal a valuation concern: forward P/E of 19.91 paired with earnings declining 15.5% YoY and a PEG of 3.75 (elevated) suggest the market is pricing in recovery that has not yet appeared. The 4-quarter earnings record of all "in line" results offers no reassurance that consensus expectations will be beaten. Analyst consensus is constructive with a mean 9% upside to target, but recent downgrades from Argus and HSBC (Buy to Hold in late July/early August) signal softening conviction among research. Insider activity shows net buying of 50k shares, but this came entirely through compensation (24 grants/options excluded) with only 10 distinct officers selling and zero buying independently—the net purchase signal is weakened by its reliance on vesting. The contrast between analyst targets (+9%) and recent downgrades, combined with volume collapse and negative near-term momentum, argues against high conviction in either direction. A defensive dividend play on a stalled earnings trajectory does not justify directional conviction above base rate.
 
 **Main reasons it gave:**
-- 3 misses vs 1 beat in earnings record; most recent miss 13%
-- Price 4.8% below 20-day SMA with RSI 42.9 and negative MACD
-- Forward P/E 32.3 and trailing P/E 49.5 with leverage at 168% debt/equity
-- Analyst consensus already priced in at +24% target, limiting upside surprise
-- Volume 28% of average indicates weak conviction in bounce
+- Volume collapsed to 0.15x average despite modest price strength
+- Earnings down 15.5% YoY while stock valued at 3.75x PEG
+- Recent Argus and HSBC downgrades to Hold signal dimming analyst confidence
+- Four consecutive quarters of in-line (not beat) earnings on undemanding consensus
+- Insider net buying driven by vesting grants, no independent executive purchases
 
-<details><summary><b>News</b> — score -0.30</summary>
+<details><summary><b>News</b> — score +0.05</summary>
 
-- [MELI stock heads into the open after a 2.07 percent drop](https://www.ad-hoc-news.de/boerse/news/corporate-news/meli-stock-heads-into-the-open-after-a-2-07-percent-drop/70142535)  
-  <sub>AD HOC NEWS, 8 hours ago</sub>  
-  At the close on September 18, 2026, MELI stock finished at USD 1787.39 on Nasdaq after falling 2.07 percent; the shares traded within a recent range and sat...
-- [MercadoLibre stock slips on earnings outlook and BTIG](https://www.ad-hoc-news.de/boerse/news/corporate-news/mercadolibre-stock-slips-on-earnings-outlook-and-btig/70143613)  
-  <sub>AD HOC NEWS, 5 hours ago</sub>  
-  MELI, US58733R1023. MercadoLibre stock slips on earnings outlook and BTIG. Published on 09/21/2026 at 12:22 | Editorial responsibility: Rafael Müller,...
-- [Melisron (TASE:MLSR) Stock Still Looks Like A Bargain After An 81% Run](https://finance.yahoo.com/markets/stocks/articles/melisron-tase-mlsr-stock-still-011230128.html)  
-  <sub>Yahoo Finance, 14 hours ago</sub>  
-  Melisron has delivered a strong 3 year share price run, and that kind of gain naturally raises the question of whether the current price is still aligned...
+- [PG vs. CL: Which Consumer Staples Giant Has Stronger Market Position?](https://sg.finance.yahoo.com/news/pg-vs-cl-consumer-staples-143700151.html)  
+  <sub>Yahoo Finance Singapore, 34 minutes ago</sub>  
+  The Procter & Gamble Company PG and Colgate-Palmolive Company CL are two of the world's most established consumer staples companies, but their competitive...
+- [Procter & Gamble (PG) Refreshes Dandruff Care With HydraZinc Complex](https://simplywall.st/stocks/us/household/nyse-pg/procter-gamble/news/procter-gamble-pg-refreshes-dandruff-care-with-hydrazinc-com/amp)  
+  <sub>Simply Wall Street, 5 hours ago</sub>  
+  Procter & Gamble (NYSE:PG) has rolled out a new HydraZinc Complex across its Head & Shoulders dandruff care range. The HydraZinc formulation is described as...
+- [John Osher Built a $475 Million Toothbrush by Starting at 80 Cents While Rivals Started at $79](https://247wallst.com/investing/2026/09/22/john-osher-built-a-475-million-toothbrush-by-starting-at-80-cents-while-rivals-started-at-79/)  
+  <sub>24/7 Wall St., 5 hours ago</sub>  
+  John Osher ignored how every competitor priced electric toothbrushes and flipped the entire exercise on its head, starting from a number that made engineers...
+- [2 Rock-Solid Dividend Stocks to Buy in September Even as Oil Surges Past $100 Per Barrel.](https://www.fool.com/investing/2026/09/22/2-dividend-stocks-buy-september-oil-surges/)  
+  <sub>The Motley Fool, 7 hours ago</sub>  
+  Higher gas prices are squeezing household budgets -- but Coca-Cola and Procter & Gamble continue to pay generous dividends.
+- [4 Stocks to Buy Before They Bounce Back](https://www.morningstar.com/podcasts/the-morning-filter/4-stocks-buy-before-they-bounce-back)  
+  <sub>Morningstar, 19 hours ago</sub>  
+  What mattered in the market last week. Earnings to have on radar: Costco COST and Darden Restaurants DRI. Which of these stock picks we still like today and...
+- [PG&E Corp. stock underperforms Monday when compared to competitors](https://www.google.com/goto?url=CAESyAEB6zswFZUMpxzJLMd7SY0HBjYGclouIhMtBfL2V1nYVYfHS5H74Pcv0JeU9pj936hCYhVAieB1Y_xfeJG6MGELUn7uQ1WjGTCXhG7Ku_5MgINg_qh-04Vn7nT4EkGxHmZIdFL_XY4vaHgdyEUkkXPwgVJTDTwzBN_aYjhqdmdatZhsfRhit1zee2cDVHSz_Mk19oXSipAKoTZ2yVmgTmt8urNIhSOC72f63FP4tJBYNOqDYuXNjmEV_45taEJWv2NVdx6UepmoWA)  
+  <sub>MarketWatch, 18 hours ago</sub>  
+  Shares of PG&E Corp. PCG slipped 1.97% to $12.94 Monday, on what proved to be an all-around favorable trading session for the stock market, with the S&P 500...
+- [SMGXF Stock Price and Chart — OTC:SMGXF](https://www.tradingview.com/symbols/OTC-SMGXF/)  
+  <sub>TradingView, 20 hours ago</sub>  
+  Track STEAMSHIPS TRADING CO LTD stock price today with the live chart. Find SMGXF news, trading ideas, forecasts, financials, and more.
+- [Procter & Gamble stock falls 0.21 percent as volume growth lags](https://www.google.com/goto?url=CAESuQEB6zswFR0W1YoDAWLCVRxrjeaFXSrdUR1x_jBi6lXwNr8IzZUuSL4Pxb11Yve1aKPxBMfPvnNbsqnI1BmUP__SP9inNW6MfR5MlnS0a2gZgF4WcFCKIhbM0faodDZ4Bc4uhN2yGE9uFTcT5AkB0XEU7p9K_PVY8jSho0zpSeWhl1ZkIlbWTTWPpl3oLcYJK6Xl6SCPQOBllyoTBsDlg0bZza8anW7qNTFkfYArVaJOa7r07Ry_jgDjoQ)  
+  <sub>AD HOC NEWS, 3 hours ago</sub>  
+  Procter & Gamble stock traded at USD 146.08 on September 22, 2026, below its USD 167.25 yearly high. Fiscal 2026 organic sales rose 1 percent.
+- [The Zacks Analyst Blog Highlights Procter & Gamble, Sandisk, Analog Devices, Monarch Cement and SUNation Energy](https://www.google.com/goto?url=CAESngEB6zswFS3mUUukj_qFgPrH-8fpqq5KqccWZ_zdblB4BL6EeaJtlDy-lz0odY4o-EW-G8xGke5yzDz71RNLalKCF57JBX5UPJ9cPp8456W-8y5UV6xyhMLEkDPPebwqbMovbh6Qh7UPzkxfo1Y0Js73gEbosjDZHuGUfzTCBYRzpfNzo_xZVZQySHgAh3ZBVYG8qdD_KU1vJkqir1bMcw)  
+  <sub>Yahoo Finance, 2 hours ago</sub>  
+  Chicago, IL – September 22, 2026 – Zacks.com announces the list of stocks featured in the Analyst Blog. Every day the Zacks Equity Research analysts discuss...
 
 </details>
 
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score -0.30</summary>
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.05</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>Price and chart</b> — score -0.60</summary>
+<details><summary><b>Price and chart</b> — score +0.15</summary>
 
 ```text
-Last close 1,822.24 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 1,913.90 (-4.8%), 50d 1,876.87 (-2.9%), 200d 1,851.53 (-1.6%); 50d above 200d
-Momentum: RSI(14) 42.9 | MACD -16.066 vs signal 3.121 (histogram -19.187)
-Returns: 1d +1.9% | 5d -4.1% | 1m -5.2% | 3m +14.6%
-52-week range: 1,546.81 - 2,510.97 (now 28.6% of the way up)
-Volatility: ATR(14) 60.31 (3.3% of price) | annualised 20d 29.7%
-Volume: 0.28x the 20-day average
+Last close 147.37 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 145.67 (+1.2%), 50d 146.08 (+0.9%), 200d 147.46 (-0.1%); 50d below 200d
+Momentum: RSI(14) 55.4 | MACD 0.310 vs signal 0.062 (histogram 0.248)
+Returns: 1d +0.9% | 5d +0.5% | 1m +1.9% | 3m -2.3%
+52-week range: 138.04 - 167.20 (now 32.0% of the way up)
+Volatility: ATR(14) 2.23 (1.5% of price) | annualised 20d 13.9%
+Volume: 0.15x the 20-day average
 ```
 
 </details>
@@ -1243,13 +1077,13 @@ Volume: 0.28x the 20-day average
 <details><summary><b>Company numbers</b> — score -0.25</summary>
 
 ```text
-Sector: Consumer Cyclical / Internet Retail | market cap 92.38B
-Valuation: trailing P/E 49.49 | forward P/E 32.28 | P/B 11.79 | PEG 0.98
-Profitability: profit margin 5.3% | operating margin 6.7% | ROE 27.5%
-Growth (YoY): revenue +49.8% | earnings -10.9%
-Balance sheet: debt/equity 168.6% | free cash flow 353.38M
-Risk: beta 1.31 | short interest 1.6% of float
-Next earnings: 2026-11-04
+Sector: Consumer Defensive / Household & Personal Products | market cap 342.28B
+Valuation: trailing P/E 22.26 | forward P/E 19.91 | P/B 6.42 | PEG 3.75
+Profitability: profit margin 18.4% | operating margin 22.1% | ROE 30.3%
+Growth (YoY): revenue +1.5% | earnings -15.5%
+Balance sheet: debt/equity 64.5% | free cash flow 13.28B
+Risk: beta 0.38 | short interest 1.2% of float
+Next earnings: 2026-10-22
 ```
 
 </details>
@@ -1263,8 +1097,8 @@ _Not available today._
 <details><summary><b>Does this company beat its own forecasts</b> — score -0.25</summary>
 
 ```text
-Earnings record, last 4 quarters: 1 beat, 3 missed
-  2026-06-30 beat by 4% | 2026-03-31 missed by 7% | 2025-12-31 missed by 6% | 2025-09-30 missed by 13%
+Earnings record, last 4 quarters: 4 in line
+  2026-06-30 in line | 2026-03-31 in line | 2025-12-31 in line | 2025-09-30 in line
 ```
 
 </details>
@@ -1287,178 +1121,12 @@ _Not available today._
 
 </details>
 
-<details><summary><b>What analysts and big funds say</b> — score +0.50</summary>
-
-```text
-Consensus: buy (mean 1.58 on a 1=strong buy to 5=strong sell scale, 24 analysts)
-Ratings: 4 strong buy, 15 buy, 5 hold, 0 sell, 0 strong sell
-Price target: mean 2,264.88 (+24.3% vs last close), range 1,750.00 - 2,800.00
-Recent rating changes:
-  - 2026-09-03 BTIG: reit, Buy -> Buy
-  - 2026-08-11 JP Morgan: main, Neutral -> Neutral
-  - 2026-08-06 Cantor Fitzgerald: main, Overweight -> Overweight
-  - 2026-08-06 BTIG: reit, Buy -> Buy
-  - 2026-07-15 Citigroup: main, Neutral -> Neutral
-  - 2026-06-02 BTIG: reit, Buy -> Buy
-Institutional ownership: 80.3%
-Largest holders: Capital Research Global Investors (6.2%), BAILLIE GIFFORD & CO (6.0%), Capital International Investors (3.7%), Capital World Investors (3.5%), Morgan Stanley (2.9%)
-```
-
-</details>
-
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.50</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Buying and selling by company insiders</b> — score +0.20</summary>
-
-```text
-Last 180 days: bought 0 shares in 0 transaction(s) | sold n/a shares in 0
-Net: +0 shares | insiders hold 3,529,511 shares
-Distinct insiders: 2 buying, 0 selling
-Open-market purchases — insiders spending their own money:
-  - 2026-06-11 MELAMUD MARCELO (Officer): 124 shares, 200.00K
-  - 2026-05-22 AGUZIN ALEJANDRO NICOLAS (Director): 600 shares, 993.56K
-(4 grant/option/gift transaction(s) excluded — compensation, not a view on the price)
-```
-
-</details>
-
-<details><summary><b>Who is positioned how</b> — score +0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Money going into and out of this fund</b> — score +0.20</summary>
-
-_Not available today._
-
-</details>
-
-### Procter & Gamble (PG) · Company — NEUTRAL, confidence 0.35
-
-**In the model's own words:**
-
-> PG presents conflicting signals that resist a directional conviction. On the positive side: recent fiscal Q4 results were solid, the company delivered 4 consecutive earnings in line with expectations, a strong analyst consensus (6 strong buys, 7 buys vs zero sells), mean price target of $160.61 (+10.1%) suggests upside, solid fundamentals including 30.3% ROE and 22.1% operating margin, and significant insider net buying (+50,121 shares over 180 days from 25 transactions). On the negative side: the GuruFocus DCF analysis values PG at $90 intrinsic value vs $146 price (37% overvalued), trailing P/E of 22.03 is elevated for single-digit revenue growth (+1.5%), earnings declined 15.5% YoY despite solid absolute profitability, PEG of 3.75 signals expensive valuation relative to growth, and recent technical weakness with the stock down 1.1% from its 200d SMA and trading below its 50d average. The news flow is mixed and largely generic (dividend reviews, DCF commentary) with no material catalyst. Technicals show neutral momentum (RSI 50.4) and a stock holding near recent highs but not breaking out; volume is notably thin at 0.13x average. The recent downgrade pattern (Argus Research and HSBC both moved from Buy to Hold in late July/early August) suggests analyst sentiment may be shifting, though the consensus remains constructive. The insider buying appears routine (officers selling portions of holdings for liquidity/tax purposes) rather than a concentrated signal of conviction. Given the valuation concern, modest growth, recent analyst downgrades amid weak volume, and absence of a near-term catalyst, a NEUTRAL posture at low-to-moderate conviction is appropriate until either the valuation compresses or a clearer fundamental catalyst emerges.
-
-**Main reasons it gave:**
-- DCF intrinsic value $90 vs price $146 (37% overvaluation)
-- Earnings declined 15.5% YoY despite 4 consecutive quarters in line
-- Recent downgrades from Argus Research and HSBC (Buy to Hold)
-- Elevated trailing P/E 22.03 on modest 1.5% revenue growth
-- Insider net buying of 50,121 shares routine for officers, not concentrated conviction
-
-<details><summary><b>News</b> — score -0.15</summary>
-
-- [3 Unpopular Stocks Walking a Fine Line](https://stockstory.org/us/stocks/nyse/pg/news/buy-or-sell/3-unpopular-stocks-walking-a-fine-line)  
-  <sub>StockStory, 7 hours ago</sub>  
-  Wall Street has issued downbeat forecasts for the stocks in this article. These predictions are rare - financial institutions typically hesitate to say bad...
-- [PG DCF Analysis: Intrinsic Value $90 vs Price $146](https://www.gurufocus.com/news/9089607/pg-dcf-analysis-intrinsic-value-90-vs-price-146)  
-  <sub>GuruFocus, 3 hours ago</sub>  
-  On September 21, 2026, we delve into the DCF analysis for Procter & Gamble Co (PG), a company that has seen mixed price performance recently,...
-- [Best Dividend Stocks for 2026: What 2025’s Winners Tell Investors](https://finchannel.com/best-dividend-stocks-for-2026-what-2025s-winners-tell-investors/135909/american-business-trends/stock-prices/2026/09/)  
-  <sub>finchannel, 7 hours ago</sub>  
-  A review of the best-performing dividend stocks of 2025, including CVS, Invesco, Hasbro, Ford and others, with dividend trends and 2026 outlook.
-- [Procter & Gamble stock holds firm as investors eye recent earnings and dividend strength](https://www.ad-hoc-news.de/boerse/news/corporate-news/procter-and-gamble-stock-holds-firm-as-investors-eye-recent-earnings-and/70143504)  
-  <sub>AD HOC NEWS, 5 hours ago</sub>  
-  Procter & Gamble stock trades near its recent high after solid fiscal Q4 2026 results reported on August 2, 2026. The consumer goods giant lifted annual...
-- [I'm Watching PG&E Closely, but Here's Why I Haven't Bought the Dip](https://www.aol.com/articles/im-watching-pg-e-closely-162500000.html)  
-  <sub>AOL.com, 23 hours ago</sub>  
-  Utilities are usually seen as low-risk bets, but due to its California footprint, risk abounds with PG&E.
-- [PG Electroplast to host investor meet at Nuvama CEO Forum on Sep 28](https://scanx.trade/stock-market-news/companies/pg-electroplast-host-investor-meet-nuvama-ceo-forum-sep-28/51519154)  
-  <sub>scanx.trade, 8 hours ago</sub>  
-  PG Electroplast will attend the Nuvama Emerging India CEO Forum on September 28, 2026. The physical meeting will take place at Hotel Grand Hyatt, Mumbai,...
-- [HDB: HDFC Bank Limited - Stock Price, Quote and News | NYSE](https://techgraph.co/stock-market/quote/hdb/)  
-  <sub>TechGraph, 4 hours ago</sub>  
-  HDB: HDFC Bank Limited stock price, quote and news on NYSE. Live HDB chart, volume, 52-week range and coverage on TechGraph.
-- [Procter & Gamble stock heads into the open after a muted move](https://www.ad-hoc-news.de/boerse/news/corporate-news/procter-and-gamble-stock-heads-into-the-open-after-a-muted-move/70142078)  
-  <sub>AD HOC NEWS, 9 hours ago</sub>  
-  At the close on September 18, 2026, Procter & Gamble stock finished little changed on the NYSE, holding within its recent trading range while the S&P 500...
-- [POWERGRID Infrastructure Inves Share Price - Live PGINVIT Stock Price & Chart](https://upstox.com/stocks/powergrid-infrastructure-inves-share-price/)  
-  <sub>Upstox, 8 hours ago</sub>  
-  Get POWERGRID Infrastructure Inves share price, market statistics, corporate action, fundamental and technical analysis at Upstox.
-- [PG&E Corporation stock falls sharply as wildfire liability fears mount](https://www.ad-hoc-news.de/boerse/news/corporate-news/pg-and-e-corporation-stock-falls-sharply-as-wildfire-liability-fears-mount/70139139)  
-  <sub>AD HOC NEWS, 22 hours ago</sub>  
-  PG&E Corporation stock has dropped about 26.5 percent over the past 30 days to USD 13.20 as of September 18, 2026 amid renewed wildfire liability concerns.
-
-</details>
-
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score -0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Price and chart</b> — score -0.05</summary>
-
-```text
-Last close 145.87 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 145.62 (+0.2%), 50d 146.10 (-0.2%), 200d 147.46 (-1.1%); 50d below 200d
-Momentum: RSI(14) 50.4 | MACD 0.200 vs signal -0.003 (histogram 0.204)
-Returns: 1d -0.4% | 5d -0.2% | 1m +2.0% | 3m -1.2%
-52-week range: 138.04 - 167.20 (now 26.9% of the way up)
-Volatility: ATR(14) 2.25 (1.5% of price) | annualised 20d 14.4%
-Volume: 0.13x the 20-day average
-```
-
-</details>
-
-<details><summary><b>Company numbers</b> — score -0.35</summary>
-
-```text
-Sector: Consumer Defensive / Household & Personal Products | market cap 338.81B
-Valuation: trailing P/E 22.03 | forward P/E 19.71 | P/B 6.36 | PEG 3.75
-Profitability: profit margin 18.4% | operating margin 22.1% | ROE 30.3%
-Growth (YoY): revenue +1.5% | earnings -15.5%
-Balance sheet: debt/equity 64.5% | free cash flow 13.28B
-Risk: beta 0.38 | short interest 1.2% of float
-Next earnings: 2026-10-22
-```
-
-</details>
-
-<details><summary><b>What this fund holds</b> — score -0.35</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Does this company beat its own forecasts</b> — score -0.35</summary>
-
-```text
-Earnings record, last 4 quarters: 4 in line
-  2026-06-30 in line | 2026-03-31 in line | 2025-12-31 in line | 2025-09-30 in line
-```
-
-</details>
-
-<details><summary><b>What holding this fund costs you</b> — score -0.35</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How much oil and gas is in storage</b> — score -0.35</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How the crop is growing</b> — score -0.35</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts and big funds say</b> — score +0.25</summary>
+<details><summary><b>What analysts and big funds say</b> — score +0.35</summary>
 
 ```text
 Consensus: buy (mean 2.20 on a 1=strong buy to 5=strong sell scale, 23 analysts)
 Ratings: 6 strong buy, 7 buy, 12 hold, 0 sell, 0 strong sell
-Price target: mean 160.61 (+10.1% vs last close), range 143.00 - 186.00
+Price target: mean 160.61 (+9.0% vs last close), range 143.00 - 186.00
 Recent rating changes:
   - 2026-08-07 Argus Research: down, Buy -> Hold
   - 2026-07-30 HSBC: down, Buy -> Hold
@@ -1472,13 +1140,13 @@ Largest holders: Blackrock Inc. (8.2%), Vanguard Capital Management LLC (6.6%), 
 
 </details>
 
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.25</summary>
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.35</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>Buying and selling by company insiders</b> — score +0.05</summary>
+<details><summary><b>Buying and selling by company insiders</b> — score +0.10</summary>
 
 ```text
 Last 180 days: bought 90,364 shares in 25 transaction(s) | sold 40,243 shares in 13
@@ -1490,6 +1158,164 @@ Sales — weak evidence on their own; often scheduled 10b5-1 plans, tax on vesti
   - 2026-08-20 JANZARUK MATTHEW W. (Officer): 156 shares, 22.43K
   - 2026-08-20 PURUSHOTHAMAN BALAJI (Officer): 2,019 shares, 290.31K
 (24 grant/option/gift transaction(s) excluded — compensation, not a view on the price)
+```
+
+</details>
+
+<details><summary><b>Who is positioned how</b> — score +0.10</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Money going into and out of this fund</b> — score +0.10</summary>
+
+_Not available today._
+
+</details>
+
+### Royal Bank of Canada (RY) · Company — NEUTRAL, confidence 0.35
+
+**Result:** REJECTED · bias is NEUTRAL; no trade
+
+**In the model's own words:**
+
+> News is entirely auto-generated price-action filler (200-day MA crossing stories, daily close recaps) with no ticker-specific catalyst. Technicals are mixed: price above the 200d by 10% and 50d above 200d, but below both 20d and 50d SMAs with MACD negative and RSI 44, and volume at 0.24x average, so the 'upward momentum confirmed' framing is not supported by the tape. Fundamentals are solid but fully valued at ~16x forward with a price target only 2.4% above spot; earnings not until December. Issuer buybacks are not insider conviction. No edge either way.
+
+**Main reasons it gave:**
+- News flow is auto-generated close recaps and MA-crossing listicles, no company catalyst
+- Price below 20d (-1.0%) and 50d (-2.5%) SMAs with MACD histogram -0.187, RSI 43.9
+- Volume 0.24x 20-day average — thin, low-information tape
+- Mean price target 208.70, only +2.4% vs last close; no rating change since Aug 2025
+- Insider 'purchases' are issuer buyback blocks, not executive open-market buys
+
+<details><summary><b>News</b> — score +0.05</summary>
+
+- [Royal Bank of Canada (TSE:RY) Share Price Crosses Above 200 Day Moving Average - Here's What Happened](https://www.marketbeat.com/instant-alerts/price-royal-bank-of-canada-tse-ry-share-price-crosses-above-200-day-moving-average-heres-what-happened-2026-09-22/)  
+  <sub>MarketBeat, 7 hours ago</sub>  
+  Royal Bank of Canada (TSE:RY) Stock Passes Above 200 Day Moving Average - Here's What Happened.
+- [Royal Bank of Canada stock rises Monday, outperforms market](https://www.marketwatch.com/data-news/royal-bank-of-canada-stock-rises-monday-outperforms-market-d9da3d00-ae5d487094ed?mod=mw_quote_news)  
+  <sub>MarketWatch, 19 hours ago</sub>  
+  Trading volume of 1.6 M shares remained below its 50-day average volume of 3.2 M. Editor's Note: This story was auto-generated by Automated Insights,...
+- [RY stock ends the day slightly higher at the close on the NYSE](https://www.ad-hoc-news.de/boerse/news/nebenwerte/ry-stock-ends-the-day-slightly-higher-at-the-close-on-the-nyse/70147630)  
+  <sub>AD HOC NEWS, 17 hours ago</sub>  
+  On September 21, 2026, RY stock closed at USD 203.30 on the NYSE, up about 1.2 percent from the prior session while trading within a roughly USD 20.51 to...
+- [Royal Bank of Canada stock gains 1.42 percent as earnings remain in view](https://www.ad-hoc-news.de/boerse/news/corporate-news/royal-bank-of-canada-stock-gains-1-42-percent-as-earnings-remain-in-view/70154208)  
+  <sub>AD HOC NEWS, 5 hours ago</sub>  
+  Royal Bank of Canada stock closed at USD 206.19 on September 21, 2026, up 1.42 percent. Quarterly EPS reached CAD 4.28 on revenue of CAD 18.54 billion.
+- [Royal Bank of Canada stock gains 1.42 percent ahead of the open](https://www.ad-hoc-news.de/boerse/news/corporate-news/royal-bank-of-canada-stock-gains-1-42-percent-ahead-of-the-open/70151943)  
+  <sub>AD HOC NEWS, 9 hours ago</sub>  
+  At the close on September 21, 2026, Royal Bank of Canada stock reached USD 206.19, while its TSX listing closed at CAD 284.93; the next ex-dividend date is...
+- [Royal Bank of Canada stock forecast: Upward momentum confirmed despite short-term risks](https://tradersunion.com/news/stocks/show/3432441-royal-bank-of-canada-down/)  
+  <sub>Traders Union, 1 hour ago</sub>  
+  Highlights. Shares of Royal Bank of Canada moved above the 200-day moving average, an event watched by momentum-driven traders.
+
+</details>
+
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.05</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Price and chart</b> — score -0.10</summary>
+
+```text
+Last close 203.72 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 205.87 (-1.0%), 50d 208.98 (-2.5%), 200d 185.01 (+10.1%); 50d above 200d
+Momentum: RSI(14) 43.9 | MACD -1.204 vs signal -1.017 (histogram -0.187)
+Returns: 1d -1.2% | 5d -0.2% | 1m -0.7% | 3m +0.4%
+52-week range: 143.64 - 217.87 (now 80.9% of the way up)
+Volatility: ATR(14) 3.21 (1.6% of price) | annualised 20d 16.4%
+Volume: 0.24x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.25</summary>
+
+```text
+Sector: Financial Services / Banks - Diversified | market cap 282.04B
+Valuation: trailing P/E 17.96 | forward P/E 15.95 | P/B 2.95 | PEG 2.26
+Profitability: profit margin 33.9% | operating margin 46.4% | ROE 16.2%
+Growth (YoY): revenue +8.9% | earnings +12.8%
+Balance sheet: debt/equity n/a | free cash flow n/a
+Risk: beta 0.92 | short interest n/a of float
+Next earnings: 2026-12-03
+```
+
+</details>
+
+<details><summary><b>What this fund holds</b> — score +0.25</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Does this company beat its own forecasts</b> — score +0.25</summary>
+
+```text
+Earnings record, last 4 quarters: 2 beats, 2 in line
+  2026-09-30 in line | 2026-06-30 in line | 2026-03-31 beat by 3% | 2026-03-31 beat by 3%
+```
+
+</details>
+
+<details><summary><b>What holding this fund costs you</b> — score +0.25</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How much oil and gas is in storage</b> — score +0.25</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How the crop is growing</b> — score +0.25</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.10</summary>
+
+```text
+Consensus: buy (mean 2.13 on a 1=strong buy to 5=strong sell scale, 3 analysts)
+Ratings: 4 strong buy, 5 buy, 5 hold, 0 sell, 1 strong sell
+Price target: mean 208.70 (+2.4% vs last close), range 181.14 - 227.60
+Recent rating changes:
+  - 2025-08-29 Argus Research: main, Buy -> Buy
+  - 2024-12-05 BMO Capital: main, Outperform -> Outperform
+  - 2024-08-29 BMO Capital: main, Outperform -> Outperform
+  - 2024-06-06 Argus Research: main, Buy -> Buy
+  - 2024-04-05 BMO Capital: up, Market Perform -> Outperform
+  - 2023-12-18 B of A Securities: up, Neutral -> Buy
+Institutional ownership: 49.6%
+Largest holders: Royal Bank of Canada (5.1%), Bank of Montreal /CAN/ (4.4%), Vanguard Capital Management LLC (3.1%), FIL LTD (1.7%), TD Asset Management, Inc (1.7%)
+```
+
+</details>
+
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.10</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.05</summary>
+
+```text
+Last 180 days: bought 0 shares in 0 transaction(s) | sold n/a shares in 0
+Net: +0 shares | insiders hold 387,640 shares
+Distinct insiders: 1 buying, 0 selling
+Open-market purchases — insiders spending their own money:
+  - 2026-08-31 Royal Bank of Canada (Issuer): 350,000 shares, 71.49M
+  - 2026-08-28 Royal Bank of Canada (Issuer): 350,000 shares, 71.50M
+  - 2026-07-31 Royal Bank of Canada (Issuer): 211 shares, 44.11K
+  - 2026-07-31 Royal Bank of Canada (Issuer): 140 shares, 29.28K
+(105 grant/option/gift transaction(s) excluded — compensation, not a view on the price)
 ```
 
 </details>
@@ -1506,204 +1332,53 @@ _Not available today._
 
 </details>
 
-### Royal Bank of Canada (RY) · Company — NEUTRAL, confidence 0.35
-
-**In the model's own words:**
-
-> Royal Bank of Canada presents a mixed picture with no clear directional catalyst. News is generic coverage focused on the 2.47% dividend yield and P/E valuation (15.4x in one headline, 18.1x in fundamentals) without material new developments or earnings-specific catalysts. Technicals show a stock that is neither extended nor deeply oversold: RSI at 46.8 is neutral, price sits 11% above the 200d MA but only 0.3% below the 20d, and volume is thin at 0.13x average. The most recent earnings were in line (last two quarters), with an earlier beat already digested. Valuation at 18.1x forward P/E is cited as a "quality premium" but places RY above peers like CIBC and TD on trailing multiples. Analyst consensus is solidly bullish (mean 2.13, mostly buy/strong buy ratings) with a mean price target of 209.55 (+2.1%), but this consensus appears fully reflected in the 49.6% institutional ownership and the modest rating activity over the past 18 months. Insider activity consists of share buybacks by the issuer (the company itself), which is a weak signal—buybacks are routine capital allocation, not insiders with superior information deploying personal capital. No officers or directors are buying. Growth is solid (revenue +8.9%, earnings +12.8% YoY) and profitability is healthy, but these support a "hold at fair value" thesis rather than a near-term directional move. Earnings are not until December 3, 2026, leaving 2.5 months until the next material catalyst. The stock's intraday action shows a 0.9% bounce but zero return over the past month, suggesting equilibrium. With no fresh catalyst, conflicting valuation narratives, thin volume, and insider disinterest, conviction merits a below-midpoint NEUTRAL call.
-
-**Main reasons it gave:**
-- Recent earnings in line with consensus, not beats
-- Analyst consensus already reflected in 49.6% institutional ownership and modest 2.1% upside to mean target
-- Share buybacks by issuer, not open-market purchases by officers indicating personal conviction
-- No material catalyst until December 3 earnings date
-- Valuation dispute in headlines (15.4x vs 18.1x) with stock trading above peer multiples on trailing basis
-
-<details><summary><b>News</b> — score +0.00</summary>
-
-- [Royal Bank of Canada stock holds firm as earnings and valuation draw focus](https://www.ad-hoc-news.de/boerse/news/corporate-news/royal-bank-of-canada-stock-holds-firm-as-earnings-and-valuation-draw-focus/70144761)  
-  <sub>AD HOC NEWS, 2 hours ago</sub>  
-  Royal Bank of Canada stock trades at a P/E of 15.4x as of September 20, 2026, highlighting a quality premium over Canadian peers.
-- [Why Is Royal Bank of Canada (TSX:RY) Drawing Fresh Attention?](https://kalkinemedia.com/ca/stocks/bluechip/why-is-royal-bank-of-canada-tsxry-drawing-fresh-attention)  
-  <sub>Kalkine Media, 7 hours ago</sub>  
-  Royal Bank of Canada coverage examines current market developments, its banking, wealth services and capital markets operations and the S&P/TSX 60 backdrop...
-- [Royal Bank of Canada’s 2.47% Yield Looks Well Supported as Earnings Growth and Capital Strength Reinforce Dividend Outlook](https://kalkine.ca/news/dividend-stocks/royal-bank-of-canadas-247-yield-looks-well-supported-as-earnings-growth-and-capital-strength-reinforce-dividend-outlook)  
-  <sub>kalkine.ca, 2 hours ago</sub>  
-  You are reading a free article with opinions that may differ from the recommendation given by Kalkine in its paid research reports.
-- [RY stock heads into the open after a modest decline on the TSX](https://www.ad-hoc-news.de/boerse/news/corporate-news/ry-stock-heads-into-the-open-after-a-modest-decline-on-the-tsx/70142014)  
-  <sub>AD HOC NEWS, 9 hours ago</sub>  
-  At the close on September 20, 2026, RY stock finished at CAD 284.45 on the Toronto Stock Exchange, slipping 0.17 percent, while the broader Canadian market...
-- [Resolute Mining Stock Drops 8.3% as Syama Cut Narrows Gold-Price Buffer](https://ts2.tech/en/resolute-mining-stock-drops-8-3-as-syama-cut-narrows-gold-price-buffer/)  
-  <sub>TechStock², 10 hours ago</sub>  
-  Sydney, September 21, 2026, 15:24 (AEST). Resolute traded at A$1.242, down 8.3%, at 15:17 AEST. The 2026 group production midpoint fell 18.1% to 215,000...
-- [CIBC stands out as the value pick among Canada’s major bank stocks](https://uk.investing.com/news/stock-market-news/cibc-stands-out-as-the-value-pick-among-canadas-major-bank-stocks-93CH-4875332)  
-  <sub>Investing.com UK, 24 hours ago</sub>  
-  Investing.com -- CIBC and TD Bank currently look like the cheapest Canadian bank stocks by P/E ratio—both trading under 14x trailing earnings, while Royal...
-- [Why Is Royal Bank of Canada (TSX:RY) Back in Focus?](https://kalkinemedia.com/ca/stocks/financial/why-is-royal-bank-of-canada-tsxry-back-in-focus-1)  
-  <sub>Kalkine Media, 9 hours ago</sub>  
-  Royal Bank of Canada coverage examines current market developments, its banking, wealth services and capital markets operations and the S&P/TSX 60 backdrop...
-
-</details>
-
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Price and chart</b> — score +0.00</summary>
-
-```text
-Last close 205.23 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 205.84 (-0.3%), 50d 209.10 (-1.9%), 200d 184.77 (+11.1%); 50d above 200d
-Momentum: RSI(14) 46.8 | MACD -1.236 vs signal -0.986 (histogram -0.250)
-Returns: 1d +0.9% | 5d +0.0% | 1m +0.0% | 3m +1.2%
-52-week range: 143.64 - 217.87 (now 83.0% of the way up)
-Volatility: ATR(14) 3.18 (1.6% of price) | annualised 20d 15.5%
-Volume: 0.13x the 20-day average
-```
-
-</details>
-
-<details><summary><b>Company numbers</b> — score +0.15</summary>
-
-```text
-Sector: Financial Services / Banks - Diversified | market cap 284.12B
-Valuation: trailing P/E 18.10 | forward P/E 16.07 | P/B 2.97 | PEG 2.26
-Profitability: profit margin 33.9% | operating margin 46.4% | ROE 16.2%
-Growth (YoY): revenue +8.9% | earnings +12.8%
-Balance sheet: debt/equity n/a | free cash flow n/a
-Risk: beta 0.92 | short interest n/a of float
-Next earnings: 2026-12-03
-```
-
-</details>
-
-<details><summary><b>What this fund holds</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Does this company beat its own forecasts</b> — score +0.15</summary>
-
-```text
-Earnings record, last 4 quarters: 2 beats, 2 in line
-  2026-09-30 in line | 2026-06-30 in line | 2026-03-31 beat by 3% | 2026-03-31 beat by 3%
-```
-
-</details>
-
-<details><summary><b>What holding this fund costs you</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How much oil and gas is in storage</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How the crop is growing</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts and big funds say</b> — score +0.25</summary>
-
-```text
-Consensus: buy (mean 2.13 on a 1=strong buy to 5=strong sell scale, 3 analysts)
-Ratings: 4 strong buy, 5 buy, 5 hold, 0 sell, 1 strong sell
-Price target: mean 209.55 (+2.1% vs last close), range 181.88 - 228.54
-Recent rating changes:
-  - 2025-08-29 Argus Research: main, Buy -> Buy
-  - 2024-12-05 BMO Capital: main, Outperform -> Outperform
-  - 2024-08-29 BMO Capital: main, Outperform -> Outperform
-  - 2024-06-06 Argus Research: main, Buy -> Buy
-  - 2024-04-05 BMO Capital: up, Market Perform -> Outperform
-  - 2023-12-18 B of A Securities: up, Neutral -> Buy
-Institutional ownership: 49.6%
-Largest holders: Royal Bank of Canada (5.1%), Bank of Montreal /CAN/ (4.4%), Vanguard Capital Management LLC (3.1%), FIL LTD (1.7%), TD Asset Management, Inc (1.7%)
-```
-
-</details>
-
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.25</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Buying and selling by company insiders</b> — score -0.10</summary>
-
-```text
-Last 180 days: bought 0 shares in 0 transaction(s) | sold n/a shares in 0
-Net: +0 shares | insiders hold 387,640 shares
-Distinct insiders: 1 buying, 0 selling
-Open-market purchases — insiders spending their own money:
-  - 2026-08-31 Royal Bank of Canada (Issuer): 350,000 shares, 69.76M
-  - 2026-08-28 Royal Bank of Canada (Issuer): 350,000 shares, 70.00M
-  - 2026-07-31 Royal Bank of Canada (Issuer): 211 shares, 43.82K
-  - 2026-07-31 Royal Bank of Canada (Issuer): 140 shares, 29.09K
-(105 grant/option/gift transaction(s) excluded — compensation, not a view on the price)
-```
-
-</details>
-
-<details><summary><b>Who is positioned how</b> — score -0.10</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Money going into and out of this fund</b> — score -0.10</summary>
-
-_Not available today._
-
-</details>
-
 ### Toyota (TM) · Company — NEUTRAL, confidence 0.35
 
 **Result:** REJECTED · bias is NEUTRAL; no trade
 
 **In the model's own words:**
 
-> News flow is generic filler: most items are unrelated to Toyota (Pega, Cosmo, Indian market roundups), and the two TM headlines are auto-generated price recaps with no catalyst. Technicals are mid-range and mildly negative: price below 20d and 200d SMAs, 50d below 200d, MACD rolling under signal, RSI exactly 50, and volume at 0.11x average implies little information. Fundamentals are the most supportive leg — trailing P/E 8.6, +10.4% revenue and +86.9% earnings growth, four straight beats, low beta 0.34 — and analysts are strong_buy with a 21% target gap, but that prior is long-standing and already in the price. No insider transactions. Nothing ticker-specific to trade over a few days.
+> News flow is almost entirely irrelevant noise (unrelated tickers matched on 'TM' string, price recaps) with no ticker-specific catalyst. Technicals are mixed-to-soft: below 20d and 200d SMA, 50d below 200d, MACD negative histogram, RSI ~49, very thin volume. Fundamentals are supportive — 8.5x trailing P/E, +10% revenue, four straight beats — and consensus targets imply ~22% upside, but that prior is stale and already priced. No insider activity. Conflicting dimensions with no catalyst warrant NEUTRAL.
 
 **Main reasons it gave:**
-- TM-specific headlines are auto-generated price recaps; other news items concern unrelated companies
-- 50d SMA below 200d, price -4.6% vs 200d, MACD histogram -0.788, RSI 50
-- Trailing P/E 8.56 with revenue +10.4% and earnings +86.9% YoY
-- Four consecutive earnings beats (44%, 12%, 27%, 24%)
-- Strong_buy consensus with mean target 234 (+21.5%) but only 4 analysts and no fresh rating change
-- No insider open-market transactions in 180 days
+- No ticker-specific news; headlines are unrelated 'TM'/trademark string matches
+- Price below 20d and 200d SMA with 50d under 200d, MACD histogram -0.80
+- Four consecutive earnings beats, latest by 44%
+- Trailing P/E 8.5 with revenue +10.4% and earnings +86.9% YoY
+- Analyst mean target 234 (+21.7%) but only 4 analysts and last change a 2025 downgrade
 
 <details><summary><b>News</b> — score +0.00</summary>
 
-- [Gartner gave Pega top scores in two business automation categories](https://www.stocktitan.net/news/PEGA/pega-named-a-leader-in-gartner-magic-quadrant-tm-and-recognized-in-moqn69n6omnn.html)  
-  <sub>Stock Titan, 2 hours ago</sub>  
-  Gartner assessed 20 vendors across seven criteria, while Pega's AI suite was recognized for a second consecutive year in a companion report.
-- [Toyota Motor stock steadies as automation and demand plans shape outlook](https://www.ad-hoc-news.de/boerse/news/corporate-news/toyota-motor-stock-steadies-as-automation-and-demand-plans-shape-outlook/70144193)  
-  <sub>AD HOC NEWS, 3 hours ago</sub>  
-  TM, US8923313071. Toyota Motor stock steadies as automation and demand plans shape outlook. Published on 09/21/2026 at 13:48 | Editorial responsibility:...
-- [More than 334,000 colonoscopies tested AI. Odds of detecting colon growths were 22% higher.](https://www.stocktitan.net/news/CMOPF/largest-real-world-study-of-the-gi-genius-tm-intelligent-endoscopy-5tkhp8ivrwz1.html)  
-  <sub>Stock Titan, 10 hours ago</sub>  
-  Cosmo (CMOPF) reported results from the CADeNCE study, the largest real‑world evaluation of its GI Genius(TM) intelligent endoscopy system, covering more...
-- [Toyota Motor stock heads into the open after a 1.23 percent drop.](https://www.ad-hoc-news.de/boerse/news/corporate-news/toyota-motor-stock-heads-into-the-open-after-a-1-23-percent-drop/70141600)  
-  <sub>AD HOC NEWS, 10 hours ago</sub>  
-  TM, US8923313071. Toyota Motor stock heads into the open after a 1.23 percent drop. Published on 09/21/2026 at 07:03 | Editorial responsibility: Rafael...
-- [Indian Stock Market News, Equity Market and Sensex Today in India](https://www.equitymaster.com/tm/tm.asp?date=9/21/2026&title=GPT-Infra-Bags-Major-Railway-Infrastructure-Order--Oil-India-Plans-Major-Deepwater-Exploration-Push--Top-Buzzing-Stocks-Today)  
-  <sub>Equitymaster, 15 hours ago</sub>  
-  Top cues to track in today's stock market session.
-- [Sensex Today Trades Higher | Nifty Above 23,350 | Sun Pharma & HCL Tech Top Gainers](https://www.equitymaster.com/indian-share-markets/09/21/2026/Sensex-Today-Trades-Higher--Nifty-Above-23350--Sun-Pharma--HCL-Tech-Top-Gainers?utm_source=todays-market-plug&utm_medium=website&utm_campaign=content&utm_content=TM)  
-  <sub>Equitymaster, 11 hours ago</sub>  
-  Asian equities edged higher on Monday, helped by gains in semiconductor stocks as demand related to artificial intelligence continued to support the...
-- [GCash IPO expanding MSME reach](https://tribune.net.ph/2026/09/20/gcash-ipo-expanding-msme-reach)  
-  <sub>Daily Tribune, 24 hours ago</sub>  
-  The DTI says wider digital payment adoption can help MSMEs expand into e-commerce and reach customers beyond local markets, as GCash parent Mynt prepares...
+- [Some B2B studies remove up to 59.6% of responses. RIWI launched a human check.](https://www.stocktitan.net/news/RWCRF/riwi-launches-verify-human-tm-a-browser-based-human-verification-ajncn1igg76g.html)  
+  <sub>Stock Titan, 3 hours ago</sub>  
+  RIWI's browser-based service uses behavioural, device and session signals, with optional on-device facial analysis, and is onboarding paying customers.
+- [Promino Reports Strength in Revenue as New Inventory and Kroger Distribution Drive Growth](https://finance.yahoo.com/healthcare/articles/promino-reports-strength-revenue-inventory-110000385.html)  
+  <sub>Yahoo Finance, 4 hours ago</sub>  
+  August generates approximately 34% of Promino's year-to-date net revenue as new proprietary Rejuvenate formula reaches expanded U.S. retail...
+- [Most construction blueprints went from hours to about 3–5 seconds](https://www.stocktitan.net/news/IGCRF/integrated-quantum-technologies-announces-first-customer-engagement-btwd44l53rko.html)  
+  <sub>Stock Titan, 3 hours ago</sub>  
+  VEIL improved Pivotly's model performance by about 5-8 percentage points and produced a production-ready workflow; no broader deployment agreement exists.
+- [TM stock ends the day 1.23 percent lower at the close](https://www.ad-hoc-news.de/boerse/news/nebenwerte/tm-stock-ends-the-day-1-23-percent-lower-at-the-close/70147673)  
+  <sub>AD HOC NEWS, 17 hours ago</sub>  
+  On September 21, 2026, TM stock closed at USD 191.53 on the NYSE, down 1.23 percent from the prior close, as the ADRs of Toyota Motor tracked a softer tone...
+- [(SWIN) Market Insights and Trading Signals (SWIN:CA)](https://news.stocktradersdaily.com/canada/swin-market-insights-and-trading-signals_20260921_a4df49)  
+  <sub>Stock Traders Daily, 14 hours ago</sub>  
+  Market Insights Report for HAMILTON CHAMPIONS TM Enhanced U.S. Dividend ETF (SWIN) with Key Trading Signals.
+- [4 Dividend-Friendly Auto Stocks to Weather the Industry Challenges](https://www.google.com/goto?url=CAESzgEB6zswFVSW0-TgL25rxPVqogYTmmKAZwXUXahGcecP3PNw0-Kfc6wCPEkBBCUtMb7NYtl7I2gK8l-zec5pYlU20nPFfmcbK0rdyxf55VzMfp995cqquOd3P4jro3sZUS7v0ubJD6q-B1tn0OwDWIlgIIginsye6tLVDIkRDgWgskFIAuO_gDhhux4jNrOnZNJxnGJhpuMIe1V_A_-R0uq_YoNqssqlS-ezE7WJWDeUVDkI--UXdCmlEPikfCBSk35oX2miEsujJ20bw8_2-Q)  
+  <sub>The Globe and Mail, 23 hours ago</sub>  
+  Detailed price information for Toyota Motor Corp Ord ADR (TM-N) from The Globe and Mail including charting and trades.
+- [Carnatic musician T M Krishna moves Supreme Court against Centre's directive to sing six stanzas of Vande...](https://www.google.com/goto?url=CAES5AEB6zswFZvvrWPuEgrdevgINCKUzBGY2WLI3_3Knw6M2oOT9mU1ZGdP-Va-ci6fjufgyAC5Bpq7XesY0Fs5apCrDjcBvJkuGcg0DEudGtt6R2YtfkxxJbD7aTVyRfMeRfGH6J89KjiIX-ywMlplB3jZX1oKucpuaFMml4rDnKZbgEhf6QGJVc9ZO8Wtl-nVMw76wuluoEaqhf1fZRBt-Q68v8lKxq1Bbgh_L4y7VFsNXCXoiTkU6R6BbULus-EOrd8y236IGQK8PB916JaN2EoXg89RKeJOmvcFHr7-IXgAw-CMvGU)  
+  <sub>Moneycontrol.com, 8 hours ago</sub>  
+  Krishna has challenged the Centre's circular on the singing of Vande Mataram as well as the recent amendment to the Prevention of Insults to National Honour...
+- [Bruce Lee is among the inspirations behind Be Water's seven bottle messages](https://www.stocktitan.net/news/INKW/more-than-water-the-story-and-inspiration-behind-be-water-7cubz1bxjmbt.html)  
+  <sub>Stock Titan, 3 hours ago</sub>  
+  Greene Concepts (INKW) outlines the purpose and inspiration behind its premium artesian spring water brand, Be Water™, emphasizing values-based branding...
+- [Toyota stock heads into the open after a 2.97 percent gain](https://www.ad-hoc-news.de/boerse/news/corporate-news/toyota-stock-heads-into-the-open-after-a-2-97-percent-gain/70152020)  
+  <sub>AD HOC NEWS, 9 hours ago</sub>  
+  TM, US8923313071. Toyota stock heads into the open after a 2.97 percent gain. Published on 09/22/2026 at 08:40 | Editorial responsibility: Rafael Müller,...
+- [Sensex Today Ends 329 Points Lower | Nifty Below 23,350 | LTM Ltd Down 4%](https://www.equitymaster.com/indian-share-markets/09/22/2026/Sensex-Today-Ends-329-Points-Lower--Nifty-Below-23350--LTM-Ltd-Down-4?utm_source=homepage&utm_medium=website&utm_campaign=Content&utm_content=TM)  
+  <sub>Equitymaster, 5 hours ago</sub>  
+  The BSE Sensex ends 329 points lower, while Nifty ended 85 points lower, down at 23329.
 
 </details>
 
@@ -1713,16 +1388,16 @@ _Not available today._
 
 </details>
 
-<details><summary><b>Price and chart</b> — score -0.20</summary>
+<details><summary><b>Price and chart</b> — score -0.25</summary>
 
 ```text
-Last close 192.73 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 194.57 (-0.9%), 50d 189.05 (+1.9%), 200d 202.02 (-4.6%); 50d below 200d
-Momentum: RSI(14) 50.0 | MACD 1.043 vs signal 1.831 (histogram -0.788)
-Returns: 1d +0.6% | 5d -2.4% | 1m +0.3% | 3m +13.6%
-52-week range: 166.50 - 248.29 (now 32.1% of the way up)
-Volatility: ATR(14) 3.35 (1.7% of price) | annualised 20d 21.2%
-Volume: 0.11x the 20-day average
+Last close 192.38 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 194.49 (-1.1%), 50d 189.40 (+1.6%), 200d 202.00 (-4.8%); 50d below 200d
+Momentum: RSI(14) 49.5 | MACD 0.833 vs signal 1.629 (histogram -0.795)
+Returns: 1d -0.1% | 5d -1.6% | 1m -2.5% | 3m +15.0%
+52-week range: 166.50 - 248.29 (now 31.6% of the way up)
+Volatility: ATR(14) 3.25 (1.7% of price) | annualised 20d 20.2%
+Volume: 0.12x the 20-day average
 ```
 
 </details>
@@ -1730,8 +1405,8 @@ Volume: 0.11x the 20-day average
 <details><summary><b>Company numbers</b> — score +0.45</summary>
 
 ```text
-Sector: Consumer Cyclical / Auto Manufacturers | market cap 228.23B
-Valuation: trailing P/E 8.56 | forward P/E 12.21 | P/B 15.67 | PEG n/a
+Sector: Consumer Cyclical / Auto Manufacturers | market cap 227.82B
+Valuation: trailing P/E 8.54 | forward P/E 12.19 | P/B 15.64 | PEG n/a
 Profitability: profit margin 8.6% | operating margin 7.9% | ROE 12.4%
 Growth (YoY): revenue +10.4% | earnings +86.9%
 Balance sheet: debt/equity 115.0% | free cash flow -3.60T
@@ -1774,12 +1449,12 @@ _Not available today._
 
 </details>
 
-<details><summary><b>What analysts and big funds say</b> — score +0.35</summary>
+<details><summary><b>What analysts and big funds say</b> — score +0.30</summary>
 
 ```text
 Consensus: strong_buy (mean 1.50 on a 1=strong buy to 5=strong sell scale, 4 analysts)
 Ratings: 2 strong buy, 2 buy, 0 hold, 0 sell, 0 strong sell
-Price target: mean 234.08 (+21.5% vs last close), range 230.00 - 239.31
+Price target: mean 234.08 (+21.7% vs last close), range 230.00 - 239.31
 Recent rating changes:
   - 2025-11-07 Freedom Broker: down, Buy -> Hold
   - 2025-02-04 Macquarie: up, Neutral -> Outperform
@@ -1793,7 +1468,7 @@ Largest holders: Fisher Asset Management, LLC (0.5%), Morgan Stanley (0.2%), FMR
 
 </details>
 
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.35</summary>
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.30</summary>
 
 _Not available today._
 
@@ -1805,7 +1480,6 @@ _Not available today._
 Last 180 days: bought 0 shares in 0 transaction(s) | sold n/a shares in 0
 Net: +0 shares | insiders hold 757,877 shares
 Distinct insiders: 0 buying, 0 selling
-(1 grant/option/gift transaction(s) excluded — compensation, not a view on the price)
 ```
 
 </details>
@@ -1824,77 +1498,79 @@ _Not available today._
 
 ### Exxon Mobil (XOM) · Company — NEUTRAL, confidence 0.35
 
+**Result:** REJECTED · bias is NEUTRAL; no trade
+
 **In the model's own words:**
 
-> XOM is caught between conflicting signals that prevent a directional conviction. The recent price action shows weakness (-2.7% in 1d, -3.6% in 5d) despite a strong 3-month gain (+14.9%), and technicals display early deterioration: RSI at 45.8 is neutral, MACD histogram turned negative, and volume is only 21% of the 20-day average, suggesting weak conviction behind the sell-off. The stock trades 24-27% above intrinsic value per multiple valuation frameworks and carries a trailing P/E of 20.47, which is elevated relative to a forward P/E of 14.74 and PEG of 1.40. Fundamentally, earnings have been mixed (2 beats, 2 in-line over last 4 quarters), and the next earnings date is 39 days away, leaving limited near-term catalyst clarity. The analyst consensus is constructive (buy rating, +7.4% target), but recent rating changes show mixed sentiment: two neutral/downgrade moves (Piper Sandler, Bank of America) offset by maintains of Overweight/Buy from MS, Barclays, and TD Cowen. The Venezuela re-entry story is speculative and multi-year. Insider buying was net positive over 180 days (+6.9M shares) but lacked attribution to specific named executives. The news is largely sector-neutral roundups and valuation commentary rather than ticker-specific catalysts. With technicals showing signs of momentum fade, valuation stretched, earnings record uneven, and no material near-term trigger, the risk-reward does not favor a directional bet at this moment.
+> News is dominated by a crude-driven 3% selloff on easing supply fears, which is macro rather than company-specific; one headline is about an unrelated ticker (XMTR) and should be ignored. Technicals are mixed: below 20d SMA with negative MACD histogram and RSI 46, but still above 50d/200d and +14% over 3 months, on very thin volume. Fundamentals are solid (forward P/E 14.8, low leverage, strong FCF, 2 beats/2 in line) with earnings over a month away. Analyst consensus is a lukewarm buy with 15 holds and a recent BofA downgrade; target implies only ~7%. Insider data is internally inconsistent (aggregate net buying but zero distinct insiders) and carries little weight. No clear directional edge.
 
 **Main reasons it gave:**
-- Recent 1d and 5d price weakness with below-average volume suggests fading momentum
-- Valuation 24-27% above fair value on GuruFocus and 20.5x trailing P/E relative to forward 14.7x
-- Earnings record mixed (2 beats, 2 in-line) with next catalyst 39 days away
-- Analyst consensus constructive but recent downgrades (BofA, Piper Sandler) offset maintains
-- No material ticker-specific catalyst in past 24 hours; Venezuela story is long-dated and preliminary
+- -3.2% drop attributed to crude retreat on recovering Saudi exports, a macro not company factor
+- Below 20d SMA with MACD histogram -0.864 and RSI 46, but 50d above 200d
+- Forward P/E 14.76, D/E 15.9%, FCF $20.7B, earnings +112.8% YoY
+- Consensus skewed to hold (15 of 22) with BofA downgrade in July; target only +7.4%
+- Insider block shows aggregate net buying but 0 distinct buyers/sellers — unreliable
 
-<details><summary><b>News</b> — score +0.00</summary>
+<details><summary><b>News</b> — score -0.30</summary>
 
-- [Monday's session: gap up and gap down stock in the S&P500 index](https://www.chartmill.com/news/DOW/Chartmill-55111-Mondays-session-gap-up-and-gap-down-stock-in-the-SP500-index)  
-  <sub>ChartMill, 35 minutes ago</sub>  
-  Wondering which stocks are making significant price gaps? Explore the S&P500 index on Monday to find the gap up and gap down stocks in today's session.
-- [XOM Looks 24.0% Overvalued on GF Value™ as Dividend Sustainabili](https://www.gurufocus.com/news/9090097/xom-looks-240-overvalued-on-gf-value-as-dividend-sustainability-faces-mixed-signals)  
-  <sub>GuruFocus, 5 minutes ago</sub>  
-  On September 21, 2026, ExxonMobil Holdings Corp (NYSE: XOM) experienced a notable decline in its stock price, slipping by $3.94 to around $159.59.
-- [Zacks Market Edge Highlights: ExxonMobil, JPMorgan Chase and NVIDIA](https://www.tradingview.com/news/zacks:84adcc7ce094b:0-zacks-market-edge-highlights-exxonmobil-jpmorgan-chase-and-nvidia/)  
-  <sub>TradingView, 2 hours ago</sub>  
-  For Immediate ReleaseChicago, IL – September 21, 2026 – Zacks Market Edge is a podcast hosted weekly by Zacks Stock Strategist Tracey Ryniec.
-- [XOM: Volume Growth Still Matters, Free Cash Flow Discipline Now Carries The Case](https://simplywall.st/community/narratives/us/energy/nyse-xom/exxonmobil-holdings/6q89hkau-xom-future-dividend-strength-and-global-projects-will-balance-sector-risks/updates/28-the-thesis-on-exxonmobil-has-been-reviewed-and-reaffirmed-t)  
-  <sub>Simply Wall Street, 2 hours ago</sub>  
-  The thesis on ExxonMobil has been reviewed and reaffirmed. The updated view places more weight on recent evidence of capital discipline, cost savings and...
-- [Why Are BATL, TPET, XOM, CVX, USO, UCO Stocks Rising Overnight?](https://stocktwits.com/news-articles/markets/equity/why-are-batl-tpet-xom-cvx-uso-uco-stocks-rising-overnight/cZZLqW1R7Mp)  
-  <sub>Stocktwits, 18 hours ago</sub>  
-  BATL, TPET, USO, UCO Stocks: Retail Sentiment. On Stocktwits, retail sentiment around BATL stock slipped from 'extremely bullish' to 'bullish' over 24 hours...
-- [Exxon (XOM) Eyes a Return to Venezuela After Nearly Two Decades Away](https://finance.yahoo.com/energy/articles/exxon-xom-eyes-return-venezuela-164059135.html)  
-  <sub>Yahoo Finance, 22 hours ago</sub>  
-  A Wall Street Journal report on September 16 revealed that ExxonMobil Holdings Corporation (NYSE:XOM) is nearing a preliminary agreement with Venezuela's...
-- [3 Inflated Stocks We Think Twice About](https://www.theglobeandmail.com/investing/markets/stocks/XOM/pressreleases/4706590/3-inflated-stocks-we-think-twice-about/)  
-  <sub>The Globe and Mail, 11 hours ago</sub>  
+- [Exxon Mobil Holdings (XOM) Stock Drops Despite Market Gains: Important Facts to Note](https://www.google.com/goto?url=CAESlwEB6zswFccMlyaKPChj_DFNrb0l4iH6QWgM435G8iyF_G07apryffg9_iNxfgT1MiT1_beYKQt2g1yC__8IoA-QibU801s3XcM93saVFbJiqT-V6Pqi_ttYko8jzoVwGbGlLGuhLzLuoWEOPygLwMTKFVPZikjMOLyrY-cNbwQYHf0KhFcZPpiz7XeTAd67wqQf3_Fax0d-)  
+  <sub>Yahoo Finance, 17 hours ago</sub>  
+  In the latest trading session, Exxon Mobil Holdings (XOM) closed at $158.30, marking a -3.2% move from the previous day. The stock's change was less than...
+- [XOM|Exxon Mobil Corp|Price:158.300|Chg%:-5.240](https://www.tradingkey.com/markets/stocks/xom)  
+  <sub>TradingKey, 8 hours ago</sub>  
+  Exxon Mobil Corp News · Phillips 66 Stock (PSX) Moved Down by 3.80% on Sep 21: What Signal Does It Send? • Phillips 66 stock pulled back due to broader energy...
+- [Is Exxon Mobil (NYSE:XOM) Stock Worth Watching Today?](https://kalkinemedia.com/us/stocks/energy/is-exxon-mobil-nysexom-stock-worth-watching-today)  
+  <sub>Kalkine Media, 2 hours ago</sub>  
+  Exxon Mobil (NYSE:XOM) enters Monday with energy positioning as crude retreats with supply routes improving.
+- [ExxonMobil Stock Falls Monday: What's Happening?](https://www.benzinga.com/trading-ideas/movers/26/09/61899671/exxonmobil-stock-falls-monday-whats-happening)  
+  <sub>Benzinga, 24 hours ago</sub>  
+  ExxonMobil Corp. (NYSE:XOM) shares are trading lower Monday morning as global benchmark crude prices retreat amid recovering Saudi Arabian export volumes...
+- [ExxonMobil Falls as Crude Prices Retreat on Easing Supply Fears](https://www.quiverquant.com/news/ExxonMobil+Falls+as+Crude+Prices+Retreat+on+Easing+Supply+Fears)  
+  <sub>Quiver Quantitative, 22 hours ago</sub>  
+  ExxonMobil Holdings Corp. (XOM) is down 3.3% today. Here is some analysis on what might have caused.
+- [ExxonMobil Holdings Corp (XOM) Shares Fall 3.2% -- What GF Score of 72 Tells Investors](https://www.gurufocus.com/news/9090511)  
+  <sub>GuruFocus, 18 hours ago</sub>  
+  On September 21, 2026, ExxonMobil Holdings Corp (XOM) shares declined by 3.2%, bringing the current price to $158.30. This drop is notable within the...
+- [Rosenblatt raises Xometry stock price target to $120 on AI strength](https://uk.investing.com/news/stock-market-news/rosenblatt-raises-xometry-stock-price-target-to-120-on-ai-strength-93CH-4877439)  
+  <sub>Investing.com UK, 3 hours ago</sub>  
+  Investing.com - Rosenblatt raised its price target on Xometry Inc (NASDAQ:XMTR) to $120 from $110 on Monday while maintaining a Buy rating on the shares.
+- [ExxonMobil (NYSE:XOM) Stock Price Down 3.1% - What's Next?](https://www.marketbeat.com/instant-alerts/price-exxonmobil-nyse-xom-stock-price-down-31-whats-next-2026-09-21/)  
+  <sub>MarketBeat, 18 hours ago</sub>  
+  Shares of ExxonMobil Corporation (NYSE:XOM - Get Free Report) traded down 3.1% during mid-day trading on Monday . The stock traded as low as $157.94 and...
+- [This Energy Stock Could Give ExxonMobil a Run: Should You Buy?](https://www.theglobeandmail.com/investing/markets/stocks/XOM/pressreleases/4714760/this-energy-stock-could-give-exxonmobil-a-run-should-you-buy/)  
+  <sub>The Globe and Mail, 23 hours ago</sub>  
   Detailed price information for Exxonmobil Holdings Corp (XOM-N) from The Globe and Mail including charting and trades.
-- [Xometry stock rating reiterated at Citizens on durable growth outlook By Investing.com](https://uk.investing.com/news/stock-market-news/xometry-stock-rating-reiterated-at-citizens-on-durable-growth-outlook-93CH-4875988)  
-  <sub>Investing.com, 3 hours ago</sub>  
-  Investing.com - Citizens reiterated a Market Outperform rating and $120 price target on Xometry Inc (NASDAQ:XMTR) stock following investor meetings in...
-- [XOM Looks 27.3% Overvalued on GF Value™ Amid Dividend Sustainabi](https://www.gurufocus.com/news/9089749/xom-looks-273-overvalued-on-gf-value-amid-dividend-sustainability-focus)  
-  <sub>GuruFocus, 2 hours ago</sub>  
-  On September 21, 2026, RBC Capital analyst Biraj Borkhataria reaffirmed a Sector Perform rating and a $180 price target for ExxonMobil Holdings Corp (NYSE:...
-- [HOST News & Events](https://intellectia.ai/stock/HOST/news)  
-  <sub>Intellectia AI, 5 hours ago</sub>  
-  Latest HOST stock news: earnings reports, major events, and real-time price action alerts. Daily updates on everything moving HOST stock.
+- [ExxonMobil Nears a Venezuela Return After 19 Years. Here’s Where the Stock Could Go](https://www.tikr.com/blog/exxonmobil-nears-a-venezuela-return-after-19-years-heres-where-the-stock-could-go)  
+  <sub>TIKR.com, 16 hours ago</sub>  
+  Current Price: $163.54; Target Price (Mid): ~$170; Street Target: ~$171; Potential Total Return: ~4%; Annualized IRR: ~1% / year.
 
 </details>
 
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score -0.30</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>Price and chart</b> — score -0.25</summary>
+<details><summary><b>Price and chart</b> — score -0.15</summary>
 
 ```text
-Last close 159.12 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 162.36 (-2.0%), 50d 158.19 (+0.6%), 200d 147.12 (+8.2%); 50d above 200d
-Momentum: RSI(14) 45.8 | MACD 1.419 vs signal 2.046 (histogram -0.627)
-Returns: 1d -2.7% | 5d -3.6% | 1m -4.2% | 3m +14.9%
-52-week range: 110.64 - 171.47 (now 79.7% of the way up)
-Volatility: ATR(14) 3.76 (2.4% of price) | annualised 20d 27.6%
-Volume: 0.21x the 20-day average
+Last close 159.16 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 162.07 (-1.8%), 50d 158.47 (+0.4%), 200d 147.32 (+8.0%); 50d above 200d
+Momentum: RSI(14) 46.2 | MACD 0.952 vs signal 1.817 (histogram -0.864)
+Returns: 1d +0.5% | 5d -6.0% | 1m -3.6% | 3m +13.9%
+52-week range: 110.64 - 171.47 (now 79.8% of the way up)
+Volatility: ATR(14) 3.84 (2.4% of price) | annualised 20d 28.3%
+Volume: 0.25x the 20-day average
 ```
 
 </details>
 
-<details><summary><b>Company numbers</b> — score -0.15</summary>
+<details><summary><b>Company numbers</b> — score +0.35</summary>
 
 ```text
-Sector: Energy / Oil & Gas Integrated | market cap 654.14B
-Valuation: trailing P/E 20.47 | forward P/E 14.74 | P/B 2.52 | PEG 1.40
+Sector: Energy / Oil & Gas Integrated | market cap 654.45B
+Valuation: trailing P/E 20.48 | forward P/E 14.76 | P/B 2.52 | PEG 1.40
 Profitability: profit margin 9.1% | operating margin 15.9% | ROE 12.6%
 Growth (YoY): revenue +44.1% | earnings +112.8%
 Balance sheet: debt/equity 15.9% | free cash flow 20.67B
@@ -1904,13 +1580,13 @@ Next earnings: 2026-10-30
 
 </details>
 
-<details><summary><b>What this fund holds</b> — score -0.15</summary>
+<details><summary><b>What this fund holds</b> — score +0.35</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>Does this company beat its own forecasts</b> — score -0.15</summary>
+<details><summary><b>Does this company beat its own forecasts</b> — score +0.35</summary>
 
 ```text
 Earnings record, last 4 quarters: 2 beats, 2 in line
@@ -1919,25 +1595,25 @@ Earnings record, last 4 quarters: 2 beats, 2 in line
 
 </details>
 
-<details><summary><b>What holding this fund costs you</b> — score -0.15</summary>
+<details><summary><b>What holding this fund costs you</b> — score +0.35</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>How much oil and gas is in storage</b> — score -0.15</summary>
+<details><summary><b>How much oil and gas is in storage</b> — score +0.35</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>How the crop is growing</b> — score -0.15</summary>
+<details><summary><b>How the crop is growing</b> — score +0.35</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What analysts and big funds say</b> — score +0.25</summary>
+<details><summary><b>What analysts and big funds say</b> — score +0.05</summary>
 
 ```text
 Consensus: buy (mean 2.32 on a 1=strong buy to 5=strong sell scale, 22 analysts)
@@ -1956,13 +1632,13 @@ Largest holders: Blackrock Inc. (8.1%), Vanguard Capital Management LLC (6.5%), 
 
 </details>
 
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.25</summary>
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.05</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>Buying and selling by company insiders</b> — score +0.15</summary>
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
 
 ```text
 Last 180 days: bought 10,818,651 shares in 251 transaction(s) | sold 3,904,152 shares in 49
@@ -1972,13 +1648,13 @@ Distinct insiders: 0 buying, 0 selling
 
 </details>
 
-<details><summary><b>Who is positioned how</b> — score +0.15</summary>
+<details><summary><b>Who is positioned how</b> — score +0.00</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>Money going into and out of this fund</b> — score +0.15</summary>
+<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
 
 _Not available today._
 
@@ -1988,36 +1664,36 @@ _Not available today._
 
 <details><summary><b>News</b> — score n/a</summary>
 
-- [Alphabet Stock Surges as Google Search Makes a Major Comeback](https://finance.yahoo.com/markets/stocks/articles/alphabet-stock-surges-google-search-122833154.html)  
-  <sub>Yahoo Finance, 3 hours ago</sub>  
-  This article first appeared on GuruFocus. Alphabet (GOOGL, Financials) shares were higher in Friday's premarket, after Evercore boosted its price target on...
-- [What's Going On With Alphabet Stock Today?](https://www.benzinga.com/trading-ideas/movers/26/09/61897638/whats-going-on-with-alphabet-stock-today-2)  
-  <sub>Benzinga, 47 minutes ago</sub>  
-  Alphabet Inc. (NASDAQ:GOOG) shares are moving higher. The company unveiled Googlebook, a new line of Android-based laptops built for deep integration with...
-- [Alphabet (GOOGL) Stock Price Forecast 2026: Cloud Hit $20B But FCF Collapsed — Buy or Short?](https://www.tradingkey.com/analysis/stocks/us-stocks/262008961-alphabet-googl-stock-price-forecast-2026-google-cloud-tradingkey)  
-  <sub>TradingKey, 14 hours ago</sub>  
-  The main reason the market is selling Alphabet stock down is the increased $190 billion 2026 capex guidance which has dropped Free Cash Flow margin down from 21...
-- [This Energy Storage Stock Jumps on Deal to Power Google Data Centers](https://www.barrons.com/articles/eos-energy-stock-google-alphabet-3b0aaf6d)  
-  <sub>Barron's, 5 hours ago</sub>  
-  This Energy Storage Stock Jumps on Deal to Power Google Data Centers ... Eos Energy Enterprises will supply Alphabet-owned Google with zinc-based data-center...
-- [The Tech Selloff Is Only Strengthening My Belief In Alphabet](https://247wallst.com/investing/2026/09/21/the-tech-selloff-is-only-strengthening-my-belief-in-alphabet/)  
-  <sub>24/7 Wall St., 4 hours ago</sub>  
-  While most investors flee the tech selloff, one mega cap keeps pulling more capital in the opposite direction, and the reasoning has nothing to do with...
-- [Google fined €403M by Irish regulatory board for privacy violations (GOOG:NASDAQ)](https://seekingalpha.com/news/4644713-google-fined-403m-by-irish-regulatory-board-for-privacy-violations)  
-  <sub>Seeking Alpha, 2 hours ago</sub>  
-  Ireland's DPC fines Google €403M for GDPR location-data violations (2018–2020).
-- [GOOG vs GOOGL - which Alphabet share class should you buy?](https://finance.yahoo.com/markets/stocks/articles/goog-vs-googl-alphabet-share-102934940.html)  
-  <sub>Yahoo Finance, 5 hours ago</sub>  
-  If you're thinking of buying shares in Google's parent company Alphabet, you might be confused as to why there are two symbols to choose from.
-- [Garmin Stock Rises Overnight: Can Its $200 Whoop And Google Fitbit Challenger Get Investors’ Hearts Racing Again?](https://stocktwits.com/news-articles/markets/equity/garmin-stock-rises-overnight-can-its-200-whoop-and-google-fitbit-challenger-get-investors-hearts-racing-again/cZZmJxPR7wj)  
-  <sub>Stocktwits, 9 hours ago</sub>  
-  Benchmark raised its AMC price target to $3 from $2.50 and kept a Buy rating after the company's Q2 results beat expectations. The firm said AMC's revenue and...
-- [Is GOOGL Overvalued? DCF Says Worth $316](https://www.gurufocus.com/news/9089580/is-googl-overvalued-dcf-says-worth-316)  
-  <sub>GuruFocus, 4 hours ago</sub>  
-  On September 21, 2026, we conducted a discounted cash flow (DCF) analysis for Alphabet Inc (GOOGL), a company that has shown strong price performance over...
-- [Alphabet's strong AI-driven growth and solid fi...](https://pluang.com/en/news-feed/keyakinan-alphabet-menguat-di-tengah-penjualan-teknologi)  
-  <sub>Pluang, 4 hours ago</sub>  
-  Despite a broad tech selloff, Alphabet continues to attract investment due to its strong financial performance and leadership in AI technology.
+- [Alphabet Inc. (GOOGL) is Attracting Investor Attention: Here is What You Should Know](https://finance.yahoo.com/markets/stocks/articles/alphabet-inc-googl-attracting-investor-130005253.html)  
+  <sub>Yahoo Finance, 2 hours ago</sub>  
+  Recently, Zacks.com users have been paying close attention to Alphabet (GOOGL). This makes it worthwhile to examine what the stock has in store.
+- [What's Going On With Alphabet Stock Tuesday? - Alphabet (NASDAQ:GOOGL), Alphabet (NASDAQ:GOOG)](https://www.benzinga.com/markets/tech/26/09/61915624/if-theres-a-problem-with-google-search-theres-a-problem-with-google-stock-analyst)  
+  <sub>Benzinga, 4 hours ago</sub>  
+  Evercore's Mark Mahaney says Google Search is strengthening as Gemini closes the gap on ChatGPT. See why analysts remain bullish.
+- [How More Pieces Are Falling Into Place For Google's Nvidia AI Chip Challenge](https://www.investors.com/news/technology/google-stock-tpu-blackstone-cloud-growth-nvidia/)  
+  <sub>Investor's Business Daily, 3 hours ago</sub>  
+  Google stock could benefit as AI chip business emerges as new cloud computing growth engine and rival to Nvidia GPUs.
+- [Is Most-Watched Stock Alphabet Inc. (GOOG) Worth Betting on Now?](https://finance.yahoo.com/markets/stocks/articles/most-watched-stock-alphabet-inc-130002067.html)  
+  <sub>Yahoo Finance, 2 hours ago</sub>  
+  Alphabet (GOOG) has been one of the stocks most watched by Zacks.com users lately. So, it is worth exploring what lies ahead for the stock.
+- [Is Alphabet (NASDAQ:GOOGL) Stock Worth Watching Today?](https://kalkinemedia.com/us/stocks/growth/is-alphabet-nasdaqgoogl-stock-worth-watching-today)  
+  <sub>Kalkine Media, 2 hours ago</sub>  
+  Alphabet (NASDAQ:GOOGL) enters Monday with search, cloud and artificial intelligence spending under fresh trade attention.
+- [Wells Fargo Says Building AI Is Getting More Expensive — Here's Why It Hiked Price Targets For GOOGL, AMZN And META](https://stocktwits.com/news-articles/markets/equity/wells-fargo-sees-ai-more-expensive-not-red-flag-googl-amzn-meta/cZZSJKOR7vT)  
+  <sub>Stocktwits, 18 hours ago</sub>  
+  Wells Fargo analyst Ken Gawrelski raised the firm's price targets on Alphabet Inc. (GOOG, GOOGL), Amazon.com Inc. (AMZN) and Meta Platforms Inc. (META) on...
+- [Not Micron. Not Alphabet. Here's My Top Artificial Intelligence (AI) Stock Pick for the Next 3 Years.](https://www.theglobeandmail.com/investing/markets/stocks/GOOGL/pressreleases/4724288/not-micron-not-alphabet-heres-my-top-artificial-intelligence-ai-stock-pick-for-the-next-3-years/)  
+  <sub>The Globe and Mail, 8 hours ago</sub>  
+  Detailed price information for Alphabet Cl A (GOOGL-Q) from The Globe and Mail including charting and trades.
+- [Google: The One-Stop AI Shop (NASDAQ:GOOG)](https://seekingalpha.com/article/4948364-google-the-one-stop-ai-shop)  
+  <sub>Seeking Alpha, 23 hours ago</sub>  
+  Google stands as a one-stop shop for AI, spanning silicon, software, cloud, and telecom offerings. Read what investors should know about the tech giant's AI...
+- [Berkshire Hathaway boosts Alphabet stake 83%, s...](https://pluang.com/en/news-feed/kepercayaan-ku-pada-akumulasi-berkelanjutan-alphabet-setelah-buffett-beli)  
+  <sub>Pluang, 13 minutes ago</sub>  
+  Berkshire Hathaway increased its investment in Alphabet by 83%, making it the company's third-largest holding. This move highlights confidence in Alphabet's...
+- [AVAV Stock Rebounds After-Hours On Record Sales And $1.5B Backlog — CEO Says FY27 ‘Off To A Strong Start’](https://stocktwits.com/news-articles/markets/equity/avav-stock-rebounds-after-hours-on-record-sales-and-1-5-b-backlog-ceo-says-fy-27-off-to-a-strong-start/cZt7K4YRJCR)  
+  <sub>Stocktwits, 15 hours ago</sub>  
+  Chief Executive Wahid Nawabi said fiscal 2027 “is off to a strong start, with record first-quarter revenue and funded backlog and landmark strategic wins.”
 
 </details>
 
@@ -2030,13 +1706,13 @@ _Not available today._
 <details><summary><b>Price and chart</b> — score n/a</summary>
 
 ```text
-Last close 354.67 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 342.28 (+3.6%), 50d 345.53 (+2.6%), 200d 337.69 (+5.0%); 50d above 200d
-Momentum: RSI(14) 58.6 | MACD 0.613 vs signal -1.370 (histogram 1.983)
-Returns: 1d +1.5% | 5d +1.5% | 1m +4.1% | 3m +1.4%
-52-week range: 236.57 - 402.62 (now 71.1% of the way up)
-Volatility: ATR(14) 8.41 (2.4% of price) | annualised 20d 23.4%
-Volume: 0.39x the 20-day average
+Last close 358.84 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 342.83 (+4.7%), 50d 345.66 (+3.8%), 200d 337.89 (+6.2%); 50d above 200d
+Momentum: RSI(14) 61.3 | MACD 1.689 vs signal -0.754 (histogram 2.443)
+Returns: 1d +1.1% | 5d +4.0% | 1m +4.1% | 3m +3.7%
+52-week range: 236.57 - 402.62 (now 73.6% of the way up)
+Volatility: ATR(14) 8.46 (2.4% of price) | annualised 20d 23.5%
+Volume: 0.41x the 20-day average
 ```
 
 </details>
@@ -2044,8 +1720,8 @@ Volume: 0.39x the 20-day average
 <details><summary><b>Company numbers</b> — score n/a</summary>
 
 ```text
-Sector: Communication Services / Internet Content & Information | market cap 4.34T
-Valuation: trailing P/E 17.80 | forward P/E 23.83 | P/B 6.97 | PEG 1.27
+Sector: Communication Services / Internet Content & Information | market cap 4.39T
+Valuation: trailing P/E 18.02 | forward P/E 24.11 | P/B 7.05 | PEG 1.27
 Profitability: profit margin 54.8% | operating margin 34.0% | ROE 48.7%
 Growth (YoY): revenue +24.2% | earnings +294.0%
 Balance sheet: debt/equity 18.9% | free cash flow 22.67B
@@ -2093,7 +1769,7 @@ _Not available today._
 ```text
 Consensus: strong_buy (mean 1.38 on a 1=strong buy to 5=strong sell scale, 54 analysts)
 Ratings: 13 strong buy, 43 buy, 5 hold, 0 sell, 0 strong sell
-Price target: mean 428.16 (+20.7% vs last close), range 340.00 - 515.00
+Price target: mean 429.46 (+19.7% vs last close), range 340.00 - 515.00
 Recent rating changes:
   - 2026-09-18 Tigress Financial: main, Strong Buy -> Strong Buy
   - 2026-09-17 Evercore ISI Group: main, Outperform -> Outperform
@@ -2140,33 +1816,36 @@ _Not available today._
 
 <details><summary><b>News</b> — score n/a</summary>
 
-- [Novo Nordisk Falls 7% as Post-Wegovy Growth Plan Fails to Ease Competition Fears; Eli Lilly Slips, Viking Therapeutics Edges Higher](https://finance.yahoo.com/healthcare/articles/novo-nordisk-falls-7-post-134522608.html)  
-  <sub>Yahoo Finance, 1 hour ago</sub>  
-  Novo Nordisk took the stage at its own capital markets day and said something that sent its stock tumbling 7%, yet its closest rivals barely flinched.
-- [Nvidia vs. Eli Lilly: I’d Choose This Stock for the Next Decade](https://247wallst.com/investing/2026/09/21/nvidia-vs-eli-lilly-id-choose-this-stock-for-the-next-decade/)  
-  <sub>24/7 Wall St., 39 minutes ago</sub>  
-  NVDA posted 106% revenue growth to $96B last quarter while LLY grew 48% to $23B, yet NVIDIA trades at just 23x forward earnings against a 60% operating...
-- [Eli Lilly Vs. Novo Nordisk Stock: Temporarily Cheap Or Correctly Cheap? (NYSE:LLY)](https://seekingalpha.com/article/4948208-eli-lilly-vs-novo-nordisk-temporarily-cheap-or-correctly-cheap)  
-  <sub>Seeking Alpha, 8 hours ago</sub>  
-  Eli Lilly demonstrates superior operating momentum, while Novo Nordisk offers lower expectations and higher cash returns. Learn why LLY and NVO are rated...
-- [5 Stocks In The Spotlight Last Week: Wall Street's Most Accurate Analysts Weigh In](https://www.benzinga.com/analyst-stock-ratings/price-target/26/09/61888771/5-stocks-in-the-spotlight-last-week-wall-streets-most-accurate-analysts-weigh-in-12)  
-  <sub>Benzinga, 6 hours ago</sub>  
-  U.S. stocks ended mixed; the Dow had its worst week since March. Benzinga highlights top picks from five accurate analysts, including ON, AXSM and LLY.
-- [Novo Nordisk Stock Drops 5.6% as 2030 Goals Match Peers](https://www.tradingview.com/news/gurufocus:f13861ee9094b:0-novo-nordisk-stock-drops-5-6-as-2030-goals-match-peers/)  
-  <sub>TradingView, 3 hours ago</sub>  
-  Novo Nordisk A/S NYSE:NVO shares fell 5.96% in Copenhagen trading, as the Danish drugmaker used its London Capital Markets Day to lay out 2030 strategic...
-- [Novo Nordisk A/S Stock (NVO) Moved Down by 7.86% on Sep 21: A Full Analysis](https://www.tradingkey.com/news/market-movers/262178564-market-movers-nvo-20260921)  
-  <sub>TradingKey, 53 minutes ago</sub>  
-  Novo Nordisk faced downward pressure after its Capital Markets Day strategic update.Eli Lilly competition and patent expirations raised concerns over market...
-- [Novo Nordisk says CagriSema bests Eli Lilly's Zepbound (NVO:NYSE)](https://seekingalpha.com/news/4644774-novo-nordisk-says-cagrisema-bests-eli-lilly-zepbound)  
-  <sub>Seeking Alpha, 38 minutes ago</sub>  
-  Novo Nordisk's CagriSema beats Lilly's Zepbound in phase 3 obesity/diabetes trials, with greater weight loss and similar HbA1c reduction. Read more here.
-- [Eli Lilly and Company (LLY) Price: Live Chart & Market Cap](https://cryptorank.io/rwa/stocks/eli-lilly-and)  
-  <sub>CryptoRank, 16 hours ago</sub>  
-  Track Eli Lilly and Company (LLY), a tokenized asset in the "Stocks" category — compare its token price to the real one, and follow market cap and trading...
-- [PLTR Stock Heads for Worst Month Ever: Retail Awaits Dip Below $100, Michael Burry Takes Victory Lap](https://stocktwits.com/news-articles/markets/equity/pltr-stock-heads-for-worst-month-ever-retail-awaits-dip-below-100-michael-burry-takes-victory-lap/cZKUD9QR7O0)  
-  <sub>Stocktwits, 18 hours ago</sub>  
-  Despite strong financial growth, Palantir's shares have retreated amid an increasingly negative sentiment for software stocks.
+- [LLY Stock Gains As CEO Says Foundayo Wins One-Third Of New GLP-1 Pill Starts, Breaks Ground On $6.5B Houston Plant](https://finance.yahoo.com/healthcare/articles/lly-stock-gains-ceo-says-194919636.html)  
+  <sub>Yahoo Finance, 19 hours ago</sub>  
+  Eli Lilly & Company (LLY) broke ground at a new facility in Houston on Monday as it builds more factory capacity for Foundayo, its newly launched obesity...
+- [His Bet On Home Depot Made Ken Langone A Billionaire. Now He Sees Eli Lilly Stock Hitting $2,000](https://247wallst.com/investing/2026/09/22/his-bet-on-home-depot-made-ken-langone-a-billionaire-now-he-sees-eli-lilly-stock-hitting-2000/)  
+  <sub>24/7 Wall St., 60 minutes ago</sub>  
+  Ken Langone predicts Eli Lilly (LLY) hits $2,000 within 3-4 years, a ~73% gain from $1,154, while Home Depot (HD) sits down 25% over one year.
+- [Ken Langone predicts Eli Lilly stock will hit $2,000 in 3-4 years, rivaling his Home Depot gains.](https://pluang.com/en/news-feed/ken-langone-prediksi-saham-eli-lilly-capai-2000)  
+  <sub>Pluang, 44 minutes ago</sub>  
+  Ken Langone, co-founder of Home Depot, stated that Eli Lilly stock could reach $2000 within the next 3 to 4 years, challenging the long-term success of his...
+- [ATAI Stock Slips After Blockbuster Week: Cathie Wood Calls $3.8B Lilly Deal ‘Well-Deserved’ Return For Shareholders](https://stocktwits.com/news-articles/markets/equity/atai-cathie-wood-lilly-deal-well-deserved-return-shareholders/cZZLrZTR7MA)  
+  <sub>Stocktwits, 6 hours ago</sub>  
+  ARKG sold 1.12 million ATAI shares last week but still held 3.19 million shares as of Friday.
+- [Eli Lilly & Co (LLY) Receives a Buy from Barclays](https://www.theglobeandmail.com/investing/markets/stocks/LLY/pressreleases/4725475/eli-lilly-co-lly-receives-a-buy-from-barclays/)  
+  <sub>The Globe and Mail, 7 hours ago</sub>  
+  Detailed price information for Eli Lilly and Company (LLY-N) from The Globe and Mail including charting and trades.
+- [Eli Lilly CEO Says Foundayo Wins One-Third of New Oral GLP-1 Patients as Company Captures 70% of New Seni](https://www.benzinga.com/news/health-care/26/09/61915766/eli-lilly-ceo-says-foundayo-wins-one-third-of-new-oral-glp-1-patients-as-company-captures-70-of-new-seniors-growing-week-on-week)  
+  <sub>Benzinga, 4 hours ago</sub>  
+  Eli Lilly and Co.'s (NYSE:LLY) CEO Dave Ricks announced a significant increase in the use of GLP-1 treatments among seniors, following Medicare's July...
+- [What Lilly Stock's Breast Cancer Drug Approval Means For Shareholders](https://simplywall.st/stocks/us/pharmaceuticals-biotech/nyse-lly/eli-lilly/news/what-lilly-stocks-breast-cancer-drug-approval-means-for-shar)  
+  <sub>Simply Wall Street, 20 hours ago</sub>  
+  Eli Lilly received full U.S. FDA approval for Inluriyo, an oral estrogen receptor antagonist, in combination with Verzenio for adults with ER+, HER2–,...
+- [Eli Lilly’s Tough Month: One of The Biggest Global Banks Says 37% Gains Begin Soon](https://www.aol.com/articles/eli-lilly-tough-month-one-113421000.html)  
+  <sub>AOL.com, 4 hours ago</sub>  
+  Eli Lilly just posted a quarter that crushed estimates on every major metric, yet the stock has spent the past month getting punished anyway.
+- [Guggenheim Boosts Eli Lilly Price Target Amid Strong Weight Loss Drug Demand](https://finance.yahoo.com/markets/stocks/articles/guggenheim-boosts-eli-lilly-price-031933331.html)  
+  <sub>Yahoo Finance, 12 hours ago</sub>  
+  Key Stats for Eli Lilly StockPrice change for Eli Lilly stock in last 6 months: 27%$LLY Stock Price as of Sep. 21: $1,16552-Week High: $1292$LLY Stock Price...
+- [TD Cowen reiterates Buy on Eli Lilly stock, $1,250 target on approval](https://in.investing.com/news/stock-market-news/td-cowen-reiterates-buy-on-eli-lilly-stock-1250-target-on-approval-93CH-5600738)  
+  <sub>Investing.com India, 5 hours ago</sub>  
+  Investing.com - TD Cowen reiterated a Buy rating and $1,250 price target on Eli Lilly (NYSE:LLY) stock following the approval of its Inluriyo combination...
 
 </details>
 
@@ -2179,13 +1858,13 @@ _Not available today._
 <details><summary><b>Price and chart</b> — score n/a</summary>
 
 ```text
-Last close 1,165.36 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 1,158.81 (+0.6%), 50d 1,176.90 (-1.0%), 200d 1,066.94 (+9.2%); 50d above 200d
-Momentum: RSI(14) 51.1 | MACD -11.262 vs signal -13.053 (histogram 1.791)
-Returns: 1d +1.1% | 5d +2.4% | 1m -6.4% | 3m +5.7%
-52-week range: 714.59 - 1,280.34 (now 79.7% of the way up)
-Volatility: ATR(14) 29.80 (2.6% of price) | annualised 20d 19.5%
-Volume: 0.25x the 20-day average
+Last close 1,173.94 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 1,155.14 (+1.6%), 50d 1,176.73 (-0.2%), 200d 1,067.64 (+10.0%); 50d above 200d
+Momentum: RSI(14) 53.6 | MACD -8.566 vs signal -12.162 (histogram 3.596)
+Returns: 1d +0.8% | 5d +3.3% | 1m -6.5% | 3m +6.0%
+52-week range: 714.59 - 1,280.34 (now 81.2% of the way up)
+Volatility: ATR(14) 30.41 (2.6% of price) | annualised 20d 19.8%
+Volume: 0.30x the 20-day average
 ```
 
 </details>
@@ -2193,8 +1872,8 @@ Volume: 0.25x the 20-day average
 <details><summary><b>Company numbers</b> — score n/a</summary>
 
 ```text
-Sector: Healthcare / Drug Manufacturers - General | market cap 1.04T
-Valuation: trailing P/E 39.17 | forward P/E 24.61 | P/B 30.67 | PEG 1.14
+Sector: Healthcare / Drug Manufacturers - General | market cap 1.05T
+Valuation: trailing P/E 39.37 | forward P/E 24.80 | P/B 30.89 | PEG 1.14
 Profitability: profit margin 33.5% | operating margin 54.2% | ROE 102.3%
 Growth (YoY): revenue +47.7% | earnings +26.2%
 Balance sheet: debt/equity 162.1% | free cash flow 11.07B
@@ -2242,7 +1921,7 @@ _Not available today._
 ```text
 Consensus: buy (mean 1.63 on a 1=strong buy to 5=strong sell scale, 29 analysts)
 Ratings: 6 strong buy, 19 buy, 3 hold, 1 sell, 1 strong sell
-Price target: mean 1,325.39 (+13.7% vs last close), range 930.00 - 1,600.00
+Price target: mean 1,325.39 (+12.9% vs last close), range 930.00 - 1,600.00
 Recent rating changes:
   - 2026-09-18 Guggenheim: main, Buy -> Buy
   - 2026-09-10 HSBC: main, Reduce -> Reduce
@@ -2290,37 +1969,40 @@ _Not available today._
 
 </details>
 
-### Nvidia (NVDA) · Company — no answer, no confidence given
+### Microsoft (MSFT) · Company — no answer, no confidence given
 
 <details><summary><b>News</b> — score n/a</summary>
 
-- [Jensen Huang Just Delivered Incredible News for Nvidia Stock Investors](https://www.fool.com/investing/2026/09/21/jensen-huang-incredible-news-nvidia-stock-investor/)  
-  <sub>The Motley Fool, 1 hour ago</sub>  
-  Nvidia (NVDA +1.34%) supplies the world's best graphics processing units (GPUs) for data centers, which are the primary chips used in artificial...
-- [Wall Street Analysts Think Nvidia (NVDA) Is a Good Investment: Is It?](https://finance.yahoo.com/markets/stocks/articles/wall-street-analysts-think-nvidia-133003752.html)  
-  <sub>Yahoo Finance, 2 hours ago</sub>  
-  Investors often turn to recommendations made by Wall Street analysts before making a Buy, Sell, or Hold decision about a stock. While media reports about...
-- [Wall Street Analysts See a 46.61% Upside in Nvidia (NVDA): Can the Stock Really Move This High?](https://www.zacks.com/stock/news/2992946/wall-street-analysts-see-a-4661-upside-in-nvidia-nvda-can-the-stock-really-move-this-high)  
-  <sub>Zacks Investment Research, 2 hours ago</sub>  
-  Shares of Nvidia ( NVDA Quick Quote NVDA - Free Report) have gained 3.5% over the past four weeks to close the last trading session at $222.27,...
-- [Nvidia Stock: Are Trump Talks With China's Xi the AI Chips Catalyst It Needs?](https://www.barrons.com/articles/nvidia-stock-price-trump-china-xi-ai-chips-3828556a)  
-  <sub>Barron's, 1 hour ago</sub>  
-  is looking for something to fuel its latest assault on new share-price highs. This week's summit between President Donald Trump and Chinese leader Xi...
-- [NVDA Stock In Focus As Huawei Announces 2 Advanced AI Chips For 2027](https://stocktwits.com/news-articles/markets/equity/nvda-stock-in-focus-as-huawei-announces-2-advanced-ai-chips-for-2027/cZtr0EKRB5h)  
-  <sub>Stocktwits, 14 hours ago</sub>  
-  Huawei will launch the 960DT in Q1 2027 and Ascend 960PR in Q3 as it expands its AI chip lineup. Its UnifiedBus technology is designed to connect many...
-- [NVDA Looks 43.3% Undervalued on GF Value™](https://www.gurufocus.com/news/9089993/nvda-looks-433-undervalued-on-gf-value)  
-  <sub>GuruFocus, 1 hour ago</sub>  
-  On September 21, 2026, Nvidia's CEO Jensen Huang addressed concerns about artificial intelligence risks, dismissing fears of an AI apocalypse as exaggerated...
-- [Einride Taps Nvidia To Power Autonomous Trucking Push - Targets Up To 2,000 Vehicles By 2028](https://www.tradingview.com/news/stocktwits:24108e9aa094b:0-einride-taps-nvidia-to-power-autonomous-trucking-push-targets-up-to-2-000-vehicles-by-2028/)  
-  <sub>TradingView, 2 hours ago</sub>  
-  Shares of Einride (ENRD) rose around 7% in pre-market trading after the freight operator announced a tie-up with Nvidia (NVDA) to expand its autonomous...
-- [I Keep Buying Nvidia Over and Over Despite China Concerns, Despite The Tech Selloff](https://247wallst.com/investing/2026/09/21/i-keep-buying-nvidia-over-and-over-despite-china-concerns-despite-the-tech-selloff/)  
-  <sub>24/7 Wall St., 3 hours ago</sub>  
-  China headlines, a tech selloff, and a $279 billion supply commitment that could go sideways if AI demand fades: here is why one investor keeps adding to...
-- [Nvidia vs. Eli Lilly: I’d Choose This Stock for the Next Decade](https://www.aol.com/articles/nvidia-vs-eli-lilly-d-143010000.html)  
-  <sub>AOL.com, 38 minutes ago</sub>  
-  NVIDIA (NASDAQ: NVDA) and Eli Lilly (NYSE: LLY) just posted quarters that showcase two of the most powerful growth engines in the market.
+- [Microsoft (MSFT) Stock Looks Reasonable Despite Its 75% Five Year Run](https://finance.yahoo.com/markets/stocks/articles/microsoft-msft-stock-looks-reasonable-211138209.html)  
+  <sub>Yahoo Finance, 18 hours ago</sub>  
+  Microsoft closed at US$493.78 after a strong multi year run, and with the stock dipping over the past week, the real question for investors is whether that...
+- [Analyst Sees More Upside for Microsoft Stock Following Management Meeting](https://www.benzinga.com/trading-ideas/movers/26/09/61923311/analyst-sees-more-upside-for-microsoft-stock-following-management-meeting)  
+  <sub>Benzinga, 28 minutes ago</sub>  
+  Microsoft Corp (NASDAQ:MSFT) shares are trading slightly lower Tuesday, pulling back modestly even as Oppenheimer reiterated an Outperform rating and raised...
+- [MSFT Sees Fresh Price Target Cuts Days Before Quarterly Report – Citi Sees Strong Q4 But Expects Higher Capex Spend In Q1](https://stocktwits.com/news-articles/markets/equity/msft-sees-fresh-price-target-cuts-days-before-quarterly-report-citi-sees-strong-q4-but-expects-higher-capex-spend-in-q1/cZZPPT1R7AF)  
+  <sub>Stocktwits, 6 hours ago</sub>  
+  Wells Fargo said that amid cloud market-share and capital-spending concerns, the setup for the company's Q4 is mixed. Citi said it remains positive on...
+- [Wall Street analyst updates Microsoft stock price target](https://www.google.com/goto?url=CAEShwEB6zswFWpuk5lk-S6afOB-eIIGUkPBEvTkI4a5ZrPnVRWj9h0PmSRWEJ37t_lTuc8CjLJZt5NNhdnOgI8-zEzf3CpQAP0eN_diwZNQTXplcLvO8D8Eo1W6tiS7m2nzhs21r4znCMxdOh_K7atrt7NKv4LMHNl-v2tFxpJ6kf-c0AupoHIxwf4)  
+  <sub>Finbold, 28 minutes ago</sub>  
+  Oppenheimer has raised its Microsoft (NASDAQ: MSFT) stock price target to $570 from $515 while reiterating its 'Outperform' rating.
+- [$MSFT: Microsoft Is Compressing — Is The Market Preparing For Expansion?](https://www.moomoo.com/community/feed/msft-microsoft-is-compressing-is-the-market-preparing-for-expansion-117314426896389)  
+  <sub>Moomoo, 4 hours ago</sub>  
+  Microsoft (MSFT.US)$What's Actually Happening Here? For anyone who finds standard technical jargon confusing, here is the short version of what $MSF...
+- [How AI Cloud Expansion At Microsoft (MSFT) Has Changed Its Investment Story](https://www.google.com/goto?url=CAESuQEB6zswFU1OhLOum_bSVALUTr8qAYh9vK4siqMnTwqFf7BrS1lkQQjA2sVdyN5Yq-_M1StD7RiPlKYR-j4P1TUmfGk-gsYi4EWDqAsl7op7z7p4W9XjKC6IRhkywNyWZ0S1mkRcy7MWFFaE2LxxiWPe9Uj09tjcRqaYxfi8oqGPEBB4LVht9j2zzqsDxgM-vcKpu5rg7_T8sv7Gg-OQTbv7EB2c4dHe3eLiMLdNNiimlUh9py0RgvEPBA)  
+  <sub>Simply Wall Street, 11 hours ago</sub>  
+  Microsoft expanded its AI-heavy cloud footprint through new Azure partnerships in payments, telecoms and scientific research, while its board approved a...
+- [Is It Too Late To Buy Microsoft Stock After Its Summer Run?](https://www.trefis.com/stock/msft/articles/615998/is-it-too-late-to-buy-microsoft-stock-after-its-summer-run/2026-09-21)  
+  <sub>Trefis, 24 hours ago</sub>  
+  Microsoft (MSFT) stock is up about 30% in three months, including a 19% jump in the two trading days after its July report. That makes buying now feel late.
+- [The 'Slow Down AI' Movement Could Actually Be Bullish for These Stocks](https://www.theglobeandmail.com/investing/markets/stocks/MSFT/pressreleases/4735229/the-slow-down-ai-movement-could-actually-be-bullish-for-these-stocks/)  
+  <sub>The Globe and Mail, 7 minutes ago</sub>  
+  Detailed price information for Microsoft Corp (MSFT-Q) from The Globe and Mail including charting and trades.
+- [MSFT Stock Jumps 3% After-Hours — Lower-Than-Expected Q4 Capex, Strong Azure Sales Boost Sentiment](https://stocktwits.com/news-articles/markets/equity/msft-stock-jumps-3-after-hours-lower-than-expected-q4-capex-strong-azure-sales-boost-sentiment/cZNT9ukRJTF)  
+  <sub>Stocktwits, 12 hours ago</sub>  
+  Microsoft Azure cloud-computing revenue increased 43% during the fiscal fourth quarter, above expectations of 40%.
+- [Microsoft (MSFT) Laps the Stock Market: Here's Why](https://finance.yahoo.com/markets/stocks/articles/microsoft-msft-laps-stock-market-214503698.html)  
+  <sub>Yahoo Finance, 17 hours ago</sub>  
+  Microsoft (MSFT) closed at $501.61 in the latest trading session, marking a +1.59% move from the prior day. The stock outpaced the S&P 500's daily gain of...
 
 </details>
 
@@ -2333,13 +2015,13 @@ _Not available today._
 <details><summary><b>Price and chart</b> — score n/a</summary>
 
 ```text
-Last close 225.32 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 219.41 (+2.7%), 50d 214.56 (+5.0%), 200d 198.60 (+13.5%); 50d above 200d
-Momentum: RSI(14) 56.7 | MACD 1.257 vs signal 1.466 (histogram -0.209)
-Returns: 1d +1.4% | 5d +6.8% | 1m +3.9% | 3m +8.0%
-52-week range: 165.17 - 235.74 (now 85.2% of the way up)
-Volatility: ATR(14) 6.25 (2.8% of price) | annualised 20d 46.5%
-Volume: 0.26x the 20-day average
+Last close 496.47 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 498.89 (-0.5%), 50d 469.12 (+5.8%), 200d 431.75 (+15.0%); 50d above 200d
+Momentum: RSI(14) 53.9 | MACD 6.239 vs signal 8.742 (histogram -2.503)
+Returns: 1d -1.0% | 5d -0.1% | 1m +2.7% | 3m +32.8%
+52-week range: 352.83 - 542.07 (now 75.9% of the way up)
+Volatility: ATR(14) 10.75 (2.2% of price) | annualised 20d 22.9%
+Volume: 0.33x the 20-day average
 ```
 
 </details>
@@ -2347,8 +2029,165 @@ Volume: 0.26x the 20-day average
 <details><summary><b>Company numbers</b> — score n/a</summary>
 
 ```text
-Sector: Technology / Semiconductors | market cap 5.44T
-Valuation: trailing P/E 28.49 | forward P/E 14.37 | P/B 23.76 | PEG 0.47
+Sector: Technology / Software - Infrastructure | market cap 3.69T
+Valuation: trailing P/E 27.64 | forward P/E 20.97 | P/B 8.33 | PEG 1.60
+Profitability: profit margin 40.3% | operating margin 45.1% | ROE 34.0%
+Growth (YoY): revenue +17.7% | earnings +31.7%
+Balance sheet: debt/equity 29.1% | free cash flow 16.55B
+Risk: beta 1.11 | short interest 1.0% of float
+Next earnings: 2026-10-28
+```
+
+</details>
+
+<details><summary><b>What this fund holds</b> — score n/a</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Does this company beat its own forecasts</b> — score n/a</summary>
+
+```text
+Earnings record, last 4 quarters: 4 beats
+  2026-06-30 beat by 10% | 2026-03-31 beat by 3% | 2025-12-31 beat by 3% | 2025-09-30 beat by 10%
+```
+
+</details>
+
+<details><summary><b>What holding this fund costs you</b> — score n/a</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How much oil and gas is in storage</b> — score n/a</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How the crop is growing</b> — score n/a</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score n/a</summary>
+
+```text
+Consensus: strong_buy (mean 1.36 on a 1=strong buy to 5=strong sell scale, 52 analysts)
+Ratings: 14 strong buy, 38 buy, 3 hold, 0 sell, 0 strong sell
+Price target: mean 575.34 (+15.9% vs last close), range 440.00 - 870.00
+Recent rating changes:
+  - 2026-09-21 Cantor Fitzgerald: main, Overweight -> Overweight
+  - 2026-09-15 Citizens: reit, Market Outperform -> Market Outperform
+  - 2026-09-04 Stifel: main, Hold -> Hold
+  - 2026-09-01 B of A Securities: main, Buy -> Buy
+  - 2026-08-12 Wells Fargo: main, Overweight -> Overweight
+  - 2026-08-05 Tigress Financial: main, Buy -> Buy
+Institutional ownership: 75.8%
+Largest holders: Blackrock Inc. (8.2%), Vanguard Capital Management LLC (6.5%), State Street Corporation (4.2%), Geode Capital Management, LLC (2.5%), FMR, LLC (2.5%)
+```
+
+</details>
+
+<details><summary><b>What analysts say about what this fund holds</b> — score n/a</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score n/a</summary>
+
+```text
+Last 180 days: bought 513,644 shares in 16 transaction(s) | sold 242,344 shares in 9
+Net: +271,300 shares (+4.2% of insider holdings) | insiders hold 6,831,502 shares
+Distinct insiders: 0 buying, 5 selling
+Sales — weak evidence on their own; often scheduled 10b5-1 plans, tax on vesting, or diversification:
+  - 2026-09-14 HOOD AMY E (Chief Financial Officer): 41,674 shares, 20.76M
+  - 2026-09-01 NADELLA SATYA (Chief Executive Officer): 86,525 shares, 43.39M
+  - 2026-08-05 ALTHOFF JUDSON (Officer): 10,000 shares, 4.88M
+  - 2026-08-04 NUMOTO TAKESHI (Officer): 4,810 shares, 2.39M
+(15 grant/option/gift transaction(s) excluded — compensation, not a view on the price)
+```
+
+</details>
+
+<details><summary><b>Who is positioned how</b> — score n/a</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Money going into and out of this fund</b> — score n/a</summary>
+
+_Not available today._
+
+</details>
+
+### Nvidia (NVDA) · Company — no answer, no confidence given
+
+<details><summary><b>News</b> — score n/a</summary>
+
+- [NVIDIA Corporation (NVDA) Is a Trending Stock: Facts to Know Before Betting on It](https://finance.yahoo.com/markets/stocks/articles/nvidia-corporation-nvda-trending-stock-130004378.html)  
+  <sub>Yahoo Finance, 2 hours ago</sub>  
+  Nvidia (NVDA) has received quite a bit of attention from Zacks.com users lately. Therefore, it is wise to be aware of the facts that can impact the stock's...
+- [Nvidia stock valuation hits decade low despite profit boom](https://qz.com/nvidia-stock-valuation-decade-low-earnings-092226)  
+  <sub>Quartz, 2 hours ago</sub>  
+  Nvidia $NVDA stock is trading near its lowest valuation in more than a decade, according to Bloomberg, even as the chipmaker's revenue and net income are...
+- [NVIDIA (NVDA.US) Stock Flashes a "Warning Signal": Valuation Hits Lowest Level in Over a Decade, What Is the Market Worried About?](https://www.moomoo.com/news/post/1000022614/nvidia-nvdaus-stock-flashes-a-warning-signal-valuation-hits-lowest)  
+  <sub>Moomoo, 4 hours ago</sub>  
+  Zhitong Finance APP has learned that NVIDIA (NVDA.US) shares are sending a warning signal about whether its profit growth can be sustained.
+- [Nvidia: Trucks, Tokens, And A 28x Multiple](https://seekingalpha.com/article/4948600-nvidia-trucks-tokens-and-a-28x-multiple)  
+  <sub>Seeking Alpha, 2 hours ago</sub>  
+  Nvidia Corporation Strong Buy: $108B revenue guide, 74% gross margin, Rubin platform upside and AI cloud risks. Click for this NVDA stock update.
+- [NVDA Stock Is A ‘Bargain’ Trading 30% Below $280 Fair Value, Morningstar Says](https://stocktwits.com/news-articles/markets/equity/nvda-stock-bargain-trading-30-percent-below-fair-value/cZN43deRJP5)  
+  <sub>Stocktwits, 9 hours ago</sub>  
+  NVDA Stock Is A 'Bargain' Trading 30% Below $280 Fair Value, Morningstar Says. According to the research firm, NVDA now fits the profile of a “growth-at-...
+- [Can Apple Overtake NVIDIA as the World's Most Valuable Company?](https://www.marketbeat.com/articles/can-apple-overtake-nvidia-as-the-worlds-most-valuable-company/)  
+  <sub>MarketBeat, 43 minutes ago</sub>  
+  For most of the past two years, NVIDIA Corporation NASDAQ: NVDA has stood at the summit of the stock market. As the chipmaker whose processors power much of...
+- [Nvidia Price Prediction: Wall Street and Our Model Finally Agree](https://247wallst.com/investing/2026/09/22/nvidia-price-prediction-wall-street-and-our-model-finally-agree/)  
+  <sub>24/7 Wall St., 38 minutes ago</sub>  
+  NVDA targets $310 over 12 months, implying 40% upside from $228, with both our model and Wall Street consensus aligned on a BUY. AMD trades at a trailing...
+- [Bull of the Day: NVIDIA Corp. (NVDA)](https://www.tradingview.com/news/zacks:d237027b6094b:0-bull-of-the-day-nvidia-corp-nvda/)  
+  <sub>TradingView, 5 hours ago</sub>  
+  NVIDIA Corp. NVDA is back to being a Zacks Rank #1 (Strong Buy).Are you in?NVIDIA is the leading AI and accelerated computing company in the world.
+- [QUICK SPARK: Wall Street Is Moving Nvidia Onto Crypto Rails. 24/7 Trading Is Next](https://www.benzinga.com/crypto/cryptocurrency/26/09/61918726/nvidia-crypto-trading-rails)  
+  <sub>Benzinga, 2 hours ago</sub>  
+  Nvidia Corp (NASDAQ:NVDA) may be a Wall Street stock, but the way investors trade it, is starting to look increasingly like crypto.
+- [Nvidia Stock Missed the AI Agent Rally. Here’s What Could Turn It Around.](https://www.barrons.com/articles/nvidia-stock-price-meta-ai-chips-rally-11911927)  
+  <sub>Barron's, 3 hours ago</sub>  
+  stock was left out of the latest chip rally sparked by Meta Platforms' · META. +11.43%. Muse agent. It's a sign that the market isn't seeing the chip...
+
+</details>
+
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score n/a</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Price and chart</b> — score n/a</summary>
+
+```text
+Last close 228.86 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 220.53 (+3.8%), 50d 215.11 (+6.4%), 200d 198.85 (+15.1%); 50d above 200d
+Momentum: RSI(14) 59.4 | MACD 2.018 vs signal 1.602 (histogram 0.416)
+Returns: 1d +0.7% | 5d +7.9% | 1m +6.6% | 3m +14.4%
+52-week range: 165.17 - 235.74 (now 90.3% of the way up)
+Volatility: ATR(14) 6.22 (2.7% of price) | annualised 20d 45.3%
+Volume: 0.24x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score n/a</summary>
+
+```text
+Sector: Technology / Semiconductors | market cap 5.53T
+Valuation: trailing P/E 28.93 | forward P/E 14.59 | P/B 24.13 | PEG 0.47
 Profitability: profit margin 63.7% | operating margin 66.2% | ROE 117.2%
 Growth (YoY): revenue +105.9% | earnings +127.8%
 Balance sheet: debt/equity 17.0% | free cash flow 41.81B
@@ -2394,9 +2233,9 @@ _Not available today._
 <details><summary><b>What analysts and big funds say</b> — score n/a</summary>
 
 ```text
-Consensus: strong_buy (mean 1.31 on a 1=strong buy to 5=strong sell scale, 59 analysts)
-Ratings: 11 strong buy, 48 buy, 2 hold, 1 sell, 0 strong sell
-Price target: mean 327.70 (+45.4% vs last close), range 180.00 - 515.00
+Consensus: strong_buy (mean 1.30 on a 1=strong buy to 5=strong sell scale, 59 analysts)
+Ratings: 10 strong buy, 48 buy, 2 hold, 1 sell, 0 strong sell
+Price target: mean 327.70 (+43.2% vs last close), range 180.00 - 515.00
 Recent rating changes:
   - 2026-09-10 Piper Sandler: init, ? -> Overweight
   - 2026-09-04 Rosenblatt: main, Buy -> Buy
@@ -2420,7 +2259,7 @@ _Not available today._
 
 ```text
 Last 180 days: bought 2,452,825 shares in 17 transaction(s) | sold 5,023,547 shares in 8
-Net: -2,570,722 shares (-0.3% of insider holdings) | insiders hold 965,928,000 shares
+Net: -2,570,722 shares (-0.3% of insider holdings) | insiders hold 965,687,040 shares
 Distinct insiders: 0 buying, 4 selling
 Sales — weak evidence on their own; often scheduled 10b5-1 plans, tax on vesting, or diversification:
   - 2026-09-04 STEVENS MARK A (Director): 1,022,239 shares, 235.64M
@@ -2444,34 +2283,40 @@ _Not available today._
 
 </details>
 
-### Teva Pharmaceutical (TEVA) · Company — no answer, no confidence given
+### Novo Nordisk (NVO) · Company — no answer, no confidence given
 
 <details><summary><b>News</b> — score n/a</summary>
 
-- [Teva (NYSE: TEVA) legal chief files $273K share-sale notice](https://www.stocktitan.net/sec-filings/TEVA/144-teva-pharmaceutical-industries-ltd-sec-filing-8b18ba7d8013.html)  
-  <sub>Stock Titan, 4 hours ago</sub>  
-  Rule 144 filing shows CLO Brian Savage may sell up to 7028 Teva shares worth $273062 through Citigroup Global Markets on the NYSE from awards and options.
-- [Medincell's Partner Teva Presented New Data on Investigational Olanzapine LAI and UZEDY® at Psych Congress 2026](https://www.biospace.com/press-releases/medincells-partner-teva-presented-new-data-on-investigational-olanzapine-lai-and-uzedy-at-psych-congress-2026)  
-  <sub>BioSpace, 5 hours ago</sub>  
-  New Phase 3 analyses of Olanzapine LAI, currently under regulatory review, provided further insights into stabilization, long-term efficacy and...
-- [Nykredit A S Takes Position in Teva Pharmaceutical Industries Ltd. $TEVA](https://www.marketbeat.com/instant-alerts/filing-nykredit-a-s-takes-position-in-teva-pharmaceutical-industries-ltd-teva-2026-09-21/)  
-  <sub>MarketBeat, 7 hours ago</sub>  
-  Nykredit A S bought a new stake in shares of Teva Pharmaceutical Industries Ltd. (NYSE:TEVA - Free Report) during the second quarter, according to the...
-- [Daily US Equity Opening News: Anthropic shifts potential IPO to November; PSKY in talks with California over production concession](https://www.newsquawk.com/headlines/daily-us-equity-opening-news-anthropic-shifts-potential-ipo-to-november-psky-in-talks-with-california-over-production-concession)  
-  <sub>Newsquawk, 2 hours ago</sub>  
-  DAY AHEAD: US INDEX FUTURES: ES +0.6%, NQ +1.1%, YM +0.9%, RUT +0.8% BROKER MOVES: CIEN upgraded at Evercore; INVH & AMH upgraded at Mizuho.
-- [Medincell: Teva unveils new data on its olanzapine, FDA decision expected end of 2026](https://www.ideal-investisseur.fr/en/stock-news/medincell-teva-unveils-new-data-on-its-olanzapine-fda-decision-expected-end-of-2026/25427.html)  
-  <sub>Idéal Investisseur, 9 hours ago</sub>  
-  Teva, Medincell's partner, presented new clinical and real-world data on two treatments based on the BEPO technology of the Montpellier-based...
-- [Teva Pharmaceutical Industries stock gains on NYSE listing milestone](https://www.ad-hoc-news.de/boerse/news/nebenwerte/teva-pharmaceutical-industries-stock-gains-on-nyse-listing-milestone/70139441)  
-  <sub>AD HOC NEWS, 21 hours ago</sub>  
-  Teva Pharmaceutical Industries stock closed at USD 38.98 on September 18, 2026, marking a 36.25 percent gain since the start of the year.
-- [Aurobindo Pharma to host JP Morgan analyst meet in Hyderabad on Sep 24](https://scanx.trade/stock-market-news/companies/aurobindo-pharma-host-jp-morgan-analyst-meet-hyderabad-sep-24/51533363)  
-  <sub>scanx.trade, 4 hours ago</sub>  
-  Aurobindo Pharma officials to meet investors on September 24, 2026. Session is part of JP Morgan Healthcare Trip - Hyderabad. Group meeting scheduled for...
-- [MedinCell’s BEPO Platform Gains Momentum as Teva Unveils Strong Data for Long-Acting Antipsychotics](https://www.tipranks.com/news/company-announcements/medincells-bepo-platform-gains-momentum-as-teva-unveils-strong-data-for-long-acting-antipsychotics)  
-  <sub>TipRanks, 8 hours ago</sub>  
-  An update from MedinCell SA ( ($FR:MEDCL) ) is now available. New data presented by Teva at Psych Congress 2026 highlight the performance of two long-acting...
+- [Why Novo Nordisk Stock Just Crashed](https://finance.yahoo.com/markets/stocks/articles/why-novo-nordisk-stock-just-161429665.html)  
+  <sub>Yahoo Finance, 23 hours ago</sub>  
+  Novo Nordisk (NYSE: NVO) stock tumbled 8.1% through 11:35 a.m. ET Monday, and it has only itself to blame. Novo, you see, just told investors what to expect...
+- [Novo and UNICEF expand partnership to support a healthier start for more than 80 million children](https://www.stocktitan.net/news/NVO/novo-and-unicef-expand-partnership-to-support-a-healthier-start-for-7fkm6ox7o6ak.html)  
+  <sub>Stock Titan, 3 hours ago</sub>  
+  Novo Nordisk (NVO) and UNICEF will expand their global partnership with a four-year childhood overweight and obesity prevention programme from 2027 to 2030,...
+- [Novo eyes hair-loss market amid plans to diversify (NVO:NYSE)](https://seekingalpha.com/news/4645467-novo-eyes-hair-loss-market-amid-plans-diversify)  
+  <sub>Seeking Alpha, 25 minutes ago</sub>  
+  Novo Nordisk (NVO) announces plans to target the hair-loss market as part of its post-Wegovy strategy, boosting Veradermics (MANE) and Absci (ABSI).
+- [Novo Nordisk’s stock tumbles as doubts persist about Ozempic maker’s strategy](https://www.marketwatch.com/story/novo-nordisk-stock-tumbles-as-ozempic-maker-sets-out-2030-goals-8a5a8d2d)  
+  <sub>MarketWatch, 19 hours ago</sub>  
+  Novo Nordisk CEO Mike Doustdar poses for a photo at Novo Nordisk's headquarters in Bagsvaerd, Denmark, in August. The stock tumbled on Monday after the drug...
+- [Why Is Novo Nordisk Stock Climbing Premarket Today?](https://stocktwits.com/news-articles/markets/equity/why-is-novo-nordisk-stock-climbing-premarket-today/cZ0SCUBRex5)  
+  <sub>Stocktwits, 18 hours ago</sub>  
+  The UAE launch marks the start of Novo's global rollout, with additional launches planned later this year.
+- [Why Novo Stock Is Tumbling After Drugmaker Unveils Ambitious Growth Plan](https://www.barrons.com/articles/novo-stock-growth-plan-wegovy-ozempic-5d86fa59)  
+  <sub>Barron's, 20 hours ago</sub>  
+  plans to launch at least five new “multi-blockbusters” by the end of the decade as part of an ambitious plan to stoke growth and counter slowing sales.
+- [NVO Looks 61.9% Undervalued on GF Value™ as Dividend Remains Att](https://www.gurufocus.com/news/9091319/nvo-looks-619-undervalued-on-gf-value-as-dividend-remains-attractive)  
+  <sub>GuruFocus, 4 hours ago</sub>  
+  On September 22, 2026, Novo Nordisk AS (NYSE: NVO) CEO Mike Doustdar highlighted the company's need to strengthen investor trust amid looming patent...
+- [Novo Nordisk (NYSE:NVO) Stock Sinks Nearly 8% as US$23 Billion Obesity Plan Fails to Win Over Investors](https://stocksdownunder.com/novo-nordisk-stock-sinks-8-obesity-plan/)  
+  <sub>Stocks Down Under, 20 hours ago</sub>  
+  Novo Nordisk stock is down about 8% today near April lows after its $23 billion pipeline plan and 2030 obesity targets failed to win over investors.
+- [Goldman Sachs Sticks to Their Hold Rating for Novo Nordisk (0QIU)](https://www.theglobeandmail.com/investing/markets/stocks/NVO-N/pressreleases/4729089/goldman-sachs-sticks-to-their-hold-rating-for-novo-nordisk-0qiu/)  
+  <sub>The Globe and Mail, 4 hours ago</sub>  
+  Detailed price information for Novo Nordisk A/S ADR (NVO-N) from The Globe and Mail including charting and trades.
+- [Morgan Stanley Downgrades Novo Nordisk (NYSE: NVO) As Semaglutide Patent Cliff Threatens Terminal Value](https://www.foreignpolicyjournal.com/2026/09/21/morgan-stanley-downgrades-novo-nordisk-nyse-nvo-as-semaglutide-patent-cliff-threatens-terminal-value/)  
+  <sub>Foreign Policy Journal, 21 hours ago</sub>  
+  Novo Nordisk A/S (NYSE: NVO) received a downgrade to Underweight from Morgan Stanley on September 11, 2026, sending shares down an additional 2% following...
 
 </details>
 
@@ -2484,13 +2329,13 @@ _Not available today._
 <details><summary><b>Price and chart</b> — score n/a</summary>
 
 ```text
-Last close 39.24 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 37.53 (+4.5%), 50d 35.48 (+10.6%), 200d 33.21 (+18.2%); 50d above 200d
-Momentum: RSI(14) 63.4 | MACD 0.886 vs signal 0.747 (histogram 0.139)
-Returns: 1d +0.7% | 5d +1.3% | 1m +6.6% | 3m +21.9%
-52-week range: 18.34 - 39.25 (now 100.0% of the way up)
-Volatility: ATR(14) 1.13 (2.9% of price) | annualised 20d 31.8%
-Volume: 0.14x the 20-day average
+Last close 39.53 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 44.47 (-11.1%), 50d 46.51 (-15.0%), 200d 46.07 (-14.2%); 50d above 200d
+Momentum: RSI(14) 30.5 | MACD -1.565 vs signal -1.097 (histogram -0.468)
+Returns: 1d -0.7% | 5d -7.0% | 1m -15.4% | 3m -16.6%
+52-week range: 35.29 - 63.98 (now 14.8% of the way up)
+Volatility: ATR(14) 1.37 (3.5% of price) | annualised 20d 42.8%
+Volume: 0.89x the 20-day average
 ```
 
 </details>
@@ -2498,8 +2343,150 @@ Volume: 0.14x the 20-day average
 <details><summary><b>Company numbers</b> — score n/a</summary>
 
 ```text
-Sector: Healthcare / Drug Manufacturers - Specialty & Generic | market cap 45.77B
-Valuation: trailing P/E 65.40 | forward P/E 12.68 | P/B 5.90 | PEG 0.72
+Sector: Healthcare / Drug Manufacturers - General | market cap 174.60B
+Valuation: trailing P/E 9.81 | forward P/E 11.86 | P/B 5.12 | PEG 3.10
+Profitability: profit margin 35.3% | operating margin 42.5% | ROE 59.8%
+Growth (YoY): revenue +2.1% | earnings -20.6%
+Balance sheet: debt/equity 63.3% | free cash flow 37.67B
+Risk: beta 0.34 | short interest 1.0% of float
+Next earnings: 2026-11-04
+```
+
+</details>
+
+<details><summary><b>What this fund holds</b> — score n/a</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Does this company beat its own forecasts</b> — score n/a</summary>
+
+```text
+Earnings record, last 4 quarters: 1 beat, 1 in line, 2 missed
+  2026-06-30 missed by 6% | 2026-03-31 beat by 23% | 2025-12-31 in line | 2025-09-30 missed by 7%
+```
+
+</details>
+
+<details><summary><b>What holding this fund costs you</b> — score n/a</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How much oil and gas is in storage</b> — score n/a</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How the crop is growing</b> — score n/a</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score n/a</summary>
+
+```text
+Consensus: hold (mean 2.71 on a 1=strong buy to 5=strong sell scale, 12 analysts)
+Ratings: 0 strong buy, 3 buy, 10 hold, 1 sell, 0 strong sell
+Price target: mean 46.65 (+18.0% vs last close), range 39.43 - 63.15
+Recent rating changes:
+  - 2026-09-11 Morgan Stanley: down, Equal-Weight -> Underweight
+  - 2026-03-02 Goldman Sachs: down, Buy -> Neutral
+  - 2026-02-24 JP Morgan: down, Overweight -> Neutral
+  - 2026-01-09 CICC: init, ? -> Outperform
+  - 2025-12-08 Argus Research: down, Buy -> Hold
+  - 2025-11-28 Goldman Sachs: main, Buy -> Buy
+Institutional ownership: 9.9%
+Largest holders: Dodge & Cox Inc. (0.6%), LOOMIS SAYLES & CO L P (0.5%), Franklin Resources, Inc. (0.4%), Price (T.Rowe) Associates Inc (0.3%), Morgan Stanley (0.3%)
+```
+
+</details>
+
+<details><summary><b>What analysts say about what this fund holds</b> — score n/a</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score n/a</summary>
+
+```text
+Last 180 days: bought 0 shares in 0 transaction(s) | sold n/a shares in 0
+Net: +0 shares | insiders hold 132,841 shares
+Distinct insiders: 0 buying, 0 selling
+```
+
+</details>
+
+<details><summary><b>Who is positioned how</b> — score n/a</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Money going into and out of this fund</b> — score n/a</summary>
+
+_Not available today._
+
+</details>
+
+### Teva Pharmaceutical (TEVA) · Company — no answer, no confidence given
+
+<details><summary><b>News</b> — score n/a</summary>
+
+- [Teva’s comeback is real. The harder part is still ahead](https://www.calcalistech.com/ctechnews/article/p1rnr2p6o)  
+  <sub>CTech, 7 hours ago</sub>  
+  Last week, Richard Francis stood on the famous floor of the New York Stock Exchange, surrounded by a long line of senior Teva executives, and rang the bell...
+- [Teva CEO Details Biopharma Pivot, $700M Savings Plan and Growth Pipeline](https://finance.yahoo.com/healthcare/articles/teva-ceo-details-biopharma-pivot-090251701.html)  
+  <sub>Yahoo Finance, 6 hours ago</sub>  
+  Interested in Teva Pharmaceutical Industries Ltd.? Here are five stocks we like better. Teva is accelerating its shift toward biopharmaceuticals while...
+- [Teva Pharmaceutical Industries Ltd (TEVA) Stock Up 3.5% but GF V](https://www.gurufocus.com/news/9090563/teva-pharmaceutical-industries-ltd-teva-stock-up-35-but-gf-value-says-overvalued-gf-score-47100)  
+  <sub>GuruFocus, 17 hours ago</sub>  
+  On September 21, 2026, Teva Pharmaceutical Industries Ltd (TEVA) shares rose 3.5% to a current price of $40.06. The stock has seen a significant price...
+- [Teva stock hits 52-week high at $39.71](https://www.investing.com/news/company-news/teva-stock-hits-52week-high-at-3971-93CH-4909436)  
+  <sub>Investing.com, 23 hours ago</sub>  
+  Teva Pharmaceutical Industries Ltd ADR has reached a significant milestone, as its stock hit a 52-week high of $39.71. This marks a notable achievement for...
+- [Teva Pharmaceutical Industries (TEVA), Why Is It Back In The Spotlight?](https://finance.yahoo.com/healthcare/articles/teva-pharmaceutical-industries-teva-why-191135979.html)  
+  <sub>Yahoo Finance, 20 hours ago</sub>  
+  Teva Pharmaceutical Industries (NYSE:TEVA) is back in focus after its U.S. affiliate shared fresh Phase 3 SOLARIS data on investigational olanzapine LAI...
+- [Teva at U.S. All Stars Conference: growth plan gains traction By Investing.com](https://in.investing.com/news/stock-market-news/teva-at-us-all-stars-conference-growth-plan-gains-traction-93CH-5600523)  
+  <sub>Investing.com India, 7 hours ago</sub>  
+  On Tuesday, 22 September 2026, Teva Pharmaceutical Industries Ltd. (TEVA) used the U.S. All Stars Conference to argue that its long turnaround has moved...
+- [Teva Pharmaceutical Industries (NYSE:TEVA) Sets New 52-Week High - Still a Buy?](https://www.marketbeat.com/instant-alerts/price-teva-pharmaceutical-industries-nyse-teva-sets-new-52-week-high-still-a-buy-2026-09-21/)  
+  <sub>MarketBeat, 22 hours ago</sub>  
+  Teva Pharmaceutical Industries Ltd. (NYSE:TEVA - Get Free Report)'s share price hit a new 52-week high on Monday . The company traded as high as $39.72 and...
+
+</details>
+
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score n/a</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Price and chart</b> — score n/a</summary>
+
+```text
+Last close 39.77 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 37.72 (+5.4%), 50d 35.65 (+11.6%), 200d 33.27 (+19.5%); 50d above 200d
+Momentum: RSI(14) 64.6 | MACD 0.997 vs signal 0.807 (histogram 0.190)
+Returns: 1d -0.7% | 5d +1.3% | 1m +6.5% | 3m +19.8%
+52-week range: 18.34 - 40.06 (now 98.7% of the way up)
+Volatility: ATR(14) 1.20 (3.0% of price) | annualised 20d 32.8%
+Volume: 0.32x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score n/a</summary>
+
+```text
+Sector: Healthcare / Drug Manufacturers - Specialty & Generic | market cap 46.38B
+Valuation: trailing P/E 66.28 | forward P/E 13.09 | P/B 5.98 | PEG 0.71
 Profitability: profit margin 4.1% | operating margin 4.0% | ROE 9.7%
 Growth (YoY): revenue -0.8% | earnings n/a
 Balance sheet: debt/equity 217.8% | free cash flow 2.22B
@@ -2545,9 +2532,9 @@ _Not available today._
 <details><summary><b>What analysts and big funds say</b> — score n/a</summary>
 
 ```text
-Consensus: strong_buy (mean 1.50 on a 1=strong buy to 5=strong sell scale, 1 analysts)
-Ratings: 1 strong buy, 1 buy, 0 hold, 0 sell, 0 strong sell
-Price target: mean 42.00 (+7.0% vs last close), range 42.00 - 42.00
+Consensus: buy (mean 1.67 on a 1=strong buy to 5=strong sell scale, 2 analysts)
+Ratings: 2 strong buy, 1 buy, 0 hold, 0 sell, 0 strong sell
+Price target: mean 41.00 (+3.1% vs last close), range 40.00 - 42.00
 Recent rating changes:
   - 2026-09-09 Leerink Partners: init, ? -> Outperform
   - 2026-09-04 UBS: main, Buy -> Buy
@@ -2597,116 +2584,135 @@ _Not available today._
 
 ## Whole-market funds
 
-### Commodities basket (DBC) · Index fund — NEUTRAL, confidence 0.35
+### US small companies (IWM) · Index fund — NEUTRAL, confidence 0.35
 
 **In the model's own words:**
 
-> DBC is a broad commodities fund dominated by short-term bonds (41% in short-term Treasuries and government bonds) with meaningful energy exposure (9% Brent crude futures). The technical picture is mixed: the fund is near the top of its 52-week range (90.7%) with a 17.5% gain above the 200-day moving average, suggesting momentum, but momentum indicators are losing steam (RSI 58.8 is overbought territory, MACD histogram negative). Volume is light at 0.2x average, which weakens conviction in the current price level. The macro backdrop offers no clear tailwind: short-end Treasury yields have moved slightly higher this week, and the dollar has strengthened (+0.90), both headwinds for commodity prices. The VIX is calm at 14.62, removing volatility support. Energy inventories show a crude oil draw (bullish signal) but at only the 38th percentile, meaning levels are not tight; natural gas built at a high 71st percentile, a bearish signal. The EIA price outlook calls for WTI to fall ~10% over six months to $79, a clear headwind for this fund's energy holdings, while natural gas is forecast modestly higher. The 3-year record of +13.8% annualized reflects a strong commodity cycle, but near-term catalysts do not support extension. No analyst coverage exists for a commodity fund. Fund flows data is too sparse to read conviction. The case for staying neutral rather than bearish rests on the technical strength visible in the trend structure and the real crude draw, which offer modest support, but these are outweighed by overbought momentum, light volume, near-term EIA price forecasts showing weakness, and the lack of near-term macro catalysts.
+> IWM has retreated 2.8% from its 50-day moving average and 4.4% over the month, with RSI at 40.4 and negative MACD histogram indicating weakening momentum. The technical picture shows downside pressure after a strong run to the 76th percentile of the 52-week range. However, macro backdrop remains supportive: Treasury yields have declined slightly on the long end, the yield curve is normally sloped, and the Fed is expected to cut rates modestly over the next two years. The dollar has strengthened week-on-week, which can weigh on small-cap performance. Volatility remains calm at VIX 14.4. Fund fundamentals show elevated valuation (P/E 17.3, P/B 2.13) with a high beta of 1.24, making the fund sensitive to both market moves and rate changes. The analyst slice covering 1.7% of holdings shows all buy ratings with +24% upside, but this is too thin to drive conviction on the full fund. CFTC positioning shows large speculators net short at the 30th percentile of crowding—neutral terrain with a modest increase in shorts on the week. Fund flows data is insufficient. A recent Seeking Alpha note warned of unprofitable small-cap growth and biotech risk with weak momentum—a view not contradicted by the technicals, though built on thin analyst coverage. The combination of moderately negative technicals, stretched valuation, and positioning that is neither extreme nor clearly supportive justifies a neutral stance with slight bearish lean, pending clarification from either a technical rebound or macro catalyst.
 
 **Main reasons it gave:**
-- MACD histogram negative and RSI overbought at 58.8 despite proximity to 52-week high
-- Light volume of 0.2x average weakens conviction in current price level
-- EIA crude forecast down ~10% to $79 over six months versus current ~$88
-- Dollar strength and short-end Treasury yield rise headwinds for commodities
-- Crude draw bullish but at only 38th percentile of annual range; natural gas build at 71st percentile
+- Price 2.8% below 50-day MA with negative MACD and RSI 40.4 suggesting momentum weakness
+- P/E 17.3 and P/B 2.13 valuations elevated relative to small-cap historical norms
+- Large speculators net short 19.6% of open interest with +6% weekly increase in shorts
+- Fed rate path priced to ~4 quarter-point cuts over two years, providing modest tailwind but not offset by current technicals
 
-<details><summary><b>News</b> — score +0.00</summary>
+<details><summary><b>News</b> — score -0.25</summary>
 
-_No news found for this one today._
+- [IWO ETF: An Unprofitable Small-Cap Tilt Warrants Caution (NYSEARCA:IWO)](https://seekingalpha.com/article/4948479-iwo-unprofitable-small-cap-tilt-warrants-caution)  
+  <sub>Seeking Alpha, 12 hours ago</sub>  
+  Sell-rated iShares Russell 2000 ETF (IWO): unprofitable small-cap growth, biotech-heavy risk, weak momentum & downside signals. See more here.
+- [Exchange-Traded Funds Rise as US Equities Advance After Midday](https://www.moomoo.com/news/post/76545775/exchange-traded-funds-rise-as-us-equities-advance-after-midday)  
+  <sub>Moomoo, 21 hours ago</sub>  
+  BroadMarket IndicatorsBroad-market exchange-traded funds IWM and IVV were higher. Actively traded Invesco QQQ Trust (QQQ) added 2.5%.US equity indexes rose...
+- [Daily ETF Flows: COWZ Gobbles Up Assets](https://www.etf.com/sections/daily-etf-flows/daily-etf-flows-cowz-gobbles-assets)  
+  <sub>ETF.com, 17 hours ago</sub>  
+  Here are the daily ETF fund flows for September 18, 2026.
+- [6 Best Vanguard ETFs for 2026 and How to Invest](https://www.fool.com/investing/how-to-invest/etfs/top-vanguard-etfs/)  
+  <sub>The Motley Fool, 10 hours ago</sub>  
+  Vanguard ETFs (exchange-traded funds) have become synonymous with low-cost, long-term investing, and remain among the most widely held ETFs worldwide.
+- [Nasdaq 100 Rallies, Intel Soars 14%: Stock Market Today](https://www.tradingview.com/news/benzinga:0886239d6094b:0-nasdaq-100-rallies-intel-soars-14-stock-market-today/)  
+  <sub>TradingView, 21 hours ago</sub>  
+  U.S. equities extended their winning streak to a third session Monday, with a fourth consecutive slide in crude oil relieving pressure on Treasury yields...
+- [Ameriprise keeps S&P 500 year-end target at 8,000 despite higher-for-longer rate risks](https://www.bitget.com/amp/news/detail/12560605853460)  
+  <sub>Bitget, 18 hours ago</sub>  
+  Ameriprise kept its 2026 year-end S&P 500 target at 8000, citing improving earnings expectations despite higher yields. Full-year 2026 S&P 500 | Bitget...
+- [September Stagnation Marked By Record-Low Yields, High Duration Risk And High Valuations](https://seekingalpha.com/article/4948565-september-stagnation-marked-by-record-low-yields-high-duration-risk-high-valuations)  
+  <sub>Seeking Alpha, 4 hours ago</sub>  
+  Over the first nine months of 2026, we have witnessed a fascinating macro paradox: a surging US stock market decoupling completely from the bond market.
 
 </details>
 
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score -0.25</summary>
 
 ```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
 Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
 Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
 ```
 
 </details>
 
-<details><summary><b>Price and chart</b> — score +0.25</summary>
+<details><summary><b>Price and chart</b> — score -0.35</summary>
 
 ```text
-Last close 32.60 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 32.16 (+1.4%), 50d 30.57 (+6.6%), 200d 27.74 (+17.5%); 50d above 200d
-Momentum: RSI(14) 58.8 | MACD 0.784 vs signal 0.837 (histogram -0.053)
-Returns: 1d -1.0% | 5d -1.7% | 1m +4.8% | 3m +18.9%
-52-week range: 22.07 - 33.68 (now 90.7% of the way up)
-Volatility: ATR(14) 0.47 (1.5% of price) | annualised 20d 19.7%
-Volume: 0.20x the 20-day average
+Last close 286.65 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 291.20 (-1.6%), 50d 294.80 (-2.8%), 200d 275.22 (+4.2%); 50d above 200d
+Momentum: RSI(14) 40.4 | MACD -3.265 vs signal -2.683 (histogram -0.581)
+Returns: 1d +0.4% | 5d +0.5% | 1m -4.4% | 3m -2.9%
+52-week range: 229.11 - 305.09 (now 75.7% of the way up)
+Volatility: ATR(14) 3.44 (1.2% of price) | annualised 20d 11.6%
+Volume: 0.45x the 20-day average
 ```
 
 </details>
 
-<details><summary><b>Company numbers</b> — score -0.25</summary>
+<details><summary><b>Company numbers</b> — score -0.15</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What this fund holds</b> — score -0.25</summary>
+<details><summary><b>What this fund holds</b> — score -0.15</summary>
 
 ```text
-Fund type: Commodities Broad Basket
-What it holds: P/E n/a | P/B 0.00 | P/S 0.00 | 3y earnings growth n/a
-Yield: 2.4%
-Three-year record: +13.8% a year | beta to the market 1.05
-Cost and size: expense ratio 0.85% | net assets 1.80B
-What it is made of: Other 50.6%, Cash 44.8%, Bonds 2.7%, Stocks 1.9%
-Largest holdings: Invesco Shrt-Trm Inv Gov&Agcy Instl 40.8%, Brent Crude Future Nov 26 8.9%, Invesco Short Term Treasury ETF 6.2%, Mini Ibovespa Future Dec 26 1.9%
+Fund type: Small Blend
+What it holds: P/E 17.30 | P/B 2.13 | P/S 1.31 | 3y earnings growth n/a
+Yield: 0.9%
+Three-year record: +17.4% a year | beta to the market 1.24
+Cost and size: expense ratio 0.19% | net assets 80.46B
+What it is made of: Stocks 99.5%, Cash 0.5%
+Largest holdings: JFrog Ltd Ordinary Shares 0.3%, Moog Inc Class A 0.3%, BlackRock Cash Funds Treasury SL Agency 0.3%, UMB Financial Corp 0.3%, Glaukos Corp 0.3%
+Sector mix: Healthcare 21.0%, Financial services 18.1%, Technology 13.8%, Industrials 13.2%
 ```
 
 </details>
 
-<details><summary><b>Does this company beat its own forecasts</b> — score -0.25</summary>
+<details><summary><b>Does this company beat its own forecasts</b> — score -0.15</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What holding this fund costs you</b> — score -0.25</summary>
+<details><summary><b>What holding this fund costs you</b> — score -0.15</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>How much oil and gas is in storage</b> — score -0.25</summary>
+<details><summary><b>How much oil and gas is in storage</b> — score -0.15</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How the crop is growing</b> — score -0.15</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.30</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.30</summary>
 
 ```text
-US inventories, week ending 2026-09-11 (published the following Wednesday)
-  Crude oil: 423.4 million barrels, -0.6 on the week (a draw), 38% percentile over 52 weeks
-  Natural gas: 3,298.0 billion cubic feet, +44.0 on the week (a build), 71% percentile over 52 weeks
-A build is more supply than demand and a draw is the reverse, so a build reads bearish and a draw bullish -- as a rule of thumb, not a law. Weigh the change and how unusual the level is above the level itself, and remember the market has already seen this number.
-```
-
-</details>
-
-<details><summary><b>How the crop is growing</b> — score -0.25</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts and big funds say</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.00</summary>
-
-```text
-Rolled up from the 4 largest holdings, 57.7% of the fund by weight
-Ratings by weight: buy n/a | hold n/a | sell n/a (mean n/a on a 1=strong buy to 5=strong sell scale)
-Weighted price target: n/a above the current prices
-Holdings read: AGPXX, BRNF6, TBLL, WINZ26
-Recent rating changes among them: none reported
+Rolled up from the 5 largest holdings, 1.7% of the fund by weight  -- thin, so read this as a fact about that slice rather than the fund
+Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.73 on a 1=strong buy to 5=strong sell scale)
+Weighted price target: +24.0% above the current prices
+Holdings read: FROG, MOG-A, XTSLA, UMBF, GKOS
+Recent rating changes among them:
+  - FROG: 2026-09-04 DA Davidson: main, Buy -> Buy
+  - MOG-A: 2026-09-15 Guggenheim: init, ? -> Neutral
+  - UMBF: 2026-09-14 UBS: init, ? -> Neutral
+  - GKOS: 2026-08-20 BTIG: main, Buy -> Buy
 ```
 
 </details>
@@ -2719,7 +2725,13 @@ _Not available today._
 
 <details><summary><b>Who is positioned how</b> — score +0.00</summary>
 
-_Not available today._
+```text
+Contract: RUSSELL E-MINI - CHICAGO MERCANTILE EXCHANGE (positions as of 2026-09-15, published the following Friday)
+Large speculators: net short 19.6% of open interest (496,762 contracts)
+Change on the week: +6.0% of open interest
+Crowding: 30% percentile over 52 weeks -- within its normal range
+Read this as crowding, not as a forecast: an extreme is as often the end of a move as the middle of one.
+```
 
 </details>
 
@@ -2728,7 +2740,7 @@ _Not available today._
 ```text
 Direction: unknown
 Share count change: n/a (too few readings)
-Shares outstanding: 54.03M | fund size: 1.76B
+Shares outstanding: 281.05M | fund size: 80.56B
 Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
 ```
 
@@ -2738,46 +2750,52 @@ Creations and redemptions are settled money, not an opinion -- but they follow d
 
 **In the model's own words:**
 
-> DBA is a commodity-focused fund with an unusual composition: 51.8% Other (likely agricultural commodities given the ticker), 46.2% Cash, and only 2% Bonds. The technicals show a fund near the top of its 52-week range (77.5%), trading slightly below its 20-day SMA while holding above both the 50-day and 200-day SMAs. Momentum is neutral (RSI 49.6, MACD histogram negative at -0.125), suggesting no decisive directional push. The macro backdrop is stable: yields are flat to slightly higher across the curve, the dollar strengthened 0.90 on the week, and the VIX remains calm at 14.62. Inflation data at 3.4% is above the market's 2.3% ten-year expectation, which could support commodities over time, but this week's yield moves have been minimal. The one-day return of +1.5% is noise against the fund's low volatility (1.1% ATR). Volume is well below average (0.27x), indicating thin conviction either way. The fund's sector mix and large cash position (46.2%) suggest either hedging or recent inflows that have not yet been deployed, but fund flows data is insufficient to read. The news mention of agribusiness as a long-term theme is thematic rather than a catalyst for this cycle. Without a clear rate surprise, commodity price breakout, or flow reversal, the case for a directional tilt is absent. The fund sits at equilibrium: near range highs but on soft momentum, in a stable macro environment with no fresh catalyst.
+> DBA is a commodity-focused fund holding primarily short-term Treasuries (43.1% in AGPXX, 4.4% in TBLL) and 46.2% cash, with only 2% in actual commodities exposure. The fund's construction makes it largely a fixed income vehicle rather than an agricultural commodity play despite its ticker. Near-term technicals show weak momentum (RSI 50.3, MACD histogram negative, volume 0.17x average) with price 0.9% below the 20-day SMA, and the fund sits near the top of its 52-week range (78.6%). Macro backdrop is calm (VIX 14.42, down 2.8 on the week) with a normal upward-sloping yield curve. The news about record diesel prices and grain strength is real but represents less than 10% of the fund's actual holdings, making macro agricultural stress largely irrelevant to DBA's returns—the fund benefits from falling short-term rates more than commodity prices. The positive Trump-Xi summit sentiment supporting grains is offset by the fund's heavy Treasury weighting, which would suffer if rate expectations shift. The 3-year record of +12.7% annually reflects the recent Treasury rally, not commodity strength, and the current price action lacks conviction to change the directional call. This is not a pure-play commodity fund.
 
 **Main reasons it gave:**
-- Price near 52-week highs (77.5%) with below-average volume
-- RSI at midpoint (49.6) and MACD histogram negative (no momentum confirmation)
-- Macro backdrop stable: minimal yield moves, calm VIX, no inflation surprise this week
-- Large cash position (46.2%) and thin analyst coverage suggest no imminent reallocation
+- Fund is 46.2% cash and 47.5% short-term Treasuries, not agricultural commodities
+- Momentum indicators deteriorating: RSI neutral, MACD histogram negative, volume well below average
+- Record diesel prices and grain strength largely irrelevant to fund's Treasury-focused holdings
+- Price near 52-week highs with weak follow-through, no conviction from technicals
 
-<details><summary><b>News</b> — score +0.00</summary>
+<details><summary><b>News</b> — score +0.15</summary>
 
-- [Market Musings 200926: Watch Micron for clues on Tech direction](https://www.stockopedia.com/content/market-musings-200926-watch-micron-for-clues-on-tech-direction-1057681/)  
-  <sub>Stockopedia, 23 hours ago</sub>  
-  Agribusiness is emerging as one of the most compelling long-term investment themes within the real economy. Spanning the entire agricultural value chain,...
+- [US Diesel Prices Surge Past $6.50: The Agriculture ETFs Caught in the Crossfire](https://www.benzinga.com/etfs/sector-etfs/26/09/61908038/us-diesel-prices-surge-past-6-50-the-agriculture-etfs-caught-in-the-crossfire)  
+  <sub>Benzinga, 19 hours ago</sub>  
+  U.S. diesel prices hit a record $6.50 a gallon, putting fresh pressure on farmers. Here's what soaring fuel costs could mean for agriculture ETFs.
+- [U.S. grains rally ahead of 'positive' Trump-Xi summit, continued Russia-Ukraine fighting](https://seekingalpha.com/news/4645187-us-grains-rally-ahead-of-positive-trump-xi-summit-continued-russia-ukraine-fighting)  
+  <sub>Seeking Alpha, 18 hours ago</sub>  
+  US grain futures rose after initial US-China trade talks were called positive by both sides, raising hopes the Trump-Xi meeting will include Chinese...
+- [US diesel hits record $6.51 as supply deficit deepens despite WTI drop](https://scanx.trade/stock-market-news/commodities/newsom-signs-e15-gas-bill-california-fuel-prices-top-6-iran-tensions/51532724)  
+  <sub>scanx.trade, 19 hours ago</sub>  
+  US diesel prices hit a record high of $6.51/gal on Sep 21, 2026, driven by geopolitical tensions and infrastructure damage. Farm fuel costs rose by $11/acre...
 
 </details>
 
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.15</summary>
 
 ```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
 Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
 Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
 ```
 
 </details>
 
-<details><summary><b>Price and chart</b> — score -0.10</summary>
+<details><summary><b>Price and chart</b> — score -0.15</summary>
 
 ```text
-Last close 28.58 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 28.87 (-1.0%), 50d 28.26 (+1.1%), 200d 27.05 (+5.6%); 50d above 200d
-Momentum: RSI(14) 49.6 | MACD 0.103 vs signal 0.228 (histogram -0.125)
-Returns: 1d +1.5% | 5d -1.3% | 1m +0.7% | 3m +7.2%
-52-week range: 25.44 - 29.49 (now 77.5% of the way up)
-Volatility: ATR(14) 0.31 (1.1% of price) | annualised 20d 14.1%
-Volume: 0.27x the 20-day average
+Last close 28.62 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 28.89 (-0.9%), 50d 28.28 (+1.2%), 200d 27.07 (+5.8%); 50d above 200d
+Momentum: RSI(14) 50.3 | MACD 0.094 vs signal 0.203 (histogram -0.108)
+Returns: 1d -0.2% | 5d -0.9% | 1m +1.1% | 3m +7.6%
+52-week range: 25.44 - 29.49 (now 78.6% of the way up)
+Volatility: ATR(14) 0.30 (1.1% of price) | annualised 20d 14.7%
+Volume: 0.17x the 20-day average
 ```
 
 </details>
@@ -2862,24 +2880,24 @@ _Not available today._
 ```text
 Direction: unknown
 Share count change: n/a (too few readings)
-Shares outstanding: 27.60M | fund size: 788.81M
+Shares outstanding: 27.60M | fund size: 790.05M
 Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
 ```
 
 </details>
 
-### US company bonds, riskier (HYG) · Index fund — NEUTRAL, confidence 0.25
+### Commodities basket (DBC) · Index fund — NEUTRAL, confidence 0.25
 
 **In the model's own words:**
 
-> HYG is trading below all major moving averages (20d, 50d, 200d) with a downward trend of -1.7% versus the 200-day MA. Momentum is weak: RSI at 40.1 sits in weak territory, and MACD remains negative with the histogram still underwater. Returns over 1m (-1.1%) and 3m (-1.6%) are negative. Volume is depressed at 0.37x the 20-day average, suggesting limited conviction in either direction. On the macro side, the backdrop is benign: the yield curve remains normally upsloped at +0.98, the VIX is calm at 14.62 (down 2.5 on the week), and the dollar's recent strength (+0.90) may support credit positioning. Treasury yields moved modestly, with the 3-month rising 5bps but longer rates stable, consistent with a slow-hiking scenario already priced into the 2-year at 4.67%. Fund basics show solid fundamentals for high-yield: 5.9% yield, predominantly BB-rated credit (57.9%), and a three-year track record of +7.9% annually. However, no macro surprise or technical catalyst has emerged to justify a directional move. The technical setup—below all MAs, weak momentum, low volume, positioned in the lower half of the 52-week range—argues for patience rather than entry. Absence of recent news and flow data further limits conviction. This is a hold-steady cycle for the fund.
+> DBC is a broad commodity basket that has rallied sharply off its 52-week lows (90.4% of the way up from the range), supported by a three-month return of +20.1%. However, momentum is rolling over: RSI at 58.3 is elevated but not extreme, MACD histogram has turned negative, and volume is well below average at 0.27x the 20-day mean, suggesting the rally is losing conviction. The technical picture shows the price above all three moving averages with the 50d above the 200d, which is structurally bullish, but the recent 5-day drawdown of -3.3% and weak volume argue against adding exposure here. On the macro side, the dollar strengthened +0.93 on the week to 100.58, which headwinds commodities priced in dollars; Treasury yields moved marginally with the long end lower, which is neutral for commodities. The Fed's rate path shows the market pricing roughly 4 quarter-point hikes over two years, consistent with a slow normalization. Energy inventories show a crude draw (bullish signal) at the 38th percentile, but natural gas built (bearish) at the 71st percentile. The EIA outlook is mixed: WTI crude is forecast to fall 10% over six months to $70 by year-end, which tempers bullish sentiment, while natural gas is expected to rise 7%, supporting some holdings. The fund holds 44.8% cash and only 8.9% Brent crude futures as its largest single commodity position, making it a defensive basket with limited beta to any single commodity move. No news, no analyst coverage, and no clear flow data to assess conviction. The rally has been substantial but is showing fatigue; the macro backdrop offers no clear catalyst, and the technical structure, while not broken, is losing momentum on light volume. A modest risk-off tone from the dollar strength and the EIA's bearish six-month WTI view offsets the constructive seasonal backdrop and recent outperformance.
 
 **Main reasons it gave:**
-- Price below all major moving averages with downward trend of -1.7% vs 200d MA
-- Weak momentum: RSI 40.1, negative MACD, depressed volume at 0.37x average
-- Benign macro backdrop: yield curve normal, VIX calm, no rate surprise
-- 5.9% yield on BB-heavy credit quality supports fundamental value but insufficient to overcome technical weakness
-- No macro catalyst or flow conviction to trigger directional move
+- MACD histogram turned negative despite price strength, divergence warns of momentum fade
+- EIA crude outlook falls 10% over six months to $70, tempering upside
+- US dollar index +0.93 on the week headwinds dollar-priced commodities
+- Volume at 0.27x 20-day average on recent weakness signals lower conviction in rally
+- Crude oil draw at 38th percentile (bullish signal) but natural gas build at 71st percentile (bearish)
 
 <details><summary><b>News</b> — score +0.00</summary>
 
@@ -2890,13 +2908,164 @@ _No news found for this one today._
 <details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
 
 ```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
 Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
 Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+```
+
+</details>
+
+<details><summary><b>Price and chart</b> — score +0.35</summary>
+
+```text
+Last close 32.56 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 32.24 (+1.0%), 50d 30.65 (+6.2%), 200d 27.79 (+17.2%); 50d above 200d
+Momentum: RSI(14) 58.3 | MACD 0.714 vs signal 0.812 (histogram -0.098)
+Returns: 1d -0.1% | 5d -3.3% | 1m +4.2% | 3m +20.1%
+52-week range: 22.07 - 33.68 (now 90.4% of the way up)
+Volatility: ATR(14) 0.47 (1.4% of price) | annualised 20d 19.2%
+Volume: 0.27x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score -0.10</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What this fund holds</b> — score -0.10</summary>
+
+```text
+Fund type: Commodities Broad Basket
+What it holds: P/E n/a | P/B 0.00 | P/S 0.00 | 3y earnings growth n/a
+Yield: 2.4%
+Three-year record: +13.8% a year | beta to the market 1.05
+Cost and size: expense ratio 0.85% | net assets 1.80B
+What it is made of: Other 50.6%, Cash 44.8%, Bonds 2.7%, Stocks 1.9%
+Largest holdings: Invesco Shrt-Trm Inv Gov&Agcy Instl 40.8%, Brent Crude Future Nov 26 8.9%, Invesco Short Term Treasury ETF 6.2%, Mini Ibovespa Future Dec 26 1.9%
+```
+
+</details>
+
+<details><summary><b>Does this company beat its own forecasts</b> — score -0.10</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What holding this fund costs you</b> — score -0.10</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How much oil and gas is in storage</b> — score -0.10</summary>
+
+```text
+US inventories, week ending 2026-09-11 (published the following Wednesday)
+  Crude oil: 423.4 million barrels, -0.6 on the week (a draw), 38% percentile over 52 weeks
+  Natural gas: 3,298.0 billion cubic feet, +44.0 on the week (a build), 71% percentile over 52 weeks
+A build is more supply than demand and a draw is the reverse, so a build reads bearish and a draw bullish -- as a rule of thumb, not a law. Weigh the change and how unusual the level is above the level itself, and remember the market has already seen this number.
+```
+
+</details>
+
+<details><summary><b>How the crop is growing</b> — score -0.10</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.00</summary>
+
+```text
+Rolled up from the 4 largest holdings, 57.7% of the fund by weight
+Ratings by weight: buy n/a | hold n/a | sell n/a (mean n/a on a 1=strong buy to 5=strong sell scale)
+Weighted price target: n/a above the current prices
+Holdings read: AGPXX, BRNF6, TBLL, WINZ26
+Recent rating changes among them: none reported
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Who is positioned how</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
+
+```text
+Direction: unknown
+Share count change: n/a (too few readings)
+Shares outstanding: 54.45M | fund size: 1.77B
+Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
+```
+
+</details>
+
+### US company bonds, riskier (HYG) · Index fund — NEUTRAL, confidence 0.25
+
+**In the model's own words:**
+
+> HYG is a high-yield bond fund facing mixed signals that do not support a directional call. On the positive side, the macro backdrop remains supportive: the yield curve is normal and upward-sloping, the dollar has strengthened, and the VIX is calm at 14.42, indicating low volatility and risk appetite. The Fed's recent discount window modernization, mentioned in the news, supports banking resilience. The fund's 5.9% yield remains attractive in absolute terms. However, technical deterioration and soft fund dynamics outweigh these supports. Price is now 10% of the way up from the 52-week low, sitting below all major moving averages (20d, 50d, 200d), with the 50d below the 200d signaling a downtrend. Momentum has rolled over: RSI at 39.4 is in oversold territory but the MACD remains in sell mode with negative histogram. Returns are negative across 1m (-1.2%) and 3m (-1.5%) timeframes. Critically, volume is only 0.17x the 20-day average, indicating weak conviction and shallow liquidity behind any move. Fund flow direction is unknown and share count readings are too sparse to assess conviction from inflows or outflows. The news is neutral to mixed: comparisons to fallen angels and term fund structures are contextual, and the analyst note flagging neutral sentiment and a wait-and-see approach aligns with this assessment. Treasuries have moved modestly; the short end ticked up 5bp on the week while the long end eased, a pattern that historically supports credit but is not decisive in isolation. Credit spreads themselves are not provided. The fund's 0.67 beta to the market and large cash position provide some stability, but the technical picture argues against initiating a bullish stance, while the macro environment lacks a clear trigger for a bearish call. This is a hold and monitor posture.
+
+**Main reasons it gave:**
+- Price below 20d, 50d, and 200d moving averages; 50d below 200d
+- RSI oversold at 39.4 with MACD histogram negative
+- Volume 0.17x average; weak conviction behind price action
+- VIX calm, curve normal, and 5.9% yield supportive but insufficient to overcome technicals
+- Neutral analyst sentiment; unknown fund flow direction
+
+<details><summary><b>News</b> — score +0.00</summary>
+
+- [Precision Trading with Ishares Iboxx Usd High Yield Corporate Bond Etf (HYG) Risk Zones](https://news.stocktradersdaily.com/news_release/22/Precision_Trading_with_Ishares_Iboxx_Usd_High_Yield_Corporate_Bond_Etf_HYG_Risk_Zones_092126085002_1790038202.html)  
+  <sub>Stock Traders Daily, 18 hours ago</sub>  
+  Key findings for Ishares Iboxx Usd High Yield Corporate Bond Etf (NYSE: HYG). Full Alignment in Neutral Sentiment Favors Wait-and-See Approach...
+- [HYBR11 ETF Holdings List — BMFBOVESPA:HYBR11](https://www.tradingview.com/symbols/BMFBOVESPA-HYBR11/holdings/)  
+  <sub>TradingView, 18 hours ago</sub>  
+  Explore Nu iBoxx High Yield Hedge Carry BRL ETF holdings with weight, market value, and other helpful data to make more informed decisions for HYBR11...
+- [FALN: The Benefits And Risks Of This Fallen Angels Bond ETF](https://seekingalpha.com/article/4943886-faln-benefits-and-risks-of-this-fallen-angels-bond-etf)  
+  <sub>Seeking Alpha, 8 hours ago</sub>  
+  iShares Fallen Angels USD Bond ETF: strategy, duration/rate risk vs. HYG, returns since 2016, and FALN vs. ANGL. Learn more about the FALN ETF here.
+- [FTHY: Anticipated Termination Coming But Likely To Seek Perpetual Structure (NYSE:FTHY)](https://seekingalpha.com/article/4948468-fthy-anticipated-termination-coming-but-likely-to-seek-perpetual-structure)  
+  <sub>Seeking Alpha, 14 hours ago</sub>  
+  First Trust High Yield Opportunities 2027 Term Fund (FTHY): discount widening, weak coverage, and a likely tender offer/perpetual vote. See more here.
+- [Fed's discount window modernization supports banks, broader market resilience: Governor Jefferson (TLT:NASDAQ)](https://seekingalpha.com/news/4645436-feds-discount-window-modernization-supports-banks-broader-market-resilience-governor-jefferson)  
+  <sub>Seeking Alpha, 33 minutes ago</sub>  
+  Fed's modernization efforts will ensure that the discount window supports individual banking institutions and broader market resilience, according to the...
+
+</details>
+
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
+
+```text
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
+Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
+Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
 ```
 
 </details>
@@ -2904,24 +3073,24 @@ Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market pri
 <details><summary><b>Price and chart</b> — score -0.35</summary>
 
 ```text
-Last close 78.70 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 79.11 (-0.5%), 50d 79.37 (-0.8%), 200d 80.02 (-1.7%); 50d below 200d
-Momentum: RSI(14) 40.1 | MACD -0.277 vs signal -0.236 (histogram -0.041)
-Returns: 1d +0.2% | 5d +0.2% | 1m -1.1% | 3m -1.6%
-52-week range: 78.38 - 81.32 (now 10.9% of the way up)
-Volatility: ATR(14) 0.23 (0.3% of price) | annualised 20d 4.3%
-Volume: 0.37x the 20-day average
+Last close 78.68 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 79.05 (-0.5%), 50d 79.35 (-0.9%), 200d 80.01 (-1.7%); 50d below 200d
+Momentum: RSI(14) 39.4 | MACD -0.266 vs signal -0.243 (histogram -0.024)
+Returns: 1d -0.0% | 5d +0.4% | 1m -1.2% | 3m -1.5%
+52-week range: 78.38 - 81.32 (now 10.0% of the way up)
+Volatility: ATR(14) 0.22 (0.3% of price) | annualised 20d 4.3%
+Volume: 0.17x the 20-day average
 ```
 
 </details>
 
-<details><summary><b>Company numbers</b> — score +0.25</summary>
+<details><summary><b>Company numbers</b> — score +0.15</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What this fund holds</b> — score +0.25</summary>
+<details><summary><b>What this fund holds</b> — score +0.15</summary>
 
 ```text
 Fund type: High Yield Bond
@@ -2935,25 +3104,25 @@ Largest holdings: BlackRock Cash Funds Treasury SL Agency 1.3%
 
 </details>
 
-<details><summary><b>Does this company beat its own forecasts</b> — score +0.25</summary>
+<details><summary><b>Does this company beat its own forecasts</b> — score +0.15</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What holding this fund costs you</b> — score +0.25</summary>
+<details><summary><b>What holding this fund costs you</b> — score +0.15</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>How much oil and gas is in storage</b> — score +0.25</summary>
+<details><summary><b>How much oil and gas is in storage</b> — score +0.15</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>How the crop is growing</b> — score +0.25</summary>
+<details><summary><b>How the crop is growing</b> — score +0.15</summary>
 
 _Not available today._
 
@@ -2988,161 +3157,7 @@ _Not available today._
 ```text
 Direction: unknown
 Share count change: n/a (too few readings)
-Shares outstanding: 206.31M | fund size: 16.24B
-Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
-```
-
-</details>
-
-### US small companies (IWM) · Index fund — NEUTRAL, confidence 0.25
-
-**In the model's own words:**
-
-> IWM sits below its 20-, 50-, and 200-day moving averages with weak momentum (RSI 38.4, MACD deeply negative) despite holding above the 200-day line on a longer view. The macro backdrop is mixed: Treasury yields have stabilized with the curve normalized at +0.98, the Fed's 25bp hike landed softer than feared, and the dollar strengthened +0.90 on the week while the VIX compressed to 14.62. Valuations remain reasonable at P/E 17.30 and P/B 2.13. However, small-cap positioning shows large speculators net short 19.6% with a +6.0% weekly increase in short crowding—a shift toward bearishness, though still only at the 30th percentile historically so not extreme. The analyst view is extremely thin (1.7% coverage), with the five largest holdings all rated buy at +22.1% targets, but this offers little signal on the 98.3% of the fund not represented. Volume is low at 0.25x the 20-day average, suggesting conviction is absent on both sides. The fund's three-year returns of +17.4% annually with beta 1.24 show resilience, but near-term technicals are soft and macro data (unemployment 4.1%, claims 196k, inflation 3.4%) does not yet suggest a catalyst for re-acceleration in small caps. The one positive: rates appear to have found a ceiling, which could eventually support equities, but this has not yet translated to price action or positioning conviction.
-
-**Main reasons it gave:**
-- RSI 38.4 with MACD deeply negative; price below 20d, 50d SMA
-- Large speculator positioning net short and increasing week-over-week
-- Fed hike landed soft, curve normalized, rates appear to have stabilized at ceiling
-- Analyst coverage extremely thin at 1.7% of fund; targets of +22% on largest holdings do not represent 98% of basket
-- Low volume at 0.25x 20-day average indicates absence of conviction on either side
-
-<details><summary><b>News</b> — score +0.00</summary>
-
-- [Weekly Setup | Rates Find Their Ceiling. Chips Break Out, Washington Waits](https://www.moomoo.com/community/feed/weekly-setup-rates-find-their-ceiling-chips-break-out-washington-117308458991622)  
-  <sub>Moomoo, 5 hours ago</sub>  
-  The gift and the test arrived in the same week. The Federal Reserve's 25-basis-point hike on September 16 landed softer than feared -- markets priced ...
-- [Evolution Metals Just Joined the Indexes Behind $12.2 Trillion in Invested Assets (NASDAQ: EMAT)](https://www.benzinga.com/content/61895255/evolution-metals-just-joined-indexes-behind-12-2-trillion-invested-assets-nasdaq-emat)  
-  <sub>Benzinga, 2 hours ago</sub>  
-  WSW, NY, September 21st, 2026, FinanceWireToday, Evolution Metals & Technologies Corp. (NASDAQ:EMAT) joined the Russell 3000 and Russell 2000 indexes.
-- [The Options Weekly Ahead: Index Skew Resets, Gold Bets Build, SpaceX Vol Craters](https://www.moomoo.com/community/feed/the-options-weekly-ahead-index-skew-resets-gold-bets-build-117308120039430)  
-  <sub>Moomoo, 7 hours ago</sub>  
-  Last Week's Highlights Index Put Skew Snaps Back to Life. The cheapest hedges of the summer are gone. One-month put/call skew on the $S&P 500 Index (...
-- [BlackRock's IBIT bitcoin spot ETF surpasses GLD in daily trading](https://www.digitaltoday.co.kr/en/view/105702/blackrock-ibit-bitcoin-spot-etf-surpasses-gld)  
-  <sub>디지털투데이, 16 hours ago</sub>  
-  [DigitalToday reporter Yoonseo Lee] BlackRock's bitcoin spot exchange-traded fund (ETF), the iShares Bitcoin Trust ETF 'IBIT', rose more than 5 percent in...
-
-</details>
-
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
-
-```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
-Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
-Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
-```
-
-</details>
-
-<details><summary><b>Price and chart</b> — score -0.25</summary>
-
-```text
-Last close 285.80 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 291.78 (-2.0%), 50d 294.94 (-3.1%), 200d 275.03 (+3.9%); 50d above 200d
-Momentum: RSI(14) 38.4 | MACD -3.377 vs signal -2.534 (histogram -0.843)
-Returns: 1d +0.6% | 5d -0.7% | 1m -4.0% | 3m -4.2%
-52-week range: 229.11 - 305.09 (now 74.6% of the way up)
-Volatility: ATR(14) 3.43 (1.2% of price) | annualised 20d 11.6%
-Volume: 0.25x the 20-day average
-```
-
-</details>
-
-<details><summary><b>Company numbers</b> — score +0.10</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What this fund holds</b> — score +0.10</summary>
-
-```text
-Fund type: Small Blend
-What it holds: P/E 17.30 | P/B 2.13 | P/S 1.31 | 3y earnings growth n/a
-Yield: 0.9%
-Three-year record: +17.4% a year | beta to the market 1.24
-Cost and size: expense ratio 0.19% | net assets 80.46B
-What it is made of: Stocks 99.5%, Cash 0.5%
-Largest holdings: JFrog Ltd Ordinary Shares 0.3%, Moog Inc Class A 0.3%, BlackRock Cash Funds Treasury SL Agency 0.3%, UMB Financial Corp 0.3%, Glaukos Corp 0.3%
-Sector mix: Healthcare 21.0%, Financial services 18.1%, Technology 13.8%, Industrials 13.2%
-```
-
-</details>
-
-<details><summary><b>Does this company beat its own forecasts</b> — score +0.10</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What holding this fund costs you</b> — score +0.10</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How much oil and gas is in storage</b> — score +0.10</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How the crop is growing</b> — score +0.10</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts and big funds say</b> — score +0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.20</summary>
-
-```text
-Rolled up from the 5 largest holdings, 1.7% of the fund by weight  -- thin, so read this as a fact about that slice rather than the fund
-Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.73 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +22.1% above the current prices
-Holdings read: FROG, MOG-A, XTSLA, UMBF, GKOS
-Recent rating changes among them:
-  - FROG: 2026-09-04 DA Davidson: main, Buy -> Buy
-  - MOG-A: 2026-09-15 Guggenheim: init, ? -> Neutral
-  - UMBF: 2026-09-14 UBS: init, ? -> Neutral
-  - GKOS: 2026-08-20 BTIG: main, Buy -> Buy
-```
-
-</details>
-
-<details><summary><b>Buying and selling by company insiders</b> — score -0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Who is positioned how</b> — score -0.15</summary>
-
-```text
-Contract: RUSSELL E-MINI - CHICAGO MERCANTILE EXCHANGE (positions as of 2026-09-15, published the following Friday)
-Large speculators: net short 19.6% of open interest (496,762 contracts)
-Change on the week: +6.0% of open interest
-Crowding: 30% percentile over 52 weeks -- within its normal range
-Read this as crowding, not as a forecast: an extreme is as often the end of a move as the middle of one.
-```
-
-</details>
-
-<details><summary><b>Money going into and out of this fund</b> — score -0.15</summary>
-
-```text
-Direction: unknown
-Share count change: n/a (too few readings)
-Shares outstanding: 281.05M | fund size: 80.32B
+Shares outstanding: 206.39M | fund size: 16.24B
 Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
 ```
 
@@ -3152,56 +3167,63 @@ Creations and redemptions are settled money, not an opinion -- but they follow d
 
 **In the model's own words:**
 
-> LQD is trading below all major moving averages (20d, 50d, 200d) in a downtrend, with the 50d below the 200d signaling deteriorating momentum. RSI at 43.7 and negative MACD histogram show weakening momentum without oversold conditions that would suggest a reversal. The fund has declined 3.5% over three months and trades only 7.9% above its 52-week low, reflecting the broader headwinds in credit markets. Macro backdrop is mixed: the yield curve is normal at +0.98, the dollar strengthened 0.90 this week, and VIX fell 2.5 to 14.62 suggesting reduced stress. However, the 3-month yield moved up 5bps and the 2-year remains elevated at 4.67% against a 3.75-4.00% Fed target, indicating the bond market is not pricing imminent rate cuts. The fund's yield of 4.7% is attractive and credit quality weighted toward A-rated (46.6%) and BBB (40.2%), but there is no catalyst to reverse the technical deterioration within a single cycle. Volume is depressed at 0.22x average, which reduces confidence in any directional move. The lack of recent news, stable fund flows, and benign risk metrics prevent a bearish escalation, but the downtrend, below-average momentum, and lack of a clear macro catalyst supporting credit weakness recovery argue against conviction in a bullish reversal.
+> LQD is the largest investment-grade corporate bond ETF with a solid 4.7% yield and high-quality portfolio (59% A-rated or better). The fund's fundamentals are in-line with market averages with no idiosyncratic catalyst. Technicals show a fund in a mild downtrend: price is 3.4% below its 200-day moving average, RSI at 44.9 indicates neither oversold nor overbought conditions, and MACD histogram has just turned positive but remains in negative territory overall. The 52-week range places the fund near its lows (8.9% up from bottom), suggesting limited upside momentum. Volume is light at 0.21x average. Macro backdrop is stable: the yield curve is normally sloped at +0.95, VIX is calm at 14.42, and the Fed has signaled a path of modest further easing (market prices roughly 4 quarter-point cuts over two years). Recent inflation at 3.4% and unemployment at 4.1% are neither surprising nor recessionary. The discount window modernization comment from Fed Governor Jefferson provides minor support for financial stability but does not constitute a material surprise. With no macro catalyst, no technical breakdown or breakout, no analyst or positioning data showing conviction, and the fund trading with weak momentum and below moving averages, a modest near-term consolidation seems most likely. The yield support is real but insufficient to overcome the technical headwinds without a rate surprise or credit catalyst.
 
 **Main reasons it gave:**
-- Price below 20d, 50d, and 200d SMAs with 50d below 200d
-- RSI at 43.7 and negative MACD histogram signal fading momentum
-- Yield curve normal but 2-year yield at 4.67% reflects limited easing priced by bond market
-- Fund yield of 4.7% on A/BBB-weighted credit quality is reasonable but provides no new catalyst
-- Trading 7.9% above 52-week low with depressed volume
+- Price 3.4% below 200-day MA in downtrend
+- RSI 44.9 and MACD histogram near zero shows weak momentum
+- Yield curve normal and VIX calm—no macro urgency
+- 4.7% yield provides support but insufficient to break technical resistance
 
 <details><summary><b>News</b> — score +0.00</summary>
 
-_No news found for this one today._
+- [LQD: Largest Investment-Grade Corporate Bond ETF In The Market, Weak Investment Thesis](https://seekingalpha.com/article/4948567-lqd-largest-investment-grade-corporate-bond-etf-in-the-market-weak-investment-thesis)  
+  <sub>Seeking Alpha, 4 hours ago</sub>  
+  LQD yields 4.8% with a high-quality portfolio, and a duration of 7.7 years, with fundamentals in-line with market averages. Read more on the LQD ETF here.
+- [iShares iBoxx $ Inv Grade Corporate Bond ETF of...](https://pluang.com/en/news-feed/lqd-etf-obligasi-korporasi-investment-grade-terbesar-dengan-teori-lemah)  
+  <sub>Pluang, 4 hours ago</sub>  
+  The iShares iBoxx $ Investment Grade Corporate Bond ETF (LQD) is the largest ETF in the investment-grade corporate bond market, managing $27.5 billion in...
+- [Fed's discount window modernization supports banks, broader market resilience: Governor Jefferson (TLT:NASDAQ)](https://seekingalpha.com/news/4645436-feds-discount-window-modernization-supports-banks-broader-market-resilience-governor-jefferson)  
+  <sub>Seeking Alpha, 32 minutes ago</sub>  
+  Fed's modernization efforts will ensure that the discount window supports individual banking institutions and broader market resilience, according to the...
 
 </details>
 
 <details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
 
 ```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
 Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
 Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
 ```
 
 </details>
 
-<details><summary><b>Price and chart</b> — score -0.35</summary>
+<details><summary><b>Price and chart</b> — score -0.25</summary>
 
 ```text
-Last close 104.96 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 105.40 (-0.4%), 50d 106.07 (-1.0%), 200d 108.76 (-3.5%); 50d below 200d
-Momentum: RSI(14) 43.7 | MACD -0.468 vs signal -0.477 (histogram 0.009)
-Returns: 1d +0.2% | 5d +0.6% | 1m -1.0% | 3m -3.5%
-52-week range: 104.28 - 112.92 (now 7.9% of the way up)
-Volatility: ATR(14) 0.51 (0.5% of price) | annualised 20d 6.4%
-Volume: 0.22x the 20-day average
+Last close 105.04 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 105.35 (-0.3%), 50d 106.03 (-0.9%), 200d 108.73 (-3.4%); 50d below 200d
+Momentum: RSI(14) 44.9 | MACD -0.418 vs signal -0.464 (histogram 0.046)
+Returns: 1d -0.0% | 5d +0.7% | 1m -0.8% | 3m -3.5%
+52-week range: 104.28 - 112.92 (now 8.9% of the way up)
+Volatility: ATR(14) 0.49 (0.5% of price) | annualised 20d 6.4%
+Volume: 0.21x the 20-day average
 ```
 
 </details>
 
-<details><summary><b>Company numbers</b> — score +0.15</summary>
+<details><summary><b>Company numbers</b> — score +0.05</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What this fund holds</b> — score +0.15</summary>
+<details><summary><b>What this fund holds</b> — score +0.05</summary>
 
 ```text
 Fund type: Corporate Bond
@@ -3215,25 +3237,25 @@ Largest holdings: BlackRock Cash Funds Treasury SL Agency 1.0%
 
 </details>
 
-<details><summary><b>Does this company beat its own forecasts</b> — score +0.15</summary>
+<details><summary><b>Does this company beat its own forecasts</b> — score +0.05</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What holding this fund costs you</b> — score +0.15</summary>
+<details><summary><b>What holding this fund costs you</b> — score +0.05</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>How much oil and gas is in storage</b> — score +0.15</summary>
+<details><summary><b>How much oil and gas is in storage</b> — score +0.05</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>How the crop is growing</b> — score +0.15</summary>
+<details><summary><b>How the crop is growing</b> — score +0.05</summary>
 
 _Not available today._
 
@@ -3268,7 +3290,7 @@ _Not available today._
 ```text
 Direction: unknown
 Share count change: n/a (too few readings)
-Shares outstanding: 306.91M | fund size: 32.21B
+Shares outstanding: 306.32M | fund size: 32.18B
 Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
 ```
 
@@ -3278,57 +3300,69 @@ Creations and redemptions are settled money, not an opinion -- but they follow d
 
 **In the model's own words:**
 
-> SHY is a short-duration US government bond fund holding primarily Treasury debt. The macro backdrop shows a normalization of rate expectations: the 3-month yield rose 5bp while the 10-year was flat, the curve remains upward-sloping at +98bp (normal regime), the dollar strengthened 90bp this week on modest inflation data (3.4%), and the bond market prices roughly 75bp of Fed cuts over two years from a 4.67% two-year yield. This suggests the recent tightening cycle may have peaked, which ordinarily would support bonds. However, SHY technicals are tepid: the fund sits below its 20d, 50d and 200d moving averages, momentum (RSI 33, MACD negative) is weak, and volume is 0.12x the 20-day average—a sign of low conviction among traders. The 52-week range shows SHY near the bottom of its band, which offers optionality but no urgent catalyst. Positioning in the 2Y note is at the 95th percentile long crowding, a contrarian signal: extreme positioning is as often the end of a move as the start. The yield of 3.6% on quality collateral (100% AA US Treasuries) is fair in context, but there is no material data surprise nor a decisive technical break to justify conviction either way. The macro environment supports bonds in the absence of a rate shock, but SHY's technical weakness and crowded long positioning argue for patience. A modest bullish lean reflects improving rate-cut expectations, but low volume and extreme crowding limit the signal strength.
+> SHY is a short-duration government bond fund holding nearly all US Treasuries with a 3.6% yield. The macro backdrop shows a normally sloped curve with the 3-month at 4.01% and 10-year at 4.96%; the 2-year at 4.76% prices roughly 4 quarter-point cuts over the next two years, which is consistent with inflation at 3.4% and unemployment at 4.1%. The dollar rallied sharply (+0.93 on the week) on hawkish Fed expectations, but this affects SHY's total return only through the negligible currency exposure of a US government bond fund. Technicals are uniformly weak: price is 1.2% below the 200-day moving average, RSI at 33.8 is in oversold territory but volume is light at 0.32x average, momentum histogram is negative, and returns are flat to down across all horizons. The 52-week range places the fund near its lows. CFTC positioning in the 2-year note shows net large-speculator shorts at 29.2% of open interest, at the 95th percentile of crowding—which by the prompt's logic is as often a sign of an exhausted move as its middle. Fund flows data is insufficient. The weakness in technicals combined with crowded short positioning creates a modest contrarian case for stabilization, but SHY's returns are driven by yield carry and duration risk, not mean reversion. With the curve normal, yields stable week-over-week at the short end, and no policy surprise, there is no macro catalyst. A weak bounce is plausible on technicals alone, but conviction must remain low given the absence of a decisive driver.
 
 **Main reasons it gave:**
-- Crowded long positioning at 95th percentile of 52-week crowding—reversal risk
-- RSI 33 and below all major moving averages—technical weakness
-- 2-year yield 4.67% vs Fed target 3.75–4.00%—bond market prices ~75bp of cuts, supporting duration
-- Volume 0.12x 20-day average—low conviction trader participation
+- 3-month yield stable at 4.01% with no Fed surprise this week
+- Large speculators crowded short (95th percentile) in 2Y note—extremes often exhaust
+- RSI 33.8 in oversold on light volume, technical bounce possible but not confirmed
+- Price 1.2% below 200d SMA with flat 5d and 1m returns, no uptrend
 
 <details><summary><b>News</b> — score +0.00</summary>
 
-- [Grayscale takes Zcash ETF to US$ 914.53 million](https://portalcripto.com.br/en/grayscale-takes-zcash-etf-to-us-914-53-million)  
-  <sub>portalcripto.com.br, 17 hours ago</sub>  
-  ZCSH fund is about US$ 85 million shy of US$ 1 billion and will have a 3-for-1 stock split.
+- [The Weekly Spread: What Shaped Yields And The Dollar This Week](https://stocktwits.com/news-articles/markets/equity/the-weekly-spread-what-shaped-yields-and-the-dollar-this-week/cZtDZlBRBES)  
+  <sub>Stocktwits, 6 hours ago</sub>  
+  A hawkish interest rate hike by the Federal Reserve and expectations of further tightening propelled the U.S. dollar to its strongest weekly gain since June...
+- [Fed's discount window modernization supports banks, broader market resilience: Governor Jefferson (TLT:NASDAQ)](https://seekingalpha.com/news/4645436-feds-discount-window-modernization-supports-banks-broader-market-resilience-governor-jefferson)  
+  <sub>Seeking Alpha, 31 minutes ago</sub>  
+  Fed's modernization efforts will ensure that the discount window supports individual banking institutions and broader market resilience, according to the...
+- [A Record ETF Year Takes Shape as Inflows Near $1.5 Trillion](https://www.etf.com/sections/weekly-etf-flows/record-etf-year-takes-shape-inflows-near-15-trillion)  
+  <sub>ETF.com, 17 hours ago</sub>  
+  US-listed ETFs took in $91.9 billion last week, pushing 2026 inflows to about $1.47 trillion, nearly matching all of last year's record with three months to...
+- [Bitcoin ETFs Could Triple Gold Funds Within 5 Years](https://etfdb.com/coinshares-crypto-etf-hub/coinshares-channel/bitcoin-etfs-triple-gold-funds/)  
+  <sub>ETF Database, 23 hours ago</sub>  
+  U.S. spot bitcoin exchange-traded funds needed less than two years to approach $120 billion in assets, a pace that took gold ETFs well over a decade to...
+- [NEAR: Low-Risk Multisector Bond ETF (BATS:NEAR)](https://seekingalpha.com/article/4948373-near-low-risk-multisector-bond-etf)  
+  <sub>Seeking Alpha, 22 hours ago</sub>  
+  Explore iShares NEAR ETF: actively managed short-duration, investment-grade bonds with ~4.5% yield, low risk, and strong returns—see if it fits now.
 
 </details>
 
 <details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
 
 ```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
 Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
 Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
 ```
 
 </details>
 
-<details><summary><b>Price and chart</b> — score -0.20</summary>
+<details><summary><b>Price and chart</b> — score -0.35</summary>
 
 ```text
-Last close 81.31 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 81.62 (-0.4%), 50d 81.81 (-0.6%), 200d 82.34 (-1.3%); 50d below 200d
-Momentum: RSI(14) 33.3 | MACD -0.174 vs signal -0.140 (histogram -0.034)
-Returns: 1d +0.1% | 5d -0.0% | 1m -0.9% | 3m -0.7%
-52-week range: 81.24 - 83.18 (now 3.4% of the way up)
-Volatility: ATR(14) 0.10 (0.1% of price) | annualised 20d 2.0%
-Volume: 0.12x the 20-day average
+Last close 81.31 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 81.59 (-0.3%), 50d 81.80 (-0.6%), 200d 82.33 (-1.2%); 50d below 200d
+Momentum: RSI(14) 33.8 | MACD -0.172 vs signal -0.147 (histogram -0.025)
+Returns: 1d +0.0% | 5d -0.0% | 1m -0.8% | 3m -0.8%
+52-week range: 81.24 - 83.18 (now 3.6% of the way up)
+Volatility: ATR(14) 0.10 (0.1% of price) | annualised 20d 1.9%
+Volume: 0.32x the 20-day average
 ```
 
 </details>
 
-<details><summary><b>Company numbers</b> — score +0.15</summary>
+<details><summary><b>Company numbers</b> — score +0.00</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What this fund holds</b> — score +0.15</summary>
+<details><summary><b>What this fund holds</b> — score +0.00</summary>
 
 ```text
 Fund type: Short Government
@@ -3341,25 +3375,25 @@ What it is made of: Bonds 99.2%, Cash 0.8%
 
 </details>
 
-<details><summary><b>Does this company beat its own forecasts</b> — score +0.15</summary>
+<details><summary><b>Does this company beat its own forecasts</b> — score +0.00</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What holding this fund costs you</b> — score +0.15</summary>
+<details><summary><b>What holding this fund costs you</b> — score +0.00</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>How much oil and gas is in storage</b> — score +0.15</summary>
+<details><summary><b>How much oil and gas is in storage</b> — score +0.00</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>How the crop is growing</b> — score +0.15</summary>
+<details><summary><b>How the crop is growing</b> — score +0.00</summary>
 
 _Not available today._
 
@@ -3377,13 +3411,13 @@ _Not available today._
 
 </details>
 
-<details><summary><b>Buying and selling by company insiders</b> — score -0.35</summary>
+<details><summary><b>Buying and selling by company insiders</b> — score +0.20</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>Who is positioned how</b> — score -0.35</summary>
+<details><summary><b>Who is positioned how</b> — score +0.20</summary>
 
 ```text
 Contract: UST 2Y NOTE - CHICAGO BOARD OF TRADE (positions as of 2026-09-15, published the following Friday)
@@ -3395,71 +3429,204 @@ Read this as crowding, not as a forecast: an extreme is as often the end of a mo
 
 </details>
 
-<details><summary><b>Money going into and out of this fund</b> — score -0.35</summary>
+<details><summary><b>Money going into and out of this fund</b> — score +0.20</summary>
 
 ```text
 Direction: unknown
 Share count change: n/a (too few readings)
-Shares outstanding: 318.97M | fund size: 25.93B
+Shares outstanding: 319.03M | fund size: 25.94B
 Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
 ```
 
 </details>
 
-### Europe (VGK) · Index fund — NEUTRAL, confidence 0.25
+### Emerging markets (VWO) · Index fund — NEUTRAL, confidence 0.25
 
 **In the model's own words:**
 
-> VGK is a broadly diversified European equity fund with reasonable fundamentals (P/E 17.85, 2.8% yield) and solid three-year returns (+17.6% annually). However, multiple headwinds argue against a directional call. Technicals show the fund trading 1.7% below its 20-day moving average with RSI at 42.5 and a negative MACD histogram, suggesting mild weakness. Momentum is mixed: modest 1-day strength (+1.1%) is offset by 1-month underperformance (-3.1%). The US dollar has strengthened notably (+0.90 this week), a headwind for US-based investors in euro-denominated assets. More critically, CFTC positioning in the MSCI EAFE shows large speculators at the 95th percentile crowded long—a positioning extreme that is as often a sign of late-stage moves as early ones. The analyst view is constructive (65.7% buy, +16.6% target) but covers only 11.4% of the fund, too thin to drive conviction. Macro backdrop is stable: the yield curve is normalizing, inflation expectations remain anchored at 2.3%, and volatility is low at 14.62. No policy surprise or data shock has occurred. News flow is generic and immaterial (TradingView sector roundups, not macro or sector catalysts). The absence of recent analyst rating changes among the largest holdings and unknown fund flows provide no additional traction. This reads as a holding pattern: no catalyst sharp enough to overcome the modest technical weakness and positioning crowding.
+> VWO is a diversified emerging-markets fund holding 95.3% stocks with a 0.75 market beta and three-year annualized returns of +17.6%. The technical picture shows the fund near 52-week highs (94.4% of range), trading above its 20d, 50d, and 200d moving averages with a normal positive slope to the curve. Recent price action is mixed: +2.9% over 5 days but flat on the month (+0.8%), with RSI at 56.4 (mid-range, neither extended nor weak) and MACD just rolling over into negative territory. Volume is notably light at 0.30x the 20-day average, which dampens conviction in any directional move. The macro backdrop is supportive: the yield curve is normal (not inverted), the dollar has strengthened modestly (+0.93 on the week), VIX is calm at 14.42, and inflation expectations remain contained at 2.3% over 10 years. US jobless claims at 196k are stable. However, analyst coverage is thin (22.2% of holdings), showing 100% buy ratings with +34.4% upside, but this applies to only the five largest holdings and cannot be confidently extrapolated to the full fund. CFTC positioning in EM futures shows net long at 37th percentile—within normal range with a modest net reduction of 0.9 percentage points on the week, suggesting no exceptional conviction among large speculators. Fund flows data is unavailable (too few readings). The macro environment offers no clear catalyst for a directional shift: rates and inflation are stable, policy is on a known path, and the fund sits at the high end of its range on light volume. Technical strength is real but late in the move, and thin analyst coverage prevents a stronger bullish lean.
 
 **Main reasons it gave:**
-- CFTC positioning at 95th percentile crowded long in EAFE
-- USD strengthened +0.90 on week, headwind for euro exposure
-- RSI 42.5 and negative MACD histogram suggest momentum loss
-- Analyst view thin at 11.4% coverage of fund weight
-- No macro catalyst: stable yields, anchored inflation expectations
+- Trading near 52-week highs on light volume; MACD rolling negative despite price strength
+- Thin analyst coverage (22.2% of fund) limits conviction on the +34.4% target cited
+- EM futures positioning at 37th percentile crowding with net reduction on the week
+- Macro backdrop stable but not catalytic: normal yield curve, contained inflation, no rate surprise
 
 <details><summary><b>News</b> — score +0.00</summary>
 
-- [ETFs Investing in Navigator Company SA Stocks](https://www.tradingview.com/symbols/LSX-895885/etfs/)  
-  <sub>TradingView, 14 hours ago</sub>  
-  Explore funds investing in 895885 in a single list with price, expense ratio, and more stats for an in-depth analysis of new opportunities.
-- [ETFs Investing in BAWAG Group AG Stocks](https://www.tradingview.com/symbols/OTC-BWAGF/etfs/)  
-  <sub>TradingView, 15 hours ago</sub>  
-  Explore funds investing in BWAGF in a single list with price, expense ratio, and more stats for an in-depth analysis of new opportunities.
-- [ETFs Investing in Lakefront Biotherapeutics Stocks](https://www.google.com/goto?url=CAESagHrOzAVpkUYrEB2LRRYp7jtC7-ezeAZEEgRIMSI6AY39MhvoioDm4uFF-QNL1U0pcKdxfLP7vSVbO6bisQI19yTJcRg9jGdypIPW-0lj-ZPuQWacHolo4AsXofOma_Zed9BgHMJwYcheDA)  
-  <sub>TradingView, 15 hours ago</sub>  
-  Explore funds investing in GXE in a single list with price, expense ratio, and more stats for an in-depth analysis of new opportunities.
-- [ETFs Investing in Endesa S.A. Stocks](https://www.google.com/goto?url=CAESaQHrOzAVwWbJteFq-n-sYTp0OQ-lEZ6k68ThY8NsMV0rCSY2RhigiRHrVPL_dxyQxNab5cWinYZ3bxLbPu_2leyqNgUh9ELmDkrwbGa1bh2m-ZQocdj-HtXiACiSQqISb1_Oi0BvaFXdOQ)  
-  <sub>TradingView, 19 hours ago</sub>  
-  Explore funds investing in ENA in a single list with price, expense ratio, and more stats for an in-depth analysis of new opportunities.
+- [Daily ETF Flows: COWZ Gobbles Up Assets](https://finance.yahoo.com/markets/options/articles/daily-etf-flows-cowz-gobbles-210028745.html)  
+  <sub>Yahoo Finance, 18 hours ago</sub>  
+  Top 10 Creations (All ETFs). Ticker. Name. Net Flows ($, mm). AUM ($, mm). AUM % Change. IVV · iShares Core S&P 500 ETF. 8,519.50. 845,149.30. 1.01%.
 
 </details>
 
 <details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
 
 ```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
 Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
 Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
 ```
 
 </details>
 
-<details><summary><b>Price and chart</b> — score -0.25</summary>
+<details><summary><b>Price and chart</b> — score +0.35</summary>
 
 ```text
-Last close 89.18 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 90.70 (-1.7%), 50d 90.56 (-1.5%), 200d 87.39 (+2.0%); 50d above 200d
-Momentum: RSI(14) 42.5 | MACD -0.657 vs signal -0.367 (histogram -0.290)
-Returns: 1d +1.1% | 5d -0.1% | 1m -3.1% | 3m +1.1%
-52-week range: 77.90 - 93.19 (now 73.8% of the way up)
-Volatility: ATR(14) 0.89 (1.0% of price) | annualised 20d 11.3%
-Volume: 0.34x the 20-day average
+Last close 60.93 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 60.49 (+0.7%), 50d 59.76 (+2.0%), 200d 57.73 (+5.5%); 50d above 200d
+Momentum: RSI(14) 56.4 | MACD 0.094 vs signal 0.101 (histogram -0.006)
+Returns: 1d -0.3% | 5d +2.9% | 1m +0.8% | 3m +2.7%
+52-week range: 52.42 - 61.44 (now 94.4% of the way up)
+Volatility: ATR(14) 0.62 (1.0% of price) | annualised 20d 13.1%
+Volume: 0.30x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.20</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What this fund holds</b> — score +0.20</summary>
+
+```text
+Fund type: Diversified Emerging Mkts
+What it holds: P/E 15.91 | P/B 2.13 | P/S 1.86 | 3y earnings growth n/a
+Yield: 2.3%
+Three-year record: +17.6% a year | beta to the market 0.75
+Cost and size: expense ratio 0.06% | net assets 168.36B
+What it is made of: Stocks 95.3%, Cash 4.6%, Other 0.1%, Preferred 0.0%
+Largest holdings: Taiwan Semiconductor Manufacturing Co Ltd 14.7%, Tencent Holdings Ltd 2.9%, Alibaba Group Holding Ltd Ordinary Shares 2.2%, MediaTek Inc 1.5%, Delta Electronics Inc 0.9%
+Sector mix: Technology 31.8%, Financial services 20.2%, Consumer cyclical 9.9%, Basic materials 7.9%
+```
+
+</details>
+
+<details><summary><b>Does this company beat its own forecasts</b> — score +0.20</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What holding this fund costs you</b> — score +0.20</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How much oil and gas is in storage</b> — score +0.20</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How the crop is growing</b> — score +0.20</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.40</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.40</summary>
+
+```text
+Rolled up from the 5 largest holdings, 22.2% of the fund by weight  -- thin, so read this as a fact about that slice rather than the fund
+Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.34 on a 1=strong buy to 5=strong sell scale)
+Weighted price target: +34.4% above the current prices
+Holdings read: 2330.TW, 0700.HK, 9988.HK, 2454.TW, 2308.TW
+Recent rating changes among them: none reported
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Who is positioned how</b> — score +0.00</summary>
+
+```text
+Contract: MSCI EM INDEX - ICE FUTURES U.S. (positions as of 2026-09-15, published the following Friday)
+Large speculators: net long 3.3% of open interest (1,310,241 contracts)
+Change on the week: -0.9% of open interest
+Crowding: 37% percentile over 52 weeks -- within its normal range
+Read this as crowding, not as a forecast: an extreme is as often the end of a move as the middle of one.
+```
+
+</details>
+
+<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
+
+```text
+Direction: unknown
+Share count change: n/a (too few readings)
+Shares outstanding: 1.42B | fund size: 86.41B
+Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
+```
+
+</details>
+
+### Europe (VGK) · Index fund — NEUTRAL, confidence 0.20
+
+**Result:** REJECTED · bias is NEUTRAL; no trade
+
+**In the model's own words:**
+
+> No macro surprise this cycle: US yields little changed, VIX calm at 14.4, curve normally sloped. VGK sits just below its 20d and 50d SMAs with negative MACD and RSI 42, but still above the 200d and up 2.2% over three months — a mild consolidation, not a break, and volume is only 0.29x average. Dollar up 0.93 on the week is a modest headwind for unhedged European equity. Holdings valuation is reasonable (P/E 17.9, 2.8% yield) and the thin analyst roll-up over 11.4% of the fund is constructive but not decisive. EAFE speculative net long at the 95th percentile argues against chasing upside. ECB note on Chinese competition to German industry is a slow-burn structural point, not a catalyst.
+
+**Main reasons it gave:**
+- Price below 20d and 50d SMA but 1.9% above 200d; RSI 42, MACD histogram -0.23
+- Volume 0.29x 20-day average — no conviction behind the pullback
+- 10y -4bp, 30y -7bp, VIX -2.8 to 14.4: no rate or vol surprise
+- EAFE spec net long at 95th percentile of 52 weeks, crowded long
+- Dollar index +0.93 on the week, headwind for unhedged Europe exposure
+
+<details><summary><b>News</b> — score -0.10</summary>
+
+- [Germany faces two-front squeeze from Chinese factory strength, ECB says (DAX:NASDAQ)](https://seekingalpha.com/news/4645393-germany-faces-two-front-squeeze-from-chinese-factory-strength-ecb-says)  
+  <sub>Seeking Alpha, 2 hours ago</sub>  
+  ECB analysis: China's move up the value chain pressures Germany's autos, machinery and capital goods as China rivals exports and imports less from Europe.
+
+</details>
+
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score -0.10</summary>
+
+```text
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
+Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
+Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+```
+
+</details>
+
+<details><summary><b>Price and chart</b> — score -0.15</summary>
+
+```text
+Last close 89.11 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 90.53 (-1.6%), 50d 90.59 (-1.6%), 200d 87.43 (+1.9%); 50d above 200d
+Momentum: RSI(14) 42.2 | MACD -0.649 vs signal -0.423 (histogram -0.226)
+Returns: 1d -0.1% | 5d +0.2% | 1m -3.9% | 3m +2.2%
+52-week range: 77.90 - 93.19 (now 73.3% of the way up)
+Volatility: ATR(14) 0.87 (1.0% of price) | annualised 20d 11.4%
+Volume: 0.29x the 20-day average
 ```
 
 </details>
@@ -3509,18 +3676,18 @@ _Not available today._
 
 </details>
 
-<details><summary><b>What analysts and big funds say</b> — score +0.35</summary>
+<details><summary><b>What analysts and big funds say</b> — score +0.20</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.35</summary>
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.20</summary>
 
 ```text
 Rolled up from the 5 largest holdings, 11.4% of the fund by weight  -- thin, so read this as a fact about that slice rather than the fund
 Ratings by weight: buy 65.7% | hold 34.3% | sell 0.0% (mean 2.11 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +16.6% above the current prices
+Weighted price target: +15.7% above the current prices
 Holdings read: ASML.AS, HSBA.L, ROP.SW, NOVN.SW, SHEL.L
 Recent rating changes among them: none reported
 ```
@@ -3550,148 +3717,7 @@ Read this as crowding, not as a forecast: an extreme is as often the end of a mo
 ```text
 Direction: unknown
 Share count change: n/a (too few readings)
-Shares outstanding: 442.27M | fund size: 39.44B
-Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
-```
-
-</details>
-
-### Emerging markets (VWO) · Index fund — NEUTRAL, confidence 0.25
-
-**In the model's own words:**
-
-> VWO trades within a normal technical range with modest positive momentum but insufficient catalysts to justify directional conviction. The fund is up 5.5% above its 200-day moving average and trading at the 93.6th percentile of its 52-week range, leaving limited room to the upside without a fresh catalyst. Macro conditions are stable: Treasury yields are flat to slightly higher, the dollar has strengthened, the Fed is expected to hold or ease modestly, and inflation expectations remain anchored at 2.3%. The analyst coverage of the top 5 holdings (22.2% of the fund) is uniformly bullish with a +35.3% price target, but this slice is thin and does not speak to the broader 78% of the fund not in that sample. The positioning in the EM index futures is within its normal range at the 37th percentile of crowding, with a slight reduction in net long exposure over the week—no signal of accumulation. Fund flows data is incomplete. Technicals show RSI at 56.5 (neutral), MACD histogram negative, and volume well below average at 0.33x the 20-day mean, suggesting tepid conviction in the move. The 1-month return of +1.4% is not commensurate with the 5.5% rally from the 200-day; the index has retraced most of its gains in recent weeks. Without a macro surprise, technical break on volume, or material shift in positioning, the risk-reward is balanced but uninspiring.
-
-**Main reasons it gave:**
-- RSI 56.5 and MACD histogram negative despite near-52-week highs suggest momentum is not accelerating
-- Volume 0.33x 20-day average implies weak conviction in the upside move
-- EM futures positioning at 37th percentile with -0.9% weekly change shows no accumulation or conviction shift
-- Analyst coverage of top 5 holdings is bullish but covers only 22% of fund weight
-- Treasury curve normal, dollar strengthening, no data surprise to justify a tactical call
-
-<details><summary><b>News</b> — score +0.00</summary>
-
-- [ETFs Investing in ANTA Sports Products Ltd. Stocks](https://www.google.com/goto?url=CAESbwHrOzAV0hI26gn6PF8DyrAa7HOZL3gAG89wUCDbMnsuMT8ui1idCNeG9vB-5JZ0gk5LXeqKwsxrfa4AJyxavMTQpEsbjdwU-VM9rbG4iuF4Ed24BQz2XVZjNk842-d-_slYz_XkSx1F-LIxIfi61w)  
-  <sub>TradingView, 15 hours ago</sub>  
-  Explore funds investing in AS7 in a single list with price, expense ratio, and more stats for an in-depth analysis of new opportunities.
-
-</details>
-
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
-
-```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
-Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
-Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
-```
-
-</details>
-
-<details><summary><b>Price and chart</b> — score +0.20</summary>
-
-```text
-Last close 60.86 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 60.43 (+0.7%), 50d 59.71 (+1.9%), 200d 57.70 (+5.5%); 50d above 200d
-Momentum: RSI(14) 56.5 | MACD 0.019 vs signal 0.098 (histogram -0.079)
-Returns: 1d +1.4% | 5d +2.1% | 1m +1.4% | 3m -0.6%
-52-week range: 52.42 - 61.44 (now 93.6% of the way up)
-Volatility: ATR(14) 0.63 (1.0% of price) | annualised 20d 12.6%
-Volume: 0.33x the 20-day average
-```
-
-</details>
-
-<details><summary><b>Company numbers</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What this fund holds</b> — score +0.15</summary>
-
-```text
-Fund type: Diversified Emerging Mkts
-What it holds: P/E 15.91 | P/B 2.13 | P/S 1.86 | 3y earnings growth n/a
-Yield: 2.3%
-Three-year record: +17.6% a year | beta to the market 0.75
-Cost and size: expense ratio 0.06% | net assets 168.36B
-What it is made of: Stocks 95.3%, Cash 4.6%, Other 0.1%, Preferred 0.0%
-Largest holdings: Taiwan Semiconductor Manufacturing Co Ltd 14.7%, Tencent Holdings Ltd 2.9%, Alibaba Group Holding Ltd Ordinary Shares 2.2%, MediaTek Inc 1.5%, Delta Electronics Inc 0.9%
-Sector mix: Technology 31.8%, Financial services 20.2%, Consumer cyclical 9.9%, Basic materials 7.9%
-```
-
-</details>
-
-<details><summary><b>Does this company beat its own forecasts</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What holding this fund costs you</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How much oil and gas is in storage</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How the crop is growing</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts and big funds say</b> — score +0.25</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.25</summary>
-
-```text
-Rolled up from the 5 largest holdings, 22.2% of the fund by weight  -- thin, so read this as a fact about that slice rather than the fund
-Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.34 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +35.3% above the current prices
-Holdings read: 2330.TW, 0700.HK, 9988.HK, 2454.TW, 2308.TW
-Recent rating changes among them: none reported
-```
-
-</details>
-
-<details><summary><b>Buying and selling by company insiders</b> — score -0.05</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Who is positioned how</b> — score -0.05</summary>
-
-```text
-Contract: MSCI EM INDEX - ICE FUTURES U.S. (positions as of 2026-09-15, published the following Friday)
-Large speculators: net long 3.3% of open interest (1,310,241 contracts)
-Change on the week: -0.9% of open interest
-Crowding: 37% percentile over 52 weeks -- within its normal range
-Read this as crowding, not as a forecast: an extreme is as often the end of a move as the middle of one.
-```
-
-</details>
-
-<details><summary><b>Money going into and out of this fund</b> — score -0.05</summary>
-
-```text
-Direction: unknown
-Share count change: n/a (too few readings)
-Shares outstanding: 1.42B | fund size: 86.31B
+Shares outstanding: 441.87M | fund size: 39.38B
 Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
 ```
 
@@ -3708,13 +3734,13 @@ _No news found for this one today._
 <details><summary><b>Interest rates, the dollar and market nerves</b> — score n/a</summary>
 
 ```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
 Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
 Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
 ```
 
 </details>
@@ -3722,13 +3748,13 @@ Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market pri
 <details><summary><b>Price and chart</b> — score n/a</summary>
 
 ```text
-Last close 93.70 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 94.14 (-0.5%), 50d 94.68 (-1.0%), 200d 95.66 (-2.1%); 50d below 200d
-Momentum: RSI(14) 43.4 | MACD -0.430 vs signal -0.399 (histogram -0.032)
-Returns: 1d +0.3% | 5d +0.5% | 1m -1.0% | 3m -2.8%
-52-week range: 92.95 - 97.74 (now 15.7% of the way up)
-Volatility: ATR(14) 0.40 (0.4% of price) | annualised 20d 5.7%
-Volume: 0.41x the 20-day average
+Last close 93.82 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 94.09 (-0.3%), 50d 94.65 (-0.9%), 200d 95.65 (-1.9%); 50d below 200d
+Momentum: RSI(14) 45.3 | MACD -0.383 vs signal -0.394 (histogram 0.011)
+Returns: 1d +0.0% | 5d +0.9% | 1m -1.0% | 3m -2.5%
+52-week range: 92.95 - 97.74 (now 18.2% of the way up)
+Volatility: ATR(14) 0.39 (0.4% of price) | annualised 20d 5.7%
+Volume: 0.30x the 20-day average
 ```
 
 </details>
@@ -3806,7 +3832,7 @@ _Not available today._
 ```text
 Direction: unknown
 Share count change: n/a (too few readings)
-Shares outstanding: 160.26M | fund size: 15.02B
+Shares outstanding: 159.90M | fund size: 15.00B
 Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
 ```
 
@@ -3816,25 +3842,37 @@ Creations and redemptions are settled money, not an opinion -- but they follow d
 
 <details><summary><b>News</b> — score n/a</summary>
 
-- [FLDR: A Low-Risk Fixed Income Vehicle For Risk-Averse Allocation (BATS:FLDR)](https://seekingalpha.com/article/4948236-fldr-a-low-risk-fixed-income-vehicle-for-risk-averse-allocation)  
-  <sub>Seeking Alpha, 6 hours ago</sub>  
-  Fidelity Low Duration Bond Factor ETF offers ultra-short duration and high-quality investment-grade exposure, minimizing both interest rate and credit risk.
-- [Gold to $5,000? Strategist Warns a Drop to $3,000 Comes First](https://www.benzinga.com/markets/commodities/26/09/61889634/gold-to-5000-strategist-warns-a-drop-to-3000-comes-first)  
-  <sub>Benzinga, 5 hours ago</sub>  
-  Gold targets $5000 on continuous ETF inflows, yet market euphoria and rising bond yields signal potential risk for precious metals.
+- [The Technical Signals Behind (IEF) That Institutions Follow](https://news.stocktradersdaily.com/news_release/12/The_Technical_Signals_Behind_IEF_That_Institutions_Follow_092126110002_1790046002.html)  
+  <sub>Stock Traders Daily, 16 hours ago</sub>  
+  Price-action only: Ishares 7-10 Year Treasury Bond Etf (IEF) movements set the tone for institutional models. The Technical Signals Behind (IEF) That...
+- [The Bond Market's Big Re-Steepening](https://finance.yahoo.com/markets/options/articles/bond-markets-big-steepening-040150357.html)  
+  <sub>Yahoo Finance, 11 hours ago</sub>  
+  The Federal Reserve's rate hike last week, its first in three years, capped a shift that had been building in the bond market for months.
+- [Fed's discount window modernization supports banks, broader market resilience: Governor Jefferson (TLT:NASDAQ)](https://www.google.com/goto?url=CAESvQEB6zswFUlCT17hgEJHU1nutb0_0Ft_rDrgc4DzamZIxSxvuuYbQKUGGCEFb8pfqUCYGouY8HADBe3VGvJ6SLUxzBtIP-YPY2_xg-17-jGOL07-zugexnf44pUxkanNW05VNdyPNp3xqb0Z1v7u7sHi0qWFjtXNgXctvJ8ohCXrkxGRVinPKwYMYvvbJf11UurqsiGQKw8j0XzPQttPuMvehKlnzgaGjetUFI8-IffLNcW7kj9nAXhBTpahyIQ)  
+  <sub>Seeking Alpha, 32 minutes ago</sub>  
+  Fed's modernization efforts will ensure that the discount window supports individual banking institutions and broader market resilience, according to the...
+- [Capital Flows in US Equities and Insights into the Derivatives Market Amid Accumulating Macro Risks: The Interplay Between Hedge Fund De-leveraging and Long-Term Capital Inflows](https://www.google.com/goto?url=CAESnwEB6zswFQYrBjF-0HQezhrMpJyt_61-4sSh69POK8mKIidPfO-p6lpBVRn0b8WIi1cpxYQVPRwRwZhX0_fofZ7M9muZgEFciuvMAmScnNGZDTXu-Ub3DRp-n5voxc-_HMaJifQkjjvwpEiMG5FwJp9VLpWcN8j3i3uakhia1pPBPK5p-bYeOzJXamacFNniXEI9x3VYtSwAmyGlG0TcOSs)  
+  <sub>富途牛牛, 11 hours ago</sub>  
+  MainpointsAccumulating macro risks have prompted hedge funds to reduce their equity holdings, but robust long-term inflows have provided support.
+- [Yardeni Research Says Warsh 'Fails First Credibility Test' As 30-Year Treasury Yield Tops 5%](https://stocktwits.com/news-articles/markets/equity/yardeni-research-says-warsh-fails-first-credibility-test-as-30-year-treasury-yield-tops-5/cZNPMioRJc5)  
+  <sub>Stocktwits, 22 hours ago</sub>  
+  The yield on the 30-year U.S. Treasury bond spiked over 5%, touching levels not seen since the global financial crisis of 2007 after the Federal Reserve's...
+- [Applovin Stock In Focus Amid Reportedly Ongoing SEC Probe; Convequity Says Wait For The Dip Before Investing](https://www.google.com/goto?url=CAESjwEB6zswFas79ZG0xjQtlaT4P_bpGVMU9a2YN2ppAAuqumRWSx5zfQ4CUKZSAsHSxKoEZK_-G5VwEMS0uPXseRh2zqz--et9GmqtcAb_pdHbzs08T4V4X-Lzx1TFCFAYnEya9vlqX8kV2aIXSv1eHmdcCRc8yTwK00ompg672kaXeWtw-eBKJfj3vXto_Ri3-A)  
+  <sub>Stocktwits, 18 hours ago</sub>  
+  The SEC stated to Bloomberg News that an “investigation involving AppLovin is still active and ongoing”.
 
 </details>
 
 <details><summary><b>Interest rates, the dollar and market nerves</b> — score n/a</summary>
 
 ```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
 Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
 Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
 ```
 
 </details>
@@ -3842,13 +3880,13 @@ Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market pri
 <details><summary><b>Price and chart</b> — score n/a</summary>
 
 ```text
-Last close 91.08 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 91.97 (-1.0%), 50d 92.70 (-1.7%), 200d 94.78 (-3.9%); 50d below 200d
-Momentum: RSI(14) 36.7 | MACD -0.583 vs signal -0.508 (histogram -0.074)
-Returns: 1d +0.3% | 5d +0.2% | 1m -2.1% | 3m -3.1%
-52-week range: 90.73 - 97.99 (now 4.9% of the way up)
-Volatility: ATR(14) 0.40 (0.4% of price) | annualised 20d 5.6%
-Volume: 0.15x the 20-day average
+Last close 91.14 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 91.88 (-0.8%), 50d 92.66 (-1.6%), 200d 94.75 (-3.8%); 50d below 200d
+Momentum: RSI(14) 37.8 | MACD -0.553 vs signal -0.517 (histogram -0.037)
+Returns: 1d -0.0% | 5d +0.4% | 1m -1.8% | 3m -3.2%
+52-week range: 90.73 - 97.99 (now 5.7% of the way up)
+Volatility: ATR(14) 0.38 (0.4% of price) | annualised 20d 5.5%
+Volume: 0.35x the 20-day average
 ```
 
 </details>
@@ -3931,7 +3969,7 @@ Read this as crowding, not as a forecast: an extreme is as often the end of a mo
 ```text
 Direction: unknown
 Share count change: n/a (too few readings)
-Shares outstanding: 461.15M | fund size: 42.00B
+Shares outstanding: 460.82M | fund size: 42.00B
 Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
 ```
 
@@ -3941,28 +3979,25 @@ Creations and redemptions are settled money, not an opinion -- but they follow d
 
 <details><summary><b>News</b> — score n/a</summary>
 
-- [Is Invesco S&P MidCap 400 GARP ETF (GRPM) a Strong ETF Right Now?](https://finance.yahoo.com/markets/stocks/articles/invesco-p-midcap-400-garp-102002232.html)  
-  <sub>Yahoo Finance, 5 hours ago</sub>  
-  Launched on 12/03/2010, the Invesco S&P MidCap 400 GARP ETF (GRPM) is a smart beta exchange traded fund offering broad exposure to the Style Box - Mid Cap...
-- [Chip Strength Lifts Nasdaq Futures; Oil Slides](https://www.moomoo.com/community/feed/chip-strength-lifts-nasdaq-futures-oil-slides-117308928557462?chain_id=Name1K9-3FXPhg.1lb2720&global_content=%7B%22promote_id%22%3A13764%2C%22sub_promote_id%22%3A107%2C%22f%22%3A%22www.moomoo.com%2Fetfs%2FPMGOLD-AU%22%7D)  
-  <sub>Moomoo, 3 hours ago</sub>  
-  Tap the related stocks on the image above to add them to your Watchlist. Market Overview $E-mini S&P 500 Futures (DEC6) (ESmain.US)$ +0.72%, $E-mini N...
-- [Futures Rise: Can Market Take Off? 2026's Top Stocks Are Buys](https://www.investors.com/market-trend/stock-market-today/dow-jones-futures-robinhood-sandisk-amd-moderna-surge-buy-areas/)  
-  <sub>Investor's Business Daily, 3 hours ago</sub>  
-  Dow Jones futures: The stock market is set for a positive start to the week with Robinhood, Sandisk, AMD and Moderna already in buy areas.
+- [Invesco S&P 500 Equal Weight ETF declares quarterly distribution of $0.7951](https://www.tradingview.com/news/seekingalpha:f3a141f84094b:0-invesco-s-p-500-equal-weight-etf-declares-quarterly-distribution-of-0-7951/)  
+  <sub>TradingView, 21 hours ago</sub>  
+  Content provided by Seeking Alpha is intended for information purposes only, and that Seeking Alpha does not offer any personalist investment advice and is...
+- [S&P 500 Snapshot: Stocks Edge Lower for 2nd Straight Week](https://etfdb.com/fixed-income-content-hub/stocks-lower-for-2nd-straight-week-s-p-500-snapshot/)  
+  <sub>ETF Database, 22 hours ago</sub>  
+  The S&P 500 wrapped up the week with a fractional loss of nearly 1%, ending lower for a second straight week.
 
 </details>
 
 <details><summary><b>Interest rates, the dollar and market nerves</b> — score n/a</summary>
 
 ```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
 Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
 Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
 ```
 
 </details>
@@ -3970,13 +4005,13 @@ Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market pri
 <details><summary><b>Price and chart</b> — score n/a</summary>
 
 ```text
-Last close 212.26 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 217.05 (-2.2%), 50d 217.21 (-2.3%), 200d 204.94 (+3.6%); 50d above 200d
-Momentum: RSI(14) 36.2 | MACD -1.663 vs signal -0.967 (histogram -0.696)
-Returns: 1d -0.0% | 5d -1.3% | 1m -3.6% | 3m +1.3%
-52-week range: 182.18 - 222.77 (now 74.1% of the way up)
+Last close 212.57 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 216.61 (-1.9%), 50d 217.18 (-2.1%), 200d 205.05 (+3.7%); 50d above 200d
+Momentum: RSI(14) 37.6 | MACD -1.674 vs signal -1.103 (histogram -0.571)
+Returns: 1d -0.1% | 5d -0.6% | 1m -4.1% | 3m +1.8%
+52-week range: 182.18 - 222.77 (now 74.9% of the way up)
 Volatility: ATR(14) 1.86 (0.9% of price) | annualised 20d 8.7%
-Volume: 0.30x the 20-day average
+Volume: 0.44x the 20-day average
 ```
 
 </details>
@@ -4036,8 +4071,8 @@ _Not available today._
 
 ```text
 Rolled up from the 5 largest holdings, 1.8% of the fund by weight  -- thin, so read this as a fact about that slice rather than the fund
-Ratings by weight: buy 67.9% | hold 32.1% | sell 0.0% (mean 2.12 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +2.3% above the current prices
+Ratings by weight: buy 67.9% | hold 32.1% | sell 0.0% (mean 2.11 on a 1=strong buy to 5=strong sell scale)
+Weighted price target: -1.1% above the current prices
 Holdings read: MRNA, VEEV, ZBRA, CRL, DASH
 Recent rating changes among them:
   - MRNA: 2026-09-03 Rothschild & Co: down, Neutral -> Sell
@@ -4072,7 +4107,7 @@ Read this as crowding, not as a forecast: an extreme is as often the end of a mo
 ```text
 Direction: unknown
 Share count change: n/a (too few readings)
-Shares outstanding: 475.30M | fund size: 100.89B
+Shares outstanding: 475.10M | fund size: 100.99B
 Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
 ```
 
@@ -4082,49 +4117,49 @@ Creations and redemptions are settled money, not an opinion -- but they follow d
 
 <details><summary><b>News</b> — score n/a</summary>
 
-- [TIPS: The Only Part Of The Federal Debt That Grows Without An Auction (NYSEARCA:TIP)](https://seekingalpha.com/article/4948238-tips-the-only-part-of-the-federal-debt-that-grows-without-an-auction)  
-  <sub>Seeking Alpha, 6 hours ago</sub>  
-  Summary. I rate iShares TIPS Bond ETF a Hold at $105.27 due to structural inflation accretion dynamics and lack of actionable trade opportunities.
-- [Dogecoin Price Prediction Stalls as Bitwise Shuts DOGE ETF and Pepeto Presale Races Past $11 Million](https://techbullion.com/dogecoin-price-prediction-stalls-as-bitwise-shuts-doge-etf-and-pepeto-presale-races-past-11-million/)  
-  <sub>TechBullion, 24 hours ago</sub>  
-  Explore the latest insights on dogecoin price as ETF developments impact the market. Discover the current trends and predictions.
-- [Washington Becomes a Quantum Investor: Inside the Defiance QTUM ETF as CHIPS Awards Move From Letters to Contracts](https://www.tipranks.com/news/washington-becomes-a-quantum-investor-inside-the-defiance-qtum-etf-as-chips-awards-move-from-letters-to-contracts)  
+- [‘The Sell Button Won’t Work’: Why Rate Hikes No Longer Save Debt Markets](https://www.benzinga.com/markets/bonds/26/09/61916030/the-sell-button-wont-work-why-rate-hikes-no-longer-save-debt-markets)  
+  <sub>Benzinga, 3 hours ago</sub>  
+  Forget Fed rate hikes: Macro analysts reveal why fiscal dominance and massive deficits make gold and real assets the ultimate hedges.
+- [3 Best Dividend ETFs Paying 9%+ Yields](https://www.tipranks.com/news/3-best-dividend-etfs-paying-9-yields-2)  
+  <sub>TipRanks, 14 minutes ago</sub>  
+  Dividend ETFs continue to attract income-seeking investors, but some options stand out more than others. Based on TipRanks' High Dividend Yield ETFs tool,...
+- [Ethereum ETF Inflow Signals Investors Doubling Down on Ether’s Rally](https://www.tipranks.com/news/cryptocurrencies/ethereum-etf-inflow-signals-investors-doubling-down-on-ethers-rally)  
   <sub>TipRanks, 4 hours ago</sub>  
-  Between September 8 and September 16, the U.S. Commerce Department converted up to $1.3 billion of proposed CHIPS and Science Act quantum incentives into...
-- [Cathie Wood Sells Tech Favorites Palantir and AMD; Buys Archer Aviation Stock for ARK Innovation ETF](https://www.tipranks.com/news/cathie-wood-sells-tech-favorites-palantir-and-amd-buys-archer-aviation-stock-for-ark-innovation-etf)  
-  <sub>TipRanks, 2 hours ago</sub>  
-  Cathie Wood and her team at ARK Invest made a notable move in their latest portfolio updates. The investment firm sold off shares of tech favorites Palantir...
-- [Why Is the Roundhill Memory ETF (DRAM) Rising Today, Sept. 17?](https://www.google.com/goto?url=CAESjwEB6zswFQF4Ufssg1l37hceikdti8XI8v1_ODiL6FUzLjOomTVwRvmqg8yOV-tF4DbJ9a8f08z8lM0WsT9ae1XxBcVkFi7saSWFueEh4qpq_Xs6s7akMBz5sy6rQmPaf2H_1-YfwfJYmCsJ5D3N9SkzBOghtGS3GhgHtvwitWIfyabNqvu9ikxtvjZVGrIn7Q)  
-  <sub>TipRanks, 5 hours ago</sub>  
-  Roundhill Memory ETF ($DRAM) is up more than 4% as of this writing on Thursday, as memory and semiconductor stocks continue to gain momentum.
-- [İş Yatırım Details Market-Making Activity in ISX30 ETF](https://www.tipranks.com/news/company-announcements/is-yatirim-details-market-making-activity-in-isx30-etf-2)  
-  <sub>TipRanks, 4 hours ago</sub>  
-  Is Yatirim Menkul Degerler AS ( ($TR:ISMEN) ) just unveiled an announcement. İş Yatırım Menkul Değerler A.Ş., a leading brokerage and investment services...
-- [From Korean Chipmakers to Leveraged Semiconductor ETFs: STARTRADER Launches 49 New 24/7 Stock and ETF CFDs](https://www.tipranks.com/news/newswire/from-korean-chipmakers-to-leveraged-semiconductor-etfs-startrader-launches-49-new-24-7-stock-and-etf-cfds)  
-  <sub>TipRanks, 6 hours ago</sub>  
-  Port Louis, Mauritius, September 21st, 2026, FinanceWire Available from September 18, 2026, the expansion adds 30 US stocks, 14 ETFs, and five USD-quoted...
-- [Bitcoin ETF IBIT Draws Fresh Wave of Inflows as Price Surge Lures Traditional Investors](https://www.tipranks.com/news/cryptocurrencies/bitcoin-etf-ibit-draws-fresh-wave-of-inflows-as-price-surge-lures-traditional-investors)  
-  <sub>TipRanks, 5 hours ago</sub>  
-  Bitcoin ETF pulls in fresh cash as investors chase rally IShares Bitcoin Trust Registered's IBIT logged new inflows of $183.7 million on September 18, 2026,...
-- [Leveraged XRP Bets Heat Up as ProShares Ultra XRP ETF Draws Fresh Inflows](https://www.tipranks.com/news/cryptocurrencies/leveraged-xrp-bets-heat-up-as-proshares-ultra-xrp-etf-draws-fresh-inflows-2)  
-  <sub>TipRanks, 8 hours ago</sub>  
-  ProShares Ultra XRP ETF saw another jolt of capital this week, as the leveraged crypto fund logged a fresh inflow of $521151 on September 15, 2026.
-- [Leveraged Bitcoin Bulls Tap the Brakes as ProShares’ BITU Registers Outflow](https://www.tipranks.com/news/cryptocurrencies/leveraged-bitcoin-bulls-tap-the-brakes-as-proshares-bitu-registers-outflow)  
+  Ethereum ETF pulls in fresh cash as traders chase rally The VanEck Ethereum ETF, ETHV, saw a fresh influx of capital on September 18, 2026, with net flows...
+- [Trump’s Munitions Claim: Implications for Aerospace & Defense ETFs](https://www.tipranks.com/news/catalyst/trumps-munitions-claim-implications-for-aerospace-defense-etfs)  
   <sub>TipRanks, 3 hours ago</sub>  
-  Leveraged Bitcoin Bulls Tap the Brakes as ProShares' BITU Sees Outflow ProShares Ultra Bitcoin ETF, BITU, recorded a single-day outflow of $515284 on...
+  President Trump has posted a new announcement on Truth Social, the social media platform. He wrote: “The cowards and traitors would love to say the United...
+- [Bitcoin ETF Giant IBIT Draws Fresh Inflows as BTC Rallies Above $86K](https://www.tipranks.com/news/cryptocurrencies/bitcoin-etf-giant-ibit-draws-fresh-inflows-as-btc-rallies-above-86k)  
+  <sub>TipRanks, 5 hours ago</sub>  
+  Bitcoin ETF inflows are picking up again as IShares Bitcoin Trust Registered's IBIT logged fresh demand on September 21, 2026.
+- [XRP ETF Outflows Hint at Profit-Taking Even as Token’s Rally Stays Intact](https://www.google.com/goto?url=CAESrwEB6zswFV9KRIvzEl-55H5Niu3giwFCR7bIep-NbfhDVI9K3kYFE98ERmEdJmWCc39KCWxsFIc3yvwpVuUB3JkE8IaDy9-ufqiFMCathLhl2DODhK7EYVDc4xO5ZL6gOkkBgfgZjKLiAOhJCGiAA_4p2-0m_cLtx5tVmvhwUmVhL9pCfUngkRXM3USOrzRprz3FKtOOom20E76-lEhguS1_2H_4jAfu_epvpCxF1fpM)  
+  <sub>TipRanks, 16 hours ago</sub>  
+  XRP ETF Sees a Jolt of Outflows as Traders Lock In Gains The Volatility Shares Trust XRP ETF, XRPI, recorded net outflows of $1429614 on September 15, 2026,...
+- [3 Best ETFs Offering 10%+ Upside, Picked by AI Analyst](https://www.tipranks.com/news/3-best-etfs-offering-10-upside-picked-by-ai-analyst)  
+  <sub>TipRanks, 19 hours ago</sub>  
+  Exchange-traded funds (ETFs) remain a key way to capture growth opportunities in the market. Investors seeking exposure to industries such as tech,...
+- [Evolve Sets September 2026 Payouts Across UltraYield ETFs and Income Funds](https://www.google.com/goto?url=CAEStgEB6zswFSJRR64OeIq15dka2S85zdSb9MJ2n8yFP3v8KN9-Yh4QGT58n1__fsPSIjn374xrsczu4dbWDET-bgPIoGQhkX6pIzdMfdP_qVTtk1bLz2TvX3dUgsdS3I_zSEYu1n9rRiQb-8bkqr2hbGb6IQsiBwa0WW6sIX1kI9B95rXEQ_gpoGEzR0gM89yivwm2f9HKRW4Ylfp8qcmtdd_jaYHW6jbpgcJOfIj1HJkDq6pwvo2ADQ)  
+  <sub>TipRanks, 18 hours ago</sub>  
+  The latest update is out from Evolve US Equity UltraYield ETF Trust Units -Hedged- ( ($TSE:BIGY) ). Evolve Funds Group Inc. has declared September 2026 cash...
+- [Bitcoin ETF EZBC Draws Fresh Inflows as Price Rally Lures Mainstream Investors](https://www.google.com/goto?url=CAEStQEB6zswFb5HPd2wz8S6Au_ZAFyKsj-PHniObrHNl-D6JVUpBTvuXy8A3cjMOQNZwhgyRaLPC8Iz11Ff4UB7fLgM0B3sBlrB8AydepH-xVHBMfhbEC9N1HB6se_l8nMatBM14TEymuUE9YjW_ZoCN4zyWNEr5rCES7i7mfDccpLB4PRQZFPN3K3tOWUDHeWpMj9kd-d6zdYwQEbBH9lXD5QuG7eDiLISMxhf6lXQ5SWay6jBD5VB)  
+  <sub>TipRanks, 19 hours ago</sub>  
+  Bitcoin ETF pulls in fresh cash as price surge accelerates The Franklin Bitcoin ETF, EZBC, recorded net inflows of $4569300 on September 15, 2026,...
+- [Bitcoin Keeps Climbing While Covered Call ETF YBTC Sees Investors Trim Exposure](https://www.tipranks.com/news/cryptocurrencies/bitcoin-keeps-climbing-while-covered-call-etf-ybtc-sees-investors-trim-exposure)  
+  <sub>TipRanks, 21 hours ago</sub>  
+  Bitcoin Options ETF Sees Modest Outflow as Rally Marches On The Roundhill Bitcoin Covered Call Strategy ETF, YBTC, recorded net outflows of $526953 on...
 
 </details>
 
 <details><summary><b>Interest rates, the dollar and market nerves</b> — score n/a</summary>
 
 ```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
 Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
 Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
 ```
 
 </details>
@@ -4132,13 +4167,13 @@ Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market pri
 <details><summary><b>Price and chart</b> — score n/a</summary>
 
 ```text
-Last close 105.53 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 106.54 (-0.9%), 50d 107.07 (-1.4%), 200d 109.60 (-3.7%); 50d below 200d
-Momentum: RSI(14) 33.5 | MACD -0.503 vs signal -0.391 (histogram -0.111)
-Returns: 1d +0.2% | 5d -0.3% | 1m -1.9% | 3m -3.1%
-52-week range: 105.27 - 112.20 (now 3.8% of the way up)
-Volatility: ATR(14) 0.36 (0.3% of price) | annualised 20d 4.1%
-Volume: 0.44x the 20-day average
+Last close 105.61 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 106.46 (-0.8%), 50d 107.03 (-1.3%), 200d 109.58 (-3.6%); 50d below 200d
+Momentum: RSI(14) 35.7 | MACD -0.487 vs signal -0.408 (histogram -0.078)
+Returns: 1d -0.1% | 5d -0.2% | 1m -1.4% | 3m -3.0%
+52-week range: 105.27 - 112.20 (now 4.9% of the way up)
+Volatility: ATR(14) 0.35 (0.3% of price) | annualised 20d 4.2%
+Volume: 0.27x the 20-day average
 ```
 
 </details>
@@ -4221,7 +4256,7 @@ Read this as crowding, not as a forecast: an extreme is as often the end of a mo
 ```text
 Direction: unknown
 Share count change: n/a (too few readings)
-Shares outstanding: 142.47M | fund size: 15.03B
+Shares outstanding: 142.60M | fund size: 15.06B
 Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
 ```
 
@@ -4231,49 +4266,49 @@ Creations and redemptions are settled money, not an opinion -- but they follow d
 
 <details><summary><b>News</b> — score n/a</summary>
 
-- [The Fed shouldn't 'look through' some supply shocks, Chicago Fed's Goolsbee says (TLT:NASDAQ)](https://seekingalpha.com/news/4644700-the-fed-shouldnt-look-through-some-supply-shocks-chicago-feds-goolsbee-says)  
-  <sub>Seeking Alpha, 3 hours ago</sub>  
-  Since the 1970s, the Federal Reserve has held the stance of “looking through” supply shocks and only responding if the resulting inflation bleeds into other...
-- [Investors pour $625B into bond funds despite po...](https://pluang.com/en/news-feed/harga-obligasi-turun-tetap-ada-pembeli)  
-  <sub>Pluang, 3 hours ago</sub>  
-  In 2023, bond investors have faced losses, with major bond ETFs like the iShares Core US Aggregate Bond ETF down 4% and the iShares 20+ Year Treasury Bond...
-- [Why the White House's Push to Control Bond Markets Is Destined to Disappoint Investors](https://www.theglobeandmail.com/investing/markets/markets-news/motley/4702709/why-the-white-house-s-push-to-control-bond-markets-is-destined-to-disappoint-investors/)  
-  <sub>The Globe and Mail, 20 hours ago</sub>  
-  With enough gumption, the White House and the Treasury Department can try to nudge the bond market in its preferred direction. In August, the Treasury said...
-- [Nasdaq, S&P 500, Dow Futures Shake Off Iran Jitters As Investors Turn To AI Hyperscaler Earnings: INTC, TSLA, TTD, HIMS In Focus](https://stocktwits.com/news-articles/markets/equity/nasdaq-s-and-p-500-dow-futures-shake-off-iran-jitters-as-investors-turn-to-ai-hyperscaler-earnings-intc-tsla-ttd-hims-in-focus/cZZYW1bR7UM)  
-  <sub>Stocktwits, 10 hours ago</sub>  
-  Markets were primarily focused on earnings from major companies, alongside rising oil prices due to the continued tensions between the U.S. and Iran.
-- [Nasdaq, S&P 500 Futures Rise As Chip Rally Counters Iran Jitters Ahead Of Big Tech Earnings: Why IREN, ACHR, TSLA, BA Stocks Are Drawing Focus](https://stocktwits.com/news-articles/markets/equity/nasdaq-s-and-p-500-futures-rise-as-chip-rally-counters-iran-jitters-ahead-of-big-tech-earnings/cZZ1tCdR7HO)  
-  <sub>Stocktwits, 22 hours ago</sub>  
-  The VanEck Semiconductor ETF was up 0.41% at close, reversing three consecutive days of declines. However, tensions in the Middle East continued to rise...
-- [Higher Rates Push Investors to Short and Intermediate Bond Funds](https://www.thedailyupside.com/etf/thematics-sectors/higher-rates-push-investors-to-short-and-intermediate-bond-funds/)  
-  <sub>The Daily Upside, 11 hours ago</sub>  
-  More than $9 billion flowed into short-term government funds in August, the second-highest month on record after March 2020.
-- [Dow, S&P 500, Nasdaq Futures Climb Ahead Of Key China Summit: CRML, APLD, GME, AMD Stocks In Focus](https://es.tradingview.com/news/stocktwits:09b9f8005094b:0-dow-s-p-500-nasdaq-futures-climb-ahead-of-key-china-summit-crml-apld-gme-amd-stocks-in-focus/)  
-  <sub>TradingView, 13 hours ago</sub>  
-  U.S. stock futures traded higher in the overnight session late Sunday ahead of a key summit this week between President Donald Trump and Chinese President...
+- [TLT ETF Slips As Resurgence In War Risk, Elevated Oil Prices Build Case For Rate Hikes](https://stocktwits.com/news-articles/markets/equity/us-treasury-yield-etfs-drop-as-resurgence-in-war-risk-elevated-oil-prices-build-case-for-rate-hikes/cZmoWmwR7VO)  
+  <sub>Stocktwits, 15 hours ago</sub>  
+  TLT ETF Slips As Resurgence In War Risk, Elevated Oil Prices Build Case For Rate Hikes · TLT ETF has seen outflows in five out of six months ending June 2026.
+- [Fed's discount window modernization supports banks, broader market resilience: Governor Jefferson (TLT:NASDAQ)](https://seekingalpha.com/news/4645436-feds-discount-window-modernization-supports-banks-broader-market-resilience-governor-jefferson)  
+  <sub>Seeking Alpha, 32 minutes ago</sub>  
+  Fed's modernization efforts will ensure that the discount window supports individual banking institutions and broader market resilience, according to the...
+- [A Record ETF Year Takes Shape as Inflows Near $1.5 Trillion](https://finance.yahoo.com/markets/stocks/articles/record-etf-takes-shape-inflows-210017196.html)  
+  <sub>Yahoo Finance, 18 hours ago</sub>  
+  US-listed ETFs took in $91.9 billion last week, pushing 2026 inflows to about $1.47 trillion, nearly matching last year's record with three months to spare.
 - [S&P 500, Nasdaq, Dow Futures Ease After Another Record Close As AI Momentum Cushions Iran's Expanding Strikes: MRVL, AVGO, MSFT, PANW In Focus](https://stocktwits.com/news-articles/markets/equity/sp500-nasdaq-dow-futures-ease-after-another-record-close-ai-momentum-cushions-iran-strikes/cZ0SoqTReDV)  
-  <sub>Stocktwits, 9 hours ago</sub>  
+  <sub>Stocktwits, 6 hours ago</sub>  
   U.S. President Donald Trump said in a post on Truth Social on Tuesday that the U.S. and Iran deal negotiations are ongoing, dismissing reports of strained...
-- [COST Stock Retreats After Hours On Decelerating Comparable Sales After Strong May Performance](https://stocktwits.com/news-articles/markets/equity/cost-stock-retreats-after-hours-on-decelerating-comparable-sales-after-strong-may-performance/cZmoWMAR7VQ)  
-  <sub>Stocktwits, 9 hours ago</sub>  
-  Costco reported net sales of $29.24 billion for the five weeks ended July 5, 2026, a 10.6% increase from $26.44 billion a year earlier.
-- [Nasdaq, S&P 500, Dow Futures Climb As Trump's $2B Quantum Computing Bet Outweighs Iran Jitters: RKLB, IBM, RGTI, NIO In Focus](https://stocktwits.com/news-articles/markets/equity/nasdaq-sp500-dow-futures-climb-as-trump-quantum-computing-bet-outweighs-iran-jitters/cZgbH1xRe8r)  
+- [Dow Drops To Record Worst Week In Six Months Amid Elevated Yields, Oil — NVDA, TSLA, SPCX, ONON In Focus](https://stocktwits.com/news-articles/markets/equity/dow-drops-to-record-worst-week-in-six-months-amid-elevated-yields-oil-nvda-tsla-spcx-onon-in-focus/cZtHOYsRBEK)  
+  <sub>Stocktwits, 14 hours ago</sub>  
+  An interest rate hike amid soaring energy costs and rising inflation concerns has weighed on the Dow.
+- [Nasdaq, S&P 500 Futures Rise As Chip Rally Counters Iran Jitters Ahead Of Big Tech Earnings: Why IREN, ACHR, TSLA, BA Stocks Are Drawing Focus](https://stocktwits.com/news-articles/markets/equity/nasdaq-s-and-p-500-futures-rise-as-chip-rally-counters-iran-jitters-ahead-of-big-tech-earnings/cZZ1tCdR7HO)  
+  <sub>Stocktwits, 17 hours ago</sub>  
+  The VanEck Semiconductor ETF was up 0.41% at close, reversing three consecutive days of declines. However, tensions in the Middle East continued to rise...
+- [BlackRock's $16.6 Billion Bond Fund Pays 6% Monthly. BND Pays 4% and Made 2% Last Year](https://247wallst.com/investing/etf/2026/09/21/blackrocks-16-6-billion-bond-fund-pays-6-monthly-bnd-pays-4-and-made-2-last-year/)  
+  <sub>24/7 Wall St., 18 hours ago</sub>  
+  Your core bond fund may be paying you far less than it should while quietly losing ground in today's rate environment. A massive active ETF from BlackRock...
+- [Bond Panic? Great! This 13% Payer Is on Sale (for 91 Cents on the Dollar)](https://contrarianoutlook.com/bond-panic-great-this-13-payer-is-on-sale-for-91-cents-on-the-dollar/)  
+  <sub>Contrarian Outlook, 6 hours ago</sub>  
+  In one corner of the income market, a “rubber band” is stretched about as far as it can go. When it snaps back, I expect it to catapult the prices of a...
+- [S&P 500, Nasdaq, Dow Futures Retreat After Rally Fueled By SpaceX, US-Iran Deal As Fed Meeting Looms: TSLA, PLAY, FISV In Focus](https://stocktwits.com/news-articles/markets/equity/sp500-nasdaq-dow-futures-retreat-after-rally-fueled-by-spacex-us-iran-deal-as-fed-meeting-looms/cZKW76IR7ER)  
   <sub>Stocktwits, 20 hours ago</sub>  
-  The Trump administration said on Friday it would invest $2 billion in quantum computing stocks, with about half earmarked for IBM.
+  The Dow index jumped to a new all-time intraday high on Monday, while the Nasdaq jumped to its best close since the end of March.
+- [The Bond Market's Big Re-Steepening](https://finance.yahoo.com/markets/options/articles/bond-markets-big-steepening-040150357.html)  
+  <sub>Yahoo Finance, 11 hours ago</sub>  
+  The Federal Reserve's rate hike last week, its first in three years, capped a shift that had been building in the bond market for months.
 
 </details>
 
 <details><summary><b>Interest rates, the dollar and market nerves</b> — score n/a</summary>
 
 ```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
 Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
 Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
 ```
 
 </details>
@@ -4281,13 +4316,13 @@ Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market pri
 <details><summary><b>Price and chart</b> — score n/a</summary>
 
 ```text
-Last close 81.64 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 81.94 (-0.4%), 50d 82.56 (-1.1%), 200d 85.83 (-4.9%); 50d below 200d
-Momentum: RSI(14) 47.0 | MACD -0.425 vs signal -0.448 (histogram 0.023)
-Returns: 1d +0.5% | 5d +0.9% | 1m -0.8% | 3m -5.2%
-52-week range: 80.71 - 92.06 (now 8.2% of the way up)
-Volatility: ATR(14) 0.68 (0.8% of price) | annualised 20d 9.2%
-Volume: 0.37x the 20-day average
+Last close 81.75 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 81.90 (-0.2%), 50d 82.51 (-0.9%), 200d 85.80 (-4.7%); 50d below 200d
+Momentum: RSI(14) 48.0 | MACD -0.363 vs signal -0.429 (histogram 0.066)
+Returns: 1d -0.1% | 5d +1.3% | 1m -0.4% | 3m -5.2%
+52-week range: 80.71 - 92.06 (now 9.2% of the way up)
+Volatility: ATR(14) 0.66 (0.8% of price) | annualised 20d 9.0%
+Volume: 0.23x the 20-day average
 ```
 
 </details>
@@ -4370,7 +4405,7 @@ Read this as crowding, not as a forecast: an extreme is as often the end of a mo
 ```text
 Direction: unknown
 Share count change: n/a (too few readings)
-Shares outstanding: 109.70M | fund size: 8.96B
+Shares outstanding: 109.70M | fund size: 8.97B
 Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
 ```
 
@@ -4387,13 +4422,13 @@ _No news found for this one today._
 <details><summary><b>Interest rates, the dollar and market nerves</b> — score n/a</summary>
 
 ```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
 Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
 Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
 ```
 
 </details>
@@ -4401,13 +4436,13 @@ Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market pri
 <details><summary><b>Price and chart</b> — score n/a</summary>
 
 ```text
-Last close 28.43 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 28.14 (+1.1%), 50d 28.21 (+0.8%), 200d 27.72 (+2.6%); 50d above 200d
-Momentum: RSI(14) 64.9 | MACD 0.062 vs signal 0.012 (histogram 0.049)
-Returns: 1d +0.2% | 5d +0.9% | 1m +1.9% | 3m +0.3%
-52-week range: 26.47 - 28.60 (now 92.3% of the way up)
-Volatility: ATR(14) 0.10 (0.4% of price) | annualised 20d 4.6%
-Volume: 0.25x the 20-day average
+Last close 28.50 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 28.17 (+1.2%), 50d 28.21 (+1.1%), 200d 27.73 (+2.8%); 50d above 200d
+Momentum: RSI(14) 67.5 | MACD 0.081 vs signal 0.026 (histogram 0.054)
+Returns: 1d +0.1% | 5d +1.0% | 1m +2.2% | 3m +0.2%
+52-week range: 26.47 - 28.60 (now 95.5% of the way up)
+Volatility: ATR(14) 0.10 (0.3% of price) | annualised 20d 4.6%
+Volume: 0.07x the 20-day average
 ```
 
 </details>
@@ -4497,7 +4532,7 @@ Read this as crowding, not as a forecast: an extreme is as often the end of a mo
 ```text
 Direction: unknown
 Share count change: n/a (too few readings)
-Shares outstanding: 10.52M | fund size: 299.18M
+Shares outstanding: 10.53M | fund size: 300.02M
 Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
 ```
 
@@ -4507,19 +4542,18 @@ Creations and redemptions are settled money, not an opinion -- but they follow d
 
 ### Taiwan (EWT) · Sector or country — BULLISH, confidence 0.35
 
-**Result:** REJECTED · no room under the sleeve budget limit
+**Result:** ACCEPTED · 33 shares · submitted buy 33 EWT @ ~114.82, stop 110.28
 
 **In the model's own words:**
 
-> EWT is at a 52-week high, 32.9% above its 200d SMA with 50d>200d and positive MACD, and RSI 65.8 is strong without being extreme. Analyst roll-up over 38% of the fund is unanimously buy with ~28% upside, though that is concentrated AI-semis coverage (TSMC alone 22%). Macro is benign for risk: VIX down 2.5 to 14.6, curve normally sloped, 10y unchanged. Offsets: no macro catalyst this cycle, breakout came on 0.25x average volume, dollar up 0.9 and a priced hiking path are mild headwinds for an EM tech proxy, and P/E 27 after +43.5%/yr for three years leaves little cushion. Modest long tilt rather than a conviction call.
+> EWT is at 99% of its 52-week range after +8% in five days, with 50d above 200d and MACD positive but RSI 65 and volume only 0.4x average -- a strong trend rather than a fresh catalyst. No macro surprise this week: yields flat to slightly lower at the long end, VIX calm at 14.4, though a firmer dollar (+0.93) and a bond market pricing hikes are mild headwinds for a high-beta (1.30) Taiwan tech basket. Analyst roll-up is unanimous buy with +27% targets, but covers only 38% of the fund and is dominated by TSMC at 22%. Flows direction unknown, so no behavioural read. Trend-following long at modest size; no policy or data shock justifies more.
 
 **Main reasons it gave:**
-- Close 115.04 at top of 52-week range, +32.9% vs 200d SMA, 50d above 200d
-- Breakout volume only 0.25x the 20-day average
-- Analyst roll-up over 38% of fund: 100% buy, +27.8% weighted target
-- VIX 14.62, down 2.5 on week; 10y flat, curve +0.98 normal
-- Dollar index +0.90 and 2y at 4.67% pricing hikes — headwind for EM tech
-- 73.9% technology, 22.1% single-name TSMC concentration; P/E 27.3
+- Price at 99.2% of 52-week range, +32.7% above 200d SMA, 50d above 200d
+- 5d +8.0% and 1m +10.5% but on 0.40x average volume
+- RSI 65.3 with MACD above signal -- momentum intact, not yet extreme
+- Analyst roll-up 100% buy, +27.2% weighted target, but only 38% coverage and 22% is TSMC
+- VIX 14.4 and flat long-end yields -- no macro surprise; dollar +0.93 a mild EM headwind
 
 <details><summary><b>News</b> — score +0.00</summary>
 
@@ -4530,13 +4564,13 @@ _No news found for this one today._
 <details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
 
 ```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
 Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
 Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
 ```
 
 </details>
@@ -4544,13 +4578,13 @@ Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market pri
 <details><summary><b>Price and chart</b> — score +0.55</summary>
 
 ```text
-Last close 115.04 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 109.19 (+5.3%), 50d 104.29 (+10.3%), 200d 86.54 (+32.9%); 50d above 200d
-Momentum: RSI(14) 65.8 | MACD 1.904 vs signal 1.761 (histogram 0.143)
-Returns: 1d +3.0% | 5d +7.3% | 1m +10.5% | 3m +3.1%
-52-week range: 60.03 - 115.04 (now 100.0% of the way up)
-Volatility: ATR(14) 2.30 (2.0% of price) | annualised 20d 25.9%
-Volume: 0.25x the 20-day average
+Last close 115.20 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 109.82 (+4.9%), 50d 104.57 (+10.2%), 200d 86.80 (+32.7%); 50d above 200d
+Momentum: RSI(14) 65.3 | MACD 2.195 vs signal 1.856 (histogram 0.340)
+Returns: 1d -0.4% | 5d +8.0% | 1m +10.5% | 3m +9.5%
+52-week range: 60.03 - 115.64 (now 99.2% of the way up)
+Volatility: ATR(14) 2.27 (2.0% of price) | annualised 20d 26.3%
+Volume: 0.40x the 20-day average
 ```
 
 </details>
@@ -4611,146 +4645,9 @@ _Not available today._
 ```text
 Rolled up from the 5 largest holdings, 38.0% of the fund by weight
 Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.35 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +27.8% above the current prices
+Weighted price target: +27.2% above the current prices
 Holdings read: 2330.TW, 2454.TW, 2308.TW, 2317.TW, 3711.TW
 Recent rating changes among them: none reported
-```
-
-</details>
-
-<details><summary><b>Buying and selling by company insiders</b> — score n/a</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Who is positioned how</b> — score n/a</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Money going into and out of this fund</b> — score n/a</summary>
-
-_Not available today._
-
-</details>
-
-### US house builders (XHB) · Sector or country — BEARISH, confidence 0.35
-
-**Result:** REJECTED · no room under the sleeve budget limit
-
-**In the model's own words:**
-
-> Homebuilder/construction basket is in a clear downtrend: price below 20/50/200d SMAs, 50d under 200d, -8.5% in a month, sitting 6.8% off the 52-week low with negative MACD. The macro backdrop is the driver: 10-year at 4.96% and a 2-year at 4.67% implying the market prices tightening rather than easing, which is direct pressure on mortgage rates and housing-sensitive cyclicals, plus a firmer dollar. Offsets are real -- RSI 33.7 is oversold, volume is thin (0.21x), VIX is calm at 14.6, and analyst targets on the top slice sit +22% above spot -- so this is a modest, low-conviction tilt rather than a catalyst trade. The single news item is an unrelated ETF listicle and carries no information.
-
-**Main reasons it gave:**
-- Price below 20d (-4.1%), 50d (-8.0%) and 200d (-9.3%) SMAs with 50d under 200d
-- 10-year yield 4.96% and 2-year 4.67% vs 4.00% Fed target -- market pricing hikes, adverse for rate-sensitive housing
-- -8.5% 1m / -11.4% 3m, only 6.8% above the 52-week low
-- RSI 33.7 and 0.21x average volume argue against chasing the break
-- Top-5 roll-up (20.9% of fund) shows 73.5% buy weight and +22.4% targets -- thin coverage, mild offset
-
-<details><summary><b>News</b> — score +0.00</summary>
-
-- [Should You Invest in the Invesco Building & Construction ETF (PKB)?](https://finance.yahoo.com/markets/stocks/articles/invest-invesco-building-construction-etf-102002535.html)  
-  <sub>Yahoo Finance, 5 hours ago</sub>  
-  Looking for broad exposure to the Industrials - Engineering and Construction segment of the equity market? You should consider the Invesco Building...
-
-</details>
-
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
-
-```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
-Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
-Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
-```
-
-</details>
-
-<details><summary><b>Price and chart</b> — score -0.55</summary>
-
-```text
-Last close 96.68 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 100.81 (-4.1%), 50d 105.03 (-8.0%), 200d 106.61 (-9.3%); 50d below 200d
-Momentum: RSI(14) 33.7 | MACD -2.664 vs signal -2.380 (histogram -0.285)
-Returns: 1d +0.3% | 5d -1.6% | 1m -8.5% | 3m -11.4%
-52-week range: 94.86 - 121.36 (now 6.8% of the way up)
-Volatility: ATR(14) 2.14 (2.2% of price) | annualised 20d 18.5%
-Volume: 0.21x the 20-day average
-```
-
-</details>
-
-<details><summary><b>Company numbers</b> — score -0.10</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What this fund holds</b> — score -0.10</summary>
-
-```text
-Fund type: Consumer Cyclical
-What it holds: P/E 19.52 | P/B 2.34 | P/S 1.36 | 3y earnings growth n/a
-Yield: 0.8%
-Three-year record: +7.6% a year | beta to the market 1.46
-Cost and size: expense ratio 0.35% | net assets 1.33B
-What it is made of: Stocks 100.0%, Cash 0.1%
-Largest holdings: Installed Building Products Inc 4.4%, Owens-Corning Inc 4.3%, Allegion PLC 4.3%, Champion Homes Inc 4.1%, Williams-Sonoma Inc 3.9%
-Sector mix: Consumer cyclical 60.7%, Industrials 37.9%, Real estate 1.5%
-```
-
-</details>
-
-<details><summary><b>Does this company beat its own forecasts</b> — score -0.10</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What holding this fund costs you</b> — score -0.10</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How much oil and gas is in storage</b> — score -0.10</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How the crop is growing</b> — score -0.10</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts and big funds say</b> — score +0.35</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.35</summary>
-
-```text
-Rolled up from the 5 largest holdings, 20.9% of the fund by weight  -- thin, so read this as a fact about that slice rather than the fund
-Ratings by weight: buy 73.5% | hold 26.5% | sell 0.0% (mean 2.11 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +22.4% above the current prices
-Holdings read: IBP, OC, ALLE, SKY, WSM
-Recent rating changes among them:
-  - IBP: 2026-09-15 Stifel: init, ? -> Buy
-  - OC: 2026-09-11 Wells Fargo: main, Overweight -> Overweight
-  - ALLE: 2026-08-10 Morgan Stanley: main, Equal-Weight -> Equal-Weight
-  - SKY: 2026-08-06 UBS: main, Buy -> Buy
-  - WSM: 2026-09-09 Evercore ISI Group: main, In-Line -> In-Line
 ```
 
 </details>
@@ -4772,57 +4669,211 @@ _Not available today._
 ```text
 Direction: unknown
 Share count change: n/a (too few readings)
-Shares outstanding: 13.76M | fund size: 1.33B
+Shares outstanding: 105.25M | fund size: 12.12B
 Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
 ```
 
 </details>
 
-### Israel (EIS) · Sector or country — BULLISH, confidence 0.30
-
-**Result:** REJECTED · no room under the sleeve budget limit
+### Defence and aerospace (ITA) · Sector or country — NEUTRAL, confidence 0.35
 
 **In the model's own words:**
 
-> EIS is in a clean uptrend (50d>200d, price above all major SMAs, RSI 59, MACD positive) with +4.6% over a month, though volume is light at 0.71x average and there is no macro catalyst. Rates were essentially unchanged on the week, VIX fell to 14.6 (calm), and the dollar firmed slightly -- a benign but unremarkable backdrop. The analyst roll-up over 37.6% of the fund is unanimously buy with a +14.7% weighted target, which supports a mild positive tilt. Flow direction is unknown, so no behavioural read. Nothing here rises to a macro surprise, so conviction stays low.
+> ITA has suffered a sustained pullback: down 10.1% over one month and 9.5% over three months, with price now 7.3% below the 200-day moving average and RSI at 29 signalling oversold conditions. The technicals show a deteriorating trend against all major moving averages, though the pullback has been orderly rather than panicked. Macro conditions remain stable—yields are flat to down on the week, the dollar has strengthened modestly, and the VIX at 14.4 reflects calm. The fund's valuation metrics (P/E 34.7, P/B 6.6) are elevated but not unusual for a quality industrials basket with strong three-year performance (+25.8% annualized). Analyst consensus on the 57.5% of holdings covered is decisively bullish: 100% buy ratings with a weighted +26.7% price target, and a recent upgrade of Lockheed Martin (a 4.7% position) to Buy provides a tailwind. The $1.2B Army missile contract for Lockheed Martin is sector-supportive but immaterial to fund returns—a single holding's win is noise in a 99.8% stock fund. Fund flows data is incomplete. The case for a bounce rests on oversold technicals, unanimous analyst sentiment on the five largest holdings, and an intact macro backdrop, but the fund's recent underperformance and elevated multiples argue for caution. This is a setup where conviction is warranted neither for a strong call nor for a full reversal; a modest bullish lean reflects the technical extreme and analyst consensus without ignoring the valuation and recent trend.
 
 **Main reasons it gave:**
-- Price above 20d/50d/200d SMAs with 50d above 200d and RSI 59
-- Advance on light volume (0.71x 20-day average)
-- Analyst roll-up over 37.6% of fund: 100% buy, +14.7% weighted target
-- VIX 14.62, down 2.5 on the week; 10-year yield unchanged
-- P/E 17.89 with concentrated financials weight (36%) and 10% single-name Teva exposure
+- RSI 29 signals oversold after -10.1% month pullback
+- analyst consensus 100% buy with +26.7% weighted price target on 57.5% of fund
+- price 7.3% below 200-day MA, all moving averages bearish
+- elevated P/E 34.7 and P/B 6.6 valuations persist through drawdown
+- LMT upgrade to Buy and $1.2B contract support sector but minor to fund composition
 
-<details><summary><b>News</b> — score +0.00</summary>
+<details><summary><b>News</b> — score +0.15</summary>
 
-_No news found for this one today._
+- [Should You Invest in the iShares U.S. Aerospace & Defense ETF (ITA)?](https://finance.yahoo.com/markets/stocks/articles/invest-ishares-u-aerospace-defense-102002161.html)  
+  <sub>Yahoo Finance, 5 hours ago</sub>  
+  Sector ETF report for ITA.
+- [Lockheed Martin Lands $1.2 Billion Army Missile Deal](https://www.benzinga.com/news/contracts/26/09/61913994/lockheed-martin-lands-1-2-billion-army-missile-deal)  
+  <sub>Benzinga, 5 hours ago</sub>  
+  Lockheed Martin wins $1.2B U.S. Army contract for PrSM Increment 2 missiles targeting moving maritime targets.
 
 </details>
 
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.15</summary>
 
 ```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
 Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
 Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
 ```
 
 </details>
 
-<details><summary><b>Price and chart</b> — score +0.45</summary>
+<details><summary><b>Price and chart</b> — score -0.45</summary>
 
 ```text
-Last close 126.74 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 123.93 (+2.3%), 50d 122.10 (+3.8%), 200d 121.97 (+3.9%); 50d above 200d
-Momentum: RSI(14) 59.1 | MACD 0.704 vs signal 0.575 (histogram 0.129)
-Returns: 1d +1.6% | 5d +3.0% | 1m +4.6% | 3m +4.7%
-52-week range: 94.16 - 137.69 (now 74.8% of the way up)
-Volatility: ATR(14) 1.72 (1.4% of price) | annualised 20d 19.8%
-Volume: 0.71x the 20-day average
+Last close 213.44 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 222.51 (-4.1%), 50d 234.40 (-8.9%), 200d 230.28 (-7.3%); 50d above 200d
+Momentum: RSI(14) 29.0 | MACD -6.658 vs signal -6.296 (histogram -0.362)
+Returns: 1d -1.2% | 5d -0.3% | 1m -10.1% | 3m -9.5%
+52-week range: 198.23 - 253.22 (now 27.7% of the way up)
+Volatility: ATR(14) 4.11 (1.9% of price) | annualised 20d 14.8%
+Volume: 0.40x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.25</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What this fund holds</b> — score +0.25</summary>
+
+```text
+Fund type: Industrials
+What it holds: P/E 34.66 | P/B 6.62 | P/S 3.21 | 3y earnings growth n/a
+Yield: 0.5%
+Three-year record: +25.8% a year | beta to the market 0.99
+Cost and size: expense ratio 0.37% | net assets 13.63B
+What it is made of: Stocks 99.8%, Cash 0.2%
+Largest holdings: GE Aerospace 21.6%, RTX Corp 17.2%, Boeing Co 9.1%, General Dynamics Corp 4.8%, Lockheed Martin Corp 4.7%
+Sector mix: Industrials 100.0%
+```
+
+</details>
+
+<details><summary><b>Does this company beat its own forecasts</b> — score +0.25</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What holding this fund costs you</b> — score +0.25</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How much oil and gas is in storage</b> — score +0.25</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How the crop is growing</b> — score +0.25</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.80</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.80</summary>
+
+```text
+Rolled up from the 5 largest holdings, 57.5% of the fund by weight
+Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.75 on a 1=strong buy to 5=strong sell scale)
+Weighted price target: +26.7% above the current prices
+Holdings read: GE, RTX, BA, GD, LMT
+Recent rating changes among them:
+  - GE: 2026-07-23 Bernstein: main, Outperform -> Outperform
+  - RTX: 2026-08-03 Bernstein: main, Market Perform -> Market Perform
+  - BA: 2026-09-21 Jefferies: main, Buy -> Buy
+  - GD: 2026-09-08 UBS: main, Neutral -> Neutral
+  - LMT: 2026-09-08 UBS: up, Neutral -> Buy
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Who is positioned how</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
+
+```text
+Direction: unknown
+Share count change: n/a (too few readings)
+Shares outstanding: 63.73M | fund size: 13.60B
+Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
+```
+
+</details>
+
+### US regional banks (KRE) · Sector or country — BEARISH, confidence 0.32
+
+**Result:** ACCEPTED · 53 shares · submitted sell 53 KRE @ ~71.35, stop 73.81
+
+**In the model's own words:**
+
+> Regional banks are in a clear short-term downtrend (below 20d and 50d SMAs, RSI 31, MACD below signal) against a macro backdrop where the 2-year at 4.76% versus a 4.00% target prices further tightening -- an unfriendly rate path for deposit-funded lenders, with the 10-year near 5%. Nothing here is a fresh surprise: the week's long-end moves were small, VIX fell to 14, and the decline came on light volume (0.47x), so this is drift rather than a break. Valuation is undemanding (P/E 12.6, P/B 1.27) and the thin analyst roll-up (7.1% of the fund) skews positive with a +21% weighted target, which caps downside conviction. The headline items drawing 2023 analogies are speculative framing rather than new information and I do not weight them as evidence.
+
+**Main reasons it gave:**
+- Price below 20d (-3.0%) and 50d (-5.1%) SMAs with RSI 31.4 and negative MACD histogram
+- 2-year 4.76% vs 4.00% Fed target implies further hikes priced -- headwind for regional bank funding costs
+- 10-year 4.96%, long end actually fell slightly on the week: no fresh rate shock this cycle
+- Decline occurring on 0.47x average volume with VIX down 2.8 to 14.4 -- no stress confirmation
+- Holdings cheap at P/E 12.6 / P/B 1.27 with thin (7.1% weight) analyst roll-up 74% buy, +20.8% target
+
+<details><summary><b>News</b> — score -0.15</summary>
+
+- [KRE Lost 36% in Five Weeks in 2023. Another Rate Hike Shock May be Coming](https://www.google.com/goto?url=CAESrwEB6zswFflG_40mEBDbRbWPgQ0Htv5HOsPBeL5sFqF5glxwJK9DS_F6QFntSf6LiH4NIdYttN27_kXcR6Q6lPgOpJoIkFjtBePJn1ncRCp8cqZg5Zi7N_SjoQ36oFLuz3dhVhD3Pw7Jv0E2qjGXEO6LmPzzI3l5DIpxkrRA0n4Whl-Dn_iM7ZMW8ySl6AMBPChIp8BhzTWnHFUtYLnFZodhGczYRqDTBJ6tSekFbKFt)  
+  <sub>24/7 Wall St., 20 hours ago</sub>  
+  The Fed just raised rates again, and regional banks are carrying the same vulnerabilities that wiped out a third of KRE's value in five weeks three years...
+- [Regional bank ETF KRE fell 36% in five weeks in 2023; rate hikes may trigger similar risks again.](https://www.google.com/goto?url=CAESqAEB6zswFQIk4ynsqcscFiwVkawuNT6lolfMHeUWBR0hVMgIyx3mjyQxfBnNW-YGeqzpmd-eeQhzXDKlzZEkP-SyzCNwCestd7WS4sq_RV825rHB6JmMNOWgUOZST8u_a8uTVe3snMOqq_uWLcR54LfX0_4RBusoCl-0j0aLt4T7pGOHDqPlvKAE9F5tV6f6DCcVR5ljyt20-ynBAQL-tCDp9s9j4oT0LxA)  
+  <sub>Pluang, 20 hours ago</sub>  
+  The SPDR S&P Regional Banking ETF (KRE) dropped 36% in five weeks during 2023 due to failures of key regional banks. With the Fed raising rates again in...
+- [SPDR S&P Regional Banking ETF declares quarterly distribution of $0.4125](https://www.google.com/goto?url=CAESvwEB6zswFSXsglEKY5Z-Xn2J8QHNXa4qduD3Nb3WqnrcCYr8nF562gX8Caqp7RCANXIGj35IUyKm7dDfcL-UbRYH06BS6jqmTNHKhENNKsHUWSvcz_zb_HPr700h2fNAYJ8JtNPTfUmSWl_i0lbjDRMIWU5xXvDXrwAUPw5o9IBAbdbSGH_xegFtsrQh0a8Fp8xfb7m-gmzWBVveUWSVuGbi4Wbbq959ksXjauRG19yeEJGtLRKqFnSrUT84lwkJBQ)  
+  <sub>TradingView, 21 hours ago</sub>  
+  Content provided by Seeking Alpha is intended for information purposes only, and that Seeking Alpha does not offer any personalist investment advice and is...
+- [Fed's discount window modernization supports banks, broader market resilience: Governor Jefferson (TLT:NASDAQ)](https://seekingalpha.com/news/4645436-feds-discount-window-modernization-supports-banks-broader-market-resilience-governor-jefferson)  
+  <sub>Seeking Alpha, 35 minutes ago</sub>  
+  Fed's modernization efforts will ensure that the discount window supports individual banking institutions and broader market resilience, according to the...
+
+</details>
+
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score -0.15</summary>
+
+```text
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
+Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
+Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+```
+
+</details>
+
+<details><summary><b>Price and chart</b> — score -0.40</summary>
+
+```text
+Last close 71.43 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 73.67 (-3.0%), 50d 75.24 (-5.1%), 200d 70.42 (+1.4%); 50d above 200d
+Momentum: RSI(14) 31.4 | MACD -0.822 vs signal -0.607 (histogram -0.215)
+Returns: 1d -0.8% | 5d -3.5% | 1m -4.6% | 3m -2.3%
+52-week range: 58.14 - 77.93 (now 67.2% of the way up)
+Volatility: ATR(14) 1.22 (1.7% of price) | annualised 20d 14.7%
+Volume: 0.47x the 20-day average
 ```
 
 </details>
@@ -4836,14 +4887,14 @@ _Not available today._
 <details><summary><b>What this fund holds</b> — score +0.15</summary>
 
 ```text
-Fund type: Focused Region
-What it holds: P/E 17.89 | P/B 2.43 | P/S 2.45 | 3y earnings growth n/a
-Yield: 1.5%
-Three-year record: +34.0% a year | beta to the market 1.07
-Cost and size: expense ratio 0.59% | net assets 897.28M
-What it is made of: Stocks 99.5%, Cash 0.5%
-Largest holdings: Teva Pharmaceutical Industries Ltd ADR 10.1%, Bank Leumi Le-Israel BM 9.0%, Bank Hapoalim BM 8.1%, Tower Semiconductor Ltd 5.5%, Elbit Systems Ltd 4.8%
-Sector mix: Financial services 36.1%, Technology 18.1%, Healthcare 10.7%, Industrials 10.0%
+Fund type: Financial
+What it holds: P/E 12.60 | P/B 1.27 | P/S 3.77 | 3y earnings growth n/a
+Yield: 2.2%
+Three-year record: +22.6% a year | beta to the market 1.04
+Cost and size: expense ratio 0.35% | net assets 4.01B
+What it is made of: Stocks 99.9%, Cash 0.1%
+Largest holdings: Cullen/Frost Bankers Inc 1.5%, SouthState Bank Corp 1.4%, Popular Inc 1.4%, Pinnacle Financial Partners Inc 1.4%, UMB Financial Corp 1.4%
+Sector mix: Financial services 100.0%
 ```
 
 </details>
@@ -4872,23 +4923,25 @@ _Not available today._
 
 </details>
 
-<details><summary><b>What analysts and big funds say</b> — score +0.45</summary>
+<details><summary><b>What analysts and big funds say</b> — score +0.20</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.45</summary>
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.20</summary>
 
 ```text
-Rolled up from the 5 largest holdings, 37.6% of the fund by weight
-Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.19 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +14.7% above the current prices
-Holdings read: TEVA, LUMI.TA, POLI.TA, TSEM.TA, ESLT.TA
+Rolled up from the 5 largest holdings, 7.1% of the fund by weight  -- thin, so read this as a fact about that slice rather than the fund
+Ratings by weight: buy 74.3% | hold 25.7% | sell 0.0% (mean 1.88 on a 1=strong buy to 5=strong sell scale)
+Weighted price target: +20.8% above the current prices
+Holdings read: CFR, SSB, BPOP, PNFP, UMBF
 Recent rating changes among them:
-  - TEVA: 2026-09-09 Leerink Partners: init, ? -> Outperform
-  - TSEM.TA: 2026-09-18 Barclays: init, ? -> Overweight
-  - ESLT.TA: 2026-08-19 JP Morgan: main, Neutral -> Neutral
+  - CFR: 2026-09-08 Morgan Stanley: up, Underweight -> Overweight
+  - SSB: 2026-07-28 Citigroup: main, Buy -> Buy
+  - BPOP: 2026-09-22 Citigroup: main, Buy -> Buy
+  - PNFP: 2026-09-08 Morgan Stanley: init, ? -> Overweight
+  - UMBF: 2026-09-14 UBS: init, ? -> Neutral
 ```
 
 </details>
@@ -4910,74 +4963,71 @@ _Not available today._
 ```text
 Direction: unknown
 Share count change: n/a (too few readings)
-Shares outstanding: 2.55M | fund size: 323.19M
+Shares outstanding: 55.14M | fund size: 3.94B
 Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
 ```
 
 </details>
 
-### Chip makers (SMH) · Sector or country — NEUTRAL, confidence 0.28
+### US technology (XLK) · Sector or country — NEUTRAL, confidence 0.28
 
 **Result:** REJECTED · bias is NEUTRAL; no trade
 
 **In the model's own words:**
 
-> SMH is in a firm uptrend (above 20/50/200d, 50d>200d, +21% vs 200d) with a fresh MACD cross and a +3.1% day, but the move came on 0.53x average volume and is still -11.7% over three months, so this is a bounce inside a wide range rather than a decisive break. Macro is unhelpful for high-beta duration-sensitive tech: the 2-year at 4.67% versus a 4.00% target prices further hikes, the 10-year sits near 5% unchanged, the dollar firmed 0.9 and inflation is 3.4%. No policy or data surprise this week; VIX at 14.6 is calm. Holdings-level analyst view is genuinely supportive (100% buy by weight across 49% coverage, +37% weighted target) but valuation is rich (P/E 37.8, beta 2.06). The Seeking Alpha piece asserting SMH is 'ready to run' is promotional and given no weight; the SK hynix index-inclusion stories are irrelevant to SMH's own basket. Net: no edge in timing a macro-sensitive chip basket here.
+> Strong uptrend (above all major SMAs, near 52-week highs, +6.3% in five days, MACD positive) and calm vol with VIX down 2.8 argue for risk-on, but there is no macro catalyst: yields barely moved, the curve is normally sloped, and the 2-year still prices tightening rather than cuts with inflation at 3.4%. Volume on the advance is only 0.51x average, and RSI 65.7 with the fund 95.9% of the way up its range leaves little cushion at a 33x P/E and 1.50 beta. Holdings analyst view is supportive but covers only 45.7% of the fund and reflects consensus already in price. The single-holding AI headlines (AMD, Micron) are noise for a basket call. Slight positive tilt, not enough for a directional bet.
 
 **Main reasons it gave:**
-- Price above 20/50/200d SMAs, 50d>200d, MACD crossed above signal (hist +3.0)
-- Rally on 0.53x 20-day average volume; still -11.7% over 3 months
-- 2-year 4.67% vs 4.00% Fed target prices ~3 hikes; 10-year flat at 4.96%, dollar +0.90
-- Holdings roll-up: 100% buy by weight over 49.2% of fund, +36.9% weighted target
-- Rich basket valuation (P/E 37.8, P/B 11.1) with beta 2.06 and 35.7% 20-day annualised vol
+- Price 4.6% above 20d and 19.8% above 200d SMA, 95.9% of 52-week range
+- Advance on 0.51x average volume; RSI 65.7 near overbought
+- VIX 14.42, down 2.8 on week -- calm backdrop, no rate surprise (10y -0.04)
+- 2-year 4.76% vs 4.00% target prices hikes, inflation still 3.4%
+- Holdings roll-up 100% buy, +24.4% target, but only 45.7% coverage; P/E 33 and beta 1.50
 
-<details><summary><b>News</b> — score +0.05</summary>
+<details><summary><b>News</b> — score +0.15</summary>
 
-- [Stocks Didn't Really Rally Because Of The Rate Hike; SMH & Robinhood Markets Ready To Run](https://seekingalpha.com/article/4948230-stocks-didnt-rally-because-of-rate-hike-smh-robinhood-markets-ready-to-run)  
-  <sub>Seeking Alpha, 3 hours ago</sub>  
-  The most bullish part of the FOMC meeting wasn't the rate hike; it was the clarity it gave investors. SMH, QQQ, and a select cohort of chip stocks all look...
-- [SK hynix ADR Joins Major U.S. and Korean ETFs](https://www.businesskorea.co.kr/news/articleView.html?idxno=277460)  
-  <sub>Businesskorea, 6 hours ago</sub>  
-  As domestic and foreign exchange-traded funds (ETFs) containing SK hynix American Depositary Receipts (ADR) rapidly increase, market attention is focusing...
-- [History Says This Chip ETF Keeps Beating the S&P 500. It Has Trailed the Index Only Twice Since 2016.](https://www.theglobeandmail.com/investing/markets/stocks/SMH-Q/pressreleases/4704160/history-says-this-chip-etf-keeps-beating-the-sp-500-it-has-trailed-the-index-only-twice-since-2016/)  
-  <sub>The Globe and Mail, 12 hours ago</sub>  
-  Detailed price information for Vaneck Semiconductor ETF (SMH-Q) from The Globe and Mail including charting and trades.
-- [SK Hynix ADR Joins Benchmark U.S. Semiconductor Index SMH; Samsung Asset Management ETF Adds It Too](https://finance.biggo.com/news/23c8ad76-4117-493c-99e6-a260b0522c56)  
-  <sub>BigGo Finance, 14 hours ago</sub>  
-  Samsung Asset Management's KODEX US Semiconductor ETF has added SK Hynix ADR at approximately 4.8% weighting following the September regular…
-- [KODEX U.S. Semiconductor ETF Adds SK hynix ADR](https://en.sedaily.com/finance/2026/09/21/kodex-us-semiconductor-etf-adds-sk-hynix-adr)  
-  <sub>Seoul Economic Daily, 14 hours ago</sub>  
-  SK hynix Joins Leading U.S. Chip Index Two Months After Nasdaq Debut Weighting of 4.8% Matches That of SMH, the Largest U.S. Chip ETF. Finance|.
-- [Samsung Asset Management Adds SK hynix ADR to 'KODEX US Semiconductor' ETF](https://www.asiae.co.kr/en/article/2026092109164342016)  
-  <sub>아시아경제, 15 hours ago</sub>  
-  Samsung Asset Management announced on September 21 that the 'KODEX US Semiconductor' Exchange-Traded Fund (ETF) has newly included SK hynix ADR, follo.
+- [AI Optimism Returns, Pushing Inflation Risks Into The Background](https://seekingalpha.com/article/4948604-ai-optimism-returns-pushing-inflation-risks-background)  
+  <sub>Seeking Alpha, 2 hours ago</sub>  
+  Monday's AI-fueled optimism spilled over to stocks generally. The SPDR S&P 500 ETF, for example, rallied to just below its record close from early August.
+- [State Street Technology Select Sector SPDR ETF declares quarterly distribution of $0.2207](https://www.tradingview.com/news/seekingalpha:1d686bdb8094b:0-state-street-technology-select-sector-spdr-etf-declares-quarterly-distribution-of-0-2207/)  
+  <sub>TradingView, 21 hours ago</sub>  
+  Content provided by Seeking Alpha is intended for information purposes only, and that Seeking Alpha does not offer any personalist investment advice and is...
+- [The Strange Pair That Led the Market Higher](https://moneyandmarkets.com/the-strange-pair-that-led-the-market-higher/amp/)  
+  <sub>Money & Markets, 20 hours ago</sub>  
+  Only two sectors finished higher last week, and the unusual pairing tells us plenty about where investors are finding safety...
+- [Micron, Nvidia lead $1T market-cap stocks by Quant ratings as AMD joins the club (XLK:NYSEARCA)](https://seekingalpha.com/news/4645012-micron-nvidia-lead-1t-market-cap-stocks-by-quant-ratings-as-amd-joins-the-club)  
+  <sub>Seeking Alpha, 21 hours ago</sub>  
+  AMD joins the $1T club as AI chip stocks surge. See Seeking Alpha Quant ratings for trillion-dollar giants and top Strong Buys—check the list now.
+- [Custom Chips May Outpace GPUs By 2027 (NYSE:SHOC)](https://seekingalpha.com/article/4948575-custom-chips-may-outpace-gpus-by-2027)  
+  <sub>Seeking Alpha, 4 hours ago</sub>  
+  Strive US Semiconductor ETF offers diversified exposure to both GPU and custom chip growth. Read why SHOC ETF may outperform peers.
 
 </details>
 
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.05</summary>
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.15</summary>
 
 ```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
 Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
 Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
 ```
 
 </details>
 
-<details><summary><b>Price and chart</b> — score +0.30</summary>
+<details><summary><b>Price and chart</b> — score +0.45</summary>
 
 ```text
-Last close 590.89 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 559.35 (+5.6%), 50d 564.38 (+4.7%), 200d 488.47 (+21.0%); 50d above 200d
-Momentum: RSI(14) 59.8 | MACD 0.209 vs signal -2.796 (histogram 3.005)
-Returns: 1d +3.1% | 5d +9.1% | 1m +5.0% | 3m -11.7%
-52-week range: 315.71 - 668.91 (now 77.9% of the way up)
-Volatility: ATR(14) 16.56 (2.8% of price) | annualised 20d 35.7%
-Volume: 0.53x the 20-day average
+Last close 195.28 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 186.71 (+4.6%), 50d 183.58 (+6.4%), 200d 162.94 (+19.8%); 50d above 200d
+Momentum: RSI(14) 65.7 | MACD 1.994 vs signal 1.126 (histogram 0.868)
+Returns: 1d +0.2% | 5d +6.3% | 1m +6.5% | 3m +6.0%
+52-week range: 127.50 - 198.21 (now 95.9% of the way up)
+Volatility: ATR(14) 3.40 (1.7% of price) | annualised 20d 21.7%
+Volume: 0.51x the 20-day average
 ```
 
 </details>
@@ -4992,12 +5042,12 @@ _Not available today._
 
 ```text
 Fund type: Technology
-What it holds: P/E 37.78 | P/B 11.07 | P/S 13.20 | 3y earnings growth n/a
-Yield: 0.2%
-Three-year record: +58.0% a year | beta to the market 2.06
-Cost and size: expense ratio 0.35% | net assets 67.79B
-What it is made of: Stocks 99.9%, Cash 0.1%
-Largest holdings: NVIDIA Corp 22.6%, Taiwan Semiconductor Manufacturing Co Ltd ADR 9.7%, Broadcom Inc 6.1%, Micron Technology Inc 5.5%, Advanced Micro Devices Inc 5.4%
+What it holds: P/E 33.01 | P/B 11.41 | P/S 8.77 | 3y earnings growth n/a
+Yield: 0.4%
+Three-year record: +31.6% a year | beta to the market 1.50
+Cost and size: expense ratio 0.08% | net assets 121.44B
+What it is made of: Stocks 100.0%, Cash 0.0%
+Largest holdings: NVIDIA Corp 14.4%, Apple Inc 12.5%, Microsoft Corp 10.1%, Broadcom Inc 4.7%, Micron Technology Inc 4.0%
 Sector mix: Technology 100.0%
 ```
 
@@ -5027,175 +5077,18 @@ _Not available today._
 
 </details>
 
-<details><summary><b>What analysts and big funds say</b> — score +0.45</summary>
+<details><summary><b>What analysts and big funds say</b> — score +0.40</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.45</summary>
-
-```text
-Rolled up from the 5 largest holdings, 49.2% of the fund by weight
-Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.34 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +36.9% above the current prices
-Holdings read: NVDA, TSM, AVGO, MU, AMD
-Recent rating changes among them:
-  - NVDA: 2026-09-10 Piper Sandler: init, ? -> Overweight
-  - TSM: 2026-09-02 Stifel: init, ? -> Buy
-  - AVGO: 2026-09-10 Piper Sandler: init, ? -> Overweight
-  - MU: 2026-09-18 RBC Capital: reit, Outperform -> Outperform
-  - AMD: 2026-09-10 Piper Sandler: init, ? -> Overweight
-```
-
-</details>
-
-<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Who is positioned how</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
-
-```text
-Direction: unknown
-Share count change: n/a (too few readings)
-Shares outstanding: 124.27M | fund size: 73.43B
-Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
-```
-
-</details>
-
-### US technology (XLK) · Sector or country — NEUTRAL, confidence 0.28
-
-**Result:** REJECTED · bias is NEUTRAL; no trade
-
-**In the model's own words:**
-
-> XLK is in a strong uptrend (above 20/50/200d, 50d>200d, +18.9% vs 200d, RSI 63.7, MACD positive) and near 52-week highs, with calm volatility (VIX 14.6, -2.5 on week) and unanimous buy coverage across 45.7% of the fund with +26% weighted targets. But there is no macro catalyst this week: yields essentially flat across the curve, curve normally sloped, dollar firm, and the 2-year still prices a hiking path against 3.4% inflation -- a headwind for a 33x P/E, 1.50-beta sector. Volume on the latest advance was 0.44x average, which undercuts the breakout. News is roundups, single-holding items and trade-talk anticipation, not a policy surprise. Slight upward tilt at most; NEUTRAL is the honest call.
-
-**Main reasons it gave:**
-- Price 93.3% of 52-week range, above 20/50/200d SMAs with 50d>200d
-- Advance came on 0.44x average volume -- weak confirmation
-- Treasury yields flat on the week (10y +0.00), no rate or data surprise
-- 2-year 4.67% prices ~3 hikes with inflation at 3.4% -- headwind for 33x P/E tech
-- 100% buy ratings and +26.1% weighted target over 45.7% of fund weight
-
-<details><summary><b>News</b> — score +0.10</summary>
-
-- [U.S.-China Talks Seem Successful: ETF Areas in Focus](https://www.google.com/goto?url=CAESogEB6zswFYpwUadWKfhefy7WC9tVgwuY0JtVcj34eErJtZPD8s9Ww-IGnochmCgm9Lj5nm9-Ork6Cn8H3l_KBu8yTsDxAfw_Aw--tpZgph9DfTqR1R21j4ZA-zra2bjD1sVDuCAj47yboLMPx3fy86NU1q5JHnLqcQuN2PY8ZbKLydRgOQ2HWCiggVqRoYxc57gPKA-5SJ8zOl_ao-WsoviVv8A)  
-  <sub>TradingView, 2 hours ago</sub>  
-  Investors are currently tracking developments ahead of an expected meeting between U.S. President Donald Trump and Chinese President Xi Jinping in...
-- [Exchange-Traded Funds Rise, Equity Futures up Pre-Bell Monday as Oil Prices Decline](https://www.moomoo.com/news/post/76538074/exchange-traded-funds-rise-equity-futures-up-pre-bell-monday)  
-  <sub>Moomoo, 1 hour ago</sub>  
-  Thebroad market exchange-traded fund SPDR S&P 500 ETF Trust (SPY) was up 0.7% and the actively traded Invesco QQQ Trust (QQQ) advanced 1.1% in Monday's...
-- [Leading And Lagging Sectors For September 21, 2026](https://www.google.com/goto?url=CAESngEB6zswFWr6XMVsKURncCG_jn_bE4_8cG0PDDcWxeLtuYWHNiC9VDOCQeWTdK1Uc7c50FpxAuRtxGj9ot_rPc0UpmNQF4cdJ6vyPnn63x-ZS6T6brceoeVp8EdFG547-23MvU0DUuNuTD-DVyNdAkF03RNArCVam4KL4xpFS7FVwZE524b-7Ql5q37VFuV5EuFGnmcl478_8_fBFHqJqg)  
-  <sub>Benzinga, 2 hours ago</sub>  
-  Gainers Symbol Name Price Change ($) Change (%) Volume (NYSE:XLK) State Street Technology Select Sector SPDR ETF 191.7700 2.170 1.14 39.0K (NYSE:XLC) State...
-- [Meta Spikes 7% as Wells Fargo Lifts Price Target to $796 Ahead of Connect; Alphabet Nudges Higher, Microsoft Holds Flat](https://www.google.com/goto?url=CAES2AEB6zswFU5nPjDnVSqJTCLEoXOyrhChvz-4TqfBselJbhat4m-oxs9XFmnW3PDqGTSNgJ0fQNYixskpCEdH-bM4eLu68zw0BUBmHzGqqdHAv9E7CWuybHtaBWFVT1E14XKRh6FiJ7khjQwzf9HXf_n3oaREXE1VtK7qJpkfE0WelclcLNwR1IFWzH3gR8lV2eZuc5k1fnFy8qf1XD2jdfE4vlZrGQbM6XaDBCuJGwQxaMcjMgXZuHDWiyrtFV0XMu8ui6VIW-7uSKVFcinUHl_fkBWJiXa8YHI)  
-  <sub>24/7 Wall St., 50 minutes ago</sub>  
-  Wells Fargo raised its META price target from $640 to $796, sending shares up 6% to $704 ahead of the Connect conference. Alphabet climbed 2% with the...
-- [The Week That Proved AI Is Real: MSFT +16%, AMZN +10%, META -10%, AAPL -4% - Winners, Losers and Key Takeaways](https://www.tradingkey.com/analysis/stocks/us-stocks/262067343-week-review-july-28-31-2026-microsoft-amazon-apple-meta-earnings-ai-tradingkey)  
-  <sub>TradingKey, 14 hours ago</sub>  
-  Microsoft surged 16% adding $450B in a single day. Amazon jumped 10%. Meta crashed 10%. Apple fell 4%. The KOSPI gained 17.9% — the largest one-day gain in...
-- [Applied Materials (AMAT) Earnings Preview: AI Chip Demand, Capital Expenditure Trends, & Trade Setups - In Progress](https://www.google.com/goto?url=CAES1QEB6zswFfhjo_qB8_fjnDZLxkQBaExogJWJf8spyvZrRVTMIpsu5cKhp4LaRdcbjrH6sBfs6oLOu58S6AZXL1B5Tb1t8VaZ1UAtbTL4cpUzQRys-xPvItyHkGXV0BGNUlxDqBiXkRQL-Y5adkQpP_z1WRcjZJ3eHhtTieJVMFGHFbvKDmZ5fpzVTcWvx27KObrVaQTpMw5PsUa85_t97w1lnG5BytqclKEnIyTxkX_ZqV-cUXh-tehKisQitC5R1neYGflKeanyB_pXjYo2KdZ3kYkaf5c)  
-  <sub>TradingKey, 18 hours ago</sub>  
-  TradingKey - The May 14 report comes when AMAT has risen by 179.83% over the past year and the whole semiconductor equipment cycle rests on AI demand for...
-
-</details>
-
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.10</summary>
-
-```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
-Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
-Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
-```
-
-</details>
-
-<details><summary><b>Price and chart</b> — score +0.45</summary>
-
-```text
-Last close 193.49 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 185.88 (+4.1%), 50d 183.27 (+5.6%), 200d 162.69 (+18.9%); 50d above 200d
-Momentum: RSI(14) 63.7 | MACD 1.385 vs signal 0.888 (histogram 0.497)
-Returns: 1d +2.1% | 5d +5.0% | 1m +5.7% | 3m +0.7%
-52-week range: 127.50 - 198.21 (now 93.3% of the way up)
-Volatility: ATR(14) 3.46 (1.8% of price) | annualised 20d 22.2%
-Volume: 0.44x the 20-day average
-```
-
-</details>
-
-<details><summary><b>Company numbers</b> — score -0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What this fund holds</b> — score -0.15</summary>
-
-```text
-Fund type: Technology
-What it holds: P/E 33.01 | P/B 11.41 | P/S 8.77 | 3y earnings growth n/a
-Yield: 0.4%
-Three-year record: +31.6% a year | beta to the market 1.50
-Cost and size: expense ratio 0.08% | net assets 121.44B
-What it is made of: Stocks 100.0%, Cash 0.0%
-Largest holdings: NVIDIA Corp 14.4%, Apple Inc 12.5%, Microsoft Corp 10.1%, Broadcom Inc 4.7%, Micron Technology Inc 4.0%
-Sector mix: Technology 100.0%
-```
-
-</details>
-
-<details><summary><b>Does this company beat its own forecasts</b> — score -0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What holding this fund costs you</b> — score -0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How much oil and gas is in storage</b> — score -0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How the crop is growing</b> — score -0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts and big funds say</b> — score +0.45</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.45</summary>
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.40</summary>
 
 ```text
 Rolled up from the 5 largest holdings, 45.7% of the fund by weight
 Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.56 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +26.1% above the current prices
+Weighted price target: +24.4% above the current prices
 Holdings read: NVDA, AAPL, MSFT, AVGO, MU
 Recent rating changes among them:
   - NVDA: 2026-09-10 Piper Sandler: init, ? -> Overweight
@@ -5224,7 +5117,7 @@ _Not available today._
 ```text
 Direction: unknown
 Share count change: n/a (too few readings)
-Shares outstanding: 660.09M | fund size: 127.72B
+Shares outstanding: 640.16M | fund size: 125.01B
 Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
 ```
 
@@ -5234,14 +5127,14 @@ Creations and redemptions are settled money, not an opinion -- but they follow d
 
 **In the model's own words:**
 
-> EWA is an Australian equity fund with mixed technical and fundamental signals offering no clear directional catalyst. The technical picture shows deteriorating momentum (RSI 44.5, MACD histogram negative) and price weakness below multiple moving averages (-2.0% vs 20d, -1.6% vs 50d), offset by still-positive trend relative to the 200d SMA. Volume is subdued at 0.20x average, limiting signal reliability. The fund's holdings face headwinds from analyst consensus: the largest 46.4% of holdings (financials and BHP) carry a weighted mean rating of 3.48 on a 1-5 sell scale with a collective -6.7% downside to targets, suggesting limited near-term upside. Valuation is moderate at 21.06x P/E with a 2.8% yield. Macro backdrop is neutral: US yields have moved modestly higher with the curve normalizing, the dollar has appreciated 0.90 on the week, and VIX has declined, reflecting reduced risk-off sentiment. There is no material data surprise, policy shock, or technical break to justify conviction in either direction. A weak quarter-point AUD sensitivity to modest USD strength and elevated yield environment provide light headwinds, but nothing decisive. The fund deserves a hold pending clearer catalyst.
+> EWA is an Australian equity fund trading near its 52-week highs with mixed technicals and no significant macro catalyst. The fund holds 99.5% stocks dominated by financials (41.1%) and basic materials (26.7%), concentrated in BHP, CBA, NAB, Westpac and ANZ. Technicals are soft: price is 1.9% below its 20-day moving average, RSI sits at 44.5 (not yet oversold but below neutral), MACD is negative with histogram deteriorating, and momentum is sluggish despite a modest 3.6% three-month return. Volume is well below average at 0.18x the 20-day baseline, suggesting weak conviction in the move. The macro backdrop is benign but not supportive: the US dollar has strengthened 0.93% this week to 100.58, which is headwind for an Australian equity fund; Treasury yields are stable with the curve normal but the rate path suggests continued Fed tightness through 2026. Fund basics show reasonable valuation at a 21x P/E and 2.8% yield, but analyst coverage of the top 46% of holdings is mixed—59.6% rated hold, 40.4% rated sell, with a weighted price target implying 6.8% downside to current prices. The near-term setup lacks a clear bullish catalyst: macro is not supportive, technicals are deteriorating, analyst consensus is cautious, and flows are untracked. The modest recent intra-fund rally and low volatility environment argue against a bearish call, but the evidence does not justify conviction in either direction.
 
 **Main reasons it gave:**
-- Momentum deterioration: RSI 44.5, MACD histogram -0.125 and below signal line
-- Analyst consensus on top 46% holdings at 3.48/5 (hold-to-sell) with -6.7% target downside
-- Price below 20d and 50d SMAs (-2.0% and -1.6% respectively)
-- Low trading volume at 0.20x 20d average limits breakout conviction
-- No macro catalyst: Treasury yields flat to modestly higher, VIX calm at 14.62
+- Analyst consensus weighted to hold and sell over top 46% of fund, with -6.8% price target to current prices
+- USD strength this week headwind for AUD-denominated equity returns
+- RSI 44.5 and negative MACD histogram signal weakening momentum despite 52-week highs
+- Volume at 0.18x 20-day average—thin conviction behind recent move
+- Price 1.9% below 20d SMA, below 50d SMA despite normal yield curve backdrop
 
 <details><summary><b>News</b> — score +0.00</summary>
 
@@ -5252,38 +5145,38 @@ _No news found for this one today._
 <details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
 
 ```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
 Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
 Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
 ```
 
 </details>
 
-<details><summary><b>Price and chart</b> — score -0.30</summary>
+<details><summary><b>Price and chart</b> — score -0.25</summary>
 
 ```text
-Last close 29.02 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 29.62 (-2.0%), 50d 29.48 (-1.6%), 200d 28.54 (+1.7%); 50d above 200d
-Momentum: RSI(14) 44.5 | MACD -0.218 vs signal -0.093 (histogram -0.125)
-Returns: 1d +0.9% | 5d -0.1% | 1m -2.5% | 3m +2.0%
+Last close 29.02 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 29.57 (-1.9%), 50d 29.49 (-1.6%), 200d 28.56 (+1.6%); 50d above 200d
+Momentum: RSI(14) 44.5 | MACD -0.216 vs signal -0.118 (histogram -0.099)
+Returns: 1d -0.1% | 5d +0.5% | 1m -3.7% | 3m +3.6%
 52-week range: 24.95 - 30.43 (now 74.3% of the way up)
-Volatility: ATR(14) 0.39 (1.3% of price) | annualised 20d 17.2%
-Volume: 0.20x the 20-day average
+Volatility: ATR(14) 0.37 (1.3% of price) | annualised 20d 17.3%
+Volume: 0.18x the 20-day average
 ```
 
 </details>
 
-<details><summary><b>Company numbers</b> — score -0.15</summary>
+<details><summary><b>Company numbers</b> — score +0.05</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What this fund holds</b> — score -0.15</summary>
+<details><summary><b>What this fund holds</b> — score +0.05</summary>
 
 ```text
 Fund type: Focused Region
@@ -5298,63 +5191,68 @@ Sector mix: Financial services 41.1%, Basic materials 26.7%, Consumer cyclical 6
 
 </details>
 
-<details><summary><b>Does this company beat its own forecasts</b> — score -0.15</summary>
+<details><summary><b>Does this company beat its own forecasts</b> — score +0.05</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What holding this fund costs you</b> — score -0.15</summary>
+<details><summary><b>What holding this fund costs you</b> — score +0.05</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>How much oil and gas is in storage</b> — score -0.15</summary>
+<details><summary><b>How much oil and gas is in storage</b> — score +0.05</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>How the crop is growing</b> — score -0.15</summary>
+<details><summary><b>How the crop is growing</b> — score +0.05</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What analysts and big funds say</b> — score -0.25</summary>
+<details><summary><b>What analysts and big funds say</b> — score -0.35</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What analysts say about what this fund holds</b> — score -0.25</summary>
+<details><summary><b>What analysts say about what this fund holds</b> — score -0.35</summary>
 
 ```text
 Rolled up from the 5 largest holdings, 46.4% of the fund by weight
 Ratings by weight: buy 0.0% | hold 59.6% | sell 40.4% (mean 3.48 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: -6.7% above the current prices
+Weighted price target: -6.8% above the current prices
 Holdings read: BHP.AX, CBA.AX, NAB.AX, WBC.AX, ANZ.AX
 Recent rating changes among them: none reported
 ```
 
 </details>
 
-<details><summary><b>Buying and selling by company insiders</b> — score n/a</summary>
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>Who is positioned how</b> — score n/a</summary>
+<details><summary><b>Who is positioned how</b> — score +0.00</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>Money going into and out of this fund</b> — score n/a</summary>
+<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
 
-_Not available today._
+```text
+Direction: unknown
+Share count change: n/a (too few readings)
+Shares outstanding: 46.17M | fund size: 1.34B
+Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
+```
 
 </details>
 
@@ -5362,14 +5260,14 @@ _Not available today._
 
 **In the model's own words:**
 
-> EWC (iShares Canada ETF) presents a mixed technical and fundamental picture with no catalytic macro shifts to justify a directional lean. The fund has drifted lower over the past month (-2.6%) despite holding above its 200-day moving average, and is trading 1.6% below its 20-day SMA. Momentum indicators are tepid: RSI at 43.3 suggests neither overbought nor oversold conditions, while MACD histogram remains negative, indicating weak or fading upside momentum. The 3-month performance of +3.9% shows the fund still holds a constructive longer-term trend, and the fund's beta of 0.79 with three-year returns of +21.9% annually reflects solid historical performance. On the fundamental side, analyst coverage of the top 28.3% of holdings is constructive (74.3% buy-rated, +7.1% weighted price target), but this represents less than one-third of the fund. The valuation metrics are reasonable (P/E 19.49, yield 1.2%) for a Canadian equity fund with heavy exposure to financials (39.2%) and energy (17.9%), sectors that are neither especially compelling nor concerning at current macro conditions. The macro backdrop offers no fresh impetus: Treasury yields are stable intra-week, the dollar has strengthened modestly (+0.90), volatility has declined (VIX -2.5), and the rate path prices only about three quarter-point hikes over two years. No significant news or data surprises have emerged to shift the calculus. Volume is light at 0.23x average, typical of early autumn trading. The technicals do not show a decisive break either direction; the fund remains in a choppy consolidation phase. Without a material catalyst—whether policy surprise, earnings inflection, or technical breakdown/breakout—the appropriate stance is to await clearer direction.
+> EWC is a focused Canadian equity fund with moderate fundamentals and mixed technicals. The fund trades at reasonable valuations (P/E 19.49, P/B 2.83) with a 1.2% yield, benefiting from a strong three-year track record (+21.9% annualized). Technicals show the fund near 52-week highs (84.6% of range) but momentum is neutral: RSI at 48 and MACD histogram negative, with price slightly below the 20-day moving average. The fund is now 5.5% above its 200-day MA with the 50-day MA above it, suggesting a long-term uptrend, but recent weakness (down 2.8% over one month, up only 0.6% over five days) indicates loss of momentum. Analyst coverage of the largest holdings (28.3% of fund) shows 74% buy-rated with a modest +4.5% price target above current levels, a muted endorsement. The macro backdrop is stable: the Fed is on hold with rates priced for modest hikes ahead, the dollar strengthened modestly (+0.93 on the week), and volatility remains calm (VIX 14.42). However, no fresh catalyst has emerged to justify a directional tilt. The fund holds significant financials exposure (39.2%) and energy (17.9%), which benefit from stable rates but lack a near-term driver. Volume is below average (0.50x 20-day), suggesting thin interest. Without a material data surprise, policy shift, or decisive technical break, the balanced risk-reward supports a neutral stance.
 
 **Main reasons it gave:**
-- RSI 43.3 and negative MACD histogram signal fading momentum
-- price 1.6% below 20-day MA, -2.6% over one month despite 4.7% above 200-day MA
-- analyst coverage of top holdings shows +7.1% target but covers only 28.3% of fund
-- macro backdrop stable with no rate surprise or policy catalyst
-- light volume at 0.23x average suggests low conviction in either direction
+- RSI 48 and negative MACD histogram signal neutral momentum despite uptrend structure
+- Analyst roll-up shows 74% buy-rated with only +4.5% upside on 28.3% fund coverage
+- Price near 52-week highs with 2.8% monthly decline suggests momentum loss
+- Macro stable with no fresh catalyst; CAD financial and energy sectors lack near-term drivers
+- Below-average volume reflects muted demand
 
 <details><summary><b>News</b> — score +0.00</summary>
 
@@ -5380,13 +5278,13 @@ _No news found for this one today._
 <details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
 
 ```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
 Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
 Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
 ```
 
 </details>
@@ -5394,24 +5292,24 @@ Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market pri
 <details><summary><b>Price and chart</b> — score -0.15</summary>
 
 ```text
-Last close 60.17 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 61.18 (-1.6%), 50d 60.67 (-0.8%), 200d 57.46 (+4.7%); 50d above 200d
-Momentum: RSI(14) 43.3 | MACD -0.229 vs signal -0.029 (histogram -0.200)
-Returns: 1d -0.1% | 5d -0.5% | 1m -2.6% | 3m +3.9%
-52-week range: 49.72 - 62.64 (now 80.9% of the way up)
-Volatility: ATR(14) 0.67 (1.1% of price) | annualised 20d 13.4%
-Volume: 0.23x the 20-day average
+Last close 60.65 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 61.12 (-0.8%), 50d 60.72 (-0.1%), 200d 57.50 (+5.5%); 50d above 200d
+Momentum: RSI(14) 48.0 | MACD -0.194 vs signal -0.058 (histogram -0.135)
+Returns: 1d +0.4% | 5d +0.6% | 1m -2.8% | 3m +5.2%
+52-week range: 49.72 - 62.64 (now 84.6% of the way up)
+Volatility: ATR(14) 0.65 (1.1% of price) | annualised 20d 13.6%
+Volume: 0.50x the 20-day average
 ```
 
 </details>
 
-<details><summary><b>Company numbers</b> — score +0.15</summary>
+<details><summary><b>Company numbers</b> — score +0.10</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What this fund holds</b> — score +0.15</summary>
+<details><summary><b>What this fund holds</b> — score +0.10</summary>
 
 ```text
 Fund type: Focused Region
@@ -5426,25 +5324,25 @@ Sector mix: Financial services 39.2%, Energy 17.9%, Basic materials 16.1%, Indus
 
 </details>
 
-<details><summary><b>Does this company beat its own forecasts</b> — score +0.15</summary>
+<details><summary><b>Does this company beat its own forecasts</b> — score +0.10</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What holding this fund costs you</b> — score +0.15</summary>
+<details><summary><b>What holding this fund costs you</b> — score +0.10</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>How much oil and gas is in storage</b> — score +0.15</summary>
+<details><summary><b>How much oil and gas is in storage</b> — score +0.10</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>How the crop is growing</b> — score +0.15</summary>
+<details><summary><b>How the crop is growing</b> — score +0.10</summary>
 
 _Not available today._
 
@@ -5461,7 +5359,7 @@ _Not available today._
 ```text
 Rolled up from the 5 largest holdings, 28.3% of the fund by weight
 Ratings by weight: buy 74.3% | hold 25.7% | sell 0.0% (mean 2.20 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +7.1% above the current prices
+Weighted price target: +4.5% above the current prices
 Holdings read: RY, TD, SHOP, BMO.TO, BNS.TO
 Recent rating changes among them:
   - RY: 2025-08-29 Argus Research: main, Buy -> Buy
@@ -5473,21 +5371,26 @@ Recent rating changes among them:
 
 </details>
 
-<details><summary><b>Buying and selling by company insiders</b> — score n/a</summary>
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>Who is positioned how</b> — score n/a</summary>
+<details><summary><b>Who is positioned how</b> — score +0.00</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>Money going into and out of this fund</b> — score n/a</summary>
+<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
 
-_Not available today._
+```text
+Direction: unknown
+Share count change: n/a (too few readings)
+Shares outstanding: 113.71M | fund size: 6.90B
+Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
+```
 
 </details>
 
@@ -5495,14 +5398,14 @@ _Not available today._
 
 **In the model's own words:**
 
-> EWD (iShares MSCI Sweden ETF) holds a focused basket of Swedish equities with solid fundamentals: P/E 14.99, dividend yield 3.4%, and three-year annualized returns of +19.6%. The fund is currently trading 1.6% below its 20-day SMA and 0.8% below its 50-day, with RSI at 45.7 and MACD in negative territory—technical indicators suggest mild weakness without conviction. Momentum is softer over the one- and three-month horizon. The analyst roll-up (29.5% coverage) shows 82% buy ratings with a +10.6% upside target, which is constructive but modest and covers less than one-third of the fund. Macro backdrop is benign: the yield curve is positively sloped at +0.98, VIX is calm at 14.62, the dollar has risen 0.90 this week, and US rates are stable. Volume is notably thin at 0.08x the 20-day average, limiting the reliability of the recent +1.3% one-day move. The fund trades 67.7% of the way up its 52-week range, not at an extreme. There is no recent news catalyst, no rate surprise, and no decisive technical break. The combination of adequate valuations, analyst support on major holdings, and calm macro conditions prevents a bearish call, but the technical softness, thin volume, thin analyst coverage roll-up, and absence of a specific near-term catalyst do not support conviction to the upside. A marginal lean to stability is warranted.
+> EWD is a Swedish-focused equity fund trading near recent highs with mixed technical signals and no macro catalyst. The technical picture shows price above the 200-day MA (supportive) but below both 20- and 50-day SMAs, RSI at mid-range 48.7, and MACD negative with narrowing histogram—a picture of consolidation rather than momentum. Monthly returns of -3.0% against 3-month gains of +6.7% suggest the recent rally has lost steam. Macro conditions are benign: USD strength, normal yield curve, falling volatility, and a rate path that prices about 4 quarter-point hikes over two years. FUND BASICS show modest leverage (beta 1.19) with a reasonable P/E of 14.99 and a 3.4% yield. ANALYST VIEW is constructively biased at 82.1% buy-weighted and a +9.3% price target, but this roll-up covers only 29.5% of the fund and offers limited insight into the full portfolio. The lack of recent news, unknown fund flow direction, and absence of insider positioning data leave conviction low. The fund is neither broken nor compelling: technicals are neutral, fundamentals are fair, sentiment is constructive but not urgent, and no macro surprise has occurred. This warrants a modest cautious posture while acknowledging upside optionality from analyst targets.
 
 **Main reasons it gave:**
-- RSI 45.7 and MACD histogram negative; price below both 20d and 50d SMAs
-- Analyst roll-up 82% buy with +10.6% target, but covers only 29.5% of fund
-- Thin volume 0.08x 20-day average undermines technical signal reliability
-- Macro stable with normal yield curve and low volatility; no catalyst
-- Valuation reasonable at P/E 14.99, 3.4% yield, but no specific near-term driver
+- Price below 20d and 50d SMAs despite 52-week 71.3% positioning and +6.7% 3-month return
+- RSI 48.7 and negative MACD histogram signal consolidation not momentum
+- Analyst roll-up 82.1% buy-weighted with +9.3% target but covering only 29.5% of fund
+- P/E 14.99 and 3.4% yield offer fair valuation in context of normal yield curve and benign macro
+- No macro surprise, policy shift, or technical breakout to justify elevated conviction
 
 <details><summary><b>News</b> — score +0.00</summary>
 
@@ -5513,13 +5416,13 @@ _No news found for this one today._
 <details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
 
 ```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
 Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
 Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
 ```
 
 </details>
@@ -5527,13 +5430,13 @@ Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market pri
 <details><summary><b>Price and chart</b> — score -0.15</summary>
 
 ```text
-Last close 51.70 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 52.57 (-1.6%), 50d 52.11 (-0.8%), 200d 51.29 (+0.8%); 50d above 200d
-Momentum: RSI(14) 45.7 | MACD -0.339 vs signal -0.142 (histogram -0.197)
-Returns: 1d +1.3% | 5d +0.4% | 1m -2.2% | 3m +3.1%
-52-week range: 45.38 - 54.72 (now 67.7% of the way up)
-Volatility: ATR(14) 0.67 (1.3% of price) | annualised 20d 15.5%
-Volume: 0.08x the 20-day average
+Last close 52.04 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 52.50 (-0.9%), 50d 52.16 (-0.2%), 200d 51.32 (+1.4%); 50d above 200d
+Momentum: RSI(14) 48.7 | MACD -0.295 vs signal -0.172 (histogram -0.123)
+Returns: 1d +0.5% | 5d +1.5% | 1m -3.0% | 3m +6.7%
+52-week range: 45.38 - 54.72 (now 71.3% of the way up)
+Volatility: ATR(14) 0.67 (1.3% of price) | annualised 20d 15.8%
+Volume: 0.97x the 20-day average
 ```
 
 </details>
@@ -5594,137 +5497,10 @@ _Not available today._
 ```text
 Rolled up from the 4 largest holdings, 29.5% of the fund by weight
 Ratings by weight: buy 82.1% | hold 17.9% | sell 0.0% (mean 1.97 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +10.6% above the current prices
+Weighted price target: +9.3% above the current prices
 Holdings read: SPOT, VOLV-B.ST, ATCO-A.ST, SAND.ST
 Recent rating changes among them:
   - SPOT: 2026-08-13 Argus Research: reit, Buy -> Buy
-```
-
-</details>
-
-<details><summary><b>Buying and selling by company insiders</b> — score n/a</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Who is positioned how</b> — score n/a</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Money going into and out of this fund</b> — score n/a</summary>
-
-_Not available today._
-
-</details>
-
-### Germany (EWG) · Sector or country — NEUTRAL, confidence 0.25
-
-**In the model's own words:**
-
-> EWG is a focused German equity fund with solid fundamentals and analyst support, but technical positioning and macro conditions do not yet justify a directional call. The fund's 18.4 P/E and 1.9% yield sit in reasonable territory; the three-year +18.2% annualized return reflects solid performance. Analyst coverage of the top 45.5% by weight shows 78% buy ratings and a +15.9% price target, which is constructive. However, technicals are mixed: the fund is 1.9% below its 20-day SMA and RSI(14) at 42.9 is in neutral-to-weak momentum territory. MACD histogram is negative, signalling weakening momentum. The price sits 69% of the way through its 52-week range with only 0.23x average volume, suggesting light conviction in the move. Macro backdrop is calm with VIX at 14.6, Treasury yields stable, and the curve normally upward-sloping, but offers no catalyst. The dollar has strengthened +0.90 this week, which can pressure international equities; rate expectations imply modest Fed ease ahead but nothing dramatic. The one-month return of -3.0% and negligible five-day change (-0.3%) show recent choppiness without directional clarity. German equities lack a fresh macro or policy impulse to trigger re-rating. Support from analyst consensus on the holdings is real, but insufficient alone to overcome neutral technicals and absent catalysts in a macro environment that is stable rather than favorable.
-
-**Main reasons it gave:**
-- Analyst buy ratings 78% of top 5 holdings with +15.9% price target
-- RSI(14) at 42.9 and negative MACD histogram signal weakening momentum
-- Price 1.9% below 20-day SMA; low volume (0.23x 20d avg) shows weak conviction
-- No macro catalyst; stable rates and calm volatility do not support a directional move
-
-<details><summary><b>News</b> — score +0.00</summary>
-
-_No news found for this one today._
-
-</details>
-
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
-
-```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
-Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
-Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
-```
-
-</details>
-
-<details><summary><b>Price and chart</b> — score -0.15</summary>
-
-```text
-Last close 42.58 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 43.41 (-1.9%), 50d 42.99 (-0.9%), 200d 42.37 (+0.5%); 50d above 200d
-Momentum: RSI(14) 42.9 | MACD -0.270 vs signal -0.100 (histogram -0.170)
-Returns: 1d +1.0% | 5d -0.3% | 1m -3.0% | 3m +2.5%
-52-week range: 38.08 - 44.59 (now 69.2% of the way up)
-Volatility: ATR(14) 0.45 (1.1% of price) | annualised 20d 12.5%
-Volume: 0.23x the 20-day average
-```
-
-</details>
-
-<details><summary><b>Company numbers</b> — score +0.35</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What this fund holds</b> — score +0.35</summary>
-
-```text
-Fund type: Focused Region
-What it holds: P/E 18.40 | P/B 1.94 | P/S 1.28 | 3y earnings growth n/a
-Yield: 1.9%
-Three-year record: +18.2% a year | beta to the market 0.98
-Cost and size: expense ratio 0.49% | net assets 1.82B
-What it is made of: Stocks 99.8%, Cash 0.2%
-Largest holdings: Siemens AG 12.1%, SAP SE 11.3%, Allianz SE 10.0%, Siemens Energy AG Ordinary Shares 6.4%, Deutsche Telekom AG 5.6%
-Sector mix: Industrials 28.7%, Financial services 23.2%, Technology 15.9%, Consumer cyclical 7.4%
-```
-
-</details>
-
-<details><summary><b>Does this company beat its own forecasts</b> — score +0.35</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What holding this fund costs you</b> — score +0.35</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How much oil and gas is in storage</b> — score +0.35</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How the crop is growing</b> — score +0.35</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts and big funds say</b> — score +0.45</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.45</summary>
-
-```text
-Rolled up from the 5 largest holdings, 45.5% of the fund by weight
-Ratings by weight: buy 78.0% | hold 22.0% | sell 0.0% (mean 1.85 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +15.9% above the current prices
-Holdings read: SIE.DE, SAP.DE, ALV.DE, ENR.DE, DTE.DE
-Recent rating changes among them: none reported
 ```
 
 </details>
@@ -5746,23 +5522,24 @@ _Not available today._
 ```text
 Direction: unknown
 Share count change: n/a (too few readings)
-Shares outstanding: 79.50M | fund size: 3.39B
+Shares outstanding: 14.83M | fund size: 771.50M
 Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
 ```
 
 </details>
 
-### Japan (EWJ) · Sector or country — NEUTRAL, confidence 0.25
+### Italy (EWI) · Sector or country — NEUTRAL, confidence 0.25
 
 **In the model's own words:**
 
-> EWJ is at the top of its 52-week range after a 9% move from the 200-day MA, with momentum indicators showing exhaustion (RSI at 56, MACD histogram negative). Technicals suggest limited upside from current levels. The macro backdrop is mixed: the dollar strengthened 0.90 this week to 100.36, which headwinds the yen and therefore a Japan fund; Treasury yields are stable; volatility is low and benign. Fund fundamentals are reasonable (P/E 19.1, 3.7% yield, strong 3-year returns) but offer no exceptional catalyst. Analyst coverage of the largest holdings (only 17% of fund weight) shows universal buy ratings with a +19.7% price target, but this thin coverage and the target's typical forward-looking bias limit its weight. CFTC positioning in the Nikkei is modest and near historical averages with only a 1.5% increase on the week, showing neither crowding nor conviction. Fund flows data is insufficient. The fund has had a solid run, but the combination of technical saturation, dollar strength headwinds, and lack of new macro or flow catalyst argues for neutrality rather than a bullish extension.
+> EWI is an Italian equities fund with strong fundamental valuations (P/E 15.25, P/B 1.85) and a 3.0% yield, supported by analyst consensus showing 100% buy-rated holdings with a +10.9% weighted price target across the 51% of the fund covered. The macro backdrop is stable: Treasury yields moved marginally this week with the curve remaining normal (+0.95 points), the dollar strengthened modestly (+0.93), and volatility declined to a calm 14.42. However, technicals present conflicting signals. The fund trades 1.4-1.8% below its 20d and 50d SMAs and is underperforming its own three-year trend, with RSI at 43.7 (neither oversold nor overbought) and MACD below its signal line suggesting weakening momentum. Volume is only 0.54x the 20-day average, indicating thin conviction behind the recent -3.6% monthly decline. The fund sits at 79.2% of its 52-week range, neither at an extreme. No material macro surprise has occurred this week, and no catalyst or data release has shifted expectations materially. While analyst coverage is constructive and valuations are reasonable, the lack of recent price action, light flows data, and absence of a specific catalyst argue against a directional lean. The technical weakness is soft rather than severe, and there is no evidence of either forced selling or institutional accumulation.
 
 **Main reasons it gave:**
-- Price at 96% of 52-week range with RSI exhaustion and negative MACD histogram
-- Dollar strength to 100.36 (+0.90 on week) headwinds yen-denominated Japan exposure
-- Analyst buy ratings on top 5 holdings but coverage only 17% of fund weight
-- CFTC positioning at 38th percentile, only +1.5% change on week, within normal range
+- Italian equities trading 1.4-1.8% below near-term moving averages with weak momentum
+- Analysts 100% buy-rated on largest holdings with +10.9% average price target
+- Stable macro backdrop with normal yield curve and modest dollar strength
+- Below-average volume suggesting weak conviction behind recent declines
+- No material policy, rate or data surprise this cycle
 
 <details><summary><b>News</b> — score +0.00</summary>
 
@@ -5773,27 +5550,165 @@ _No news found for this one today._
 <details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
 
 ```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
 Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
 Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
 ```
 
 </details>
 
-<details><summary><b>Price and chart</b> — score -0.30</summary>
+<details><summary><b>Price and chart</b> — score -0.35</summary>
 
 ```text
-Last close 97.83 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 96.76 (+1.1%), 50d 95.02 (+3.0%), 200d 89.77 (+9.0%); 50d above 200d
-Momentum: RSI(14) 56.3 | MACD 0.657 vs signal 0.703 (histogram -0.046)
-Returns: 1d +0.9% | 5d +0.3% | 1m +3.8% | 3m +0.9%
-52-week range: 78.36 - 98.56 (now 96.4% of the way up)
-Volatility: ATR(14) 1.34 (1.4% of price) | annualised 20d 14.5%
-Volume: 0.43x the 20-day average
+Last close 60.64 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 61.51 (-1.4%), 50d 61.74 (-1.8%), 200d 57.77 (+5.0%); 50d above 200d
+Momentum: RSI(14) 43.7 | MACD -0.369 vs signal -0.259 (histogram -0.109)
+Returns: 1d -1.0% | 5d -0.2% | 1m -3.6% | 3m +2.1%
+52-week range: 50.31 - 63.35 (now 79.2% of the way up)
+Volatility: ATR(14) 0.73 (1.2% of price) | annualised 20d 16.6%
+Volume: 0.54x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.40</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What this fund holds</b> — score +0.40</summary>
+
+```text
+Fund type: Focused Region
+What it holds: P/E 15.25 | P/B 1.85 | P/S 1.64 | 3y earnings growth n/a
+Yield: 3.0%
+Three-year record: +28.5% a year | beta to the market 0.88
+Cost and size: expense ratio 0.50% | net assets 1.13B
+What it is made of: Stocks 99.8%, Cash 0.2%
+Largest holdings: UniCredit SpA 16.8%, Intesa Sanpaolo 13.6%, Enel SpA 10.3%, Ferrari NV 5.2%, Eni SpA 5.0%
+Sector mix: Financial services 52.6%, Utilities 16.3%, Industrials 9.7%, Consumer cyclical 9.0%
+```
+
+</details>
+
+<details><summary><b>Does this company beat its own forecasts</b> — score +0.40</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What holding this fund costs you</b> — score +0.40</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How much oil and gas is in storage</b> — score +0.40</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How the crop is growing</b> — score +0.40</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.55</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.55</summary>
+
+```text
+Rolled up from the 5 largest holdings, 50.9% of the fund by weight
+Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 2.03 on a 1=strong buy to 5=strong sell scale)
+Weighted price target: +10.9% above the current prices
+Holdings read: UCG.MI, ISP.MI, ENEL.MI, RACE.MI, ENI.MI
+Recent rating changes among them:
+  - RACE.MI: 2026-07-31 UBS: main, Buy -> Buy
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Who is positioned how</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
+
+```text
+Direction: unknown
+Share count change: n/a (too few readings)
+Shares outstanding: 18.83M | fund size: 1.14B
+Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
+```
+
+</details>
+
+### Japan (EWJ) · Sector or country — NEUTRAL, confidence 0.25
+
+**Result:** REJECTED · bias is NEUTRAL; no trade
+
+**In the model's own words:**
+
+> EWJ sits at 99.5% of its 52-week range with trend intact above 20/50/200d SMAs, but momentum is flattening (MACD histogram 0.007, RSI 58.7) and volume is only 0.46x average, so the breakout is not decisive. Macro is benign rather than catalytic: VIX 14.4 and lower long yields help, but a stronger dollar (+0.93) is a headwind for unhedged Japan exposure and the 2-year prices a hiking path. Holdings are reasonably valued (P/E 19, 3.7% yield) and analyst coverage on the top 17% is uniformly buy with +19.7% targets, though that slice is thin. Spec positioning is mid-range. No policy or data surprise this cycle, so no side warranted beyond a mild upward tilt.
+
+**Main reasons it gave:**
+- Price at 99.5% of 52-week range but volume only 0.46x 20-day average
+- MACD histogram 0.007 -- momentum essentially flat despite uptrend
+- Dollar index +0.93 on the week, a headwind for unhedged Japan exposure
+- VIX 14.4, down 2.8, calm backdrop with no policy or data surprise
+- CFTC Nikkei spec net long at 38th percentile -- no crowding extreme
+
+<details><summary><b>News</b> — score +0.10</summary>
+
+- [Asian stocks mostly rise on tech rally, lower yields, and US-China trade hopes](https://seekingalpha.com/news/4645224-asian-stocks-mostly-rise-on-tech-rally-lower-yields-and-us-china-trade-hopes)  
+  <sub>Seeking Alpha, 9 hours ago</sub>  
+  Asian stock markets delivered a mixed performance on Tuesday, picking up momentum from overnight gains on Wall Street. A fresh rally in technology shares...
+
+</details>
+
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.10</summary>
+
+```text
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
+Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
+Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+```
+
+</details>
+
+<details><summary><b>Price and chart</b> — score +0.30</summary>
+
+```text
+Last close 98.45 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 96.94 (+1.6%), 50d 95.14 (+3.5%), 200d 89.85 (+9.6%); 50d above 200d
+Momentum: RSI(14) 58.7 | MACD 0.713 vs signal 0.707 (histogram 0.007)
+Returns: 1d +0.5% | 5d +1.6% | 1m +3.4% | 3m +6.1%
+52-week range: 78.36 - 98.56 (now 99.5% of the way up)
+Volatility: ATR(14) 1.32 (1.3% of price) | annualised 20d 14.5%
+Volume: 0.46x the 20-day average
 ```
 
 </details>
@@ -5843,13 +5758,13 @@ _Not available today._
 
 </details>
 
-<details><summary><b>What analysts and big funds say</b> — score +0.40</summary>
+<details><summary><b>What analysts and big funds say</b> — score +0.25</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.40</summary>
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.25</summary>
 
 ```text
 Rolled up from the 5 largest holdings, 17.0% of the fund by weight  -- thin, so read this as a fact about that slice rather than the fund
@@ -5861,13 +5776,13 @@ Recent rating changes among them: none reported
 
 </details>
 
-<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+<details><summary><b>Buying and selling by company insiders</b> — score +0.05</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>Who is positioned how</b> — score +0.00</summary>
+<details><summary><b>Who is positioned how</b> — score +0.05</summary>
 
 ```text
 Contract: NIKKEI STOCK AVERAGE YEN DENOM - CHICAGO MERCANTILE EXCHANGE (positions as of 2026-09-15, published the following Friday)
@@ -5879,12 +5794,12 @@ Read this as crowding, not as a forecast: an extreme is as often the end of a mo
 
 </details>
 
-<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
+<details><summary><b>Money going into and out of this fund</b> — score +0.05</summary>
 
 ```text
 Direction: unknown
 Share count change: n/a (too few readings)
-Shares outstanding: 234.82M | fund size: 22.97B
+Shares outstanding: 234.29M | fund size: 23.07B
 Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
 ```
 
@@ -5894,13 +5809,14 @@ Creations and redemptions are settled money, not an opinion -- but they follow d
 
 **In the model's own words:**
 
-> EWL is a focused Swiss equity fund holding large-cap names (Roche, Novartis, Nestle, UBS, Richemont). Technicals show a weak picture: the fund trades 1.7–2.9% below its 20d, 50d, and 200d moving averages, RSI at 42 signals mild oversold conditions, and MACD remains negative with a deteriorating histogram. The one-month return of −4.4% reflects downward pressure. However, the broader macro backdrop is stable: the yield curve is normally sloped, the Fed is holding steady with modest rate expectations, and VIX at 14.62 reflects calm markets. No macro surprise or policy catalyst has emerged. On valuation, the fund trades at a P/E of 24.65 and P/B of 4.25, which is elevated but not shocking for quality Swiss equities. Analyst coverage of the top 5 holdings (48.5% of the fund) shows 74.5% buy-rated and a +9.4% consensus price target, which is mildly supportive but insufficient to overcome the technical weakness in isolation. Volume is light at 0.31x the 20-day average, and fund flow conviction cannot be read (insufficient data). The three-year performance at +12.1% annually and 0.91 beta suggest steady exposure to broad market health, but near-term momentum is unfavorable. Without a clear macro catalyst, a decisive technical reversal, or a material shift in fund flows, the case remains equivocal. A small long bias is warranted only by analyst upside and valuation stability, tempered by technical underperformance.
+> EWL is a focused Switzerland equity fund trading with mixed technical signals and absent macro catalysts. Technicals show mild weakness: price is below all major moving averages (20d, 50d, 200d), RSI is sub-50 at 43.7 indicating weak momentum, and MACD remains negative though histogram is narrowing. The 1-month return of -5.1% and below-average volume suggest lack of conviction. Macro backdrop is stable with a normalized yield curve, calm volatility (VIX 14.4), and no recent data surprises; the dollar's +0.93 week move is modest. Fund fundamentals show elevated valuation multiples (P/E 24.65, P/B 4.25) typical of Swiss large-cap quality names, with 1.7% yield and a 3-year record of +12.1% annually. Analyst coverage of the largest 48.5% of holdings shows 74.5% buy-rated at a weighted +9.8% upside target, providing mild support. Fund flows data is unavailable, limiting insight into recent investor conviction. The weighted analyst view and recovery from oversold RSI argue against a bearish call, but the technical breakdown, absence of any positive news catalyst, and lack of macro tailwind prevent a bullish stance. The position between moving averages, near the middle of its 52-week range, and with stable macro conditions supports a holding pattern.
 
 **Main reasons it gave:**
-- Price 1.7–2.9% below 20d, 50d, 200d SMAs; RSI 42 and negative MACD suggest recent selling pressure
-- Analyst consensus 74.5% buy on top 48.5% of holdings; +9.4% price target provides modest floor
-- No macro catalyst; stable curve, calm VIX, and steady Fed backdrop offer neutral environment
-- One-month return −4.4% and light volume (0.31x 20d average) indicate weak near-term conviction
+- Price below 20d, 50d, and 200d moving averages with momentum RSI at 43.7
+- Analyst consensus bullish on 48.5% of holdings, weighted target +9.8% above current prices
+- No macro catalyst; stable yields, low volatility, and normalized curve
+- 1-month return of -5.1% with below-average volume suggests weak demand
+- P/E of 24.65 and P/B of 4.25 price premium typical of quality holdings, not compelling at current levels
 
 <details><summary><b>News</b> — score +0.00</summary>
 
@@ -5911,13 +5827,13 @@ _No news found for this one today._
 <details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
 
 ```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
 Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
 Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
 ```
 
 </details>
@@ -5925,13 +5841,13 @@ Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market pri
 <details><summary><b>Price and chart</b> — score -0.35</summary>
 
 ```text
-Last close 60.94 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 62.00 (-1.7%), 50d 62.76 (-2.9%), 200d 61.54 (-1.0%); 50d above 200d
-Momentum: RSI(14) 42.2 | MACD -0.839 vs signal -0.686 (histogram -0.152)
-Returns: 1d +1.5% | 5d +0.7% | 1m -4.4% | 3m -0.5%
-52-week range: 53.86 - 65.08 (now 63.1% of the way up)
-Volatility: ATR(14) 0.70 (1.1% of price) | annualised 20d 13.9%
-Volume: 0.31x the 20-day average
+Last close 61.08 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 61.84 (-1.2%), 50d 62.73 (-2.6%), 200d 61.56 (-0.8%); 50d above 200d
+Momentum: RSI(14) 43.7 | MACD -0.777 vs signal -0.706 (histogram -0.071)
+Returns: 1d +0.4% | 5d +1.4% | 1m -5.1% | 3m -0.7%
+52-week range: 53.86 - 65.08 (now 64.3% of the way up)
+Volatility: ATR(14) 0.68 (1.1% of price) | annualised 20d 13.8%
+Volume: 0.65x the 20-day average
 ```
 
 </details>
@@ -5981,18 +5897,18 @@ _Not available today._
 
 </details>
 
-<details><summary><b>What analysts and big funds say</b> — score +0.30</summary>
+<details><summary><b>What analysts and big funds say</b> — score +0.35</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.30</summary>
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.35</summary>
 
 ```text
 Rolled up from the 5 largest holdings, 48.5% of the fund by weight
 Ratings by weight: buy 74.5% | hold 25.5% | sell 0.0% (mean 2.40 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +9.4% above the current prices
+Weighted price target: +9.8% above the current prices
 Holdings read: ROP.SW, NOVN.SW, NESN.SW, UBSG.SW, CFR.SW
 Recent rating changes among them:
   - UBSG.SW: 2026-04-20 Barclays: up, Underweight -> Equal-Weight
@@ -6017,7 +5933,7 @@ _Not available today._
 ```text
 Direction: unknown
 Share count change: n/a (too few readings)
-Shares outstanding: 28.62M | fund size: 1.74B
+Shares outstanding: 28.62M | fund size: 1.75B
 Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
 ```
 
@@ -6027,14 +5943,13 @@ Creations and redemptions are settled money, not an opinion -- but they follow d
 
 **In the model's own words:**
 
-> EWN is a focused Netherlands equity ETF held back by mixed momentum and macro headwinds. The technical picture is conflicted: the fund sits 76% of the way up its 52-week range and trades near its 20-day and 50-day SMAs, suggesting consolidation rather than conviction. RSI at 48.8 and negative MACD histogram show momentum has faded despite recent 1.1% daily gain and 1.9% five-day strength; the one-month -1.7% and three-month -4.1% returns reveal underlying weakness. Volume is critically thin at 0.03x the 20-day average, signaling low conviction from buyers. The macro backdrop is neutral to slightly restrictive: the dollar strengthened 0.90 on the week to 100.36, which pressures EM-adjacent holdings; US rates are stable with an upward-sloping curve and VIX calm at 14.62, removing tail-risk hedging demand. Fund fundamentals are reasonable—P/E 18.97, 4.1% yield, three-year +23.3% annually—and analyst coverage of the top 44% shows 100% buy ratings with +33.1% upside, a positive signal. However, a fresh initiation by Rothschild on Nebius (4.3% of fund) with a Sell rating on 2026-09-21 clouds the near-term outlook for a core holding. The fund's 1.14 beta and concentration in Technology (31.5%) and Financials (21.4%) leave it exposed to rate-sensitive sectors at a moment when US yields are stable but the market is pricing only modest Fed cuts ahead. No news in 24 hours and extremely light volume suggest the market is waiting for clarity. The case for conviction either way is absent.
+> EWN (Euronext N.V.) is a Netherlands-focused equity fund trading near recent highs with modestly positive technicals but insufficient conviction drivers for a directional call. Technicals show the fund above its 20, 50, and 200-day moving averages with a 6.8% gain over 200 days, but momentum is neutral (RSI 52.1, MACD histogram near zero) and recent performance is mixed (-1.7% over one month despite +3% over five days). The fund is near the top of its 52-week range at 79.6%, which typically warrants caution. Macro backdrop is stable with a normal upward-sloping yield curve, contained inflation expectations, and falling volatility (VIX down 2.8 this week), but Treasury yields are essentially flat across the week with no fresh surprise. The analyst consensus on the five largest holdings (44% of the fund) is unanimously bullish with a weighted price target 29.7% above current prices, which is encouraging but applies to less than half the fund and carries no independent timing signal. A new Sell rating on NBIS (Nebius, 4.3% of the fund) from Rothschild yesterday is a minor headwind. Fund basics show reasonable valuation (P/E 18.97) and a strong three-year track record (+23.3% annualized), but these move slowly and do not justify a fresh view. Volume is well below average (0.17x) and flows data are insufficient. The call is NEUTRAL because there is no material catalyst: no macro surprise, no technical break, and analyst sentiment—while positive—is rolled up from less than half the fund and offers no directional edge on timing.
 
 **Main reasons it gave:**
-- RSI momentum fade at 48.8 and negative MACD histogram despite recent gains
-- Volume critically thin at 0.03x 20-day average
-- Dollar strength +0.90 on week pressures non-USD holdings
-- Fresh Sell-rated initiation on Nebius (4.3% of fund) by Rothschild on 2026-09-21
-- 100% buy ratings from analysts with +33.1% weighted price target on top 44% of holdings, offset by technical consolidation
+- Near 52-week high (79.6%) with neutral momentum (RSI 52.1, MACD flat)
+- Analyst consensus +29.7% price target but covers only 44% of fund weight
+- Macro stable with flat weekly yields and declining volatility, no surprise
+- Volume 0.17x average and flows data insufficient
 
 <details><summary><b>News</b> — score +0.00</summary>
 
@@ -6045,38 +5960,38 @@ _No news found for this one today._
 <details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
 
 ```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
 Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
 Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
 ```
 
 </details>
 
-<details><summary><b>Price and chart</b> — score -0.15</summary>
+<details><summary><b>Price and chart</b> — score +0.15</summary>
 
 ```text
-Last close 67.78 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 67.99 (-0.3%), 50d 68.15 (-0.6%), 200d 63.91 (+6.0%); 50d above 200d
-Momentum: RSI(14) 48.8 | MACD -0.474 vs signal -0.354 (histogram -0.121)
-Returns: 1d +1.1% | 5d +1.9% | 1m -1.7% | 3m -4.1%
-52-week range: 55.33 - 71.61 (now 76.4% of the way up)
-Volatility: ATR(14) 0.89 (1.3% of price) | annualised 20d 14.3%
-Volume: 0.03x the 20-day average
+Last close 68.29 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 67.94 (+0.5%), 50d 68.18 (+0.2%), 200d 63.96 (+6.8%); 50d above 200d
+Momentum: RSI(14) 52.1 | MACD -0.368 vs signal -0.356 (histogram -0.013)
+Returns: 1d +0.6% | 5d +3.0% | 1m -1.7% | 3m +0.6%
+52-week range: 55.33 - 71.61 (now 79.6% of the way up)
+Volatility: ATR(14) 0.90 (1.3% of price) | annualised 20d 14.6%
+Volume: 0.17x the 20-day average
 ```
 
 </details>
 
-<details><summary><b>Company numbers</b> — score +0.35</summary>
+<details><summary><b>Company numbers</b> — score +0.25</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What this fund holds</b> — score +0.35</summary>
+<details><summary><b>What this fund holds</b> — score +0.25</summary>
 
 ```text
 Fund type: Focused Region
@@ -6091,42 +6006,42 @@ Sector mix: Technology 31.5%, Financial services 21.4%, Industrials 10.8%, Consu
 
 </details>
 
-<details><summary><b>Does this company beat its own forecasts</b> — score +0.35</summary>
+<details><summary><b>Does this company beat its own forecasts</b> — score +0.25</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What holding this fund costs you</b> — score +0.35</summary>
+<details><summary><b>What holding this fund costs you</b> — score +0.25</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>How much oil and gas is in storage</b> — score +0.35</summary>
+<details><summary><b>How much oil and gas is in storage</b> — score +0.25</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>How the crop is growing</b> — score +0.35</summary>
+<details><summary><b>How the crop is growing</b> — score +0.25</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What analysts and big funds say</b> — score +0.50</summary>
+<details><summary><b>What analysts and big funds say</b> — score +0.45</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.50</summary>
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.45</summary>
 
 ```text
 Rolled up from the 5 largest holdings, 44.1% of the fund by weight
-Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.60 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +33.1% above the current prices
+Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.65 on a 1=strong buy to 5=strong sell scale)
+Weighted price target: +29.7% above the current prices
 Holdings read: ASML.AS, INGA.AS, PRX.AS, NBIS, ASM.AS
 Recent rating changes among them:
   - NBIS: 2026-09-21 Rothschild & Co: init, ? -> Sell
@@ -6151,7 +6066,7 @@ _Not available today._
 ```text
 Direction: unknown
 Share count change: n/a (too few readings)
-Shares outstanding: 5.55M | fund size: 376.15M
+Shares outstanding: 5.55M | fund size: 379.01M
 Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
 ```
 
@@ -6161,13 +6076,14 @@ Creations and redemptions are settled money, not an opinion -- but they follow d
 
 **In the model's own words:**
 
-> EWP is a focused Spain equity fund holding 99.7% stocks with exposure concentrated in financials (45.4%) and utilities (20.0%). The macro backdrop shows a normal, upward-sloping yield curve with short-end rates up modestly on the week; the dollar has strengthened but volatility remains calm at 14.62 VIX. No material news flow in the past 24 hours. Technicals present a mixed picture: the fund sits 7.2% above its 200-day moving average with a healthy three-year return of 33.6% annualized, but momentum is neutral-to-weak (RSI 47.9, MACD histogram negative), the one-month return is negative at -1.4%, and today's volume is well below average at 0.10x the 20-day. The price sits at 87.6% of the 52-week range, near recent highs. Fund basics show reasonable valuation (P/E 16.28, P/B 2.22) with a 2.7% yield, and analyst coverage of the top 5 holdings (54.5% of assets) shows 52% buy and 48% hold ratings with a modest +1.5% weighted price target. Fund flows are indeterminate due to insufficient data. The lack of any recent catalyst, combined with mixed technicals at an elevated level in the 52-week range, weak momentum, and thin volume, argues against conviction in either direction. The fund appears fairly valued on fundamentals with adequate analyst support, but macro conditions are neutral and there is no specific trigger to shift positioning.
+> EWP is a Spain-focused equity fund trading near 52-week highs with moderate positive fundamentals but lacking near-term catalysts. The fund's valuation (P/E 16.28, P/B 2.22) is reasonable for a developed market and its 3-year record is strong at +33.6% annually, but current technicals show early signs of exhaustion: RSI at 47.9 is neutral-to-bearish, MACD histogram is negative, and the fund has underperformed over the past month (-2.4%) despite a strong 3-month run (+4.0%). It is trading 87.7% of the way to its 52-week high, leaving limited upside before resistance. The analyst view of the top 5 holdings (54.5% of the fund) is modestly bullish with a +1.5% weighted price target and buy ratings on 52% of that weight, but this is thin conviction. Macro backdrop is benign: the yield curve is normal, the dollar has strengthened slightly (+0.93 on the week), volatility is calm at 14.42, and inflation remains elevated at 3.4% with the Fed on hold. The bond market prices only modest rate cuts ahead. No macro surprise has occurred, and there is no sector-specific catalyst in the news. Volume is below average at 0.54x the 20-day mean, suggesting weak conviction behind the current price level. The fund's 2.7% yield and financial-services-heavy composition (45.4%) are reasonable but not compelling in a world where rates remain sticky. With technicals rolling over, valuation extended, and no fresh catalyst, the case for directional movement is weak.
 
 **Main reasons it gave:**
-- RSI 47.9 and MACD histogram negative despite price near 200-day high
-- One-month return -1.4% and volume 0.10x average on day of +1.3% move
-- Analysts show modest +1.5% upside on top 54% of holdings but no recent catalysts
-- Spain exposure benefits from normal yield curve but lacks rate or policy surprise to drive flows
+- RSI 47.9 and negative MACD histogram suggest early bearish divergence despite near 52-week highs
+- Fund at 87.7% of 52-week range with -2.4% one-month return despite +4% three-month gain
+- Analyst target of +1.5% weighted upside on top 5 holdings (54.5% of fund) provides only modest support
+- Volume 0.54x 20-day average indicates weak conviction behind current price level
+- No macro catalyst present: sticky inflation at 3.4%, normal yield curve, calm volatility
 
 <details><summary><b>News</b> — score +0.00</summary>
 
@@ -6178,27 +6094,27 @@ _No news found for this one today._
 <details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
 
 ```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
 Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
 Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
 ```
 
 </details>
 
-<details><summary><b>Price and chart</b> — score -0.15</summary>
+<details><summary><b>Price and chart</b> — score -0.25</summary>
 
 ```text
-Last close 61.37 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 61.96 (-0.9%), 50d 61.45 (-0.1%), 200d 57.27 (+7.2%); 50d above 200d
-Momentum: RSI(14) 47.9 | MACD -0.181 vs signal -0.008 (histogram -0.174)
-Returns: 1d +1.3% | 5d +0.6% | 1m -1.4% | 3m +3.2%
-52-week range: 48.25 - 63.23 (now 87.6% of the way up)
-Volatility: ATR(14) 0.79 (1.3% of price) | annualised 20d 15.2%
-Volume: 0.10x the 20-day average
+Last close 61.38 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 61.87 (-0.8%), 50d 61.50 (-0.2%), 200d 57.32 (+7.1%); 50d above 200d
+Momentum: RSI(14) 47.9 | MACD -0.173 vs signal -0.040 (histogram -0.133)
+Returns: 1d -0.1% | 5d +0.5% | 1m -2.4% | 3m +4.0%
+52-week range: 48.25 - 63.23 (now 87.7% of the way up)
+Volatility: ATR(14) 0.77 (1.3% of price) | annualised 20d 15.1%
+Volume: 0.54x the 20-day average
 ```
 
 </details>
@@ -6294,14 +6210,14 @@ Creations and redemptions are settled money, not an opinion -- but they follow d
 
 **In the model's own words:**
 
-> EWU is a focused UK equity fund currently trading near the upper end of its 52-week range with no material macro catalyst or news catalyst present. The technical picture is mixed: the fund sits slightly below its 20-day and 50-day moving averages but remains above its 200-day, with momentum indicators (RSI 45.6, MACD histogram negative) showing neither clear strength nor decisive weakness. The three-month return of +4.3% has pulled price near resistance. Volume is notably light at 0.13x the 20-day average, suggesting low conviction on either side. The macro backdrop is stable: the US curve remains normally upsloped, volatility is calm at 14.62, and the Fed path prices modest further tightening. Sterling is embedded in a stronger dollar environment (+0.90 on the week), a minor headwind for UK equities. Analyst coverage of the top 36% of holdings shows a constructive tilt (buy 57.5%, hold 42.5%) with a +10.9% weighted price target, but this rolls up a thin fraction of the fund and reflects analyst positioning rather than a catalyst. The fund's valuation (P/E 17.08, P/B 2.29) is neither compelling nor alarming. Fund flows data is insufficient to infer conviction. The lack of any directional catalyst—no policy surprise, no earnings surprise, no technical breakout on volume—argues for a neutral stance with minimal conviction. The modest analyst upside and position in the upper half of the range offer marginal support, but not enough to override the absence of a clear trigger.
+> EWU tracks UK-listed equities with a 3.1% yield and solid three-year performance of +18% annually. Technicals show the fund trading 1.3% below its 20-day MA and 0.9% below its 50-day MA, with RSI at 44 and a negative MACD histogram suggesting fading momentum. The fund sits 77.7% of the way through its 52-week range, near midcycle. No meaningful macro catalyst has emerged: Treasury yields are stable with the curve upward-sloping, the dollar has strengthened modestly (+0.93% on the week), and VIX has compressed to 14.42. US inflation at 3.4% and unemployment at 4.1% remain within the recent range, and the Fed rate path prices only modest further tightening. Analyst coverage of the top 5 holdings (36% of the fund) leans bullish at 57.5% buy-rated with a +11.2% weighted price target, but this roll-up is thin relative to the full fund and does not override the technical retracement and steady macro backdrop. Recent 1-month and 5-day returns are negative, volume is below average, and there is no news catalyst to interrupt the sidelong consolidation. The absence of recent share count data prevents a read on fund flows. The positioning is neither clearly bullish nor bearish, warranting a neutral stance with modest upside bias from analyst sentiment alone.
 
 **Main reasons it gave:**
-- No macro or policy catalyst present; stable rate environment with normal curve
-- RSI at 45.6 and negative MACD histogram show no clear momentum; light volume (0.13x) reflects low conviction
-- Price near 52-week high with resistance; sitting below both 20d and 50d SMAs
-- Analyst roll-up on top 36% holdings shows +10.9% weighted target, but thin coverage and no fresh catalyst
-- Stronger US dollar (+0.90 on week) a modest headwind for UK equity exposure
+- RSI 44 and negative MACD histogram indicate fading momentum
+- Price 1.3% below 20-day MA and 0.9% below 50-day MA
+- Analyst coverage of top 5 holdings shows +11.2% weighted price target but covers only 36% of fund
+- Macro backdrop stable with no rate or policy surprises; dollar +0.93% on the week
+- Volume 0.66x 20-day average on recent weakness
 
 <details><summary><b>News</b> — score +0.00</summary>
 
@@ -6312,431 +6228,27 @@ _No news found for this one today._
 <details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
 
 ```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
 Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
 Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
 ```
 
 </details>
 
-<details><summary><b>Price and chart</b> — score -0.10</summary>
+<details><summary><b>Price and chart</b> — score -0.15</summary>
 
 ```text
-Last close 47.67 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 48.21 (-1.1%), 50d 47.96 (-0.6%), 200d 46.52 (+2.5%); 50d above 200d
-Momentum: RSI(14) 45.6 | MACD -0.154 vs signal -0.043 (histogram -0.112)
-Returns: 1d +0.9% | 5d -0.5% | 1m -1.8% | 3m +4.3%
-52-week range: 41.04 - 49.39 (now 79.5% of the way up)
-Volatility: ATR(14) 0.47 (1.0% of price) | annualised 20d 11.3%
-Volume: 0.13x the 20-day average
-```
-
-</details>
-
-<details><summary><b>Company numbers</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What this fund holds</b> — score +0.00</summary>
-
-```text
-Fund type: Focused Region
-What it holds: P/E 17.08 | P/B 2.29 | P/S 1.52 | 3y earnings growth n/a
-Yield: 3.1%
-Three-year record: +18.0% a year | beta to the market 0.68
-Cost and size: expense ratio 0.50% | net assets 3.79B
-What it is made of: Stocks 97.9%, Other 1.1%, Cash 0.9%
-Largest holdings: HSBC Holdings PLC 11.0%, Shell PLC 7.8%, AstraZeneca PLC 7.6%, Rolls-Royce Holdings PLC 5.3%, Unilever PLC 4.3%
-Sector mix: Financial services 26.4%, Consumer defensive 14.3%, Industrials 13.9%, Healthcare 12.7%
-```
-
-</details>
-
-<details><summary><b>Does this company beat its own forecasts</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What holding this fund costs you</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How much oil and gas is in storage</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How the crop is growing</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts and big funds say</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.15</summary>
-
-```text
-Rolled up from the 5 largest holdings, 36.0% of the fund by weight
-Ratings by weight: buy 57.5% | hold 42.5% | sell 0.0% (mean 2.18 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +10.9% above the current prices
-Holdings read: HSBA.L, SHEL.L, AZN.L, RR.L, ULVR.L
-Recent rating changes among them:
-  - AZN.L: 2026-08-24 CICC: init, ? -> Outperform
-```
-
-</details>
-
-<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Who is positioned how</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
-
-```text
-Direction: unknown
-Share count change: n/a (too few readings)
-Shares outstanding: 80.06M | fund size: 3.82B
-Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
-```
-
-</details>
-
-### Mexico (EWW) · Sector or country — NEUTRAL, confidence 0.25
-
-**In the model's own words:**
-
-> EWW (iShares MSCI Mexico ETF) is a focused regional fund trading 3.0-3.2% below its 20-, 50- and 200-day moving averages in a still-uptrend structure (50d above 200d). Momentum is deteriorating: RSI at 38.4 suggests weakness, MACD histogram is negative, and recent returns are negative across all horizons (1d flat, 5d -1.9%, 1m -2.8%). Volume is well below average at 0.30x the 20-day mean, indicating low conviction in either direction. Macro backdrop is mixed: the US dollar strengthened +0.90 this week to 100.36, which is headwind for emerging-market equities; US yields are stable to slightly higher at the short end; the Fed is expected to cut rates modestly over two years, but the immediate picture is firm. On the positive side, analyst coverage of the fund's 5 largest holdings (48% of weight) shows unanimous buy ratings with an 18% price target upside; the fund's 3-year return of +10.7% annually and 3.2% yield are respectable. However, fund basics show modest valuation (P/E 12.68, P/B 1.98) and the holdings are concentrated in cyclical sectors (basic materials 27%, financials 20%) that are sensitive to both currency moves and global growth. The recent USD strength and lack of positive catalysts in the past 24 hours, combined with deteriorating technicals and low volume, do not justify a directional call. The analyst upside is noted but is forward-looking and does not override the current momentum weakness and flow uncertainty. A neutral stance is appropriate pending either a technical reversal on improved volume or a material shift in macro conditions (Fed policy surprise, notable data beat, or dollar reversal).
-
-**Main reasons it gave:**
-- RSI 38.4 and negative MACD histogram signal weakening momentum
-- Volume 0.30x 20-day average shows low conviction on any move
-- USD +0.90 on week headwind for EM equity fund
-- Analyst buy consensus on 48% of fund with 18% price target, but not reflected in current price action
-- Price 3.0-3.2% below all key moving averages in still-intact uptrend
-
-<details><summary><b>News</b> — score +0.00</summary>
-
-_No news found for this one today._
-
-</details>
-
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
-
-```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
-Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
-Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
-```
-
-</details>
-
-<details><summary><b>Price and chart</b> — score -0.40</summary>
-
-```text
-Last close 73.42 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 75.75 (-3.1%), 50d 75.86 (-3.2%), 200d 75.67 (-3.0%); 50d above 200d
-Momentum: RSI(14) 38.4 | MACD -0.716 vs signal -0.386 (histogram -0.330)
-Returns: 1d +0.1% | 5d -1.9% | 1m -2.8% | 3m -3.3%
-52-week range: 64.39 - 81.23 (now 53.6% of the way up)
-Volatility: ATR(14) 1.26 (1.7% of price) | annualised 20d 14.8%
-Volume: 0.30x the 20-day average
-```
-
-</details>
-
-<details><summary><b>Company numbers</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What this fund holds</b> — score +0.15</summary>
-
-```text
-Fund type: Focused Region
-What it holds: P/E 12.68 | P/B 1.98 | P/S 1.49 | 3y earnings growth n/a
-Yield: 3.2%
-Three-year record: +10.7% a year | beta to the market 1.05
-Cost and size: expense ratio 0.50% | net assets 1.82B
-What it is made of: Stocks 99.5%, Cash 0.5%
-Largest holdings: Grupo Mexico SAB de CV Class B 16.6%, Grupo Financiero Banorte SAB de CV Class O 11.1%, Fomento Economico Mexicano SAB de CV Units Cons. Of 1 Shs-B- And 4 Shs-D- 8.3%, America Movil SAB de CV Ordinary Shares - Class B 7.2%, Cemex SAB de CV 4.4%
-Sector mix: Basic materials 27.3%, Consumer defensive 24.4%, Financial services 19.7%, Industrials 11.7%
-```
-
-</details>
-
-<details><summary><b>Does this company beat its own forecasts</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What holding this fund costs you</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How much oil and gas is in storage</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How the crop is growing</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts and big funds say</b> — score +0.50</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.50</summary>
-
-```text
-Rolled up from the 5 largest holdings, 47.6% of the fund by weight
-Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 2.06 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +18.0% above the current prices
-Holdings read: GMEXICOB.MX, GFNORTEO.MX, FEMSAUBD.MX, AMXB.MX, CEMEXCPO.MX
-Recent rating changes among them:
-  - GMEXICOB.MX: 2018-11-12 Citigroup: down, Buy -> Neutral
-```
-
-</details>
-
-<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Who is positioned how</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
-
-```text
-Direction: unknown
-Share count change: n/a (too few readings)
-Shares outstanding: 18.90M | fund size: 1.39B
-Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
-```
-
-</details>
-
-### Brazil (EWZ) · Sector or country — NEUTRAL, confidence 0.25
-
-**Result:** REJECTED · bias is NEUTRAL; no trade
-
-**In the model's own words:**
-
-> EWZ has run +11% in a month and sits 71% up its 52-week range, but momentum is flattening (MACD histogram slightly negative, volume 0.4x average) and the 50d remains below the 200d. No macro catalyst this cycle: US yields essentially unchanged, curve normally sloped, VIX calm at 14.6, though a firmer dollar (+0.90) and a bond market pricing hikes rather than cuts is a mild headwind for Brazilian equities. Valuation is cheap (P/E 10.5, 4.1% yield) and analyst coverage of the top 40.9% of the fund is 100% buy with +22.8% targets, which supports the medium term but is not a timing signal after a double-digit run. Flows data insufficient. Staying neutral with a modest constructive tilt.
-
-**Main reasons it gave:**
-- +11.2% in one month, 71% of 52-week range, but MACD histogram negative and volume 0.4x average
-- 50d SMA still below 200d despite price above both
-- Top-5 holdings (40.9% weight) 100% buy-rated, +22.8% weighted price target
-- Dollar index +0.90 on the week and 2y at 4.67% pricing hikes — headwind for EM
-- No macro or Brazil-specific news in the window; VIX 14.6 and 10y unchanged
-
-<details><summary><b>News</b> — score +0.00</summary>
-
-_No news found for this one today._
-
-</details>
-
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
-
-```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
-Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
-Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
-```
-
-</details>
-
-<details><summary><b>Price and chart</b> — score +0.25</summary>
-
-```text
-Last close 37.98 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 37.22 (+2.0%), 50d 36.08 (+5.3%), 200d 36.20 (+4.9%); 50d below 200d
-Momentum: RSI(14) 60.5 | MACD 0.636 vs signal 0.669 (histogram -0.033)
-Returns: 1d +1.2% | 5d +0.7% | 1m +11.2% | 3m +10.8%
-52-week range: 28.79 - 41.73 (now 71.0% of the way up)
-Volatility: ATR(14) 0.78 (2.1% of price) | annualised 20d 21.9%
-Volume: 0.40x the 20-day average
-```
-
-</details>
-
-<details><summary><b>Company numbers</b> — score +0.40</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What this fund holds</b> — score +0.40</summary>
-
-```text
-Fund type: Focused Region
-What it holds: P/E 10.48 | P/B 1.79 | P/S 1.28 | 3y earnings growth n/a
-Yield: 4.1%
-Three-year record: +11.5% a year | beta to the market 0.84
-Cost and size: expense ratio 0.59% | net assets 8.17B
-What it is made of: Stocks 96.5%, Cash 2.7%, Preferred 0.8%
-Largest holdings: Vale SA 10.1%, Nu Holdings Ltd Ordinary Shares Class A 9.5%, Itau Unibanco Holding SA Participating Preferred 7.7%, Petroleo Brasileiro SA Petrobras Participating Preferred 7.0%, Petroleo Brasileiro SA Petrobras 6.6%
-Sector mix: Financial services 34.1%, Energy 17.4%, Basic materials 14.5%, Utilities 12.4%
-```
-
-</details>
-
-<details><summary><b>Does this company beat its own forecasts</b> — score +0.40</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What holding this fund costs you</b> — score +0.40</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How much oil and gas is in storage</b> — score +0.40</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How the crop is growing</b> — score +0.40</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts and big funds say</b> — score +0.45</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.45</summary>
-
-```text
-Rolled up from the 5 largest holdings, 40.9% of the fund by weight
-Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.81 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +22.8% above the current prices
-Holdings read: VALE3.SA, NU, ITUB4, PETR4, PETR3.SA
-Recent rating changes among them:
-  - NU: 2026-09-16 Itau BBA: down, Outperform -> Market Perform
-```
-
-</details>
-
-<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Who is positioned how</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
-
-```text
-Direction: unknown
-Share count change: n/a (too few readings)
-Shares outstanding: 200.55M | fund size: 7.62B
-Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
-```
-
-</details>
-
-### South Africa (EZA) · Sector or country — NEUTRAL, confidence 0.25
-
-**In the model's own words:**
-
-> EZA is a focused South African equity fund heavily weighted to gold miners (23.6% combined: Anglogold, Gold Fields) and financials (33.2%). The technical picture is mixed: the fund sits 1.2% above its 50-day MA but 3.0% below the 20-day, momentum is weak (RSI 45.6, MACD histogram -0.501), and volume is 0.17x average suggesting low conviction. The 50-day MA sits below the 200-day, indicating a downtrend over intermediate timeframes, though the fund is only 36% of the way up its 52-week range. Macro conditions are stable: the dollar strengthened 0.90 on the week to 100.36, which typically pressures gold prices and SA equities; Treasury yields are steady (10-year flat on the week); and VIX declined to 14.62, indicating calm risk appetite. Analyst view is bullish (100% buy-rated holdings with +23.7% upside to targets), but this covers only 45.6% of the fund's holdings and reflects sentiment on the largest names rather than conviction in the fund itself. There is no news catalyst in the past 24 hours, no insider positioning data, and no clear macro surprise to act on. The three-year annual return of +28.3% is backward-looking and does not inform near-term direction. The combination of weak technicals, a stronger dollar headwind, subdued volume, and absence of a fresh catalyst does not support a directional call. The bullish analyst overlay is noted but insufficient to overcome the technical weakness given the fund's regional and sector concentration.
-
-**Main reasons it gave:**
-- RSI 45.6 and MACD histogram -0.501 show weak momentum despite 3m gain of +4.6%
-- US dollar strengthened 0.90 on week to 100.36, headwind for gold and SA equities
-- 50-day MA below 200-day MA signals intermediate downtrend
-- Analyst buy-rating and +23.7% upside target covers only 45.6% of fund holdings
-- Volume 0.17x average indicates low participation in current price action
-
-<details><summary><b>News</b> — score +0.00</summary>
-
-_No news found for this one today._
-
-</details>
-
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
-
-```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
-Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
-Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
-```
-
-</details>
-
-<details><summary><b>Price and chart</b> — score -0.35</summary>
-
-```text
-Last close 68.11 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 70.19 (-3.0%), 50d 67.30 (+1.2%), 200d 69.26 (-1.7%); 50d below 200d
-Momentum: RSI(14) 45.6 | MACD 0.048 vs signal 0.549 (histogram -0.501)
-Returns: 1d -0.6% | 5d -0.6% | 1m -3.3% | 3m +4.6%
-52-week range: 60.43 - 81.60 (now 36.3% of the way up)
-Volatility: ATR(14) 1.27 (1.9% of price) | annualised 20d 21.7%
-Volume: 0.17x the 20-day average
+Last close 47.53 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 48.14 (-1.3%), 50d 47.99 (-0.9%), 200d 46.54 (+2.1%); 50d above 200d
+Momentum: RSI(14) 44.0 | MACD -0.168 vs signal -0.068 (histogram -0.100)
+Returns: 1d -0.3% | 5d -0.6% | 1m -2.9% | 3m +4.3%
+52-week range: 41.04 - 49.39 (now 77.7% of the way up)
+Volatility: ATR(14) 0.45 (0.9% of price) | annualised 20d 11.2%
+Volume: 0.66x the 20-day average
 ```
 
 </details>
@@ -6751,13 +6263,13 @@ _Not available today._
 
 ```text
 Fund type: Focused Region
-What it holds: P/E 9.31 | P/B 2.24 | P/S 1.92 | 3y earnings growth n/a
-Yield: 7.1%
-Three-year record: +28.3% a year | beta to the market 1.02
-Cost and size: expense ratio 0.59% | net assets 578.49M
-What it is made of: Stocks 99.7%, Cash 0.3%
-Largest holdings: Anglogold Ashanti PLC 13.7%, Gold Fields Ltd 9.9%, Naspers Ltd Class N 8.8%, Firstrand Ltd 7.1%, Standard Bank Group Ltd 6.1%
-Sector mix: Basic materials 41.0%, Financial services 33.2%, Consumer cyclical 12.8%, Communication services 6.2%
+What it holds: P/E 17.08 | P/B 2.29 | P/S 1.52 | 3y earnings growth n/a
+Yield: 3.1%
+Three-year record: +18.0% a year | beta to the market 0.68
+Cost and size: expense ratio 0.50% | net assets 3.79B
+What it is made of: Stocks 97.9%, Other 1.1%, Cash 0.9%
+Largest holdings: HSBC Holdings PLC 11.0%, Shell PLC 7.8%, AstraZeneca PLC 7.6%, Rolls-Royce Holdings PLC 5.3%, Unilever PLC 4.3%
+Sector mix: Financial services 26.4%, Consumer defensive 14.3%, Industrials 13.9%, Healthcare 12.7%
 ```
 
 </details>
@@ -6786,18 +6298,152 @@ _Not available today._
 
 </details>
 
-<details><summary><b>What analysts and big funds say</b> — score +0.40</summary>
+<details><summary><b>What analysts and big funds say</b> — score +0.25</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.40</summary>
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.25</summary>
+
+```text
+Rolled up from the 5 largest holdings, 36.0% of the fund by weight
+Ratings by weight: buy 57.5% | hold 42.5% | sell 0.0% (mean 2.18 on a 1=strong buy to 5=strong sell scale)
+Weighted price target: +11.2% above the current prices
+Holdings read: HSBA.L, SHEL.L, AZN.L, RR.L, ULVR.L
+Recent rating changes among them:
+  - AZN.L: 2026-08-24 CICC: init, ? -> Outperform
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Who is positioned how</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
+
+```text
+Direction: unknown
+Share count change: n/a (too few readings)
+Shares outstanding: 79.92M | fund size: 3.80B
+Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
+```
+
+</details>
+
+### South Africa (EZA) · Sector or country — NEUTRAL, confidence 0.25
+
+**In the model's own words:**
+
+> EZA is a South African-focused ETF with a rich 7.1% yield and attractive valuations (P/E 9.31, P/B 2.24) that offer structural appeal. Analyst coverage of its top 45.6% is uniformly bullish with a +21.8% weighted price target, and the three-year track record of +28.3% annualized returns demonstrates execution. However, the technical picture offers little support for a directional move here and now. Price is down 2% from its 20-day SMA despite being up 7.4% over three months, and momentum is weak: RSI at 48 shows no directional conviction, MACD is below signal with a -0.432 histogram, and volume is only 0.50x the 20-day average. The fund is positioned only 38.7% of the way up its 52-week range, suggesting it has not yet participated in the broader risk-on moves that might lift emerging market equities. Macro conditions are mixed: the dollar has strengthened sharply (+0.93 on the week to 100.58), which headwinds South African assets and the rand-denominated holdings; the Fed rate path still prices 4 quarter-point hikes, which keeps global financial conditions restrictive; and the VIX at 14.42 indicates calm but not conviction. Treasury yields at the long end have dipped slightly, but the curve is normally sloped and there is no policy surprise to anchor a tactical call. The fund's no news and unknown flow direction leave behavioral signals absent. The case for EZA is fundamentally sound—cheap equity, high yield, solid coverage—but it is a matter of patience and price, not timing. A sustained break above the 20-day SMA on volume would be required to shift conviction higher.
+
+**Main reasons it gave:**
+- Uniform buy ratings and +21.8% weighted price target among top 5 holdings covering 45.6% of fund
+- Valuation floor: P/E 9.31, P/B 2.24, 7.1% yield
+- Momentum and trend both weak: RSI 48, MACD below signal, price below 20d SMA on 0.5x volume
+- Dollar strength +0.93 on week headwinds emerging market rand-denominated assets
+- No flow data and no news; technical recovery needed to confirm bullish thesis
+
+<details><summary><b>News</b> — score +0.00</summary>
+
+_No news found for this one today._
+
+</details>
+
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
+
+```text
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
+Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
+Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+```
+
+</details>
+
+<details><summary><b>Price and chart</b> — score -0.25</summary>
+
+```text
+Last close 68.63 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 70.06 (-2.0%), 50d 67.42 (+1.8%), 200d 69.27 (-0.9%); 50d below 200d
+Momentum: RSI(14) 48.0 | MACD 0.010 vs signal 0.442 (histogram -0.432)
+Returns: 1d +0.6% | 5d -0.4% | 1m -5.4% | 3m +7.4%
+52-week range: 60.43 - 81.60 (now 38.7% of the way up)
+Volatility: ATR(14) 1.25 (1.8% of price) | annualised 20d 21.3%
+Volume: 0.50x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.55</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What this fund holds</b> — score +0.55</summary>
+
+```text
+Fund type: Focused Region
+What it holds: P/E 9.31 | P/B 2.24 | P/S 1.92 | 3y earnings growth n/a
+Yield: 7.1%
+Three-year record: +28.3% a year | beta to the market 1.02
+Cost and size: expense ratio 0.59% | net assets 578.49M
+What it is made of: Stocks 99.7%, Cash 0.3%
+Largest holdings: Anglogold Ashanti PLC 13.7%, Gold Fields Ltd 9.9%, Naspers Ltd Class N 8.8%, Firstrand Ltd 7.1%, Standard Bank Group Ltd 6.1%
+Sector mix: Basic materials 41.0%, Financial services 33.2%, Consumer cyclical 12.8%, Communication services 6.2%
+```
+
+</details>
+
+<details><summary><b>Does this company beat its own forecasts</b> — score +0.55</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What holding this fund costs you</b> — score +0.55</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How much oil and gas is in storage</b> — score +0.55</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How the crop is growing</b> — score +0.55</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.65</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.65</summary>
 
 ```text
 Rolled up from the 5 largest holdings, 45.6% of the fund by weight
 Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.82 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +23.7% above the current prices
+Weighted price target: +21.8% above the current prices
 Holdings read: AU, GFI.JO, NPN.JO, FSR.JO, SBK.JO
 Recent rating changes among them:
   - AU: 2026-09-16 RBC Capital: main, Outperform -> Outperform
@@ -6822,7 +6468,7 @@ _Not available today._
 ```text
 Direction: unknown
 Share count change: n/a (too few readings)
-Shares outstanding: 7.90M | fund size: 538.07M
+Shares outstanding: 7.90M | fund size: 542.18M
 Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
 ```
 
@@ -6832,14 +6478,14 @@ Creations and redemptions are settled money, not an opinion -- but they follow d
 
 **In the model's own words:**
 
-> INDA faces headwinds from weakening technicals and macro crosscurrents, partially offset by analyst optimism on its largest holdings. The fund is trading below its 20d, 50d, and 200d SMAs with the 50d below the 200d, signaling a bearish trend structure. Momentum is deteriorating: RSI at 43.9 is below 50 and MACD histogram is negative. The 3-month return of -3.1% and position at the 29.9th percentile of the 52-week range indicate downward pressure. Macro conditions are mixed: the US dollar strengthened 0.90% this week to 100.36, which typically pressures emerging markets; Treasury yields are broadly stable at elevated levels, keeping carry costs high. The curve is normally sloped and VIX is calm at 14.62, so panic is not priced in. On the positive side, analyst coverage of the top 5 holdings (24.7% of the fund) shows 100% buy ratings with a weighted price target 30.2% above current levels, suggesting conviction among analysts on the largest positions. However, this view covers less than 25% of the fund and is thin as a read on the whole. Fund basics show a P/E of 22.87 and P/B of 3.14, which are reasonable for India equity but not cheap, and the 3-year 2.3% annualized return trails broad markets. The absence of flow data and very light volume (0.17x average) limit confidence in either direction. The technical deterioration and strong dollar are offset but not overcome by analyst bullishness on a narrow slice. This warrants a small lean to caution while acknowledging the analyst case remains intact.
+> INDA faces mixed signals with no clear macro catalyst to drive a directional view. The fund's technicals are weak: price is down 3.6% from its 200-day moving average, momentum is flagging (RSI 43.5, MACD below signal), and the 50-day is below the 200-day, signaling deteriorating trend. Volume is subdued at 0.24x the 20-day average, suggesting low conviction. The 1-month and 3-month returns are modestly negative, and the fund sits only 29% of the way up its 52-week range, well off recent highs. On the positive side, analyst coverage of the largest holdings (24.7% of the fund, a thin sample) shows 100% buy ratings with a +30.8% weighted price target, and the fund's three-year beta of 0.56 provides some stability. However, the valuations are stretched (P/E 22.87, P/B 3.14, P/S 2.72), and fund flows data is unavailable. The macro backdrop is benign but unremarkable: the US yield curve is normalizing with a +0.95 slope, the dollar has strengthened 0.93 this week, inflation expectations remain anchored at 2.3%, and the VIX at 14.42 reflects calm markets. There is no rate surprise, no policy catalyst, and no technical break to justify a conviction move. The stretched valuations and weakening technicals offset the positive analyst view, leaving no persuasive reason to bet directionally when the broader setup offers no edge.
 
 **Main reasons it gave:**
-- 50d SMA below 200d, price below all key moving averages
-- US dollar +0.90% on the week pressures emerging market equity
-- Analyst roll-up shows +30.2% price target on largest 5 holdings but covers only 24.7% of fund
-- RSI 43.9 and negative MACD histogram indicate deteriorating momentum
-- 3-month return -3.1% with position at 52-week low quartile
+- Price 3.6% below 200-day MA with 50d below 200d
+- RSI 43.5 and MACD histogram negative signal weakening momentum
+- Valuation elevated at P/E 22.87, P/B 3.14 relative to growth backdrop
+- Analyst buy ratings and +30.8% price target on largest 24.7% of holdings offset by thin coverage
+- Subdued volume at 0.24x 20-day average suggests low conviction in direction
 
 <details><summary><b>News</b> — score +0.00</summary>
 
@@ -6850,38 +6496,38 @@ _No news found for this one today._
 <details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
 
 ```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
 Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
 Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
 ```
 
 </details>
 
-<details><summary><b>Price and chart</b> — score -0.45</summary>
+<details><summary><b>Price and chart</b> — score -0.35</summary>
 
 ```text
-Last close 48.38 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 48.99 (-1.3%), 50d 49.22 (-1.7%), 200d 50.13 (-3.5%); 50d below 200d
-Momentum: RSI(14) 43.9 | MACD -0.427 vs signal -0.309 (histogram -0.118)
-Returns: 1d +0.7% | 5d -0.1% | 1m -2.4% | 3m -3.1%
-52-week range: 45.42 - 55.29 (now 29.9% of the way up)
-Volatility: ATR(14) 0.45 (0.9% of price) | annualised 20d 14.5%
-Volume: 0.17x the 20-day average
+Last close 48.31 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 48.95 (-1.3%), 50d 49.21 (-1.8%), 200d 50.10 (-3.6%); 50d below 200d
+Momentum: RSI(14) 43.5 | MACD -0.398 vs signal -0.325 (histogram -0.072)
+Returns: 1d -0.4% | 5d +1.5% | 1m -2.7% | 3m -1.5%
+52-week range: 45.42 - 55.29 (now 29.3% of the way up)
+Volatility: ATR(14) 0.44 (0.9% of price) | annualised 20d 14.6%
+Volume: 0.24x the 20-day average
 ```
 
 </details>
 
-<details><summary><b>Company numbers</b> — score -0.05</summary>
+<details><summary><b>Company numbers</b> — score -0.15</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What this fund holds</b> — score -0.05</summary>
+<details><summary><b>What this fund holds</b> — score -0.15</summary>
 
 ```text
 Fund type: India Equity
@@ -6896,25 +6542,25 @@ Sector mix: Financial services 30.1%, Consumer cyclical 12.8%, Industrials 9.7%,
 
 </details>
 
-<details><summary><b>Does this company beat its own forecasts</b> — score -0.05</summary>
+<details><summary><b>Does this company beat its own forecasts</b> — score -0.15</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What holding this fund costs you</b> — score -0.05</summary>
+<details><summary><b>What holding this fund costs you</b> — score -0.15</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>How much oil and gas is in storage</b> — score -0.05</summary>
+<details><summary><b>How much oil and gas is in storage</b> — score -0.15</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>How the crop is growing</b> — score -0.05</summary>
+<details><summary><b>How the crop is growing</b> — score -0.15</summary>
 
 _Not available today._
 
@@ -6931,7 +6577,7 @@ _Not available today._
 ```text
 Rolled up from the 5 largest holdings, 24.7% of the fund by weight  -- thin, so read this as a fact about that slice rather than the fund
 Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.36 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +30.2% above the current prices
+Weighted price target: +30.8% above the current prices
 Holdings read: HDFCBANK.NS, RELIANCE.NS, ICICIBANK.NS, BHARTIARTL.NS, INFY.NS
 Recent rating changes among them: none reported
 ```
@@ -6955,145 +6601,7 @@ _Not available today._
 ```text
 Direction: unknown
 Share count change: n/a (too few readings)
-Shares outstanding: 141.66M | fund size: 6.85B
-Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
-```
-
-</details>
-
-### US regional banks (KRE) · Sector or country — NEUTRAL, confidence 0.25
-
-**In the model's own words:**
-
-> KRE is a regional bank ETF trading below its key moving averages (20d, 50d) with momentum weakening (RSI 35.7, MACD histogram negative), suggesting near-term technical fragility. However, the macro backdrop does not yet support a bearish call: the yield curve is normal and upward sloping at +0.98, treasury yields are stable on the week, the dollar has strengthened modestly (+0.90), and the VIX is calm at 14.62. Inflation at 3.4% and unemployment at 4.1% are not crisis signals. The Fed's priced path implies modest easing ahead (3 quarter-point cuts priced over two years), which could support financials, but the fund's valuation (P/E 12.60, P/B 1.27) is not expensive enough to have priced in a rally. Analyst coverage of the five largest holdings (7.1% of the fund) shows 65.9% buy ratings and a weighted +19.4% price target, with recent upgrades from Morgan Stanley and UBS, but this thin coverage—one-fifteenth of the fund—limits its force. No news, unknown flows, and sub-average volume (0.34x) suggest low conviction in either direction. The technical weakness is real but not yet a breakdown, and the macro regime is neutral. The call is neutral with low conviction, held by near-term downside momentum offset by the lack of a macro catalyst to justify a more aggressive bearish stance and modest analyst support for the largest holdings.
-
-**Main reasons it gave:**
-- RSI 35.7 and negative MACD histogram show weakening momentum
-- price -2% to -4% below 20d and 50d SMAs signals near-term technical weakness
-- yield curve normal and upward-sloping at +0.98, supporting financial sector thesis
-- analyst view of top 5 holdings shows 65.9% buy and +19.4% price target but covers only 7.1% of fund
-- below-average volume and unknown flows indicate low conviction
-
-<details><summary><b>News</b> — score +0.00</summary>
-
-_No news found for this one today._
-
-</details>
-
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
-
-```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
-Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
-Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
-```
-
-</details>
-
-<details><summary><b>Price and chart</b> — score -0.35</summary>
-
-```text
-Last close 72.34 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 73.85 (-2.0%), 50d 75.32 (-4.0%), 200d 70.39 (+2.8%); 50d above 200d
-Momentum: RSI(14) 35.7 | MACD -0.691 vs signal -0.547 (histogram -0.144)
-Returns: 1d -0.6% | 5d -2.4% | 1m -3.2% | 3m +0.5%
-52-week range: 58.14 - 77.93 (now 71.8% of the way up)
-Volatility: ATR(14) 1.20 (1.7% of price) | annualised 20d 14.3%
-Volume: 0.34x the 20-day average
-```
-
-</details>
-
-<details><summary><b>Company numbers</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What this fund holds</b> — score +0.15</summary>
-
-```text
-Fund type: Financial
-What it holds: P/E 12.60 | P/B 1.27 | P/S 3.77 | 3y earnings growth n/a
-Yield: 2.2%
-Three-year record: +22.6% a year | beta to the market 1.04
-Cost and size: expense ratio 0.35% | net assets 4.01B
-What it is made of: Stocks 99.9%, Cash 0.1%
-Largest holdings: Cullen/Frost Bankers Inc 1.5%, SouthState Bank Corp 1.4%, Popular Inc 1.4%, Pinnacle Financial Partners Inc 1.4%, UMB Financial Corp 1.4%
-Sector mix: Financial services 100.0%
-```
-
-</details>
-
-<details><summary><b>Does this company beat its own forecasts</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What holding this fund costs you</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How much oil and gas is in storage</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How the crop is growing</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts and big funds say</b> — score +0.25</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.25</summary>
-
-```text
-Rolled up from the 5 largest holdings, 7.1% of the fund by weight  -- thin, so read this as a fact about that slice rather than the fund
-Ratings by weight: buy 65.9% | hold 34.1% | sell 0.0% (mean 2.04 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +19.4% above the current prices
-Holdings read: CFR, SSB, BPOP, PNFP, UMBF
-Recent rating changes among them:
-  - CFR: 2026-09-08 Morgan Stanley: up, Underweight -> Overweight
-  - SSB: 2026-07-28 Citigroup: main, Buy -> Buy
-  - BPOP: 2026-08-31 Benchmark: main, Buy -> Buy
-  - PNFP: 2026-09-08 Morgan Stanley: init, ? -> Overweight
-  - UMBF: 2026-09-14 UBS: init, ? -> Neutral
-```
-
-</details>
-
-<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Who is positioned how</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
-
-```text
-Direction: unknown
-Share count change: n/a (too few readings)
-Shares outstanding: 55.11M | fund size: 3.99B
+Shares outstanding: 139.94M | fund size: 6.76B
 Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
 ```
 
@@ -7103,64 +6611,64 @@ Creations and redemptions are settled money, not an opinion -- but they follow d
 
 **In the model's own words:**
 
-> KSA is a focused Saudi Arabia equity fund holding high-quality blue chips with strong analyst support (90% buy ratings, +15.1% price target on 44% of holdings). Valuation is reasonable at 15x P/E with 2.7% yield. However, technicals are deteriorating: price is below all three moving averages (20d, 50d, 200d), momentum is weak (RSI 31.5, MACD negative with histogram -0.190), and the fund is down 3.1% over one month on below-average volume. The 52-week range shows KSA near the lower quartile. Macro backdrop is calm (VIX 14.6, curve normal at +98 bps), but oil headlines are mixed—Hormuz shipments hit six-month highs yet WTI fell below $100, and Saudi production constraints offer limited tailwind. The custodian appointment to HSBC is a positive structural development but is institutional plumbing, not a price catalyst. Fund flows data is insufficient to read conviction. The combination of solid fundamentals and analyst sentiment is offset by clear technical weakness and lack of a near-term macro or idiosyncratic catalyst to reverse the downtrend. This warrants a modest bearish lean rather than outright NEUTRAL given the technical deterioration, but analyst support and reasonable valuation prevent a stronger conviction.
+> KSA presents a mixed picture with offsetting signals. On the bullish side, analyst coverage of the fund's five largest holdings (44.4% of the fund) shows 90% buy-rated securities with a weighted price target of +15.8% above current levels, and the fund trades at reasonable valuations (P/E 15.0, yield 2.7%). However, multiple headwinds constrain conviction. Technically, the fund is below all major moving averages (20d, 50d, 200d), momentum is weakly negative (RSI 36, MACD histogram -0.165), and volume is 0.33x the 20-day average—signs of waning interest. Returns are down over 1-month and 3-month horizons despite the bullish analyst view, suggesting sentiment has turned cautious. The dollar strengthened +0.93 this week to 100.58, which is a headwind for emerging market exposure. Volatility is calm at 14.42 VIX, reducing urgency in either direction. The macro backdrop is stable but not supportive: yields are flat to slightly down on the week, the Fed is on hold, and the upward-sloping curve offers no special tailwind to Saudi equities. The fund's low beta (0.18) and three-year return of +1.5% annually reflect its defensive positioning within the EM universe. Analyst optimism on the largest holdings does not overcome the technical deterioration and regional headwinds. This is a hold for existing positions rather than a new entry point.
 
 **Main reasons it gave:**
-- RSI 31.5 with price below all three moving averages (20d, 50d, 200d)
-- MACD negative with histogram -0.190 and one-month return -3.1%
-- Analysts rate 90% buy on 44% of holdings with +15.1% price target
-- P/E 15.0 and 2.7% yield provide valuation cushion despite recent weakness
-- Oil headlines mixed; Hormuz shipments highest in 6 months but WTI fell below $100
+- Analysts rate 90% of top-5 holdings as buy with +15.8% price target
+- Price below 20d, 50d, and 200d moving averages; RSI 36 indicates weak momentum
+- Dollar index +0.93 on week, headwind to emerging market exposure
+- Volume 0.33x 20-day average; 1m and 3m returns negative despite bullish analyst view
+- Flow data unavailable; no recent rating changes among major holdings
 
-<details><summary><b>News</b> — score +0.10</summary>
+<details><summary><b>News</b> — score +0.00</summary>
 
-- [HSBC Saudi Arabia named custodian to Al Rajhi MSCI Saudi Arabia ETF](https://www.globalcustodian.com/hsbc-saudi-arabia-named-custodian-to-al-rajhi-msci-saudi-arabia-etf/)  
-  <sub>Global Custodian, 3 hours ago</sub>  
-  Custody. HSBC Saudi Arabia named custodian to Al Rajhi MSCI Saudi Arabia ETF. Mandate adds to HSBC Saudi Arabia's growing ETF and securities services...
-- [Hormuz Oil Shipments Hit Six-Month High? ETFs to Win/Lose](https://www.tradingview.com/news/zacks:9ed16a4fe094b:0-hormuz-oil-shipments-hit-six-month-high-etfs-to-win-lose/)  
-  <sub>TradingView, 3 hours ago</sub>  
-  Oil and liquefied natural gas shipments through the Strait of Hormuz reached their highest level in six months over the past two weeks, indicating that...
-- [Oil Near $100, Treasury Yields Near 5%, Bitcoin’s Resilience: 3 Charts To Watch This Week](https://www.tradingview.com/news/stocktwits:c7de3f4f9094b:0-oil-near-100-treasury-yields-near-5-bitcoin-s-resilience-3-charts-to-watch-this-week/)  
-  <sub>TradingView, 6 hours ago</sub>  
-  WTI crude oil futures fell back below $100 a barrel Monday after Saudi Arabia said its East-West pipeline could restore about half of its capacity within...
+- [(KSA) as a Liquidity Pulse for Institutional Tactics](https://www.google.com/goto?url=CAESvAEB6zswFfazaLi1jeS5MtAUjq5M9Rp0cTMY5gWkxxKphaszEBeXtXHM-I9ZgUsIGUrVH3UeNRsohvw3iFpNbObIqMLApBZNEOWStXkjJUYlXx2D5G2sckrZJP7LOon_n-kaehpwHvWqqCDB8hKRZxMe5SXkOyEDBcSBIG9U8j84Okt7X0PllGfiDtv2Y0aEEyPCoPlAgfyYX9k3ieLUdeRv7sK0zwvxYQLtDHYDw6wyDJ5G53kvKnPhGQoURw)  
+  <sub>Stock Traders Daily, 7 hours ago</sub>  
+  Key findings for Ishares Msci Saudi Arabia Etf (NYSE: KSA). Neutral Sentiment in Near Term Could Moderate Mid-Term Weakness; A mid-channel oscillation...
+- [Bet on These Nuclear ETFs to Ride the AI Data Center Boom Now](https://www.tradingview.com/news/zacks:0431ede44094b:0-bet-on-these-nuclear-etfs-to-ride-the-ai-data-center-boom-now/)  
+  <sub>TradingView, 2 hours ago</sub>  
+  The rapid expansion of artificial intelligence (AI) data centers is fundamentally reshaping global electricity demand. To this end, Gartner projected last...
+- [Saudi Exchange clears Albilad Capital as market maker for three ETFs](https://enterpriseam.com/ksa/2026/09/22/saudi-exchange-clears-albilad-capital-as-market-maker-for-three-etfs/)  
+  <sub>EnterpriseAM, 15 hours ago</sub>  
+  Albilad will quote its own ETFs. Albilad Capital has been cleared to make markets in three of its ETFs. The Saudi Exchange approved Albilad Capital as a...
 
 </details>
 
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.10</summary>
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
 
 ```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
 Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
 Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
 ```
 
 </details>
 
-<details><summary><b>Price and chart</b> — score -0.55</summary>
+<details><summary><b>Price and chart</b> — score -0.35</summary>
 
 ```text
-Last close 37.06 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 38.34 (-3.4%), 50d 37.79 (-1.9%), 200d 38.14 (-2.8%); 50d below 200d
-Momentum: RSI(14) 31.5 | MACD -0.215 vs signal -0.026 (histogram -0.190)
-Returns: 1d -1.0% | 5d -2.0% | 1m -3.1% | 3m -3.3%
-52-week range: 35.83 - 41.03 (now 23.6% of the way up)
-Volatility: ATR(14) 0.30 (0.8% of price) | annualised 20d 11.4%
-Volume: 0.50x the 20-day average
+Last close 37.28 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 38.26 (-2.6%), 50d 37.79 (-1.4%), 200d 38.14 (-2.3%); 50d below 200d
+Momentum: RSI(14) 36.0 | MACD -0.231 vs signal -0.066 (histogram -0.165)
+Returns: 1d +0.3% | 5d -0.4% | 1m -2.7% | 3m -2.4%
+52-week range: 35.83 - 41.03 (now 27.9% of the way up)
+Volatility: ATR(14) 0.29 (0.8% of price) | annualised 20d 8.5%
+Volume: 0.33x the 20-day average
 ```
 
 </details>
 
-<details><summary><b>Company numbers</b> — score +0.35</summary>
+<details><summary><b>Company numbers</b> — score +0.20</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What this fund holds</b> — score +0.35</summary>
+<details><summary><b>What this fund holds</b> — score +0.20</summary>
 
 ```text
 Fund type: Focused Region
@@ -7175,42 +6683,42 @@ Sector mix: Financial services 41.9%, Basic materials 12.7%, Energy 12.1%, Commu
 
 </details>
 
-<details><summary><b>Does this company beat its own forecasts</b> — score +0.35</summary>
+<details><summary><b>Does this company beat its own forecasts</b> — score +0.20</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What holding this fund costs you</b> — score +0.35</summary>
+<details><summary><b>What holding this fund costs you</b> — score +0.20</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>How much oil and gas is in storage</b> — score +0.35</summary>
+<details><summary><b>How much oil and gas is in storage</b> — score +0.20</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>How the crop is growing</b> — score +0.35</summary>
+<details><summary><b>How the crop is growing</b> — score +0.20</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What analysts and big funds say</b> — score +0.65</summary>
+<details><summary><b>What analysts and big funds say</b> — score +0.45</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.65</summary>
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.45</summary>
 
 ```text
 Rolled up from the 5 largest holdings, 44.4% of the fund by weight
 Ratings by weight: buy 90.0% | hold 10.0% | sell 0.0% (mean 2.06 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +15.1% above the current prices
+Weighted price target: +15.8% above the current prices
 Holdings read: 1120.SR, 2222.SR, 1180.SR, 7010.SR, 1211.SR
 Recent rating changes among them: none reported
 ```
@@ -7234,60 +6742,206 @@ _Not available today._
 ```text
 Direction: unknown
 Share count change: n/a (too few readings)
-Shares outstanding: 17.03M | fund size: 631.15M
+Shares outstanding: 17.02M | fund size: 634.49M
 Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
 ```
 
 </details>
 
-### China (MCHI) · Sector or country — NEUTRAL, confidence 0.25
+### Chip makers (SMH) · Sector or country — NEUTRAL, confidence 0.25
+
+**Result:** REJECTED · bias is NEUTRAL; no trade
 
 **In the model's own words:**
 
-> MCHI is a concentrated China regional fund facing conflicting signals with no clear catalyst for direction change. On the positive side, analyst coverage of its five largest holdings (32% of the fund) is unanimously bullish with a +52.8% weighted price target, and the fund's valuation metrics (P/E 11.90, P/B 1.39) remain attractive relative to developed markets. The three-year return of +9.1% annually and 2.0% yield provide income support. However, technicals are weak: the price is down 6.2% from its 200-day moving average, momentum is soft (RSI 47.7, MACD histogram negative), and volume is well below average at 0.28x the 20-day mean, suggesting weak conviction. The macro backdrop is mixed: a strengthening dollar (+0.90 on the week) typically headwinds China equities, while the Fed's rate path and Treasury moves show modest policy changes rather than a clear catalyst. Most critically, the news of China's sharp decline in rare earth exports to the US ahead of a Trump-Xi summit introduces geopolitical risk to the China exposure without yet being priced as a decisive break. The fund's low beta of 0.44 to broader markets and its 6.3B in assets suggest it moves with China-specific factors rather than global equity sentiment. With technicals lagging fundamentals, no analyst rating changes among major holdings, and macro signals ambiguous, the risk-reward lacks a clear directional edge. A material catalyst would require either a surprise improvement in China growth data, a geopolitical de-escalation, or a decisive technical break above resistance.
+> No macro surprise this cycle: yields little changed, curve normally sloped, VIX calm at 14.4 and falling. The technical picture is constructive -- price above 20/50/200d, 50d above 200d, +11% in five days, MACD crossed positive -- but the move came on volume at 0.41x average and 3-month return is still -3.3%, so the breakout is not decisively confirmed. Analyst roll-up is uniformly bullish (100% buy, +35% targets) but covers only 49% of the fund and is a slow-moving input. Valuation is rich (P/E 37.8, beta 2.06) and the priced rate path implies hikes rather than cuts, a headwind for long-duration growth. News flow is noise -- price listings, an index-inclusion mechanic and a promotional piece on a rival ETF. Flows unknown. Slight bullish tilt from trend only.
 
 **Main reasons it gave:**
-- Analyst consensus on top 5 holdings 100% buy with +52.8% weighted price target
-- Price down 6.2% from 200-day SMA with RSI 47.7 and negative MACD histogram
-- China rare earth exports to US fell sharply, adding geopolitical uncertainty ahead of Trump-Xi summit
-- Fund valuation (P/E 11.90, P/B 1.39) attractive but volume 0.28x average signals weak institutional demand
-- Dollar strength (+0.90 on week) typically headwind for China equities with no offsetting domestic catalyst
+- Price +7.0% over 20d SMA and +22.9% over 200d, 50d above 200d
+- 5-day return +11.0% but on volume 0.41x 20-day average
+- VIX 14.42, down 2.8 on week; 10y -4bp, no rate or data surprise
+- Analyst roll-up 100% buy, +34.9% weighted target, but only 49.2% coverage
+- Holdings P/E 37.78 with beta 2.06 and 2-year at 4.76% pricing hikes
 
-<details><summary><b>News</b> — score -0.15</summary>
+<details><summary><b>News</b> — score +0.00</summary>
 
-- [ETFs Investing in AAC Technologies Holdings Inc. Stocks](https://www.tradingview.com/symbols/DUS-A2XN/etfs/)  
-  <sub>TradingView, 20 hours ago</sub>  
-  Explore funds investing in A2XN in a single list with price, expense ratio, and more stats for an in-depth analysis of new opportunities.
-- [China's rare earth exports to US drop ahead of Trump-Xi summit](https://invezz.com/uk/news/2026/09/21/chinas-rare-earth-exports-to-us-fall-20percent-ahead-of-trump-xi-summit/)  
-  <sub>Invezz, 4 hours ago</sub>  
-  China's shipments of rare earth magnets to the US fell sharply last month, according to official Chinese customs data released Sunday.
+- [VanEck Semiconductor ETF (Derivatives) Price (SMH/USD) Today | Live Price, Market Cap & Chart](https://www.binance.com/en/price/vaneck-semiconductor-etf-derivatives)  
+  <sub>Binance, 18 hours ago</sub>  
+  The current price of VanEck Semiconductor ETF (Derivatives) (SMH) is $596.53. Top cryptocurrency prices are updated in real-time on Binance's price directory.
+- [SK Hynix ADR Inclusions in the SMH ETF, VanEck Semi UCITS ETF, and KODEX US Semi ETF Rebalances](https://www.smartkarma.com/insights/sk-hynix-adr-inclusions-in-the-smh-etf-vaneck-semi-ucits-etf-and-kodex-us-semi-etf-rebalances)  
+  <sub>Smartkarma, 17 hours ago</sub>  
+  There are several notable ETFs (SMH ETF, VanEck Semiconductor UCITS ETF, and KODEX US Semiconductor ETF) that will include SK Hynix (SKHY US) ADRs in their...
+- [VanEck Semiconductor ETF Outperforms S and P 500 in 2026](https://suaragarut.id/en/vaneck-semiconductor-etf-outperforms-index)  
+  <sub>SuaraGarut.ID, 5 hours ago</sub>  
+  The VanEck Semiconductor ETF (SMH) generated a total return of approximately 59 percent in 2026, outperforming the S and P 500 index's 12 percent gain with...
+- [PSI: A Semiconductor ETF Built Around More Than Nvidia (NYSEARCA:PSI)](https://seekingalpha.com/article/4948533-psi-a-semiconductor-etf-built-around-more-than-nvidia)  
+  <sub>Seeking Alpha, 7 hours ago</sub>  
+  Summary. Invesco Semiconductors ETF earns a Buy rating for its differentiated, non-market cap-weighted approach to semiconductor and AI exposure.
 
 </details>
 
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score -0.15</summary>
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
 
 ```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
 Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
 Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
 ```
 
 </details>
 
-<details><summary><b>Price and chart</b> — score -0.25</summary>
+<details><summary><b>Price and chart</b> — score +0.35</summary>
 
 ```text
-Last close 53.67 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 53.96 (-0.5%), 50d 54.47 (-1.5%), 200d 57.22 (-6.2%); 50d below 200d
-Momentum: RSI(14) 47.7 | MACD -0.500 vs signal -0.419 (histogram -0.080)
-Returns: 1d +1.1% | 5d +0.7% | 1m -3.3% | 3m +1.5%
-52-week range: 50.48 - 66.99 (now 19.4% of the way up)
-Volatility: ATR(14) 0.60 (1.1% of price) | annualised 20d 13.7%
-Volume: 0.28x the 20-day average
+Last close 601.62 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 562.34 (+7.0%), 50d 564.80 (+6.5%), 200d 489.68 (+22.9%); 50d above 200d
+Momentum: RSI(14) 62.5 | MACD 3.524 vs signal -1.466 (histogram 4.990)
+Returns: 1d +0.9% | 5d +11.0% | 1m +7.4% | 3m -3.3%
+52-week range: 321.06 - 668.91 (now 80.7% of the way up)
+Volatility: ATR(14) 16.78 (2.8% of price) | annualised 20d 35.3%
+Volume: 0.41x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score -0.10</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What this fund holds</b> — score -0.10</summary>
+
+```text
+Fund type: Technology
+What it holds: P/E 37.78 | P/B 11.07 | P/S 13.20 | 3y earnings growth n/a
+Yield: 0.2%
+Three-year record: +58.0% a year | beta to the market 2.06
+Cost and size: expense ratio 0.35% | net assets 67.79B
+What it is made of: Stocks 99.9%, Cash 0.1%
+Largest holdings: NVIDIA Corp 22.6%, Taiwan Semiconductor Manufacturing Co Ltd ADR 9.7%, Broadcom Inc 6.1%, Micron Technology Inc 5.5%, Advanced Micro Devices Inc 5.4%
+Sector mix: Technology 100.0%
+```
+
+</details>
+
+<details><summary><b>Does this company beat its own forecasts</b> — score -0.10</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What holding this fund costs you</b> — score -0.10</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How much oil and gas is in storage</b> — score -0.10</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How the crop is growing</b> — score -0.10</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.35</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.35</summary>
+
+```text
+Rolled up from the 5 largest holdings, 49.2% of the fund by weight
+Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.33 on a 1=strong buy to 5=strong sell scale)
+Weighted price target: +34.9% above the current prices
+Holdings read: NVDA, TSM, AVGO, MU, AMD
+Recent rating changes among them:
+  - NVDA: 2026-09-10 Piper Sandler: init, ? -> Overweight
+  - TSM: 2026-09-02 Stifel: init, ? -> Buy
+  - AVGO: 2026-09-10 Piper Sandler: init, ? -> Overweight
+  - MU: 2026-09-18 RBC Capital: reit, Outperform -> Outperform
+  - AMD: 2026-09-10 Piper Sandler: init, ? -> Overweight
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Who is positioned how</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
+
+```text
+Direction: unknown
+Share count change: n/a (too few readings)
+Shares outstanding: 118.34M | fund size: 71.19B
+Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
+```
+
+</details>
+
+### Turkey (TUR) · Sector or country — NEUTRAL, confidence 0.25
+
+**In the model's own words:**
+
+> TUR is a focused Turkey equity fund down 8.2% over the past month, now trading 4.8% below its 200-day moving average with RSI at 39.7 and negative MACD histogram, indicating intermediate downtrend momentum. However, several factors temper a bearish conviction: (1) The fund's valuation remains compressed at P/E 13.81 and P/B 1.21, with a 2.1% yield providing income support. (2) Analyst coverage of the top 39.5% of holdings shows 100% buy ratings with +17.2% weighted price targets, suggesting meaningful undervaluation at current levels. (3) Macro conditions show a stable Fed path with calm volatility (VIX 14.42), and the curve remains normally upward-sloping. (4) The dollar strength (+0.93 on the week to 100.58) is a headwind for Turkey exposure given currency sensitivity, but this is reflected in the recent drawdown. The weak volume (0.32x average) and lack of recent news suggest a consolidation phase rather than a definitive break. The fund's three-year beta of 0.44 indicates lower systematic risk, and the mid-range positioning in the 52-week range (46.3%) does not suggest capitulation. A modest tilt to neutral rather than outright bullish reflects the technical weakness and momentum deterioration, partially offset by valuation and analyst support.
+
+**Main reasons it gave:**
+- P/E 13.81 and P/B 1.21 valuations compressed vs analyst +17.2% target
+- Price 4.8% below 200-day SMA with RSI 39.7 and negative MACD histogram
+- Dollar strength +0.93 to 100.58 headwind for Turkish assets
+- 100% buy ratings on 39.5% of fund holdings by weight
+- Weak volume 0.32x average suggests consolidation not capitulation
+
+<details><summary><b>News</b> — score +0.00</summary>
+
+_No news found for this one today._
+
+</details>
+
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
+
+```text
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
+Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
+Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+```
+
+</details>
+
+<details><summary><b>Price and chart</b> — score -0.45</summary>
+
+```text
+Last close 37.38 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 39.34 (-5.0%), 50d 39.22 (-4.7%), 200d 39.28 (-4.8%); 50d below 200d
+Momentum: RSI(14) 39.7 | MACD -0.570 vs signal -0.240 (histogram -0.330)
+Returns: 1d -0.7% | 5d -3.5% | 1m -8.2% | 3m -6.6%
+52-week range: 31.90 - 43.74 (now 46.3% of the way up)
+Volatility: ATR(14) 0.75 (2.0% of price) | annualised 20d 34.6%
+Volume: 0.32x the 20-day average
 ```
 
 </details>
@@ -7301,14 +6955,14 @@ _Not available today._
 <details><summary><b>What this fund holds</b> — score +0.35</summary>
 
 ```text
-Fund type: Greater China Region
-What it holds: P/E 11.90 | P/B 1.39 | P/S 1.38 | 3y earnings growth n/a
-Yield: 2.0%
-Three-year record: +9.1% a year | beta to the market 0.44
-Cost and size: expense ratio 0.59% | net assets 6.33B
-What it is made of: Stocks 99.8%, Cash 0.2%
-Largest holdings: Tencent Holdings Ltd 13.9%, Alibaba Group Holding Ltd Ordinary Shares 9.6%, China Construction Bank Corp Class H 4.0%, Industrial And Commercial Bank Of China Ltd Class H 2.5%, Xiaomi Corp Class B 2.4%
-Sector mix: Consumer cyclical 23.4%, Financial services 20.0%, Communication services 18.2%, Technology 11.8%
+Fund type: Focused Region
+What it holds: P/E 13.81 | P/B 1.21 | P/S 0.66 | 3y earnings growth n/a
+Yield: 2.1%
+Three-year record: +3.2% a year | beta to the market 0.44
+Cost and size: expense ratio 0.59% | net assets 225.08M
+What it is made of: Stocks 100.4%, Cash -0.4%
+Largest holdings: Aselsan Elektronik Sanayi Ve Ticaret AS 11.2%, Tupras-Turkiye Petrol Rafineleri AS 9.7%, Bim Birlesik Magazalar AS 8.7%, Akbank TAS 5.6%, Turk Hava Yollari AO 4.4%
+Sector mix: Industrials 31.2%, Financial services 14.7%, Consumer defensive 11.9%, Basic materials 11.1%
 ```
 
 </details>
@@ -7346,142 +7000,9 @@ _Not available today._
 <details><summary><b>What analysts say about what this fund holds</b> — score +0.55</summary>
 
 ```text
-Rolled up from the 5 largest holdings, 32.2% of the fund by weight
-Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.41 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +52.8% above the current prices
-Holdings read: 0700.HK, 9988.HK, 00939, 01398, 1810.HK
-Recent rating changes among them: none reported
-```
-
-</details>
-
-<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Who is positioned how</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
-
-```text
-Direction: unknown
-Share count change: n/a (too few readings)
-Shares outstanding: 120.50M | fund size: 6.47B
-Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
-```
-
-</details>
-
-### Turkey (TUR) · Sector or country — NEUTRAL, confidence 0.25
-
-**In the model's own words:**
-
-> TUR is a Turkish equities fund with modest positive technical headwinds balanced by supportive fundamentals and analyst sentiment. The fund trades 4.4–4.9% below its moving averages across the 20d, 50d, and 200d, with RSI(14) at 40.4 indicating neither oversold nor strongly bearish conditions; momentum (MACD histogram -0.358) is negative but not extreme. The 50d SMA below the 200d suggests a primary downtrend, though the 1-month pullback of 6.8% is moderate in the context of the fund's 34.5% annualised volatility. Volume is light at 0.22x average, reducing conviction in the directional move. On the fundamental side, the fund's valuation (P/E 13.81, P/B 1.21, P/S 0.66) is attractive, and the 2.1% yield provides modest income support. Analyst coverage of the top 39.5% of holdings shows 100% buy ratings with a +16.2% weighted price target, a constructive signal. However, the macro backdrop is mixed: the US dollar has strengthened +0.90 this week, which historically pressures emerging markets including Turkish assets; Treasury yields are broadly flat to up slightly, maintaining elevated carry costs; and VIX is calm at 14.62, suggesting low market stress but also reduced risk appetite for EM exposure. Fund flows data are unavailable, and no news was found in the past 24 hours. The combination of technical weakness, a strengthening dollar, and light volume prevents a bullish lean despite the attractive valuation and analyst optimism. A modest neutral-to-slightly-bullish lean is warranted by fundamentals and analyst consensus, but macro headwinds and technical deterioration constrain conviction.
-
-**Main reasons it gave:**
-- Price 4.4–4.9% below 20d, 50d, and 200d SMAs with 50d below 200d
-- RSI(14) 40.4 and MACD histogram -0.358 show modest negative momentum
-- Attractive valuation (P/E 13.81, P/B 1.21, P/S 0.66) and 2.1% yield
-- Analyst consensus 100% buy on top 39.5% of holdings with +16.2% price target
-- US dollar +0.90 on the week pressures emerging market assets
-
-<details><summary><b>News</b> — score +0.00</summary>
-
-_No news found for this one today._
-
-</details>
-
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
-
-```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
-Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
-Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
-```
-
-</details>
-
-<details><summary><b>Price and chart</b> — score -0.35</summary>
-
-```text
-Last close 37.55 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 39.49 (-4.9%), 50d 39.23 (-4.3%), 200d 39.26 (-4.4%); 50d below 200d
-Momentum: RSI(14) 40.4 | MACD -0.517 vs signal -0.159 (histogram -0.358)
-Returns: 1d +0.7% | 5d -5.6% | 1m -6.8% | 3m -7.3%
-52-week range: 31.90 - 43.74 (now 47.7% of the way up)
-Volatility: ATR(14) 0.77 (2.1% of price) | annualised 20d 34.5%
-Volume: 0.22x the 20-day average
-```
-
-</details>
-
-<details><summary><b>Company numbers</b> — score +0.45</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What this fund holds</b> — score +0.45</summary>
-
-```text
-Fund type: Focused Region
-What it holds: P/E 13.81 | P/B 1.21 | P/S 0.66 | 3y earnings growth n/a
-Yield: 2.1%
-Three-year record: +3.2% a year | beta to the market 0.44
-Cost and size: expense ratio 0.59% | net assets 225.08M
-What it is made of: Stocks 100.4%, Cash -0.4%
-Largest holdings: Aselsan Elektronik Sanayi Ve Ticaret AS 11.2%, Tupras-Turkiye Petrol Rafineleri AS 9.7%, Bim Birlesik Magazalar AS 8.7%, Akbank TAS 5.6%, Turk Hava Yollari AO 4.4%
-Sector mix: Industrials 31.2%, Financial services 14.7%, Consumer defensive 11.9%, Basic materials 11.1%
-```
-
-</details>
-
-<details><summary><b>Does this company beat its own forecasts</b> — score +0.45</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What holding this fund costs you</b> — score +0.45</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How much oil and gas is in storage</b> — score +0.45</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How the crop is growing</b> — score +0.45</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts and big funds say</b> — score +0.50</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.50</summary>
-
-```text
 Rolled up from the 5 largest holdings, 39.5% of the fund by weight
 Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.69 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +16.2% above the current prices
+Weighted price target: +17.2% above the current prices
 Holdings read: ASELS.IS, TUPRS.IS, BIMAS.IS, AKBNK.IS, THYAO.IS
 Recent rating changes among them: none reported
 ```
@@ -7505,7 +7026,7 @@ _Not available today._
 ```text
 Direction: unknown
 Share count change: n/a (too few readings)
-Shares outstanding: 15.65M | fund size: 587.66M
+Shares outstanding: 15.65M | fund size: 585.00M
 Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
 ```
 
@@ -7515,30 +7036,51 @@ Creations and redemptions are settled money, not an opinion -- but they follow d
 
 **In the model's own words:**
 
-> VNQ sits in a weak technical position with price below its 20-, 50- and 200-day SMAs, RSI at 37 suggesting oversold conditions, and negative MACD histogram indicating momentum erosion. The 1-month -4.8% drawdown shows recent underperformance. However, several offsetting factors prevent a bearish call: (1) the 50d SMA remains above 200d, so the uptrend structure is intact despite the pullback; (2) the yield curve is normal and upward-sloping at +98bp, supporting real estate; (3) VIX at 14.62 is calm, reducing near-term stress; (4) analyst consensus on the top 39.9% of holdings is unanimously bullish with a +16.7% weighted price target; (5) recent rating upgrades (Equinix Buy initiation, Barclays upgrade AMT to Overweight) show fresh positive sentiment. The macro backdrop is stable: inflation at 3.4% is not deflationary, unemployment 4.1% is moderate, and the Fed rate path prices only modest tightening. Treasury yields are essentially flat for the week. Fund flows data is too sparse to read. The technical weakness argues against conviction bullish, but the combination of beaten-down price (48.9% of 52-week range), oversold RSI, intact trend structure, and strong analyst backing on core holdings suggests limited downside risk and modest upside potential from here. A small bounce is plausible but not a high-conviction signal.
+> VNQ is trading below its 20-, 50-, and 200-day moving averages, with momentum deteriorating (RSI 37.1, MACD histogram negative). Returns are negative across 1-month (-4.8%) and 3-month (-4.2%) timeframes. The technical picture is weak and suggests downward pressure. Offsetting this, the broader macro environment shows a normalized yield curve (+0.95 spread), calming volatility (VIX -2.8 to 14.42), and a 3.6% yield that remains attractive at current rates. Analyst consensus on the fund's largest holdings is unanimously bullish with a 16.6% weighted price target, and recent rating changes include upgrades (EQIX, AMT). News flow highlights pockets of momentum in mid-cap and small-cap REITs, though some small-cap names lag. The fund's fundamentals remain solid (beta 0.98, 3-year return 8.9% annualized), but near-term technicals are clearly broken and volume is light (0.28x average). The weak momentum and price deterioration outweigh the longer-term bullish backdrop and analyst positivity, warranting a cautious stance. A technical recovery to the 50-day SMA or a clear rate surprise lower would alter this view.
 
 **Main reasons it gave:**
-- Price below all major SMAs with RSI 37, momentum negative but trend structure intact
-- Analyst consensus +100% buy on top 39.9% of holdings with +16.7% price target
-- Normal yield curve +98bp and calm VIX 14.62 support real estate asset class
-- Recent rating upgrades (EQIX Buy initiation, AMT upgrade) show fresh sentiment lift
+- RSI 37.1 with MACD histogram negative indicates momentum deterioration
+- Price trading 3.8% below 50-day SMA in downtrend; 1-month return -4.8%
+- Analyst consensus unanimously bullish with 16.6% weighted price target on top 5 holdings
+- Yield curve normal and VIX low provide supportive macro backdrop
+- Light volume (0.28x average) suggests conviction is weak on both sides
 
-<details><summary><b>News</b> — score +0.00</summary>
+<details><summary><b>News</b> — score +0.20</summary>
 
-_No news found for this one today._
+- [Real estate stocks with the strongest dividend growth grades (VNQ:NYSEARCA)](https://seekingalpha.com/news/4645336-real-estate-stocks-with-the-strongest-dividend-growth-grades)  
+  <sub>Seeking Alpha, 3 hours ago</sub>  
+  Screen the top 7 real estate stocks with A+ dividend growth grades—CTRE, CURB, DRH, LB, MRP, NMRK, WELL—plus key REIT ETFs.
+- [Vanguard Real Estate ETF To Go Ex-Dividend On September 23rd, 2026 With 0.8046 USD Dividend Per Share](https://www.moomoo.com/news/post/76552332/vanguard-real-estate-etf-to-go-ex-dividend-on-september)  
+  <sub>Moomoo, 10 hours ago</sub>  
+  September21st (Eastern Time) - $Vanguard Real Estate ETF(VNQ.US)$ is trading ex-dividend on September 23rd, 2026.Shareholders of record on September 23rd,...
+- [BXDC, SAFE lead 10 small-cap U.S. REITs with weak momentum grades](https://seekingalpha.com/news/4645428-bxdc-safe-lead-10-small-cap-us-reits-with-weak-momentum-grades)  
+  <sub>Seeking Alpha, 10 minutes ago</sub>  
+  Small-cap U.S. REIT momentum is lagging: see the weakest Quant Momentum Grades, YTD returns, and key names like BXDC and SAFE—review the list now.
+- [Agree Realty: Perfect Balance, Limited Appeal Of Fixed Income (NYSE:ADC)](https://seekingalpha.com/article/4948540-agree-realty-perfect-balance-limited-appeal-of-fixed-income)  
+  <sub>Seeking Alpha, 6 hours ago</sub>  
+  Agree Realty Corporation maintains strong fundamentals, with robust credit metrics and a portfolio of 2824 retail properties. Read more on ADC stock here.
+- [Mid-cap REIT momentum is building: 10 stocks in the watchlist (XLRE:NYSEARCA)](https://seekingalpha.com/news/4644793-mid-cap-reit-momentum-is-building-10-stocks-in-the-watchlist)  
+  <sub>Seeking Alpha, 24 hours ago</sub>  
+  Top mid-cap U.S. REITs are surging with A-range momentum grades—see the leaders, YTD gains, and key REIT ETFs to watch.
+- [4 REITs with A+ momentum grades lead the small-cap stocks list](https://seekingalpha.com/news/4644791-4-reits-with-a-momentum-grades-lead-the-small-cap-stocks-list)  
+  <sub>Seeking Alpha, 24 hours ago</sub>  
+  Discover top small-cap U.S. REIT stocks with A-range momentum grades and strong YTD gains—see the leaders and REIT ETFs to watch.
+- [JLL, DOC among 10 large and mega-cap REITs with strong momentum (XLRE:NYSEARCA)](https://seekingalpha.com/news/4644794-jll-doc-among-10-large--and-mega-cap-reits-with-strong-momentum)  
+  <sub>Seeking Alpha, 24 hours ago</sub>  
+  Large- and mega-cap U.S. REIT stocks are showing some powerful momentum, with several names carrying A-range Momentum Grades that point to stronger...
 
 </details>
 
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.20</summary>
 
 ```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
 Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
 Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
 ```
 
 </details>
@@ -7546,13 +7088,155 @@ Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market pri
 <details><summary><b>Price and chart</b> — score -0.35</summary>
 
 ```text
-Last close 93.82 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 95.76 (-2.0%), 50d 97.59 (-3.9%), 200d 94.31 (-0.5%); 50d above 200d
-Momentum: RSI(14) 37.4 | MACD -1.215 vs signal -1.018 (histogram -0.197)
-Returns: 1d +1.0% | 5d -0.5% | 1m -4.8% | 3m -2.9%
-52-week range: 87.00 - 100.95 (now 48.9% of the way up)
-Volatility: ATR(14) 1.12 (1.2% of price) | annualised 20d 10.4%
-Volume: 0.35x the 20-day average
+Last close 93.76 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 95.50 (-1.8%), 50d 97.51 (-3.8%), 200d 94.33 (-0.6%); 50d above 200d
+Momentum: RSI(14) 37.1 | MACD -1.187 vs signal -1.052 (histogram -0.135)
+Returns: 1d -0.1% | 5d -0.4% | 1m -4.8% | 3m -4.2%
+52-week range: 87.00 - 100.95 (now 48.5% of the way up)
+Volatility: ATR(14) 1.07 (1.1% of price) | annualised 20d 9.9%
+Volume: 0.28x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.35</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What this fund holds</b> — score +0.35</summary>
+
+```text
+Fund type: Real Estate
+What it holds: P/E 30.19 | P/B 2.59 | P/S 4.94 | 3y earnings growth n/a
+Yield: 3.6%
+Three-year record: +8.9% a year | beta to the market 0.98
+Cost and size: expense ratio 0.13% | net assets 70.82B
+What it is made of: Stocks 99.1%, Cash 0.7%, Other 0.2%
+Largest holdings: Vanguard Real Estate II Index 14.5%, Welltower Inc 8.7%, Prologis Inc 6.9%, Equinix Inc 5.5%, American Tower Corp 4.3%
+Sector mix: Real estate 99.4%, Communication services 0.4%, Energy 0.1%, Industrials 0.0%
+```
+
+</details>
+
+<details><summary><b>Does this company beat its own forecasts</b> — score +0.35</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What holding this fund costs you</b> — score +0.35</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How much oil and gas is in storage</b> — score +0.35</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How the crop is growing</b> — score +0.35</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.55</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.55</summary>
+
+```text
+Rolled up from the 5 largest holdings, 39.9% of the fund by weight
+Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.70 on a 1=strong buy to 5=strong sell scale)
+Weighted price target: +16.6% above the current prices
+Holdings read: VRTPX, WELL, PLD, EQIX, AMT
+Recent rating changes among them:
+  - WELL: 2024-10-01 Wells Fargo: down, Overweight -> Equal-Weight
+  - PLD: 2026-09-01 Wells Fargo: main, Overweight -> Overweight
+  - EQIX: 2026-09-21 Rothschild & Co: init, ? -> Buy
+  - AMT: 2026-08-20 Barclays: up, Equal-Weight -> Overweight
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Who is positioned how</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
+
+```text
+Direction: unknown
+Share count change: n/a (too few readings)
+Shares outstanding: 761.95M | fund size: 71.44B
+Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
+```
+
+</details>
+
+### US house builders (XHB) · Sector or country — NEUTRAL, confidence 0.25
+
+**In the model's own words:**
+
+> XHB is a consumer cyclical housing/building products fund with elevated beta (1.46) in a macro environment that offers mixed signals. On the positive side: the yield curve is normal and upward-sloping, volatility is calm (VIX 14.4), and the fund bounced +1.8% in the last day. Analysts covering the top 20.9% of holdings are bullish (73.5% buy-rated, +18.8% price target), and recent rating changes show stability or initiation rather than downgrades. However, technicals are deteriorating. The fund sits 7.4% below its 200-day MA with the 50d below 200d (a bear cross), RSI at 41.8 (not yet oversold but weak), and MACD slightly negative. Price action shows -7.3% over one month and -8.8% over three months. The 52-week range shows the fund trading near the bottom of its range (14.6% of the way up from low to high), and volume is thin at 0.27x average. Macro backdrop is stable but not bullish: near-term yields flat to up, inflation still elevated at 3.4%, and the Fed pricing in further hikes. Treasury yield curve slope is normal at +0.95, which is neutral for a cyclical. No clear catalyst has emerged this week beyond a routine distribution announcement. The thin analyst coverage and thin volume limit conviction. The technical deterioration and positioning in the bottom quartile of the year's range argue against a bullish lean, but the normal macro conditions and analyst support prevent a bearish call.
+
+**Main reasons it gave:**
+- Fund down 7.4% vs 200-day MA with 50d below 200d
+- 73.5% buy ratings on top holdings with +18.8% target, though only 20.9% covered
+- Trading 14.6% of 52-week range from bottom; thin volume 0.27x average
+- Normal yield curve +0.95 and calm VIX 14.4, but macro backdrop offers no fresh tailwind
+- RSI 41.8 and MACD slightly negative; -1.7% vs 20-day MA
+
+<details><summary><b>News</b> — score +0.00</summary>
+
+- [SPDR S&P Homebuilders ETF declares quarterly distribution of $0.5358](https://www.tradingview.com/news/seekingalpha:9c06a2cec094b:0-spdr-s-p-homebuilders-etf-declares-quarterly-distribution-of-0-5358/)  
+  <sub>TradingView, 21 hours ago</sub>  
+  Content provided by Seeking Alpha is intended for information purposes only, and that Seeking Alpha does not offer any personalist investment advice and is...
+- [ETFs Investing in Installed Building Products, Inc. Stocks](https://www.tradingview.com/symbols/GETTEX-2IL/etfs/)  
+  <sub>TradingView, 15 hours ago</sub>  
+  Explore funds investing in 2IL in a single list with price, expense ratio, and more stats for an in-depth analysis of new opportunities.
+
+</details>
+
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
+
+```text
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
+Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
+Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+```
+
+</details>
+
+<details><summary><b>Price and chart</b> — score -0.35</summary>
+
+```text
+Last close 98.72 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 100.44 (-1.7%), 50d 104.87 (-5.9%), 200d 106.56 (-7.4%); 50d below 200d
+Momentum: RSI(14) 41.8 | MACD -2.441 vs signal -2.388 (histogram -0.053)
+Returns: 1d +1.8% | 5d +1.0% | 1m -7.3% | 3m -8.8%
+52-week range: 94.86 - 121.36 (now 14.6% of the way up)
+Volatility: ATR(14) 2.20 (2.2% of price) | annualised 20d 20.4%
+Volume: 0.27x the 20-day average
 ```
 
 </details>
@@ -7566,14 +7250,14 @@ _Not available today._
 <details><summary><b>What this fund holds</b> — score +0.15</summary>
 
 ```text
-Fund type: Real Estate
-What it holds: P/E 30.19 | P/B 2.59 | P/S 4.94 | 3y earnings growth n/a
-Yield: 3.6%
-Three-year record: +8.9% a year | beta to the market 0.98
-Cost and size: expense ratio 0.13% | net assets 70.82B
-What it is made of: Stocks 99.1%, Cash 0.7%, Other 0.2%
-Largest holdings: Vanguard Real Estate II Index 14.5%, Welltower Inc 8.7%, Prologis Inc 6.9%, Equinix Inc 5.5%, American Tower Corp 4.3%
-Sector mix: Real estate 99.4%, Communication services 0.4%, Energy 0.1%, Industrials 0.0%
+Fund type: Consumer Cyclical
+What it holds: P/E 19.52 | P/B 2.34 | P/S 1.36 | 3y earnings growth n/a
+Yield: 0.8%
+Three-year record: +7.6% a year | beta to the market 1.46
+Cost and size: expense ratio 0.35% | net assets 1.33B
+What it is made of: Stocks 100.0%, Cash 0.1%
+Largest holdings: Installed Building Products Inc 4.4%, Owens-Corning Inc 4.3%, Allegion PLC 4.3%, Champion Homes Inc 4.1%, Williams-Sonoma Inc 3.9%
+Sector mix: Consumer cyclical 60.7%, Industrials 37.9%, Real estate 1.5%
 ```
 
 </details>
@@ -7602,24 +7286,25 @@ _Not available today._
 
 </details>
 
-<details><summary><b>What analysts and big funds say</b> — score +0.60</summary>
+<details><summary><b>What analysts and big funds say</b> — score +0.45</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.60</summary>
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.45</summary>
 
 ```text
-Rolled up from the 5 largest holdings, 39.9% of the fund by weight
-Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.74 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +16.7% above the current prices
-Holdings read: VRTPX, WELL, PLD, EQIX, AMT
+Rolled up from the 5 largest holdings, 20.9% of the fund by weight  -- thin, so read this as a fact about that slice rather than the fund
+Ratings by weight: buy 73.5% | hold 26.5% | sell 0.0% (mean 2.11 on a 1=strong buy to 5=strong sell scale)
+Weighted price target: +18.8% above the current prices
+Holdings read: IBP, OC, ALLE, SKY, WSM
 Recent rating changes among them:
-  - WELL: 2024-10-01 Wells Fargo: down, Overweight -> Equal-Weight
-  - PLD: 2026-09-01 Wells Fargo: main, Overweight -> Overweight
-  - EQIX: 2026-09-21 Rothschild & Co: init, ? -> Buy
-  - AMT: 2026-08-20 Barclays: up, Equal-Weight -> Overweight
+  - IBP: 2026-09-15 Stifel: init, ? -> Buy
+  - OC: 2026-09-11 Wells Fargo: main, Overweight -> Overweight
+  - ALLE: 2026-08-10 Morgan Stanley: main, Equal-Weight -> Equal-Weight
+  - SKY: 2026-08-06 UBS: main, Buy -> Buy
+  - WSM: 2026-09-09 Evercore ISI Group: main, In-Line -> In-Line
 ```
 
 </details>
@@ -7641,7 +7326,7 @@ _Not available today._
 ```text
 Direction: unknown
 Share count change: n/a (too few readings)
-Shares outstanding: 757.71M | fund size: 71.09B
+Shares outstanding: 13.82M | fund size: 1.36B
 Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
 ```
 
@@ -7651,36 +7336,42 @@ Creations and redemptions are settled money, not an opinion -- but they follow d
 
 **In the model's own words:**
 
-> XLB is caught between offsetting technical and fundamental signals with no clear catalyst. Technicals are weak: the fund trades 3.9% below its 20-day moving average with RSI at 34.3, MACD in negative territory, and a one-month decline of -5.0%, but volume is light at 0.35x average, which limits the signal's conviction. The fund is down only -1.2% from its 200-day MA, suggesting the weakness is relatively recent rather than a regime break. Macro backdrop is stable: Treasury yields moved modestly, the yield curve is normally upsloped at +0.98, the dollar firmed but modestly, and the VIX fell to 14.62 in calm conditions. The Fed has priced rate cuts ahead but no shock has occurred. On valuation, the fund's P/E of 24.59 and P/B of 3.00 are elevated for a materials fund, and GuruFocus flags overvaluation, though that is a static call not a change. Analyst coverage of the top 37% of holdings is uniformly bullish—100% buy-rated with a +14.5% weighted price target—which would normally support a mild bullish lean, but this coverage is thin as a fraction of the total fund and there are no recent upgrades of consequence, just maintenance ratings. Fund flows data is insufficient. The one-month drawdown is material but lacks a macro or earnings shock to explain it, and light volume suggests it may not be conviction-driven selling. This is a wait-and-see setup: technicals have turned sour but not decisively, fundamentals are not visibly deteriorating, and the macro calendar offers no imminent catalyst. A break below the 200-day MA with volume, or a clear macro shift, would warrant a bearish reassessment.
+> XLB exhibits mixed signals that do not support a directional conviction. Technicals show deteriorating momentum with RSI at 38.2 (oversold), a negative MACD histogram, and the price trading 3% below its 20-day and 50-day moving averages, but notably the fund has recovered 68.9% of its 52-week range from lows, suggesting no capitulation. The recent 1-day gain of 0.8% on subdued volume (0.36x average) lacks conviction. Macro conditions remain benign: yields are stable with an upward-sloping curve, the dollar has strengthened modestly, and the VIX at 14.42 shows calm. The Fed's rate-cut expectations (4 quarter-point hikes priced over two years) and market inflation expectations at 2.3% provide a neutral backdrop for materials. Fund fundamentals show reasonable valuation (P/E 24.59, yield 1.6%) with a three-year record of +9.2% annually and low beta (0.82), but no compelling catalyst. Analyst sentiment on the five largest holdings (37% of the fund) is solidly bullish with a 100% buy rating and a +13.1% weighted price target, providing some support. However, the news flow is generic ETF recommendation content with no material catalyst, and fund flows data is insufficient to read conviction. The combination of oversold technicals, subdued recent performance (-6.4% in one month), and lack of a macro or policy catalyst argues against conviction in either direction at this time.
 
 **Main reasons it gave:**
-- RSI 34.3 and MACD negative histogram, fund 3.9% below 20-day MA
-- Light volume on weakness limits conviction of technical breakdown
-- Analyst consensus 100% buy-rated with +14.5% price target on largest holdings
-- Valuation elevated at P/E 24.59 and P/B 3.00 relative to materials peers
-- Macro backdrop stable: yield curve normal, VIX calm, no Fed surprise
+- Momentum deteriorated with RSI 38.2 and negative MACD histogram despite slight daily bounce
+- Analyst roll-up shows 100% buy rating and +13.1% price target on 37% of fund
+- Price trading 3% below 20d and 50d moving averages with subdued volume
+- Fund flows data insufficient to assess conviction; no policy or macro catalyst present
+- One-month return of -6.4% contrasts with three-year annual gain of +9.2%
 
 <details><summary><b>News</b> — score +0.00</summary>
 
-- [XLB Looks 3.0% Overvalued on GF Value™ as Dividend Sustainabilit](https://www.gurufocus.com/news/9089824/xlb-looks-30-overvalued-on-gf-value-as-dividend-sustainability-remains-key)  
-  <sub>GuruFocus, 2 hours ago</sub>  
-  On September 21, 2026, the S&P Select Materials SPDR (ticker: XLB) established critical pivot points using the DeMark calculation method, setting a pivot...
-- [Leading And Lagging Sectors For September 21, 2026](https://www.benzinga.com/etfs/sector-etfs/26/09/61894029/leading-and-lagging-sectors-september-21-2026)  
+- [Should You Invest in the iShares U.S. Basic Materials ETF (IYM)?](https://finance.yahoo.com/markets/stocks/articles/invest-ishares-u-basic-materials-102002460.html)  
+  <sub>Yahoo Finance, 5 hours ago</sub>  
+  If you're interested in broad exposure to the Materials - Broad segment of the equity market, look no further than the iShares U.S. Basic Materials ETF...
+- [Basic Materials Sector Still Shows Promise In 2026, But Proceed With Caution](https://seekingalpha.com/article/4948499-basic-materials-sector-still-shows-promise-in-2026-but-proceed-with-caution)  
+  <sub>Seeking Alpha, 4 hours ago</sub>  
+  Top XLB holdings like Newmont, Freeport-McMoran, Linde, Corteva, and Nucor have delivered strong YTD performance. Learn why XLB ETF is a hold.
+- [Leading And Lagging Sectors For September 22, 2026](https://www.benzinga.com/etfs/sector-etfs/26/09/61919139/leading-and-lagging-sectors-september-22-2026)  
   <sub>Benzinga, 2 hours ago</sub>  
-  Gainers Symbol Name Price Change ($) Change (%) Volume (NYSE:XLK) State Street Technology Select Sector SPDR ETF 191.7700 2.170 1.14 39.0K (NYSE:XLC) State...
+  Gainers Symbol Name Price Change ($) Change (%) Volume (NYSE:XLB) State Street Materials Select Sector SPDR ETF 49.9500 0.240 0.48 2.2K (NYSE:XLP) State...
+- [Staples ETF Widens Gap Over Discretionary in 2026](https://www.etftrends.com/sector-investing-content-hub/staples-etf-widens-gap-over-discretionary-in-2026/)  
+  <sub>ETF Trends, 3 hours ago</sub>  
+  State Street's staples ETF is outpacing its discretionary counterpart by more than 13 percentage points as household budgets tighten.
 
 </details>
 
 <details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
 
 ```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
 Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
 Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
 ```
 
 </details>
@@ -7688,13 +7379,13 @@ Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market pri
 <details><summary><b>Price and chart</b> — score -0.35</summary>
 
 ```text
-Last close 49.81 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 51.86 (-3.9%), 50d 51.75 (-3.7%), 200d 50.43 (-1.2%); 50d above 200d
-Momentum: RSI(14) 34.3 | MACD -0.586 vs signal -0.321 (histogram -0.265)
-Returns: 1d -0.4% | 5d -1.3% | 1m -5.0% | 3m -3.5%
-52-week range: 42.23 - 53.67 (now 66.3% of the way up)
-Volatility: ATR(14) 0.77 (1.5% of price) | annualised 20d 12.4%
-Volume: 0.35x the 20-day average
+Last close 50.11 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 51.68 (-3.0%), 50d 51.74 (-3.1%), 200d 50.45 (-0.7%); 50d above 200d
+Momentum: RSI(14) 38.2 | MACD -0.612 vs signal -0.380 (histogram -0.232)
+Returns: 1d +0.8% | 5d -1.2% | 1m -6.4% | 3m -1.5%
+52-week range: 42.23 - 53.67 (now 68.9% of the way up)
+Volatility: ATR(14) 0.76 (1.5% of price) | annualised 20d 13.0%
+Volume: 0.36x the 20-day average
 ```
 
 </details>
@@ -7755,7 +7446,7 @@ _Not available today._
 ```text
 Rolled up from the 5 largest holdings, 37.0% of the fund by weight
 Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.71 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +14.5% above the current prices
+Weighted price target: +13.1% above the current prices
 Holdings read: LIN, NEM, FCX, CTVA, APD
 Recent rating changes among them:
   - LIN: 2026-09-11 Keybanc: init, ? -> Overweight
@@ -7784,1393 +7475,57 @@ _Not available today._
 ```text
 Direction: unknown
 Share count change: n/a (too few readings)
-Shares outstanding: 71.92M | fund size: 3.58B
+Shares outstanding: 71.92M | fund size: 3.60B
 Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
 ```
 
 </details>
 
-### US energy companies (XLE) · Sector or country — NEUTRAL, confidence 0.25
-
-**In the model's own words:**
-
-> XLE is trading near 52-week highs with positive 3-year returns and 100% analyst buy ratings on its top holdings, supported by a +5.4% weighted price target. However, near-term technicals are showing deterioration: the price is 2.1% below the 20-day moving average, momentum has rolled over (RSI 46.9, MACD histogram negative at -0.354), and volume is well below average at 0.49x. Recent price action shows -2.5% on the day and -2.8% over five days despite broader market strength. The energy backdrop is mixed: crude inventories drew 0.6M barrels (bullish) but remain at only the 38th percentile, while petrol inventories built to a 52-week low (bearish signal for demand). The EIA price outlook calls for WTI to decline ~10% over six months to $79/barrel, a headwind for energy sector valuations. Macro conditions are stable with a normalized yield curve, low volatility (VIX 14.6), and the dollar firmer week-over-week. Strait of Hormuz shipments hitting a six-month high and supertanker supply constraints are modest supply-side supports, but insufficient to overcome the combination of near-term technical weakness, soft inventory demand signals, and a downward price forecast. Fund flows data is incomplete, limiting conviction on positioning. The call reflects cautious positioning ahead of what could be further consolidation, with no clear catalyst to justify a directional lean.
-
-**Main reasons it gave:**
-- Momentum rolling over: RSI 46.9 and MACD histogram -0.354 after price break below 20d MA
-- EIA six-month crude forecast down ~10% to $79/barrel; three-month forecast down to $84.50
-- Petrol inventories at 13th percentile despite seasonal build, signaling weak demand
-- 100% buy ratings from analysts with +5.4% weighted price target offset by technical deterioration
-- Volume 0.49x average during down move, suggesting lack of conviction in recent weakness
-
-<details><summary><b>News</b> — score -0.15</summary>
-
-- [Exchange-Traded Funds Rise, Equity Futures up Pre-Bell Monday as Oil Prices Decline](https://www.moomoo.com/news/post/76538074/exchange-traded-funds-rise-equity-futures-up-pre-bell-monday)  
-  <sub>Moomoo, 1 hour ago</sub>  
-  Thebroad market exchange-traded fund SPDR S&P 500 ETF Trust (SPY) was up 0.7% and the actively traded Invesco QQQ Trust (QQQ) advanced 1.1% in Monday's...
-- [SCHD: Why I Think This ETF Still Wins In A Rate Hike Cycle (NYSEARCA:SCHD)](https://seekingalpha.com/article/4948157-schd-why-i-think-this-etf-still-wins-in-a-rate-hike-cycle)  
-  <sub>Seeking Alpha, 2 hours ago</sub>  
-  Summary. Schwab U.S. Dividend Equity ETF (SCHD) remains a core buy for income-focused portfolios, leveraging disciplined methodology and low-cost structure.
-- [Hormuz Oil Shipments Hit Six-Month High? ETFs to Win/Lose](https://www.tradingview.com/news/zacks:9ed16a4fe094b:0-hormuz-oil-shipments-hit-six-month-high-etfs-to-win-lose/)  
-  <sub>TradingView, 3 hours ago</sub>  
-  Oil and liquefied natural gas shipments through the Strait of Hormuz reached their highest level in six months over the past two weeks, indicating that...
-- [Leading And Lagging Sectors For September 21, 2026](https://www.benzinga.com/etfs/sector-etfs/26/09/61894029/leading-and-lagging-sectors-september-21-2026)  
-  <sub>Benzinga, 2 hours ago</sub>  
-  Gainers Symbol Name Price Change ($) Change (%) Volume (NYSE:XLK) State Street Technology Select Sector SPDR ETF 191.7700 2.170 1.14 39.0K (NYSE:XLC) State...
-- [Futures Rise: Can Market Take Off? 2026's Top Stocks Are Buys](https://www.investors.com/market-trend/stock-market-today/dow-jones-futures-robinhood-sandisk-amd-moderna-surge-buy-areas/)  
-  <sub>Investor's Business Daily, 3 hours ago</sub>  
-  Dow Jones futures: The stock market is set for a positive start to the week with Robinhood, Sandisk, AMD and Moderna already in buy areas.
-- [Crude Oil Weekly Outlook: BRICS Summit Calls for Maximum Restraint](https://www.stonex.com/en-gb/news-and-analysis/crude-oil-weekly-outlook-brics-summit-calls-for-maximum-restraint/)  
-  <sub>www.stonex.com, 10 hours ago</sub>  
-  The BRICS summit called for maximum restraint this weekend as the energy crisis reaches critical economic tipping points. Diplomacy was presented as the...
-- [Oil supertanker shortage: Another risk for gas prices](https://seekingalpha.com/news/4644620-oil-supertanker-shortage-another-risk-for-gas-prices)  
-  <sub>Seeking Alpha, 7 hours ago</sub>  
-  There's now a shortage of oil supertankers, adding more pressure on gasoline prices, with shipping rates reaching record levels around the world.
-- [Silver Jumps 3% While Copper Surges 2.2% And Gold Breaks Hig](https://www.kucoin.com/news/insight/XLE/6ab02e2662cf3700074382dc)  
-  <sub>KuCoin, 20 hours ago</sub>  
-  Silver Jumps 3% While Copper Surges 2.2% And Gold Breaks Higher ~ Monday Market Moves Full Episode: https://t.co/ze6UCHwPEN Rick Rule Mining in Mexico...
-- [Qatar Energy CEO counters Bessent: Strait of Hormuz ‘will never be obsolete’ (CL1:COM:Commodity)](https://seekingalpha.com/news/4644605-qatar-energy-ceo-counters-bessent-strait-of-hormuz-will-never-be-obsolete)  
-  <sub>Seeking Alpha, 10 hours ago</sub>  
-  Qatari Energy Minister Saad Al-Kaabi on Sunday said Treasury Secretary Scott Bessent was “wrong” when he said that the strategic Strait of Hormuz will be...
-
-</details>
-
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score -0.15</summary>
-
-```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
-Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
-Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
-```
-
-</details>
-
-<details><summary><b>Price and chart</b> — score -0.35</summary>
-
-```text
-Last close 62.71 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 64.06 (-2.1%), 50d 61.33 (+2.3%), 200d 55.82 (+12.4%); 50d above 200d
-Momentum: RSI(14) 46.9 | MACD 0.805 vs signal 1.159 (histogram -0.354)
-Returns: 1d -2.5% | 5d -2.8% | 1m -1.6% | 3m +16.0%
-52-week range: 42.61 - 65.93 (now 86.2% of the way up)
-Volatility: ATR(14) 1.31 (2.1% of price) | annualised 20d 21.4%
-Volume: 0.49x the 20-day average
-```
-
-</details>
-
-<details><summary><b>Company numbers</b> — score -0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What this fund holds</b> — score -0.20</summary>
-
-```text
-Fund type: Equity Energy
-What it holds: P/E 17.74 | P/B 2.58 | P/S 1.68 | 3y earnings growth n/a
-Yield: 2.4%
-Three-year record: +15.1% a year | beta to the market -0.07
-Cost and size: expense ratio 0.08% | net assets 41.44B
-What it is made of: Stocks 99.8%, Cash 0.2%
-Largest holdings: ExxonMobil Holdings Corp 19.9%, Chevron Corp 14.9%, ConocoPhillips 6.2%, Marathon Petroleum Corp 5.4%, Phillips 66 5.3%
-Sector mix: Energy 100.0%
-```
-
-</details>
-
-<details><summary><b>Does this company beat its own forecasts</b> — score -0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What holding this fund costs you</b> — score -0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How much oil and gas is in storage</b> — score -0.20</summary>
-
-```text
-US inventories, week ending 2026-09-11 (published the following Wednesday)
-  Crude oil: 423.4 million barrels, -0.6 on the week (a draw), 38% percentile over 52 weeks
-  Petrol: 207.7 million barrels, +0.8 on the week (a build), 13% percentile over 52 weeks -- low for the time of year
-  Diesel: 107.9 million barrels, +1.6 on the week (a build), 33% percentile over 52 weeks
-  Natural gas: 3,298.0 billion cubic feet, +44.0 on the week (a build), 71% percentile over 52 weeks
-A build is more supply than demand and a draw is the reverse, so a build reads bearish and a draw bullish -- as a rule of thumb, not a law. Weigh the change and how unusual the level is above the level itself, and remember the market has already seen this number.
-```
-
-</details>
-
-<details><summary><b>How the crop is growing</b> — score -0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts and big funds say</b> — score +0.50</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.50</summary>
-
-```text
-Rolled up from the 5 largest holdings, 51.7% of the fund by weight
-Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 2.04 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +5.4% above the current prices
-Holdings read: XOM, CVX, COP, MPC, PSX
-Recent rating changes among them:
-  - XOM: 2026-09-03 Piper Sandler: main, Neutral -> Neutral
-  - CVX: 2026-09-03 BMO Capital: main, Outperform -> Outperform
-  - COP: 2026-09-14 UBS: main, Buy -> Buy
-  - MPC: 2026-09-21 Goldman Sachs: main, Buy -> Buy
-  - PSX: 2026-09-17 BMO Capital: main, Outperform -> Outperform
-```
-
-</details>
-
-<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Who is positioned how</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
-
-```text
-Direction: unknown
-Share count change: n/a (too few readings)
-Shares outstanding: 186.42M | fund size: 11.69B
-Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
-```
-
-</details>
-
-### US banks and finance (XLF) · Sector or country — NEUTRAL, confidence 0.25
-
-**In the model's own words:**
-
-> XLF is trading 2.6% below its 20-day moving average and shows weak momentum with RSI at 36.6 and a negative MACD histogram, indicating downward pressure. However, the fundamental backdrop remains constructive: the fund's largest holdings (JPM, BRK-B, V, MA, BAC) have unanimous buy ratings from analysts with an +11.6% weighted price target above current prices, and the analyst roll-up covers 41.5% of the fund's weight. The macro environment is benign—a normal upward-sloping yield curve, falling volatility (VIX down 2.5 this week), and a strengthening dollar (+0.90 on the week) which can support financial services stocks. The fund's valuation at P/E 16.36 and P/B 2.42 appears reasonable relative to its 18.8% annualized three-year return and defensive 0.71 beta. The headwind is technical: price is 2.4-2.6% below its 50- and 20-day moving averages, volume is light at 0.35x average, and momentum indicators are in weak territory. The news flow is generic and does not contain a material surprise. The recent short-term pullback (-2.1% over 5 days) coincides with higher short-term Treasury yields (3-month +5bp this week) but this is a modest move in a low-volatility environment. Without a decisive technical break, a data surprise, or a policy catalyst, the balanced setup—strong analyst coverage and fundamentals offset by near-term weakness—supports NEUTRAL with modest upside conviction. The call could shift bullish on technical repair or a yield curve steepen, or bearish on a break below the 50-day.
-
-**Main reasons it gave:**
-- Price 2.6% below 20-day moving average with RSI 36.6 and negative MACD histogram
-- Analyst consensus: 100% buy weighting, +11.6% price target on top 41.5% of holdings
-- Normal yield curve, VIX down 2.5 this week, falling long-end yields
-- Light volume at 0.35x average; no data surprise or policy catalyst
-- Valuation P/E 16.36 reasonable relative to 18.8% three-year annualized return
-
-<details><summary><b>News</b> — score +0.00</summary>
-
-- [XLF Looks 0.0% Fairly Valued on GF Value™](https://www.gurufocus.com/news/9089808/xlf-looks-00-fairly-valued-on-gf-value)  
-  <sub>GuruFocus, 2 hours ago</sub>  
-  On September 21, 2026, the Financial Select Sector SPDR ETF (ticker: XLF) has established key DeMark pivot points that traders are watching closely to gauge...
-- [These financial stocks score highest on dividend growth (XLF:NYSEARCA)](https://seekingalpha.com/news/4644706-these-financial-stocks-score-highest-on-dividend-growth)  
-  <sub>Seeking Alpha, 4 hours ago</sub>  
-  Screen top financial stocks with A+ Dividend Growth Grades—CINF, ERIE, EVR, MA, MCO, MSCI, PGR, SEIC, V.
-- [Product Due Diligence Session: Building Resilient Portfolios with Real Assets | ETF Trends](https://www.advisorperspectives.com/webinars/2026/10/07/building-resilient-portfolios-with-real-assets?partnerref=APSidebar)  
-  <sub>Advisor Perspectives, 1 hour ago</sub>  
-  Attendees will gain insights into the role of real assets and a framework for implementing an allocation in client portfolios.
-- [Exchange-Traded Funds Rise, Equity Futures up Pre-Bell Monday as Oil Prices Decline](https://www.moomoo.com/news/post/76538074/exchange-traded-funds-rise-equity-futures-up-pre-bell-monday)  
-  <sub>Moomoo, 1 hour ago</sub>  
-  Thebroad market exchange-traded fund SPDR S&P 500 ETF Trust (SPY) was up 0.7% and the actively traded Invesco QQQ Trust (QQQ) advanced 1.1% in Monday's...
-- [Leading And Lagging Sectors For September 21, 2026](https://www.benzinga.com/etfs/sector-etfs/26/09/61894029/leading-and-lagging-sectors-september-21-2026)  
-  <sub>Benzinga, 2 hours ago</sub>  
-  Gainers Symbol Name Price Change ($) Change (%) Volume (NYSE:XLK) State Street Technology Select Sector SPDR ETF 191.7700 2.170 1.14 39.0K (NYSE:XLC) State...
-- [Futures Rise: Can Market Take Off? 2026's Top Stocks Are Buys](https://www.investors.com/market-trend/stock-market-today/dow-jones-futures-robinhood-sandisk-amd-moderna-surge-buy-areas/)  
-  <sub>Investor's Business Daily, 3 hours ago</sub>  
-  Dow Jones futures: The stock market is set for a positive start to the week with Robinhood, Sandisk, AMD and Moderna already in buy areas.
-
-</details>
-
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
-
-```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
-Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
-Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
-```
-
-</details>
-
-<details><summary><b>Price and chart</b> — score -0.35</summary>
-
-```text
-Last close 55.81 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 57.29 (-2.6%), 50d 57.18 (-2.4%), 200d 53.71 (+3.9%); 50d above 200d
-Momentum: RSI(14) 36.6 | MACD -0.350 vs signal -0.098 (histogram -0.253)
-Returns: 1d -0.1% | 5d -2.1% | 1m -2.0% | 3m +3.9%
-52-week range: 47.81 - 58.56 (now 74.5% of the way up)
-Volatility: ATR(14) 0.69 (1.2% of price) | annualised 20d 12.8%
-Volume: 0.35x the 20-day average
-```
-
-</details>
-
-<details><summary><b>Company numbers</b> — score +0.40</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What this fund holds</b> — score +0.40</summary>
-
-```text
-Fund type: Financial
-What it holds: P/E 16.36 | P/B 2.42 | P/S 3.50 | 3y earnings growth n/a
-Yield: 1.4%
-Three-year record: +18.8% a year | beta to the market 0.71
-Cost and size: expense ratio 0.08% | net assets 54.59B
-What it is made of: Stocks 99.8%, Cash 0.2%
-Largest holdings: JPMorgan Chase & Co 11.7%, Berkshire Hathaway Inc Class B 11.3%, Visa Inc Class A 7.7%, Mastercard Inc Class A 5.8%, Bank of America Corp 5.0%
-Sector mix: Financial services 98.1%, Technology 1.6%, Industrials 0.3%
-```
-
-</details>
-
-<details><summary><b>Does this company beat its own forecasts</b> — score +0.40</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What holding this fund costs you</b> — score +0.40</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How much oil and gas is in storage</b> — score +0.40</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How the crop is growing</b> — score +0.40</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts and big funds say</b> — score +0.50</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.50</summary>
-
-```text
-Rolled up from the 5 largest holdings, 41.5% of the fund by weight
-Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.80 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +11.6% above the current prices
-Holdings read: JPM, BRK-B, V, MA, BAC
-Recent rating changes among them:
-  - JPM: 2026-08-14 Wells Fargo: main, Overweight -> Overweight
-  - BRK-B: 2026-08-10 UBS: main, Buy -> Buy
-  - V: 2026-08-31 RBC Capital: main, Outperform -> Outperform
-  - MA: 2026-08-31 RBC Capital: main, Outperform -> Outperform
-  - BAC: 2026-08-03 UBS: main, Buy -> Buy
-```
-
-</details>
-
-<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Who is positioned how</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
-
-```text
-Direction: unknown
-Share count change: n/a (too few readings)
-Shares outstanding: 883.44M | fund size: 49.31B
-Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
-```
-
-</details>
-
-### US industry (XLI) · Sector or country — NEUTRAL, confidence 0.25
-
-**In the model's own words:**
-
-> XLI trades below its 20-day, 50-day and 200-day moving averages, with momentum deteriorating (RSI 35, MACD histogram negative) and volume well below average. The 1-month return is -5.5% and the 3-month is -6.5%, indicating a sustained downturn. Macro backdrop is stable: the yield curve slopes normally, VIX is calm at 14.6 (down 2.5 on the week), the dollar has strengthened 0.9 on the week, and Treasury yields have moved modestly. Inflation at 3.4% and unemployment at 4.1% are not far outside expectations. The fund's fundamentals show elevated valuation (P/E 28.43, P/B 6.75) after the recent rally, and while analyst coverage of the top 25.8% is uniformly bullish with a +23.1% price target, the largest holding UNP just upgraded to Buy on 2026-09-16, suggesting fresh conviction, but this is offset by broad technical weakness and below-average volume suggesting weak conviction from the fund's actual investors. There is no decisive macro catalyst or technical break to justify a directional call. The U.S.-China talks mentioned in headlines are speculative forward guidance, not a settled development, and the sector rotation into technology (XLK +1.14% vs XLI flat) on a down day reflects relative weakness, not absolute strength.
-
-**Main reasons it gave:**
-- RSI 35 and negative MACD histogram signal momentum deterioration
-- Price 2.0-4.9% below short and intermediate moving averages over one month
-- Volume 0.43x 20-day average suggests weak investor conviction despite analyst upside targets
-- P/E 28.43 and P/B 6.75 reflect stretched valuation after recent appreciation
-- Analyst roll-up 100% buy rated with +23.1% price target offset by technical breakdown
-
-<details><summary><b>News</b> — score +0.00</summary>
-
-- [Product Due Diligence Session: Building Resilient Portfolios with Real Assets | ETF Trends](https://www.advisorperspectives.com/webinars/2026/10/07/building-resilient-portfolios-with-real-assets?partnerref=APSidebar)  
-  <sub>Advisor Perspectives, 1 hour ago</sub>  
-  Attendees will gain insights into the role of real assets and a framework for implementing an allocation in client portfolios.
-- [Exchange-Traded Funds Rise, Equity Futures up Pre-Bell Monday as Oil Prices Decline](https://www.moomoo.com/news/post/76538074/exchange-traded-funds-rise-equity-futures-up-pre-bell-monday)  
-  <sub>Moomoo, 1 hour ago</sub>  
-  Thebroad market exchange-traded fund SPDR S&P 500 ETF Trust (SPY) was up 0.7% and the actively traded Invesco QQQ Trust (QQQ) advanced 1.1% in Monday's...
-- [Leading And Lagging Sectors For September 21, 2026](https://www.benzinga.com/etfs/sector-etfs/26/09/61894029/leading-and-lagging-sectors-september-21-2026)  
-  <sub>Benzinga, 2 hours ago</sub>  
-  Gainers Symbol Name Price Change ($) Change (%) Volume (NYSE:XLK) State Street Technology Select Sector SPDR ETF 191.7700 2.170 1.14 39.0K (NYSE:XLC) State...
-- [U.S.-China Talks Seem Successful: ETF Areas in Focus](https://www.tradingview.com/news/zacks:5293da3f7094b:0-u-s-china-talks-seem-successful-etf-areas-in-focus/)  
-  <sub>TradingView, 2 hours ago</sub>  
-  Investors are currently tracking developments ahead of an expected meeting between U.S. President Donald Trump and Chinese President Xi Jinping in...
-
-</details>
-
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
-
-```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
-Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
-Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
-```
-
-</details>
-
-<details><summary><b>Price and chart</b> — score -0.35</summary>
-
-```text
-Last close 169.92 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 173.47 (-2.0%), 50d 178.74 (-4.9%), 200d 171.72 (-1.0%); 50d above 200d
-Momentum: RSI(14) 35.0 | MACD -3.033 vs signal -2.808 (histogram -0.225)
-Returns: 1d +0.1% | 5d -0.0% | 1m -5.5% | 3m -6.5%
-52-week range: 147.83 - 186.51 (now 57.1% of the way up)
-Volatility: ATR(14) 2.44 (1.4% of price) | annualised 20d 13.1%
-Volume: 0.43x the 20-day average
-```
-
-</details>
-
-<details><summary><b>Company numbers</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What this fund holds</b> — score +0.15</summary>
-
-```text
-Fund type: Industrials
-What it holds: P/E 28.43 | P/B 6.75 | P/S 3.00 | 3y earnings growth n/a
-Yield: 1.2%
-Three-year record: +19.0% a year | beta to the market 1.02
-Cost and size: expense ratio 0.08% | net assets 31.95B
-What it is made of: Stocks 100.0%, Cash 0.1%
-Largest holdings: Caterpillar Inc 6.7%, GE Aerospace 6.4%, RTX Corp 5.1%, GE Vernova Inc 4.4%, Union Pacific Corp 3.2%
-Sector mix: Industrials 92.8%, Technology 6.7%, Basic materials 0.3%, Consumer cyclical 0.2%
-```
-
-</details>
-
-<details><summary><b>Does this company beat its own forecasts</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What holding this fund costs you</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How much oil and gas is in storage</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How the crop is growing</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts and big funds say</b> — score +0.45</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.45</summary>
-
-```text
-Rolled up from the 5 largest holdings, 25.8% of the fund by weight
-Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.79 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +23.1% above the current prices
-Holdings read: CAT, GE, RTX, GEV, UNP
-Recent rating changes among them:
-  - CAT: 2024-10-14 JP Morgan: main, Overweight -> Overweight
-  - GE: 2026-07-23 Bernstein: main, Outperform -> Outperform
-  - RTX: 2026-08-03 Bernstein: main, Market Perform -> Market Perform
-  - GEV: 2026-09-15 Bernstein: reit, Outperform -> Outperform
-  - UNP: 2026-09-16 UBS: up, Neutral -> Buy
-```
-
-</details>
-
-<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Who is positioned how</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
-
-```text
-Direction: unknown
-Share count change: n/a (too few readings)
-Shares outstanding: 136.63M | fund size: 23.22B
-Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
-```
-
-</details>
-
-### US everyday goods (XLP) · Sector or country — NEUTRAL, confidence 0.25
-
-**In the model's own words:**
-
-> XLP shows conflicting signals on a weak macro backdrop. Technicals are markedly oversold with RSI at 35.7 and negative MACD histogram, offering a potential bounce opportunity; the fund has underperformed over the past month (-3.9%) and trades below its 20, 50, and 200-day moving averages. However, the fundamental picture is constructive: analyst consensus on the largest holdings (39.6% of the fund) is unanimously bullish with a +14% weighted price target, and the fund's defensive positioning (beta 0.49, 2.6% yield) remains appropriate for the current environment. Macro conditions are stable -- the VIX is calm at 14.62, the yield curve is normal at +0.98, and the Fed's rate path suggests near-terminal rates. The recent underperformance appears technical exhaustion rather than a fundamental deterioration. The one minor headwind is low volume on the day (0.38x average), which limits conviction in any bounce. The fund remains attractive for defensive investors given analyst support for its largest holdings, but macro timing risk and the absence of a clear near-term catalyst (no recent positive surprise, no decisive technical reversal) prevent a stronger call.
-
-**Main reasons it gave:**
-- RSI 35.7 signals technical oversold condition
-- Analyst consensus buy on top 5 holdings with +14% weighted price target
-- Fund underperformed 1m and 3m despite stable macro backdrop
-- Volume 0.38x average limits conviction in reversal
-- Defensive positioning (beta 0.49) remains appropriate for environment
-
-<details><summary><b>News</b> — score +0.00</summary>
-
-- [Exchange-Traded Funds Rise, Equity Futures up Pre-Bell Monday as Oil Prices Decline](https://www.moomoo.com/news/post/76538074/exchange-traded-funds-rise-equity-futures-up-pre-bell-monday)  
-  <sub>Moomoo, 1 hour ago</sub>  
-  Thebroad market exchange-traded fund SPDR S&P 500 ETF Trust (SPY) was up 0.7% and the actively traded Invesco QQQ Trust (QQQ) advanced 1.1% in Monday's...
-- [Leading And Lagging Sectors For September 21, 2026](https://www.benzinga.com/etfs/sector-etfs/26/09/61894029/leading-and-lagging-sectors-september-21-2026)  
-  <sub>Benzinga, 2 hours ago</sub>  
-  Gainers Symbol Name Price Change ($) Change (%) Volume (NYSE:XLK) State Street Technology Select Sector SPDR ETF 191.7700 2.170 1.14 39.0K (NYSE:XLC) State...
-- [XLV Looks 1.0% Overvalued on GF Value™ as Dividend Sustainabilit](https://www.gurufocus.com/news/9089817/xlv-looks-10-overvalued-on-gf-value-as-dividend-sustainability-remains-strong)  
-  <sub>GuruFocus, 2 hours ago</sub>  
-  On September 21, 2026, the Health Care Select Sector SPDR ETF (ticker: XLV) saw new pivot points established using the DeMark method, signaling potential...
-- [Should You Invest in the iShares U.S. Consumer Discretionary ETF (IYC)?](https://finance.yahoo.com/markets/stocks/articles/invest-ishares-u-consumer-discretionary-102002712.html)  
-  <sub>Yahoo Finance, 5 hours ago</sub>  
-  Designed to provide broad exposure to the Consumer Discretionary - Broad segment of the equity market, the iShares U.S. Consumer Discretionary ETF (IYC) is...
-- [Novo Nordisk Falls 7% as Post-Wegovy Growth Plan Fails to Ease Competition Fears; Eli Lilly Slips, Viking Therapeutics Edges Higher](https://247wallst.com/investing/2026/09/21/novo-nordisk-falls-7-as-post-wegovy-growth-plan-fails-to-ease-competition-fears-eli-lilly-slips-viking-therapeutics-edges-higher/)  
-  <sub>24/7 Wall St., 2 hours ago</sub>  
-  Novo Nordisk took the stage at its own capital markets day and said something that sent its stock tumbling 7%, yet its closest rivals barely flinched.
-- [Healthcare stocks with the strongest dividend growth grades (XLV:NYSEARCA)](https://seekingalpha.com/news/4644665-healthcare-stocks-with-the-strongest-dividend-growth-grades)  
-  <sub>Seeking Alpha, 5 hours ago</sub>  
-  Screen the top healthcare dividend growth stocks (A+ to A-) across pharma, devices, services and life sciences—see the full list and ETFs to watch now.
-- [Biotech Week Ahead: XLV Beats The Market — Here Are The Stocks, Readouts And Events To Watch Next](https://finance.yahoo.com/healthcare/articles/biotech-week-ahead-xlv-beats-043704054.html)  
-  <sub>Yahoo Finance, 11 hours ago</sub>  
-  The Health Care Select Sector SPDR Fund (XLV) gained 1.8% last week, outperforming the broader market and biotech ETFs. Sellas Life Sciences (SLS) will...
-
-</details>
-
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
-
-```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
-Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
-Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
-```
-
-</details>
-
-<details><summary><b>Price and chart</b> — score -0.35</summary>
-
-```text
-Last close 82.04 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 84.49 (-2.9%), 50d 84.88 (-3.3%), 200d 83.59 (-1.9%); 50d above 200d
-Momentum: RSI(14) 35.7 | MACD -0.666 vs signal -0.432 (histogram -0.234)
-Returns: 1d -0.9% | 5d -2.8% | 1m -3.9% | 3m -0.2%
-52-week range: 75.60 - 90.01 (now 44.7% of the way up)
-Volatility: ATR(14) 0.99 (1.2% of price) | annualised 20d 12.8%
-Volume: 0.38x the 20-day average
-```
-
-</details>
-
-<details><summary><b>Company numbers</b> — score +0.45</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What this fund holds</b> — score +0.45</summary>
-
-```text
-Fund type: Consumer Defensive
-What it holds: P/E 25.14 | P/B 4.58 | P/S 1.36 | 3y earnings growth n/a
-Yield: 2.6%
-Three-year record: +7.6% a year | beta to the market 0.49
-Cost and size: expense ratio 0.08% | net assets 14.52B
-What it is made of: Stocks 99.9%, Cash 0.1%
-Largest holdings: Walmart Inc 9.8%, Costco Wholesale Corp 8.9%, Coca-Cola Co 7.3%, Procter & Gamble Co 7.2%, Philip Morris International Inc 6.2%
-Sector mix: Consumer defensive 98.2%, Consumer cyclical 1.8%
-```
-
-</details>
-
-<details><summary><b>Does this company beat its own forecasts</b> — score +0.45</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What holding this fund costs you</b> — score +0.45</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How much oil and gas is in storage</b> — score +0.45</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How the crop is growing</b> — score +0.45</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts and big funds say</b> — score +0.60</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.60</summary>
-
-```text
-Rolled up from the 5 largest holdings, 39.6% of the fund by weight
-Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.81 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +14.0% above the current prices
-Holdings read: WMT, COST, KO, PG, PM
-Recent rating changes among them:
-  - WMT: 2026-09-10 DA Davidson: main, Buy -> Buy
-  - COST: 2026-09-16 Oppenheimer: reit, Outperform -> Outperform
-  - KO: 2026-07-30 Argus Research: main, Buy -> Buy
-  - PG: 2026-08-07 Argus Research: down, Buy -> Hold
-  - PM: 2026-07-30 Citigroup: main, Buy -> Buy
-```
-
-</details>
-
-<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Who is positioned how</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
-
-```text
-Direction: unknown
-Share count change: n/a (too few readings)
-Shares outstanding: 210.17M | fund size: 17.24B
-Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
-```
-
-</details>
-
-### US electricity and water (XLU) · Sector or country — NEUTRAL, confidence 0.25
-
-**In the model's own words:**
-
-> XLU is technically oversold with RSI at 29.6 and negative momentum (MACD histogram -0.133), trading 8.3% below its 200-day moving average on below-average volume. Macro backdrop is calm: VIX at 14.62, yield curve normal, and the Fed has cut rates as expected. Analyst coverage of the fund's largest holdings shows strong buy weight (80.9%) with a +21.5% price target, providing fundamental support. However, recent news consists of one promotional article and two vendor pieces about competing ETFs, with no material macro catalyst. The fund's valuation at 19.0x P/E is elevated relative to historical norms, and rates have stabilized rather than moving decisively in utilities' favor. The technical picture shows acute oversold conditions that typically precede bounces, but conviction is tempered by: (1) the lack of a concrete catalyst to drive reversal; (2) the absence of fund flow data to confirm accumulation; (3) modest recent momentum. This is a setup where utilities could stabilize, but without a clear macro trigger or behavioral confirmation from flows, the risk-reward is ambiguous. A small bullish tilt reflects oversold technicals and positive analyst sentiment on holdings, but the conviction floor reflects the absence of a material surprise or decisive catalyst.
-
-**Main reasons it gave:**
-- RSI 29.6 oversold with negative MACD histogram
-- Analyst consensus on top 39.4% of holdings at +21.5% price target
-- Trading 8.3% below 200-day SMA on below-average volume
-- No material macro catalyst; rates stable, VIX calm
-- P/E 19.0x elevated; fund flows data unavailable
-
-<details><summary><b>News</b> — score +0.00</summary>
-
-- [Buy Utilities At 16x While Demand Climbs (NYSEARCA:XLU)](https://seekingalpha.com/article/4948161-buy-utilities-at-16x-while-demand-climbs?source=feed_tag_market_outlook)  
-  <sub>Seeking Alpha, 17 hours ago</sub>  
-  Explore Global X U.S. Electrification ETF (ZAP): utilities + industrials for grid modernization.
-- [EMLP ETF offers stability with North American e...](https://www.google.com/goto?url=CAESjQEB6zswFd4H6TTpOjkwstVlFbjqOyWp6MRctt4AL-VNNIXceereOKDq1GVhfT2g5tCW2AtJfhqrGWs0IxYUJvId7E3rc8z89ki5SWGXQUxPHfnhZGda0TNxXtuJ1tSgyn1EQU7bqJq79MAKoZFO_Qx7E5z7kKy80YOsiJp32vIbS4Slrf0oBRgo7WXGW-Y)  
-  <sub>Pluang, 14 hours ago</sub>  
-  EMLP is an actively managed ETF focused on North American energy infrastructure, especially electric power and transmission, aiming for total return with...
-- [Global X U.S. Electrification ETF targets growt...](https://pluang.com/en/news-feed/beli-utilitas-di-16x-saat-permintaan-naik)  
-  <sub>Pluang, 17 hours ago</sub>  
-  The Global X U.S. Electrification ETF (ZAP) offers focused exposure to utilities and industrials benefiting from U.S. electrification and grid modernization...
-- [EMLP: May Be A 'Set It And Forget It' Candidate For Risky Times (NYSEARCA:EMLP)](https://seekingalpha.com/article/4948165-emlp-may-be-a-set-it-and-forget-it-candidate-for-risky-times?source=feed_sector_etf_portfolio_strategy)  
-  <sub>Seeking Alpha, 14 hours ago</sub>  
-  EMLP is an actively managed ETF focused on North American energy infrastructure. Click here to read why EMLP is a Hold.
-
-</details>
-
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
-
-```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
-Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
-Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
-```
-
-</details>
-
-<details><summary><b>Price and chart</b> — score +0.35</summary>
-
-```text
-Last close 40.85 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 42.45 (-3.8%), 50d 43.73 (-6.6%), 200d 44.54 (-8.3%); 50d below 200d
-Momentum: RSI(14) 29.6 | MACD -0.708 vs signal -0.575 (histogram -0.133)
-Returns: 1d -0.6% | 5d -2.3% | 1m -6.7% | 3m -8.7%
-52-week range: 40.85 - 47.73 (now 0.0% of the way up)
-Volatility: ATR(14) 0.62 (1.5% of price) | annualised 20d 13.8%
-Volume: 0.37x the 20-day average
-```
-
-</details>
-
-<details><summary><b>Company numbers</b> — score +0.40</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What this fund holds</b> — score +0.40</summary>
-
-```text
-Fund type: Utilities
-What it holds: P/E 19.02 | P/B 2.14 | P/S 2.65 | 3y earnings growth n/a
-Yield: 2.8%
-Three-year record: +11.5% a year | beta to the market 0.43
-Cost and size: expense ratio 0.08% | net assets 21.84B
-What it is made of: Stocks 100.0%, Cash 0.1%
-Largest holdings: NextEra Energy Inc 13.0%, Southern Co 7.5%, Duke Energy Corp 7.1%, Constellation Energy Corp 6.7%, American Electric Power Co Inc 5.1%
-Sector mix: Utilities 100.0%
-```
-
-</details>
-
-<details><summary><b>Does this company beat its own forecasts</b> — score +0.40</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What holding this fund costs you</b> — score +0.40</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How much oil and gas is in storage</b> — score +0.40</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How the crop is growing</b> — score +0.40</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts and big funds say</b> — score +0.50</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.50</summary>
-
-```text
-Rolled up from the 5 largest holdings, 39.4% of the fund by weight
-Ratings by weight: buy 80.9% | hold 19.1% | sell 0.0% (mean 2.06 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +21.5% above the current prices
-Holdings read: NEE, SO, DUK, CEG, AEP
-Recent rating changes among them:
-  - NEE: 2026-09-18 Morgan Stanley: main, Overweight -> Overweight
-  - SO: 2026-09-18 Morgan Stanley: main, Underweight -> Underweight
-  - DUK: 2026-09-18 Morgan Stanley: main, Equal-Weight -> Equal-Weight
-  - CEG: 2026-09-18 Morgan Stanley: main, Overweight -> Overweight
-  - AEP: 2026-09-18 Morgan Stanley: main, Overweight -> Overweight
-```
-
-</details>
-
-<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Who is positioned how</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
-
-```text
-Direction: unknown
-Share count change: n/a (too few readings)
-Shares outstanding: 163.27M | fund size: 6.67B
-Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
-```
-
-</details>
-
-### US health care (XLV) · Sector or country — NEUTRAL, confidence 0.25
-
-**In the model's own words:**
-
-> XLV trades near the top of its 52-week range with elevated valuation (P/E 30.47, 1% overvalued on GF Value), but sentiment remains supported. Technicals show a stalled uptrend: price is 0.7% below the 20-day SMA, momentum has rolled over (RSI 51, MACD histogram negative at -0.406), and volume is 33% of average, all consistent with consolidation or pullback risk. The macro backdrop is stable with yields flat this week, a normal upward-sloping curve, low volatility (VIX 14.6), and a dollar up 0.9% -- none of these are a macro catalyst. The fund's largest five holdings (44% of weight) are uniformly rated Buy by consensus with a +10% upside target, which is constructive but already partially reflected in the 12.5% three-month return and 8.2% gain from the 200-day MA. Novo Nordisk's 7% drop and GLP-1 competitive fears are single-holding news within an 100-holding fund, not a material sector signal. The absence of recent fund flow data prevents a conviction read from insider activity. Technicals do not support a bullish add here, and valuation at P/E 30.47 offers limited margin of safety; upside targets are modest relative to what has already been priced in. This is a hold, not a buy.
-
-**Main reasons it gave:**
-- Price 0.7% below 20-day SMA with RSI 51 and negative MACD histogram signal stall
-- P/E 30.47 with 1% overvaluation on GF Value limits margin of safety
-- Analyst consensus +10% upside already partially reflected in 12.5% three-month gain
-- Volume 33% below 20-day average on a near-record-high price
-- Novo Nordisk decline is single-holding news in 100-holding fund
-
-<details><summary><b>News</b> — score +0.15</summary>
-
-- [XLV Looks 1.0% Overvalued on GF Value™ as Dividend Sustainabilit](https://www.gurufocus.com/news/9089817/xlv-looks-10-overvalued-on-gf-value-as-dividend-sustainability-remains-strong)  
-  <sub>GuruFocus, 2 hours ago</sub>  
-  On September 21, 2026, the Health Care Select Sector SPDR ETF (ticker: XLV) saw new pivot points established using the DeMark method, signaling potential...
-- [Novo Nordisk Falls 7% as Post-Wegovy Growth Plan Fails to Ease Competition Fears; Eli Lilly Slips, Viking Therapeutics Edges Higher](https://247wallst.com/investing/2026/09/21/novo-nordisk-falls-7-as-post-wegovy-growth-plan-fails-to-ease-competition-fears-eli-lilly-slips-viking-therapeutics-edges-higher/)  
-  <sub>24/7 Wall St., 1 hour ago</sub>  
-  Novo Nordisk took the stage at its own capital markets day and said something that sent its stock tumbling 7%, yet its closest rivals barely flinched.
-- [Healthcare stocks with the strongest dividend growth grades (XLV:NYSEARCA)](https://seekingalpha.com/news/4644665-healthcare-stocks-with-the-strongest-dividend-growth-grades)  
-  <sub>Seeking Alpha, 5 hours ago</sub>  
-  Screen the top healthcare dividend growth stocks (A+ to A-) across pharma, devices, services and life sciences—see the full list and ETFs to watch now.
-- [Biotech Week Ahead: XLV Beats The Market — Here Are The Stocks, Readouts And Events To Watch Next](https://finance.yahoo.com/healthcare/articles/biotech-week-ahead-xlv-beats-043704054.html)  
-  <sub>Yahoo Finance, 11 hours ago</sub>  
-  The Health Care Select Sector SPDR Fund (XLV) gained 1.8% last week, outperforming the broader market and biotech ETFs. Sellas Life Sciences (SLS) will...
-- [Exchange-Traded Funds Rise, Equity Futures up Pre-Bell Monday as Oil Prices Decline](https://www.moomoo.com/news/post/76538074/exchange-traded-funds-rise-equity-futures-up-pre-bell-monday)  
-  <sub>Moomoo, 1 hour ago</sub>  
-  Thebroad market exchange-traded fund SPDR S&P 500 ETF Trust (SPY) was up 0.7% and the actively traded Invesco QQQ Trust (QQQ) advanced 1.1% in Monday's...
-- [Leading And Lagging Sectors For September 21, 2026](https://www.benzinga.com/etfs/sector-etfs/26/09/61894029/leading-and-lagging-sectors-september-21-2026)  
-  <sub>Benzinga, 2 hours ago</sub>  
-  Gainers Symbol Name Price Change ($) Change (%) Volume (NYSE:XLK) State Street Technology Select Sector SPDR ETF 191.7700 2.170 1.14 39.0K (NYSE:XLC) State...
-
-</details>
-
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.15</summary>
-
-```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
-Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
-Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
-```
-
-</details>
-
-<details><summary><b>Price and chart</b> — score -0.25</summary>
-
-```text
-Last close 168.80 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 170.00 (-0.7%), 50d 166.91 (+1.1%), 200d 155.99 (+8.2%); 50d above 200d
-Momentum: RSI(14) 51.1 | MACD 0.026 vs signal 0.432 (histogram -0.406)
-Returns: 1d +0.2% | 5d +0.6% | 1m -2.1% | 3m +12.5%
-52-week range: 134.13 - 175.68 (now 83.5% of the way up)
-Volatility: ATR(14) 2.28 (1.4% of price) | annualised 20d 13.4%
-Volume: 0.33x the 20-day average
-```
-
-</details>
-
-<details><summary><b>Company numbers</b> — score +0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What this fund holds</b> — score +0.20</summary>
-
-```text
-Fund type: Health
-What it holds: P/E 30.47 | P/B 4.77 | P/S 1.66 | 3y earnings growth n/a
-Yield: 1.5%
-Three-year record: +10.3% a year | beta to the market 0.52
-Cost and size: expense ratio 0.08% | net assets 43.91B
-What it is made of: Stocks 99.9%, Cash 0.1%
-Largest holdings: Eli Lilly and Co 14.9%, Johnson & Johnson 10.4%, AbbVie Inc 7.4%, Merck & Co Inc 5.9%, UnitedHealth Group Inc 5.7%
-Sector mix: Healthcare 100.0%
-```
-
-</details>
-
-<details><summary><b>Does this company beat its own forecasts</b> — score +0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What holding this fund costs you</b> — score +0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How much oil and gas is in storage</b> — score +0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How the crop is growing</b> — score +0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts and big funds say</b> — score +0.40</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.40</summary>
-
-```text
-Rolled up from the 5 largest holdings, 44.3% of the fund by weight
-Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.72 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +10.0% above the current prices
-Holdings read: LLY, JNJ, ABBV, MRK, UNH
-Recent rating changes among them:
-  - LLY: 2026-09-18 Guggenheim: main, Buy -> Buy
-  - JNJ: 2026-09-10 HSBC: main, Buy -> Buy
-  - ABBV: 2026-09-10 HSBC: main, Buy -> Buy
-  - MRK: 2026-09-10 HSBC: main, Buy -> Buy
-  - UNH: 2026-07-21 JP Morgan: main, Overweight -> Overweight
-```
-
-</details>
-
-<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Who is positioned how</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
-
-```text
-Direction: unknown
-Share count change: n/a (too few readings)
-Shares outstanding: 261.78M | fund size: 44.19B
-Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
-```
-
-</details>
-
-### Argentina (ARGT) · Sector or country — NEUTRAL, confidence 0.20
+### US media and communication (XLC) · Sector or country — NEUTRAL, confidence 0.25
 
 **Result:** REJECTED · bias is NEUTRAL; no trade
 
 **In the model's own words:**
 
-> No macro catalyst this cycle: US yields essentially unchanged on the week, curve normally sloped, VIX calm at 14.6. Technicals are mildly soft -- price below 20d/50d, MACD negative, RSI 41, on light volume -- but no decisive break, and 50d remains above 200d. Fund basics are reasonable (P/E 15.5, strong 3y record) and analyst roll-up over 51% of weight is unanimously buy with ~30% upside, a mild positive offset. A stronger dollar (+0.90) is a modest headwind for Argentine equities. Flows direction unknown, so no behavioural read. NEUTRAL.
+> No macro surprise this week: yields little changed, curve normal, VIX calm at 14.4, and the only policy note is a 2-year still pricing hikes. XLC trades modestly above its 20/50d averages with RSI 57.7 and a mild positive MACD, but the 50d remains below the 200d and volume is 0.41x average -- a drift, not a break. Holdings analyst roll-up is constructive (100% buy weight, +11% targets) but covers only 45% of the fund and is slow-moving. News is constituent-level noise (PSKY/WBD deal, TMUS downgrade) that the basket dilutes. Flow direction unknown, so no behavioural read.
 
 **Main reasons it gave:**
-- 10-year unchanged on the week; curve +0.98, VIX 14.6 calm -- no rate surprise
-- Price below 20d (-3.0%) and 50d (-1.9%), MACD histogram -0.47, RSI 40.7
-- Volume 0.53x 20-day average -- no conviction behind the pullback
-- Analyst roll-up on 51.1% of weight: 100% buy, +30% weighted target
-- Dollar index +0.90 on the week, a headwind for EM/Argentina exposure
+- 50d SMA still below 200d despite price +2% over 20d SMA
+- Volume 0.41x 20-day average -- no conviction behind the move
+- VIX 14.42, down 2.8 on the week; 10y -4bp, no rate surprise
+- Analyst roll-up 100% buy weight, +11.1% targets, but only 45.5% coverage
+- Fund P/E 15.4 with 3y return +19.3%/yr, beta 0.85
 
 <details><summary><b>News</b> — score +0.00</summary>
 
-_No news found for this one today._
+- [Paramount Skydance Rises 4% on 12-State Settlement, Warner Bros. Discovery Holds Flat as $110B Deal Nears Its Close](https://www.google.com/goto?url=CAES1AEB6zswFQnMml_UulFytciQNLXCe-vIIiokyF5cpe3F76K_OTqe8Dk6xTRXXuVoLF1BC8L8wEGpR8lTsP5i1sXtE1Rs2Yq8FdBFqTHY11TclpMps4GIsjrncy_LYHi94DQivJGL5XOehpaUEMXL_YMufSZi0QYhRGOVyiBbmwfG6bWGJSCUs523tzxEA7pIEM8Gi_GtGko75JQQCckVuL2201Ybxgz-BnCEQycKZp7Gnn-JLprpejBd1RKSEXcZQT-bcObwUAOYx3lcvVnHyYbhAAr76Q)  
+  <sub>24/7 Wall St., 17 minutes ago</sub>  
+  PSKY surged 8% after a 12-state settlement cleared its $110B WBD acquisition path; WBD held flat, already up 8% over the prior month. XLC's 0.4% gain versus...
+- [These five communication services stocks score highest on dividend growth (XLC:NYSEARCA)](https://seekingalpha.com/news/4644863-these-five-communication-services-stocks-score-highest-on-dividend-growth)  
+  <sub>Seeking Alpha, 24 hours ago</sub>  
+  Top communication services dividend growth stocks ranked: GOOGL, META, MTCH, NYT & TMUS plus key ETFs—see who leads and invest smarter today.
+- [Leading And Lagging Sectors For September 22, 2026](https://www.google.com/goto?url=CAESngEB6zswFc2twsODRLTV3NPiiEaRHCIizLuRrw7GeMyfQfDCP3TtAYtO2sH_QgboABb7_WZKj6VYKuP77Ud9fLbH0ZCrC2T14Ufj19qBwSSke242_5EGQVZ1wMkxTbeLCtIC_iM6vSb9bTmeK6VKALn8GbcU8PyFFdqSXEX2PhmlulsF4mjnXPz8HijLA8DqQkC9LYvXkPhssEfmVT9NtQ)  
+  <sub>Benzinga, 2 hours ago</sub>  
+  Gainers Symbol Name Price Change ($) Change (%) Volume (NYSE:XLB) State Street Materials Select Sector SPDR ETF 49.9500 0.240 0.48 2.2K (NYSE:XLP) State...
+- [T-Mobile Stock Slips To More Than Two-Year Low — JPMorgan Cuts Target Ahead Of Q3 Citing Softer Service Revenue Outlook](https://www.tradingview.com/news/stocktwits:a31866873094b:0-t-mobile-stock-slips-to-more-than-two-year-low-jpmorgan-cuts-target-ahead-of-q3-citing-softer-service-revenue-outlook/)  
+  <sub>TradingView, 23 hours ago</sub>  
+  T-Mobile US Inc. (TMUS) shares slipped as much as 3% on Monday, to their lowest level in more than two years.JPMorgan analyst Sebastiano Petti lowered the...
+- [Billionaire Investor More Than Doubles Live Nation Stake](https://www.google.com/goto?url=CAESqgEB6zswFZlc6lrQFs2gqnqxdMht-A4bzbA_KTvNApkG9TwzdYyuEYWv5bTDFF8oeftPAptAVU3pnXvQXeLrXUP7yN06xPwiuAUp87iMkjJdCHWABWaKA9s1X_Gr04zufB5RLU7oLAYsKqi5H03X7xYpjkfM-Y5Ddexv16qgfbkmIZFt6lbwEN3yIMZanOZAUwlFPwTcZn-I3kEcZW8hWptHgxbMGKBrHfiP1A)  
+  <sub>Benzinga, 21 hours ago</sub>  
+  Dan Loeb's Third Point raised its Live Nation stake 144% in Q2 while making Warner Bros Discovery its largest holding at June 30.
 
 </details>
 
 <details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
 
 ```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
 Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
 Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
-```
-
-</details>
-
-<details><summary><b>Price and chart</b> — score -0.25</summary>
-
-```text
-Last close 92.17 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 95.00 (-3.0%), 50d 93.92 (-1.9%), 200d 92.74 (-0.6%); 50d above 200d
-Momentum: RSI(14) 40.7 | MACD -0.101 vs signal 0.369 (histogram -0.470)
-Returns: 1d -0.3% | 5d -3.4% | 1m -0.1% | 3m -2.7%
-52-week range: 67.55 - 102.94 (now 69.6% of the way up)
-Volatility: ATR(14) 1.84 (2.0% of price) | annualised 20d 18.0%
-Volume: 0.53x the 20-day average
-```
-
-</details>
-
-<details><summary><b>Company numbers</b> — score +0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What this fund holds</b> — score +0.20</summary>
-
-```text
-Fund type: Focused Region
-What it holds: P/E 15.48 | P/B 1.77 | P/S 1.36 | 3y earnings growth n/a
-Yield: 1.1%
-Three-year record: +27.9% a year | beta to the market 0.50
-Cost and size: expense ratio 0.59% | net assets 815.33M
-What it is made of: Stocks 99.9%, Cash 0.1%
-Largest holdings: MercadoLibre Inc 25.4%, YPF SA ADR 9.5%, Vista Energy SAB de CV ADR 6.2%, Grupo Financiero Galicia SA ADR 5.6%, Banco Macro SA ADR 4.3%
-Sector mix: Consumer cyclical 30.4%, Energy 19.4%, Financial services 14.4%, Basic materials 12.0%
-```
-
-</details>
-
-<details><summary><b>Does this company beat its own forecasts</b> — score +0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What holding this fund costs you</b> — score +0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How much oil and gas is in storage</b> — score +0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How the crop is growing</b> — score +0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts and big funds say</b> — score +0.45</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.45</summary>
-
-```text
-Rolled up from the 5 largest holdings, 51.1% of the fund by weight
-Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.54 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +30.1% above the current prices
-Holdings read: MELI, YPF, VIST, GGAL, BMA
-Recent rating changes among them:
-  - MELI: 2026-09-03 BTIG: reit, Buy -> Buy
-  - YPF: 2026-09-01 JP Morgan: main, Overweight -> Overweight
-  - VIST: 2026-09-01 JP Morgan: main, Overweight -> Overweight
-  - GGAL: 2026-06-25 JP Morgan: main, Overweight -> Overweight
-  - BMA: 2026-06-25 JP Morgan: main, Overweight -> Overweight
-```
-
-</details>
-
-<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Who is positioned how</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
-
-```text
-Direction: unknown
-Share count change: n/a (too few readings)
-Shares outstanding: 8.72M | fund size: 804.08M
-Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
-```
-
-</details>
-
-### Poland (EPOL) · Sector or country — NEUTRAL, confidence 0.20
-
-**Result:** REJECTED · bias is NEUTRAL; no trade
-
-**In the model's own words:**
-
-> Poland equities sit at the top of a strong uptrend (+16.6% vs 200d, 98.6% of 52-week range) but momentum is rolling over (MACD below signal) on very thin volume, and the weighted analyst target on the top 47% of the fund is slightly below current prices. Macro backdrop is benign but not a catalyst: VIX 14.6 and calm, 10-year unchanged, though a firmer dollar (+0.90) and a bond market pricing hikes are mild headwinds for an EM regional fund. No macro or policy surprise this cycle, so no directional edge. Cheap valuation (P/E 13.5, 3.3% yield) argues against shorting an extended tape.
-
-**Main reasons it gave:**
-- Price at 98.6% of 52-week range, 50d above 200d, +15.8% in 3 months
-- MACD 0.424 below signal 0.510 with volume only 0.21x average
-- Weighted analyst price target 2.9% below current price across 47.4% of fund
-- VIX 14.62 and 10-year unchanged on the week -- no macro surprise
-- Dollar index +0.90 on the week, 2-year at 4.67% pricing hikes, mild EM headwind
-
-<details><summary><b>News</b> — score +0.00</summary>
-
-_No news found for this one today._
-
-</details>
-
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
-
-```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
-Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
-Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
-```
-
-</details>
-
-<details><summary><b>Price and chart</b> — score +0.25</summary>
-
-```text
-Last close 45.57 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 44.68 (+2.0%), 50d 43.44 (+4.9%), 200d 39.07 (+16.6%); 50d above 200d
-Momentum: RSI(14) 59.3 | MACD 0.424 vs signal 0.510 (histogram -0.086)
-Returns: 1d +2.6% | 5d +0.9% | 1m +3.2% | 3m +15.8%
-52-week range: 31.57 - 45.76 (now 98.6% of the way up)
-Volatility: ATR(14) 0.67 (1.5% of price) | annualised 20d 19.6%
-Volume: 0.21x the 20-day average
-```
-
-</details>
-
-<details><summary><b>Company numbers</b> — score +0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What this fund holds</b> — score +0.20</summary>
-
-```text
-Fund type: Focused Region
-What it holds: P/E 13.47 | P/B 2.00 | P/S 1.36 | 3y earnings growth n/a
-Yield: 3.3%
-Three-year record: +42.9% a year | beta to the market 0.73
-Cost and size: expense ratio 0.59% | net assets 848.26M
-What it is made of: Stocks 99.3%, Cash 0.7%
-Largest holdings: PKO Bank Polski SA 15.4%, Orlen SA 13.8%, Bank Polska Kasa Opieki SA 7.1%, Powszechny Zaklad Ubezpieczen SA 6.4%, KGHM Polska Miedz SA 4.6%
-Sector mix: Financial services 46.1%, Energy 14.5%, Consumer cyclical 12.7%, Basic materials 6.8%
-```
-
-</details>
-
-<details><summary><b>Does this company beat its own forecasts</b> — score +0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What holding this fund costs you</b> — score +0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How much oil and gas is in storage</b> — score +0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How the crop is growing</b> — score +0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts and big funds say</b> — score -0.05</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts say about what this fund holds</b> — score -0.05</summary>
-
-```text
-Rolled up from the 5 largest holdings, 47.4% of the fund by weight
-Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 2.14 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: -2.9% above the current prices
-Holdings read: PKO.WA, PKN.WA, PEO.WA, PZU.WA, KGH.WA
-Recent rating changes among them: none reported
-```
-
-</details>
-
-<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Who is positioned how</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
-
-```text
-Direction: unknown
-Share count change: n/a (too few readings)
-Shares outstanding: 19.24M | fund size: 876.67M
-Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
-```
-
-</details>
-
-### Italy (EWI) · Sector or country — NEUTRAL, confidence 0.20
-
-**Result:** REJECTED · bias is NEUTRAL; no trade
-
-**In the model's own words:**
-
-> No macro surprise this week: yields essentially unchanged, curve normal, VIX calm and falling. EWI sits just below its 20d/50d with slightly negative MACD but a strong uptrend vs the 200d, so the technical picture is mixed consolidation rather than a break. Holdings are cheap (P/E 15, 3% yield) and analyst coverage on half the fund is uniformly buy with ~11% upside, but that is a slow-moving valuation argument, not a catalyst. Flow direction unknown. Dollar strength is a mild headwind for a euro-denominated basket. Default to NEUTRAL.
-
-**Main reasons it gave:**
-- Price below 20d (-0.9%) and 50d (-1.1%) SMAs with MACD histogram -0.131, RSI 46.6
-- 50d above 200d, +5.8% over 200d, 82.6% of 52-week range - intact longer uptrend
-- 10-year yield flat on week, curve +0.98 normal, VIX 14.62 down 2.5 - no macro surprise
-- Holdings P/E 15.25, 3.0% yield; 52.6% financial services concentration
-- Analyst roll-up on 50.9% of fund: 100% buy, +10.6% weighted target upside
-- Dollar index +0.90 on the week, a headwind for unhedged euro exposure
-
-<details><summary><b>News</b> — score +0.00</summary>
-
-_No news found for this one today._
-
-</details>
-
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
-
-```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
-Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
-Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
-```
-
-</details>
-
-<details><summary><b>Price and chart</b> — score -0.05</summary>
-
-```text
-Last close 61.08 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 61.60 (-0.9%), 50d 61.73 (-1.1%), 200d 57.73 (+5.8%); 50d above 200d
-Momentum: RSI(14) 46.6 | MACD -0.366 vs signal -0.235 (histogram -0.131)
-Returns: 1d +1.7% | 5d +0.3% | 1m -2.7% | 3m +1.0%
-52-week range: 50.31 - 63.35 (now 82.6% of the way up)
-Volatility: ATR(14) 0.72 (1.2% of price) | annualised 20d 15.9%
-Volume: 0.19x the 20-day average
-```
-
-</details>
-
-<details><summary><b>Company numbers</b> — score +0.25</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What this fund holds</b> — score +0.25</summary>
-
-```text
-Fund type: Focused Region
-What it holds: P/E 15.25 | P/B 1.85 | P/S 1.64 | 3y earnings growth n/a
-Yield: 3.0%
-Three-year record: +28.5% a year | beta to the market 0.88
-Cost and size: expense ratio 0.50% | net assets 1.13B
-What it is made of: Stocks 99.8%, Cash 0.2%
-Largest holdings: UniCredit SpA 16.8%, Intesa Sanpaolo 13.6%, Enel SpA 10.3%, Ferrari NV 5.2%, Eni SpA 5.0%
-Sector mix: Financial services 52.6%, Utilities 16.3%, Industrials 9.7%, Consumer cyclical 9.0%
-```
-
-</details>
-
-<details><summary><b>Does this company beat its own forecasts</b> — score +0.25</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What holding this fund costs you</b> — score +0.25</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How much oil and gas is in storage</b> — score +0.25</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How the crop is growing</b> — score +0.25</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts and big funds say</b> — score +0.35</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.35</summary>
-
-```text
-Rolled up from the 5 largest holdings, 50.9% of the fund by weight
-Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 2.03 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +10.6% above the current prices
-Holdings read: UCG.MI, ISP.MI, ENEL.MI, RACE.MI, ENI.MI
-Recent rating changes among them:
-  - RACE.MI: 2026-07-31 UBS: main, Buy -> Buy
-```
-
-</details>
-
-<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Who is positioned how</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
-
-```text
-Direction: unknown
-Share count change: n/a (too few readings)
-Shares outstanding: 18.74M | fund size: 1.14B
-Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
-```
-
-</details>
-
-### South Korea (EWY) · Sector or country — NEUTRAL, confidence 0.20
-
-**Result:** REJECTED · bias is NEUTRAL; no trade
-
-**In the model's own words:**
-
-> No macro surprise this cycle: yields essentially flat across the curve, curve normally sloped, VIX calm at 14.6 and falling. Dollar firmed +0.9, a mild headwind for Korean equities. Technicals are constructive (price above all major SMAs, 50d>200d, +6.8% in 5 days) but on 0.33x volume and with MACD rolling over, and the fund is still -14.1% over three months with 46% annualised volatility and beta 2.5 -- a two-way risk profile, not a clean break. Valuation is cheap (P/E 10.4) but the fund is really a levered bet on SK hynix and Samsung at 46% combined weight. Analyst roll-up returned no usable ratings or targets, so that dimension is left unscored. No macro catalyst to justify a side.
-
-**Main reasons it gave:**
-- 10-year yield unchanged on the week, curve normally sloped +0.98 -- no rate surprise
-- VIX 14.62, down 2.5 on the week (calm regime)
-- Price +3.6% over 20d SMA and +23.8% over 200d, 50d above 200d, but volume only 0.33x average
-- MACD histogram negative (-0.171) despite RSI 57 -- momentum flattening
-- Concentration risk: SK hynix 23.7% + Samsung 22.2%, tech 54.6%, beta 2.50
-- Analyst roll-up returned no ratings or price targets despite 53.5% coverage
-
-<details><summary><b>News</b> — score +0.00</summary>
-
-_No news found for this one today._
-
-</details>
-
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
-
-```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
-Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
-Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
 ```
 
 </details>
@@ -9178,732 +7533,13 @@ Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market pri
 <details><summary><b>Price and chart</b> — score +0.20</summary>
 
 ```text
-Last close 188.22 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 181.63 (+3.6%), 50d 173.49 (+8.5%), 200d 152.08 (+23.8%); 50d above 200d
-Momentum: RSI(14) 57.0 | MACD 1.966 vs signal 2.137 (histogram -0.171)
-Returns: 1d +3.8% | 5d +6.8% | 1m +5.6% | 3m -14.1%
-52-week range: 78.87 - 219.20 (now 77.9% of the way up)
-Volatility: ATR(14) 6.65 (3.5% of price) | annualised 20d 46.0%
-Volume: 0.33x the 20-day average
-```
-
-</details>
-
-<details><summary><b>Company numbers</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What this fund holds</b> — score +0.15</summary>
-
-```text
-Fund type: Focused Region
-What it holds: P/E 10.41 | P/B 1.83 | P/S 1.70 | 3y earnings growth n/a
-Yield: 1.1%
-Three-year record: +45.5% a year | beta to the market 2.50
-Cost and size: expense ratio 0.59% | net assets 27.72B
-What it is made of: Stocks 99.5%, Cash 0.5%
-Largest holdings: SK hynix Inc 23.7%, Samsung Electronics Co Ltd 22.2%, SK Square 2.9%, Samsung Electro-Mechanics Co Ltd 2.7%, KB Financial Group Inc 2.0%
-Sector mix: Technology 54.6%, Industrials 17.0%, Financial services 11.1%, Consumer cyclical 5.1%
-```
-
-</details>
-
-<details><summary><b>Does this company beat its own forecasts</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What holding this fund costs you</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How much oil and gas is in storage</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How the crop is growing</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts and big funds say</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.00</summary>
-
-```text
-Rolled up from the 5 largest holdings, 53.5% of the fund by weight
-Ratings by weight: buy n/a | hold n/a | sell n/a (mean n/a on a 1=strong buy to 5=strong sell scale)
-Weighted price target: n/a above the current prices
-Holdings read: 000660.KQ, 005930.KQ, 402340.KQ, 009150.KQ, 105560.KQ
-Recent rating changes among them: none reported
-```
-
-</details>
-
-<details><summary><b>Buying and selling by company insiders</b> — score n/a</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Who is positioned how</b> — score n/a</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Money going into and out of this fund</b> — score n/a</summary>
-
-_Not available today._
-
-</details>
-
-### Gold mining companies (GDX) · Sector or country — NEUTRAL, confidence 0.20
-
-**Result:** REJECTED · bias is NEUTRAL; no trade
-
-**In the model's own words:**
-
-> Gold miners are consolidating after a big run: price sits below the 20d SMA but well above the 50d and 200d, MACD has rolled over, RSI is neutral at 49.6, and volume is thin at 0.25x average. Macro is mixed for gold -- the dollar firmed +0.90 on the week, the 2-year prices hikes rather than cuts, and long yields are flat-to-slightly-lower; none of that is a fresh surprise in either direction. News is promotional target-chasing ($5,000 gold) with one piece explicitly flagging a $3,000 drawdown risk first -- narrative, not catalyst. Analyst roll-up is uniformly buy with +10.8% upside but only covers 40% of the fund and the recent RBC actions were reiterations. Flows direction is unknown, so no behavioural read. No policy or data surprise, so no directional bet.
-
-**Main reasons it gave:**
-- Price -3.9% below 20d SMA with MACD histogram -1.14, momentum rolling over after +15.9% 3m run
-- Dollar index +0.90 on the week and 2-year at 4.67% pricing hikes, a headwind for gold
-- Analyst roll-up 100% buy, +10.8% weighted target, but only 39.9% fund coverage and recent actions were reiterations
-- VIX 14.62 and calm, flat 10-year -- no macro surprise this cycle
-- Volume 0.25x the 20-day average, so the pullback lacks conviction
-
-<details><summary><b>News</b> — score +0.05</summary>
-
-- [Hormuz Oil Shipments Hit Six-Month High? ETFs to Win/Lose](https://www.tradingview.com/news/zacks:9ed16a4fe094b:0-hormuz-oil-shipments-hit-six-month-high-etfs-to-win-lose/)  
-  <sub>TradingView, 3 hours ago</sub>  
-  Oil and liquefied natural gas shipments through the Strait of Hormuz reached their highest level in six months over the past two weeks, indicating that...
-- [Gold to $5,000? Strategist Warns a Drop to $3,000 Comes First](https://www.benzinga.com/markets/commodities/26/09/61889634/gold-to-5000-strategist-warns-a-drop-to-3000-comes-first)  
-  <sub>Benzinga, 5 hours ago</sub>  
-  Gold targets $5000 on continuous ETF inflows, yet market euphoria and rising bond yields signal potential risk for precious metals.
-- [Product Due Diligence Session: Building Resilient Portfolios with Real Assets | ETF Trends](https://www.advisorperspectives.com/webinars/2026/10/07/building-resilient-portfolios-with-real-assets?partnerref=APSidebar)  
-  <sub>Advisor Perspectives, 1 hour ago</sub>  
-  Attendees will gain insights into the role of real assets and a framework for implementing an allocation in client portfolios.
-- [Gold rebounds from $4K support as Timmer sees $5K in sight (GLD:NYSEARCA)](https://seekingalpha.com/news/4644631-gold-rebounds-from-4k-support-as-timmer-sees-5k-in-sight)  
-  <sub>Seeking Alpha, 7 hours ago</sub>  
-  Gold price outlook: Fidelity's Jurrien Timmer says global liquidity, M2 growth and ETF flows could drive gold from $4K toward $5K+.
-- [Betashares: ETF inflows strengthen bull case for gold](https://www.moneymanagement.com.au/betashares-etf-inflows-strengthen-bull-case-for-gold/)  
-  <sub>Money Management, 20 hours ago</sub>  
-  Betashares sees upcoming tailwinds for gold, but notes a discrepancy between profitability and current valuations. The ETF provider observed rising return...
-- [Inflation Watch Mode: Diversify, Buy Dips, Or Hedge? Yes (NDX)](https://seekingalpha.com/article/4948170-inflation-watch-mode-diversify-buy-dips-or-hedge-yes)  
-  <sub>Seeking Alpha, 13 hours ago</sub>  
-  I remain bullish on equities, expecting a rally into late September driven by robust earnings and AI-related momentum. Read more on the market here.
-
-</details>
-
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.05</summary>
-
-```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
-Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
-Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
-```
-
-</details>
-
-<details><summary><b>Price and chart</b> — score -0.15</summary>
-
-```text
-Last close 94.42 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 98.21 (-3.9%), 50d 88.35 (+6.9%), 200d 90.73 (+4.1%); 50d below 200d
-Momentum: RSI(14) 49.6 | MACD 1.075 vs signal 2.215 (histogram -1.140)
-Returns: 1d -1.1% | 5d +0.3% | 1m -5.4% | 3m +15.9%
-52-week range: 68.28 - 115.84 (now 55.0% of the way up)
-Volatility: ATR(14) 3.36 (3.6% of price) | annualised 20d 38.6%
-Volume: 0.25x the 20-day average
-```
-
-</details>
-
-<details><summary><b>Company numbers</b> — score +0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What this fund holds</b> — score +0.20</summary>
-
-```text
-Fund type: Equity Precious Metals
-What it holds: P/E 12.84 | P/B 2.68 | P/S 4.10 | 3y earnings growth n/a
-Yield: 0.6%
-Three-year record: +49.2% a year | beta to the market 0.83
-Cost and size: expense ratio 0.51% | net assets 30.54B
-What it is made of: Stocks 100.0%
-Largest holdings: Newmont Corp 10.7%, Agnico Eagle Mines Ltd 10.7%, Barrick Mining Corp 7.4%, Wheaton Precious Metals Corp 5.8%, Anglogold Ashanti PLC 5.3%
-Sector mix: Basic materials 100.0%
-```
-
-</details>
-
-<details><summary><b>Does this company beat its own forecasts</b> — score +0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What holding this fund costs you</b> — score +0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How much oil and gas is in storage</b> — score +0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How the crop is growing</b> — score +0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts and big funds say</b> — score +0.35</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.35</summary>
-
-```text
-Rolled up from the 5 largest holdings, 39.9% of the fund by weight
-Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.66 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +10.8% above the current prices
-Holdings read: NEM, AEM.TO, ABX.TO, WPM.TO, AU
-Recent rating changes among them:
-  - NEM: 2026-09-16 RBC Capital: main, Outperform -> Outperform
-  - AEM.TO: 2026-09-16 RBC Capital: main, Sector Perform -> Sector Perform
-  - ABX.TO: 2026-09-16 RBC Capital: main, Outperform -> Outperform
-  - WPM.TO: 2026-09-16 RBC Capital: main, Outperform -> Outperform
-  - AU: 2026-09-16 RBC Capital: main, Outperform -> Outperform
-```
-
-</details>
-
-<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Who is positioned how</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
-
-```text
-Direction: unknown
-Share count change: n/a (too few readings)
-Shares outstanding: 328.81M | fund size: 31.05B
-Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
-```
-
-</details>
-
-### Software (IGV) · Sector or country — NEUTRAL, confidence 0.20
-
-**Result:** REJECTED · bias is NEUTRAL; no trade
-
-**In the model's own words:**
-
-> No macro surprise this week: yields essentially flat, VIX calm at 14.6, curve normally sloped. IGV's trend is constructive (above 20/50/200d, +21.9% 3m) but momentum is fading (MACD below signal, 5d flat, volume 0.33x average) and the fund is well below its 52-week high. Holdings are expensive (P/E 34, beta 1.21) with a hawkish-leaning priced rate path, offsetting a uniformly buy-rated top-5 roll-up (~43% coverage, +8.8% targets). The single news item is a promotional listicle-style piece, not evidence. NEUTRAL.
-
-**Main reasons it gave:**
-- 10-year yield unchanged on week, VIX 14.6 and falling -- no macro surprise
-- Price above 20/50/200d SMAs with 50d over 200d, +21.9% over 3 months
-- MACD histogram negative (-0.190) and volume only 0.33x 20-day average
-- Top-5 holdings 100% buy-rated by weight, +8.8% weighted target, but only 43% coverage
-- Holdings P/E 34.2, P/S 9.1 with 2-year at 4.67% pricing hikes, not cuts
-
-<details><summary><b>News</b> — score +0.00</summary>
-
-- [Nvidia Has Been the King of AI. This ETF Bets the Next Winners Will Be Somewhere Else.](https://www.fool.com/investing/2026/09/21/nvidia-king-of-ai-this-etf-bets-next-winners-igv/)  
-  <sub>The Motley Fool, 5 hours ago</sub>  
-  The factors that made software stocks a laggard before could make them leaders today.
-
-</details>
-
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
-
-```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
-Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
-Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
-```
-
-</details>
-
-<details><summary><b>Price and chart</b> — score +0.15</summary>
-
-```text
-Last close 106.44 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 104.93 (+1.4%), 50d 100.29 (+6.1%), 200d 93.68 (+13.6%); 50d above 200d
-Momentum: RSI(14) 56.3 | MACD 1.143 vs signal 1.332 (histogram -0.190)
-Returns: 1d +2.0% | 5d -0.2% | 1m +4.4% | 3m +21.9%
-52-week range: 74.67 - 117.79 (now 73.7% of the way up)
-Volatility: ATR(14) 2.71 (2.5% of price) | annualised 20d 42.2%
-Volume: 0.33x the 20-day average
-```
-
-</details>
-
-<details><summary><b>Company numbers</b> — score -0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What this fund holds</b> — score -0.15</summary>
-
-```text
-Fund type: Technology
-What it holds: P/E 34.20 | P/B 8.09 | P/S 9.07 | 3y earnings growth n/a
-Yield: 0.0%
-Three-year record: +14.0% a year | beta to the market 1.21
-Cost and size: expense ratio 0.38% | net assets 15.74B
-What it is made of: Stocks 100.0%, Cash 0.1%
-Largest holdings: Palantir Technologies Inc Ordinary Shares - Class A 10.3%, Palo Alto Networks Inc 9.7%, Microsoft Corp 9.2%, CrowdStrike Holdings Inc Class A 7.4%, Salesforce Inc 6.6%
-Sector mix: Technology 94.4%, Communication services 3.8%, Financial services 1.5%, Consumer cyclical 0.2%
-```
-
-</details>
-
-<details><summary><b>Does this company beat its own forecasts</b> — score -0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What holding this fund costs you</b> — score -0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How much oil and gas is in storage</b> — score -0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How the crop is growing</b> — score -0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts and big funds say</b> — score +0.35</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.35</summary>
-
-```text
-Rolled up from the 5 largest holdings, 43.2% of the fund by weight
-Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.66 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +8.8% above the current prices
-Holdings read: PLTR, PANW, MSFT, CRWD, CRM
-Recent rating changes among them:
-  - PLTR: 2026-09-15 UBS: main, Buy -> Buy
-  - PANW: 2026-09-17 Bernstein: down, Outperform -> Market Perform
-  - MSFT: 2026-09-21 Cantor Fitzgerald: main, Overweight -> Overweight
-  - CRWD: 2026-09-18 B of A Securities: main, Neutral -> Neutral
-  - CRM: 2026-09-18 Citizens: reit, Market Outperform -> Market Outperform
-```
-
-</details>
-
-<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Who is positioned how</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
-
-```text
-Direction: unknown
-Share count change: n/a (too few readings)
-Shares outstanding: 12.50M | fund size: 1.33B
-Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
-```
-
-</details>
-
-### Defence and aerospace (ITA) · Sector or country — NEUTRAL, confidence 0.20
-
-**Result:** REJECTED · bias is NEUTRAL; no trade
-
-**In the model's own words:**
-
-> Aerospace/defense basket in a sharp pullback: -9.2% over a month, below 20/50/200d SMAs with RSI 31 and negative MACD, but volume is only 0.23x average and no macro catalyst has arrived. Rates were essentially flat on the week, VIX fell to 14.6, dollar modestly firmer -- nothing that constitutes a policy or data surprise. Analyst roll-up on 57.5% of the fund is uniformly buy with ~25% upside, which offsets the weak tape but is backward-looking. News items are irrelevant (a Bitcoin volatility story and a Canada-France space MOU). Oversold in an intact longer-term uptrend is not a directional edge; stand aside.
-
-**Main reasons it gave:**
-- Price -8.1% vs 50d SMA and -6.3% vs 200d, RSI 31, MACD below signal
-- Down volume at 0.23x 20-day average -- weak conviction in the selloff
-- 10y yield unchanged on week, VIX -2.5 to 14.6: no macro surprise
-- Holdings roll-up 100% buy by weight, +24.9% weighted price target over 57.5% of fund
-- P/E 34.7 and 0.5% yield after a +25.8%/yr three-year run leaves valuation rich
-
-<details><summary><b>News</b> — score +0.00</summary>
-
-- [Canada, France plan space partnership as Ottawa deepens European ties](https://www.google.com/goto?url=CAESogEB6zswFafEAvOi2xZFVeqNGq8yhl7tvjtySxC1N2egZ7yjmgNUhyQOr4hfDjGcZgZ0RkgvkGuHbt_AQtC7dVSWNq-MTQvWHVp_34s9A_oLjYhIkNo_hV_qZw788IX5x9IIbmqKpSu1F7QlZjzogBMN2f0uDQiqp04yqFX87c5LIRJvGp8otc3X8kF3nU4hEwFAmje7Gy9lt6IIbEY8ZTIOg9w)  
-  <sub>Seeking Alpha, 20 hours ago</sub>  
-  Canada and France plan to cooperate on space-launch systems and ground-based infrastructure as Ottawa seeks closer economic and security ties with Europe.
-- [BlackRock says Bitcoin volatility fell to 35–40](https://www.google.com/goto?url=CAESfAHrOzAVQ6Be0cAesVaxD3l4muyjAwJx_hTDGEPlGV10zZy259-_1BZ6Mn_sY713XlEQDWv1XSzuLTQjzUOjGK2i4PGwxiAvKhlZhqWfs2dcLhnJdf6A7G34pAlCGe3u7VBlE5DrA9QBnAiPU11KjJ43UqLETfIhEhUTPpc)  
-  <sub>Crypto News, 24 hours ago</sub>  
-  BlackRock's Jay Jacobs says Bitcoin volatility has fallen to 35–40 as large holders use ETF wrappers for lending, options and liquidity.
-
-</details>
-
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
-
-```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
-Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
-Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
-```
-
-</details>
-
-<details><summary><b>Price and chart</b> — score -0.35</summary>
-
-```text
-Last close 215.76 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 223.49 (-3.5%), 50d 234.83 (-8.1%), 200d 230.22 (-6.3%); 50d above 200d
-Momentum: RSI(14) 31.0 | MACD -6.748 vs signal -6.211 (histogram -0.537)
-Returns: 1d +0.9% | 5d -0.5% | 1m -9.2% | 3m -8.4%
-52-week range: 198.23 - 253.22 (now 31.9% of the way up)
-Volatility: ATR(14) 3.86 (1.8% of price) | annualised 20d 14.9%
-Volume: 0.23x the 20-day average
-```
-
-</details>
-
-<details><summary><b>Company numbers</b> — score -0.10</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What this fund holds</b> — score -0.10</summary>
-
-```text
-Fund type: Industrials
-What it holds: P/E 34.66 | P/B 6.62 | P/S 3.21 | 3y earnings growth n/a
-Yield: 0.5%
-Three-year record: +25.8% a year | beta to the market 0.99
-Cost and size: expense ratio 0.37% | net assets 13.63B
-What it is made of: Stocks 99.8%, Cash 0.2%
-Largest holdings: GE Aerospace 21.6%, RTX Corp 17.2%, Boeing Co 9.1%, General Dynamics Corp 4.8%, Lockheed Martin Corp 4.7%
-Sector mix: Industrials 100.0%
-```
-
-</details>
-
-<details><summary><b>Does this company beat its own forecasts</b> — score -0.10</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What holding this fund costs you</b> — score -0.10</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How much oil and gas is in storage</b> — score -0.10</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How the crop is growing</b> — score -0.10</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts and big funds say</b> — score +0.45</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.45</summary>
-
-```text
-Rolled up from the 5 largest holdings, 57.5% of the fund by weight
-Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.75 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +24.9% above the current prices
-Holdings read: GE, RTX, BA, GD, LMT
-Recent rating changes among them:
-  - GE: 2026-07-23 Bernstein: main, Outperform -> Outperform
-  - RTX: 2026-08-03 Bernstein: main, Market Perform -> Market Perform
-  - BA: 2026-09-18 B of A Securities: reit, Buy -> Buy
-  - GD: 2026-09-08 UBS: main, Neutral -> Neutral
-  - LMT: 2026-09-08 UBS: up, Neutral -> Buy
-```
-
-</details>
-
-<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Who is positioned how</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
-
-```text
-Direction: unknown
-Share count change: n/a (too few readings)
-Shares outstanding: 63.32M | fund size: 13.66B
-Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
-```
-
-</details>
-
-### Transport and delivery (IYT) · Sector or country — NEUTRAL, confidence 0.20
-
-**Result:** REJECTED · bias is NEUTRAL; no trade
-
-**In the model's own words:**
-
-> Transports are in a clear downtrend (below 20/50d SMAs, MACD negative, RSI 28.8 oversold) but there is no macro catalyst this week: yields flat, VIX calm and falling, curve normal. Oversold on light volume argues against pressing shorts, while the trend argues against buying. Analyst roll-up on 53% of the fund is constructive (91% buy, +26% targets), partially offsetting the weak tape. Rate path pricing hikes and a firmer dollar are mild headwinds for a high-beta cyclical basket. No news flow; no fund flow data. NEUTRAL with a slight negative tilt.
-
-**Main reasons it gave:**
-- Price 4.7% below 20d and 7.3% below 50d SMA, MACD histogram -0.331
-- RSI(14) 28.8 oversold on volume just 0.32x average
-- Analyst roll-up over 53.1% of fund: 90.8% buy weight, +26.5% weighted target
-- Macro quiet: 10y unchanged on week, VIX 14.6 and falling, curve +0.98 normal
-- 2-year at 4.67% vs 4.00% target prices hikes; dollar +0.90 on week, headwind for cyclicals
-
-<details><summary><b>News</b> — score +0.00</summary>
-
-_No news found for this one today._
-
-</details>
-
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
-
-```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
-Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
-Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
-```
-
-</details>
-
-<details><summary><b>Price and chart</b> — score -0.50</summary>
-
-```text
-Last close 79.46 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 83.37 (-4.7%), 50d 85.68 (-7.3%), 200d 81.10 (-2.0%); 50d above 200d
-Momentum: RSI(14) 28.8 | MACD -1.634 vs signal -1.303 (histogram -0.331)
-Returns: 1d -1.0% | 5d -3.8% | 1m -7.9% | 3m -6.1%
-52-week range: 68.14 - 90.01 (now 51.8% of the way up)
-Volatility: ATR(14) 1.28 (1.6% of price) | annualised 20d 15.8%
-Volume: 0.32x the 20-day average
-```
-
-</details>
-
-<details><summary><b>Company numbers</b> — score -0.10</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What this fund holds</b> — score -0.10</summary>
-
-```text
-Fund type: Industrials
-What it holds: P/E 20.28 | P/B 4.25 | P/S 1.45 | 3y earnings growth n/a
-Yield: 0.9%
-Three-year record: +11.5% a year | beta to the market 1.28
-Cost and size: expense ratio 0.37% | net assets 2.20B
-What it is made of: Stocks 99.8%, Cash 0.2%
-Largest holdings: Union Pacific Corp 17.8%, Uber Technologies Inc 15.4%, CSX Corp 9.4%, United Parcel Service Inc Class B 5.6%, Norfolk Southern Corp 4.9%
-Sector mix: Industrials 83.8%, Technology 16.2%
-```
-
-</details>
-
-<details><summary><b>Does this company beat its own forecasts</b> — score -0.10</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What holding this fund costs you</b> — score -0.10</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How much oil and gas is in storage</b> — score -0.10</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How the crop is growing</b> — score -0.10</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts and big funds say</b> — score +0.45</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts say about what this fund holds</b> — score +0.45</summary>
-
-```text
-Rolled up from the 5 largest holdings, 53.1% of the fund by weight
-Ratings by weight: buy 90.8% | hold 9.2% | sell 0.0% (mean 1.84 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +26.5% above the current prices
-Holdings read: UNP, UBER, CSX, UPS, NSC
-Recent rating changes among them:
-  - UNP: 2026-09-16 UBS: up, Neutral -> Buy
-  - UBER: 2026-09-09 Scotiabank: init, ? -> Sector Outperform
-  - CSX: 2026-09-18 B of A Securities: main, Buy -> Buy
-  - UPS: 2026-07-29 Stifel: main, Buy -> Buy
-  - NSC: 2026-07-27 BMO Capital: main, Market Perform -> Market Perform
-```
-
-</details>
-
-<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Who is positioned how</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
-
-```text
-Direction: unknown
-Share count change: n/a (too few readings)
-Shares outstanding: 27.46M | fund size: 2.18B
-Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
-```
-
-</details>
-
-### US media and communication (XLC) · Sector or country — NEUTRAL, confidence 0.20
-
-**Result:** REJECTED · bias is NEUTRAL; no trade
-
-**In the model's own words:**
-
-> No macro surprise this week: 10-year unchanged, curve normally sloped, VIX down to 14.6, no data release far from expectations. Technicals are mixed -- price above 20d/50d but below the 200d with a death-cross configuration, MACD histogram slightly negative, volume 0.6x average on the pop. The 7% WBD move is a small-weight constituent story and does not drive a fund where Meta and Alphabet are 35%. Analyst roll-up is constructive (100% buy by weight, +13% targets) but covers only 45% of the fund and is slow-moving. Rate path pricing hikes and a firmer dollar are mild headwinds for long-duration growth exposure. No side worth taking.
-
-**Main reasons it gave:**
-- 10-year 4.96% unchanged on the week; curve +0.98 normal; VIX 14.62 and falling -- no policy or vol shock
-- Price 113.47 below 200d SMA 113.99 with 50d under 200d; MACD histogram -0.036
-- Rally came on 0.61x average volume -- not a decisive break
-- Analyst roll-up 100% buy, +13% weighted target, but only 45.5% of fund covered
-- 2-year 4.67% vs 4.00% target prices ~3 hikes; dollar +0.90 -- headwind for duration-sensitive growth names
-
-<details><summary><b>News</b> — score +0.05</summary>
-
-- [Warner Bros. Discovery Jumps 7%, Paramount Skydance Climbs 5% as Antitrust Settlement Talks Advance; Netflix Sits Out the Rally](https://247wallst.com/investing/2026/09/21/warner-bros-discovery-jumps-7-paramount-skydance-climbs-5-as-antitrust-settlement-talks-advance-netflix-sits-out-the-rally/)  
-  <sub>24/7 Wall St., 2 hours ago</sub>  
-  Shares of Warner Bros. Discovery (NASDAQ:WBD | WBD Price Prediction) are jumping in early Monday trading on fresh reports that antitrust settlement talks...
-- [Leading And Lagging Sectors For September 21, 2026](https://www.benzinga.com/etfs/sector-etfs/26/09/61894029/leading-and-lagging-sectors-september-21-2026)  
-  <sub>Benzinga, 2 hours ago</sub>  
-  Gainers Symbol Name Price Change ($) Change (%) Volume (NYSE:XLK) State Street Technology Select Sector SPDR ETF 191.7700 2.170 1.14 39.0K (NYSE:XLC) State...
-
-</details>
-
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.05</summary>
-
-```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
-Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
-Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
-```
-
-</details>
-
-<details><summary><b>Price and chart</b> — score +0.05</summary>
-
-```text
-Last close 113.47 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 112.39 (+1.0%), 50d 111.22 (+2.0%), 200d 113.99 (-0.5%); 50d below 200d
-Momentum: RSI(14) 54.4 | MACD 0.412 vs signal 0.448 (histogram -0.036)
-Returns: 1d +2.4% | 5d -1.4% | 1m +2.5% | 3m +6.2%
-52-week range: 105.38 - 120.08 (now 55.0% of the way up)
-Volatility: ATR(14) 1.79 (1.6% of price) | annualised 20d 18.9%
-Volume: 0.61x the 20-day average
+Last close 114.79 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 112.58 (+2.0%), 50d 111.31 (+3.1%), 200d 113.99 (+0.7%); 50d below 200d
+Momentum: RSI(14) 57.7 | MACD 0.642 vs signal 0.503 (histogram 0.139)
+Returns: 1d +0.0% | 5d +0.7% | 1m +3.0% | 3m +7.0%
+52-week range: 105.38 - 120.08 (now 64.0% of the way up)
+Volatility: ATR(14) 1.84 (1.6% of price) | annualised 20d 21.0%
+Volume: 0.41x the 20-day average
 ```
 
 </details>
@@ -9963,14 +7599,14 @@ _Not available today._
 
 ```text
 Rolled up from the 5 largest holdings, 45.5% of the fund by weight
-Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.55 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +13.0% above the current prices
+Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.54 on a 1=strong buy to 5=strong sell scale)
+Weighted price target: +11.1% above the current prices
 Holdings read: META, GOOGL, GOOG, T, VZ
 Recent rating changes among them:
   - META: 2024-09-30 Cantor Fitzgerald: reit, Overweight -> Overweight
   - GOOGL: 2026-09-18 Tigress Financial: main, Strong Buy -> Strong Buy
   - GOOG: 2026-07-23 JP Morgan: main, Overweight -> Overweight
-  - T: 2026-07-23 Wolfe Research: up, Peer Perform -> Outperform
+  - T: 2026-09-21 BNP Paribas: up, Neutral -> Outperform
   - VZ: 2026-07-27 TD Cowen: main, Buy -> Buy
 ```
 
@@ -9993,72 +7629,2399 @@ _Not available today._
 ```text
 Direction: unknown
 Share count change: n/a (too few readings)
-Shares outstanding: 198.53M | fund size: 22.53B
+Shares outstanding: 202.30M | fund size: 23.22B
 Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
 ```
 
 </details>
 
-### Biotech (XBI) · Sector or country — no answer, no confidence given
+### US energy companies (XLE) · Sector or country — NEUTRAL, confidence 0.25
 
-<details><summary><b>News</b> — score n/a</summary>
+**In the model's own words:**
 
-- [SLS, IBRX Eye Green Month As Biotech ETF Gains Steam: Analyst Sees ‘Continued Opportunities’ In Immuno-Oncology](https://stocktwits.com/news-articles/markets/equity/sls-ibrx-xbi-analyst-continued-opportunities-immuno-oncology/cZ1BDwKR7hT)  
-  <sub>Stocktwits, 17 hours ago</sub>  
-  XBI, which includes both SLS and IBRX, is on track for its strongest monthly performance since December 2023.
-- [Biotech Week Ahead: XLV Beats The Market — Here Are The Stocks, Readouts And Events To Watch Next](https://finance.yahoo.com/healthcare/articles/biotech-week-ahead-xlv-beats-043704054.html)  
-  <sub>Yahoo Finance, 11 hours ago</sub>  
-  The Health Care Select Sector SPDR Fund (XLV) gained 1.8% last week, outperforming the broader market and biotech ETFs. Sellas Life Sciences (SLS) will...
-- [The Real Start of Every Biotech Story is not a Lab but the Funding Decision](https://www.moomoo.com/community/feed/the-real-start-of-every-biotech-story-is-not-a-117304363909126)  
-  <sub>Moomoo, 23 hours ago</sub>  
-  Before a company like the ones I usually write about here can develop a drug, someone has to fund the basic science behind it, and that funding proces...
-- [Could IBRX Be A Tokenized Stock? Founder’s Tease Sends ImmunityBio Traders Into Speculation Mode](https://stocktwits.com/news-articles/markets/equity/ibrx-tokenized-stock-founder-tease-immunitybio-traders-speculation-mode/cZMRI94RB4K)  
-  <sub>Stocktwits, 5 hours ago</sub>  
-  IBRX stock, ImmunityBio, ImmunityBio Patrick Soon-Shiong, tokenized stocks, Nant Global Finance, SEC Innovation Exemption, blockchain stock trading.
-- [NOK Stock Rises Overnight: Nokia’s EURO STOXX 50 Index Return On Monday Adds To AI-Fueled Momentum](https://stocktwits.com/news-articles/markets/equity/nok-stock-rises-overnight-nokia-s-euro-stoxx-50-index-return-on-monday-adds-to-ai-fueled-momentum/cZMRdyoRB4Q)  
-  <sub>Stocktwits, 10 hours ago</sub>  
-  Its inclusion in the EURO STOXX 50 will trigger passive buying from index funds in the Eurozone, likely pushing its prices higher and in turn,...
-- [NIO, XPEV, LI Fall In Hong Kong Amid US-China Trade Truce Jitters — Here’s What's Happening Across China’s EV Sector](https://stocktwits.com/news-articles/markets/equity/nio-xpev-li-us-china-trade-truce-jitters-china-ev-sector/cZMR3iQRB4W)  
-  <sub>Stocktwits, 10 hours ago</sub>  
-  Nio expects ES9 deliveries to reach 30000 this week, less than four months after deliveries began.
+> XLE trades near multi-year highs (85% through its 52-week range) on a 11.7% gain over 200 days, but technical momentum has stalled with price below its 20-day moving average, RSI neutral at 45.7, and MACD histogram negative. The macro backdrop is mixed: oil prices have slipped this week (WTI to $93.51), the EIA forecasts a 10% decline in crude over the next six months to $70/barrel by end of 2027, and crude inventories drew last week but sit only at the 38th percentile. Petrol is notably tight at the 13th percentile, which supports refiner margins for holdings like MPC and PSX. Analyst coverage of the fund's top five holdings—51.7% of the fund—shows all buy ratings with a +6.4% price target, though Jefferies downgraded MPC from Buy to Hold on 2026-09-22, the day of this close. The energy sector itself shows no fundamental repricing; valuations (P/E 17.74) are unchanged and the fund's three-year return of +15.1% annually reflects prior upside already captured. VIX is calm at 14.4, rates are stable with the yield curve normal, and the dollar has strengthened 93 basis points this week—typically a headwind for energy. Neither fund flows nor positioning data is available to confirm conviction. The news cycle repeats that XLE is concentrated in oil and gas (not surprising for an energy ETF), and one day of modest price weakness does not constitute a catalyst. A technical breakdown from here or continued price weakness would argue bearish, but the current setup favors waiting for either trend confirmation or a catalyst—rate shock, geopolitical event, or EIA surprise—before taking a directional call.
+
+**Main reasons it gave:**
+- Oil prices fell to $93.51 as of publication; EIA forecasts WTI declining to $70 by end of 2027
+- Price below 20-day SMA at 62.45 vs 64.02, RSI 45.7 neutral, MACD histogram negative
+- Petrol inventories at 13th percentile support refiner margins
+- Analyst coverage of top 51.7% of fund shows 100% buy ratings with +6.4% price target, though MPC downgraded to Hold on 2026-09-22
+- Fund at 85% of 52-week range with three-year annualized return of 15.1% already achieved; no fresh catalyst evident
+
+<details><summary><b>News</b> — score -0.15</summary>
+
+- [XLE Is 91% Oil and Gas. Investors Buying "Energy" May Own Less Than They Think](https://247wallst.com/investing/etf/2026/09/21/xle-is-91-oil-and-gas-investors-buying-energy-may-own-less-than-they-think/)  
+  <sub>24/7 Wall St., 19 hours ago</sub>  
+  The ticker says energy, but the fund's holdings tell a much narrower story than most investors expect before they buy in. By Omor Ibne Ehsan.
+- [Oil Slid, Sending Energy ETFs Lower Before The Open](https://finimize.com/content/oil-slid-sending-energy-etfs-lower-before-the-open)  
+  <sub>Finimize, 2 hours ago</sub>  
+  WTI fell to $93.51 a barrel and Brent to $98.50, while TotalEnergies signed an MOU with Venezuela's PDVSA and Solaris lined up $1 billion of notes due 2032.
+- [XLE ETF is 91% oil and gas, not broad energy ex...](https://pluang.com/en/news-feed/xle-91-persen-minyak-dan-gas-pemodal-energi-mungkin-milik-kurang-dari-yang)  
+  <sub>Pluang, 19 hours ago</sub>  
+  The Energy Select Sector SPDR Fund (XLE) is heavily concentrated in large-cap U.S. oil and gas companies like ExxonMobil and Chevron, making up 91% of its...
+- [The Fed Is Watching AI Inflation. Here's What ETF Investors Should Watch](https://www.tradingview.com/news/benzinga:92e972516094b:0-the-fed-is-watching-ai-inflation-here-s-what-etf-investors-should-watch/)  
+  <sub>TradingView, 23 hours ago</sub>  
+  ETF investors have an unusual second-order trade due to exorbitant AI spending.Chicago Fed President Austan Goolsbee warned Monday that a surge in AI...
+- [Large-cap energy stocks with long-running Strong Buy Quant ratings (XLE:NYSEARCA)](https://seekingalpha.com/news/4645377-large-cap-energy-stocks-with-long-running-strong-buy-quant-ratings)  
+  <sub>Seeking Alpha, 2 hours ago</sub>  
+  Screen of large-cap energy stocks with 60+ days of Strong Buy Quant Ratings—NESR, PARR, PBF, PSX, DINO, CVX—plus key energy ETFs.
 
 </details>
 
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score n/a</summary>
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score -0.15</summary>
 
 ```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
 Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
 Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
 ```
 
 </details>
 
-<details><summary><b>Price and chart</b> — score n/a</summary>
+<details><summary><b>Price and chart</b> — score -0.25</summary>
 
 ```text
-Last close 158.51 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 161.27 (-1.7%), 50d 157.56 (+0.6%), 200d 137.31 (+15.4%); 50d above 200d
-Momentum: RSI(14) 49.1 | MACD -0.673 vs signal 0.145 (histogram -0.818)
-Returns: 1d +1.1% | 5d +0.6% | 1m -3.0% | 3m +8.7%
-52-week range: 95.60 - 169.55 (now 85.1% of the way up)
-Volatility: ATR(14) 3.99 (2.5% of price) | annualised 20d 24.5%
-Volume: 0.35x the 20-day average
+Last close 62.45 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 64.02 (-2.5%), 50d 61.44 (+1.6%), 200d 55.90 (+11.7%); 50d above 200d
+Momentum: RSI(14) 45.7 | MACD 0.591 vs signal 1.042 (histogram -0.451)
+Returns: 1d -0.0% | 5d -5.3% | 1m -1.9% | 3m +14.7%
+52-week range: 42.61 - 65.93 (now 85.1% of the way up)
+Volatility: ATR(14) 1.31 (2.1% of price) | annualised 20d 21.8%
+Volume: 0.50x the 20-day average
 ```
 
 </details>
 
-<details><summary><b>Company numbers</b> — score n/a</summary>
+<details><summary><b>Company numbers</b> — score -0.20</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What this fund holds</b> — score n/a</summary>
+<details><summary><b>What this fund holds</b> — score -0.20</summary>
+
+```text
+Fund type: Equity Energy
+What it holds: P/E 17.74 | P/B 2.58 | P/S 1.68 | 3y earnings growth n/a
+Yield: 2.4%
+Three-year record: +15.1% a year | beta to the market -0.07
+Cost and size: expense ratio 0.08% | net assets 41.44B
+What it is made of: Stocks 99.8%, Cash 0.2%
+Largest holdings: ExxonMobil Holdings Corp 19.9%, Chevron Corp 14.9%, ConocoPhillips 6.2%, Marathon Petroleum Corp 5.4%, Phillips 66 5.3%
+Sector mix: Energy 100.0%
+```
+
+</details>
+
+<details><summary><b>Does this company beat its own forecasts</b> — score -0.20</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What holding this fund costs you</b> — score -0.20</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How much oil and gas is in storage</b> — score -0.20</summary>
+
+```text
+US inventories, week ending 2026-09-11 (published the following Wednesday)
+  Crude oil: 423.4 million barrels, -0.6 on the week (a draw), 38% percentile over 52 weeks
+  Petrol: 207.7 million barrels, +0.8 on the week (a build), 13% percentile over 52 weeks -- low for the time of year
+  Diesel: 107.9 million barrels, +1.6 on the week (a build), 33% percentile over 52 weeks
+  Natural gas: 3,298.0 billion cubic feet, +44.0 on the week (a build), 71% percentile over 52 weeks
+A build is more supply than demand and a draw is the reverse, so a build reads bearish and a draw bullish -- as a rule of thumb, not a law. Weigh the change and how unusual the level is above the level itself, and remember the market has already seen this number.
+```
+
+</details>
+
+<details><summary><b>How the crop is growing</b> — score -0.20</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.35</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.35</summary>
+
+```text
+Rolled up from the 5 largest holdings, 51.7% of the fund by weight
+Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 2.05 on a 1=strong buy to 5=strong sell scale)
+Weighted price target: +6.4% above the current prices
+Holdings read: XOM, CVX, COP, MPC, PSX
+Recent rating changes among them:
+  - XOM: 2026-09-03 Piper Sandler: main, Neutral -> Neutral
+  - CVX: 2026-09-03 BMO Capital: main, Outperform -> Outperform
+  - COP: 2026-09-14 UBS: main, Buy -> Buy
+  - MPC: 2026-09-22 Jefferies: down, Buy -> Hold
+  - PSX: 2026-09-17 BMO Capital: main, Outperform -> Outperform
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Who is positioned how</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
+
+```text
+Direction: unknown
+Share count change: n/a (too few readings)
+Shares outstanding: 186.42M | fund size: 11.64B
+Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
+```
+
+</details>
+
+### US banks and finance (XLF) · Sector or country — NEUTRAL, confidence 0.25
+
+**Result:** REJECTED · bias is NEUTRAL; no trade
+
+**In the model's own words:**
+
+> No macro surprise this cycle: yields barely moved (10y -4bp), curve normally sloped, VIX fell to 14.4 and inflation/claims data were in line. The only notable change is price itself -- XLF is 4-5% under both its 20d and 50d SMAs with RSI 29 and a negative MACD histogram, but that break came on light volume (0.61x) and the 50d remains above the 200d, so it reads as a pullback within an uptrend rather than a decisive breakdown. Holdings are reasonably valued (P/E 16.4) and analyst coverage of the top 41.5% is unanimously buy with ~14% upside, a mild offset. The one live macro headwind is a 2-year at 4.76% pricing hikes rather than cuts, which cuts both ways for banks. News flow was sector roundups and single-name stories, which carry no information for the basket. No side justified.
+
+**Main reasons it gave:**
+- RSI(14) 29.1 and price 4.3%/4.4% below 20d/50d SMA, but 50d still above 200d
+- Breakdown on 0.61x average volume -- no heavy-volume confirmation
+- 10y yield -4bp on week, VIX -2.8 to 14.4, curve +0.95 normal: no rate or policy surprise
+- 2-year 4.76% vs 4.00% target prices ~4 hikes -- ambiguous for financials
+- Top-5 holdings (41.5% of fund) 100% buy-rated with +13.8% weighted target, coverage thin relative to fund
+
+<details><summary><b>News</b> — score +0.00</summary>
+
+- [Leading And Lagging Sectors For September 22, 2026](https://www.benzinga.com/etfs/sector-etfs/26/09/61919139/leading-and-lagging-sectors-september-22-2026)  
+  <sub>Benzinga, 2 hours ago</sub>  
+  Gainers Symbol Name Price Change ($) Change (%) Volume (NYSE:XLB) State Street Materials Select Sector SPDR ETF 49.9500 0.240 0.48 2.2K (NYSE:XLP) State...
+- [Northern Trust Stock: Is NTRS Outperforming the Financial Sector?](https://finance.yahoo.com/markets/stocks/articles/northern-trust-stock-ntrs-outperforming-160739477.html)  
+  <sub>Yahoo Finance, 23 hours ago</sub>  
+  Northern Trust Corporation (NTRS), headquartered in Chicago, Illinois, offers wealth management, asset servicing, asset management, and banking solutions.
+- [Sector Update: Financial Stocks Advance Monday Afternoon](https://www.moomoo.com/news/post/76546999/sector-update-financial-stocks-advance-monday-afternoon)  
+  <sub>Moomoo, 21 hours ago</sub>  
+  Financialstocks were advancing in Monday afternoon trading, with the NYSE Financial Index rising 0.6% and the State Street Financial Select Sector SPDR ETF...
+- [Why do investors keep ignoring higher yields and oil prices?](https://invezz.com/au/news/2026/09/22/why-do-investors-keep-ignoring-higher-yields-and-oil-prices/)  
+  <sub>Invezz, 1 hour ago</sub>  
+  Historically, two financial forces have consistently struck fear into equity markets: higher oil prices and a sharp increase in the government bond yields.
+
+</details>
+
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
+
+```text
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
+Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
+Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+```
+
+</details>
+
+<details><summary><b>Price and chart</b> — score -0.35</summary>
+
+```text
+Last close 54.65 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 57.12 (-4.3%), 50d 57.15 (-4.4%), 200d 53.71 (+1.8%); 50d above 200d
+Momentum: RSI(14) 29.1 | MACD -0.476 vs signal -0.172 (histogram -0.304)
+Returns: 1d -2.2% | 5d -3.9% | 1m -4.9% | 3m +1.4%
+52-week range: 47.81 - 58.56 (now 63.7% of the way up)
+Volatility: ATR(14) 0.75 (1.4% of price) | annualised 20d 13.7%
+Volume: 0.61x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.20</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What this fund holds</b> — score +0.20</summary>
+
+```text
+Fund type: Financial
+What it holds: P/E 16.36 | P/B 2.42 | P/S 3.50 | 3y earnings growth n/a
+Yield: 1.4%
+Three-year record: +18.8% a year | beta to the market 0.71
+Cost and size: expense ratio 0.08% | net assets 54.59B
+What it is made of: Stocks 99.8%, Cash 0.2%
+Largest holdings: JPMorgan Chase & Co 11.7%, Berkshire Hathaway Inc Class B 11.3%, Visa Inc Class A 7.7%, Mastercard Inc Class A 5.8%, Bank of America Corp 5.0%
+Sector mix: Financial services 98.1%, Technology 1.6%, Industrials 0.3%
+```
+
+</details>
+
+<details><summary><b>Does this company beat its own forecasts</b> — score +0.20</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What holding this fund costs you</b> — score +0.20</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How much oil and gas is in storage</b> — score +0.20</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How the crop is growing</b> — score +0.20</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.30</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.30</summary>
+
+```text
+Rolled up from the 5 largest holdings, 41.5% of the fund by weight
+Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.80 on a 1=strong buy to 5=strong sell scale)
+Weighted price target: +13.8% above the current prices
+Holdings read: JPM, BRK-B, V, MA, BAC
+Recent rating changes among them:
+  - JPM: 2026-08-14 Wells Fargo: main, Overweight -> Overweight
+  - BRK-B: 2026-08-10 UBS: main, Buy -> Buy
+  - V: 2026-08-31 RBC Capital: main, Outperform -> Outperform
+  - MA: 2026-08-31 RBC Capital: main, Outperform -> Outperform
+  - BAC: 2026-08-03 UBS: main, Buy -> Buy
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Who is positioned how</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
+
+```text
+Direction: unknown
+Share count change: n/a (too few readings)
+Shares outstanding: 883.44M | fund size: 48.28B
+Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
+```
+
+</details>
+
+### US industry (XLI) · Sector or country — NEUTRAL, confidence 0.25
+
+**In the model's own words:**
+
+> XLI is trading below its 20d, 50d and 200d moving averages, with momentum deeply in bearish territory: RSI at 34.5 signals oversold conditions, MACD is negative with a widening histogram, and the fund has declined 5.9% over one month and 4.8% over three months. Volume is below average, which undercuts the significance of the technical breakdown. The macro backdrop is stable with a normal upward-sloping yield curve, the dollar has strengthened but modestly, and the VIX has fallen to a calm 14.42, suggesting no acute risk-off event is driving the weakness. Analyst coverage of the five largest holdings (25.8% of the fund) is uniformly bullish, with a weighted price target 24.5% above current levels and a recent buy upgrade for Union Pacific. Fund basics show a P/E of 28.43, elevated but consistent with prior growth, and a three-year record of +19% annualized return. The fund pays a 1.2% yield and has substantial net assets. The bearish technicals and oversold reading suggest a bounce is possible from here, but the timing of a macro turn is uncertain and the fund's valuation leaves limited margin of safety. No policy surprise, inflation surprise, or decisive technical break on volume has occurred to justify a directional call. The weakness appears tactical rather than structural, but the combination of momentum damage and elevated valuation argues for patience before adding exposure.
+
+**Main reasons it gave:**
+- RSI 34.5 and MACD negative; price 5% below 50d SMA
+- Analyst roll-up shows 100% buy ratings with +24.5% price target on largest 25.8% of fund
+- P/E 28.43 elevated; three-year return 19% annualized sustains valuation
+- Macro backdrop stable: VIX 14.4, normal yield curve, no data surprises
+- Volume 0.51x 20d average undercuts technical breakdown significance
+
+<details><summary><b>News</b> — score +0.00</summary>
+
+- [Four industrial stocks with persistent Strong Buy Quant signals (XLI:NYSEARCA)](https://seekingalpha.com/news/4645451-four-industrial-stocks-with-persistent-strong-buy-quant-signals)  
+  <sub>Seeking Alpha, 1 hour ago</sub>  
+  Industrial stock picks: 4 names with 60+ days of Strong Buy Quant Ratings (ATI, SNDR, FA, KNX).
+- [Leading And Lagging Sectors For September 22, 2026](https://www.benzinga.com/etfs/sector-etfs/26/09/61919139/leading-and-lagging-sectors-september-22-2026)  
+  <sub>Benzinga, 2 hours ago</sub>  
+  Gainers Symbol Name Price Change ($) Change (%) Volume (NYSE:XLB) State Street Materials Select Sector SPDR ETF 49.9500 0.240 0.48 2.2K (NYSE:XLP) State...
+- [State Street Industrial Select Sector SPDR ETF declares quarterly distribution of $0.4550](https://www.tradingview.com/news/seekingalpha:1551123ce094b:0-state-street-industrial-select-sector-spdr-etf-declares-quarterly-distribution-of-0-4550/)  
+  <sub>TradingView, 21 hours ago</sub>  
+  Content provided by Seeking Alpha is intended for information purposes only, and that Seeking Alpha does not offer any personalist investment advice and is...
+- [XTN: Transportation Likely To Lag Into 2027 Amid Macro Pressures And Factor Weaknesses](https://seekingalpha.com/article/4948496-xtn-transportation-likely-to-lag-into-2027-given-macro-pressures-factor-weaknesses)  
+  <sub>Seeking Alpha, 9 hours ago</sub>  
+  Summary. I initiate coverage of the State Street SPDR S&P Transportation ETF with a Hold rating. I believe XTN will underperform IVV into 2027 as higher...
+
+</details>
+
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
+
+```text
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
+Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
+Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+```
+
+</details>
+
+<details><summary><b>Price and chart</b> — score -0.65</summary>
+
+```text
+Last close 169.63 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 173.01 (-1.9%), 50d 178.52 (-5.0%), 200d 171.80 (-1.3%); 50d above 200d
+Momentum: RSI(14) 34.5 | MACD -2.939 vs signal -2.833 (histogram -0.106)
+Returns: 1d -0.2% | 5d +0.5% | 1m -5.9% | 3m -4.8%
+52-week range: 147.83 - 186.51 (now 56.4% of the way up)
+Volatility: ATR(14) 2.39 (1.4% of price) | annualised 20d 13.0%
+Volume: 0.51x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.35</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What this fund holds</b> — score +0.35</summary>
+
+```text
+Fund type: Industrials
+What it holds: P/E 28.43 | P/B 6.75 | P/S 3.00 | 3y earnings growth n/a
+Yield: 1.2%
+Three-year record: +19.0% a year | beta to the market 1.02
+Cost and size: expense ratio 0.08% | net assets 31.95B
+What it is made of: Stocks 100.0%, Cash 0.1%
+Largest holdings: Caterpillar Inc 6.7%, GE Aerospace 6.4%, RTX Corp 5.1%, GE Vernova Inc 4.4%, Union Pacific Corp 3.2%
+Sector mix: Industrials 92.8%, Technology 6.7%, Basic materials 0.3%, Consumer cyclical 0.2%
+```
+
+</details>
+
+<details><summary><b>Does this company beat its own forecasts</b> — score +0.35</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What holding this fund costs you</b> — score +0.35</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How much oil and gas is in storage</b> — score +0.35</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How the crop is growing</b> — score +0.35</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.70</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.70</summary>
+
+```text
+Rolled up from the 5 largest holdings, 25.8% of the fund by weight
+Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.79 on a 1=strong buy to 5=strong sell scale)
+Weighted price target: +24.5% above the current prices
+Holdings read: CAT, GE, RTX, GEV, UNP
+Recent rating changes among them:
+  - CAT: 2024-10-14 JP Morgan: main, Overweight -> Overweight
+  - GE: 2026-07-23 Bernstein: main, Outperform -> Outperform
+  - RTX: 2026-08-03 Bernstein: main, Market Perform -> Market Perform
+  - GEV: 2026-09-15 Bernstein: reit, Outperform -> Outperform
+  - UNP: 2026-09-16 UBS: up, Neutral -> Buy
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Who is positioned how</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
+
+```text
+Direction: unknown
+Share count change: n/a (too few readings)
+Shares outstanding: 136.63M | fund size: 23.18B
+Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
+```
+
+</details>
+
+### US everyday goods (XLP) · Sector or country — NEUTRAL, confidence 0.25
+
+**In the model's own words:**
+
+> XLP has outperformed discretionary YTD (+6.6% vs broader market advance) and carries a low beta of 0.49, making it a defensive anchor. The fund's largest holdings are all rated Buy by consensus with a weighted price target 12.9% above current levels, and the 2.6% yield supports downside. However, technicals show weakness: price sits below all major moving averages (20d, 50d, 200d), RSI at 41.5 signals oversold conditions but momentum is negative (MACD histogram deteriorating), and recent returns are down across 1m (-3.7%) and 5d (-1.1%) timeframes despite today's +1.0% bounce. Volume is below average at 0.48x 20-day, suggesting limited conviction behind the move. The macro backdrop remains stable: yields flat to modestly lower this week, the curve normal at +95bp, the dollar firming slightly (+0.93), and the VIX calm at 14.4. Inflation at 3.4% with the Fed holding at 4.0% creates no urgent catalyst. The fund is trading defensively—a rational position in a calm macro environment—but has not broken decisively to either side. Analyst support for holdings is strong but not sufficient to overcome near-term technical deterioration and lack of volume conviction.
+
+**Main reasons it gave:**
+- Price below 20d, 50d and 200d moving averages despite recent outperformance
+- Analyst consensus +12.9% price target on 39.6% of fund weight, all Buy rated
+- RSI 41.5 with negative MACD histogram, volume 0.48x average on +1.0% bounce
+- Fund yield 2.6% with low beta 0.49 provides defensive properties in stable macro
+- No clear fund flow data; macro backdrop calm with normal yield curve and contained inflation expectations
+
+<details><summary><b>News</b> — score +0.15</summary>
+
+- [Staples ETF Widens Gap Over Discretionary in 2026](https://www.etftrends.com/sector-investing-content-hub/staples-etf-widens-gap-over-discretionary-in-2026/)  
+  <sub>ETF Trends, 3 hours ago</sub>  
+  The State Street Consumer Staples Select Sector SPDR ETF (XLP) has climbed 6.6% so far in 2026, according to State Street data as of September 21.
+- [Inflation Pressures May Persist: ETFs Worth Watching Now](https://www.google.com/goto?url=CAESmAEB6zswFQFMKbiiRl9dZFlggHARpNA0SXN2yfLL0mIr0syhBjxs9BP9BtonxaQ_IAzjpR4wdzqXwpSaDyQzgrTS8VhG4gfa-2gvBFhJ9HQz3tmNUK5UqK1kNK9yMHxoyivfrgssOaUXDfxebJ6yeyud1DPaFbLzEC8a874QItiNYuTWL6yyM0wQvTsomlBep6PAUEk4ZBoEXA)  
+  <sub>Zacks Investment Research, 19 minutes ago</sub>  
+  From strong demand and AI spending to higher oil prices and war costs, multiple forces could keep inflation elevated for longer, putting ETFs in focus.
+- [Leading And Lagging Sectors For September 22, 2026](https://www.benzinga.com/etfs/sector-etfs/26/09/61919139/leading-and-lagging-sectors-september-22-2026)  
+  <sub>Benzinga, 2 hours ago</sub>  
+  Gainers Symbol Name Price Change ($) Change (%) Volume (NYSE:XLB) State Street Materials Select Sector SPDR ETF 49.9500 0.240 0.48 2.2K (NYSE:XLP) State...
+- [Hormel Foods Stock: Is HRL Underperforming the Consumer Defensive Sector?](https://finance.yahoo.com/markets/stocks/articles/hormel-foods-stock-hrl-underperforming-184803592.html)  
+  <sub>Yahoo Finance, 21 hours ago</sub>  
+  With a market cap of $11.5 billion, Hormel Foods Corporation (HRL) is a global branded food company. The company owns a broad portfolio of well-known brands...
+- [State Street Consumer Disc Sel Sect SPDR ETF declares quarterly distribution of $0.2441](https://www.tradingview.com/news/seekingalpha:2683e83b6094b:0-state-street-consumer-disc-sel-sect-spdr-etf-declares-quarterly-distribution-of-0-2441/)  
+  <sub>TradingView, 21 hours ago</sub>  
+  Content provided by Seeking Alpha is intended for information purposes only, and that Seeking Alpha does not offer any personalist investment advice and is...
+- [Exchange-Traded Funds Rise as US Equities Advance After Midday](https://www.moomoo.com/news/post/76545775/exchange-traded-funds-rise-as-us-equities-advance-after-midday)  
+  <sub>Moomoo, 21 hours ago</sub>  
+  BroadMarket IndicatorsBroad-market exchange-traded funds IWM and IVV were higher. Actively traded Invesco QQQ Trust (QQQ) added 2.5%.US equity indexes rose...
+
+</details>
+
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.15</summary>
+
+```text
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
+Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
+Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+```
+
+</details>
+
+<details><summary><b>Price and chart</b> — score -0.30</summary>
+
+```text
+Last close 82.77 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 84.25 (-1.8%), 50d 84.84 (-2.4%), 200d 83.61 (-1.0%); 50d above 200d
+Momentum: RSI(14) 41.5 | MACD -0.688 vs signal -0.485 (histogram -0.203)
+Returns: 1d +1.0% | 5d -1.1% | 1m -3.7% | 3m -1.1%
+52-week range: 75.60 - 90.01 (now 49.8% of the way up)
+Volatility: ATR(14) 0.98 (1.2% of price) | annualised 20d 11.7%
+Volume: 0.48x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.30</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What this fund holds</b> — score +0.30</summary>
+
+```text
+Fund type: Consumer Defensive
+What it holds: P/E 25.14 | P/B 4.58 | P/S 1.36 | 3y earnings growth n/a
+Yield: 2.6%
+Three-year record: +7.6% a year | beta to the market 0.49
+Cost and size: expense ratio 0.08% | net assets 14.52B
+What it is made of: Stocks 99.9%, Cash 0.1%
+Largest holdings: Walmart Inc 9.8%, Costco Wholesale Corp 8.9%, Coca-Cola Co 7.3%, Procter & Gamble Co 7.2%, Philip Morris International Inc 6.2%
+Sector mix: Consumer defensive 98.2%, Consumer cyclical 1.8%
+```
+
+</details>
+
+<details><summary><b>Does this company beat its own forecasts</b> — score +0.30</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What holding this fund costs you</b> — score +0.30</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How much oil and gas is in storage</b> — score +0.30</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How the crop is growing</b> — score +0.30</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.40</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.40</summary>
+
+```text
+Rolled up from the 5 largest holdings, 39.6% of the fund by weight
+Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.81 on a 1=strong buy to 5=strong sell scale)
+Weighted price target: +12.9% above the current prices
+Holdings read: WMT, COST, KO, PG, PM
+Recent rating changes among them:
+  - WMT: 2026-09-10 DA Davidson: main, Buy -> Buy
+  - COST: 2026-09-16 Oppenheimer: reit, Outperform -> Outperform
+  - KO: 2026-07-30 Argus Research: main, Buy -> Buy
+  - PG: 2026-08-07 Argus Research: down, Buy -> Hold
+  - PM: 2026-07-30 Citigroup: main, Buy -> Buy
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Who is positioned how</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
+
+```text
+Direction: unknown
+Share count change: n/a (too few readings)
+Shares outstanding: 210.17M | fund size: 17.40B
+Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
+```
+
+</details>
+
+### US electricity and water (XLU) · Sector or country — NEUTRAL, confidence 0.25
+
+**In the model's own words:**
+
+> XLU sits at an inflection point with mixed signals. The technicals are weak: price is 8.5% below the 200-day moving average, RSI at 29.7 signals oversold conditions, MACD remains negative though histogram is tightening, and volume is subormal at 0.37x average. The one-month drawdown of 4.8% and three-month of 9.6% reflect a material selloff. However, offsetting bearish technicals is a compelling fundamental setup: the fund's top five holdings (39.4% of the fund) carry analyst consensus of 81% buy-rated and a weighted price target 21.9% above current levels, with no sell ratings. Valuations remain reasonable for utilities at 19.0x P/E with a 2.8% yield. The macro backdrop is neutral: the Fed is on hold at 4.0% target, the bond market prices modest easing ahead (4 quarter-point cuts over two years), Treasury yields are stable week-over-week, the dollar has strengthened modestly, and the VIX at 14.4 is calm. The oversold technical picture and strong analyst conviction on the largest holdings suggest potential upside, but the broken technical trend, weak recent momentum, and below-average volume preclude a bullish call. No clear macro catalyst has emerged to drive a directional move; the Fed's AI inflation watch mentioned in one headline does not constitute a policy surprise. The risk system will treat this as a weak signal.
+
+**Main reasons it gave:**
+- Price 8.5% below 200-day moving average with negative MACD and RSI 29.7 signals oversold technicals
+- Analyst consensus 81% buy on largest 5 holdings with +21.9% weighted price target
+- Utilities valuation at 19.0x P/E with 2.8% yield remains reasonable
+- Sub-average volume and 4.8% one-month drawdown signal weak conviction to sell
+
+<details><summary><b>News</b> — score +0.10</summary>
+
+- [The Fed Is Watching AI Inflation. Here's What ETF Investors Should Watch](https://www.google.com/goto?url=CAESuwEB6zswFR0wSuLUALtQ0As0mQ17ih58fhwZ-i6gmaLUwgeBeY1R7KC4Kw7OLY9Gi19YNmjckOAoP-j9kHOXlvRXEViDNf6uhk5WVCwZ6oxJ45A_Llr39kRa2IBZBCtf08U8-21vNyI9kxo8yKgrtYspsPaj2geDvE2ugT2iIx6wUyg4Edbzmq_mA-VWdgLpkvayKjm5eexQtTA4Z0UORhkA8p-4LmZxjUHDGZCka5WKN3Y0wQCJl55GCsPa)  
+  <sub>TradingView, 23 hours ago</sub>  
+  ETF investors have an unusual second-order trade due to exorbitant AI spending.Chicago Fed President Austan Goolsbee warned Monday that a surge in AI...
+- [Should You Invest in the iShares U.S. Utilities ETF (IDU)?](https://finance.yahoo.com/markets/stocks/articles/invest-ishares-u-utilities-etf-102001914.html)  
+  <sub>Yahoo Finance, 5 hours ago</sub>  
+  If you're interested in broad exposure to the Utilities - Broad segment of the equity market, look no further than the iShares U.S. Utilities ETF (IDU),...
+- [The Strange Pair That Led the Market Higher](https://moneyandmarkets.com/the-strange-pair-that-led-the-market-higher/amp/)  
+  <sub>Money & Markets, 20 hours ago</sub>  
+  Only two sectors finished higher last week, and the unusual pairing tells us plenty about where investors are finding safety...
+- [Leading And Lagging Sectors For September 22, 2026](https://www.google.com/goto?url=CAESngEB6zswFU40QRlDFI6bcGpTnka5JKKFvyq9JqlYyxufI-Bm4yIgNzfQ63e0I-qDE0WTKVgV7D5Rb3_zYTe6aIl2bTozxRPp0eyVhoczuGjU_rTxoWnBD46Whyg7BlA5R7etFiKAm8Yn6Rv0hHDq0S7ibKcFAWb1_paPzg2TSwFbh9mW1T6V1bBhayG8IGLGiwDwyaVKjqyEH9TPtHsU_g)  
+  <sub>Benzinga, 2 hours ago</sub>  
+  Gainers Symbol Name Price Change ($) Change (%) Volume (NYSE:XLB) State Street Materials Select Sector SPDR ETF 49.9500 0.240 0.48 2.2K (NYSE:XLP) State...
+- [How Is AES Corporation's Stock Performance Compared to Other Utility Stocks](https://www.google.com/goto?url=CAESrwEB6zswFYmFTM9ukb1QF7DY_QjakmjTCbmX9VUMh2BFKXkgB_JelvssKotq9kUuWYCpyENcT6R2bJavL8RBdpyKoI01xWP3F0ZMUFFLorvZQPMR16i44Oaf2n4jlDtlYdOQ3Tcl4M-7iY5jGiRrlTX7wyKxferOuVNvwNp7v-yxU5xcyYzh65KVskEaJzrHM2nz1LbT7Nw-x7OnFD6DDGCTNqnplbad9D7Urv3a3SO5)  
+  <sub>Barchart.com, 6 hours ago</sub>  
+  AES Corporation has rallied other utility stocks, yet analysts remain skeptical about the stock's outlook.
+- [State Street Utilities Select Sector SPDR ETF declares quarterly distribution of $0.3004](https://www.google.com/goto?url=CAESzwEB6zswFRfb8eFONEeCUyv7MCXQNtzJlsgfTxBuewnV-azdAQLnvgdwlaOMRT3WaXLYOi9yUTXkE8wIm9QuVazVIr3nJC2aZFPhL5g9XNzARBYKViQiETrJbzJla7etZyvfPOKOKovOD-6AkHczrE60f9F3JkakAD62F6yi30QL1SZ7xVlicSzHoMco_ANaTbo8JAUAks8EQd-KjOplGbMriF8PPdr-rmUfShOahZ7Jb51W579M6U_GRaMpzxMEvjPQUgSPJuGy4YRao2Owpbc)  
+  <sub>TradingView, 21 hours ago</sub>  
+  Content provided by Seeking Alpha is intended for information purposes only, and that Seeking Alpha does not offer any personalist investment advice and is...
+
+</details>
+
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.10</summary>
+
+```text
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
+Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
+Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+```
+
+</details>
+
+<details><summary><b>Price and chart</b> — score -0.45</summary>
+
+```text
+Last close 40.74 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 42.31 (-3.7%), 50d 43.62 (-6.6%), 200d 44.52 (-8.5%); 50d below 200d
+Momentum: RSI(14) 29.7 | MACD -0.759 vs signal -0.614 (histogram -0.144)
+Returns: 1d +0.2% | 5d -1.4% | 1m -4.8% | 3m -9.6%
+52-week range: 40.66 - 47.73 (now 1.1% of the way up)
+Volatility: ATR(14) 0.60 (1.5% of price) | annualised 20d 13.3%
+Volume: 0.37x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.55</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What this fund holds</b> — score +0.55</summary>
+
+```text
+Fund type: Utilities
+What it holds: P/E 19.02 | P/B 2.14 | P/S 2.65 | 3y earnings growth n/a
+Yield: 2.8%
+Three-year record: +11.5% a year | beta to the market 0.43
+Cost and size: expense ratio 0.08% | net assets 21.84B
+What it is made of: Stocks 100.0%, Cash 0.1%
+Largest holdings: NextEra Energy Inc 13.0%, Southern Co 7.5%, Duke Energy Corp 7.1%, Constellation Energy Corp 6.7%, American Electric Power Co Inc 5.1%
+Sector mix: Utilities 100.0%
+```
+
+</details>
+
+<details><summary><b>Does this company beat its own forecasts</b> — score +0.55</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What holding this fund costs you</b> — score +0.55</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How much oil and gas is in storage</b> — score +0.55</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How the crop is growing</b> — score +0.55</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.60</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.60</summary>
+
+```text
+Rolled up from the 5 largest holdings, 39.4% of the fund by weight
+Ratings by weight: buy 80.9% | hold 19.1% | sell 0.0% (mean 2.06 on a 1=strong buy to 5=strong sell scale)
+Weighted price target: +21.9% above the current prices
+Holdings read: NEE, SO, DUK, CEG, AEP
+Recent rating changes among them:
+  - NEE: 2026-09-18 Morgan Stanley: main, Overweight -> Overweight
+  - SO: 2026-09-18 Morgan Stanley: main, Underweight -> Underweight
+  - DUK: 2026-09-18 Morgan Stanley: main, Equal-Weight -> Equal-Weight
+  - CEG: 2026-09-18 Morgan Stanley: main, Overweight -> Overweight
+  - AEP: 2026-09-18 Morgan Stanley: main, Overweight -> Overweight
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Who is positioned how</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
+
+```text
+Direction: unknown
+Share count change: n/a (too few readings)
+Shares outstanding: 163.27M | fund size: 6.65B
+Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
+```
+
+</details>
+
+### Argentina (ARGT) · Sector or country — NEUTRAL, confidence 0.20
+
+**Result:** REJECTED · bias is NEUTRAL; no trade
+
+**In the model's own words:**
+
+> No macro catalyst in the window and no fund-relevant news. Price sits just below all three major moving averages with negative MACD and RSI near 39, but on light volume and within a 3-month range of roughly flat — drift, not a decisive break. Macro backdrop is mixed but not surprising: long yields slightly lower, dollar firmer (+0.93, a headwind for an Argentine equity basket), VIX calm at 14.4. Holdings analyst roll-up is strongly positive (100% buy weight, +31% weighted target) but covers only 51% of a fund that is 25% MercadoLibre, so it is as much a single-name read as a fund read. Flows direction unknown, so the behavioural dimension is unscored. Nothing here clears the bar for a directional macro call.
+
+**Main reasons it gave:**
+- Close 91.80 below 20d/50d/200d SMAs; MACD histogram -0.511, RSI 39.4
+- Volume only 0.56x 20-day average — no conviction behind the drift
+- Dollar index +0.93 on the week, a headwind for Argentine ADR basket
+- Holdings roll-up 100% buy weight, +31.4% weighted target but only 51.1% coverage and 25% MELI concentration
+- VIX 14.4 and no macro release or policy surprise in the window
+
+<details><summary><b>News</b> — score +0.00</summary>
+
+_No news found for this one today._
+
+</details>
+
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
+
+```text
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
+Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
+Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+```
+
+</details>
+
+<details><summary><b>Price and chart</b> — score -0.25</summary>
+
+```text
+Last close 91.80 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 94.86 (-3.2%), 50d 93.87 (-2.2%), 200d 92.72 (-1.0%); 50d above 200d
+Momentum: RSI(14) 39.4 | MACD -0.267 vs signal 0.245 (histogram -0.511)
+Returns: 1d -0.6% | 5d -2.9% | 1m -1.1% | 3m -0.8%
+52-week range: 67.55 - 102.94 (now 68.5% of the way up)
+Volatility: ATR(14) 1.79 (2.0% of price) | annualised 20d 16.0%
+Volume: 0.56x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.15</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What this fund holds</b> — score +0.15</summary>
+
+```text
+Fund type: Focused Region
+What it holds: P/E 15.48 | P/B 1.77 | P/S 1.36 | 3y earnings growth n/a
+Yield: 1.1%
+Three-year record: +27.9% a year | beta to the market 0.50
+Cost and size: expense ratio 0.59% | net assets 815.33M
+What it is made of: Stocks 99.9%, Cash 0.1%
+Largest holdings: MercadoLibre Inc 25.4%, YPF SA ADR 9.5%, Vista Energy SAB de CV ADR 6.2%, Grupo Financiero Galicia SA ADR 5.6%, Banco Macro SA ADR 4.3%
+Sector mix: Consumer cyclical 30.4%, Energy 19.4%, Financial services 14.4%, Basic materials 12.0%
+```
+
+</details>
+
+<details><summary><b>Does this company beat its own forecasts</b> — score +0.15</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What holding this fund costs you</b> — score +0.15</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How much oil and gas is in storage</b> — score +0.15</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How the crop is growing</b> — score +0.15</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.45</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.45</summary>
+
+```text
+Rolled up from the 5 largest holdings, 51.1% of the fund by weight
+Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.54 on a 1=strong buy to 5=strong sell scale)
+Weighted price target: +31.4% above the current prices
+Holdings read: MELI, YPF, VIST, GGAL, BMA
+Recent rating changes among them:
+  - MELI: 2026-09-03 BTIG: reit, Buy -> Buy
+  - YPF: 2026-09-01 JP Morgan: main, Overweight -> Overweight
+  - VIST: 2026-09-01 JP Morgan: main, Overweight -> Overweight
+  - GGAL: 2026-06-25 JP Morgan: main, Overweight -> Overweight
+  - BMA: 2026-06-25 JP Morgan: main, Overweight -> Overweight
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Who is positioned how</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
+
+```text
+Direction: unknown
+Share count change: n/a (too few readings)
+Shares outstanding: 8.81M | fund size: 809.16M
+Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
+```
+
+</details>
+
+### Israel (EIS) · Sector or country — NEUTRAL, confidence 0.20
+
+**Result:** REJECTED · bias is NEUTRAL; no trade
+
+**In the model's own words:**
+
+> Israel equity fund in a mild uptrend (above 20/50/200d, 50d>200d, RSI 55.6, MACD positive) but no macro catalyst this cycle: yields little changed, VIX calm at 14.4, curve normally sloped. Analyst roll-up is supportive (100% buy, +14.4% target) but covers only 37.6% of the fund and is concentrated in Teva and two banks. Volume at 0.23x average and a -1.4% day argue against reading the trend as decisive. Flows direction unknown. Default to NEUTRAL with a slight positive tilt.
+
+**Main reasons it gave:**
+- Price above 20d/50d/200d SMAs with 50d>200d and positive MACD histogram
+- Volume only 0.23x 20-day average — weak conviction behind the move
+- Analyst roll-up 100% buy, +14.4% weighted target, but only 37.6% coverage
+- Macro quiet: 10y -4bp, VIX 14.4 (-2.8), curve +0.95 normal
+- No fund or macro news in past 24 hours; flow direction unknown
+
+<details><summary><b>News</b> — score +0.00</summary>
+
+_No news found for this one today._
+
+</details>
+
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
+
+```text
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
+Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
+Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+```
+
+</details>
+
+<details><summary><b>Price and chart</b> — score +0.30</summary>
+
+```text
+Last close 125.90 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 124.20 (+1.4%), 50d 122.27 (+3.0%), 200d 122.07 (+3.1%); 50d above 200d
+Momentum: RSI(14) 55.6 | MACD 0.829 vs signal 0.637 (histogram 0.191)
+Returns: 1d -1.4% | 5d +2.7% | 1m +2.5% | 3m +5.4%
+52-week range: 94.16 - 137.69 (now 72.9% of the way up)
+Volatility: ATR(14) 1.81 (1.4% of price) | annualised 20d 20.8%
+Volume: 0.23x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.15</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What this fund holds</b> — score +0.15</summary>
+
+```text
+Fund type: Focused Region
+What it holds: P/E 17.89 | P/B 2.43 | P/S 2.45 | 3y earnings growth n/a
+Yield: 1.5%
+Three-year record: +34.0% a year | beta to the market 1.07
+Cost and size: expense ratio 0.59% | net assets 897.28M
+What it is made of: Stocks 99.5%, Cash 0.5%
+Largest holdings: Teva Pharmaceutical Industries Ltd ADR 10.1%, Bank Leumi Le-Israel BM 9.0%, Bank Hapoalim BM 8.1%, Tower Semiconductor Ltd 5.5%, Elbit Systems Ltd 4.8%
+Sector mix: Financial services 36.1%, Technology 18.1%, Healthcare 10.7%, Industrials 10.0%
+```
+
+</details>
+
+<details><summary><b>Does this company beat its own forecasts</b> — score +0.15</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What holding this fund costs you</b> — score +0.15</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How much oil and gas is in storage</b> — score +0.15</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How the crop is growing</b> — score +0.15</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.35</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.35</summary>
+
+```text
+Rolled up from the 5 largest holdings, 37.6% of the fund by weight
+Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.25 on a 1=strong buy to 5=strong sell scale)
+Weighted price target: +14.4% above the current prices
+Holdings read: TEVA, LUMI.TA, POLI.TA, TSEM.TA, ESLT.TA
+Recent rating changes among them:
+  - TEVA: 2026-09-09 Leerink Partners: init, ? -> Outperform
+  - TSEM.TA: 2026-09-18 Barclays: init, ? -> Overweight
+  - ESLT.TA: 2026-08-19 JP Morgan: main, Neutral -> Neutral
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Who is positioned how</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
+
+```text
+Direction: unknown
+Share count change: n/a (too few readings)
+Shares outstanding: 2.55M | fund size: 321.05M
+Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
+```
+
+</details>
+
+### Poland (EPOL) · Sector or country — NEUTRAL, confidence 0.20
+
+**Result:** REJECTED · bias is NEUTRAL; no trade
+
+**In the model's own words:**
+
+> Strong uptrend near 52-week highs (+15.8% vs 200d, 50d above 200d) but momentum is flattening (MACD histogram negative, RSI 56.9, volume 0.27x average) and the weighted analyst price target sits slightly below current prices, implying the rally has run past consensus fair value. Macro is quiet: yields little changed, VIX calm at 14.4, but the dollar firmed +0.93 on the week, a mild headwind for an unhedged Polish equity fund, and the priced rate path points to hikes rather than cuts. No macro or policy surprise and no news this cycle, so no basis for a directional call. Valuation remains cheap (P/E 13.5, 3.3% yield), which keeps the medium-term tilt constructive without justifying a timing bet.
+
+**Main reasons it gave:**
+- Price at 96.9% of 52-week range, +17% in 3 months
+- MACD histogram -0.060 with volume 0.27x 20-day average
+- Weighted price target 2.3% below current price across 47.4% of fund
+- Dollar index +0.93 on the week; 2-year at 4.76% prices hikes
+- Holdings P/E 13.5 and 3.3% yield, VIX calm at 14.4
+
+<details><summary><b>News</b> — score +0.00</summary>
+
+_No news found for this one today._
+
+</details>
+
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
+
+```text
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
+Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
+Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+```
+
+</details>
+
+<details><summary><b>Price and chart</b> — score +0.25</summary>
+
+```text
+Last close 45.33 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 44.73 (+1.3%), 50d 43.55 (+4.1%), 200d 39.13 (+15.8%); 50d above 200d
+Momentum: RSI(14) 56.9 | MACD 0.437 vs signal 0.497 (histogram -0.060)
+Returns: 1d -0.8% | 5d +1.0% | 1m +2.0% | 3m +17.0%
+52-week range: 31.57 - 45.76 (now 96.9% of the way up)
+Volatility: ATR(14) 0.66 (1.5% of price) | annualised 20d 20.3%
+Volume: 0.27x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.30</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What this fund holds</b> — score +0.30</summary>
+
+```text
+Fund type: Focused Region
+What it holds: P/E 13.47 | P/B 2.00 | P/S 1.36 | 3y earnings growth n/a
+Yield: 3.3%
+Three-year record: +42.9% a year | beta to the market 0.73
+Cost and size: expense ratio 0.59% | net assets 848.26M
+What it is made of: Stocks 99.3%, Cash 0.7%
+Largest holdings: PKO Bank Polski SA 15.4%, Orlen SA 13.8%, Bank Polska Kasa Opieki SA 7.1%, Powszechny Zaklad Ubezpieczen SA 6.4%, KGHM Polska Miedz SA 4.6%
+Sector mix: Financial services 46.1%, Energy 14.5%, Consumer cyclical 12.7%, Basic materials 6.8%
+```
+
+</details>
+
+<details><summary><b>Does this company beat its own forecasts</b> — score +0.30</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What holding this fund costs you</b> — score +0.30</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How much oil and gas is in storage</b> — score +0.30</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How the crop is growing</b> — score +0.30</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.05</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.05</summary>
+
+```text
+Rolled up from the 5 largest holdings, 47.4% of the fund by weight
+Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 2.14 on a 1=strong buy to 5=strong sell scale)
+Weighted price target: -2.3% above the current prices
+Holdings read: PKO.WA, PKN.WA, PEO.WA, PZU.WA, KGH.WA
+Recent rating changes among them: none reported
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Who is positioned how</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
+
+```text
+Direction: unknown
+Share count change: n/a (too few readings)
+Shares outstanding: 19.09M | fund size: 865.05M
+Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
+```
+
+</details>
+
+### Germany (EWG) · Sector or country — NEUTRAL, confidence 0.20
+
+**Result:** REJECTED · bias is NEUTRAL; no trade
+
+**In the model's own words:**
+
+> No macro surprise this week: US yields little changed, VIX calm at 14.4, curve normally sloped. EWG is chopping below its 20d and 50d SMAs with negative MACD and RSI 42, but sits just above the 200d and up 3.8% over three months -- a drift, not a break, and volume is 0.16x average. Analyst roll-up on 45.5% of the fund is constructive (78% buy, +16% weighted target) and holdings valuation is unremarkable at 18.4x. The single news item, an ECB note on Chinese competition in German autos/machinery/capital goods, is a slow structural headwind rather than a datable catalyst, though it argues against leaning long into an industrials-heavy (28.7%) basket. A firmer dollar (+0.93) is a mild drag on unhedged euro exposure for USD holders. Net: stand aside.
+
+**Main reasons it gave:**
+- Price below 20d (-1.9%) and 50d (-1.1%) SMAs with MACD histogram -0.14 and RSI 42
+- US 10y -4bp, VIX -2.8 to 14.4, curve +0.95 normal -- no rate or policy surprise
+- Analyst roll-up over 45.5% of fund: 78% buy, weighted target +16.2%
+- ECB flags Chinese competition squeezing German autos/machinery -- structural, not a catalyst
+- Dollar index +0.93 on the week, a headwind for unhedged euro exposure
+- Volume at 0.16x 20-day average -- no conviction behind the drift
+
+<details><summary><b>News</b> — score -0.20</summary>
+
+- [Germany faces two-front squeeze from Chinese factory strength, ECB says (DAX:NASDAQ)](https://seekingalpha.com/news/4645393-germany-faces-two-front-squeeze-from-chinese-factory-strength-ecb-says)  
+  <sub>Seeking Alpha, 2 hours ago</sub>  
+  ECB analysis: China's move up the value chain pressures Germany's autos, machinery and capital goods as China rivals exports and imports less from Europe.
+
+</details>
+
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score -0.20</summary>
+
+```text
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
+Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
+Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+```
+
+</details>
+
+<details><summary><b>Price and chart</b> — score -0.20</summary>
+
+```text
+Last close 42.53 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 43.33 (-1.9%), 50d 43.01 (-1.1%), 200d 42.38 (+0.3%); 50d above 200d
+Momentum: RSI(14) 42.3 | MACD -0.275 vs signal -0.135 (histogram -0.140)
+Returns: 1d -0.2% | 5d +0.0% | 1m -3.8% | 3m +3.8%
+52-week range: 38.08 - 44.59 (now 68.4% of the way up)
+Volatility: ATR(14) 0.44 (1.0% of price) | annualised 20d 12.5%
+Volume: 0.16x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.10</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What this fund holds</b> — score +0.10</summary>
+
+```text
+Fund type: Focused Region
+What it holds: P/E 18.40 | P/B 1.94 | P/S 1.28 | 3y earnings growth n/a
+Yield: 1.9%
+Three-year record: +18.2% a year | beta to the market 0.98
+Cost and size: expense ratio 0.49% | net assets 1.82B
+What it is made of: Stocks 99.8%, Cash 0.2%
+Largest holdings: Siemens AG 12.1%, SAP SE 11.3%, Allianz SE 10.0%, Siemens Energy AG Ordinary Shares 6.4%, Deutsche Telekom AG 5.6%
+Sector mix: Industrials 28.7%, Financial services 23.2%, Technology 15.9%, Consumer cyclical 7.4%
+```
+
+</details>
+
+<details><summary><b>Does this company beat its own forecasts</b> — score +0.10</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What holding this fund costs you</b> — score +0.10</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How much oil and gas is in storage</b> — score +0.10</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How the crop is growing</b> — score +0.10</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.35</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.35</summary>
+
+```text
+Rolled up from the 5 largest holdings, 45.5% of the fund by weight
+Ratings by weight: buy 78.0% | hold 22.0% | sell 0.0% (mean 1.85 on a 1=strong buy to 5=strong sell scale)
+Weighted price target: +16.2% above the current prices
+Holdings read: SIE.DE, SAP.DE, ALV.DE, ENR.DE, DTE.DE
+Recent rating changes among them: none reported
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Who is positioned how</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
+
+```text
+Direction: unknown
+Share count change: n/a (too few readings)
+Shares outstanding: 79.50M | fund size: 3.38B
+Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
+```
+
+</details>
+
+### Mexico (EWW) · Sector or country — NEUTRAL, confidence 0.20
+
+**Result:** REJECTED · bias is NEUTRAL; no trade
+
+**In the model's own words:**
+
+> EWW is drifting below all three major moving averages (-2.4% vs 20d, -2.8% vs 50d/200d) with negative MACD and RSI at 40.6, but volume is only 0.21x average and volatility is low, so there is no decisive break. Macro is mixed rather than surprising: a firmer dollar (+0.93 on the week) is a mild headwind for Mexican equities, and the 2-year at 4.76% vs a 4.00% Fed target prices hikes rather than cuts, but nothing moved sharply this week and VIX fell to 14.4. Holdings are cheap (P/E 12.7, 3.2% yield) and sell-side coverage on the top 47.6% of the fund is unanimously buy with +16.6% targets, which offsets the soft tape. No macro or data catalyst to justify a directional call; flow data is unavailable.
+
+**Main reasons it gave:**
+- Price below 20d/50d/200d SMAs with MACD histogram -0.267 and RSI 40.6
+- Volume just 0.21x 20-day average — no conviction behind the drift
+- Dollar index +0.93 on the week, a headwind for peso-denominated equities
+- Holdings P/E 12.68 and 3.2% yield, cheap versus global peers
+- Rolled-up analyst view on 47.6% of fund: 100% buy, +16.6% weighted target
+- No macro release or policy surprise this week; VIX down to 14.4
+
+<details><summary><b>News</b> — score +0.00</summary>
+
+_No news found for this one today._
+
+</details>
+
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
+
+```text
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
+Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
+Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+```
+
+</details>
+
+<details><summary><b>Price and chart</b> — score -0.35</summary>
+
+```text
+Last close 73.75 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 75.59 (-2.4%), 50d 75.86 (-2.8%), 200d 75.69 (-2.6%); 50d above 200d
+Momentum: RSI(14) 40.6 | MACD -0.715 vs signal -0.448 (histogram -0.267)
+Returns: 1d +0.1% | 5d -0.4% | 1m -4.7% | 3m -1.3%
+52-week range: 64.39 - 81.23 (now 55.6% of the way up)
+Volatility: ATR(14) 1.23 (1.7% of price) | annualised 20d 15.1%
+Volume: 0.21x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.25</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What this fund holds</b> — score +0.25</summary>
+
+```text
+Fund type: Focused Region
+What it holds: P/E 12.68 | P/B 1.98 | P/S 1.49 | 3y earnings growth n/a
+Yield: 3.2%
+Three-year record: +10.7% a year | beta to the market 1.05
+Cost and size: expense ratio 0.50% | net assets 1.82B
+What it is made of: Stocks 99.5%, Cash 0.5%
+Largest holdings: Grupo Mexico SAB de CV Class B 16.6%, Grupo Financiero Banorte SAB de CV Class O 11.1%, Fomento Economico Mexicano SAB de CV Units Cons. Of 1 Shs-B- And 4 Shs-D- 8.3%, America Movil SAB de CV Ordinary Shares - Class B 7.2%, Cemex SAB de CV 4.4%
+Sector mix: Basic materials 27.3%, Consumer defensive 24.4%, Financial services 19.7%, Industrials 11.7%
+```
+
+</details>
+
+<details><summary><b>Does this company beat its own forecasts</b> — score +0.25</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What holding this fund costs you</b> — score +0.25</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How much oil and gas is in storage</b> — score +0.25</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How the crop is growing</b> — score +0.25</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.40</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.40</summary>
+
+```text
+Rolled up from the 5 largest holdings, 47.6% of the fund by weight
+Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 2.06 on a 1=strong buy to 5=strong sell scale)
+Weighted price target: +16.6% above the current prices
+Holdings read: GMEXICOB.MX, GFNORTEO.MX, FEMSAUBD.MX, AMXB.MX, CEMEXCPO.MX
+Recent rating changes among them:
+  - GMEXICOB.MX: 2018-11-12 Citigroup: down, Buy -> Neutral
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Who is positioned how</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
+
+```text
+Direction: unknown
+Share count change: n/a (too few readings)
+Shares outstanding: 18.90M | fund size: 1.39B
+Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
+```
+
+</details>
+
+### South Korea (EWY) · Sector or country — NEUTRAL, confidence 0.20
+
+**Result:** REJECTED · bias is NEUTRAL; no trade
+
+**In the model's own words:**
+
+> EWY is in a strong uptrend (+24.8% vs 200d, 50d>200d, RSI 58.5, MACD positive) but the move is extended after +7.9% in five days with annualised 20d volatility of 45% and thin volume, and the fund is effectively a levered bet on two memory/semi names (SK hynix + Samsung = 46%). Macro is benign but not a catalyst: yields little changed, VIX down to 14.4, curve normal, though a firmer dollar (+0.93) and a priced Fed hiking path are headwinds for Korean equity. Valuation is cheap (P/E 10.4) but that is a slow-moving fact. No policy or data surprise this cycle, so no directional edge. Analyst roll-up carries no usable ratings or targets and flow direction is unknown, so both left null. News items are generic ETF-flow and regional roundups.
+
+**Main reasons it gave:**
+- Price +4.3% over 20d SMA and +24.8% over 200d, 50d above 200d
+- 5-day return +7.9% on volume just 0.37x average — extended, low-conviction thrust
+- Annualised 20d volatility 45%, beta 2.50, 46% of fund in SK hynix and Samsung
+- Macro quiet: 10y -4bp, VIX 14.4 (-2.8), curve +0.95 normal; dollar +0.93 a mild EM headwind
+- Holdings P/E 10.4 with no analyst ratings/targets available and unknown flow direction
+
+<details><summary><b>News</b> — score +0.10</summary>
+
+- [A Record ETF Year Takes Shape as Inflows Near $1.5 Trillion](https://finance.yahoo.com/markets/stocks/articles/record-etf-takes-shape-inflows-210017196.html)  
+  <sub>Yahoo Finance, 18 hours ago</sub>  
+  US-listed ETFs took in $91.9 billion last week, pushing 2026 inflows to about $1.47 trillion, nearly matching last year's record with three months to spare.
+- [Asian stocks mostly rise on tech rally, lower yields, and US-China trade hopes](https://seekingalpha.com/news/4645224-asian-stocks-mostly-rise-on-tech-rally-lower-yields-and-us-china-trade-hopes)  
+  <sub>Seeking Alpha, 9 hours ago</sub>  
+  Asian stock markets delivered a mixed performance on Tuesday, picking up momentum from overnight gains on Wall Street. A fresh rally in technology shares...
+
+</details>
+
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.10</summary>
+
+```text
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
+Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
+Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+```
+
+</details>
+
+<details><summary><b>Price and chart</b> — score +0.35</summary>
+
+```text
+Last close 190.43 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 182.52 (+4.3%), 50d 173.96 (+9.5%), 200d 152.57 (+24.8%); 50d above 200d
+Momentum: RSI(14) 58.5 | MACD 2.541 vs signal 2.230 (histogram 0.312)
+Returns: 1d +0.7% | 5d +7.9% | 1m +6.8% | 3m -0.9%
+52-week range: 78.87 - 219.20 (now 79.5% of the way up)
+Volatility: ATR(14) 6.59 (3.5% of price) | annualised 20d 45.2%
+Volume: 0.37x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.20</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What this fund holds</b> — score +0.20</summary>
+
+```text
+Fund type: Focused Region
+What it holds: P/E 10.41 | P/B 1.83 | P/S 1.70 | 3y earnings growth n/a
+Yield: 1.1%
+Three-year record: +45.5% a year | beta to the market 2.50
+Cost and size: expense ratio 0.59% | net assets 27.72B
+What it is made of: Stocks 99.5%, Cash 0.5%
+Largest holdings: SK hynix Inc 23.7%, Samsung Electronics Co Ltd 22.2%, SK Square 2.9%, Samsung Electro-Mechanics Co Ltd 2.7%, KB Financial Group Inc 2.0%
+Sector mix: Technology 54.6%, Industrials 17.0%, Financial services 11.1%, Consumer cyclical 5.1%
+```
+
+</details>
+
+<details><summary><b>Does this company beat its own forecasts</b> — score +0.20</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What holding this fund costs you</b> — score +0.20</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How much oil and gas is in storage</b> — score +0.20</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How the crop is growing</b> — score +0.20</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.00</summary>
+
+```text
+Rolled up from the 5 largest holdings, 53.5% of the fund by weight
+Ratings by weight: buy n/a | hold n/a | sell n/a (mean n/a on a 1=strong buy to 5=strong sell scale)
+Weighted price target: n/a above the current prices
+Holdings read: 000660.KQ, 005930.KQ, 402340.KQ, 009150.KQ, 105560.KQ
+Recent rating changes among them: none reported
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Who is positioned how</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
+
+```text
+Direction: unknown
+Share count change: n/a (too few readings)
+Shares outstanding: 152.34M | fund size: 29.01B
+Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
+```
+
+</details>
+
+### Brazil (EWZ) · Sector or country — NEUTRAL, confidence 0.20
+
+**Result:** REJECTED · bias is NEUTRAL; no trade
+
+**In the model's own words:**
+
+> No macro surprise this cycle: US yields little changed, VIX calm at 14.4, curve normally sloped. The offsetting facts are a firmer dollar (+0.93 on the week) and a 2-year pricing a hiking path, both mild headwinds for Brazilian equities, versus solid momentum (1m +7.9%, above all key SMAs) and cheap holdings (P/E 10.5, 4.1% yield, +23.7% weighted target upside). MACD histogram has just rolled negative on very light volume (0.27x) and the 50d remains below the 200d, so the breakout is not decisive. Analyst roll-up covers only 41% of the fund and includes a downgrade of NU. No news and no flow direction available. NEUTRAL with a slight constructive tilt.
+
+**Main reasons it gave:**
+- Dollar index +0.93 on the week, a headwind for Brazil equity in USD terms
+- VIX 14.4, down 2.8, and 10y yield -4bp: no rate or policy surprise
+- Price +7.9% 1m and above 20/50/200d SMAs, but 50d still below 200d and MACD histogram negative
+- Volume 0.27x 20-day average, weak confirmation of the move
+- Holdings P/E 10.5, 4.1% yield, weighted analyst target +23.7% but only 41% coverage
+
+<details><summary><b>News</b> — score +0.00</summary>
+
+_No news found for this one today._
+
+</details>
+
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
+
+```text
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
+Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
+Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+```
+
+</details>
+
+<details><summary><b>Price and chart</b> — score +0.25</summary>
+
+```text
+Last close 37.85 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 37.36 (+1.3%), 50d 36.13 (+4.7%), 200d 36.22 (+4.5%); 50d below 200d
+Momentum: RSI(14) 58.6 | MACD 0.614 vs signal 0.660 (histogram -0.045)
+Returns: 1d -0.6% | 5d +0.2% | 1m +7.9% | 3m +10.8%
+52-week range: 28.79 - 41.73 (now 70.0% of the way up)
+Volatility: ATR(14) 0.77 (2.0% of price) | annualised 20d 22.3%
+Volume: 0.27x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.35</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What this fund holds</b> — score +0.35</summary>
+
+```text
+Fund type: Focused Region
+What it holds: P/E 10.48 | P/B 1.79 | P/S 1.28 | 3y earnings growth n/a
+Yield: 4.1%
+Three-year record: +11.5% a year | beta to the market 0.84
+Cost and size: expense ratio 0.59% | net assets 8.17B
+What it is made of: Stocks 96.5%, Cash 2.7%, Preferred 0.8%
+Largest holdings: Vale SA 10.1%, Nu Holdings Ltd Ordinary Shares Class A 9.5%, Itau Unibanco Holding SA Participating Preferred 7.7%, Petroleo Brasileiro SA Petrobras Participating Preferred 7.0%, Petroleo Brasileiro SA Petrobras 6.6%
+Sector mix: Financial services 34.1%, Energy 17.4%, Basic materials 14.5%, Utilities 12.4%
+```
+
+</details>
+
+<details><summary><b>Does this company beat its own forecasts</b> — score +0.35</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What holding this fund costs you</b> — score +0.35</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How much oil and gas is in storage</b> — score +0.35</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How the crop is growing</b> — score +0.35</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.30</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.30</summary>
+
+```text
+Rolled up from the 5 largest holdings, 40.9% of the fund by weight
+Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.81 on a 1=strong buy to 5=strong sell scale)
+Weighted price target: +23.7% above the current prices
+Holdings read: VALE3.SA, NU, ITUB4, PETR4, PETR3.SA
+Recent rating changes among them:
+  - NU: 2026-09-16 Itau BBA: down, Outperform -> Market Perform
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Who is positioned how</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
+
+```text
+Direction: unknown
+Share count change: n/a (too few readings)
+Shares outstanding: 200.55M | fund size: 7.59B
+Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
+```
+
+</details>
+
+### Gold mining companies (GDX) · Sector or country — NEUTRAL, confidence 0.20
+
+**Result:** REJECTED · bias is NEUTRAL; no trade
+
+**In the model's own words:**
+
+> No fresh macro catalyst: yields essentially flat to slightly lower at the long end, VIX calm at 14.4, and the dollar firmer on the week (+0.93) — a mild headwind for gold miners. Technicals are mixed: still +7.8% over the 50d and +5.4% over the 200d after a +23% quarter, but price is below the 20d SMA, MACD histogram is negative, RSI is mid-range, 1m return -6.9%, and volume is only 0.26x average, so the bounce lacks conviction. Fund basics are supportive (P/E 12.8, 100% buy ratings across the top 40% of weight, +9.7% weighted target) but those are slow-moving and already reflect a big run. Record Chinese gold imports are a genuine demand datum, offset by the dollar and a priced hiking path (2y 4.76% vs 4.00% target). Nothing here clears the bar for a directional macro timing call. Flow direction unavailable, so no behavioural read.
+
+**Main reasons it gave:**
+- Dollar index +0.93 on the week, gold snapped three-session win streak
+- Price -2.2% vs 20d SMA with MACD histogram -0.984 and 1m return -6.9%
+- Volume only 0.26x 20-day average on the bounce
+- Top-5 holdings 100% buy by weight, +9.7% weighted price target (39.9% coverage)
+- VIX 14.4 and flat-to-lower long yields — no rate or policy surprise this week
+
+<details><summary><b>News</b> — score +0.05</summary>
+
+- [China's gold imports surpass 1,000-ton mark on strong domestic demand](https://seekingalpha.com/news/4645254-china-gold-imports-surpass-1000-ton-mark-on-strong-domestic-demand)  
+  <sub>Seeking Alpha, 3 hours ago</sub>  
+  Chinese gold imports reached record highs this year, bolstered by a retreat in international bullion prices and a strengthening yuan.
+- [‘The Sell Button Won’t Work’: Why Rate Hikes No Longer Save Debt Markets](https://www.benzinga.com/markets/bonds/26/09/61916030/the-sell-button-wont-work-why-rate-hikes-no-longer-save-debt-markets)  
+  <sub>Benzinga, 3 hours ago</sub>  
+  Forget Fed rate hikes: Macro analysts reveal why fiscal dominance and massive deficits make gold and real assets the ultimate hedges.
+- [Nasdaq 100 Rallies, Intel Soars 14%: Stock Market Today](https://www.tradingview.com/news/benzinga:0886239d6094b:0-nasdaq-100-rallies-intel-soars-14-stock-market-today/)  
+  <sub>TradingView, 21 hours ago</sub>  
+  U.S. equities extended their winning streak to a third session Monday, with a fourth consecutive slide in crude oil relieving pressure on Treasury yields...
+- [Gold snaps three-session win streak as dollar rises, oil prices fall (GLD:NYSEARCA)](https://seekingalpha.com/news/4645199-gold-snaps-three-session-win-streak-as-dollar-rises-oil-prices-fall)  
+  <sub>Seeking Alpha, 18 hours ago</sub>  
+  Gold futures turned lower, snapping a three-session winning streak, as the market returned its focus to US yields and the Federal Reserve's interest rate...
+
+</details>
+
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.05</summary>
+
+```text
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
+Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
+Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+```
+
+</details>
+
+<details><summary><b>Price and chart</b> — score -0.10</summary>
+
+```text
+Last close 95.71 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 97.82 (-2.2%), 50d 88.80 (+7.8%), 200d 90.81 (+5.4%); 50d below 200d
+Momentum: RSI(14) 52.0 | MACD 0.986 vs signal 1.970 (histogram -0.984)
+Returns: 1d +1.4% | 5d +1.7% | 1m -6.9% | 3m +23.2%
+52-week range: 68.28 - 115.84 (now 57.7% of the way up)
+Volatility: ATR(14) 3.25 (3.4% of price) | annualised 20d 38.9%
+Volume: 0.26x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.30</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What this fund holds</b> — score +0.30</summary>
+
+```text
+Fund type: Equity Precious Metals
+What it holds: P/E 12.84 | P/B 2.68 | P/S 4.10 | 3y earnings growth n/a
+Yield: 0.6%
+Three-year record: +49.2% a year | beta to the market 0.83
+Cost and size: expense ratio 0.51% | net assets 30.54B
+What it is made of: Stocks 100.0%
+Largest holdings: Newmont Corp 10.7%, Agnico Eagle Mines Ltd 10.7%, Barrick Mining Corp 7.4%, Wheaton Precious Metals Corp 5.8%, Anglogold Ashanti PLC 5.3%
+Sector mix: Basic materials 100.0%
+```
+
+</details>
+
+<details><summary><b>Does this company beat its own forecasts</b> — score +0.30</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What holding this fund costs you</b> — score +0.30</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How much oil and gas is in storage</b> — score +0.30</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How the crop is growing</b> — score +0.30</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.35</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.35</summary>
+
+```text
+Rolled up from the 5 largest holdings, 39.9% of the fund by weight
+Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.66 on a 1=strong buy to 5=strong sell scale)
+Weighted price target: +9.7% above the current prices
+Holdings read: NEM, AEM.TO, ABX.TO, WPM.TO, AU
+Recent rating changes among them:
+  - NEM: 2026-09-16 RBC Capital: main, Outperform -> Outperform
+  - AEM.TO: 2026-09-16 RBC Capital: main, Sector Perform -> Sector Perform
+  - ABX.TO: 2026-09-16 RBC Capital: main, Outperform -> Outperform
+  - WPM.TO: 2026-09-16 RBC Capital: main, Outperform -> Outperform
+  - AU: 2026-09-16 RBC Capital: main, Outperform -> Outperform
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Who is positioned how</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
+
+```text
+Direction: unknown
+Share count change: n/a (too few readings)
+Shares outstanding: 319.25M | fund size: 30.56B
+Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
+```
+
+</details>
+
+### Software (IGV) · Sector or country — NEUTRAL, confidence 0.20
+
+**Result:** REJECTED · bias is NEUTRAL; no trade
+
+**In the model's own words:**
+
+> Uptrend intact (50d>200d, +21% 3m) but momentum is fading — MACD histogram negative, RSI mid-range, volume just 0.38x average, and annualised 20d vol of 42.7% is high for a calm-VIX tape. Macro gives no surprise: yields little changed, curve normally sloped, VIX down to 14.4, though a 2-year at 4.76% versus a 4.00% target implies a tightening path that is unhelpful for a P/E 34 growth basket, and the dollar firmed. News is stock-level noise (BlackBerry design win, Cramer call, listicles) rather than sector macro; one item is an ETF promotion piece and carries no weight. Analyst roll-up is constructive but covers only 43% of the fund and 100% buy weight is more a fact about coverage bias than about upside. No catalyst to justify a side.
+
+**Main reasons it gave:**
+- MACD below signal (histogram -0.120) with RSI 54.8 — momentum cooling after +21.4% 3m run
+- Volume 0.38x 20-day average; 20d annualised vol 42.7% despite VIX 14.4
+- Yields nearly unchanged on the week, curve +0.95 normal — no rate surprise
+- 2-year 4.76% vs 4.00% Fed target prices further hikes, a headwind to P/E 34.2 holdings
+- Analyst roll-up 100% buy but only 43.2% of fund covered, +9.4% weighted target
+- News flow is single-name (BB, ORCL) and ETF-promotion, not sector macro
+
+<details><summary><b>News</b> — score +0.10</summary>
+
+- [BlackBerry Jumps 7% as Coretura Selects QNX-Based Alloy Kore for Truck Platform; Aptiv Edges Higher, Mobileye Barely Budges](https://247wallst.com/investing/2026/09/22/blackberry-jumps-7-as-coretura-selects-qnx-based-alloy-kore-for-truck-platform-aptiv-edges-higher-mobileye-barely-budges/)  
+  <sub>24/7 Wall St., 2 hours ago</sub>  
+  Coretura just handed BlackBerry its first named design win for Alloy Kore, sending shares surging well past the broader software sector, but the deal comes...
+- [AI Is Reshaping SaaS—These 2 Software ETFs Offer Different Ways to Play It](https://www.marketbeat.com/articles/ai-is-reshaping-saasthese-2-software-etfs-offer-different-ways-to-play-it/)  
+  <sub>MarketBeat, 23 hours ago</sub>  
+  Salesforce's expanded OpenAI partnership highlights AI's impact on SaaS, boosting interest in software ETFs IGV and WCLD, which have rallied but differ in...
+- [Buy These 4 Cybersecurity Stocks, Skip These 2: Josh Brown Names Names](https://www.tradingview.com/news/benzinga:be089c112094b:0)  
+  <sub>TradingView, 22 hours ago</sub>  
+  Ritholtz Wealth Management CEO Josh Brown and colleague Sean Russo used their latest “The Best Stocks in the Market” column at CNBC to stake out a clear...
+- [BlackBerry Climbs 5% on Cramer Buy Call Ahead of Earnings; Aptiv Inches Higher, Mobileye Sits Tight](https://247wallst.com/investing/2026/09/21/blackberry-climbs-5-on-cramer-buy-call-ahead-of-earnings-aptiv-inches-higher-mobileye-sits-tight/)  
+  <sub>24/7 Wall St., 21 hours ago</sub>  
+  A Cramer lightning-round call just sent BlackBerry shares surging ahead of a quarterly report that could either validate the QNX software story or unwind...
+- [Oracle Stock Tops S&P 500 Winners Today: PLTR, CRM, PANW Also Rally As Analyst Sees ‘Anthropic Fear Trade’ Unwinding](https://stocktwits.com/news-articles/markets/equity/oracle-stock-tops-s-and-p-500-winners-today-pltr-crm-panw-also-rally-as-analyst-sees-anthropic-fear-trade-unwinding/cZJpAS8RIHT)  
+  <sub>Stocktwits, 7 hours ago</sub>  
+  Shares of software companies appear to be rebounding from record lows, with analysts projecting the upward swing could be sustained.
+
+</details>
+
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.10</summary>
+
+```text
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
+Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
+Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+```
+
+</details>
+
+<details><summary><b>Price and chart</b> — score +0.15</summary>
+
+```text
+Last close 105.98 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 105.14 (+0.8%), 50d 100.57 (+5.4%), 200d 93.68 (+13.1%); 50d above 200d
+Momentum: RSI(14) 54.8 | MACD 1.193 vs signal 1.313 (histogram -0.120)
+Returns: 1d -1.1% | 5d +0.4% | 1m +2.5% | 3m +21.4%
+52-week range: 74.67 - 117.79 (now 72.6% of the way up)
+Volatility: ATR(14) 2.74 (2.6% of price) | annualised 20d 42.7%
+Volume: 0.38x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score -0.15</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What this fund holds</b> — score -0.15</summary>
+
+```text
+Fund type: Technology
+What it holds: P/E 34.20 | P/B 8.09 | P/S 9.07 | 3y earnings growth n/a
+Yield: 0.0%
+Three-year record: +14.0% a year | beta to the market 1.21
+Cost and size: expense ratio 0.38% | net assets 15.74B
+What it is made of: Stocks 100.0%, Cash 0.1%
+Largest holdings: Palantir Technologies Inc Ordinary Shares - Class A 10.3%, Palo Alto Networks Inc 9.7%, Microsoft Corp 9.2%, CrowdStrike Holdings Inc Class A 7.4%, Salesforce Inc 6.6%
+Sector mix: Technology 94.4%, Communication services 3.8%, Financial services 1.5%, Consumer cyclical 0.2%
+```
+
+</details>
+
+<details><summary><b>Does this company beat its own forecasts</b> — score -0.15</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What holding this fund costs you</b> — score -0.15</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How much oil and gas is in storage</b> — score -0.15</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How the crop is growing</b> — score -0.15</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.30</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.30</summary>
+
+```text
+Rolled up from the 5 largest holdings, 43.2% of the fund by weight
+Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.66 on a 1=strong buy to 5=strong sell scale)
+Weighted price target: +9.4% above the current prices
+Holdings read: PLTR, PANW, MSFT, CRWD, CRM
+Recent rating changes among them:
+  - PLTR: 2026-09-15 UBS: main, Buy -> Buy
+  - PANW: 2026-09-21 Morgan Stanley: main, Overweight -> Overweight
+  - MSFT: 2026-09-21 Cantor Fitzgerald: main, Overweight -> Overweight
+  - CRWD: 2026-09-21 Morgan Stanley: main, Overweight -> Overweight
+  - CRM: 2026-09-18 Citizens: reit, Market Outperform -> Market Outperform
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Who is positioned how</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
+
+```text
+Direction: unknown
+Share count change: n/a (too few readings)
+Shares outstanding: 12.50M | fund size: 1.32B
+Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
+```
+
+</details>
+
+### Transport and delivery (IYT) · Sector or country — NEUTRAL, confidence 0.20
+
+**Result:** REJECTED · bias is NEUTRAL; no trade
+
+**In the model's own words:**
+
+> Transports are in a clear short-term downtrend (-8.2% in a month, below 20/50d SMAs, MACD negative) but RSI 30 is oversold near the 200d and volume is light, so this looks like a drawdown rather than a confirmed break. Macro is mixed-to-restrictive: 2y at 4.76% prices hikes rather than cuts, inflation still 3.4%, dollar firming -- unhelpful for a cyclical, high-beta (1.28) basket -- but VIX fell to 14.4 and the curve is normally sloped, so no shock. Analyst roll-up on 53% of the fund is genuinely constructive (91% buy, +27% targets, UNP upgrade). Only news item is a third-party Hold rating on a different transport ETF, opinion not data. No macro surprise this cycle; default NEUTRAL.
+
+**Main reasons it gave:**
+- Price 6.6% below 50d SMA with negative MACD but RSI 30.3 oversold near 200d SMA
+- Volume 0.23x 20-day average -- no conviction behind the decline
+- 2-year at 4.76% vs 4.00% Fed target prices tightening, inflation still 3.4%
+- Analyst roll-up over 53% of fund: 91% buy, +26.6% weighted target, UNP upgraded by UBS
+- VIX 14.42 and -2.8 on week; normal +0.95 curve -- no macro shock
+
+<details><summary><b>News</b> — score -0.10</summary>
+
+- [XTN: Transportation Likely To Lag Into 2027 Amid Macro Pressures And Factor Weaknesses](https://seekingalpha.com/article/4948496-xtn-transportation-likely-to-lag-into-2027-given-macro-pressures-factor-weaknesses)  
+  <sub>Seeking Alpha, 9 hours ago</sub>  
+  Summary. I initiate coverage of the State Street SPDR S&P Transportation ETF with a Hold rating. I believe XTN will underperform IVV into 2027 as higher...
+
+</details>
+
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score -0.10</summary>
+
+```text
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
+Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
+Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+```
+
+</details>
+
+<details><summary><b>Price and chart</b> — score -0.35</summary>
+
+```text
+Last close 79.90 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 83.04 (-3.8%), 50d 85.53 (-6.6%), 200d 81.13 (-1.5%); 50d above 200d
+Momentum: RSI(14) 30.3 | MACD -1.634 vs signal -1.364 (histogram -0.270)
+Returns: 1d +0.1% | 5d -2.3% | 1m -8.2% | 3m -4.8%
+52-week range: 68.14 - 90.01 (now 53.8% of the way up)
+Volatility: ATR(14) 1.26 (1.6% of price) | annualised 20d 15.8%
+Volume: 0.23x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score -0.05</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What this fund holds</b> — score -0.05</summary>
+
+```text
+Fund type: Industrials
+What it holds: P/E 20.28 | P/B 4.25 | P/S 1.45 | 3y earnings growth n/a
+Yield: 0.9%
+Three-year record: +11.5% a year | beta to the market 1.28
+Cost and size: expense ratio 0.37% | net assets 2.20B
+What it is made of: Stocks 99.8%, Cash 0.2%
+Largest holdings: Union Pacific Corp 17.8%, Uber Technologies Inc 15.4%, CSX Corp 9.4%, United Parcel Service Inc Class B 5.6%, Norfolk Southern Corp 4.9%
+Sector mix: Industrials 83.8%, Technology 16.2%
+```
+
+</details>
+
+<details><summary><b>Does this company beat its own forecasts</b> — score -0.05</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What holding this fund costs you</b> — score -0.05</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How much oil and gas is in storage</b> — score -0.05</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How the crop is growing</b> — score -0.05</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.45</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.45</summary>
+
+```text
+Rolled up from the 5 largest holdings, 53.1% of the fund by weight
+Ratings by weight: buy 90.8% | hold 9.2% | sell 0.0% (mean 1.84 on a 1=strong buy to 5=strong sell scale)
+Weighted price target: +26.6% above the current prices
+Holdings read: UNP, UBER, CSX, UPS, NSC
+Recent rating changes among them:
+  - UNP: 2026-09-16 UBS: up, Neutral -> Buy
+  - UBER: 2026-09-09 Scotiabank: init, ? -> Sector Outperform
+  - CSX: 2026-09-18 B of A Securities: main, Buy -> Buy
+  - UPS: 2026-07-29 Stifel: main, Buy -> Buy
+  - NSC: 2026-07-27 BMO Capital: main, Market Perform -> Market Perform
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Who is positioned how</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
+
+```text
+Direction: unknown
+Share count change: n/a (too few readings)
+Shares outstanding: 27.47M | fund size: 2.19B
+Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
+```
+
+</details>
+
+### China (MCHI) · Sector or country — NEUTRAL, confidence 0.20
+
+**Result:** REJECTED · bias is NEUTRAL; no trade
+
+**In the model's own words:**
+
+> No macro surprise this cycle: US yields little changed, VIX calm at 14.4, curve normally sloped. MCHI sits mid-range technically — above the 20d but below the 50d and 5.3% under a declining 200d, with 50d<200d and volume at a third of average, so no decisive break. Valuation is cheap (P/E 11.9, P/B 1.39) and sell-side targets on the top five holdings imply +48%, but that roll-up covers only 32% of the fund and analyst targets on Chinese megacaps are chronically optimistic. The lone news item is single-holding Alibaba chatter, not a macro driver. A firmer dollar (+0.93 on the week) is a mild headwind for EM equity. Flows direction unknown, so no behavioural read.
+
+**Main reasons it gave:**
+- 50d SMA below 200d, price 5.3% under 200d, only 22% of 52-week range
+- VIX 14.4 and 10y -4bp on the week — no rate or policy surprise
+- Holdings P/E 11.9 / P/B 1.39 with 2.0% yield
+- Analyst roll-up +47.7% target but covers only 32.2% of fund by weight
+- Volume 0.34x 20-day average — no conviction behind recent move
+
+<details><summary><b>News</b> — score +0.05</summary>
+
+- [Alibaba stock forms a bullish pattern as it unveils new advanced AI chip](https://invezz.com/au/news/2026/09/22/alibaba-stock-forms-a-bullish-pattern-as-it-unveils-new-advanced-ai-chip/)  
+  <sub>Invezz, 7 hours ago</sub>  
+  Alibaba stock jumped by 3% on Tuesday in Hong Kong as investors reacted to news from its Apsara Conference in Hangzhou. BABA jumped to $118.5,...
+
+</details>
+
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.05</summary>
+
+```text
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
+Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
+Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+```
+
+</details>
+
+<details><summary><b>Price and chart</b> — score -0.05</summary>
+
+```text
+Last close 54.15 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 53.94 (+0.4%), 50d 54.50 (-0.6%), 200d 57.18 (-5.3%); 50d below 200d
+Momentum: RSI(14) 51.7 | MACD -0.383 vs signal -0.408 (histogram 0.025)
+Returns: 1d +0.3% | 5d +2.4% | 1m -2.7% | 3m +4.5%
+52-week range: 50.48 - 66.99 (now 22.3% of the way up)
+Volatility: ATR(14) 0.61 (1.1% of price) | annualised 20d 14.0%
+Volume: 0.34x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.30</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What this fund holds</b> — score +0.30</summary>
+
+```text
+Fund type: Greater China Region
+What it holds: P/E 11.90 | P/B 1.39 | P/S 1.38 | 3y earnings growth n/a
+Yield: 2.0%
+Three-year record: +9.1% a year | beta to the market 0.44
+Cost and size: expense ratio 0.59% | net assets 6.33B
+What it is made of: Stocks 99.8%, Cash 0.2%
+Largest holdings: Tencent Holdings Ltd 13.9%, Alibaba Group Holding Ltd Ordinary Shares 9.6%, China Construction Bank Corp Class H 4.0%, Industrial And Commercial Bank Of China Ltd Class H 2.5%, Xiaomi Corp Class B 2.4%
+Sector mix: Consumer cyclical 23.4%, Financial services 20.0%, Communication services 18.2%, Technology 11.8%
+```
+
+</details>
+
+<details><summary><b>Does this company beat its own forecasts</b> — score +0.30</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What holding this fund costs you</b> — score +0.30</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How much oil and gas is in storage</b> — score +0.30</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How the crop is growing</b> — score +0.30</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.35</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.35</summary>
+
+```text
+Rolled up from the 5 largest holdings, 32.2% of the fund by weight
+Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.41 on a 1=strong buy to 5=strong sell scale)
+Weighted price target: +47.7% above the current prices
+Holdings read: 0700.HK, 9988.HK, 00939, 01398, 1810.HK
+Recent rating changes among them: none reported
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Who is positioned how</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
+
+```text
+Direction: unknown
+Share count change: n/a (too few readings)
+Shares outstanding: 119.03M | fund size: 6.45B
+Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
+```
+
+</details>
+
+### Biotech (XBI) · Sector or country — NEUTRAL, confidence 0.20
+
+**Result:** REJECTED · bias is NEUTRAL; no trade
+
+**In the model's own words:**
+
+> XBI sits near 52-week highs with a positive longer trend (50d>200d, +17.8% vs 200d) and a strong 5-day pop, but MACD has rolled negative, volume is only 0.45x average and the 1-month return is negative -- no decisive break. Macro is quiet: yields little changed, curve normal, VIX 14.4 and falling, though the 2-year prices hikes rather than cuts, which is a mild headwind for long-duration biotech. News flow is sector-supportive (record $106B biopharma M&A, positive NTLA Phase 3) but headlines about single constituents and a Cathie Wood listicle are not a fund thesis. Analyst roll-up covers only 9% of the fund and shows a negative weighted target with an MRNA downgrade -- a fact about that slice. Flow direction unknown. No macro catalyst, so NEUTRAL.
+
+**Main reasons it gave:**
+- MACD below signal (-0.397 histogram) while price sits 89.7% up the 52-week range on 0.45x volume
+- Longer-term uptrend intact: 50d above 200d, +17.8% vs 200d SMA
+- Biopharma M&A at $106B across 201 deals, strongest pace in years
+- 2-year at 4.76% vs 4.00% Fed target prices hikes, a headwind for long-duration biotech
+- Analyst roll-up covers only 9% of fund weight and shows -18.3% weighted target plus an MRNA downgrade to Sell
+
+<details><summary><b>News</b> — score +0.20</summary>
+
+- [Cathie Wood Loads Up On Biotech: 5 ETFs Holding Her Latest Bets](https://www.benzinga.com/etfs/sector-etfs/26/09/61923369/cathie-wood-loads-up-on-biotech-5-etfs-holding-her-latest-bets)  
+  <sub>Benzinga, 37 minutes ago</sub>  
+  Cathie Wood's ARKG bought Ionis, Beam, Veracyte and Scribe Therapeutics. Here are the biotech ETFs that also hold her latest bets.
+- [Gilead, Merck, Eli Lilly Lead $106B Biopharma Takeover Wave In 2026](https://stocktwits.com/news-articles/markets/equity/gilead-merck-eli-lilly-lead-106-billion-takeover-wave-in-2026/cZ0FblYRezX)  
+  <sub>Stocktwits, 12 hours ago</sub>  
+  Biopharma M&A has surged to $106 billion across 201 deals through early June 2026, putting the sector on track for its strongest full-year total since the...
+- [Moderna To Present Additional Data From Key Melanoma Trial At ESMO Congress – Retail Says ‘Breakout Is Getting Hard To Ignore’](https://stocktwits.com/news-articles/markets/equity/moderna-to-present-additional-data-from-key-melanoma-trial-at-esmo-congress-mrna-stock-rises/cZMRFFZRBIL)  
+  <sub>Stocktwits, 22 hours ago</sub>  
+  Moderna will showcase detailed melanoma results for Intismeran at ESMO, alongside data and trial updates exploring the personalized therapy in pancreatic...
+- [CRWD, PANW Stocks Extend AI-Fueled Rally As Cybersecurity Bets Outpace Software](https://www.google.com/goto?url=CAESxwEB6zswFdnW_GY7H504XGimXPyO8Nhjh9LstNo6Yccd0X3GdZIJyHov1BNiH006QgR8GR7Aafv6ZF31xoBgTWU9ol4_MB9gA77qb6Ue-CLkZFyk1K5Q979zo-yPJFg2ofnaDqB3jNuoiR0hkuN6tQCXd3pwEoJt60dGTJux4e5TJHdwtSVSAa0a1PAcawRGgV-oMjLGywasf1_mHjdHDKdm5STMysrwTutgoSFp5miGYiiojskdNoFhI7FMB74B4hJtOxEKOdF-)  
+  <sub>Stocktwits, 8 hours ago</sub>  
+  CRWD and PANW extended gains as investors weighed AI-driven cyber threats against slower frontier-model development. Cybersecurity executives have...
+- [NTLA Jumps Premarket On Positive Late-Stage Trial Data For Gene-Editing Therapy — Retail Says Buy Now Before It’s Too Late](https://stocktwits.com/news-articles/markets/equity/ntla-stock-soars-intellia-positive-gene-therapy-trial/cZBNFouRe2C)  
+  <sub>Stocktwits, 8 hours ago</sub>  
+  Intellia Therapeutics stated that its Phase 3 trial of lonvoguran ziclumeran met the primary and secondary endpoints, with favorable safety and...
+
+</details>
+
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.20</summary>
+
+```text
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
+Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
+Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+```
+
+</details>
+
+<details><summary><b>Price and chart</b> — score +0.10</summary>
+
+```text
+Last close 161.96 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 161.14 (+0.5%), 50d 157.68 (+2.7%), 200d 137.51 (+17.8%); 50d above 200d
+Momentum: RSI(14) 54.9 | MACD -0.356 vs signal 0.041 (histogram -0.397)
+Returns: 1d +2.4% | 5d +5.1% | 1m -2.3% | 3m +10.2%
+52-week range: 95.86 - 169.55 (now 89.7% of the way up)
+Volatility: ATR(14) 3.98 (2.5% of price) | annualised 20d 25.8%
+Volume: 0.45x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.05</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What this fund holds</b> — score +0.05</summary>
 
 ```text
 Fund type: Health
@@ -10073,71 +10036,219 @@ Sector mix: Healthcare 99.3%, Financial services 0.7%
 
 </details>
 
-<details><summary><b>Does this company beat its own forecasts</b> — score n/a</summary>
+<details><summary><b>Does this company beat its own forecasts</b> — score +0.05</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What holding this fund costs you</b> — score n/a</summary>
+<details><summary><b>What holding this fund costs you</b> — score +0.05</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>How much oil and gas is in storage</b> — score n/a</summary>
+<details><summary><b>How much oil and gas is in storage</b> — score +0.05</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>How the crop is growing</b> — score n/a</summary>
+<details><summary><b>How the crop is growing</b> — score +0.05</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What analysts and big funds say</b> — score n/a</summary>
+<details><summary><b>What analysts and big funds say</b> — score -0.20</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What analysts say about what this fund holds</b> — score n/a</summary>
+<details><summary><b>What analysts say about what this fund holds</b> — score -0.20</summary>
 
 ```text
 Rolled up from the 5 largest holdings, 9.0% of the fund by weight  -- thin, so read this as a fact about that slice rather than the fund
 Ratings by weight: buy 52.0% | hold 48.0% | sell 0.0% (mean 2.18 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: -15.3% above the current prices
+Weighted price target: -18.3% above the current prices
 Holdings read: MRNA, TWST, APGE, KYMR, HALO
 Recent rating changes among them:
   - MRNA: 2026-09-03 Rothschild & Co: down, Neutral -> Sell
   - TWST: 2026-09-18 BWS Financial: main, Sell -> Sell
   - APGE: 2026-08-13 Truist Securities: main, Hold -> Hold
-  - KYMR: 2026-09-14 B of A Securities: main, Buy -> Buy
+  - KYMR: 2026-09-22 Stifel: main, Buy -> Buy
   - HALO: 2026-09-02 HC Wainwright & Co.: reit, Buy -> Buy
 ```
 
 </details>
 
-<details><summary><b>Buying and selling by company insiders</b> — score n/a</summary>
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>Who is positioned how</b> — score n/a</summary>
+<details><summary><b>Who is positioned how</b> — score +0.00</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>Money going into and out of this fund</b> — score n/a</summary>
+<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
 
 ```text
 Direction: unknown
 Share count change: n/a (too few readings)
-Shares outstanding: 73.99M | fund size: 11.73B
+Shares outstanding: 72.77M | fund size: 11.79B
+Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
+```
+
+</details>
+
+### US health care (XLV) · Sector or country — NEUTRAL, confidence 0.20
+
+**Result:** REJECTED · bias is NEUTRAL; no trade
+
+**In the model's own words:**
+
+> No macro or policy surprise this week: yields broadly flat to slightly lower at the long end, VIX calm at 14.4, curve normally sloped. XLV sits above its 20/50/200d averages with a 3-month gain of 12%, but momentum is fading (MACD below signal, 1-month -2.4%) on light volume, so the technical picture is mixed rather than decisive. Holdings analyst roll-up is uniformly Buy with ~9.5% upside but covers only 44% of the fund and is slow-moving. News is a distribution notice and sector roundups -- noise. Defensive healthcare with beta 0.52 and P/E 30 offers no edge either way this cycle.
+
+**Main reasons it gave:**
+- VIX 14.4, -2.8 on the week; no rate or policy surprise (10y -4bp, Fed target 4.00%)
+- Price above 20/50/200d SMAs, 50d>200d, +12% 3m
+- MACD histogram -0.203 and 1-month return -2.4% on 0.47x volume
+- Holdings roll-up 100% buy, +9.5% weighted target, but only 44.3% coverage
+- News limited to distribution announcement and sector listicles
+
+<details><summary><b>News</b> — score +0.00</summary>
+
+- [State Street Health Care Select Sector SPDR ETF declares quarterly distribution of $0.6422](https://www.tradingview.com/news/seekingalpha:121fd3c5b094b:0-state-street-health-care-select-sector-spdr-etf-declares-quarterly-distribution-of-0-6422/)  
+  <sub>TradingView, 21 hours ago</sub>  
+  Content provided by Seeking Alpha is intended for information purposes only, and that Seeking Alpha does not offer any personalist investment advice and is...
+- [Leading And Lagging Sectors For September 22, 2026](https://www.benzinga.com/etfs/sector-etfs/26/09/61919139/leading-and-lagging-sectors-september-22-2026)  
+  <sub>Benzinga, 2 hours ago</sub>  
+  Gainers Symbol Name Price Change ($) Change (%) Volume (NYSE:XLB) State Street Materials Select Sector SPDR ETF 49.9500 0.240 0.48 2.2K (NYSE:XLP) State...
+- [The Strange Pair That Led the Market Higher](https://moneyandmarkets.com/the-strange-pair-that-led-the-market-higher/)  
+  <sub>Money & Markets, 14 hours ago</sub>  
+  Only two sectors finished higher last week, and the unusual pairing tells us plenty about where investors are finding safety...
+
+</details>
+
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
+
+```text
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
+Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
+Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+```
+
+</details>
+
+<details><summary><b>Price and chart</b> — score +0.10</summary>
+
+```text
+Last close 170.39 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 169.80 (+0.3%), 50d 167.10 (+2.0%), 200d 156.07 (+9.2%); 50d above 200d
+Momentum: RSI(14) 55.8 | MACD 0.182 vs signal 0.385 (histogram -0.203)
+Returns: 1d +0.8% | 5d +1.6% | 1m -2.4% | 3m +12.0%
+52-week range: 134.13 - 175.68 (now 87.3% of the way up)
+Volatility: ATR(14) 2.34 (1.4% of price) | annualised 20d 13.9%
+Volume: 0.47x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What this fund holds</b> — score +0.00</summary>
+
+```text
+Fund type: Health
+What it holds: P/E 30.47 | P/B 4.77 | P/S 1.66 | 3y earnings growth n/a
+Yield: 1.5%
+Three-year record: +10.3% a year | beta to the market 0.52
+Cost and size: expense ratio 0.08% | net assets 43.91B
+What it is made of: Stocks 99.9%, Cash 0.1%
+Largest holdings: Eli Lilly and Co 14.9%, Johnson & Johnson 10.4%, AbbVie Inc 7.4%, Merck & Co Inc 5.9%, UnitedHealth Group Inc 5.7%
+Sector mix: Healthcare 100.0%
+```
+
+</details>
+
+<details><summary><b>Does this company beat its own forecasts</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What holding this fund costs you</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How much oil and gas is in storage</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How the crop is growing</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score +0.30</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts say about what this fund holds</b> — score +0.30</summary>
+
+```text
+Rolled up from the 5 largest holdings, 44.3% of the fund by weight
+Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.72 on a 1=strong buy to 5=strong sell scale)
+Weighted price target: +9.5% above the current prices
+Holdings read: LLY, JNJ, ABBV, MRK, UNH
+Recent rating changes among them:
+  - LLY: 2026-09-22 TD Cowen: reit, Buy -> Buy
+  - JNJ: 2026-09-10 HSBC: main, Buy -> Buy
+  - ABBV: 2026-09-10 HSBC: main, Buy -> Buy
+  - MRK: 2026-09-10 HSBC: main, Buy -> Buy
+  - UNH: 2026-07-21 JP Morgan: main, Overweight -> Overweight
+```
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Who is positioned how</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
+
+```text
+Direction: unknown
+Share count change: n/a (too few readings)
+Shares outstanding: 260.63M | fund size: 44.41B
 Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
 ```
 
@@ -10147,34 +10258,37 @@ Creations and redemptions are settled money, not an opinion -- but they follow d
 
 <details><summary><b>News</b> — score n/a</summary>
 
-- [Should You Invest in the iShares U.S. Consumer Discretionary ETF (IYC)?](https://finance.yahoo.com/markets/stocks/articles/invest-ishares-u-consumer-discretionary-102002712.html)  
-  <sub>Yahoo Finance, 5 hours ago</sub>  
-  Designed to provide broad exposure to the Consumer Discretionary - Broad segment of the equity market, the iShares U.S. Consumer Discretionary ETF (IYC) is...
-- [Exchange-Traded Funds Rise, Equity Futures up Pre-Bell Monday as Oil Prices Decline](https://www.moomoo.com/news/post/76538074/exchange-traded-funds-rise-equity-futures-up-pre-bell-monday)  
-  <sub>Moomoo, 1 hour ago</sub>  
-  Thebroad market exchange-traded fund SPDR S&P 500 ETF Trust (SPY) was up 0.7% and the actively traded Invesco QQQ Trust (QQQ) advanced 1.1% in Monday's...
-- [Leading And Lagging Sectors For September 21, 2026](https://www.benzinga.com/etfs/sector-etfs/26/09/61894029/leading-and-lagging-sectors-september-21-2026)  
+- [Staples ETF Widens Gap Over Discretionary in 2026](https://www.etftrends.com/sector-investing-content-hub/staples-etf-widens-gap-over-discretionary-in-2026/)  
+  <sub>ETF Trends, 3 hours ago</sub>  
+  State Street's staples ETF is outpacing its discretionary counterpart by more than 13 percentage points as household budgets tighten.
+- [State Street Consumer Disc Sel Sect SPDR ETF declares quarterly distribution of $0.2441](https://www.google.com/goto?url=CAESzgEB6zswFbbq6iW76TROV3RzzwxXoj33MEadlnOT6rONLHfPQeD_lidClrtXWivjSqJyixZtEuj8icNhNfQ3rC2PrKoQmv9qY2XkBEL-_pwwcHeI5lq00YB3Qt88QeiluBXOrBXzw82MX_TPTV0BWTyZbq38atiQ64dEjRtybvCHbAY6BZpsWUgGzYynGn61cRgt4xGljU4N-4HKoeFHGq8mrfc3urjSH7bcNLXOylsrVVQWZjIK_FujDWbaMfD1j5D392miL_bUOoI65kpArQ)  
+  <sub>TradingView, 21 hours ago</sub>  
+  Content provided by Seeking Alpha is intended for information purposes only, and that Seeking Alpha does not offer any personalist investment advice and is...
+- [Darden Restaurants Stock: Is DRI Outperforming the Consumer Discretionary Sector?](https://www.google.com/goto?url=CAESowEB6zswFbGHiUtxviq7zJhYlNW4Pz9MygTQBE2cZL7mIptcQhHH2URMIfiV5EWcq2s_65KmiVbtyyb-9D8mVUE43gX0XDkZK5Zg8Udxq4OM9JKHuLp_3QvK6yjBPudN1-hzdNUucD07uiTzczF-xzZxxAFKR6_s4EOZEYucXnfgzTY1Xa0_1XjRG06-ajf-qMk6fil2_jIcw29foqbjBSRXcGWs)  
+  <sub>Yahoo Finance, 13 hours ago</sub>  
+  Darden Restaurants, Inc. (DRI), headquartered in Orlando, Florida, is one of the largest full-service restaurant operators in the United States.
+- [On Holding Surges 13% as Investor Day Sets Ambitious Sales Target and $1B Buyback; Nike Ticks Up 2%](https://247wallst.com/investing/2026/09/22/on-holding-surges-13-as-investor-day-sets-ambitious-sales-target-and-1b-buyback-nike-ticks-up-2/)  
+  <sub>24/7 Wall St., 1 hour ago</sub>  
+  On Holding just did something it has never done before, and the stock is repricing fast. Whether today's surge marks a turning point or a trap depends on...
+- [Leading And Lagging Sectors For September 22, 2026](https://www.google.com/goto?url=CAESngEB6zswFX-UO7GmFih5RXGg8-I0wOunQPZ1MBi9HIdhFejgPclo4i0JscxRV6ouODGODeNQ9WN_vb_W2NnGaf6JmJBZI0z9rBVaxpclrvE17jaAoRDEE8MKU9ejFO0fMyw_Of_jHOGXxg89USKaMb23uM3nCIcYwAOKGNT6cQ2y6u-7CqROeKLQDUFGB_2y7d8QSBF5rdNWm20oGkaZbQ)  
   <sub>Benzinga, 2 hours ago</sub>  
-  Gainers Symbol Name Price Change ($) Change (%) Volume (NYSE:XLK) State Street Technology Select Sector SPDR ETF 191.7700 2.170 1.14 39.0K (NYSE:XLC) State...
-- [Should You Invest in the Vanguard Consumer Discretionary Index Fund ETF Shares (VCR)?](https://finance.yahoo.com/markets/stocks/articles/invest-vanguard-consumer-discretionary-index-102002432.html)  
-  <sub>Yahoo Finance, 5 hours ago</sub>  
-  The Vanguard Consumer Discretionary Index Fund ETF Shares (VCR) was launched on January 26, 2004, and is a passively managed exchange traded fund designed...
-- [How to Buy McDonald's Stock (MCD) in 2026](https://www.fool.com/investing/how-to-invest/stocks/how-to-invest-in-mcdonalds-stock/)  
-  <sub>The Motley Fool, 18 hours ago</sub>  
-  Learn about how to invest in McDonald's stock, including how to buy shares, whether it pays a dividend, and its stock split history.
+  Gainers Symbol Name Price Change ($) Change (%) Volume (NYSE:XLB) State Street Materials Select Sector SPDR ETF 49.9500 0.240 0.48 2.2K (NYSE:XLP) State...
+- [Two new option listings and eight option delistings on September 21st](https://www.tipranks.com/news/the-fly/two-new-option-listings-and-eight-option-delistings-on-september-21st-thefly-news?mod=mw_quote_news)  
+  <sub>TipRanks, 22 hours ago</sub>  
+  New option listings for September 21st include Surrozen Inc (SRZN) and Standard Nuclear Inc (STDN). Option delistings effective September 21st include...
 
 </details>
 
 <details><summary><b>Interest rates, the dollar and market nerves</b> — score n/a</summary>
 
 ```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
 Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
 Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
 ```
 
 </details>
@@ -10182,13 +10296,13 @@ Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market pri
 <details><summary><b>Price and chart</b> — score n/a</summary>
 
 ```text
-Last close 111.62 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 114.16 (-2.2%), 50d 115.26 (-3.2%), 200d 116.81 (-4.4%); 50d below 200d
-Momentum: RSI(14) 40.6 | MACD -1.480 vs signal -1.152 (histogram -0.327)
-Returns: 1d +0.5% | 5d -1.1% | 1m -4.3% | 3m -2.9%
-52-week range: 105.66 - 124.52 (now 31.6% of the way up)
-Volatility: ATR(14) 1.59 (1.4% of price) | annualised 20d 15.0%
-Volume: 0.24x the 20-day average
+Last close 112.16 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 113.88 (-1.5%), 50d 115.19 (-2.6%), 200d 116.78 (-4.0%); 50d below 200d
+Momentum: RSI(14) 42.9 | MACD -1.358 vs signal -1.186 (histogram -0.173)
+Returns: 1d -0.1% | 5d +1.2% | 1m -5.0% | 3m -1.4%
+52-week range: 105.66 - 124.52 (now 34.5% of the way up)
+Volatility: ATR(14) 1.59 (1.4% of price) | annualised 20d 15.5%
+Volume: 0.48x the 20-day average
 ```
 
 </details>
@@ -10248,8 +10362,8 @@ _Not available today._
 
 ```text
 Rolled up from the 5 largest holdings, 55.0% of the fund by weight
-Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.77 on a 1=strong buy to 5=strong sell scale)
-Weighted price target: +22.0% above the current prices
+Ratings by weight: buy 100.0% | hold 0.0% | sell 0.0% (mean 1.78 on a 1=strong buy to 5=strong sell scale)
+Weighted price target: +22.1% above the current prices
 Holdings read: AMZN, TSLA, HD, MCD, BKNG
 Recent rating changes among them:
   - AMZN: 2026-09-03 Wells Fargo: main, Overweight -> Overweight
@@ -10278,7 +10392,7 @@ _Not available today._
 ```text
 Direction: unknown
 Share count change: n/a (too few readings)
-Shares outstanding: 206.55M | fund size: 23.05B
+Shares outstanding: 204.84M | fund size: 22.97B
 Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
 ```
 
@@ -10286,88 +10400,121 @@ Creations and redemptions are settled money, not an opinion -- but they follow d
 
 ## Commodities
 
-### Sugar (CANE) · Commodity — NEUTRAL, confidence 0.25
+### Oil (USO) · Commodity — BEARISH, confidence 0.40
+
+**Result:** ERROR · BrokerError: submit_order failed for USO: {"code":42210000,"message":"only day orders are allowed for hard-to-borrow asset \"USO\""}
 
 **In the model's own words:**
 
-> CANE is a sugar futures fund trading near the top of its 52-week range with mixed technicals and a severe structural headwind. The 3-month chart shows the fund +21.5% versus the commodity +38.7%, a -17.2% gap driven by contango roll costs averaging -12.5% annually. This is history, not forecasting, but it means the fund has bled value for months while the commodity itself rallied -- a structural tax that will persist if the curve stays in backwardation. Technicals are neutral to slightly negative: price is 1.8% below the 20-day SMA, RSI sits at 50.5 (no momentum), and MACD has turned down with a negative histogram. The 52-week rally (+26% from the 9.02 low) has crowded speculators to the 98th percentile long, a crowding that is as often a top as it is a middle. The only bullish element is the 50-day SMA above the 200-day in a gently upsloping trend, and a 3-month return of +21.5% that, while lagging the commodity sharply, still reflects underlying strength in sugar prices. Macro backdrop is stable: volatility is calm at 14.62, yields are flat to slightly higher, the curve is normal, and inflation expectations remain anchored. There is no fresh catalyst, no positioning surprise, and no unusual flow data (too few readings to read). Without a clear technical break, a macro surprise, or a flow reversal, this trade appears fairly valued at the margin with a significant structural cost working against longs. A NEUTRAL signal reflects this equilibrium.
+> Geopolitical risk premium is deflating: crude has fallen five straight sessions (-9.3% on the week) on reports Iran may reopen the Strait of Hormuz, and speculative positioning sits at the 98th percentile of the past year -- a crowded long unwinding into good news is the classic setup for further downside. EIA's official outlook sees WTI falling ~10% over six months toward $79, far below spot, and product inventories built last week even as crude drew marginally. Technicals are still in an uptrend (50d>200d, +31% over 3 months) which caps conviction, but MACD has crossed below signal, RSI has cooled to 54, and volatility is high (44% annualised). Macro is not a driver here: curve normal, VIX calm, though a firmer dollar (+0.93) is a mild headwind for crude. News items promoting specific microcaps or leveraged ETFs are noise and were disregarded.
 
 **Main reasons it gave:**
-- 52-week crowding at 98th percentile with net long near record levels
-- Negative roll drag: fund -12.5% annualized cost versus commodity, -17.2% over 3 months
-- Price 1.8% below 20-day SMA and 76.8% of the way to 52-week high
-- MACD histogram negative with RSI neutral at 50.5
-- No fresh macro catalyst or policy surprise to justify re-entry
+- Fifth consecutive down session on reported Iranian offer to reopen Strait of Hormuz within 7 days
+- CFTC spec net long at 98th percentile of 52 weeks, slightly reduced on the week -- crowded long
+- EIA STEO forecasts WTI $88 now to $79 in six months, $70 average 2027, well below spot
+- MACD below signal (histogram -0.671) and RSI 54 despite price 84% up the 52-week range
+- Petrol +0.8mb and diesel +1.6mb builds against only a 0.6mb crude draw
 
-<details><summary><b>News</b> — score +0.00</summary>
+<details><summary><b>News</b> — score -0.40</summary>
 
-_No news found for this one today._
+- [Oil Slid, Sending Energy ETFs Lower Before The Open](https://finimize.com/content/oil-slid-sending-energy-etfs-lower-before-the-open)  
+  <sub>Finimize, 2 hours ago</sub>  
+  WTI fell to $93.51 a barrel and Brent to $98.50, while TotalEnergies signed an MOU with Venezuela's PDVSA and Solaris lined up $1 billion of notes due 2032.
+- [U.S. retail diesel prices hit record above $6.50 as momentum grows for export ban (USO:NYSEARCA)](https://seekingalpha.com/news/4645215-us-retail-diesel-prices-hit-record-above-650-as-momentum-grows-for-export-ban)  
+  <sub>Seeking Alpha, 15 hours ago</sub>  
+  Calls for a US ban diesel exports are gaining momentum as the national average retail price of diesel hit $6.51/gal, the highest on record.
+- [Oil ETFs Surge: What's Next for Commodity Investors?](https://www.zacks.com/stock/news/2993265/oil-etfs-surge-whats-next-for-commodity-investors)  
+  <sub>Zacks Investment Research, 18 hours ago</sub>  
+  What's next for oil, gold and copper as geopolitical risks reshape commodity markets?
+- [Capital Flows in US Equities and Insights into the Derivatives Market Amid Accumulating Macro Risks: The Interplay Between Hedge Fund De-leveraging and Long-Term Capital Inflows](https://news.futunn.com/en/post/79600148/capital-flows-in-us-equities-and-insights-into-the-derivatives)  
+  <sub>富途牛牛, 12 hours ago</sub>  
+  MainpointsAccumulating macro risks have prompted hedge funds to reduce their equity holdings, but robust long-term inflows have provided support.
+- [Crude Slips After Iran Reportedly Offers To Reopen Strait Of Hormuz Within 7 Days — USO, SCO In Spotlight](https://stocktwits.com/news-articles/markets/equity/crude-slips-after-iran-reportedly-offers-to-reopen-strait-of-hormuz-within-7-days-uso-sco-in-spotlight/cZMPZ6TRBeN)  
+  <sub>Stocktwits, 11 hours ago</sub>  
+  Crude oil prices slipped Tuesday after Iran reportedly offered to reopen the Strait of Hormuz within seven days if the U.S. takes initial steps toward...
+- [Stocks Jump On Iran, China, and Bitcoin Hopium—But The Big Conflicts Have Not Gone Away](https://www.benzinga.com/Opinion/26/09/61906130/stocks-jump-on-iran-china-and-bitcoin-hopium-but-the-big-conflicts-have-not-gone-away)  
+  <sub>Benzinga, 21 hours ago</sub>  
+  Buying On Hopium Please click here for an enlarged chart of Direxion Daily Semiconductor Bull 3X ETF (NYSE:SOXL). Note the following: Semiconductors reflect...
+- [Oil prices extend slide as Iran reportedly offers to open Strait of Hormuz in seven days](https://seekingalpha.com/news/4645441-oil-prices-extend-slide-as-iran-reportedly-offers-to-open-strait-of-hormuz-in-seven-days)  
+  <sub>Seeking Alpha, 1 hour ago</sub>  
+  Crude oil futures fell for a fifth consecutive session following reports of a conditional Iranian offer to reopen the Strait of Hormuz within seven days if...
+- [Wall Street's Biggest Bull Turns Cautious Even As S&P 500 Tops 7,600: Yardeni Warns Oil, Fed And Mega IPOs Could Shake Up Record Rally](https://stocktwits.com/news-articles/markets/equity/ed-yardeni-warns-oil-fed-mega-ipos-share-up-record-sp-500-rally/cZ0j4xDRexs)  
+  <sub>Stocktwits, 6 hours ago</sub>  
+  Ed Yardeni, president of Yardeni Research and one of Wall Street's most bullish strategists, is growing more cautious about the stock market's near-term...
+- [Dow Soars Over 750 Points, Hits Record High As Investors Look Beyond Tech Stocks — PCE Inflation Comes In Hottest Since October 2023](https://stocktwits.com/news-articles/markets/equity/dow-soars-hits-record-high-pce-report-may-2026/cZ1GmZ6R7Xa)  
+  <sub>Stocktwits, 15 hours ago</sub>  
+  U.S. equities were mixed in Thursday morning's trade as investors looked beyond the tech trade, with healthcare and industrial goods stocks helping lift the...
+- [BATL, TPET, SKYQ, INDO Stocks Surge Premarket: Oil Prices Spike On Renewed US-Iran Hostilities](https://stocktwits.com/news-articles/markets/equity/batl-tpet-skyq-indo-stocks-surge-premarket-as-oil-prices-spike/cZgi9rgResX)  
+  <sub>Stocktwits, 12 hours ago</sub>  
+  Oil prices climbed higher after reports emerged that the U.S. and Iran had exchanged fire, stoking concerns over the prolonged closure of the Strait of...
 
 </details>
 
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score -0.40</summary>
 
 ```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
 Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
 Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
 ```
 
 </details>
 
-<details><summary><b>Price and chart</b> — score -0.15</summary>
+<details><summary><b>Price and chart</b> — score -0.20</summary>
 
 ```text
-Last close 11.17 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 11.38 (-1.8%), 50d 10.66 (+4.8%), 200d 9.90 (+12.8%); 50d above 200d
-Momentum: RSI(14) 50.5 | MACD 0.136 vs signal 0.237 (histogram -0.101)
-Returns: 1d +1.1% | 5d -2.4% | 1m -0.2% | 3m +21.5%
-52-week range: 9.02 - 11.82 (now 76.8% of the way up)
-Volatility: ATR(14) 0.21 (1.9% of price) | annualised 20d 24.4%
-Volume: 0.50x the 20-day average
+Last close 146.73 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 145.05 (+1.2%), 50d 133.89 (+9.6%), 200d 112.05 (+30.9%); 50d above 200d
+Momentum: RSI(14) 54.0 | MACD 6.167 vs signal 6.837 (histogram -0.671)
+Returns: 1d -1.0% | 5d -9.3% | 1m +9.0% | 3m +31.9%
+52-week range: 66.17 - 161.86 (now 84.2% of the way up)
+Volatility: ATR(14) 4.92 (3.4% of price) | annualised 20d 44.9%
+Volume: 0.63x the 20-day average
 ```
 
 </details>
 
-<details><summary><b>Company numbers</b> — score -0.35</summary>
+<details><summary><b>Company numbers</b> — score -0.40</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What this fund holds</b> — score -0.35</summary>
+<details><summary><b>What this fund holds</b> — score -0.40</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>Does this company beat its own forecasts</b> — score -0.35</summary>
+<details><summary><b>Does this company beat its own forecasts</b> — score -0.40</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What holding this fund costs you</b> — score -0.35</summary>
+<details><summary><b>What holding this fund costs you</b> — score -0.40</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How much oil and gas is in storage</b> — score -0.40</summary>
 
 ```text
-Cost of holding this fund instead of sugar itself: -12.5% a year -- heavy: rolling contracts costs this fund real money
-Measured: 3 months: fund +21.5%, commodity +38.7%, gap -17.2% | 6 months: fund +6.9%, commodity +18.0%, gap -11.1% | 12 months: fund +7.9%, commodity +20.4%, gap -12.5%
-A commodity fund holds futures, not sugar, and must sell each expiring contract to buy the next one. Where the next month costs more, that roll loses money every month. This gap is what the structure has actually cost, fees included -- it is history rather than a forecast, and it is not a direction: heavy carry is a reason to want a larger move to justify a long, and a tailwind for a short.
+US inventories, week ending 2026-09-11 (published the following Wednesday)
+  Crude oil: 423.4 million barrels, -0.6 on the week (a draw), 38% percentile over 52 weeks
+  Petrol: 207.7 million barrels, +0.8 on the week (a build), 13% percentile over 52 weeks -- low for the time of year
+  Diesel: 107.9 million barrels, +1.6 on the week (a build), 33% percentile over 52 weeks
+A build is more supply than demand and a draw is the reverse, so a build reads bearish and a draw bullish -- as a rule of thumb, not a law. Weigh the change and how unusual the level is above the level itself, and remember the market has already seen this number.
 ```
 
 </details>
 
-<details><summary><b>How much oil and gas is in storage</b> — score -0.35</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How the crop is growing</b> — score -0.35</summary>
+<details><summary><b>How the crop is growing</b> — score -0.40</summary>
 
 _Not available today._
 
@@ -10394,9 +10541,9 @@ _Not available today._
 <details><summary><b>Who is positioned how</b> — score -0.40</summary>
 
 ```text
-Contract: SUGAR NO. 11 - ICE FUTURES U.S. (positions as of 2026-09-15, published the following Friday)
-Large speculators: net long 18.5% of open interest (1,219,523 contracts)
-Change on the week: -0.2% of open interest
+Contract: WTI-PHYSICAL - NEW YORK MERCANTILE EXCHANGE (positions as of 2026-09-15, published the following Friday)
+Large speculators: net long 5.4% of open interest (1,955,764 contracts)
+Change on the week: -0.3% of open interest
 Crowding: 98% percentile over 52 weeks -- a crowded long by the standards of the past year
 Read this as crowding, not as a forecast: an extreme is as often the end of a move as the middle of one.
 ```
@@ -10408,500 +10555,109 @@ Read this as crowding, not as a forecast: an extreme is as often the end of a mo
 ```text
 Direction: unknown
 Share count change: n/a (too few readings)
-Shares outstanding: 5.11M | fund size: 57.13M
+Shares outstanding: 12.28M | fund size: 1.80B
 Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
 ```
 
 </details>
 
-### Silver (SLV) · Commodity — NEUTRAL, confidence 0.25
+### Corn (CORN) · Commodity — NEUTRAL, confidence 0.35
 
 **In the model's own words:**
 
-> SLV trades 9.3% below its 200-day moving average with a 50d still below 200d, indicating a downtrend environment despite a recent 5.1% bounce over 5 days. Momentum is mixed: RSI at 53.4 is neither oversold nor overbought, and MACD histogram is negative. The fund faces a structural 2.6% annual drag from futures roll costs, a permanent headwind. Positioning shows large speculators at 65th percentile crowding with a net short of 1.3% on the week, suggesting neither extreme conviction nor major unwind. Macro backdrop is benign: the Fed is expected to cut rates modestly (pricing about 75bp over two years), the curve is normal, and the dollar has strengthened 0.9% this week, which is a modest headwind for dollar-denominated commodities. Volatility at 14.6 is calm. Volume is light at 0.32x average, reducing confidence in the recent bounce. No macro catalyst or technical breakout is present; the trend remains down despite the short-term recovery. This is a holding pattern, not a directional setup.
+> Corn has rallied 20% in three months and sits 95% of the way to its 52-week high, driven by WASDE yield downgrades and trade optimism around Trump-Xi talks. Technicals show strength across the trend (6.8% above 50d SMA, 11.3% above 200d), but momentum is deteriorating: RSI at 62 is elevated, MACD histogram has turned negative, and the latest daily close fell 0.8%. Volume is below average at 0.9x 20-day, signalling weakening conviction behind the move. Most critically, positioning is at the 97th percentile of the past year—a crowded long by construction of the CFTC data—which historically marks exhaustion as often as continuation. Crop condition at 57% good-or-excellent is 9 percentage points worse than the same week last year, which is bearish for price, but this is published information already priced in. The cost of holding the fund is -13.9% annualized due to contango roll drag; this makes the long less attractive and favors patience. Macro is calm (VIX 14.4), the dollar has strengthened (+0.93 on the week), and diesel at record highs lifts input costs—bullish for demand destruction. The setup contains multiple conflicting signals: supply tightness and trade optimism offset by extreme speculative crowding, weakening momentum, and punitive carry costs. This is not a clear catalyst, and macro timing on a single commodity is inherently difficult. The technical deterioration argues caution; the fundamental story is mixed rather than directional.
 
 **Main reasons it gave:**
-- price 9.3% below 200d MA, 50d below 200d in downtrend
-- MACD histogram negative, momentum not confirming bounce
-- 2.6% annual structural drag from futures roll costs
-- large speculator positioning at 65th percentile, not extreme
-- dollar +0.9% this week, mild headwind for silver
+- CFTC positioning at 97th percentile of past year; crowding statistically predicts exhaustion not continuation
+- MACD momentum negative despite price near 52-week high; volume below average
+- Crop condition 9 points worse year-on-year but already known; published schedule removes surprise value
+- Contango roll cost -13.9% annualized headwind to long position; highest entry point in a year demands larger move to justify
+- Dollar +0.93 on week and diesel record high support demand destruction risk
 
-<details><summary><b>News</b> — score +0.00</summary>
+<details><summary><b>News</b> — score +0.30</summary>
 
-_No news found for this one today._
+- [What's Behind The Latest Surge In Grain And Oilseed Prices?](https://seekingalpha.com/article/4948386-what-behind-latest-surge-grain-oilseed-prices)  
+  <sub>Seeking Alpha, 22 hours ago</sub>  
+  September 1 marked the start of the new marketing year for corn and soybeans, with yield estimates down as of the most recent WASDE report.
+- [U.S. grains rally ahead of 'positive' Trump-Xi summit, continued Russia-Ukraine fighting](https://seekingalpha.com/news/4645187-us-grains-rally-ahead-of-positive-trump-xi-summit-continued-russia-ukraine-fighting)  
+  <sub>Seeking Alpha, 19 hours ago</sub>  
+  US grain futures rose after initial US-China trade talks were called positive by both sides, raising hopes the Trump-Xi meeting will include Chinese...
+- [US diesel hits record $6.51 as supply deficit deepens despite WTI drop](https://scanx.trade/stock-market-news/commodities/newsom-signs-e15-gas-bill-california-fuel-prices-top-6-iran-tensions/51532724)  
+  <sub>scanx.trade, 19 hours ago</sub>  
+  US diesel prices hit a record high of $6.51/gal on Sep 21, 2026, driven by geopolitical tensions and infrastructure damage. Farm fuel costs rose by $11/acre...
 
 </details>
 
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.30</summary>
 
 ```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
 Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
 Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
 ```
 
 </details>
 
-<details><summary><b>Price and chart</b> — score -0.15</summary>
+<details><summary><b>Price and chart</b> — score +0.20</summary>
 
 ```text
-Last close 59.74 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 59.61 (+0.2%), 50d 56.93 (+4.9%), 200d 65.84 (-9.3%); 50d below 200d
-Momentum: RSI(14) 53.4 | MACD 0.158 vs signal 0.299 (histogram -0.141)
-Returns: 1d -0.3% | 5d +5.1% | 1m -3.1% | 3m +1.4%
-52-week range: 39.04 - 105.60 (now 31.1% of the way up)
-Volatility: ATR(14) 1.78 (3.0% of price) | annualised 20d 37.4%
-Volume: 0.32x the 20-day average
+Last close 20.11 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 19.99 (+0.6%), 50d 18.83 (+6.8%), 200d 18.08 (+11.3%); 50d above 200d
+Momentum: RSI(14) 61.9 | MACD 0.347 vs signal 0.417 (histogram -0.070)
+Returns: 1d -0.8% | 5d +0.4% | 1m +5.8% | 3m +20.2%
+52-week range: 16.47 - 20.29 (now 95.4% of the way up)
+Volatility: ATR(14) 0.31 (1.6% of price) | annualised 20d 17.7%
+Volume: 0.90x the 20-day average
 ```
 
 </details>
 
-<details><summary><b>Company numbers</b> — score -0.30</summary>
+<details><summary><b>Company numbers</b> — score -0.10</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What this fund holds</b> — score -0.30</summary>
+<details><summary><b>What this fund holds</b> — score -0.10</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>Does this company beat its own forecasts</b> — score -0.30</summary>
+<details><summary><b>Does this company beat its own forecasts</b> — score -0.10</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>What holding this fund costs you</b> — score -0.30</summary>
+<details><summary><b>What holding this fund costs you</b> — score -0.10</summary>
 
 ```text
-Cost of holding this fund instead of silver itself: -2.6% a year -- a steady drag
-Measured: 3 months: fund +1.4%, commodity +1.7%, gap -0.3% | 6 months: fund -2.9%, commodity -3.9%, gap +1.0% | 12 months: fund +57.2%, commodity +59.8%, gap -2.6%
-A commodity fund holds futures, not silver, and must sell each expiring contract to buy the next one. Where the next month costs more, that roll loses money every month. This gap is what the structure has actually cost, fees included -- it is history rather than a forecast, and it is not a direction: heavy carry is a reason to want a larger move to justify a long, and a tailwind for a short.
+Cost of holding this fund instead of corn itself: -13.9% a year -- heavy: rolling contracts costs this fund real money
+Measured: 3 months: fund +20.2%, commodity +31.7%, gap -11.6% | 6 months: fund +8.7%, commodity +17.5%, gap -8.8% | 12 months: fund +13.4%, commodity +27.3%, gap -13.9%
+A commodity fund holds futures, not corn, and must sell each expiring contract to buy the next one. Where the next month costs more, that roll loses money every month. This gap is what the structure has actually cost, fees included -- it is history rather than a forecast, and it is not a direction: heavy carry is a reason to want a larger move to justify a long, and a tailwind for a short.
 ```
 
 </details>
 
-<details><summary><b>How much oil and gas is in storage</b> — score -0.30</summary>
+<details><summary><b>How much oil and gas is in storage</b> — score -0.10</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>How the crop is growing</b> — score -0.30</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts and big funds say</b> — score n/a</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts say about what this fund holds</b> — score n/a</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Who is positioned how</b> — score +0.00</summary>
+<details><summary><b>How the crop is growing</b> — score -0.10</summary>
 
 ```text
-Contract: SILVER - COMMODITY EXCHANGE INC. (positions as of 2026-09-15, published the following Friday)
-Large speculators: net long 12.7% of open interest (103,745 contracts)
-Change on the week: -1.3% of open interest
-Crowding: 65% percentile over 52 weeks -- within its normal range
-Read this as crowding, not as a forecast: an extreme is as often the end of a move as the middle of one.
-```
-
-</details>
-
-<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
-
-_Not available today._
-
-</details>
-
-### Soybeans (SOYB) · Commodity — NEUTRAL, confidence 0.25
-
-**In the model's own words:**
-
-> SOYB has rallied 15.2% in three months and now sits at the 98.4th percentile of its 52-week range, driven partly by crop concerns (US soybean crop rated 58% good/excellent, down 5 points year-over-year). Technicals show an uptrend across all moving averages and positive returns, but momentum is already elevated: RSI at 64.7 suggests overbought conditions, MACD has rolled over below signal, and volume is only 0.39x average, indicating weakening conviction during the rally. Large speculators hold a net long at the 88th percentile of crowding—within normal range but not extreme—and reduced their long by 2.2% of open interest this week, a small signal of positioning moderation. Macro backdrop is stable: yields are flat to modestly higher, the dollar strengthened, and the 10-year real rate is pricing only modest Fed cuts ahead. Crop condition is steady week-to-week and while it is worse than last year, the market has already traded this fact. The fund's tracking cost is minimal at -1% annualized. The rally appears mature: near all-time highs, RSI elevated, volume flagging, and speculators slightly reducing longs. Without a fresh catalyst (weather shock, policy surprise, or significant data miss), the risk/reward at these levels favors caution rather than conviction in either direction.
-
-**Main reasons it gave:**
-- RSI 64.7 with MACD rolling over signals overbought momentum despite strong trend
-- Large speculators reduced net long 2.2% this week as fund hits 98.4th percentile of 52-week range
-- Crop condition steady week-to-week and down only 5 points YoY, already reflected in price
-- Volume 0.39x average suggests weakening conviction during rally to near all-time highs
-
-<details><summary><b>News</b> — score +0.00</summary>
-
-_No news found for this one today._
-
-</details>
-
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
-
-```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
-Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
-Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
-```
-
-</details>
-
-<details><summary><b>Price and chart</b> — score +0.35</summary>
-
-```text
-Last close 28.03 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 27.47 (+2.0%), 50d 26.30 (+6.6%), 200d 24.41 (+14.8%); 50d above 200d
-Momentum: RSI(14) 64.7 | MACD 0.522 vs signal 0.559 (histogram -0.037)
-Returns: 1d +1.3% | 5d +1.2% | 1m +7.1% | 3m +15.2%
-52-week range: 21.46 - 28.14 (now 98.4% of the way up)
-Volatility: ATR(14) 0.35 (1.3% of price) | annualised 20d 18.0%
-Volume: 0.39x the 20-day average
-```
-
-</details>
-
-<details><summary><b>Company numbers</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What this fund holds</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Does this company beat its own forecasts</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What holding this fund costs you</b> — score +0.15</summary>
-
-```text
-Cost of holding this fund instead of soybeans itself: -1.0% a year -- close to nothing, as a physically backed fund should be
-Measured: 3 months: fund +15.2%, commodity +18.5%, gap -3.3% | 6 months: fund +16.4%, commodity +13.8%, gap +2.6% | 12 months: fund +26.4%, commodity +27.4%, gap -1.0%
-A commodity fund holds futures, not soybeans, and must sell each expiring contract to buy the next one. Where the next month costs more, that roll loses money every month. This gap is what the structure has actually cost, fees included -- it is history rather than a forecast, and it is not a direction: heavy carry is a reason to want a larger move to justify a long, and a tailwind for a short.
-```
-
-</details>
-
-<details><summary><b>How much oil and gas is in storage</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How the crop is growing</b> — score +0.15</summary>
-
-```text
-Soybeans rated good or excellent: 58% of the US crop (week 37 of 2026)
-Direction over 3 weeks: steady, 0 points
-Same week last year: 63% (-5 points)
+Corn rated good or excellent: 57% of the US crop (week 38 of 2026)
+Direction over 3 weeks: steady, +1 points
+Same week last year: 66% (-9 points)
 A better crop means more supply, which reads bearish for the price, and a worse one bullish. The trend matters more than the level, and the market has already seen this: it is published on a schedule everyone trades.
 ```
-
-</details>
-
-<details><summary><b>What analysts and big funds say</b> — score n/a</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts say about what this fund holds</b> — score n/a</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Buying and selling by company insiders</b> — score -0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Who is positioned how</b> — score -0.15</summary>
-
-```text
-Contract: SOYBEANS - CHICAGO BOARD OF TRADE (positions as of 2026-09-15, published the following Friday)
-Large speculators: net long 21.9% of open interest (1,104,880 contracts)
-Change on the week: -2.2% of open interest
-Crowding: 88% percentile over 52 weeks -- within its normal range
-Read this as crowding, not as a forecast: an extreme is as often the end of a move as the middle of one.
-```
-
-</details>
-
-<details><summary><b>Money going into and out of this fund</b> — score -0.15</summary>
-
-```text
-Direction: unknown
-Share count change: n/a (too few readings)
-Shares outstanding: 1.66M | fund size: 46.45M
-Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
-```
-
-</details>
-
-### Natural gas (UNG) · Commodity — NEUTRAL, confidence 0.25
-
-**In the model's own words:**
-
-> UNG faces conflicting signals that cancel to neutral. Technicals show a fund in a downtrend (10.6% below the 200d SMA, 50d below 200d) with momentum neutral (RSI 48.9, MACD histogram near zero) and weak volume at 0.46x average. The 3-month return is -12.5%, consistent with the broader downward trend. However, the macro backdrop is benign: yields are stable with only modest moves, the dollar strengthened (+0.90 on the week) which typically pressures natural gas, and the VIX is low at 14.62 suggesting risk appetite is intact. On the commodity fundamentals, inventory builds at the 71st percentile are mildly bearish but not extreme; the EIA outlook forecasts a 7% rise from current levels over six months, a modest but constructive view. Most critically, the fund's cost of holding is severe at -15.4% annualized due to contango roll losses—this is a structural headwind that demands a meaningfully larger move to justify a long, and a tailwind for shorts. Large speculators hold a net short at the 33rd percentile of crowding, neither extreme nor shifted materially on the week. Taken together: technicals are weak, the commodity outlook is slightly bullish, the carry structure bleeds long positions, and positioning shows no extreme. This is a sideways tape with structural headwinds, not a directional setup.
-
-**Main reasons it gave:**
-- Downtrend intact: price 10.6% below 200-day SMA with 50d below 200d
-- Heavy roll cost at -15.4% annually suppresses long conviction
-- EIA forecast sees 7% rise over 6 months, mildly supportive
-- Inventory builds at 71st percentile—mild bearish pressure but not extreme
-- Dollar strength (+0.90 on week) headwind for natural gas
-
-<details><summary><b>News</b> — score +0.00</summary>
-
-_No news found for this one today._
-
-</details>
-
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
-
-```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
-Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
-Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
-```
-
-</details>
-
-<details><summary><b>Price and chart</b> — score -0.35</summary>
-
-```text
-Last close 10.30 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 10.38 (-0.8%), 50d 10.23 (+0.6%), 200d 11.52 (-10.6%); 50d below 200d
-Momentum: RSI(14) 48.9 | MACD 0.018 vs signal 0.020 (histogram -0.002)
-Returns: 1d -1.1% | 5d -0.3% | 1m +2.8% | 3m -12.5%
-52-week range: 9.63 - 16.90 (now 9.1% of the way up)
-Volatility: ATR(14) 0.27 (2.6% of price) | annualised 20d 24.6%
-Volume: 0.46x the 20-day average
-```
-
-</details>
-
-<details><summary><b>Company numbers</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What this fund holds</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Does this company beat its own forecasts</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What holding this fund costs you</b> — score +0.15</summary>
-
-```text
-Cost of holding this fund instead of natural gas itself: -15.4% a year -- heavy: rolling contracts costs this fund real money
-Measured: 3 months: fund -12.5%, commodity -12.7%, gap +0.2% | 6 months: fund -16.9%, commodity -8.2%, gap -8.7% | 12 months: fund -18.7%, commodity -3.4%, gap -15.4%
-A commodity fund holds futures, not natural gas, and must sell each expiring contract to buy the next one. Where the next month costs more, that roll loses money every month. This gap is what the structure has actually cost, fees included -- it is history rather than a forecast, and it is not a direction: heavy carry is a reason to want a larger move to justify a long, and a tailwind for a short.
-```
-
-</details>
-
-<details><summary><b>How much oil and gas is in storage</b> — score +0.15</summary>
-
-```text
-US inventories, week ending 2026-09-11 (published the following Wednesday)
-  Natural gas: 3,298.0 billion cubic feet, +44.0 on the week (a build), 71% percentile over 52 weeks
-A build is more supply than demand and a draw is the reverse, so a build reads bearish and a draw bullish -- as a rule of thumb, not a law. Weigh the change and how unusual the level is above the level itself, and remember the market has already seen this number.
-```
-
-</details>
-
-<details><summary><b>How the crop is growing</b> — score +0.15</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts and big funds say</b> — score n/a</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts say about what this fund holds</b> — score n/a</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Buying and selling by company insiders</b> — score -0.05</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Who is positioned how</b> — score -0.05</summary>
-
-```text
-Contract: NAT GAS NYME - NEW YORK MERCANTILE EXCHANGE (positions as of 2026-09-15, published the following Friday)
-Large speculators: net short 5.5% of open interest (1,820,003 contracts)
-Change on the week: -0.2% of open interest
-Crowding: 33% percentile over 52 weeks -- within its normal range
-Read this as crowding, not as a forecast: an extreme is as often the end of a move as the middle of one.
-```
-
-</details>
-
-<details><summary><b>Money going into and out of this fund</b> — score -0.05</summary>
-
-_Not available today._
-
-</details>
-
-### Oil (USO) · Commodity — NEUTRAL, confidence 0.25
-
-**In the model's own words:**
-
-> USO tracks WTI crude oil, which is caught between conflicting macro and technical signals. The recent rally from $66 to $148 (86th percentile of 52-week range) is extended technically, with momentum flattening (RSI 56, MACD histogram 0.006). A four-day selloff below $100 reflects de-escalation rhetoric from Trump on Iran and Yemen, reducing near-term geopolitical premium. Positioning is at the 98th percentile of crowding—a crowded long that often marks the end of a move rather than the middle. Energy inventories show crude draws (bullish, 38th percentile) but petrol and diesel builds (bearish), reflecting mixed demand signals and the diesel shortage noted in headlines. The EIA forecast sees WTI falling 10% over six months to $79, creating a headwind even if near-term support holds. Treasury yields rose marginally (3-month +5bp) but the curve normalized; the dollar strengthened +0.90 on the week, a structural headwind for commodities. News flow is mixed: geopolitical risk premiums compressing, but diesel scarcity and Strait of Hormuz concerns persisting. Volume is 0.44x average, suggesting weak conviction in either direction. The technicals show a valid uptrend (50d > 200d, price +33% in three months) but entry momentum is flat and positioning extreme, leaving little room for new buyers. A failure to hold above $95-$100 would accelerate a retest toward $85 in line with EIA forecasts.
-
-**Main reasons it gave:**
-- Positioning at 98th percentile crowding, a crowded long historically coincident with move exhaustion
-- EIA official forecast sees WTI falling 10% to $79 over six months, well below spot
-- Four-day selloff as Trump signals openness to Iran talks and defers Yemen action, reducing geopolitical premium
-- Crude inventory draw (bullish) offset by petrol and diesel builds and low gasoline stocks (bearish mixed demand)
-- RSI 56 and flat MACD histogram after 32.9% gain show momentum rolling over despite uptrend intact
-
-<details><summary><b>News</b> — score -0.15</summary>
-
-- [Trading Crude Oil With The UCO And SCO ETFs (NYSEARCA:UCO)](https://seekingalpha.com/article/4948162-trading-crude-oil-with-the-uco-and-sco-etfs)  
-  <sub>Seeking Alpha, 3 hours ago</sub>  
-  ProShares Ultra Bloomberg Crude Oil ETF is a Buy, supported by strong momentum and liquidity, but carries high volatility and risk. Read more on UCO & SCO...
-- [Oil Near $100, Treasury Yields Near 5%, Bitcoin’s Resilience: 3 Charts To Watch This Week](https://www.tradingview.com/news/stocktwits:c7de3f4f9094b:0-oil-near-100-treasury-yields-near-5-bitcoin-s-resilience-3-charts-to-watch-this-week/)  
-  <sub>TradingView, 6 hours ago</sub>  
-  WTI crude oil futures fell back below $100 a barrel Monday after Saudi Arabia said its East-West pipeline could restore about half of its capacity within...
-- [Gavin Newsom Fires Back at Trump’s 'Disastrous' Iran War With E15 Gas Push as California Fuel Tops $6](https://www.benzinga.com/news/politics/26/09/61889688/gavin-newsom-fires-back-at-trumps-disastrous-iran-war-with-e15-gas-push-as-california-fuel-tops-6)  
-  <sub>Benzinga, 5 hours ago</sub>  
-  California Gov. Gavin Newsom will release E15 fuel to ease soaring gas prices, blaming Trump's Iran war and Strait of Hormuz disruptions.
-- [Crude oil dips below $100 after Trump says he may be open to talking to Iran (CL1:COM:Commodity)](https://seekingalpha.com/news/4644792-crude-oil-dips-below-100-after-trump-says-he-may-be-open-to-talking-to-iran)  
-  <sub>Seeking Alpha, 40 minutes ago</sub>  
-  Crude oil futures fell for the fourth straight session after President Trump reportedly decided against bombing Yemen for now and indicated he was open to...
-- [Diesel Hits Historic $6.51/Gal: Commodity Strategist Warns We Are Facing a Deficit That 'No Handshake' Can Refill](https://www.tradingview.com/news/benzinga:ebba5f08d094b:0-diesel-hits-historic-6-51-gal-commodity-strategist-warns-we-are-facing-a-deficit-that-no-handshake-can-refill/)  
-  <sub>TradingView, 4 hours ago</sub>  
-  The national average price for diesel reached $6.51 per gallon on Monday. A commodity strategist stated the supply disruption has moved into a diesel market...
-- [Stocks Didn't Really Rally Because Of The Rate Hike; SMH & Robinhood Markets Ready To Run](https://seekingalpha.com/article/4948230-stocks-didnt-rally-because-of-rate-hike-smh-robinhood-markets-ready-to-run)  
-  <sub>Seeking Alpha, 3 hours ago</sub>  
-  The most bullish part of the FOMC meeting wasn't the rate hike; it was the clarity it gave investors. SMH, QQQ, and a select cohort of chip stocks all look...
-- [Qatar Energy CEO counters Bessent: Strait of Hormuz ‘will never be obsolete’ (CL1:COM:Commodity)](https://seekingalpha.com/news/4644605-qatar-energy-ceo-counters-bessent-strait-of-hormuz-will-never-be-obsolete)  
-  <sub>Seeking Alpha, 11 hours ago</sub>  
-  Qatari Energy Minister Saad Al-Kaabi on Sunday said Treasury Secretary Scott Bessent was “wrong” when he said that the strategic Strait of Hormuz will be...
-
-</details>
-
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score -0.15</summary>
-
-```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
-Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
-Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
-```
-
-</details>
-
-<details><summary><b>Price and chart</b> — score +0.10</summary>
-
-```text
-Last close 148.47 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 144.34 (+2.9%), 50d 133.32 (+11.4%), 200d 111.67 (+32.9%); 50d above 200d
-Momentum: RSI(14) 56.2 | MACD 7.016 vs signal 7.010 (histogram 0.006)
-Returns: 1d -3.5% | 5d -5.2% | 1m +10.4% | 3m +31.8%
-52-week range: 66.17 - 161.86 (now 86.0% of the way up)
-Volatility: ATR(14) 5.02 (3.4% of price) | annualised 20d 45.1%
-Volume: 0.44x the 20-day average
-```
-
-</details>
-
-<details><summary><b>Company numbers</b> — score -0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What this fund holds</b> — score -0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Does this company beat its own forecasts</b> — score -0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What holding this fund costs you</b> — score -0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How much oil and gas is in storage</b> — score -0.20</summary>
-
-```text
-US inventories, week ending 2026-09-11 (published the following Wednesday)
-  Crude oil: 423.4 million barrels, -0.6 on the week (a draw), 38% percentile over 52 weeks
-  Petrol: 207.7 million barrels, +0.8 on the week (a build), 13% percentile over 52 weeks -- low for the time of year
-  Diesel: 107.9 million barrels, +1.6 on the week (a build), 33% percentile over 52 weeks
-A build is more supply than demand and a draw is the reverse, so a build reads bearish and a draw bullish -- as a rule of thumb, not a law. Weigh the change and how unusual the level is above the level itself, and remember the market has already seen this number.
-```
-
-</details>
-
-<details><summary><b>How the crop is growing</b> — score -0.20</summary>
-
-_Not available today._
 
 </details>
 
@@ -10926,271 +10682,6 @@ _Not available today._
 <details><summary><b>Who is positioned how</b> — score -0.25</summary>
 
 ```text
-Contract: WTI-PHYSICAL - NEW YORK MERCANTILE EXCHANGE (positions as of 2026-09-15, published the following Friday)
-Large speculators: net long 5.4% of open interest (1,955,764 contracts)
-Change on the week: -0.3% of open interest
-Crowding: 98% percentile over 52 weeks -- a crowded long by the standards of the past year
-Read this as crowding, not as a forecast: an extreme is as often the end of a move as the middle of one.
-```
-
-</details>
-
-<details><summary><b>Money going into and out of this fund</b> — score -0.25</summary>
-
-_Not available today._
-
-</details>
-
-### Wheat (WEAT) · Commodity — NEUTRAL, confidence 0.25
-
-**In the model's own words:**
-
-> WEAT presents a mixed technical and fundamental picture with no clear directional catalyst. The price has rallied 15.4% over three months and sits at the 78th percentile of its 52-week range, supported by a solid uptrend versus the 200-day moving average (+14.2%). However, momentum is deteriorating: RSI at 51.5 shows no overbought condition, but MACD has turned negative (histogram -0.186) and the price is 1.7% below the 20-day SMA, suggesting momentum is stalling. Volume is well below average at 0.38x the 20-day level, indicating weak conviction in the rally. On the macro side, the Treasury curve has normalized with short rates rising modestly, the dollar has strengthened (+0.90%), and the VIX remains calm at 14.62. CFTC positioning is crowded long at the 90th percentile, historically a contrarian signal; large speculators have reduced their net short position by 1.8% of open interest on the week, but a crowded long often marks the end of a move rather than the middle. Crop conditions are slightly better than last year (51% vs 49% good/excellent), providing mild supply pressure. Most concerning is the fund's carry cost: at -14.1% annualized, the rolling structure has been a significant headwind. The rally has outpaced this drag only because the underlying commodity moved substantially; without continued strong wheat price action, the fund faces structural decay. No macro surprise or policy catalyst has emerged to justify a directional tilt. The weak volume, negative momentum divergence, crowded positioning, and heavy carry cost argue for caution on a long, while the uptrend and modest supply news are insufficient to justify a short. The lack of fresh news or data surprise leaves no clear edge.
-
-**Main reasons it gave:**
-- MACD histogram turned negative despite price near highs
-- CFTC positioning crowded long at 90th percentile, a contrarian signal
-- Fund carry cost of -14.1% annualized, structural headwind that has been masked by commodity rally
-- Volume 0.38x average suggests weak conviction in price advance
-- No macro catalyst or news catalyst present to sustain rally
-
-<details><summary><b>News</b> — score +0.00</summary>
-
-_No news found for this one today._
-
-</details>
-
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
-
-```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
-Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
-Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
-```
-
-</details>
-
-<details><summary><b>Price and chart</b> — score +0.10</summary>
-
-```text
-Last close 26.25 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 26.71 (-1.7%), 50d 25.46 (+3.1%), 200d 22.98 (+14.2%); 50d above 200d
-Momentum: RSI(14) 51.5 | MACD 0.235 vs signal 0.421 (histogram -0.186)
-Returns: 1d +1.5% | 5d +0.3% | 1m +3.4% | 3m +15.4%
-52-week range: 19.88 - 28.00 (now 78.4% of the way up)
-Volatility: ATR(14) 0.61 (2.3% of price) | annualised 20d 31.0%
-Volume: 0.38x the 20-day average
-```
-
-</details>
-
-<details><summary><b>Company numbers</b> — score -0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What this fund holds</b> — score -0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Does this company beat its own forecasts</b> — score -0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What holding this fund costs you</b> — score -0.20</summary>
-
-```text
-Cost of holding this fund instead of wheat itself: -14.1% a year -- heavy: rolling contracts costs this fund real money
-Measured: 3 months: fund +15.4%, commodity +21.5%, gap -6.1% | 6 months: fund +14.9%, commodity +22.0%, gap -7.1% | 12 months: fund +24.4%, commodity +38.5%, gap -14.1%
-A commodity fund holds futures, not wheat, and must sell each expiring contract to buy the next one. Where the next month costs more, that roll loses money every month. This gap is what the structure has actually cost, fees included -- it is history rather than a forecast, and it is not a direction: heavy carry is a reason to want a larger move to justify a long, and a tailwind for a short.
-```
-
-</details>
-
-<details><summary><b>How much oil and gas is in storage</b> — score -0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How the crop is growing</b> — score -0.20</summary>
-
-```text
-Wheat rated good or excellent: 51% of the US crop (week 34 of 2026)
-Direction over 1 weeks: not enough readings to say
-Same week last year: 49% (+2 points)
-A better crop means more supply, which reads bearish for the price, and a worse one bullish. The trend matters more than the level, and the market has already seen this: it is published on a schedule everyone trades.
-```
-
-</details>
-
-<details><summary><b>What analysts and big funds say</b> — score n/a</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts say about what this fund holds</b> — score n/a</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Buying and selling by company insiders</b> — score -0.35</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Who is positioned how</b> — score -0.35</summary>
-
-```text
-Contract: WHEAT-SRW - CHICAGO BOARD OF TRADE (positions as of 2026-09-15, published the following Friday)
-Large speculators: net short 0.8% of open interest (485,138 contracts)
-Change on the week: -1.8% of open interest
-Crowding: 90% percentile over 52 weeks -- a crowded long by the standards of the past year
-Read this as crowding, not as a forecast: an extreme is as often the end of a move as the middle of one.
-```
-
-</details>
-
-<details><summary><b>Money going into and out of this fund</b> — score -0.35</summary>
-
-```text
-Direction: unknown
-Share count change: n/a (too few readings)
-Shares outstanding: 13.72M | fund size: 360.19M
-Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
-```
-
-</details>
-
-### Corn (CORN) · Commodity — NEUTRAL, confidence 0.20
-
-**Result:** REJECTED · bias is NEUTRAL; no trade
-
-**In the model's own words:**
-
-> Uptrend is intact (price 95% of 52-week range, 50d above 200d, +19.9% in 3 months) and crop condition at 57% good/excellent vs 67% a year ago is supportive of prices, but the offsetting evidence is heavy: speculative net long at the 97th percentile of the past year and slightly rolling over, MACD histogram turning negative, volume only 0.67x average, and a measured -14.1% annual roll cost that has cost this fund 11-14 points versus the commodity itself. A crowded long into a contango-bleeding vehicle near range highs is not a place to add directional risk. Macro is quiet: 10-year unchanged on the week, VIX 14.6, though a firmer dollar (+0.90) is a mild headwind for commodities. The lone news item concerns diesel and is not a corn signal.
-
-**Main reasons it gave:**
-- Spec net long at 97th percentile of 52 weeks, down 0.5% on the week -- crowded and no longer building
-- Roll cost -14.1%/yr; fund +13.4% vs corn +27.5% over 12 months
-- Crop 57% good/excellent vs 67% year-ago, steady 3 weeks -- supply-supportive but already known
-- Price 95.4% up 52-week range with MACD histogram -0.086 and volume 0.67x average
-- Dollar index +0.90 on the week; rates and VIX essentially unchanged, no macro surprise
-
-<details><summary><b>News</b> — score +0.00</summary>
-
-- [Diesel Hits Historic $6.51/Gal: Commodity Strategist Warns We Are Facing a Deficit That 'No Handshake' Can Refill](https://www.tradingview.com/news/benzinga:ebba5f08d094b:0-diesel-hits-historic-6-51-gal-commodity-strategist-warns-we-are-facing-a-deficit-that-no-handshake-can-refill/)  
-  <sub>TradingView, 4 hours ago</sub>  
-  The national average price for diesel reached $6.51 per gallon on Monday. A commodity strategist stated the supply disruption has moved into a diesel market...
-
-</details>
-
-<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
-
-```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
-Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
-Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
-```
-
-</details>
-
-<details><summary><b>Price and chart</b> — score +0.30</summary>
-
-```text
-Last close 20.12 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 19.94 (+0.9%), 50d 18.77 (+7.1%), 200d 18.06 (+11.4%); 50d above 200d
-Momentum: RSI(14) 63.8 | MACD 0.346 vs signal 0.431 (histogram -0.086)
-Returns: 1d +2.1% | 5d +0.5% | 1m +6.8% | 3m +19.9%
-52-week range: 16.47 - 20.29 (now 95.4% of the way up)
-Volatility: ATR(14) 0.31 (1.5% of price) | annualised 20d 16.2%
-Volume: 0.67x the 20-day average
-```
-
-</details>
-
-<details><summary><b>Company numbers</b> — score -0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What this fund holds</b> — score -0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Does this company beat its own forecasts</b> — score -0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What holding this fund costs you</b> — score -0.20</summary>
-
-```text
-Cost of holding this fund instead of corn itself: -14.1% a year -- heavy: rolling contracts costs this fund real money
-Measured: 3 months: fund +19.9%, commodity +31.3%, gap -11.3% | 6 months: fund +7.0%, commodity +16.1%, gap -9.1% | 12 months: fund +13.4%, commodity +27.5%, gap -14.1%
-A commodity fund holds futures, not corn, and must sell each expiring contract to buy the next one. Where the next month costs more, that roll loses money every month. This gap is what the structure has actually cost, fees included -- it is history rather than a forecast, and it is not a direction: heavy carry is a reason to want a larger move to justify a long, and a tailwind for a short.
-```
-
-</details>
-
-<details><summary><b>How much oil and gas is in storage</b> — score -0.20</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>How the crop is growing</b> — score -0.20</summary>
-
-```text
-Corn rated good or excellent: 57% of the US crop (week 37 of 2026)
-Direction over 3 weeks: steady, 0 points
-Same week last year: 67% (-10 points)
-A better crop means more supply, which reads bearish for the price, and a worse one bullish. The trend matters more than the level, and the market has already seen this: it is published on a schedule everyone trades.
-```
-
-</details>
-
-<details><summary><b>What analysts and big funds say</b> — score n/a</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>What analysts say about what this fund holds</b> — score n/a</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Buying and selling by company insiders</b> — score -0.30</summary>
-
-_Not available today._
-
-</details>
-
-<details><summary><b>Who is positioned how</b> — score -0.30</summary>
-
-```text
 Contract: CORN - CHICAGO BOARD OF TRADE (positions as of 2026-09-15, published the following Friday)
 Large speculators: net long 22.5% of open interest (1,843,824 contracts)
 Change on the week: -0.5% of open interest
@@ -11200,31 +10691,28 @@ Read this as crowding, not as a forecast: an extreme is as often the end of a mo
 
 </details>
 
-<details><summary><b>Money going into and out of this fund</b> — score -0.30</summary>
+<details><summary><b>Money going into and out of this fund</b> — score -0.25</summary>
 
 ```text
 Direction: unknown
 Share count change: n/a (too few readings)
-Shares outstanding: 8.26M | fund size: 166.21M
+Shares outstanding: 8.38M | fund size: 168.47M
 Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
 ```
 
 </details>
 
-### Copper (CPER) · Commodity — NEUTRAL, confidence 0.20
-
-**Result:** REJECTED · bias is NEUTRAL; no trade
+### Sugar (CANE) · Commodity — NEUTRAL, confidence 0.25
 
 **In the model's own words:**
 
-> Uptrend is intact -- price near 52-week highs, above all major moving averages, 50d over 200d, RSI 57 -- but the breakout is on 0.38x average volume, which is not a decisive break. No macro catalyst: yields flat on the week, curve normally sloped, VIX calm at 14.6, and a firming dollar (+0.90) is a mild headwind for copper. Positioning is mid-range and specs trimmed 5.1% of open interest last week, so no crowding extreme either way. The -6.1% annual roll cost is a real drag that argues for wanting a larger move before taking a long. No news flow to weigh. Default to NEUTRAL with a slight positive tilt from trend.
+> CANE is a sugar futures fund trading at the top of its range with a heavily crowded long positioning (98th percentile of the past year) and facing a structural headwind from rolling costs of -11.5% annually. The technical picture is mixed: price is up 13% from the 200-day moving average and has rallied 21.2% in three months, but momentum is stalling (RSI 51.4, MACD histogram negative, price now 1.5% below the 20-day SMA). The 3-month cost gap of -16.4% is particularly steep, indicating the fund has lost material value to the roll while the commodity itself gained 37.6%. Macro conditions are stable with low volatility and no recent data surprise; the rate path priced in mild Fed cuts over two years, which is neither supportive nor hostile to commodities. No news catalyst in the past 24 hours. The combination of extreme crowding at cycle highs, mounting evidence of roll decay, and momentum divergence argues for caution, but the fund remains above the 50-day SMA and has not broken the uptrend structurally. This is a hold rather than a trade signal in either direction.
 
 **Main reasons it gave:**
-- price at 96.5% of 52-week range, above 20d/50d/200d with 50d over 200d
-- breakout volume only 0.38x the 20-day average
-- roll cost of -6.1% a year versus spot copper
-- CFTC specs net long 22.5% of OI but down 5.1% on the week, 40th percentile crowding
-- macro quiet: 10-year unchanged, VIX 14.6, dollar +0.90 on the week
+- Large speculator positioning at 98th percentile crowding after 3-month 21.2% rally
+- Roll cost of -11.5% annually, with 3-month fund gain of 21.2% vs commodity gain of 37.6%
+- Momentum divergence: RSI neutral, MACD histogram negative despite price near 52-week highs
+- Price 77.9% of the way into the 52-week range with price below 20-day SMA
 
 <details><summary><b>News</b> — score +0.00</summary>
 
@@ -11235,27 +10723,165 @@ _No news found for this one today._
 <details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
 
 ```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
 Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
 Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
 ```
 
 </details>
 
-<details><summary><b>Price and chart</b> — score +0.35</summary>
+<details><summary><b>Price and chart</b> — score +0.20</summary>
 
 ```text
-Last close 40.62 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 39.74 (+2.2%), 50d 39.47 (+2.9%), 200d 37.13 (+9.4%); 50d above 200d
-Momentum: RSI(14) 57.4 | MACD 0.043 vs signal 0.003 (histogram 0.040)
-Returns: 1d +1.0% | 5d +6.2% | 1m +3.2% | 3m +4.7%
-52-week range: 28.58 - 41.05 (now 96.5% of the way up)
-Volatility: ATR(14) 0.73 (1.8% of price) | annualised 20d 28.2%
-Volume: 0.38x the 20-day average
+Last close 11.20 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 11.38 (-1.5%), 50d 10.69 (+4.8%), 200d 9.91 (+13.0%); 50d above 200d
+Momentum: RSI(14) 51.4 | MACD 0.115 vs signal 0.212 (histogram -0.097)
+Returns: 1d +0.6% | 5d -1.6% | 1m -0.1% | 3m +21.2%
+52-week range: 9.02 - 11.82 (now 77.9% of the way up)
+Volatility: ATR(14) 0.20 (1.8% of price) | annualised 20d 24.3%
+Volume: 1.97x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score -0.40</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What this fund holds</b> — score -0.40</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Does this company beat its own forecasts</b> — score -0.40</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What holding this fund costs you</b> — score -0.40</summary>
+
+```text
+Cost of holding this fund instead of sugar itself: -11.5% a year -- heavy: rolling contracts costs this fund real money
+Measured: 3 months: fund +21.2%, commodity +37.6%, gap -16.4% | 6 months: fund +7.2%, commodity +19.0%, gap -11.8% | 12 months: fund +8.0%, commodity +19.5%, gap -11.5%
+A commodity fund holds futures, not sugar, and must sell each expiring contract to buy the next one. Where the next month costs more, that roll loses money every month. This gap is what the structure has actually cost, fees included -- it is history rather than a forecast, and it is not a direction: heavy carry is a reason to want a larger move to justify a long, and a tailwind for a short.
+```
+
+</details>
+
+<details><summary><b>How much oil and gas is in storage</b> — score -0.40</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How the crop is growing</b> — score -0.40</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score n/a</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts say about what this fund holds</b> — score n/a</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.30</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Who is positioned how</b> — score +0.30</summary>
+
+```text
+Contract: SUGAR NO. 11 - ICE FUTURES U.S. (positions as of 2026-09-15, published the following Friday)
+Large speculators: net long 18.5% of open interest (1,219,523 contracts)
+Change on the week: -0.2% of open interest
+Crowding: 98% percentile over 52 weeks -- a crowded long by the standards of the past year
+Read this as crowding, not as a forecast: an extreme is as often the end of a move as the middle of one.
+```
+
+</details>
+
+<details><summary><b>Money going into and out of this fund</b> — score +0.30</summary>
+
+```text
+Direction: unknown
+Share count change: n/a (too few readings)
+Shares outstanding: 5.26M | fund size: 58.94M
+Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
+```
+
+</details>
+
+### Copper (CPER) · Commodity — NEUTRAL, confidence 0.25
+
+**Result:** REJECTED · bias is NEUTRAL; no trade
+
+**In the model's own words:**
+
+> Copper is at the top of its 52-week range with a clean uptrend (50d>200d, MACD positive, RSI 59.6) on a physical-tightening story in China, but nothing here is a macro surprise: yields barely moved, VIX is calm at 14.4, and the dollar firmed +0.93 on the week, a mild headwind for metals. Speculative net long actually fell 5.1% of open interest to a middling 40th percentile, so the recent push is not being confirmed by fresh positioning, and volume is below average at 0.86x. The fund's -6.2%/yr roll drag is heavy and argues for demanding a larger move before paying up for a long near the highs. Vertical-extension risk plus an unremarkable macro backdrop keeps this at NEUTRAL with only a mild upward tilt.
+
+**Main reasons it gave:**
+- Close 40.99, 99.5% of the way up the 52-week range, 50d above 200d
+- CFTC spec net long fell 5.1% of OI on the week, only 40th percentile crowding
+- Roll cost -6.2%/yr vs spot copper, heavy drag on a long
+- Dollar index +0.93 on the week, VIX calm at 14.4, no rate surprise (10y -4bp)
+- Volume 0.86x 20-day average on the breakout attempt
+
+<details><summary><b>News</b> — score +0.30</summary>
+
+- [Copper rises for sixth straight day on signs of tightening supplies in China (CPER:NYSEARCA)](https://seekingalpha.com/news/4645346-copper-rises-for-sixth-straight-day-on-signs-of-tightening-supplies-in-china)  
+  <sub>Seeking Alpha, 3 hours ago</sub>  
+  Copper futures rose toward a record in early trading as falling inventories and pre-holiday buying signaled tightening supplies in China's physical market.
+- [Oil ETFs Surge: What's Next for Commodity Investors?](https://www.zacks.com/stock/news/2993265/oil-etfs-surge-whats-next-for-commodity-investors)  
+  <sub>Zacks Investment Research, 18 hours ago</sub>  
+  What's next for oil, gold and copper as geopolitical risks reshape commodity markets?
+- [[ETF 특징주] 중국 공급 압박에 구리값 오르자 CPER·COPP 강세](https://www.newspim.com/news/view/20260922001085)  
+  <sub>뉴스핌, 8 hours ago</sub>  
+  이 기사는 인공지능(AI) 모델의 번역을 기반으로 전문 기자의 분석과 아이템 발굴을 통해 생성한 콘텐츠입니다. [서울=뉴스핌] 황숙혜 기자 = 중국의 현물 공급이 위축...
+
+</details>
+
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.30</summary>
+
+```text
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
+Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
+Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+```
+
+</details>
+
+<details><summary><b>Price and chart</b> — score +0.45</summary>
+
+```text
+Last close 40.99 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 39.79 (+3.0%), 50d 39.54 (+3.7%), 200d 37.17 (+10.3%); 50d above 200d
+Momentum: RSI(14) 59.6 | MACD 0.149 vs signal 0.033 (histogram 0.116)
+Returns: 1d +0.8% | 5d +6.0% | 1m +2.5% | 3m +9.8%
+52-week range: 28.62 - 41.05 (now 99.5% of the way up)
+Volatility: ATR(14) 0.72 (1.8% of price) | annualised 20d 28.4%
+Volume: 0.86x the 20-day average
 ```
 
 </details>
@@ -11281,8 +10907,8 @@ _Not available today._
 <details><summary><b>What holding this fund costs you</b> — score -0.30</summary>
 
 ```text
-Cost of holding this fund instead of copper itself: -6.1% a year -- heavy: rolling contracts costs this fund real money
-Measured: 3 months: fund +4.7%, commodity +6.7%, gap -2.1% | 6 months: fund +25.5%, commodity +27.0%, gap -1.4% | 12 months: fund +43.3%, commodity +49.4%, gap -6.1%
+Cost of holding this fund instead of copper itself: -6.2% a year -- heavy: rolling contracts costs this fund real money
+Measured: 3 months: fund +9.8%, commodity +11.4%, gap -1.5% | 6 months: fund +22.2%, commodity +25.7%, gap -3.5% | 12 months: fund +43.4%, commodity +49.7%, gap -6.2%
 A commodity fund holds futures, not copper, and must sell each expiring contract to buy the next one. Where the next month costs more, that roll loses money every month. This gap is what the structure has actually cost, fees included -- it is history rather than a forecast, and it is not a direction: heavy carry is a reason to want a larger move to justify a long, and a tailwind for a short.
 ```
 
@@ -11312,13 +10938,13 @@ _Not available today._
 
 </details>
 
-<details><summary><b>Buying and selling by company insiders</b> — score -0.10</summary>
+<details><summary><b>Buying and selling by company insiders</b> — score -0.15</summary>
 
 _Not available today._
 
 </details>
 
-<details><summary><b>Who is positioned how</b> — score -0.10</summary>
+<details><summary><b>Who is positioned how</b> — score -0.15</summary>
 
 ```text
 Contract: COPPER- #1 - COMMODITY EXCHANGE INC. (positions as of 2026-09-15, published the following Friday)
@@ -11330,12 +10956,574 @@ Read this as crowding, not as a forecast: an extreme is as often the end of a mo
 
 </details>
 
+<details><summary><b>Money going into and out of this fund</b> — score -0.15</summary>
+
+```text
+Direction: unknown
+Share count change: n/a (too few readings)
+Shares outstanding: 18.71M | fund size: 766.80M
+Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
+```
+
+</details>
+
+### Silver (SLV) · Commodity — NEUTRAL, confidence 0.25
+
+**In the model's own words:**
+
+> Silver faces competing macro headwinds and tailwinds with no clear catalyst for directional conviction. The dollar strengthened +0.93% this week and treasury yields remain elevated at 4.96%, both headwinds for precious metals. Meanwhile news points to fiscal dominance concerns and supply deficits supporting silver, but these are structural themes not recent surprises. Technicals show the 50-day MA below the 200-day (a bearish pattern), RSI neutral at 52.8, and MACD histogram negative. Price is down 9.5% from 200d MA and sits near the lower end of the 52-week range, which could appeal to value buyers but offers no momentum confirmation. The carry cost of -3.8% annualized is a persistent drag that requires conviction of a material move to justify. Positioning at 65th percentile is normal, not crowded. Volume is subthreshold at 0.37x average. The five-day gain of +3.6% is modest and three-month return of +6.9% offers no trend confirmation given the longer-term weakness. No policy surprise, no data surprise, and no technical break support a directional call.
+
+**Main reasons it gave:**
+- Dollar index up 0.93% this week, headwind for precious metals
+- Price 9.5% below 200-day MA in bearish downtrend structure
+- Carry cost -3.8% annually reduces long conviction without catalytic move
+- Supply deficit and fiscal dominance themes are structural, not recent catalysts
+- RSI 52.8 and MACD histogram negative show no momentum support
+
+<details><summary><b>News</b> — score +0.15</summary>
+
+- [Current price of silver as of Tuesday, Sept. 22, 2026](https://fortune.com/article/current-price-of-silver-9-22-2026/)  
+  <sub>Fortune, 4 hours ago</sub>  
+  If you're worried about increased inflation, adding precious metals like silver to your portfolio can be a smart choice.
+- [Ondo Stocks Goes Live on near.com and NEAR Intents](https://ondo.finance/blog/ondo-stocks-go-live-on-near)  
+  <sub>Ondo Finance, 2 hours ago</sub>  
+  Ondo Stocks, the largest tokenized securities platform globally with $1B+ in TVL and tens of thousands of asset holders driving $26B+ in trading volume,...
+- [‘The Sell Button Won’t Work’: Why Rate Hikes No Longer Save Debt Markets](https://www.benzinga.com/markets/bonds/26/09/61916030/the-sell-button-wont-work-why-rate-hikes-no-longer-save-debt-markets)  
+  <sub>Benzinga, 3 hours ago</sub>  
+  Forget Fed rate hikes: Macro analysts reveal why fiscal dominance and massive deficits make gold and real assets the ultimate hedges.
+- [Quant Silver ETF Share Price NSE/BSE - Live Price Charts & Performance](https://hdfcsky.com/etf/quant-silver-etf)  
+  <sub>HDFC Sky, 19 hours ago</sub>  
+  Quant Silver ETF price ₹23.55 with -0.97% change at 21-09-2026 15:24. Check ETF price, returns, performance, charts and invest in ETF in India.
+- [Gold And Silver Defy A Hawkish Fed](https://seekingalpha.com/article/4948382-gold-silver-defy-hawkish-fed)  
+  <sub>Seeking Alpha, 22 hours ago</sub>  
+  Gold and silver managed to regain some ground last week despite facing what might sometimes be a difficult environment for precious metals.
+- [Silver Price Forecast: Can the Fed Delay the Next Silver Rally?](https://www.equiti.com/uae-en/news/trade-reviews/silver-price-forecast-fed-supply-deficit-2026/)  
+  <sub>www.equiti.com, 21 hours ago</sub>  
+  Silver prices face pressure from Fed rate expectations, but a sixth consecutive supply deficit and constrained mine output continue supporting the long-term...
+- [Current price of silver as of Monday, September 21, 2026](https://fortune.com/article/current-price-of-silver-9-21-2026/)  
+  <sub>Fortune, 23 hours ago</sub>  
+  If you're worried about increased inflation, adding precious metals like silver to your portfolio can be a smart choice.
+- [Bandhan Silver ETF Share Price NSE/BSE - Live Price Charts & Performance](https://www.google.com/goto?url=CAESYgHrOzAVznFbvfwL_athk4eZDtbc9jZFuS1ZxILPjpOqaS_M9XTy8mzhRJTiGgHpm6MTackxE5-nFqcVk05sY2434OJJGFNB0HIU_c6BTZITap_r_u1VrkiP5KXBNHZboTG8)  
+  <sub>HDFC Sky, 21 hours ago</sub>  
+  Bandhan Silver ETF price ₹232.30 with -1.35% change at 21-09-2026 15:29. Check ETF price, returns, performance, charts and invest in ETF in India.
+- [Gold snaps three-session win streak as dollar rises, oil prices fall (GLD:NYSEARCA)](https://seekingalpha.com/news/4645199-gold-snaps-three-session-win-streak-as-dollar-rises-oil-prices-fall)  
+  <sub>Seeking Alpha, 18 hours ago</sub>  
+  Gold futures turned lower, snapping a three-session winning streak, as the market returned its focus to US yields and the Federal Reserve's interest rate...
+- [Groww Silver ETF FOF(G)-Direct Plan](https://univest.in/mutual-funds/groww-silver-etf-fof-g-direct-plan)  
+  <sub>Univest, 19 hours ago</sub>  
+  Groww Silver ETF FOF(G)-Direct Plan details: NAV ₹22.5587, AUM 89 Cr, Expense Ratio 0.18%. Check returns, holdings, sector allocation, and fund manager...
+
+</details>
+
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.15</summary>
+
+```text
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
+Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
+Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+```
+
+</details>
+
+<details><summary><b>Price and chart</b> — score -0.25</summary>
+
+```text
+Last close 59.58 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 59.47 (+0.2%), 50d 57.08 (+4.4%), 200d 65.87 (-9.5%); 50d below 200d
+Momentum: RSI(14) 52.8 | MACD 0.192 vs signal 0.277 (histogram -0.085)
+Returns: 1d -0.1% | 5d +3.6% | 1m -5.0% | 3m +6.9%
+52-week range: 39.82 - 105.60 (now 30.0% of the way up)
+Volatility: ATR(14) 1.71 (2.9% of price) | annualised 20d 37.3%
+Volume: 0.37x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score -0.10</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What this fund holds</b> — score -0.10</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Does this company beat its own forecasts</b> — score -0.10</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What holding this fund costs you</b> — score -0.10</summary>
+
+```text
+Cost of holding this fund instead of silver itself: -3.8% a year -- a steady drag
+Measured: 3 months: fund +6.9%, commodity +7.3%, gap -0.4% | 6 months: fund -4.6%, commodity -3.6%, gap -1.0% | 12 months: fund +52.6%, commodity +56.5%, gap -3.8%
+A commodity fund holds futures, not silver, and must sell each expiring contract to buy the next one. Where the next month costs more, that roll loses money every month. This gap is what the structure has actually cost, fees included -- it is history rather than a forecast, and it is not a direction: heavy carry is a reason to want a larger move to justify a long, and a tailwind for a short.
+```
+
+</details>
+
+<details><summary><b>How much oil and gas is in storage</b> — score -0.10</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How the crop is growing</b> — score -0.10</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score n/a</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts say about what this fund holds</b> — score n/a</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score -0.05</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Who is positioned how</b> — score -0.05</summary>
+
+```text
+Contract: SILVER - COMMODITY EXCHANGE INC. (positions as of 2026-09-15, published the following Friday)
+Large speculators: net long 12.7% of open interest (103,745 contracts)
+Change on the week: -1.3% of open interest
+Crowding: 65% percentile over 52 weeks -- within its normal range
+Read this as crowding, not as a forecast: an extreme is as often the end of a move as the middle of one.
+```
+
+</details>
+
+<details><summary><b>Money going into and out of this fund</b> — score -0.05</summary>
+
+```text
+Direction: unknown
+Share count change: n/a (too few readings)
+Shares outstanding: 572.79M | fund size: 34.13B
+Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
+```
+
+</details>
+
+### Soybeans (SOYB) · Commodity — NEUTRAL, confidence 0.25
+
+**In the model's own words:**
+
+> SOYB has rallied 15.9% in three months and now sits at the 99.9th percentile of its 52-week range, with technical momentum showing RSI at 65.8 and price 15.1% above the 200-day moving average. The recent Trump-Xi trade optimism provides near-term sentiment support, but the fundamental picture is mixed. Crop conditions at 58% good/excellent are steady week-over-week and only 3 points below last year, showing no deterioration signal. CFTC positioning shows large speculators net long at the 88th percentile of crowding with a -2.2% weekly reduction, suggesting some distribution into strength rather than accumulation. The cost of holding structure shows a -1.4% annual drag from futures rolling. Macro remains benign with the yield curve normal, VIX calm at 14.4, and the dollar strengthening. The technicals reflect a mature advance rather than a breakout: volume is only 0.11x the 20-day average, momentum is rolling over (MACD histogram negative), and the instrument is at historical extremes. A bullish China trade narrative exists but is already priced into the 7.2% one-month move. The combination of extended valuation, light volume, negative momentum divergence, and modest crop deterioration year-over-year argues against chasing the rally, but no clear reversal signal has emerged. A data surprise or policy shock would be needed to break the current equilibrium.
+
+**Main reasons it gave:**
+- Price at 99.9th percentile of 52-week range with light volume suggests extended rally
+- RSI 65.8 with negative MACD histogram indicates momentum rolling over despite higher price
+- Large speculator positioning at 88th percentile crowding with -2.2% weekly reduction signals distribution
+- Crop conditions 58% G/E steady with only -3 point year-over-year decline, no supply deterioration
+- Cost of carry at -1.4% annually creates structural headwind against further appreciation
+
+<details><summary><b>News</b> — score +0.30</summary>
+
+- [U.S. grains rally ahead of 'positive' Trump-Xi summit, continued Russia-Ukraine fighting](https://seekingalpha.com/news/4645187-us-grains-rally-ahead-of-positive-trump-xi-summit-continued-russia-ukraine-fighting)  
+  <sub>Seeking Alpha, 19 hours ago</sub>  
+  US grain futures rose after initial US-China trade talks were called positive by both sides, raising hopes the Trump-Xi meeting will include Chinese...
+
+</details>
+
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.30</summary>
+
+```text
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
+Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
+Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+```
+
+</details>
+
+<details><summary><b>Price and chart</b> — score +0.25</summary>
+
+```text
+Last close 28.14 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 27.59 (+2.0%), 50d 26.36 (+6.8%), 200d 24.44 (+15.1%); 50d above 200d
+Momentum: RSI(14) 65.8 | MACD 0.523 vs signal 0.553 (histogram -0.030)
+Returns: 1d +0.1% | 5d +0.7% | 1m +7.2% | 3m +15.9%
+52-week range: 21.46 - 28.14 (now 99.9% of the way up)
+Volatility: ATR(14) 0.35 (1.2% of price) | annualised 20d 17.5%
+Volume: 0.11x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score -0.15</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What this fund holds</b> — score -0.15</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Does this company beat its own forecasts</b> — score -0.15</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What holding this fund costs you</b> — score -0.15</summary>
+
+```text
+Cost of holding this fund instead of soybeans itself: -1.4% a year -- a steady drag
+Measured: 3 months: fund +15.9%, commodity +18.9%, gap -3.0% | 6 months: fund +16.3%, commodity +14.2%, gap +2.1% | 12 months: fund +28.1%, commodity +29.5%, gap -1.4%
+A commodity fund holds futures, not soybeans, and must sell each expiring contract to buy the next one. Where the next month costs more, that roll loses money every month. This gap is what the structure has actually cost, fees included -- it is history rather than a forecast, and it is not a direction: heavy carry is a reason to want a larger move to justify a long, and a tailwind for a short.
+```
+
+</details>
+
+<details><summary><b>How much oil and gas is in storage</b> — score -0.15</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How the crop is growing</b> — score -0.15</summary>
+
+```text
+Soybeans rated good or excellent: 58% of the US crop (week 38 of 2026)
+Direction over 3 weeks: steady, 0 points
+Same week last year: 61% (-3 points)
+A better crop means more supply, which reads bearish for the price, and a worse one bullish. The trend matters more than the level, and the market has already seen this: it is published on a schedule everyone trades.
+```
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score n/a</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts say about what this fund holds</b> — score n/a</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score -0.10</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Who is positioned how</b> — score -0.10</summary>
+
+```text
+Contract: SOYBEANS - CHICAGO BOARD OF TRADE (positions as of 2026-09-15, published the following Friday)
+Large speculators: net long 21.9% of open interest (1,104,880 contracts)
+Change on the week: -2.2% of open interest
+Crowding: 88% percentile over 52 weeks -- within its normal range
+Read this as crowding, not as a forecast: an extreme is as often the end of a move as the middle of one.
+```
+
+</details>
+
 <details><summary><b>Money going into and out of this fund</b> — score -0.10</summary>
 
 ```text
 Direction: unknown
 Share count change: n/a (too few readings)
-Shares outstanding: 19.24M | fund size: 781.27M
+Shares outstanding: 1.68M | fund size: 47.14M
+Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
+```
+
+</details>
+
+### Natural gas (UNG) · Commodity — NEUTRAL, confidence 0.25
+
+**In the model's own words:**
+
+> UNG faces headwinds from a structural cost of holding that has eroded returns at -22.4% annualized, with the fund down 15.7% versus the commodity up 6.7% over the past 12 months. Near-term technicals show modest strength—price up 3.3% on the day and above both 20d and 50d moving averages with RSI 56.4 and positive MACD histogram—but this sits within a longer downtrend: the asset is 7.8% below its 200d MA in a bear market (52-week range placing it just 13.3% up from lows). Energy inventories posted a build at the 71st percentile, a neutral-to-bearish signal, while the EIA price forecast sees Henry Hub rising only 7% over six months from here—modest upside. CFTC positioning shows large speculators net short at the 33rd percentile of crowding, neither extreme nor capitulation. Macro backdrop is stable: the yield curve is upward-sloping at +95bp, VIX is calm at 14.4, and the dollar just moved +0.93% higher this week, which typically pressures commodities. No material surprise in recent data or policy. The technicals offer a weak bounce, but the structural drag from rolling costs, inventory backdrop, and modest price guidance do not support conviction above NEUTRAL.
+
+**Main reasons it gave:**
+- Cost of holding at -22.4% annualized eroded 12-month gap of -22.4% relative to the commodity
+- Natural gas inventories at 71st percentile with +44 bcf build this week reads bearish
+- EIA price forecast sees only 7% upside over six months to March 2027
+- Price 7.8% below 200-day MA in longer downtrend despite near-term +3.3% daily move
+- Dollar index up +0.93% this week, headwind for commodity fund
+
+<details><summary><b>News</b> — score +0.00</summary>
+
+_No news found for this one today._
+
+</details>
+
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.00</summary>
+
+```text
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
+Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
+Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+```
+
+</details>
+
+<details><summary><b>Price and chart</b> — score +0.35</summary>
+
+```text
+Last close 10.60 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 10.40 (+1.9%), 50d 10.24 (+3.6%), 200d 11.49 (-7.8%); 50d below 200d
+Momentum: RSI(14) 56.4 | MACD 0.034 vs signal 0.022 (histogram 0.012)
+Returns: 1d +3.3% | 5d +0.6% | 1m +6.1% | 3m -7.8%
+52-week range: 9.63 - 16.90 (now 13.3% of the way up)
+Volatility: ATR(14) 0.28 (2.6% of price) | annualised 20d 26.9%
+Volume: 1.07x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score -0.20</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What this fund holds</b> — score -0.20</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Does this company beat its own forecasts</b> — score -0.20</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What holding this fund costs you</b> — score -0.20</summary>
+
+```text
+Cost of holding this fund instead of natural gas itself: -22.4% a year -- heavy: rolling contracts costs this fund real money
+Measured: 3 months: fund -7.8%, commodity -2.1%, gap -5.8% | 6 months: fund -9.6%, commodity +6.6%, gap -16.2% | 12 months: fund -15.7%, commodity +6.7%, gap -22.4%
+A commodity fund holds futures, not natural gas, and must sell each expiring contract to buy the next one. Where the next month costs more, that roll loses money every month. This gap is what the structure has actually cost, fees included -- it is history rather than a forecast, and it is not a direction: heavy carry is a reason to want a larger move to justify a long, and a tailwind for a short.
+```
+
+</details>
+
+<details><summary><b>How much oil and gas is in storage</b> — score -0.20</summary>
+
+```text
+US inventories, week ending 2026-09-11 (published the following Wednesday)
+  Natural gas: 3,298.0 billion cubic feet, +44.0 on the week (a build), 71% percentile over 52 weeks
+A build is more supply than demand and a draw is the reverse, so a build reads bearish and a draw bullish -- as a rule of thumb, not a law. Weigh the change and how unusual the level is above the level itself, and remember the market has already seen this number.
+```
+
+</details>
+
+<details><summary><b>How the crop is growing</b> — score -0.20</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score n/a</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts say about what this fund holds</b> — score n/a</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score +0.00</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Who is positioned how</b> — score +0.00</summary>
+
+```text
+Contract: NAT GAS NYME - NEW YORK MERCANTILE EXCHANGE (positions as of 2026-09-15, published the following Friday)
+Large speculators: net short 5.5% of open interest (1,820,003 contracts)
+Change on the week: -0.2% of open interest
+Crowding: 33% percentile over 52 weeks -- within its normal range
+Read this as crowding, not as a forecast: an extreme is as often the end of a move as the middle of one.
+```
+
+</details>
+
+<details><summary><b>Money going into and out of this fund</b> — score +0.00</summary>
+
+```text
+Direction: unknown
+Share count change: n/a (too few readings)
+Shares outstanding: 55.41M | fund size: 587.34M
+Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
+```
+
+</details>
+
+### Wheat (WEAT) · Commodity — NEUTRAL, confidence 0.25
+
+**In the model's own words:**
+
+> Wheat closed slightly down yesterday (-0.8%) after a brief pop on trade optimism. The technical picture is mixed: the fund sits 76.6% of the way up its 52-week range with a 13.5% gain over a year, but momentum is fading (RSI 49.9, MACD histogram negative). The 20-day moving average is rolling over while the longer-term trend remains positive. CFTC positioning shows large speculators crowded long at the 90th percentile—a level as often marking the end of a move as the middle. More critically, the cost of holding this fund versus wheat itself is brutal: -13.5% annualized due to contango in the futures curve. The 12-month data shows the fund returned 24% while the commodity itself rose 37.5%—the fund captured only 64% of the underlying move. US crop conditions are 51% good/excellent, up only 2 points year-over-year, offering no new bullish signal. While near-term Trump-Xi trade sentiment provided a bounce, macro is calm (VIX 14.4, curve normal, dollar up 0.93 on the week). There is no clear catalyst emerging: the initial trade optimism is priced in, positioning is already crowded, and structural headwinds in the fund itself are substantial. A cautious neutral stance is warranted.
+
+**Main reasons it gave:**
+- Large speculators crowded long at 90th percentile of 52-week positioning
+- Cost of holding fund -13.5% annualized due to contango roll losses
+- Momentum fading with RSI at 50 and negative MACD histogram
+- Crop condition up only 2 points year-over-year, no new supply risk
+- Trade optimism brief and already reflected in initial move
+
+<details><summary><b>News</b> — score +0.15</summary>
+
+- [U.S. grains rally ahead of 'positive' Trump-Xi summit, continued Russia-Ukraine fighting](https://seekingalpha.com/news/4645187-us-grains-rally-ahead-of-positive-trump-xi-summit-continued-russia-ukraine-fighting)  
+  <sub>Seeking Alpha, 19 hours ago</sub>  
+  US grain futures rose after initial US-China trade talks were called positive by both sides, raising hopes the Trump-Xi meeting will include Chinese...
+- [Why is Teucrium Wheat Fund stock climbing today? By Investing.com](https://in.investing.com/news/stock-market-news/why-is-teucrium-wheat-fund-stock-climbing-today-93CH-5600047)  
+  <sub>Investing.com India, 23 hours ago</sub>  
+  Investing.com -- Teucrium Wheat Fund stock climbed 1.9% in mid-day trading to reach $26.355, as wheat futures advanced on the session against a backdrop of...
+
+</details>
+
+<details><summary><b>Interest rates, the dollar and market nerves</b> — score +0.15</summary>
+
+```text
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
+Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
+Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+```
+
+</details>
+
+<details><summary><b>Price and chart</b> — score -0.10</summary>
+
+```text
+Last close 26.10 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 26.74 (-2.4%), 50d 25.51 (+2.3%), 200d 23.00 (+13.5%); 50d above 200d
+Momentum: RSI(14) 49.9 | MACD 0.200 vs signal 0.378 (histogram -0.177)
+Returns: 1d -0.8% | 5d -0.8% | 1m +2.7% | 3m +16.4%
+52-week range: 19.88 - 28.00 (now 76.6% of the way up)
+Volatility: ATR(14) 0.59 (2.2% of price) | annualised 20d 31.4%
+Volume: 0.12x the 20-day average
+```
+
+</details>
+
+<details><summary><b>Company numbers</b> — score -0.35</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What this fund holds</b> — score -0.35</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Does this company beat its own forecasts</b> — score -0.35</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What holding this fund costs you</b> — score -0.35</summary>
+
+```text
+Cost of holding this fund instead of wheat itself: -13.5% a year -- heavy: rolling contracts costs this fund real money
+Measured: 3 months: fund +16.4%, commodity +22.5%, gap -6.0% | 6 months: fund +15.1%, commodity +22.2%, gap -7.2% | 12 months: fund +24.0%, commodity +37.5%, gap -13.5%
+A commodity fund holds futures, not wheat, and must sell each expiring contract to buy the next one. Where the next month costs more, that roll loses money every month. This gap is what the structure has actually cost, fees included -- it is history rather than a forecast, and it is not a direction: heavy carry is a reason to want a larger move to justify a long, and a tailwind for a short.
+```
+
+</details>
+
+<details><summary><b>How much oil and gas is in storage</b> — score -0.35</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>How the crop is growing</b> — score -0.35</summary>
+
+```text
+Wheat rated good or excellent: 51% of the US crop (week 34 of 2026)
+Direction over 1 weeks: not enough readings to say
+Same week last year: 49% (+2 points)
+A better crop means more supply, which reads bearish for the price, and a worse one bullish. The trend matters more than the level, and the market has already seen this: it is published on a schedule everyone trades.
+```
+
+</details>
+
+<details><summary><b>What analysts and big funds say</b> — score n/a</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>What analysts say about what this fund holds</b> — score n/a</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Buying and selling by company insiders</b> — score -0.20</summary>
+
+_Not available today._
+
+</details>
+
+<details><summary><b>Who is positioned how</b> — score -0.20</summary>
+
+```text
+Contract: WHEAT-SRW - CHICAGO BOARD OF TRADE (positions as of 2026-09-15, published the following Friday)
+Large speculators: net short 0.8% of open interest (485,138 contracts)
+Change on the week: -1.8% of open interest
+Crowding: 90% percentile over 52 weeks -- a crowded long by the standards of the past year
+Read this as crowding, not as a forecast: an extreme is as often the end of a move as the middle of one.
+```
+
+</details>
+
+<details><summary><b>Money going into and out of this fund</b> — score -0.20</summary>
+
+```text
+Direction: unknown
+Share count change: n/a (too few readings)
+Shares outstanding: 14.00M | fund size: 365.51M
 Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
 ```
 
@@ -11345,43 +11533,49 @@ Creations and redemptions are settled money, not an opinion -- but they follow d
 
 <details><summary><b>News</b> — score n/a</summary>
 
-- [SPDR Gold Shares Tokenized ETF (Derivatives) Price Today](https://cryptorank.io/price/spdr-gold-shares-tokenized-etf-derivatives)  
-  <sub>CryptoRank, 46 minutes ago</sub>  
-  Current SPDR Gold Shares Tokenized ETF (Derivatives) (GLD) token data: Price $ 397.84, Trading Volume $ 91.25K, Market Cap $ 0.00, Circ.
-- [Gold: The Rate Hikes Do Not Change The Bullish Thesis (NYSEARCA:GLD)](https://seekingalpha.com/article/4948345-gold-rate-hikes-do-not-change-bullish-thesis)  
-  <sub>Seeking Alpha, 13 minutes ago</sub>  
-  Gold has lagged stocks YTD, but inflation, deficits, and China's buying keep the long-term hedge case strong. Here's what investors need to consider.
-- [Silver Crashes To Over 6-Month Lows – But This Analyst Sees ‘Very Limited Downside’](https://stocktwits.com/news-articles/markets/equity/gold-silver-falls-six-month-lows-analysts-remain-bullish/cZKyafnR7fW)  
-  <sub>Stocktwits, 10 hours ago</sub>  
-  Rashad Hajiyev, founder of RM Capital Consulting, said silver may consolidate for a while before gradually moving higher. Peter Schiff said that while gold...
-- [Gold rebounds from $4K support as Timmer sees $5K in sight (GLD:NYSEARCA)](https://seekingalpha.com/news/4644631-gold-rebounds-from-4k-support-as-timmer-sees-5k-in-sight)  
-  <sub>Seeking Alpha, 7 hours ago</sub>  
-  Gold price outlook: Fidelity's Jurrien Timmer says global liquidity, M2 growth and ETF flows could drive gold from $4K toward $5K+.
-- [BlackRock's IBIT bitcoin spot ETF surpasses GLD in daily trading](https://www.digitaltoday.co.kr/en/view/105702/blackrock-ibit-bitcoin-spot-etf-surpasses-gld)  
-  <sub>디지털투데이, 16 hours ago</sub>  
-  BlackRock's iShares Bitcoin Trust ETF, IBIT, rose more than 5 percent in daily trading and outpaced the SPDR Gold Shares ETF, GLD, in both trading volume...
-- [The Options Weekly Ahead: Index Skew Resets, Gold Bets Build, SpaceX Vol Craters](https://www.moomoo.com/community/feed/the-options-weekly-ahead-index-skew-resets-gold-bets-build-117308120039430)  
-  <sub>Moomoo, 7 hours ago</sub>  
-  Last Week's Highlights Index Put Skew Snaps Back to Life. The cheapest hedges of the summer are gone. One-month put/call skew on the $S&P 500 Index (...
-- [Fed Enters Tightening Cycle](https://www.streetwisereports.com/article/2026/09/21/fed-enters-tightening-cycle.html)  
-  <sub>Streetwise Reports, 41 minutes ago</sub>  
-  Michael Ballanger of GGM Advisory Inc. looks at the current state of the market after the Fed's recent hike.
-- [Claude AI Predicts Bitcoin Could Outpace Gold if ETF Hedging Fades](https://www.coinspeaker.com/claude-ai-predicts-bitcoin-could-outpace-gold-if-etf-hedging-fades/)  
-  <sub>Coinspeaker, 21 hours ago</sub>  
-  Bitcoin has spent most of 2026 in gold's shadow. While the precious metal kept setting the pace as investors looked for protection against inflation and...
+- [China's gold imports surpass 1,000-ton mark on strong domestic demand](https://seekingalpha.com/news/4645254-china-gold-imports-surpass-1000-ton-mark-on-strong-domestic-demand)  
+  <sub>Seeking Alpha, 3 hours ago</sub>  
+  Chinese gold imports reached record highs this year, bolstered by a retreat in international bullion prices and a strengthening yuan.
+- [Best Gold ETFs to Buy Now for September 2026](https://www.zacks.com/featured-articles/882/best-gold-etfs)  
+  <sub>Zacks Investment Research, 20 hours ago</sub>  
+  Gold ETFs are a great way to buy the commodity without the worry of buying and storing physical bullion. Gold prices have remained elevated in 2026 amid...
+- [How do I convert SPDR Gold Shares Tokenized ETF (Derivatives) (GLD) to Japanese Yen (JPY)?](https://cryptorank.io/price/spdr-gold-shares-tokenized-etf-derivatives/jpy)  
+  <sub>CryptoRank, 23 hours ago</sub>  
+  Current SPDR Gold Shares Tokenized ETF (Derivatives) (GLD) token data: Price to Japanese Yen (JPY) - ¥ 62798, Trading Volume 14.68M, Market Cap N/A.
+- [SPDR Gold ETF Options Spot-On: On September 21st, 487.84K Contracts Were Traded, With 6.69 Million Open Interest](https://news.futunn.com/en/post/79574258/spdr-gold-etf-options-spot-on-on-september-21st-487)  
+  <sub>富途牛牛, 18 hours ago</sub>  
+  OnSeptember 21st ET, $SPDR Gold ETF(GLD.US)$ had active options trading, with a total trading volume of 487.84K options for the day, of which put options...
+- [‘The Sell Button Won’t Work’: Why Rate Hikes No Longer Save Debt Markets](https://www.benzinga.com/markets/bonds/26/09/61916030/the-sell-button-wont-work-why-rate-hikes-no-longer-save-debt-markets)  
+  <sub>Benzinga, 3 hours ago</sub>  
+  Forget Fed rate hikes: Macro analysts reveal why fiscal dominance and massive deficits make gold and real assets the ultimate hedges.
+- [Gold snaps three-session win streak as dollar rises, oil prices fall (GLD:NYSEARCA)](https://seekingalpha.com/news/4645199-gold-snaps-three-session-win-streak-as-dollar-rises-oil-prices-fall)  
+  <sub>Seeking Alpha, 18 hours ago</sub>  
+  Gold futures turned lower, snapping a three-session winning streak, as the market returned its focus to US yields and the Federal Reserve's interest rate...
+- [How do I convert SPDR Gold Shares Tokenized ETF (Derivatives) (GLD) to Chinese Yuan (CNY)?](https://cryptorank.io/price/spdr-gold-shares-tokenized-etf-derivatives/cny)  
+  <sub>CryptoRank, 24 hours ago</sub>  
+  Current SPDR Gold Shares Tokenized ETF (Derivatives) (GLD) token data: Price to Chinese Yuan (CNY) - CN¥ 2671, Trading Volume 629.66K, Market Cap N/A.
+- [How do I convert SPDR Gold Shares Tokenized ETF (Derivatives) (GLD) to Vietnamese Dong (VND)?](https://cryptorank.io/price/spdr-gold-shares-tokenized-etf-derivatives/vnd)  
+  <sub>CryptoRank, 23 hours ago</sub>  
+  Current SPDR Gold Shares Tokenized ETF (Derivatives) (GLD) token data: Price to Vietnamese Dong (VND) - ₫ 10379182, Trading Volume 2.43B, Market Cap N/A.
+- [How do I convert SPDR Gold Shares Tokenized ETF (Derivatives) (GLD) to South Korean Won (KRW)?](https://cryptorank.io/price/spdr-gold-shares-tokenized-etf-derivatives/krw)  
+  <sub>CryptoRank, 24 hours ago</sub>  
+  Current SPDR Gold Shares Tokenized ETF (Derivatives) (GLD) token data: Price to South Korean Won (KRW) - ₩ 547929, Trading Volume 129.19M, Market Cap N/A.
+- [Daily ETF Flows: COWZ Gobbles Up Assets](https://finance.yahoo.com/markets/options/articles/daily-etf-flows-cowz-gobbles-210028745.html)  
+  <sub>Yahoo Finance, 18 hours ago</sub>  
+  Top 10 Creations (All ETFs). Ticker. Name. Net Flows ($, mm). AUM ($, mm). AUM % Change. IVV · iShares Core S&P 500 ETF. 8,519.50. 845,149.30. 1.01%.
 
 </details>
 
 <details><summary><b>Interest rates, the dollar and market nerves</b> — score n/a</summary>
 
 ```text
-US Treasury yields: 3-month 3.99% (+0.05 on the week) | 5-year 4.82% (+0.03 on the week) | 10-year 4.96% (+0.00 on the week) | 30-year 5.30% (-0.03 on the week)
-Yield curve, 10-year minus 3-month: +0.98 points -- upward sloping (normal)
-US dollar index: 100.36 (+0.90 on the week)
-Volatility (VIX): 14.62 (-2.5 on the week) -- calm
+US Treasury yields: 3-month 4.01% (+0.05 on the week) | 5-year 4.83% (+0.00 on the week) | 10-year 4.96% (-0.04 on the week) | 30-year 5.30% (-0.07 on the week)
+Yield curve, 10-year minus 3-month: +0.95 points -- upward sloping (normal)
+US dollar index: 100.58 (+0.93 on the week)
+Volatility (VIX): 14.42 (-2.8 on the week) -- calm
 Latest US data: inflation 3.4% (2026-08-01) | unemployment 4.1% (2026-08-01) | jobless claims 196k (2026-09-12)
 Policy and expectations: Fed target 4.00% | market expects 2.3% inflation over 10 years
-Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market prices about 3 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
+Rate path: 2-year Treasury 4.76% vs Fed target 3.75-4.00% -- the bond market prices about 4 quarter-point hikes over the next two years (a rough read: the 2-year also carries a term premium)
 ```
 
 </details>
@@ -11389,13 +11583,13 @@ Rate path: 2-year Treasury 4.67% vs Fed target 3.75-4.00% -- the bond market pri
 <details><summary><b>Price and chart</b> — score n/a</summary>
 
 ```text
-Last close 399.00 (bar of 2026-09-21), from 500 daily bars
-Trend: vs 20d SMA 405.40 (-1.6%), 50d 393.41 (+1.4%), 200d 416.28 (-4.2%); 50d below 200d
-Momentum: RSI(14) 49.0 | MACD -0.708 vs signal 0.759 (histogram -1.467)
-Returns: 1d -0.5% | 5d +1.6% | 1m -3.9% | 3m +3.7%
-52-week range: 339.18 - 495.90 (now 38.2% of the way up)
-Volatility: ATR(14) 7.54 (1.9% of price) | annualised 20d 23.1%
-Volume: 0.25x the 20-day average
+Last close 397.53 (bar of 2026-09-22), from 501 daily bars
+Trend: vs 20d SMA 403.91 (-1.6%), 50d 394.01 (+0.9%), 200d 416.33 (-4.5%); 50d below 200d
+Momentum: RSI(14) 47.8 | MACD -0.862 vs signal 0.427 (histogram -1.289)
+Returns: 1d -0.2% | 5d +0.9% | 1m -6.1% | 3m +5.4%
+52-week range: 343.32 - 495.90 (now 35.5% of the way up)
+Volatility: ATR(14) 7.20 (1.8% of price) | annualised 20d 22.8%
+Volume: 0.21x the 20-day average
 ```
 
 </details>
@@ -11421,8 +11615,8 @@ _Not available today._
 <details><summary><b>What holding this fund costs you</b> — score n/a</summary>
 
 ```text
-Cost of holding this fund instead of gold itself: -0.4% a year -- close to nothing, as a physically backed fund should be
-Measured: 3 months: fund +3.7%, commodity +4.4%, gap -0.7% | 6 months: fund -3.5%, commodity -4.1%, gap +0.6% | 12 months: fund +18.9%, commodity +19.3%, gap -0.4%
+Cost of holding this fund instead of gold itself: -0.9% a year -- close to nothing, as a physically backed fund should be
+Measured: 3 months: fund +5.4%, commodity +5.5%, gap -0.1% | 6 months: fund -1.6%, commodity -0.7%, gap -0.9% | 12 months: fund +17.2%, commodity +18.1%, gap -0.9%
 A commodity fund holds futures, not gold, and must sell each expiring contract to buy the next one. Where the next month costs more, that roll loses money every month. This gap is what the structure has actually cost, fees included -- it is history rather than a forecast, and it is not a direction: heavy carry is a reason to want a larger move to justify a long, and a tailwind for a short.
 ```
 
@@ -11475,7 +11669,7 @@ Read this as crowding, not as a forecast: an extreme is as often the end of a mo
 ```text
 Direction: unknown
 Share count change: n/a (too few readings)
-Shares outstanding: 260.30M | fund size: 103.86B
+Shares outstanding: 260.30M | fund size: 103.48B
 Creations and redemptions are settled money, not an opinion -- but they follow demand for the exposure, so read them as conviction rather than as a forecast of price.
 ```
 
