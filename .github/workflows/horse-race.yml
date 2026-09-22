@@ -95,32 +95,6 @@ jobs:
           fi
           python analysis/horse_race.py --per-trade $ARGS | tee race.txt
 
-      # TEMPORARY, removed before merge: name the two 16 Sep trades whose
-      # sign differed between the 18:27 UTC and 21:05 UTC runs on 21 Sep.
-      - name: "TEMPORARY diagnosis: 21 Sep intraday vs close for the 16 Sep trades"
-        if: github.event_name == 'pull_request'
-        run: |
-          python - <<'PY'
-          import yfinance as yf, pandas as pd
-          cands = [("LLY",1),("TEVA",1),("SHY",-1),("IEF",-1),("TLT",-1),("TIP",-1),("LQD",-1),
-                   ("EMB",-1),("XHB",-1),("NVDA",1),("HYG",-1),("UUP",1),("XBI",-1),("XLY",-1),
-                   ("EWA",-1),("TUR",-1),("GLD",-1)]
-          print(f"{'ticker':<7}{'dir':>4}{'entry 17 open':>14}{'18:27 UTC':>11}{'21 close':>10}{'@18:27':>8}{'@close':>8}")
-          for t, d in cands:
-              daily = yf.Ticker(t).history(start="2026-09-16", end="2026-09-23", interval="1d", auto_adjust=False)
-              intra = yf.Ticker(t).history(start="2026-09-21", end="2026-09-22", interval="5m", auto_adjust=False)
-              try:
-                  entry = float(daily.loc[daily.index.date == pd.Timestamp("2026-09-17").date(), "Open"].iloc[0])
-                  close = float(daily.loc[daily.index.date == pd.Timestamp("2026-09-21").date(), "Close"].iloc[0])
-                  intra.index = intra.index.tz_convert("UTC")
-                  at = float(intra.loc[intra.index <= pd.Timestamp("2026-09-21 18:27", tz="UTC"), "Close"].iloc[-1])
-              except Exception as exc:
-                  print(f"{t:<7} n/a ({type(exc).__name__})"); continue
-              r_at, r_close = d * (at / entry - 1), d * (close / entry - 1)
-              flag = "  <- FLIPPED" if (r_at > 0) != (r_close > 0) else ""
-              print(f"{t:<7}{d:>4}{entry:>14.2f}{at:>11.2f}{close:>10.2f}{r_at:>+8.2%}{r_close:>+8.2%}{flag}")
-          PY
-
       - name: Publish to the run summary
         if: always()
         run: |

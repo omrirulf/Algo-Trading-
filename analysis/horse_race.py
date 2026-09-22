@@ -697,7 +697,7 @@ def render(
         "daily return the equal-weighted mean net return of the trades an arm opened",
         "             on one entry day; a day it opened none is 0 (it sat in cash)",
         "primary test paired daily difference, model minus momentum, Newey-West",
-        f"             standard error at lag {horizon}; checked on every {horizon}th day alone",
+        f"             standard error at lag {horizon}; checked on every {_ordinal(horizon)} day alone",
         "",
         "COVERAGE AND RECONCILIATION",
         "-" * 78,
