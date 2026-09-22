@@ -18,8 +18,9 @@ name: news ablation
 #
 # This one costs money: it is the only workflow here that asks the FULL model
 # rather than reading the journal. At the measured $0.043 a call, 100
-# contexts is 200 calls and about $9. Manual dispatch only -- nothing about
-# this belongs on a schedule.
+# contexts is 300 calls with the repeat arm and about $13 on Opus -- or
+# under a dollar against gpt-oss-120b, which is worth a dry run of the
+# machinery before spending the rest. Manual dispatch only.
 on:
   workflow_dispatch:
     inputs:
@@ -27,13 +28,31 @@ on:
         description: "Contexts to ask (each is asked twice: calls = 2x this)"
         default: "100"
       model:
-        description: "The model to ablate"
+        description: "The model to ablate, e.g. claude-opus-5 or openai/gpt-oss-120b"
         default: "claude-opus-5"
       effort:
         description: "Reasoning effort (blank for none)"
         type: choice
         options: ["low", "medium", "high", ""]
         default: "low"
+      provider:
+        description: "Which endpoint to ask. 'claude' uses ANTHROPIC_API_KEY and ignores base_url."
+        type: choice
+        options: ["claude", "openai-compatible"]
+        default: "claude"
+      base_url:
+        description: "OpenAI-compatible endpoint (ignored when provider is 'claude')"
+        default: "https://api.deepinfra.com/v1/openai"
+      repeat_with_news:
+        description: "Ask the with-news prompt twice, so the noise floor is the model against ITSELF (+50% calls)"
+        type: boolean
+        default: true
+      concurrency:
+        description: "Calls in flight at once, openai-compatible only"
+        default: "4"
+      timeout:
+        description: "Per-call timeout, seconds"
+        default: "120"
       score_returns:
         description: "Also score both sides against realised returns"
         type: boolean
@@ -67,6 +86,7 @@ jobs:
         # else, so the report goes to stderr and is captured separately.
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CANDIDATE_KEY: ${{ secrets.SCREENING_API_KEY || secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY || secrets.GROQ_API_KEY }}
           LIMIT: ${{ inputs.limit }}
           MODEL: ${{ inputs.model }}
           EFFORT: ${{ inputs.effort }}
@@ -77,6 +97,21 @@ jobs:
           # effort asked" rather than reasoning at effort ''.
           if [ -n "$EFFORT" ]; then
             ARGS="$ARGS --effort $EFFORT"
+          fi
+          # Same lesson determinism-check.yml learned the expensive way: an
+          # empty workflow_dispatch input is replaced by the declared
+          # default, so base_url="" could never have meant "ask Claude". The
+          # provider choice carries that intent, because a choice input
+          # cannot collapse into a default.
+          if [ "${{ inputs.provider }}" != "claude" ]; then
+            ARGS="$ARGS --base-url ${{ inputs.base_url }} --api-key $CANDIDATE_KEY"
+            ARGS="$ARGS --concurrency ${{ inputs.concurrency }} --timeout ${{ inputs.timeout }}"
+          fi
+          # The floor is the whole point: without it the report withholds its
+          # verdict rather than printing a flip rate with nothing to read it
+          # against. Mandatory for any model the journal never ran.
+          if [ "${{ inputs.repeat_with_news }}" = "true" ]; then
+            ARGS="$ARGS --repeat-with-news"
           fi
           # Split rather than piped: stdout is the record stream the next
           # steps split, stderr is the report a person reads. Process

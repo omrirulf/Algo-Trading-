@@ -20,14 +20,29 @@ once with the headlines removed. Everything else -- the system prompt, the
 technicals, the fundamentals, the model, the effort -- is held fixed, so the
 only difference between the two answers is the news.
 
-Both answers are *fresh*. The journalled answer is free and sits in the
-report as a third column, but it is not the baseline, because a model that
-disagrees with itself about one context in ten would otherwise contribute its
-whole flip rate to the ablation's. That self-flip rate is measured here too,
-on these same contexts, from the with-news answer against the journalled one
--- so the report carries its own noise floor rather than borrowing one from a
-different run on different lines. **An ablation flip rate that does not clear
-its own self-flip rate is not evidence the news changed anything.**
+Both answers are *fresh*. A model that disagrees with itself about one
+context in ten would otherwise contribute its whole flip rate to the
+ablation's, so the report carries its own noise floor -- and getting that
+floor right is most of this tool.
+
+``--repeat-with-news`` asks the with-news prompt a *second* time and takes
+the floor from that: same model, same prompt, same run, so the only thing
+between the two answers is the model's own sampling. That is the only
+measurement here that is a true self-comparison, and it is what should be
+used whenever the number will be acted on.
+
+Without it the floor falls back to the journalled answer, which is free but
+narrower than it looks. The journal is written by a *funnel*: a line the
+screen ended carries Haiku's answer and a line it escalated carries the full
+model's, so on a real sample the journalled answers are a mix of models. A
+fresh answer diffed against that mix is only a self-comparison on the lines
+the same model wrote, which is why those are the only lines the fallback
+counts -- and why the report says how many it had to drop. Point this tool
+at a candidate the journal never ran and the fallback has nothing left at
+all, which it reports rather than papering over.
+
+**An ablation flip rate that does not clear its own noise floor is not
+evidence the news changed anything.**
 
 Removing, not blanking loudly
 -----------------------------
@@ -77,8 +92,8 @@ from replay.runner import ReplayEntry, ReplayResult  # noqa: E402
 
 DEFAULT_LIMIT = 100
 
-#: The two arms, in report order. The recorded prompt first, because it is
-#: what production sends today.
+#: The two scored arms, in report order. The recorded prompt first, because
+#: it is what production sends today.
 WITH_NEWS = "with-news"
 WITHOUT_NEWS = "without-news"
 
@@ -91,7 +106,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--limit", type=int, default=DEFAULT_LIMIT,
         help="contexts to ask (default %(default)s). Total calls = limit x 2, "
-             "because each is asked both ways in this run.",
+             "or x 3 with --repeat-with-news.",
     )
     parser.add_argument("--model", required=True)
     parser.add_argument("--effort", default=None)
@@ -107,6 +122,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                         help="calls in flight at once, --base-url only (default %(default)s). "
                              "Ignored for Claude, which would just meet a rate limit.")
     parser.add_argument("--timeout", type=float, default=0, help="per-call timeout in seconds")
+    parser.add_argument(
+        "--repeat-with-news", action="store_true",
+        help="ask the with-news prompt a second time, so the noise floor is the "
+             "model against ITSELF on the same prompt in the same run. Costs 50%% "
+             "more calls and is the only floor worth acting on; without it the "
+             "floor falls back to the journalled answer, which is a mix of "
+             "whichever models the funnel ran.",
+    )
     parser.add_argument("--dry-run", action="store_true",
                         help="report the sample and the call count, ask nothing")
     parser.add_argument(
@@ -131,6 +154,20 @@ def eligible(entries: list[ReplayEntry]) -> list[ReplayEntry]:
     empty.
     """
     return [e for e in entries if e.context is not None and e.context.headlines]
+
+
+def same_model(asked: str, journalled: Optional[str]) -> bool:
+    """Is the journalled answer's model the one this run is asking?
+
+    The journal records the snapshot the API actually ran
+    (``claude-haiku-4-5-20251001``) where the config names an alias
+    (``claude-haiku-4-5``), so this compares by prefix in either direction
+    rather than by equality -- the same tolerance ``pricing.price_for``
+    needs, for the same reason.
+    """
+    if not asked or not journalled:
+        return False
+    return asked.startswith(journalled) or journalled.startswith(asked)
 
 
 def without_news(entry: ReplayEntry) -> ReplayEntry:
@@ -159,9 +196,17 @@ class Ablation:
     #: Fresh answers from this run. ``None`` when that call failed.
     with_news: Optional[LLMSignal]
     without_news: Optional[LLMSignal]
-    #: What the journal recorded when this line was live. Free, and not the
-    #: baseline: it is here to measure the model's disagreement with itself.
+    #: What the journal recorded when this line was live. Free, but written
+    #: by whichever model the funnel ran that day -- see ``journal_flipped``.
     journalled: Optional[LLMSignal]
+    #: The model that produced ``journalled``, and the one this run asked.
+    #: Kept together because the only thing that makes the journalled
+    #: comparison a *self*-comparison is these two being the same.
+    journalled_model: Optional[str] = None
+    asked_model: str = ""
+    #: The with-news prompt asked a second time, under --repeat-with-news.
+    #: The only true self-comparison available here.
+    repeated: Optional[LLMSignal] = None
 
     @property
     def assessable(self) -> bool:
@@ -188,16 +233,56 @@ class Ablation:
         return self.without_news.conviction - self.with_news.conviction
 
     @property
-    def self_flipped(self) -> Optional[bool]:
-        """The noise floor: the with-news answer against the journalled one.
+    def repeat_flipped(self) -> Optional[bool]:
+        """The gold floor: the same prompt, the same model, asked twice here.
 
-        Same context, same question, same configuration, asked on different
-        days. Any disagreement here is the model disagreeing with itself,
-        and the ablation has to clear it to mean anything.
+        Nothing separates these two answers but the model's own sampling, so
+        any disagreement is the wobble the ablation has to clear. ``None``
+        when --repeat-with-news was not asked for, or that call failed.
         """
-        if self.with_news is None or self.journalled is None:
+        if self.with_news is None or self.repeated is None:
+            return None
+        return self.with_news.bias != self.repeated.bias
+
+    @property
+    def journal_comparable(self) -> bool:
+        """Is the journalled answer even the same model's to disagree with?
+
+        On a real journal it often is not. The funnel writes Haiku's answer
+        on a line the screen ended and the full model's on a line it
+        escalated, so a fresh run diffed against the journal is a self
+        comparison on some lines and a cross-model one on the rest. Only the
+        former can stand in for a noise floor.
+        """
+        return (
+            self.with_news is not None
+            and self.journalled is not None
+            and same_model(self.asked_model, self.journalled_model)
+        )
+
+    @property
+    def journal_flipped(self) -> Optional[bool]:
+        """The fallback floor: this run's answer against the journalled one.
+
+        ``None`` unless the journalled answer came from the model this run
+        asked -- a different model's answer is a cross-model disagreement
+        wearing a noise floor's label, and inflating the floor is exactly
+        how a real ablation effect gets reported as nothing.
+        """
+        if not self.journal_comparable:
             return None
         return self.with_news.bias != self.journalled.bias
+
+    @property
+    def self_flipped(self) -> Optional[bool]:
+        """The noise floor, from the best source this run has.
+
+        The repeat when there is one, the journalled answer when it came
+        from the same model, and otherwise nothing at all -- which the
+        report says out loud rather than quietly reporting zero.
+        """
+        repeat = self.repeat_flipped
+        return repeat if repeat is not None else self.journal_flipped
 
 
 def _would_trade(signal: LLMSignal, floor: float) -> bool:
@@ -206,32 +291,48 @@ def _would_trade(signal: LLMSignal, floor: float) -> bool:
 
 def ablate(
     entries: list[ReplayEntry], complete: runner.Completer, max_workers: int = 1,
+    asked_model: str = "", repeat_with_news: bool = False,
 ) -> tuple[list[Ablation], list[ReplayResult]]:
-    """Ask every entry both ways and pair the answers up.
+    """Ask every entry both ways -- and, optionally, the with-news way twice.
 
     The system prompt is resolved once per line, from the *recorded* context,
-    and handed to both arms. The fund prompt is narrowed by which sections a
+    and handed to every arm. The fund prompt is narrowed by which sections a
     context carries, and although emptying ``headlines`` does not change that
     set today, deriving it twice would leave the ablation one refactor away
     from varying two things at once.
+
+    The arms go out as one flat list -- every with-news call, then every
+    without-news call, then every repeat -- and come back in the order they
+    were sent, so the slices below put each answer back on its own line.
     """
     prompts = {id(entry): runner.system_prompt_for_entry(entry) for entry in entries}
     blanked = [without_news(entry) for entry in entries]
     for original, stripped in zip(entries, blanked):
         prompts[id(stripped)] = prompts[id(original)]
 
-    asked = entries + blanked
+    # The repeat has to be a distinct object: prompts are keyed by identity,
+    # and replay_each returns one result per item in the list it was given.
+    repeats = [replace(entry) for entry in entries] if repeat_with_news else []
+    for original, again in zip(entries, repeats):
+        prompts[id(again)] = prompts[id(original)]
+
+    asked = entries + blanked + repeats
     results = runner.replay_each(asked, lambda e: prompts[id(e)], complete, max_workers)
-    half = len(entries)
+    n = len(entries)
+    kept, stripped = results[:n], results[n:2 * n]
+    again = results[2 * n:] if repeats else [None] * n
     return [
         Ablation(
             ticker=entry.ticker,
             ts_utc=entry.ts_utc,
-            with_news=kept.replayed,
-            without_news=stripped.replayed,
+            with_news=one.replayed,
+            without_news=two.replayed,
             journalled=entry.original,
+            journalled_model=entry.model,
+            asked_model=asked_model,
+            repeated=three.replayed if three is not None else None,
         )
-        for entry, kept, stripped in zip(entries, results[:half], results[half:])
+        for entry, one, two, three in zip(entries, kept, stripped, again)
     ], results
 
 
@@ -249,6 +350,12 @@ class Summary:
     trade_decision_changed: int
     self_comparable: int
     self_flipped: int
+    #: Where the floor came from: "repeat", "journal", or None when neither
+    #: was available. A report that cannot name its floor must not print one.
+    floor_source: Optional[str]
+    #: Journalled answers dropped from the fallback floor because a different
+    #: model wrote them. On a funnel-written journal this is most of them.
+    journal_cross_model: int
     mean_conviction_with: Optional[float]
     mean_conviction_without: Optional[float]
     mean_abs_conviction_delta: Optional[float]
@@ -274,6 +381,14 @@ class Summary:
         return self.self_flipped / self.self_comparable
 
     @property
+    def floor_label(self) -> str:
+        if self.floor_source == "repeat":
+            return "the model against ITSELF, same prompt asked twice"
+        if self.floor_source == "journal":
+            return "the model against its own journalled answer"
+        return "NOT MEASURED -- no same-model comparison was available"
+
+    @property
     def clears_the_noise_floor(self) -> Optional[bool]:
         """Did removing the news move the answer more than the model's own wobble?
 
@@ -287,7 +402,14 @@ class Summary:
 
 def summarise(pairs: list[Ablation], floor: float, failures: int) -> Summary:
     good = [p for p in pairs if p.assessable]
-    comparable = [p for p in pairs if p.self_flipped is not None]
+    repeats = [p for p in pairs if p.repeat_flipped is not None]
+    # The repeat is the better floor wherever it exists, and mixing the two
+    # sources would average a real self-comparison with a weaker one.
+    if repeats:
+        comparable, source = repeats, "repeat"
+    else:
+        journal = [p for p in pairs if p.journal_flipped is not None]
+        comparable, source = journal, ("journal" if journal else None)
     return Summary(
         n_asked=len(pairs),
         n_assessable=len(good),
@@ -296,6 +418,11 @@ def summarise(pairs: list[Ablation], floor: float, failures: int) -> Summary:
         trade_decision_changed=sum(1 for p in good if p.trade_decision_changed(floor)),
         self_comparable=len(comparable),
         self_flipped=sum(1 for p in comparable if p.self_flipped),
+        floor_source=source,
+        journal_cross_model=sum(
+            1 for p in pairs
+            if p.with_news is not None and p.journalled is not None and not p.journal_comparable
+        ),
         mean_conviction_with=_mean([p.with_news.conviction for p in good]),
         mean_conviction_without=_mean([p.without_news.conviction for p in good]),
         mean_abs_conviction_delta=_mean([abs(p.conviction_delta) for p in good]),
@@ -330,10 +457,13 @@ def render(summary: Summary, pairs: list[Ablation], floor: float, label: str) ->
         "-" * 78,
         f"{'direction changed when the news was removed':<52}{_pct(summary.flip_rate):>8}"
         f"  ({summary.direction_changed}/{summary.n_assessable})",
-        f"{'  ... the model disagreeing with ITSELF (noise floor)':<52}"
+        f"{'  ... the noise floor it has to clear':<52}"
         f"{_pct(summary.self_flip_rate):>8}  ({summary.self_flipped}/{summary.self_comparable})",
+        f"      floor measured as: {summary.floor_label}",
         f"{'trade decision changed (side and floor together)':<52}"
         f"{_pct(summary.trade_flip_rate):>8}  ({summary.trade_decision_changed}/{summary.n_assessable})",
+        *( [f"      {summary.journal_cross_model} journalled answer(s) came from another model "
+            f"and were left out"] if summary.journal_cross_model else [] ),
         "",
         _floor_verdict(summary),
         "",
@@ -370,10 +500,11 @@ def render(summary: Summary, pairs: list[Ablation], floor: float, label: str) ->
         "",
         "HOW TO READ THIS",
         "-" * 78,
-        "The flip rate is not the finding on its own. This model answers the",
-        "same context differently about one time in ten for no reason at all,",
-        "and that rate is measured here, on these contexts, in the row under",
-        "it. Only the gap between the two is about the news.",
+        "The flip rate is not the finding on its own. A model answers the same",
+        "context differently some of the time for no reason at all, and the row",
+        "under it is this run's measurement of that. Only the gap between the",
+        "two is about the news -- and only when the floor came from the model",
+        "that was actually asked, which the floor line above names.",
         "",
         "And a moved answer is not a better answer. Nothing above says which",
         "side the market rewarded -- for that, run with --emit-pairs and score",
@@ -383,6 +514,12 @@ def render(summary: Summary, pairs: list[Ablation], floor: float, label: str) ->
         "-" * 78,
         "Only contexts that carried headlines are asked; a line whose news",
         "block already said 'none found' is its own control and is skipped.",
+        "The journalled answers are written by a funnel -- Haiku on a line the",
+        "screen ended, the full model on a line it escalated -- so without",
+        "--repeat-with-news the fallback floor is measured on whichever subset",
+        "this run's model happened to write, and on none of it for a candidate",
+        "the journal never ran.",
+        "",
         "'Without news' means the headlines are gone and the heading remains,",
         "which is a shape production already sends. A system that fetched no",
         "news at all would also drop the news dimension from the system prompt",
@@ -392,6 +529,13 @@ def render(summary: Summary, pairs: list[Ablation], floor: float, label: str) ->
 
 
 def _floor_verdict(summary: Summary) -> str:
+    if summary.flip_rate is not None and summary.floor_source is None:
+        return (
+            f"  verdict: WITHHELD. The news moved the answer on {_pct(summary.flip_rate)} of\n"
+            "  contexts, but nothing here measured how often this model moves on its\n"
+            "  own, so that number has no floor to be read against. Re-run with\n"
+            "  --repeat-with-news, which asks the with-news prompt twice."
+        )
     if summary.clears_the_noise_floor is None:
         return "  verdict: not enough answered twice to compare anything."
     if not summary.clears_the_noise_floor:
@@ -433,6 +577,8 @@ def as_json(summary: Summary, pairs: list[Ablation], floor: float, label: str) -
         "failures": summary.failures,
         "direction_flip_rate": summary.flip_rate,
         "self_flip_rate": summary.self_flip_rate,
+        "floor_source": summary.floor_source,
+        "journal_cross_model": summary.journal_cross_model,
         "trade_decision_flip_rate": summary.trade_flip_rate,
         "clears_the_noise_floor": summary.clears_the_noise_floor,
         "mean_conviction_with": summary.mean_conviction_with,
@@ -496,7 +642,8 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     label = f"{args.model} / {args.effort}" if args.effort else args.model
-    print(f"Asking {len(entries)} context(s) x 2 = {len(entries) * 2} calls "
+    arms = 3 if args.repeat_with_news else 2
+    print(f"Asking {len(entries)} context(s) x {arms} = {len(entries) * arms} calls "
           f"({label})...", file=sys.stderr)
     if args.dry_run:
         print("--dry-run: nothing asked.", file=sys.stderr)
@@ -510,7 +657,8 @@ def main(argv: list[str] | None = None) -> int:
     # path would be firing a whole journal at a rate limit, and a
     # rate-limited context is a lost one where a slow one is only slow.
     workers = args.concurrency if args.base_url else 1
-    pairs, results = ablate(entries, complete, workers)
+    pairs, results = ablate(entries, complete, workers, asked_model=args.model,
+                            repeat_with_news=args.repeat_with_news)
     failures = sum(1 for r in results if r.error)
     summary = summarise(pairs, args.floor, failures)
 

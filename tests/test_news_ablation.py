@@ -44,12 +44,16 @@ def signal(bias=Bias.BULLISH, conviction=0.7, news=0.5) -> LLMSignal:
 
 
 def pair(with_bias=Bias.BULLISH, without_bias=Bias.BULLISH, with_conv=0.7,
-         without_conv=0.7, journalled=Bias.BULLISH) -> na.Ablation:
+         without_conv=0.7, journalled=Bias.BULLISH, repeated=None,
+         asked_model="claude-opus-5", journalled_model="claude-opus-5") -> na.Ablation:
     return na.Ablation(
         ticker="AAPL", ts_utc="2026-09-12T14:00:00+00:00",
         with_news=signal(with_bias, with_conv),
         without_news=signal(without_bias, without_conv),
         journalled=None if journalled is None else signal(journalled),
+        journalled_model=journalled_model,
+        asked_model=asked_model,
+        repeated=None if repeated is None else signal(repeated),
     )
 
 
@@ -167,10 +171,48 @@ def test_a_direction_change_is_the_two_fresh_answers_not_the_journalled_one():
     assert p.self_flipped is True      # the journalled answer disagrees too, separately
 
 
-def test_the_self_flip_rate_is_the_fresh_with_news_answer_against_the_journal():
-    assert pair(with_bias=Bias.BULLISH, journalled=Bias.BULLISH).self_flipped is False
-    assert pair(with_bias=Bias.BEARISH, journalled=Bias.BULLISH).self_flipped is True
-    assert pair(journalled=None).self_flipped is None, "nothing to compare against"
+# --- the noise floor, and what is allowed to stand in for one -------------------
+
+
+def test_the_repeat_is_the_floor_whenever_there_is_one():
+    """Same prompt, same model, same run: nothing between the two answers
+    but the model's own sampling."""
+    assert pair(with_bias=Bias.BULLISH, repeated=Bias.BULLISH).repeat_flipped is False
+    assert pair(with_bias=Bias.BULLISH, repeated=Bias.BEARISH).repeat_flipped is True
+    assert pair().repeat_flipped is None, "no repeat was asked for"
+
+
+def test_the_repeat_beats_the_journal_as_the_floor():
+    """Both available: the repeat wins, because the journalled answer was
+    produced on another day and, on a funnel, often by another model."""
+    p = pair(with_bias=Bias.BULLISH, repeated=Bias.BULLISH, journalled=Bias.BEARISH)
+    assert p.journal_flipped is True and p.repeat_flipped is False
+    assert p.self_flipped is False
+
+
+def test_the_journal_fallback_only_counts_the_same_models_answers():
+    """The funnel writes Haiku on a screened line and the full model on an
+    escalated one. Diffing a fresh Opus answer against Haiku's is a
+    cross-model disagreement, not a noise floor."""
+    same = pair(with_bias=Bias.BEARISH, journalled=Bias.BULLISH,
+                asked_model="claude-opus-5", journalled_model="claude-opus-5")
+    assert same.journal_comparable is True and same.self_flipped is True
+
+    crossed = pair(with_bias=Bias.BEARISH, journalled=Bias.BULLISH,
+                   asked_model="claude-opus-5", journalled_model="claude-haiku-4-5-20251001")
+    assert crossed.journal_comparable is False
+    assert crossed.journal_flipped is None and crossed.self_flipped is None
+
+
+def test_a_dated_snapshot_is_the_same_model_as_its_alias():
+    """The config names an alias; the API answers with the snapshot."""
+    p = pair(asked_model="claude-haiku-4-5", journalled_model="claude-haiku-4-5-20251001")
+    assert p.journal_comparable is True
+
+
+def test_a_candidate_the_journal_never_ran_has_no_fallback_floor_at_all():
+    p = pair(asked_model="openai/gpt-oss-120b", journalled_model="claude-opus-5")
+    assert p.self_flipped is None
 
 
 def test_a_trade_decision_changes_when_a_call_crosses_the_floor_either_way():
@@ -209,9 +251,9 @@ def test_an_ablation_no_bigger_than_the_models_own_wobble_does_not_clear_the_flo
     """Two flips out of four either way: the news moved nothing the model
     was not already moving on its own."""
     pairs = [
-        pair(without_bias=Bias.BEARISH, journalled=Bias.BEARISH),
-        pair(without_bias=Bias.BEARISH, journalled=Bias.BEARISH),
-        pair(), pair(),
+        pair(without_bias=Bias.BEARISH, repeated=Bias.BEARISH),
+        pair(without_bias=Bias.BEARISH, repeated=Bias.BEARISH),
+        pair(repeated=Bias.BULLISH), pair(repeated=Bias.BULLISH),
     ]
     summary = na.summarise(pairs, floor=0.30, failures=0)
     assert summary.flip_rate == pytest.approx(0.5)
@@ -221,12 +263,48 @@ def test_an_ablation_no_bigger_than_the_models_own_wobble_does_not_clear_the_flo
 
 
 def test_an_ablation_bigger_than_the_wobble_clears_it():
-    pairs = [pair(without_bias=Bias.BEARISH) for _ in range(3)] + [pair()]
+    pairs = [pair(without_bias=Bias.BEARISH, repeated=Bias.BULLISH) for _ in range(3)]
+    pairs.append(pair(repeated=Bias.BULLISH))
     summary = na.summarise(pairs, floor=0.30, failures=0)
     assert summary.flip_rate == pytest.approx(0.75)
     assert summary.self_flip_rate == pytest.approx(0.0)
     assert summary.clears_the_noise_floor is True
     assert "changing the call" in na.render(summary, pairs, 0.30, "m")
+
+
+def test_the_summary_names_where_its_floor_came_from():
+    repeats = na.summarise([pair(repeated=Bias.BULLISH)], 0.30, 0)
+    assert repeats.floor_source == "repeat"
+    assert "asked twice" in repeats.floor_label
+
+    journal = na.summarise([pair()], 0.30, 0)
+    assert journal.floor_source == "journal"
+    assert "journalled" in journal.floor_label
+
+
+def test_a_run_with_no_floor_withholds_its_verdict_rather_than_implying_zero():
+    """The failure this guards against: a cross-model comparison inflating
+    the floor until a real effect reads as nothing. With no floor at all the
+    honest output is a refusal, not a number."""
+    pairs = [pair(without_bias=Bias.BEARISH, asked_model="openai/gpt-oss-120b",
+                  journalled_model="claude-opus-5") for _ in range(4)]
+    summary = na.summarise(pairs, floor=0.30, failures=0)
+    assert summary.flip_rate == pytest.approx(1.0)
+    assert summary.floor_source is None and summary.self_flip_rate is None
+    assert summary.clears_the_noise_floor is None
+
+    text = na.render(summary, pairs, 0.30, "openai/gpt-oss-120b")
+    assert "WITHHELD" in text
+    assert "--repeat-with-news" in text
+    assert "NOT MEASURED" in text
+
+
+def test_the_report_says_how_many_journalled_answers_were_the_wrong_model():
+    pairs = [pair(repeated=Bias.BULLISH, journalled_model="claude-haiku-4-5-20251001")
+             for _ in range(3)]
+    summary = na.summarise(pairs, 0.30, 0)
+    assert summary.journal_cross_model == 3
+    assert "came from another model" in na.render(summary, pairs, 0.30, "m")
 
 
 def test_nothing_assessable_is_a_verdict_of_its_own_not_a_zero():
@@ -362,3 +440,57 @@ def test_claude_is_never_asked_concurrently(tmp_path, monkeypatch):
     monkeypatch.setattr(runner, "replay_each", fake_replay_each)
     na.main(["--journal", str(journal), "--model", "m", "--concurrency", "8"])
     assert seen["workers"] == 1
+
+
+def test_the_repeat_arm_asks_each_context_a_third_time_with_the_with_news_prompt():
+    """The third arm must send the WITH-news prompt again -- repeating the
+    blanked one would measure the wrong arm's wobble."""
+    seen: list[str] = []
+
+    def complete(system, user, schema):
+        seen.append("blank" if "- none found" in user else "news")
+        ticker = user.split("TICKER: ", 1)[1].split("\n", 1)[0]
+        return json.dumps({"ticker": ticker, "bias": "BULLISH", "conviction": 0.5, "rationale": "r"})
+
+    pairs, results = na.ablate([entry("AAPL"), entry("MSFT")], complete,
+                               asked_model="m", repeat_with_news=True)
+    assert len(results) == 6
+    assert seen == ["news", "news", "blank", "blank", "news", "news"]
+    assert all(p.repeated is not None for p in pairs)
+
+
+def test_the_repeat_arm_is_off_unless_asked_for():
+    def complete(system, user, schema):
+        ticker = user.split("TICKER: ", 1)[1].split("\n", 1)[0]
+        return json.dumps({"ticker": ticker, "bias": "BULLISH", "conviction": 0.5, "rationale": "r"})
+
+    pairs, results = na.ablate([entry("AAPL")], complete, asked_model="m")
+    assert len(results) == 2 and pairs[0].repeated is None
+
+
+def test_the_journalled_model_rides_on_the_entry():
+    """Without it the report cannot tell a self-comparison from a
+    cross-model one, which is the whole failure this guards against."""
+    line = json.dumps({
+        "ts_utc": "2026-09-12T14:00:00+00:00", "ticker": "AAPL",
+        "context": TickerContext(ticker="AAPL", headlines=HEADLINES).as_dict(),
+        "signal": {"ticker": "AAPL", "bias": "BULLISH", "conviction": 0.7, "rationale": "r"},
+        "usage": {"model": "claude-haiku-4-5-20251001"},
+    })
+    assert next(iter(runner.load_entries([line]))).model == "claude-haiku-4-5-20251001"
+    assert entry("AAPL").model is None, "a line with no usage block says so"
+
+
+def test_main_counts_three_arms_when_repeating(tmp_path, monkeypatch, capsys):
+    journal = tmp_path / "journal.log"
+    journal.write_text(journal_line("AAPL") + "\n", encoding="utf-8")
+    calls = {"n": 0}
+
+    def complete(system, user, schema):
+        calls["n"] += 1
+        return json.dumps({"ticker": "AAPL", "bias": "BULLISH", "conviction": 0.5, "rationale": "r"})
+
+    monkeypatch.setattr(runner, "measured_completer", lambda **kwargs: (complete, []))
+    assert na.main(["--journal", str(journal), "--model", "m", "--repeat-with-news"]) == 0
+    assert calls["n"] == 3
+    assert "1 context(s) x 3 = 3 calls" in capsys.readouterr().err

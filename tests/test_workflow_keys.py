@@ -492,6 +492,41 @@ def test_the_news_ablation_keeps_the_record_stream_off_the_report():
     assert '> "$RUNNER_TEMP/pairs.jsonl" 2> "$RUNNER_TEMP/ablation.txt"' in step["run"]
 
 
+def test_the_news_ablation_resolves_the_same_candidate_key():
+    """One account, one key, whichever spelling it was stored under -- the
+    same chain determinism-check.yml and model-compare.yml resolve, since
+    all three may be pointed at the same non-Claude candidate."""
+    step = _step("news-ablation.yml", "ablate", "Ask each context with the news and without it")
+    expected = " || ".join("secrets.%s" % n for n in llm.SCREENING_KEY_ENV_VARS)
+    assert step["env"]["CANDIDATE_KEY"] == "${{ %s }}" % expected
+
+
+def test_the_news_ablation_asks_claude_without_a_base_url():
+    """An empty workflow_dispatch input is replaced by its declared default,
+    so base_url="" could never mean 'ask Claude'. The provider choice
+    carries that intent, exactly as determinism-check.yml learned to."""
+    wf = yaml.safe_load((ROOT / ".github/workflows/news-ablation.yml").read_text())
+    inputs = (wf.get("on") or wf[True])["workflow_dispatch"]["inputs"]
+    assert inputs["provider"]["default"] == "claude"
+    assert set(inputs["provider"]["options"]) == {"claude", "openai-compatible"}
+
+    run = _step("news-ablation.yml", "ablate", "Ask each context with the news and without it")["run"]
+    assert "--base-url" in run
+    assert "inputs.provider" in run and '!= \'claude\'' not in run
+
+
+def test_the_news_ablation_defaults_to_measuring_its_own_noise_floor():
+    """Without the repeat arm the floor falls back to the journalled answer,
+    which a funnel wrote with a mix of models -- and for a candidate the
+    journal never ran there is no floor at all."""
+    wf = yaml.safe_load((ROOT / ".github/workflows/news-ablation.yml").read_text())
+    inputs = (wf.get("on") or wf[True])["workflow_dispatch"]["inputs"]
+    assert inputs["repeat_with_news"]["default"] is True
+
+    run = _step("news-ablation.yml", "ablate", "Ask each context with the news and without it")["run"]
+    assert "--repeat-with-news" in run
+
+
 def test_the_news_ablation_can_outlast_the_calls_it_makes():
     """Every call is paid for whether or not it is counted, so a timeout
     sized under the default sample would burn money for a truncated answer.
@@ -500,7 +535,7 @@ def test_the_news_ablation_can_outlast_the_calls_it_makes():
     so raising the default without raising the timeout fails this test.
     """
     wf = yaml.safe_load((ROOT / ".github/workflows/news-ablation.yml").read_text())
-    calls = news_ablation.DEFAULT_LIMIT * 2
+    calls = news_ablation.DEFAULT_LIMIT * 3   # the repeat arm is on by default
     # Measured: 100 sequential Opus calls at low effort took ~15 minutes.
     seconds_per_call = 9
     minutes = math.ceil(calls * seconds_per_call / 60)
