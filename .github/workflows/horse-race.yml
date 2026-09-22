@@ -5,8 +5,9 @@ name: horse race
 # Three arms on the same journal lines against the same realised returns:
 # the model as journalled, the time-series-momentum rule in rules/, and a
 # seeded coin flip. Every arm gets the same floor, the same stop and sizing
-# arithmetic, and prices fetched once. The coin flip is the row the other
-# two are really measured against.
+# arithmetic, the same round-trip cost, and prices fetched once and cut to
+# final closes. The coin flip is the row the other two are really measured
+# against, and it is drawn a thousand times to say how wide "chance" is.
 #
 # It runs here for the same boring reason correlations.yml and
 # baseline-compare.yml do: yfinance needs the open internet and a runner
@@ -31,6 +32,9 @@ on:
       equity:
         description: "Account size the position sizing is computed against"
         default: "100000"
+      cost:
+        description: "Cost per side as a fraction of notional, charged to every arm (blank: 0.001)"
+        default: ""
   # Nightly on trading days, after the day's session has a closing bar and
   # after both heartbeat crons (12:35 and 17:35 UTC) have committed the
   # day's journal. This is the "keep measuring" half of the experiment: the
@@ -77,6 +81,7 @@ jobs:
           HORIZON: ${{ inputs.horizon || '3' }}
           FLOOR: ${{ inputs.floor }}
           EQUITY: ${{ inputs.equity || '100000' }}
+          COST: ${{ inputs.cost }}
         run: |
           set -o pipefail
           ARGS="--horizon $HORIZON --equity $EQUITY"
@@ -84,7 +89,11 @@ jobs:
           if [ -n "$FLOOR" ]; then
             ARGS="$ARGS --floor $FLOOR"
           fi
-          python analysis/horse_race.py $ARGS | tee race.txt
+          # Blank means the scorer's own default, 0.10% per side.
+          if [ -n "$COST" ]; then
+            ARGS="$ARGS --cost-per-side $COST"
+          fi
+          python analysis/horse_race.py --per-trade $ARGS | tee race.txt
 
       - name: Publish to the run summary
         if: always()

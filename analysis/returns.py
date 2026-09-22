@@ -31,6 +31,7 @@ import logging
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Optional, Protocol, Sequence
+from zoneinfo import ZoneInfo
 
 log = logging.getLogger(__name__)
 
@@ -48,6 +49,18 @@ SESSION_CLOSE_UTC = time(20, 0)
 #: Calendar days of history fetched before the first signal, so there is always
 #: a bar to anchor on even across a long weekend or holiday.
 HISTORY_LEAD_DAYS = 10
+
+#: The exchange's own clock, for deciding whether today's bar is a final
+#: close yet. ``SESSION_CLOSE_UTC`` above is the deliberately-early UTC
+#: approximation the entry rule uses; finality needs the real thing, because
+#: a bar that is not final yet is an intraday price wearing a close's label.
+MARKET_TZ = ZoneInfo("America/New_York")
+SESSION_CLOSE_LOCAL = time(16, 0)
+#: How long after the bell before the day's bar is trusted as final: the
+#: closing auction prints and the vendor's bar settles in the minutes after
+#: 16:00, and a scorer that reads it at 16:01 can read a number that will
+#: still change.
+FINAL_BAR_GRACE = timedelta(minutes=30)
 
 STATUS_OK = "ok"
 STATUS_PENDING = "pending"
@@ -88,6 +101,39 @@ class ReturnLookup:
 
 class PriceSource(Protocol):
     def closes(self, ticker: str, start: date, end: date) -> PriceSeries: ...
+
+
+# --------------------------------------------------------------------------- #
+# Finality -- a bar is a close only once the session that made it is over
+# --------------------------------------------------------------------------- #
+
+
+def last_final_session(now: datetime) -> date:
+    """The latest calendar date whose daily bar is a final close at ``now``.
+
+    A vendor hands back a bar for today from the first trade of the morning,
+    and keeps rewriting it until the close. Scored at 14:30 New York it is an
+    intraday print; scored at 18:00 it is the close. Two runs of the same
+    scorer over the same journal then disagree about trades that are, on
+    paper, "resolved" -- which is exactly what happened when the same 46
+    trades scored 37.0% at 18:27 UTC and 32.6% at 21:05 UTC on the same day.
+    Every price source truncates to this date, so a run before the close
+    sees yesterday as the last bar and calls the trade pending instead.
+    """
+    if now.tzinfo is None:
+        raise ValueError("now must be timezone-aware")
+    local = now.astimezone(MARKET_TZ)
+    settled = datetime.combine(local.date(), SESSION_CLOSE_LOCAL, tzinfo=MARKET_TZ) + FINAL_BAR_GRACE
+    return local.date() if local >= settled else local.date() - timedelta(days=1)
+
+
+def final_bars(
+    bars: Sequence[tuple[date, float]], through: Optional[date]
+) -> list[tuple[date, float]]:
+    """``bars`` with anything dated after ``through`` dropped. ``None`` keeps all."""
+    if through is None:
+        return list(bars)
+    return [bar for bar in bars if bar[0] <= through]
 
 
 # --------------------------------------------------------------------------- #
@@ -171,16 +217,22 @@ def _first_bar_index(
 
 
 class YFinancePriceSource:
-    """Daily closes from yfinance, one fetch per ticker, cached in memory."""
+    """Daily closes from yfinance, one fetch per ticker, cached in memory.
 
-    def __init__(self) -> None:
+    ``final_through`` is the last date whose bar is trusted as a final close
+    (see ``last_final_session``); anything later is dropped before it is
+    cached, so no caller can be handed an intraday price as a close.
+    """
+
+    def __init__(self, final_through: Optional[date] = None) -> None:
         self._cache: dict[str, PriceSeries] = {}
+        self.final_through = final_through
 
     def closes(self, ticker: str, start: date, end: date) -> PriceSeries:
         cached = self._cache.get(ticker)
         if cached is not None:
             return cached
-        series = PriceSeries(ticker, self._fetch(ticker, start, end))
+        series = PriceSeries(ticker, final_bars(self._fetch(ticker, start, end), self.final_through))
         self._cache[ticker] = series
         return series
 
