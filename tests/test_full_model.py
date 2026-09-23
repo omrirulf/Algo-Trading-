@@ -208,3 +208,146 @@ def test_asking_the_endpoint_anonymously_is_refused():
     with pytest.raises(LLMError, match="FULL_MODEL_API_KEY"):
         _with(settings, hb.full_model_provider)
 
+
+
+# --- the transport retry, and what bounds it -------------------------------
+
+
+def test_a_timed_out_call_is_asked_once_more_on_a_shorter_ceiling():
+    """Not retried at all until 23 September, on an argument the first
+    production cycle disproved: the worst case was taken to be every call
+    running to the 300s ceiling, which left no room to ask twice. The measured
+    stage was 32 minutes, not 100, and the three tickers lost that day were
+    lost to exactly this."""
+    seen: list[float] = []
+    attempts = {"n": 0}
+
+    def flaky(request):
+        attempts["n"] += 1
+        if attempts["n"] == 1:
+            raise httpx.ReadTimeout("timed out", request=request)
+        return httpx.Response(200, json=_body())
+
+    def client(timeout):
+        seen.append(timeout)
+        return httpx.Client(transport=httpx.MockTransport(flaky), base_url="http://local")
+
+    provider = OpenAICompatibleProvider(
+        "http://local/v1", "openai/gpt-oss-120b", api_key="k", sleep=lambda _: None,
+        timeout=llm.FULL_MODEL_TIMEOUT_SECONDS,
+    )
+    import unittest.mock
+    with unittest.mock.patch.object(llm, "new_http_client", client):
+        out = provider.complete_detailed("s", "u", SCHEMA)
+
+    assert json.loads(out.text)["ticker"] == "AAPL"
+    assert seen == [llm.FULL_MODEL_TIMEOUT_SECONDS, llm.TRANSPORT_RETRY_TIMEOUT_SECONDS]
+
+
+def test_the_shortened_ceiling_does_not_leak_into_the_next_ticker():
+    """A provider is reused across the watchlist. One slow call must not
+    quietly shorten every call after it."""
+    def always_timeout(request):
+        raise httpx.ReadTimeout("timed out", request=request)
+
+    seen: list[float] = []
+
+    def client(timeout):
+        seen.append(timeout)
+        return httpx.Client(transport=httpx.MockTransport(always_timeout), base_url="http://local")
+
+    provider = OpenAICompatibleProvider(
+        "http://local/v1", "m", api_key="k", sleep=lambda _: None,
+        timeout=llm.FULL_MODEL_TIMEOUT_SECONDS,
+    )
+    import unittest.mock
+    with unittest.mock.patch.object(llm, "new_http_client", client):
+        for _ in range(2):
+            with pytest.raises(LLMError, match="unreachable"):
+                provider.complete_detailed("s", "u", SCHEMA)
+
+    # Two tickers, each asked twice, and each starting from the full ceiling.
+    assert seen == [llm.FULL_MODEL_TIMEOUT_SECONDS, llm.TRANSPORT_RETRY_TIMEOUT_SECONDS] * 2
+
+
+def test_a_transport_failure_is_never_asked_a_third_time():
+    """It is the most expensive failure there is -- billed for whatever it
+    generated before the socket gave up -- so it gets one more ask and no
+    more, however many status attempts remain."""
+    attempts = {"n": 0}
+
+    def always_timeout(request):
+        attempts["n"] += 1
+        raise httpx.ReadTimeout("timed out", request=request)
+
+    import unittest.mock
+    provider = OpenAICompatibleProvider(
+        "http://local/v1", "m", api_key="k", sleep=lambda _: None,
+    )
+    with unittest.mock.patch.object(
+        llm, "new_http_client",
+        lambda timeout: httpx.Client(transport=httpx.MockTransport(always_timeout),
+                                     base_url="http://local"),
+    ):
+        with pytest.raises(LLMError, match="unreachable"):
+            provider.complete_detailed("s", "u", SCHEMA)
+
+    assert attempts["n"] == llm.TRANSPORT_ATTEMPTS
+    assert llm.TRANSPORT_ATTEMPTS < llm.HTTP_ATTEMPTS
+
+
+# --- the stage budget, which is what makes that retry affordable -----------
+
+
+def test_a_ticker_the_budget_catches_fails_the_model_stage_and_nothing_else():
+    """The honest place to bound the cycle's worst case. The old bound was
+    arithmetic -- rounds times the per-call ceiling -- which described a cycle
+    that was already broken, and was used to forbid the retry above."""
+    asked: list[str] = []
+
+    def slow(system, user, schema):
+        asked.append(_ticker(user))
+        return "{}"
+
+    # A controlled clock rather than a real wait: the budget is set, and then
+    # the stage is told more than that has passed before the first ticker.
+    ticks = iter([0.0, 999.0, 999.0, 999.0])
+    import unittest.mock
+    prepared = [_prepared("AAPL"), _prepared("MSFT")]
+    with unittest.mock.patch.object(hb.time, "monotonic", lambda: next(ticks)):
+        answers = hb.batch_answers(
+            tuple(prepared), slow, provider=_NoBatch(), max_workers=1,
+            stage_budget_seconds=60.0,
+        )
+    assert asked == [], "a spent budget still asked"
+    for ticker in ("AAPL", "MSFT"):
+        assert isinstance(answers[ticker], LLMError)
+        assert "budget" in str(answers[ticker])
+
+
+def test_no_budget_means_no_deadline():
+    """Every other caller -- the screen, the Anthropic fallback -- passes
+    nothing and must be unaffected."""
+    asked: list[str] = []
+
+    def quick(system, user, schema):
+        asked.append(_ticker(user))
+        return "{}"
+
+    hb.batch_answers(tuple([_prepared("AAPL")]), quick, provider=_NoBatch(), max_workers=1)
+    assert asked == ["AAPL"]
+
+
+class _NoBatch:
+    """A provider with no submit_batch, so batch_answers goes live."""
+
+
+def _prepared(ticker: str):
+    return hb.PreparedTicker(
+        ticker=ticker, context=None, system_prompt="sys",
+        user_prompt=f"TICKER: {ticker}",
+    )
+
+
+def _ticker(user_prompt: str) -> str:
+    return user_prompt.split("TICKER:", 1)[1].strip()

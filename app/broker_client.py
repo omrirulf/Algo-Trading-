@@ -572,9 +572,28 @@ class AlpacaPaperBroker:
         try:
             order = self._client.replace_order_by_id(order_id, request)
         except Exception as exc:  # noqa: BLE001
-            if resizing and _is_advanced_order_qty_rejection(exc):
+            # NOT gated on `resizing`, though it was until 23 Sep 2026. The
+            # same 42210000 family refuses a price-only replace with "order
+            # chain not fully replaced", and TLT hit exactly that: the
+            # rejection was recognised, the fallback was skipped because
+            # nothing was being resized, the error propagated, and the
+            # position finished the day with no stop. An advanced order that
+            # will not take a replacement needs cancelling and replacing
+            # whether or not the quantity is what it objected to.
+            if _is_advanced_order_qty_rejection(exc):
                 return self._resize_by_replacing_the_order(order_id, qty, stop_price, exc)
             raise BrokerError(f"replace_order failed for {order_id}: {exc}") from exc
+
+        # The replacement is live, but the order it superseded is not
+        # necessarily gone, and until it is it goes on reserving the shares it
+        # covered. Every caller of this method follows it immediately with
+        # close_position_partially for the shares the resize was meant to
+        # free -- "protect first, then sell" -- so without this wait that
+        # ordering is nominal rather than real. TIP and UUP on 23 Sep 2026:
+        # the stop was resized down, the trim was refused for shares the
+        # position plainly held (available 0, held_for_orders the whole
+        # position), and both ended the day unprotected.
+        self._wait_until_terminal(str(order.symbol).upper(), order_id)
         side = getattr(order, "side", "")
         returned_qty = getattr(order, "qty", None)
         return StopOrder(
@@ -657,7 +676,7 @@ class AlpacaPaperBroker:
         )
         # The cancel is accepted before it takes effect, and until it does the
         # shares are still reserved by the order being cancelled. Wait for it.
-        self._wait_for_cancel(symbol, order_id)
+        self._wait_until_terminal(symbol, order_id)
         try:
             return self.submit_stop_order(symbol, int(qty), side, stop_price)
         except Exception as exc:  # noqa: BLE001
@@ -671,7 +690,7 @@ class AlpacaPaperBroker:
                     "for the cancelled order to release them and trying once more",
                     symbol, exc,
                 )
-                self._wait_for_cancel(symbol, order_id)
+                self._wait_until_terminal(symbol, order_id)
                 try:
                     return self.submit_stop_order(symbol, int(qty), side, stop_price)
                 except Exception as retry_exc:  # noqa: BLE001
@@ -682,8 +701,8 @@ class AlpacaPaperBroker:
                 self._naked_message(symbol, order_id, qty, side, stop_price, exc)
             ) from exc
 
-    def _wait_for_cancel(self, symbol: str, order_id: str) -> bool:
-        """Block until a cancelled order is terminal, or the patience runs out.
+    def _wait_until_terminal(self, symbol: str, order_id: str) -> bool:
+        """Block until a superseded order is terminal, or the patience runs out.
 
         Alpaca's cancel returns before the order is actually gone, and a stop
         that is still winding down goes on reserving the shares it covered.
@@ -739,10 +758,32 @@ class AlpacaPaperBroker:
         if qty < 1 or int(qty) != qty:
             raise BrokerError(f"qty must be a positive whole number, got {qty}")
         symbol = ticker.strip().upper()
+        request = ClosePositionRequest(qty=str(int(qty)))
         try:
-            order = self._client.close_position(symbol, ClosePositionRequest(qty=str(int(qty))))
+            order = self._client.close_position(symbol, request)
         except Exception as exc:  # noqa: BLE001
-            raise BrokerError(f"close_position failed for {symbol}: {exc}") from exc
+            # "Those shares are already spoken for" is the one refusal here
+            # worth a second ask. The caller has just resized the stop to free
+            # exactly these shares, and the order it superseded may still have
+            # been holding them; replace_stop_order now waits for that, and
+            # this is the belt to its braces, because the reservation can also
+            # be let go a moment after the order reports terminal. A refusal
+            # placed nothing, so asking again cannot double the exit.
+            if not _is_insufficient_qty_rejection(exc):
+                raise BrokerError(f"close_position failed for {symbol}: {exc}") from exc
+            logger.warning(
+                "%s: %d share(s) still reserved by another order; waiting %.1fs "
+                "and asking once more", symbol, int(qty),
+                CANCEL_SETTLE_ATTEMPTS * CANCEL_SETTLE_SECONDS,
+            )
+            time.sleep(CANCEL_SETTLE_ATTEMPTS * CANCEL_SETTLE_SECONDS)
+            try:
+                order = self._client.close_position(symbol, request)
+            except Exception as again:  # noqa: BLE001
+                raise BrokerError(
+                    f"close_position failed for {symbol} ({exc}), and again after "
+                    f"waiting for the shares to be released: {again}"
+                ) from again
         return str(getattr(order, "id", "") or "")
 
     def submit_stop_order(self, ticker: str, qty: int, side: str, stop_price: float) -> StopOrder:
