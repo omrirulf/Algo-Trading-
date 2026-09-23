@@ -114,6 +114,19 @@ The pairs are kept as a 90-day artifact. Most of a run's contexts have not
 aged past the horizon yet, so a later re-score costs nothing rather than
 paying for the same calls twice.
 
+That re-score is its own workflow (**Actions → rescore pairs**), given the
+run id whose pairs to read. It calls no model and holds no key: the answers
+were paid for once, and the only token it uses is the run's own read-only
+`GITHUB_TOKEN`, which is what lets one run read another's artifact. It reads
+`model-compare`'s pairs the same way, since both write the same
+`{"_side", "line"}` records.
+
+Worth knowing when reading a fresh run's returns section: `--limit` takes the
+**most recent** contexts, which are exactly the ones the market has not
+answered yet. The 100-context run of 22 September scored 0 of 56 lines on
+either side on the day. That is the expected shape, not a fault — it is why
+the artifact exists.
+
 ## What it costs
 
 Measured from the journal's own `usage` blocks, not estimated. With the

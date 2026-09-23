@@ -13,7 +13,11 @@ from analysis.returns import PriceSeries
 from learn import fit_weights as fw
 from orchestrator import blend as applier
 
-MODEL = "claude-opus-5"
+# The journal lines these fixtures write must claim whatever model
+# production actually runs: the trainer fits per model and discards
+# every line another one wrote, so a pinned name here would test the
+# discard path by accident the next time the model changes.
+from orchestrator.llm import MODEL  # noqa: E402
 START = date(2026, 6, 1)
 
 

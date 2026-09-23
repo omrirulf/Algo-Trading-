@@ -511,3 +511,13 @@ def test_the_registered_parameters_are_the_ones_the_code_runs():
     assert insider_buying.WINDOW_DAYS == 180 and insider_buying.MIN_DISTINCT_BUYERS == 2
     assert "180 calendar days" in text and "two or more distinct insiders" in text
     assert [pair[1] for pair in horse_race.PAIRED] == ["momentum", "hybrid"]
+
+    # The model arm is whoever production answers with, so the file has to
+    # name the model the code actually runs. Amendment 1 exists because that
+    # changed; a silent change is the failure this line catches.
+    from orchestrator import llm
+
+    assert llm.MODEL in text, (
+        f"the pre-registration does not name {llm.MODEL}; the model arm changed "
+        "without an amendment"
+    )

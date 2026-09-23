@@ -14,7 +14,7 @@ never re-scored under a changed rule.
 | --- | --- |
 | Registered on | 2026-09-22 (the merge of the pull request that added this file) |
 | Journal starts | 2026-09-15 |
-| First entry day counted | the first entry day after the registration date. Days before it are reported but do not count toward the minimum sample or the decision: they were seen before the rule was written. |
+| First entry day counted | the first entry day after **2026-09-23**, the date the `model` arm changed (Amendment 1). Days before it are reported but do not count toward the minimum sample or the decision: before 2026-09-22 the rule was not yet written, and on 2026-09-22 a different model was answering. |
 
 ## 1. The question
 
@@ -27,6 +27,8 @@ price, on the same lines, over the same days, after the same costs?
 | Arm | Role | Where | Reads |
 | --- | --- | --- | --- |
 | `model` | incumbent | `logs/signal_journal.log`, as written | everything in the prompt |
+
+The `model` arm is whatever production actually answered with, which is the point of it and also its one fragility: changing the production model changes the contestant. Since 2026-09-23 that is `openai/gpt-oss-120b` at high reasoning, asked on every name. Until 2026-09-22 it was a funnel — `claude-haiku-4-5` screening, `claude-opus-5` on what it escalated — so the arm's own history is two different answerers and only the later one counts. See Amendment 1.
 | `momentum` | main comparator | `rules/momentum.py` | `TechnicalSnapshot` only |
 | `hybrid` | second main comparator | `rules/hybrid.py` | `TechnicalSnapshot` + the line's own `news_score` |
 | `random` | floor | `rules/control.py`, 1000 seeds | nothing |
@@ -62,9 +64,10 @@ Parameters are fixed here and will not be tuned:
 ### The hybrid is not model-free
 
 The hybrid's `news_score` is the one the journal carries for the line, and
-that number comes from the **current model calls**: Opus on lines the screen
-escalated, Haiku on lines the screen ended. It is a mix, decided by the
-screen's outcome, and the hybrid is tested on that mix. Two consequences:
+that number comes from the **current model calls**. Until 2026-09-22 that
+was a mix decided by the screen's outcome — Opus on lines the screen
+escalated, Haiku on lines it ended. Since 2026-09-23 it is
+`openai/gpt-oss-120b` on every line. Two consequences:
 
 1. If the hybrid is chosen, production **still needs a daily news-scoring
    call**. The saving is the full-model call on escalated lines, not the
@@ -72,6 +75,13 @@ screen's outcome, and the hybrid is tested on that mix. Two consequences:
 2. A cheaper news-scoring model may score the same headlines differently
    from the mix tested here. Choosing the hybrid on this race's numbers does
    not license swapping the scorer without a new comparison.
+
+The second of those has already happened: Amendment 1 swapped the scorer. So
+the hybrid arm's history is split on the same date as the `model` arm's and
+for the same reason, and only the days after 2026-09-23 count. `momentum`,
+`random` and `insiders` read nothing a model wrote, so their histories are
+continuous — but the primary metric is a paired difference against `model`,
+which is not, so the restart is the whole race's.
 
 ## 3. The primary metric
 
@@ -154,4 +164,4 @@ registration, marked as such. Reading it is allowed. Acting on it is not.
 
 | Date | Kind | Reason |
 | --- | --- | --- |
-| (none) | | |
+| 2026-09-23 | **New registration of the `model` arm** (not a bug fix) | The owner moved production off Claude: `SCREENING_ENABLED` off, and the full model from the `claude-haiku-4-5` → `claude-opus-5` funnel to `openai/gpt-oss-120b` at high reasoning on every name, for cost (~$1.39 a cycle to ~$0.20). Section 7 allows only bug fixes, and this is not one — it replaces the contestant. The metric, the sample size and the decision rule are unchanged. What changed is who the `model` arm is — and, with it, the `news_score` the `hybrid` arm reads, which comes from the same calls (section 2, "The hybrid is not model-free"). `momentum`, `random` and `insiders` are untouched. **The 60-day count therefore restarts from 2026-09-23.** The 2026-09-22 lines stay in the journal and in the printed tables, marked pre-registration, and cannot be added to the new model's days: a mean over two different models is a mean over neither. |

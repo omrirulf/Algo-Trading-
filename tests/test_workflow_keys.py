@@ -15,6 +15,7 @@ import math
 import re
 from pathlib import Path
 
+import pytest
 import yaml
 
 from replay import news_ablation
@@ -541,4 +542,132 @@ def test_the_news_ablation_can_outlast_the_calls_it_makes():
     minutes = math.ceil(calls * seconds_per_call / 60)
     assert wf["jobs"]["ablate"]["timeout-minutes"] >= minutes * 2, (
         f"{calls} calls need about {minutes} minutes; leave room for a slower model"
+    )
+
+
+def test_the_rescore_workflow_calls_no_model_and_holds_no_key():
+    """It re-reads answers that were already paid for. A key wired in here
+    would turn a free re-read into a second bill for the same calls -- and
+    the whole reason this workflow exists is not to pay twice."""
+    text = (ROOT / ".github/workflows/rescore-pairs.yml").read_text()
+    assert "secrets." not in text, "rescore-pairs must stay credential-free"
+
+    wf = yaml.safe_load(text)
+    # The only token is the run's own read-only GITHUB_TOKEN, which is what
+    # lets one run read another run's artifact.
+    assert wf["permissions"] == {"contents": "read", "actions": "read"}
+    for step in wf["jobs"]["rescore"]["steps"]:
+        for name in (step.get("env") or {}):
+            assert "ALPACA" not in name.upper(), name
+            assert "WEBHOOK" not in name.upper(), name
+            assert "API_KEY" not in name.upper(), name
+
+
+def test_the_rescore_workflow_reads_the_shape_both_producers_write():
+    """news-ablation and model-compare both emit {"_side", "line"} records
+    and both keep them for 90 days. If either stops, this stops working."""
+    for name in ("news-ablation.yml", "model-compare.yml"):
+        wf = yaml.safe_load((ROOT / f".github/workflows/{name}").read_text())
+        job = next(iter(wf["jobs"].values()))
+        saved = [s for s in job["steps"] if "upload-artifact" in str(s.get("uses", ""))]
+        assert saved, f"{name} no longer saves its pairs"
+        assert saved[0]["with"]["retention-days"] == 90
+        assert "pairs" in saved[0]["with"]["name"]
+
+
+def _rescore_splitter() -> str:
+    """The python heredoc the workflow runs, lifted out so it can be tested."""
+    run = _step("rescore-pairs.yml", "rescore", "Score each side against what the market did")["run"]
+    # YAML strips the block scalar's common indentation before bash -- and
+    # before this -- so the heredoc arrives already at column zero.
+    return run.split("python - <<'SPLIT'\n", 1)[1].split("\nSPLIT", 1)[0]
+
+
+def test_the_rescore_splitter_refuses_a_side_name_that_is_a_path(tmp_path, monkeypatch):
+    """The side name comes out of a downloaded artifact, so it is data. Used
+    unchecked it is the filename the splitter opens for writing, and an
+    artifact naming a side '../../analysis/score_journal' would have this
+    workflow overwrite the repository it is scoring with."""
+    pairs = tmp_path / "pairs"
+    pairs.mkdir()
+    (pairs / "pairs.jsonl").write_text(
+        '{"_side": "../../../etc/passwd", "line": {"ticker": "SPY"}}\n'
+    )
+    monkeypatch.setenv("RUNNER_TEMP", str(tmp_path))
+    with pytest.raises(SystemExit) as raised:
+        exec(compile(_rescore_splitter(), "<splitter>", "exec"), {"__name__": "__main__"})
+    assert "refusing side name" in str(raised.value)
+
+
+def test_the_rescore_splitter_writes_one_file_per_side(tmp_path, monkeypatch):
+    """Both producers' artifacts are read the same way, and the side names
+    are discovered rather than listed here: the ablation writes with-news
+    and without-news, model compare writes candidate and incumbent."""
+    pairs = tmp_path / "pairs"
+    pairs.mkdir()
+    (pairs / "pairs.jsonl").write_text(
+        '{"_side": "with-news", "line": {"ticker": "SPY"}}\n'
+        "\n"
+        '{"_side": "without-news", "line": {"ticker": "SPY"}}\n'
+        '{"_side": "with-news", "line": {"ticker": "QQQ"}}\n'
+    )
+    monkeypatch.setenv("RUNNER_TEMP", str(tmp_path))
+    exec(compile(_rescore_splitter(), "<splitter>", "exec"), {"__name__": "__main__"})
+    assert (tmp_path / "sides.txt").read_text().split() == ["with-news", "without-news"]
+    assert (tmp_path / "side-with-news.jsonl").read_text().count("\n") == 2
+    assert (tmp_path / "side-without-news.jsonl").read_text().count("\n") == 1
+
+
+def test_the_cycle_is_handed_the_full_model_s_key():
+    """A secret that is never passed to the step is a secret the cycle cannot
+    read -- the lesson that left four source keys unused until 18 September.
+
+    It costs more here than it did there. An unreadable screening key only
+    loses the saving; an unreadable full-model key fails every ticker's model
+    stage, because the screen that used to stand behind a failure is off.
+    """
+    cycle = _step("heartbeat.yml", "cycle", "Run one cycle")["env"]
+    assert "FULL_MODEL_API_KEY" in cycle
+    assert "full_model_api_key" in Settings.model_fields
+
+
+def test_the_full_model_key_accepts_the_names_it_may_already_be_stored_under():
+    """Same collapsing chain as the screen, for the same reason: a key stored
+    under the name it was first pasted in as is otherwise silent."""
+    cycle = _step("heartbeat.yml", "cycle", "Run one cycle")["env"]
+    for name in ("FULL_MODEL_API_KEY", "DEEPINFRA_API_KEY", *llm.SCREENING_KEY_ENV_VARS):
+        assert f"secrets.{name}" in cycle["FULL_MODEL_API_KEY"], name
+
+
+def test_the_cycle_can_outlast_the_calls_it_has_to_make():
+    """There is no batch on an OpenAI-compatible endpoint, so the full-model
+    stage is the whole watchlist asked live. Its worst case is arithmetic --
+    rounds times the per-call ceiling -- and it has to fit the job's clock
+    alongside the context gathering, or the cycle is killed having traded
+    nothing and recorded nothing.
+
+    Derived from the constants rather than typed here, so widening the
+    watchlist, lengthening the timeout or narrowing the concurrency fails
+    this test instead of failing a cycle.
+    """
+    import math
+
+    from config import settings as _cfg
+
+    if not llm.MODEL_BASE_URL:
+        pytest.skip("the Anthropic path batches; BATCH_DEADLINE_SECONDS sizes it instead")
+
+    names = len([t for t in _cfg.get_settings().watchlist.split(",") if t.strip()])
+    rounds = math.ceil(names / _cfg.FULL_MODEL_MAX_CONCURRENCY)
+    worst_minutes = rounds * llm.FULL_MODEL_TIMEOUT_SECONDS / 60
+    # Measured on 18-22 September: the cycle spends about 42 minutes gathering
+    # context before it asks anything.
+    gathering = 42
+
+    wf = yaml.safe_load((ROOT / ".github/workflows/heartbeat.yml").read_text())
+    clock = wf["jobs"]["cycle"]["timeout-minutes"]
+    assert clock >= worst_minutes + gathering, (
+        f"{names} names {_cfg.FULL_MODEL_MAX_CONCURRENCY} at a time is {rounds} rounds "
+        f"of up to {llm.FULL_MODEL_TIMEOUT_SECONDS:.0f}s = {worst_minutes:.0f} min, "
+        f"plus ~{gathering} min gathering context, against a {clock} min clock"
     )

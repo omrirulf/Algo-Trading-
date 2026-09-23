@@ -393,24 +393,62 @@ def test_other_bad_requests_are_not_swallowed_as_fallback_problems():
 # --------------------------------------------------------------------------- #
 
 
-def test_heartbeat_call_llm_uses_the_configured_key(monkeypatch):
+def test_heartbeat_call_llm_asks_the_endpoint_with_the_configured_key(monkeypatch):
+    """The OpenAI-compatible path: which model and where are constants, the
+    token is the one thing that comes from settings."""
+    seen = {}
+
+    class FakeProvider:
+        def __init__(self, base_url, model, api_key="", timeout=None, **kw):
+            seen.update(base_url=base_url, model=model, key=api_key, timeout=timeout)
+
+        def complete_detailed(self, system_prompt, user_prompt, json_schema,
+                              model=None, effort=None, reasoning=True):
+            seen.update(prompts=(system_prompt, user_prompt), asked=model, effort=effort)
+            return json.dumps(VALID_SIGNAL)
+
+    monkeypatch.setattr(hb, "OpenAICompatibleProvider", FakeProvider)
+    monkeypatch.setattr(
+        hb, "get_settings",
+        lambda: Settings(full_model_api_key="k", _env_file=None),
+    )
+
+    raw = hb.call_llm("sys", "user", hb.SIGNAL_JSON_SCHEMA)
+    assert json.loads(raw) == VALID_SIGNAL
+    assert seen["key"] == "k"
+    assert seen["base_url"] == llm.MODEL_BASE_URL
+    assert seen["model"] == llm.MODEL and seen["asked"] == llm.MODEL
+    assert seen["effort"] == llm.MODEL_EFFORT
+    assert seen["timeout"] == llm.FULL_MODEL_TIMEOUT_SECONDS
+    assert seen["prompts"] == ("sys", "user")
+
+
+def test_heartbeat_call_llm_falls_back_to_anthropic_when_no_base_url(monkeypatch):
+    """Clearing MODEL_BASE_URL is the whole way back to Claude, and it must
+    take the key with it: the Anthropic path has never read the other token."""
     seen = {}
 
     class FakeProvider:
         def __init__(self, api_key, client=None):
             seen["key"] = api_key
 
-        def complete_detailed(self, system_prompt, user_prompt, json_schema):
-            seen["prompts"] = (system_prompt, user_prompt)
+        def complete_detailed(self, system_prompt, user_prompt, json_schema,
+                              model=None, effort=None, reasoning=True):
+            seen.update(prompts=(system_prompt, user_prompt), effort=effort)
             return json.dumps(VALID_SIGNAL)
 
+    monkeypatch.setattr(hb, "MODEL_BASE_URL", "")
     monkeypatch.setattr(hb, "AnthropicSignalProvider", FakeProvider)
-    monkeypatch.setattr(hb, "get_settings", lambda: Settings(anthropic_api_key="k", _env_file=None))
+    monkeypatch.setattr(
+        hb, "get_settings",
+        lambda: Settings(anthropic_api_key="k", _env_file=None),
+    )
 
-    raw = hb.call_llm("sys", "user", hb.SIGNAL_JSON_SCHEMA)
-    assert json.loads(raw) == VALID_SIGNAL
+    assert json.loads(hb.call_llm("sys", "user", hb.SIGNAL_JSON_SCHEMA)) == VALID_SIGNAL
     assert seen["key"] == "k"
-    assert seen["prompts"] == ("sys", "user")
+    # No effort: that vocabulary belongs to the other endpoint, and Claude's
+    # own depth is llm.EFFORT inside the provider.
+    assert seen["effort"] is None
 
 
 def test_full_cycle_posts_the_signal_the_model_returned(monkeypatch):

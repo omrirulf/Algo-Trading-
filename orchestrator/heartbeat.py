@@ -56,7 +56,10 @@ from config.settings import get_settings  # noqa: E402
 from orchestrator import blend, context, flows, journal  # noqa: E402
 from orchestrator.context import TickerContext  # noqa: E402
 from orchestrator.llm import (  # noqa: E402
+    FULL_MODEL_TIMEOUT_SECONDS,
     MODEL,
+    MODEL_BASE_URL,
+    MODEL_EFFORT,
     SCREENING_ENABLED,
     SCREENING_MODEL,
     AnthropicSignalProvider,
@@ -496,16 +499,68 @@ def screen_signal(system_prompt: str, user_prompt: str, json_schema: dict) -> Co
     )
 
 
+def full_model_provider() -> SignalProvider:
+    """Whoever answers the question that decides what is traded.
+
+    ``MODEL_BASE_URL`` blank is the historical path: Anthropic, with the Batch
+    API and its half price. Set, it is an OpenAI-compatible endpoint, asked a
+    ticker at a time because there is no batch to submit.
+
+    The base URL and the model name are module constants rather than settings
+    -- see ``orchestrator.llm.MODEL_BASE_URL`` for why -- so the only thing
+    read from the environment here is the bearer token. A base URL with no
+    token is refused at the front of the cycle instead of once per ticker: an
+    endpoint answering 401 eighty times is a session lost quietly, and the
+    screen is no longer behind it to catch that.
+    """
+    settings = get_settings()
+    if not MODEL_BASE_URL:
+        return AnthropicSignalProvider(settings.anthropic_api_key)
+    if not settings.full_model_api_key:
+        raise LLMError(
+            f"MODEL_BASE_URL is {MODEL_BASE_URL!r} but FULL_MODEL_API_KEY is empty; "
+            "the endpoint that decides what is traded would be asked anonymously"
+        )
+    return OpenAICompatibleProvider(
+        base_url=MODEL_BASE_URL,
+        model=MODEL,
+        api_key=settings.full_model_api_key,
+        timeout=FULL_MODEL_TIMEOUT_SECONDS,
+    )
+
+
+def full_model_effort() -> str | None:
+    """How hard MODEL is allowed to think, or ``None`` to say nothing.
+
+    Only the OpenAI-compatible path reads it. The Anthropic path has its own
+    ``EFFORT``, a different vocabulary reaching a different field, and sending
+    this one there would silently ask for something else.
+    """
+    if not MODEL_BASE_URL:
+        return None
+    effort = (MODEL_EFFORT or "").strip().lower()
+    if not effort:
+        return None
+    if effort not in SCREENING_EFFORTS:
+        raise LLMError(
+            f"MODEL_EFFORT={MODEL_EFFORT!r} is not one of {sorted(SCREENING_EFFORTS)}"
+        )
+    return effort
+
+
 def call_llm(system_prompt: str, user_prompt: str, json_schema: dict) -> Completion:
-    """Claude's raw JSON, plus what the call cost.
+    """The full model's raw JSON, plus what the call cost.
 
     Returns the whole ``Completion`` rather than just the text so the journal
     can record measured token counts. Cost used to be an estimate multiplied
     by a guessed output length, which is a poor basis for deciding how many
     tickers to watch.
     """
-    provider = AnthropicSignalProvider(get_settings().anthropic_api_key)
-    return provider.complete_detailed(system_prompt, user_prompt, json_schema)
+    provider = full_model_provider()
+    effort = full_model_effort()
+    return provider.complete_detailed(
+        system_prompt, user_prompt, json_schema, model=MODEL, effort=effort,
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -1260,6 +1315,7 @@ def batch_answers(
     model: str | None = None,
     reasoning: bool = True,
     deadline_seconds: float = cfg.BATCH_DEADLINE_SECONDS,
+    max_workers: int = cfg.SCREEN_MAX_CONCURRENCY,
 ) -> dict[str, "Completion | BaseException"]:
     """Ask a whole stage at half price, and pay full price for the stragglers.
 
@@ -1338,7 +1394,7 @@ def batch_answers(
     # watchlist at it at once there trades slow tickers for rate-limited ones,
     # and a rate-limited ticker is lost where a slow one is only late. That
     # stage already has batching as its answer to latency.
-    workers = 1 if collected else min(cfg.SCREEN_MAX_CONCURRENCY, len(needs_live))
+    workers = 1 if collected else min(max_workers, len(needs_live))
     if workers > 1:
         log.info("asking %d ticker(s) live, %d at a time", len(needs_live), workers)
         with ThreadPoolExecutor(max_workers=workers) as pool:
@@ -1459,7 +1515,29 @@ def run_batched_cycle(
         prepared = survivors
         log.info("%d ticker(s) escalated past the screen", len(prepared))
 
-    answers = batch_answers(tuple(prepared), call_llm, model=MODEL) if prepared else {}
+    # The provider is named rather than defaulted: batch_answers falls back
+    # to AnthropicSignalProvider, which is the wrong bill and the wrong model
+    # the moment MODEL_BASE_URL is set. It has no submit_batch, so this whole
+    # stage becomes live calls -- which is what the OpenAI-compatible path is.
+    #
+    # A misconfigured full model is every ticker's failure, not the cycle's.
+    # Raising here would take down the journal, the report, the ladder and the
+    # protection pass along with the signals -- an unprotected position is a
+    # worse outcome than a day with no new ones, and the answer is already a
+    # per-ticker value that the rest of the cycle knows how to read.
+    answers: dict[str, "Completion | BaseException"] = {}
+    if prepared:
+        try:
+            provider = full_model_provider()
+        except LLMError as exc:
+            log.error("no full model to ask (%s); every ticker fails the model stage", exc)
+            answers = {item.ticker: exc for item in prepared}
+        else:
+            answers = batch_answers(
+                tuple(prepared), call_llm,
+                provider=provider, model=MODEL, reasoning=True,
+                max_workers=cfg.FULL_MODEL_MAX_CONCURRENCY,
+            )
 
     for item in prepared:
         results.append(

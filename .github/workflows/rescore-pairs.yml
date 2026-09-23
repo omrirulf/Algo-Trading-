@@ -1,0 +1,129 @@
+name: rescore pairs
+
+# Score a run's saved pairs against returns that have since resolved.
+#
+# The expensive workflows here -- news ablation, model compare -- ask the
+# model about the MOST RECENT recorded contexts, which are precisely the ones
+# the market has not answered yet. Their returns half therefore scores almost
+# nothing on the day: the 100-context ablation of 22 September asked about
+# 21-22 September and resolved 0 of 56 lines at a 3-session horizon.
+#
+# Both save their answers as a `pairs.jsonl` artifact for 90 days, in the same
+# `{"_side": ..., "line": ...}` shape. This re-reads one of those artifacts a
+# few days later, when the horizon has passed, and scores each side. The
+# answers were already paid for; a re-run of the original workflow would pay
+# for them again and ask about a fresh, equally unresolved sample.
+#
+# It calls no model and needs no key. The only token is the run's own
+# read-only GITHUB_TOKEN, which is what lets one run read another's artifact.
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "The run whose pairs to score, e.g. 35779233765"
+        required: true
+      artifact:
+        description: "Artifact name (blank: the one artifact of that run whose name contains 'pairs')"
+        default: ""
+      horizon:
+        description: "Trading sessions held, for the returns scoring"
+        default: "3"
+
+permissions:
+  contents: read
+  # Reading another run's artifact list and downloading it. Nothing else.
+  actions: read
+
+jobs:
+  rescore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Fetch the saved pairs
+        # The REST API rather than actions/download-artifact, which would add
+        # a third action to pin for a curl and an unzip.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ inputs.run_id }}
+          ARTIFACT: ${{ inputs.artifact }}
+        run: |
+          set -euo pipefail
+          case "$RUN_ID" in
+            ''|*[!0-9]*) echo "run_id must be digits, got '$RUN_ID'" >&2; exit 2 ;;
+          esac
+          api() { curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+                            -H "Accept: application/vnd.github+json" "$@"; }
+          api "https://api.github.com/repos/$REPO/actions/runs/$RUN_ID/artifacts?per_page=100" \
+            > "$RUNNER_TEMP/artifacts.json"
+          if [ -n "$ARTIFACT" ]; then
+            filter='.artifacts[] | select(.name == $want)'
+          else
+            filter='.artifacts[] | select(.name | contains("pairs"))'
+          fi
+          count=$(jq --arg want "$ARTIFACT" "[$filter] | length" "$RUNNER_TEMP/artifacts.json")
+          if [ "$count" -ne 1 ]; then
+            echo "expected exactly one matching artifact, found $count:" >&2
+            jq -r '.artifacts[] | "  \(.name)  expired=\(.expired)"' "$RUNNER_TEMP/artifacts.json" >&2
+            exit 1
+          fi
+          jq -r --arg want "$ARTIFACT" "$filter | .expired" "$RUNNER_TEMP/artifacts.json" \
+            | grep -qx false || { echo "that artifact has expired; the answers are gone" >&2; exit 1; }
+          url=$(jq -r --arg want "$ARTIFACT" "$filter | .archive_download_url" "$RUNNER_TEMP/artifacts.json")
+          name=$(jq -r --arg want "$ARTIFACT" "$filter | .name" "$RUNNER_TEMP/artifacts.json")
+          echo "downloading $name"
+          api -o "$RUNNER_TEMP/pairs.zip" "$url"
+          unzip -o -j "$RUNNER_TEMP/pairs.zip" -d "$RUNNER_TEMP/pairs"
+          ls -l "$RUNNER_TEMP/pairs"
+          test -f "$RUNNER_TEMP/pairs/pairs.jsonl"
+
+      - name: Score each side against what the market did
+        # The side names come out of a downloaded file, so they are data, not
+        # a path: anything but a plain word is refused rather than opened.
+        env:
+          HORIZON: ${{ inputs.horizon }}
+        run: |
+          set -euo pipefail
+          case "$HORIZON" in
+            ''|*[!0-9]*) echo "horizon must be digits, got '$HORIZON'" >&2; exit 2 ;;
+          esac
+          python - <<'SPLIT'
+          import json, os, re, sys
+          tmp = os.environ["RUNNER_TEMP"]
+          handles, counts = {}, {}
+          with open(f"{tmp}/pairs/pairs.jsonl") as stream:
+              for number, raw in enumerate(stream, start=1):
+                  raw = raw.strip()
+                  if not raw:
+                      continue
+                  record = json.loads(raw)
+                  side = str(record["_side"])
+                  if not re.fullmatch(r"[A-Za-z0-9_-]{1,40}", side):
+                      sys.exit(f"line {number}: refusing side name {side!r}")
+                  if side not in handles:
+                      handles[side] = open(f"{tmp}/side-{side}.jsonl", "w")
+                      counts[side] = 0
+                  handles[side].write(json.dumps(record["line"]) + "\n")
+                  counts[side] += 1
+          for handle in handles.values():
+              handle.close()
+          if not handles:
+              sys.exit("no pairs in the artifact")
+          with open(f"{tmp}/sides.txt", "w") as out:
+              for side in sorted(handles):
+                  print(f"{side}\t{counts[side]}")
+                  out.write(side + "\n")
+          SPLIT
+          while read -r side; do
+            echo "===== $side ====="
+            python analysis/score_journal.py \
+              --journal "$RUNNER_TEMP/side-$side.jsonl" \
+              --horizon "$HORIZON"
+          done < "$RUNNER_TEMP/sides.txt" | tee -a "$GITHUB_STEP_SUMMARY"

@@ -80,6 +80,18 @@ jobs:
     # the cost of not having the headroom is a cycle that traded nothing and
     # recorded nothing. Revisit this number if BATCH_DEADLINE_SECONDS changes
     # -- it is sized against it, not against the API's own 24-hour allowance.
+    #
+    # Since 23 September the binding number is a different one. There is no
+    # batch on an OpenAI-compatible endpoint, so the full-model stage is the
+    # whole watchlist asked live: ceil(80 / FULL_MODEL_MAX_CONCURRENCY) = 20
+    # rounds, each bounded by FULL_MODEL_TIMEOUT_SECONDS = 300s, so 100
+    # minutes of worst case on top of the ~42 the cycle already spends
+    # gathering context. That is 142 against this 180, which is why a
+    # transport failure is NOT retried (orchestrator/llm.py): one more ask at
+    # the same ceiling would double the term that does not fit.
+    #
+    # Measured, rather than worst case: 128s a call at high effort, four at a
+    # time, is about 15 minutes for eighty names.
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -170,6 +182,18 @@ jobs:
           # just stays on Haiku. A secret that does not exist is an empty
           # string here, which is falsy, so the chain picks the first one set.
           SCREENING_API_KEY: ${{ secrets.SCREENING_API_KEY || secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY || secrets.GROQ_API_KEY }}
+          # The bearer token for the endpoint that now answers the question
+          # deciding what is traded. Which model and where are constants in
+          # orchestrator/llm.py on purpose -- an environment variable must not
+          # be able to change what gets traded without a diff -- so this key
+          # is the only part of that choice living outside the repository.
+          #
+          # Same collapsing chain as the screen above, and for the same
+          # reason: the DeepInfra token this cycle needs may already be stored
+          # under whichever name it was first pasted in as, and a key nothing
+          # reads is silent. Unlike the screen, silence here is not a lost
+          # saving -- it is every ticker failing the model stage.
+          FULL_MODEL_API_KEY: ${{ secrets.FULL_MODEL_API_KEY || secrets.DEEPINFRA_API_KEY || secrets.SCREENING_API_KEY || secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY || secrets.GROQ_API_KEY }}
         # --premarket on the first cron only. Batched, the model stages are
         # asked offline at half price, and the waiting for them has to happen
         # somewhere: before the session, or during it. Starting at 12:35 UTC

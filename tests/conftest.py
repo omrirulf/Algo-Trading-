@@ -33,6 +33,45 @@ def _a_real_trading_day(monkeypatch):
     monkeypatch.setattr(hb, "today_et", lambda: _A_TRADING_DAY)
 
 
+@pytest.fixture(autouse=True)
+def _a_configured_deployment(monkeypatch):
+    """Give the suite the bearer token a real deployment has.
+
+    ``orchestrator.llm.MODEL_BASE_URL`` names an OpenAI-compatible endpoint,
+    and ``heartbeat.full_model_provider`` refuses to ask it anonymously --
+    deliberately, because an endpoint answering 401 once per ticker loses a
+    session quietly now that no screen stands behind the full model. Every
+    test that runs a cycle would otherwise fail on the missing key rather than
+    on what it is testing. Nothing here reaches the network: the providers are
+    faked in the tests themselves.
+    """
+    monkeypatch.setenv("FULL_MODEL_API_KEY", "test-full-model-key")
+
+
+@pytest.fixture(autouse=True)
+def _no_real_http(monkeypatch):
+    """Make the file's first line true rather than merely intended.
+
+    It stopped being true the moment the full model moved to an
+    OpenAI-compatible endpoint: a test that faked ``AnthropicSignalProvider``
+    was faking nothing, and ``OpenAICompatibleProvider`` built its own
+    ``httpx.Client`` and went to api.deepinfra.com for real. It was the proxy
+    that caught it, which is luck, not a test suite.
+
+    A test that means to exercise the transport passes its own client, and
+    that still works -- only the un-injected path is closed.
+    """
+    from orchestrator import llm as _llm
+
+    def _refuse(timeout):
+        raise AssertionError(
+            "a test let orchestrator.llm open a real connection; "
+            "pass a fake client to the provider instead"
+        )
+
+    monkeypatch.setattr(_llm, "new_http_client", _refuse)
+
+
 @dataclass
 class FakeBroker:
     equity: float = 100_000.0

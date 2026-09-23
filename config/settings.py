@@ -397,6 +397,23 @@ BATCH_DEADLINE_SECONDS: Final[int] = 35 * 60
 #: not the thing that breaks.
 SCREEN_MAX_CONCURRENCY: Final[int] = 8
 
+#: The same, for the full model on the OpenAI-compatible path.
+#:
+#: Four rather than eight, and the reason is measured rather than guessed:
+#: against DeepInfra on 23 September, 300 calls lost 50 to HTTP 429 at four in
+#: flight and 39 at eight. A limit that barely moves with parallelism is a
+#: token-per-minute ceiling, so the queue is set by the bucket and not by this
+#: number -- what this number changes is how much of the wait is spent in
+#: backoff rather than in flight.
+#:
+#: It also sets the cycle's worst case, which is the binding constraint. The
+#: full-model stage takes ceil(watchlist / this) rounds, each bounded by
+#: FULL_MODEL_TIMEOUT_SECONDS: eighty names four at a time is twenty rounds of
+#: at most five minutes, which fits heartbeat.yml's clock alongside the ~42
+#: minutes the cycle already spends gathering context. Raising it to relieve
+#: the throttle would not -- the throttle is not where the time goes.
+FULL_MODEL_MAX_CONCURRENCY: Final[int] = 4
+
 #: Wilder ATR lookback, in trading days.
 ATR_PERIOD: Final[int] = 14
 
@@ -601,6 +618,18 @@ class Settings(BaseSettings):
             "escalation recall asked the cheap way. Never set this without a "
             "compare_screening.py run at the same effort behind it -- a screen "
             "that wrongly answers NEUTRAL loses the trade silently"
+        ),
+    )
+    full_model_api_key: str = Field(
+        default="",
+        description=(
+            "Bearer token for the endpoint orchestrator/llm.py's "
+            "MODEL_BASE_URL names. Only the token lives here: which model "
+            "decides what is traded, and where it is asked, are constants in "
+            "that module so a change to either shows up in a diff. Blank "
+            "while MODEL_BASE_URL is set is refused at startup rather than "
+            "sent as an anonymous request -- an endpoint that answers 401 "
+            "once per ticker would lose a whole session quietly"
         ),
     )
     brightdata_api_token: str = Field(default="", description="Bright Data API token (orchestrator only)")

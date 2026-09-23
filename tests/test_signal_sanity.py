@@ -73,7 +73,7 @@ def _req(cid, model=None, effort=None):
 def test_batch_params_match_the_live_shape_minus_fallbacks():
     p = _provider(_FakeBatches([]))
     params = p._batch_params(_req("a", effort="low"))
-    assert params["model"] == llm.MODEL
+    assert params["model"] == llm.ANTHROPIC_MODEL
     # The breakpoint rides the system block, not the request: top-level
     # cache_control caches the last cacheable block, which is the per-ticker
     # user prompt, and a batch would write 80 caches nothing ever reads.
