@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -63,6 +64,21 @@ _DUPLICATE_MARKERS = ("client_order_id", "duplicate", "already exists")
 # message drops it. Anything that does not match is an ordinary rejection and
 # is reported as one: the fallback below is narrow on purpose.
 _ADVANCED_QTY_MARKERS = ("42210000", "qty cannot be changed for advanced")
+
+# Alpaca's refusal when the shares a new order needs are still reserved by
+# another one. The cancel-and-replace fallback below hits this if it asks for
+# the replacement before the cancelled stop has let go of them.
+_INSUFFICIENT_QTY_MARKERS = ("40310000", "insufficient qty available")
+
+# How long to wait for a cancelled order to stop holding its shares. Alpaca
+# accepts a cancel straight away and settles it a moment later, so a
+# replacement submitted in that moment is refused for shares the position
+# plainly has -- TEVA, 22 Sep 2026: 128 held, 127 still "held_for_orders" by
+# the stop that had just been cancelled, 1 available. Four seconds is far
+# longer than the settle takes and still far shorter than the position can
+# afford to wait, and the wait ends the instant the order reports terminal.
+CANCEL_SETTLE_ATTEMPTS = 20
+CANCEL_SETTLE_SECONDS = 0.2
 
 
 class BrokerError(RuntimeError):
@@ -121,6 +137,12 @@ def _is_advanced_order_qty_rejection(exc: Exception) -> bool:
     """True only for "you may not change the quantity of an advanced order"."""
     message = str(exc).lower()
     return any(marker in message for marker in _ADVANCED_QTY_MARKERS)
+
+
+def _is_insufficient_qty_rejection(exc: Exception) -> bool:
+    """True only for "those shares are already spoken for"."""
+    message = str(exc).lower()
+    return any(marker in message for marker in _INSUFFICIENT_QTY_MARKERS)
 
 
 @dataclass(frozen=True)
@@ -572,9 +594,20 @@ class AlpacaPaperBroker:
         that can be checked is checked first, while the old stop is still
         live: which symbol and side the order belongs to, that the position
         is still open, and that the new size is a reduction of it. Only then
-        is the old order cancelled, and the replacement goes in immediately
-        after through ``submit_stop_order``, which is close-only by
-        construction and good-till-cancelled.
+        is the old order cancelled, and the replacement goes in through
+        ``submit_stop_order``, which is close-only by construction and
+        good-till-cancelled.
+
+        Between the two sits a wait, and it is not optional. Alpaca accepts a
+        cancel before the order is gone, and until it is gone it still
+        reserves the shares it covered -- so the replacement is refused for
+        shares the position plainly holds. That is what happened to TEVA on
+        22 Sep 2026 on this path's first live run: 128 shares held, 127 of
+        them still ``held_for_orders`` by the stop just cancelled, 1
+        available, and the position left with nothing. So the cancelled order
+        is polled until it reports terminal before the replacement is asked
+        for, and a refusal that still blames the share count buys one more
+        full window and one more attempt.
         """
         try:
             stuck = self._client.get_order_by_id(order_id)
@@ -622,15 +655,74 @@ class AlpacaPaperBroker:
             "placing a standalone stop in its place",
             symbol, order_id, int(qty), refusal,
         )
+        # The cancel is accepted before it takes effect, and until it does the
+        # shares are still reserved by the order being cancelled. Wait for it.
+        self._wait_for_cancel(symbol, order_id)
         try:
             return self.submit_stop_order(symbol, int(qty), side, stop_price)
         except Exception as exc:  # noqa: BLE001
+            if _is_insufficient_qty_rejection(exc):
+                # The shares were still spoken for. That is the cancel not yet
+                # settled almost every time, so give it one more full window
+                # and ask again rather than leaving the position bare over a
+                # race with the broker's own bookkeeping.
+                logger.warning(
+                    "%s replacement stop refused for want of shares (%s); waiting "
+                    "for the cancelled order to release them and trying once more",
+                    symbol, exc,
+                )
+                self._wait_for_cancel(symbol, order_id)
+                try:
+                    return self.submit_stop_order(symbol, int(qty), side, stop_price)
+                except Exception as retry_exc:  # noqa: BLE001
+                    raise UnprotectedPositionError(
+                        self._naked_message(symbol, order_id, qty, side, stop_price, retry_exc)
+                    ) from retry_exc
             raise UnprotectedPositionError(
-                f"{symbol} has NO live stop: the {int(qty)}-share replacement for "
-                f"cancelled order {order_id} was refused ({exc}). Place a "
-                f"good-till-cancelled {side} stop for {int(qty)} share(s) at "
-                f"{stop_price} now."
+                self._naked_message(symbol, order_id, qty, side, stop_price, exc)
             ) from exc
+
+    def _wait_for_cancel(self, symbol: str, order_id: str) -> bool:
+        """Block until a cancelled order is terminal, or the patience runs out.
+
+        Alpaca's cancel returns before the order is actually gone, and a stop
+        that is still winding down goes on reserving the shares it covered.
+        TEVA on 22 Sep 2026 was refused its replacement on exactly that: 128
+        shares held, 127 of them still ``held_for_orders`` by the stop that
+        had just been cancelled, 1 available.
+
+        Returns whether it settled. A timeout is not raised on: the caller's
+        next move is to try the replacement anyway, and a stop that is placed
+        beats a wait that gave up. An order that cannot be read at all counts
+        as settled -- a stop nobody can find is not holding anything.
+        """
+        for _ in range(CANCEL_SETTLE_ATTEMPTS):
+            try:
+                order = self._client.get_order_by_id(order_id)
+            except Exception:  # noqa: BLE001
+                return True
+            raw = getattr(order, "status", "")
+            state = str(getattr(raw, "value", raw)).lower()
+            if state in self._TERMINAL_ORDER_STATES:
+                return True
+            time.sleep(CANCEL_SETTLE_SECONDS)
+        logger.warning(
+            "%s cancelled stop %s is still not terminal after %.1fs; placing the "
+            "replacement anyway", symbol, order_id,
+            CANCEL_SETTLE_ATTEMPTS * CANCEL_SETTLE_SECONDS,
+        )
+        return False
+
+    @staticmethod
+    def _naked_message(symbol: str, order_id: str, qty: int, side: str,
+                       stop_price: float, exc: Exception) -> str:
+        """What a person needs to fix this by hand, in the order they need it."""
+        return (
+            f"{symbol} has NO live stop: the {int(qty)}-share replacement for "
+            f"cancelled order {order_id} was refused ({exc}). Place a "
+            f"good-till-cancelled {side} stop for {int(qty)} share(s) at "
+            f"{stop_price} now."
+        )
 
     def close_position_partially(self, ticker: str, qty: int) -> str:
         """Sell (or cover) ``qty`` shares of an open position. Returns the order id.
