@@ -626,6 +626,16 @@ RETRY_AFTER_CAP_SECONDS = 120.0
 #: above (2 + 4 + 8) without letting one ticker eat the cycle.
 HTTP_ATTEMPTS = 4
 
+#: Asks per call when the socket, rather than the server, is what failed.
+#: Two: the ask, and one more on a fresh connection. A transport failure has
+#: already spent its whole ceiling and been billed for it, so it is the one
+#: retry worth counting separately from the statuses above.
+TRANSPORT_ATTEMPTS = 2
+
+#: The ceiling on that second ask. A call that hung for the full 300s once is
+#: not likely to be quick, and the rest of the watchlist is queued behind it.
+TRANSPORT_RETRY_TIMEOUT_SECONDS = 120.0
+
 #: Asks per call when the answer parsed as the wrong shape. Two: the first is
 #: the question, the second is the question with the complaint stated.
 SCHEMA_ATTEMPTS = 2
@@ -743,26 +753,47 @@ class OpenAICompatibleProvider:
         headers = {"Authorization": f"Bearer {self._api_key}"} if self._api_key else {}
         delay = RETRY_BASE_SECONDS
         last = ""
+        transport_asks = 1
+        # Local, never self._timeout: a provider is reused across tickers,
+        # and one slow call must not quietly shorten every call after it.
+        timeout = self._timeout
         for attempt in range(self._attempts):
             if attempt:
                 self._sleep(delay)
                 delay = min(delay * 2, RETRY_CAP_SECONDS)
             try:
                 if self._client is None:
-                    with new_http_client(self._timeout) as client:
+                    with new_http_client(timeout) as client:
                         response = client.post(self._url, json=body, headers=headers)
                 else:
                     response = self._client.post(self._url, json=body, headers=headers)
             except httpx.HTTPError as exc:
-                # Deliberately NOT retried, unlike a 429. A transport failure
-                # here has usually already spent the whole per-call timeout,
-                # and the call was billed for whatever it generated before the
-                # socket gave up. Asking again doubles the most expensive
-                # failure there is, and the cycle's budget is the sum of these
-                # worst cases: eighty tickers four at a time at a 300s ceiling
-                # is twenty rounds, which fits the job's clock exactly once.
-                # Retrying it would not.
-                raise LLMError(f"{self._url} unreachable: {exc}") from exc
+                # Retried once, and only once, since 23 Sep 2026. It was not
+                # retried at all before that, on an argument that the first
+                # production cycle disproved: the worst case was taken to be
+                # every call running to the 300s ceiling, twenty rounds of
+                # it, which left no room to ask twice. The measured stage took
+                # 32 minutes, not 100 -- and the two failures that argument
+                # was protecting against, the 429 and the off-schema answer,
+                # did not occur once between them, while three tickers were
+                # lost to exactly this. The budget is now bounded by the stage
+                # deadline below rather than by refusing to ask again, which
+                # is the honest place to bound it.
+                #
+                # A retry is still the most expensive thing here -- the call
+                # was billed for whatever it generated before the socket gave
+                # up -- so it gets one, on a shorter ceiling, and a transport
+                # failure is never retried more than that however many
+                # attempts remain.
+                last = f"{self._url} unreachable: {exc}"
+                if transport_asks >= TRANSPORT_ATTEMPTS:
+                    break
+                transport_asks += 1
+                # A fresh connection, not another long wait: a call that hung
+                # for the full ceiling once is unlikely to be quick, and the
+                # stage has other tickers waiting.
+                timeout = min(timeout, TRANSPORT_RETRY_TIMEOUT_SECONDS)
+                continue
             if response.status_code == 200:
                 try:
                     return response.json()

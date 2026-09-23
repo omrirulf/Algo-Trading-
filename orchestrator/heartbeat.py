@@ -32,6 +32,7 @@ import argparse
 import logging
 import os
 import sys
+import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime
@@ -1316,6 +1317,7 @@ def batch_answers(
     reasoning: bool = True,
     deadline_seconds: float = cfg.BATCH_DEADLINE_SECONDS,
     max_workers: int = cfg.SCREEN_MAX_CONCURRENCY,
+    stage_budget_seconds: float = 0.0,
 ) -> dict[str, "Completion | BaseException"]:
     """Ask a whole stage at half price, and pay full price for the stragglers.
 
@@ -1395,18 +1397,42 @@ def batch_answers(
     # and a rate-limited ticker is lost where a slow one is only late. That
     # stage already has batching as its answer to latency.
     workers = 1 if collected else min(max_workers, len(needs_live))
+
+    # The stage's own clock, when the caller sets one. Bounding the worst case
+    # here rather than by refusing to retry is what lets a timed-out ticker be
+    # asked a second time: the cost of that retry is charged against a budget
+    # instead of against an arithmetic ceiling that assumed every call runs to
+    # its deadline. A ticker the budget catches fails the model stage, which
+    # every caller already handles; the cycle keeps its journal, its ladder
+    # and its report.
+    deadline = time.monotonic() + stage_budget_seconds if stage_budget_seconds > 0 else None
+
+    def ask(item: PreparedTicker) -> "Completion | BaseException":
+        if deadline is not None and time.monotonic() >= deadline:
+            return LLMError(
+                f"the full-model stage ran past its {stage_budget_seconds / 60:.0f} "
+                f"minute budget before {item.ticker} was asked"
+            )
+        return _ask(live, item)
+
     if workers > 1:
         log.info("asking %d ticker(s) live, %d at a time", len(needs_live), workers)
         with ThreadPoolExecutor(max_workers=workers) as pool:
             # Submitted in order and read back in order, so the answers do not
             # depend on which call happened to finish first.
-            for item, answer in zip(
-                needs_live, pool.map(lambda i: _ask(live, i), needs_live)
-            ):
+            for item, answer in zip(needs_live, pool.map(ask, needs_live)):
                 answers[item.ticker] = answer
     else:
         for item in needs_live:
-            answers[item.ticker] = _ask(live, item)
+            answers[item.ticker] = ask(item)
+
+    if deadline is not None:
+        spent = [t for t, a in answers.items() if isinstance(a, LLMError) and "budget" in str(a)]
+        if spent:
+            log.error(
+                "the full-model stage ran out of time; %d ticker(s) were never asked: %s",
+                len(spent), ", ".join(sorted(spent)),
+            )
 
     if needs_live and collected:
         log.info("%d of %d ticker(s) fell back to a live call", len(needs_live), len(prepared))
@@ -1537,6 +1563,7 @@ def run_batched_cycle(
                 tuple(prepared), call_llm,
                 provider=provider, model=MODEL, reasoning=True,
                 max_workers=cfg.FULL_MODEL_MAX_CONCURRENCY,
+                stage_budget_seconds=cfg.FULL_MODEL_STAGE_BUDGET_SECONDS,
             )
 
     for item in prepared:

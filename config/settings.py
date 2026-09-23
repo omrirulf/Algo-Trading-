@@ -414,6 +414,23 @@ SCREEN_MAX_CONCURRENCY: Final[int] = 8
 #: the throttle would not -- the throttle is not where the time goes.
 FULL_MODEL_MAX_CONCURRENCY: Final[int] = 4
 
+#: How long the full-model stage may spend in total before it stops asking.
+#:
+#: The honest place to bound the cycle's worst case. It used to be bounded by
+#: arithmetic instead -- rounds times the per-call ceiling -- which came to 100
+#: minutes and was used to argue that a timed-out call could not be asked
+#: again. The first production cycle measured the stage at 32 minutes, and the
+#: three tickers it lost were lost to exactly the retry that argument
+#: forbade. A ceiling that assumes every call runs to its deadline is
+#: describing a cycle that is already broken.
+#:
+#: Ninety minutes is nearly three times the measured stage and still leaves
+#: 48 of heartbeat.yml's 180 for the ~42 minutes of context gathering that
+#: precede it and the ladder, journal and report that follow. A ticker not
+#: started by the deadline fails the model stage like any other, which the
+#: rest of the cycle already knows how to record.
+FULL_MODEL_STAGE_BUDGET_SECONDS: Final[float] = 90 * 60
+
 #: Wilder ATR lookback, in trading days.
 ATR_PERIOD: Final[int] = 14
 

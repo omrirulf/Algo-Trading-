@@ -657,17 +657,29 @@ def test_the_cycle_can_outlast_the_calls_it_has_to_make():
     if not llm.MODEL_BASE_URL:
         pytest.skip("the Anthropic path batches; BATCH_DEADLINE_SECONDS sizes it instead")
 
-    names = len([t for t in _cfg.get_settings().watchlist.split(",") if t.strip()])
-    rounds = math.ceil(names / _cfg.FULL_MODEL_MAX_CONCURRENCY)
-    worst_minutes = rounds * llm.FULL_MODEL_TIMEOUT_SECONDS / 60
+    # The bound is the stage's own budget, not rounds times the per-call
+    # ceiling. That arithmetic came to 100 minutes, was used to argue a
+    # timed-out call could not be asked again, and described a cycle that
+    # would already be broken: the measured stage on 23 September took 32
+    # minutes and lost three tickers to the retry it forbade.
+    budget_minutes = _cfg.FULL_MODEL_STAGE_BUDGET_SECONDS / 60
     # Measured on 18-22 September: the cycle spends about 42 minutes gathering
     # context before it asks anything.
     gathering = 42
 
     wf = yaml.safe_load((ROOT / ".github/workflows/heartbeat.yml").read_text())
     clock = wf["jobs"]["cycle"]["timeout-minutes"]
-    assert clock >= worst_minutes + gathering, (
-        f"{names} names {_cfg.FULL_MODEL_MAX_CONCURRENCY} at a time is {rounds} rounds "
-        f"of up to {llm.FULL_MODEL_TIMEOUT_SECONDS:.0f}s = {worst_minutes:.0f} min, "
-        f"plus ~{gathering} min gathering context, against a {clock} min clock"
+    assert clock >= budget_minutes + gathering, (
+        f"a {budget_minutes:.0f} min full-model budget plus ~{gathering} min "
+        f"gathering context does not fit a {clock} min clock"
+    )
+
+    # And the budget has to be worth having: a single ticker's worst case
+    # must fit inside it several times over, or one slow name spends the lot.
+    worst_call = llm.FULL_MODEL_TIMEOUT_SECONDS + llm.TRANSPORT_RETRY_TIMEOUT_SECONDS
+    names = len([t for t in _cfg.get_settings().watchlist.split(",") if t.strip()])
+    rounds = math.ceil(names / _cfg.FULL_MODEL_MAX_CONCURRENCY)
+    assert _cfg.FULL_MODEL_STAGE_BUDGET_SECONDS >= 2 * worst_call, (
+        f"a {budget_minutes:.0f} min budget is too tight for a {worst_call:.0f}s "
+        f"worst-case call over {rounds} rounds"
     )
