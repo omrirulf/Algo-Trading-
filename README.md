@@ -236,9 +236,14 @@ weight or an information coefficient.
 
 ### Analyst (Claude)
 
-Put an API key from [the Anthropic Console](https://console.anthropic.com)
-in `ANTHROPIC_API_KEY`. The orchestrator sends each ticker's assembled context
-to `claude-opus-5` and gets back one signal per ticker.
+The orchestrator sends each ticker's assembled context to
+`openai/gpt-oss-120b` at high reasoning and gets back one signal per ticker.
+Put the endpoint's bearer token in `FULL_MODEL_API_KEY`.
+
+To run it on Claude instead, clear `MODEL_BASE_URL` in `orchestrator/llm.py`
+and put a key from [the Anthropic Console](https://console.anthropic.com) in
+`ANTHROPIC_API_KEY`. Which model trades the account is a module constant, not
+a setting, so that switch is always a reviewable diff.
 
 **Or use the CLI instead of a key.** If you run `ant auth login` (the
 [Anthropic CLI](https://console.anthropic.com)) on the machine that runs the

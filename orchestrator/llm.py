@@ -25,7 +25,37 @@ from orchestrator.pricing import Usage, usage_from_response
 
 log = logging.getLogger(__name__)
 
-MODEL = "claude-opus-5"
+MODEL = "openai/gpt-oss-120b"
+
+#: Where to ask for MODEL. Blank -- the historical value -- means Anthropic,
+#: with the Batch API and its half price. Anything else is an
+#: OpenAI-compatible endpoint, asked one ticker at a time because there is no
+#: batch to submit.
+#:
+#: This is a constant and not a setting on purpose, and it is the one place
+#: that rule is load-bearing. ``screening_base_url`` is an environment
+#: variable because moving the *screen* is a cost question whose worst case is
+#: a trade not taken. Moving the *full* model changes what is traded, and the
+#: repo's standing rule is that what gets traded shows up in a diff. An
+#: environment variable could change it with no commit and no review.
+#:
+#: Only the bearer token comes from settings, because a secret cannot be
+#: committed. A base URL set with no token, or a token with no base URL, is
+#: refused rather than half-applied.
+MODEL_BASE_URL = "https://api.deepinfra.com/v1/openai"
+
+#: Reasoning depth for MODEL. Read only on the OpenAI-compatible path;
+#: the Anthropic path has EFFORT below, which is a different vocabulary.
+MODEL_EFFORT = "high"
+
+#: What AnthropicSignalProvider asks for when the caller names nothing.
+#:
+#: Separate from MODEL since 23 September, when MODEL stopped being a Claude
+#: name. That class used to default to MODEL, which was right while the two
+#: were the same thing and became a request for "openai/gpt-oss-120b" from
+#: api.anthropic.com the moment they were not -- a 404 per ticker on the
+#: fallback path, reached only on the day the primary one is already broken.
+ANTHROPIC_MODEL = "claude-opus-5"
 
 #: The two-stage funnel. A cheap model reads the same prompt first; only a
 #: ticker it does not call NEUTRAL goes on to MODEL. On a day when most of the
@@ -42,7 +72,19 @@ MODEL = "claude-opus-5"
 #:
 #: Haiku 4.5 takes neither adaptive thinking nor ``effort`` -- it is asked
 #: with reasoning off, which is also what makes it the cheap stage.
-SCREENING_ENABLED = True
+#:
+#: OFF since 23 September 2026. The funnel existed to keep an expensive model
+#: off the names that did not need it: measured over six cycles, the screen
+#: ended about two thirds of the watchlist and the escalations cost $0.041 a
+#: call against the screen's $0.007. MODEL now costs a fifth of a cent, so the
+#: stage is saving roughly a tenth of a cent a ticker and costing every name
+#: the chance of the better answer. What it is *not* is free insurance: a
+#: NEUTRAL screen is exactly the case where MODEL was never asked, so what the
+#: funnel filtered out was never measured.
+#:
+#: Turning it back on is this constant and nothing else; SCREENING_MODEL and
+#: the screening settings are all still wired.
+SCREENING_ENABLED = False
 SCREENING_MODEL = "claude-haiku-4-5"
 
 #: Every name the screening endpoint's bearer token might plausibly have been
@@ -82,6 +124,12 @@ MAX_TOKENS = 16000
 
 REQUEST_TIMEOUT_SECONDS = 120.0
 
+#: The same, for the full model on the OpenAI-compatible path. Separate
+#: because 120 is not a timeout for a reasoning model at high effort, it is a
+#: coin toss: gpt-oss-120b measured ~128s a call, and a 120s deadline lost 286
+#: of 300 calls on 22 September -- every one of them billed.
+FULL_MODEL_TIMEOUT_SECONDS = 300.0
+
 #: JSON Schema keywords kept when deriving the generation-time schema. Value
 #: constraints (pattern, minLength, minimum, ...) are deliberately dropped:
 #: constrained decoding does not accept every keyword pydantic emits, and the
@@ -99,6 +147,19 @@ _KEEP = (
     "items",
     "description",
 )
+
+
+def new_http_client(timeout: float) -> httpx.Client:
+    """The one place this module opens a connection it was not handed.
+
+    A seam, not an abstraction: every other caller passes its own client, so
+    this is the only path a test cannot intercept by construction. The suite
+    closes it (``tests/conftest.py``), because faking the provider stopped
+    being enough the moment the full model moved to an OpenAI-compatible
+    endpoint -- a test that faked ``AnthropicSignalProvider`` was faking
+    nothing, and the call went out for real.
+    """
+    return httpx.Client(timeout=timeout)
 
 
 @dataclass(frozen=True)
@@ -389,7 +450,7 @@ class AnthropicSignalProvider:
             },
         }
         params = dict(
-            model=request.model or MODEL,
+            model=request.model or ANTHROPIC_MODEL,
             max_tokens=MAX_TOKENS,
             system=cached_system(request.system_prompt),
             messages=[{"role": "user", "content": request.user_prompt}],
@@ -465,7 +526,7 @@ class AnthropicSignalProvider:
                     out[item.custom_id] = LLMError(f"model returned non-JSON output: {exc}")
                     continue
                 out[item.custom_id] = Completion(
-                    text=text, usage=usage_from_response(message, model or MODEL)
+                    text=text, usage=usage_from_response(message, model or ANTHROPIC_MODEL)
                 )
             elif kind == "errored":
                 out[item.custom_id] = LLMError(f"batch item errored: {item.result.error}")
@@ -507,7 +568,7 @@ class AnthropicSignalProvider:
             "format": {"type": "json_schema", "schema": build_output_schema(json_schema)},
         }
         kwargs: dict[str, Any] = dict(
-            model=model or MODEL,
+            model=model or ANTHROPIC_MODEL,
             max_tokens=MAX_TOKENS,
             system=cached_system(system_prompt),
             messages=[{"role": "user", "content": user_prompt}],
@@ -535,7 +596,7 @@ class AnthropicSignalProvider:
             json.loads(text)
         except json.JSONDecodeError as exc:
             raise LLMError(f"model returned non-JSON output: {exc}") from exc
-        return Completion(text=text, usage=usage_from_response(response, model or MODEL))
+        return Completion(text=text, usage=usage_from_response(response, model or ANTHROPIC_MODEL))
 
 
 #: What ``reasoning=False`` becomes on a chat-completions endpoint, since that
@@ -544,6 +605,37 @@ class AnthropicSignalProvider:
 #: field a specific API has to recognise, so it does something on every model
 #: that reads a system prompt -- which is every one of them -- rather than
 #: only the ones that happen to support a vendor-specific switch.
+#: Statuses worth asking again about. 429 is the one that matters here: a
+#: token-per-minute ceiling is a wait, not a refusal. The 5xx family is the
+#: ordinary transient. Everything else -- 400, 401, 404 -- means the request
+#: itself is wrong, and asking again only spends the deadline.
+RETRY_STATUSES: frozenset[int] = frozenset({429, 500, 502, 503, 504})
+
+#: The backoff ladder, doubling from base to cap. Deliberately no jitter:
+#: the calls that collide were started at different moments by different
+#: workers, so their retries are already spread, and a deterministic ladder
+#: is one a test can assert on.
+RETRY_BASE_SECONDS = 2.0
+RETRY_CAP_SECONDS = 60.0
+
+#: A ``Retry-After`` longer than this is not a wait, it is an outage, and the
+#: cycle has a session to catch. The ladder takes over.
+RETRY_AFTER_CAP_SECONDS = 120.0
+
+#: Asks per call. Four gets through a minute-long token bucket on the ladder
+#: above (2 + 4 + 8) without letting one ticker eat the cycle.
+HTTP_ATTEMPTS = 4
+
+#: Asks per call when the answer parsed as the wrong shape. Two: the first is
+#: the question, the second is the question with the complaint stated.
+SCHEMA_ATTEMPTS = 2
+
+OFF_SCHEMA_INSTRUCTION = (
+    "\n\nYour previous answer could not be parsed. Reply with the JSON object "
+    "required by the schema and nothing else: no prose before it, no code "
+    "fence around it, no commentary after it."
+)
+
 NO_REASONING_INSTRUCTION = (
     "\n\nAnswer directly and immediately: do not show your reasoning, chain "
     "of thought, or an internal monologue before the final JSON object."
@@ -600,6 +692,9 @@ class OpenAICompatibleProvider:
         api_key: str = "",
         client: httpx.Client | None = None,
         timeout: float = REQUEST_TIMEOUT_SECONDS,
+        attempts: int = HTTP_ATTEMPTS,
+        schema_attempts: int = SCHEMA_ATTEMPTS,
+        sleep: Any = time.sleep,
     ) -> None:
         if not base_url:
             raise LLMError("an OpenAI-compatible provider needs a base URL")
@@ -608,37 +703,88 @@ class OpenAICompatibleProvider:
         self._api_key = api_key
         self._client = client
         self._timeout = timeout
+        self._attempts = max(1, attempts)
+        self._schema_attempts = max(1, schema_attempts)
+        self._sleep = sleep
+
+    def _retry_after(self, response: Any) -> float | None:
+        """The server's own instruction, when it gives one.
+
+        Guessing a backoff against a token-per-minute limit is guessing how
+        much of the minute is left. ``Retry-After`` is the one number that
+        knows, so it wins over the ladder whenever it is present and sane.
+        """
+        raw = (response.headers or {}).get("Retry-After")
+        if not raw:
+            return None
+        try:
+            seconds = float(str(raw).strip())
+        except ValueError:
+            return None            # the HTTP-date form; fall back to the ladder
+        if seconds < 0 or seconds > RETRY_AFTER_CAP_SECONDS:
+            return None
+        return seconds
 
     def _post(self, body: dict) -> dict:
+        """One answer, retrying the statuses that mean 'ask me again'.
+
+        As the *screening* stage a refused call was survivable: the funnel
+        treats a failed screen as "ask the full model", so the worst case was
+        the cycle's cost. As the *full* model there is nothing behind it, and
+        a throttled ticker is a signal the day never gets. Measured against
+        DeepInfra on 23 September: 50 of 300 calls returned 429 at four in
+        flight and 39 at eight, which is a token-per-minute ceiling rather
+        than a parallelism one -- so waiting is the fix and spreading out is
+        not.
+        """
         # A local endpoint usually wants no key at all, so the header is sent
         # only when there is something to send: a bare "Bearer " is rejected
         # by some servers that would otherwise have let the request through.
         headers = {"Authorization": f"Bearer {self._api_key}"} if self._api_key else {}
-        try:
-            if self._client is None:
-                with httpx.Client(timeout=self._timeout) as client:
-                    response = client.post(self._url, json=body, headers=headers)
-            else:
-                response = self._client.post(self._url, json=body, headers=headers)
-        except httpx.HTTPError as exc:
-            raise LLMError(f"{self._url} unreachable: {exc}") from exc
-        if response.status_code != 200:
-            raise LLMError(f"{self._url} returned HTTP {response.status_code}: {response.text[:300]}")
-        try:
-            return response.json()
-        except ValueError as exc:
-            raise LLMError(f"{self._url} returned a non-JSON body: {exc}") from exc
+        delay = RETRY_BASE_SECONDS
+        last = ""
+        for attempt in range(self._attempts):
+            if attempt:
+                self._sleep(delay)
+                delay = min(delay * 2, RETRY_CAP_SECONDS)
+            try:
+                if self._client is None:
+                    with new_http_client(self._timeout) as client:
+                        response = client.post(self._url, json=body, headers=headers)
+                else:
+                    response = self._client.post(self._url, json=body, headers=headers)
+            except httpx.HTTPError as exc:
+                # Deliberately NOT retried, unlike a 429. A transport failure
+                # here has usually already spent the whole per-call timeout,
+                # and the call was billed for whatever it generated before the
+                # socket gave up. Asking again doubles the most expensive
+                # failure there is, and the cycle's budget is the sum of these
+                # worst cases: eighty tickers four at a time at a 300s ceiling
+                # is twenty rounds, which fits the job's clock exactly once.
+                # Retrying it would not.
+                raise LLMError(f"{self._url} unreachable: {exc}") from exc
+            if response.status_code == 200:
+                try:
+                    return response.json()
+                except ValueError as exc:
+                    raise LLMError(f"{self._url} returned a non-JSON body: {exc}") from exc
+            last = f"{self._url} returned HTTP {response.status_code}: {response.text[:300]}"
+            if response.status_code not in RETRY_STATUSES:
+                break              # 400, 401, 404: asking again changes nothing
+            told = self._retry_after(response)
+            if told is not None:
+                delay = told
+        raise LLMError(f"{last} (gave up after {self._attempts} attempt(s))")
 
-    def complete_detailed(
+    def _body(
         self,
         system_prompt: str,
         user_prompt: str,
         json_schema: dict,
-        model: Optional[str] = None,
-        effort: Optional[str] = None,
-        reasoning: bool = True,
-    ) -> "Completion":
-        name = model or self._model
+        name: str,
+        effort: Optional[str],
+        reasoning: bool,
+    ) -> dict:
         if not reasoning:
             system_prompt = system_prompt + NO_REASONING_INSTRUCTION
         body: dict[str, Any] = {
@@ -673,7 +819,16 @@ class OpenAICompatibleProvider:
             body["reasoning_effort"] = "low"
         elif effort:
             body["reasoning_effort"] = effort
-        payload = self._post(body)
+        return body
+
+    @staticmethod
+    def _insist(body: dict) -> dict:
+        """The same question, with the schema complaint said out loud."""
+        retold = json.loads(json.dumps(body))
+        retold["messages"][0]["content"] += OFF_SCHEMA_INSTRUCTION
+        return retold
+
+    def _answer(self, payload: dict, name: str) -> "Completion":
         try:
             text = payload["choices"][0]["message"]["content"]
         except (KeyError, IndexError, TypeError) as exc:
@@ -686,10 +841,10 @@ class OpenAICompatibleProvider:
             raise LLMError(f"model returned non-JSON output: {exc}") from exc
 
         # Counted the same way as a Claude call so one journal line means the
-        # same thing whoever answered. ``cost_usd`` comes back None, because
-        # the model is not in the price table -- which is the honest answer:
-        # this module cannot know what someone else's hardware costs to run,
-        # and None reads as "unpriced" rather than as "free".
+        # same thing whoever answered. ``cost_usd`` is None for a model the
+        # price table does not carry -- the honest answer, because this module
+        # cannot know what someone else's hardware costs to run, and None
+        # reads as "unpriced" rather than as "free".
         usage = payload.get("usage") or {}
         return Completion(
             text=text,
@@ -699,3 +854,43 @@ class OpenAICompatibleProvider:
                 output_tokens=int(usage.get("completion_tokens") or 0),
             ),
         )
+
+    def complete_detailed(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        json_schema: dict,
+        model: Optional[str] = None,
+        effort: Optional[str] = None,
+        reasoning: bool = True,
+    ) -> "Completion":
+        """One signal, re-asking once if the answer came back off-schema.
+
+        A server that ignores ``response_format`` and answers in prose used to
+        raise straight out of here, which the funnel read as "the screen
+        failed, ask the full model" -- safe, because something better was
+        behind it. As the full model there is nothing behind it, and this is
+        not a rare shape: gpt-oss-120b answered off-schema on 12 of 300 calls
+        on 23 September and on 6 of 150 the day before, a steady 4% rather
+        than a fluke. Four percent of an eighty-name watchlist is three
+        tickers a day with no signal at all.
+
+        So a bad parse is re-asked with the complaint stated, and only a
+        second bad parse raises. The re-ask is a second billed call, which is
+        the point: it is cheaper than the trade it would otherwise skip.
+        """
+        name = model or self._model
+        body = self._body(system_prompt, user_prompt, json_schema, name, effort, reasoning)
+        for attempt in range(self._schema_attempts):
+            payload = self._post(body)
+            try:
+                return self._answer(payload, name)
+            except LLMError:
+                if attempt == self._schema_attempts - 1:
+                    raise
+                log.warning(
+                    "%s answered off-schema; asking once more with the complaint stated",
+                    name,
+                )
+                body = self._insist(body)
+        raise LLMError("unreachable")   # pragma: no cover - the loop always returns or raises

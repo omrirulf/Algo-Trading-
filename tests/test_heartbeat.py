@@ -57,13 +57,13 @@ def test_parse_signal_rejects_smuggled_fields():
 
 def test_process_ticker_logs_missing_llm_credentials(monkeypatch, caplog):
     monkeypatch.setattr(hb, "fetch_news", lambda t: ["news"])
-    monkeypatch.setattr(hb, "get_settings", lambda: Settings(_env_file=None))
+    monkeypatch.setattr(hb, "get_settings", lambda: Settings(_env_file=None, full_model_api_key=""))
     hb.process_ticker("AAPL")  # must not raise; scheduler would otherwise die
-    assert "ANTHROPIC_API_KEY" in caplog.text
+    assert "FULL_MODEL_API_KEY" in caplog.text
 
 
 def test_process_ticker_logs_missing_news_credentials(monkeypatch, caplog):
-    monkeypatch.setattr(hb, "get_settings", lambda: Settings(_env_file=None))
+    monkeypatch.setattr(hb, "get_settings", lambda: Settings(_env_file=None, full_model_api_key=""))
     hb.process_ticker("AAPL")  # no Bright Data token configured
     assert "BRIGHTDATA_API_TOKEN" in caplog.text
 
@@ -291,8 +291,10 @@ def test_outcome_survives_a_non_json_error_body(monkeypatch, _journal_to_tmp):
 # run, and -- just as importantly -- the cases that must stay green.
 
 
-def _watchlist(*tickers: str) -> Settings:
-    return Settings(watchlist=",".join(tickers), _env_file=None)
+def _watchlist(*tickers: str, model_key: str = "test-full-model-key") -> Settings:
+    return Settings(
+        watchlist=",".join(tickers), _env_file=None, full_model_api_key=model_key,
+    )
 
 
 def _result(ticker: str, stage: str, status: str | None = None, gaps: int = 0):
@@ -365,13 +367,13 @@ def test_missing_news_credentials_no_longer_fail_the_context_stage(monkeypatch):
     It then stops at the model for want of a Claude key, which is the next
     real obstacle rather than this one. Before issue #69 it never got there.
     """
-    monkeypatch.setattr(hb, "get_settings", lambda: Settings(_env_file=None))
+    monkeypatch.setattr(hb, "get_settings", lambda: Settings(_env_file=None, full_model_api_key=""))
     assert hb.process_ticker("AAPL").stage == hb.MODEL_FAILED
 
 
 def test_a_missing_llm_key_reports_a_model_failure(monkeypatch):
     monkeypatch.setattr(hb, "fetch_news", lambda t: ["news"])
-    monkeypatch.setattr(hb, "get_settings", lambda: Settings(_env_file=None))
+    monkeypatch.setattr(hb, "get_settings", lambda: Settings(_env_file=None, full_model_api_key=""))
     assert hb.process_ticker("AAPL").stage == hb.MODEL_FAILED
 
 
@@ -409,7 +411,10 @@ def test_a_completed_ticker_carries_the_engine_verdict(monkeypatch):
 
 def test_once_exits_non_zero_when_the_whole_cycle_died(monkeypatch):
     """The regression this was built for: all news fetches fail, run goes red."""
-    monkeypatch.setattr(hb, "get_settings", lambda: _watchlist("AAPL", "MSFT"))
+    # No model key either: a news failure no longer ends the ticker (the
+    # context stage records the gap and carries on), so without this the
+    # cycle would dial the real endpoint on its way to dying anyway.
+    monkeypatch.setattr(hb, "get_settings", lambda: _watchlist("AAPL", "MSFT", model_key=""))
     monkeypatch.setattr(hb, "build_dispatcher", lambda: _AlwaysOpen())
     monkeypatch.setattr(hb, "fetch_fx_rate", lambda: FxRate(rate=3.0363))
 

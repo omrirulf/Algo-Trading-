@@ -245,7 +245,7 @@ def test_reasoning_off_omits_thinking_and_effort(monkeypatch):
 def test_the_production_path_still_reasons(monkeypatch):
     provider, seen = _capture_create(monkeypatch)
     provider.complete_detailed("s", "u", {"type": "object"})
-    assert seen["model"] == llm.MODEL
+    assert seen["model"] == llm.ANTHROPIC_MODEL
     assert seen["thinking"] == {"type": "adaptive"}
     assert seen["output_config"]["effort"] == llm.EFFORT
 
@@ -290,8 +290,27 @@ def test_the_claude_screen_is_never_given_an_effort(monkeypatch):
     assert seen["effort"] is None
 
 
-def test_the_screening_model_is_priced():
-    """A journal line the cost scorer cannot price is a silent hole in the bill."""
+def test_both_stages_are_priced():
+    """A journal line the cost scorer cannot price is a silent hole in the
+    bill -- the one that made the first 80-ticker cycle report $0.00 for 114
+    screening calls."""
     assert hb.SCREENING_MODEL in PRICES
-    assert PRICES[hb.SCREENING_MODEL].input_per_mtok < PRICES[llm.MODEL].input_per_mtok
-    assert PRICES[hb.SCREENING_MODEL].output_per_mtok < PRICES[llm.MODEL].output_per_mtok
+    assert llm.MODEL in PRICES
+
+
+def test_a_screen_dearer_than_the_model_it_filters_for_is_switched_off():
+    """The funnel only ever existed to keep an expensive model off the names
+    that did not need it. Haiku is $1.00/Mtok in against gpt-oss-120b's
+    $0.05, so the cheap stage is now twenty times the dear one and every
+    screened name is a worse answer bought at a higher price.
+
+    Stated as an implication rather than a fixed expectation: put a full model
+    back that costs more than the screen and the funnel may return, but it
+    cannot be left on by habit while the prices say otherwise.
+    """
+    screen, full = PRICES[hb.SCREENING_MODEL], PRICES[llm.MODEL]
+    if screen.input_per_mtok >= full.input_per_mtok:
+        assert not llm.SCREENING_ENABLED, (
+            f"{hb.SCREENING_MODEL} costs more per input token than {llm.MODEL}; "
+            "the screen is spending money to get a worse answer"
+        )

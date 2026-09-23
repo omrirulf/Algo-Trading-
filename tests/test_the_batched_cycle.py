@@ -101,6 +101,13 @@ def batched(monkeypatch):
     # conftest turns the funnel off for every test by default; this file is
     # about both stages, so it opts back in.
     monkeypatch.setattr(hb, "SCREENING_ENABLED", True)
+    # And it pins the full model back onto Anthropic. Batching is an
+    # Anthropic-only mechanism -- an OpenAI-compatible endpoint has no batch
+    # to submit -- so with production's own constants this file would be
+    # testing the live path under a name that says offline. The machinery is
+    # still reached whenever MODEL_BASE_URL is cleared, which is what these
+    # tests are for.
+    monkeypatch.setattr(hb, "MODEL_BASE_URL", "")
     monkeypatch.setattr(hb, "fetch_news", lambda t: ["news"])
 
     def screen(system_prompt, user_prompt, schema):

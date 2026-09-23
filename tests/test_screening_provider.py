@@ -207,13 +207,32 @@ def test_the_model_name_alone_never_changes_which_claude_screens(configured):
     assert model == hb.SCREENING_MODEL
 
 
-def test_the_full_model_is_never_the_local_one():
-    """The seam is the screen. The call that decides a trade stays Claude."""
-    import inspect
+def test_the_full_model_is_named_in_the_diff_and_not_in_the_environment():
+    """The full model moved off Claude on 23 September; the rule that made
+    that a reviewable change did not move with it.
 
-    source = inspect.getsource(hb.call_llm)
-    assert "AnthropicSignalProvider" in source
-    assert "screening_provider" not in source
+    Moving the *screen* is a cost question whose worst case is a trade not
+    taken, so its endpoint and model are settings. Moving the *full* model
+    changes what is traded, so both stay module constants and an environment
+    variable cannot touch them. Only the bearer token is a setting, because a
+    secret cannot be committed.
+    """
+    import inspect
+    import re
+
+    for banned in ("full_model", "full_model_base_url", "full_model_effort",
+                   "model", "model_base_url", "model_effort"):
+        assert banned not in Settings.model_fields, banned
+    assert "full_model_api_key" in Settings.model_fields
+
+    source = inspect.getsource(hb.full_model_provider)
+    assert "MODEL_BASE_URL" in source
+    assert set(re.findall(r"settings\.(\w+)", source)) == {
+        "anthropic_api_key", "full_model_api_key",
+    }
+    # And the screen's seam stays the screen's: a screening setting reaching
+    # the full model would be the same hole by another route.
+    assert "screening_" not in source
 
 
 # --- letting the screen think, when the endpoint needs it to ---------------

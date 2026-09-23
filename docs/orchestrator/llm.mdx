@@ -5,9 +5,14 @@ description: "How five kinds of context become one signal, constrained at genera
 
 `orchestrator/llm.py` sends each ticker's assembled context — headlines plus
 the technicals, fundamentals and analyst view from
-[Market Context](/orchestrator/market-context) — to `claude-opus-5`, and gets
-back a signal that is structurally incapable of containing anything outside
-`LLMSignal`.
+[Market Context](/orchestrator/market-context) — to `openai/gpt-oss-120b` at
+high reasoning, and gets back a signal that is structurally incapable of
+containing anything outside `LLMSignal`.
+
+It was `claude-opus-5` behind a `claude-haiku-4-5` screen until 23 September
+2026. Both paths are still here: clearing `MODEL_BASE_URL` puts the full
+model back on Anthropic with the Batch API, and `SCREENING_ENABLED` turns the
+funnel back on. See [Configuration](/configuration).
 
 ## What the model may emit
 

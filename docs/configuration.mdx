@@ -249,7 +249,11 @@ code diff:
 
 | Constant | Value |
 |---|---|
-| `MODEL` | `claude-opus-5` |
-| `EFFORT` | `medium` |
+| `MODEL` | `openai/gpt-oss-120b` |
+| `MODEL_BASE_URL` | `https://api.deepinfra.com/v1/openai` (blank = Anthropic) |
+| `MODEL_EFFORT` | `high` (OpenAI-compatible path only) |
+| `ANTHROPIC_MODEL` | `claude-opus-5` (what the Anthropic path asks for) |
+| `SCREENING_ENABLED` | `False` since 23 Sep 2026 |
+| `EFFORT` | `medium` (Anthropic path only) |
 | `MAX_TOKENS` | `16000` |
 | `FALLBACK_MODE` | `"default"` (routes by refusal category) |

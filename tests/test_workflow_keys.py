@@ -616,3 +616,58 @@ def test_the_rescore_splitter_writes_one_file_per_side(tmp_path, monkeypatch):
     assert (tmp_path / "sides.txt").read_text().split() == ["with-news", "without-news"]
     assert (tmp_path / "side-with-news.jsonl").read_text().count("\n") == 2
     assert (tmp_path / "side-without-news.jsonl").read_text().count("\n") == 1
+
+
+def test_the_cycle_is_handed_the_full_model_s_key():
+    """A secret that is never passed to the step is a secret the cycle cannot
+    read -- the lesson that left four source keys unused until 18 September.
+
+    It costs more here than it did there. An unreadable screening key only
+    loses the saving; an unreadable full-model key fails every ticker's model
+    stage, because the screen that used to stand behind a failure is off.
+    """
+    cycle = _step("heartbeat.yml", "cycle", "Run one cycle")["env"]
+    assert "FULL_MODEL_API_KEY" in cycle
+    assert "full_model_api_key" in Settings.model_fields
+
+
+def test_the_full_model_key_accepts_the_names_it_may_already_be_stored_under():
+    """Same collapsing chain as the screen, for the same reason: a key stored
+    under the name it was first pasted in as is otherwise silent."""
+    cycle = _step("heartbeat.yml", "cycle", "Run one cycle")["env"]
+    for name in ("FULL_MODEL_API_KEY", "DEEPINFRA_API_KEY", *llm.SCREENING_KEY_ENV_VARS):
+        assert f"secrets.{name}" in cycle["FULL_MODEL_API_KEY"], name
+
+
+def test_the_cycle_can_outlast_the_calls_it_has_to_make():
+    """There is no batch on an OpenAI-compatible endpoint, so the full-model
+    stage is the whole watchlist asked live. Its worst case is arithmetic --
+    rounds times the per-call ceiling -- and it has to fit the job's clock
+    alongside the context gathering, or the cycle is killed having traded
+    nothing and recorded nothing.
+
+    Derived from the constants rather than typed here, so widening the
+    watchlist, lengthening the timeout or narrowing the concurrency fails
+    this test instead of failing a cycle.
+    """
+    import math
+
+    from config import settings as _cfg
+
+    if not llm.MODEL_BASE_URL:
+        pytest.skip("the Anthropic path batches; BATCH_DEADLINE_SECONDS sizes it instead")
+
+    names = len([t for t in _cfg.get_settings().watchlist.split(",") if t.strip()])
+    rounds = math.ceil(names / _cfg.FULL_MODEL_MAX_CONCURRENCY)
+    worst_minutes = rounds * llm.FULL_MODEL_TIMEOUT_SECONDS / 60
+    # Measured on 18-22 September: the cycle spends about 42 minutes gathering
+    # context before it asks anything.
+    gathering = 42
+
+    wf = yaml.safe_load((ROOT / ".github/workflows/heartbeat.yml").read_text())
+    clock = wf["jobs"]["cycle"]["timeout-minutes"]
+    assert clock >= worst_minutes + gathering, (
+        f"{names} names {_cfg.FULL_MODEL_MAX_CONCURRENCY} at a time is {rounds} rounds "
+        f"of up to {llm.FULL_MODEL_TIMEOUT_SECONDS:.0f}s = {worst_minutes:.0f} min, "
+        f"plus ~{gathering} min gathering context, against a {clock} min clock"
+    )
