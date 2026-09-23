@@ -195,7 +195,14 @@ button[disabled]{opacity:.55;cursor:default}
     // cycle
     const c = book.cycle || {};
     const total = c.tickers || 0;
-    const steps = [["On the watchlist", total], ["Screened out", c.screened_out||0], ["Judged in full", c.judged||0], ["Directional calls", (c.directional||[]).length], ["Trades placed", (c.accepted||[]).length]];
+    // "Already held" and "Screened out" are the same two journal fields
+    // (no outcome, no error) split by `held`: a held position is checked
+    // before any new trade and never asked at all, where a screened-out one
+    // was asked cheaply and said NEUTRAL. Both read as zero cost and zero
+    // outcome, so they looked identical here until the split -- with the
+    // screen off since 23 Sep 2026, "Screened out" would otherwise show every
+    // held position as if a screening stage had run one that no longer does.
+    const steps = [["On the watchlist", total], ["Already held", c.held||0], ["Screened out", c.screened_out||0], ["Judged in full", c.judged||0], ["Directional calls", (c.directional||[]).length], ["Trades placed", (c.accepted||[]).length]];
     if((c.failed||[]).length) steps.push(["Failed", c.failed.length]);
     $("funnel").innerHTML = steps.map(([l,n])=>`<div class="step"><span>${l}</span><div class="bar"><i class="${l==="Failed"?"hot":""}" style="width:${total?Math.max(1,n/total*100):0}%"></i></div><span class="n num">${n}</span></div>`).join("")
       + `<div class="muted" style="font-size:.88rem;margin-top:4px">${c.day||""} · ran ${israel(c.started)} → ${c.finished?new Date(c.finished).toLocaleTimeString("en-GB",{timeZone:"Asia/Jerusalem",hour:"2-digit",minute:"2-digit"}):"n/a"} · model cost $${(c.cost_usd??0).toFixed(2)}${(c.failed||[]).length?` · failed: ${c.failed.join(", ")}`:""}${c.lines>c.tickers?` · ${c.lines-c.tickers} duplicate lines (a second cycle ran)`:""}</div>`;
