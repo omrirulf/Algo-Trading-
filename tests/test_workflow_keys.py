@@ -15,6 +15,7 @@ import math
 import re
 from pathlib import Path
 
+import pytest
 import yaml
 
 from replay import news_ablation
@@ -542,3 +543,76 @@ def test_the_news_ablation_can_outlast_the_calls_it_makes():
     assert wf["jobs"]["ablate"]["timeout-minutes"] >= minutes * 2, (
         f"{calls} calls need about {minutes} minutes; leave room for a slower model"
     )
+
+
+def test_the_rescore_workflow_calls_no_model_and_holds_no_key():
+    """It re-reads answers that were already paid for. A key wired in here
+    would turn a free re-read into a second bill for the same calls -- and
+    the whole reason this workflow exists is not to pay twice."""
+    text = (ROOT / ".github/workflows/rescore-pairs.yml").read_text()
+    assert "secrets." not in text, "rescore-pairs must stay credential-free"
+
+    wf = yaml.safe_load(text)
+    # The only token is the run's own read-only GITHUB_TOKEN, which is what
+    # lets one run read another run's artifact.
+    assert wf["permissions"] == {"contents": "read", "actions": "read"}
+    for step in wf["jobs"]["rescore"]["steps"]:
+        for name in (step.get("env") or {}):
+            assert "ALPACA" not in name.upper(), name
+            assert "WEBHOOK" not in name.upper(), name
+            assert "API_KEY" not in name.upper(), name
+
+
+def test_the_rescore_workflow_reads_the_shape_both_producers_write():
+    """news-ablation and model-compare both emit {"_side", "line"} records
+    and both keep them for 90 days. If either stops, this stops working."""
+    for name in ("news-ablation.yml", "model-compare.yml"):
+        wf = yaml.safe_load((ROOT / f".github/workflows/{name}").read_text())
+        job = next(iter(wf["jobs"].values()))
+        saved = [s for s in job["steps"] if "upload-artifact" in str(s.get("uses", ""))]
+        assert saved, f"{name} no longer saves its pairs"
+        assert saved[0]["with"]["retention-days"] == 90
+        assert "pairs" in saved[0]["with"]["name"]
+
+
+def _rescore_splitter() -> str:
+    """The python heredoc the workflow runs, lifted out so it can be tested."""
+    run = _step("rescore-pairs.yml", "rescore", "Score each side against what the market did")["run"]
+    # YAML strips the block scalar's common indentation before bash -- and
+    # before this -- so the heredoc arrives already at column zero.
+    return run.split("python - <<'SPLIT'\n", 1)[1].split("\nSPLIT", 1)[0]
+
+
+def test_the_rescore_splitter_refuses_a_side_name_that_is_a_path(tmp_path, monkeypatch):
+    """The side name comes out of a downloaded artifact, so it is data. Used
+    unchecked it is the filename the splitter opens for writing, and an
+    artifact naming a side '../../analysis/score_journal' would have this
+    workflow overwrite the repository it is scoring with."""
+    pairs = tmp_path / "pairs"
+    pairs.mkdir()
+    (pairs / "pairs.jsonl").write_text(
+        '{"_side": "../../../etc/passwd", "line": {"ticker": "SPY"}}\n'
+    )
+    monkeypatch.setenv("RUNNER_TEMP", str(tmp_path))
+    with pytest.raises(SystemExit) as raised:
+        exec(compile(_rescore_splitter(), "<splitter>", "exec"), {"__name__": "__main__"})
+    assert "refusing side name" in str(raised.value)
+
+
+def test_the_rescore_splitter_writes_one_file_per_side(tmp_path, monkeypatch):
+    """Both producers' artifacts are read the same way, and the side names
+    are discovered rather than listed here: the ablation writes with-news
+    and without-news, model compare writes candidate and incumbent."""
+    pairs = tmp_path / "pairs"
+    pairs.mkdir()
+    (pairs / "pairs.jsonl").write_text(
+        '{"_side": "with-news", "line": {"ticker": "SPY"}}\n'
+        "\n"
+        '{"_side": "without-news", "line": {"ticker": "SPY"}}\n'
+        '{"_side": "with-news", "line": {"ticker": "QQQ"}}\n'
+    )
+    monkeypatch.setenv("RUNNER_TEMP", str(tmp_path))
+    exec(compile(_rescore_splitter(), "<splitter>", "exec"), {"__name__": "__main__"})
+    assert (tmp_path / "sides.txt").read_text().split() == ["with-news", "without-news"]
+    assert (tmp_path / "side-with-news.jsonl").read_text().count("\n") == 2
+    assert (tmp_path / "side-without-news.jsonl").read_text().count("\n") == 1
