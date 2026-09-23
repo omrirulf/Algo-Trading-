@@ -188,12 +188,15 @@ jobs:
           # be able to change what gets traded without a diff -- so this key
           # is the only part of that choice living outside the repository.
           #
-          # Same collapsing chain as the screen above, and for the same
-          # reason: the DeepInfra token this cycle needs may already be stored
-          # under whichever name it was first pasted in as, and a key nothing
-          # reads is silent. Unlike the screen, silence here is not a lost
-          # saving -- it is every ticker failing the model stage.
-          FULL_MODEL_API_KEY: ${{ secrets.FULL_MODEL_API_KEY || secrets.DEEPINFRA_API_KEY || secrets.SCREENING_API_KEY || secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY || secrets.GROQ_API_KEY }}
+          # Same collapsing chain as the screen above, minus SCREENING_API_KEY
+          # itself: that name reads as "the screening key" and is one, in the
+          # step right above this. Reusing it here for an unrelated token was
+          # the other half of the confusion behind the desk's "Already held"
+          # bug on 23 Sep 2026 -- the same word meaning two different things
+          # in two unrelated places. DEEPINFRA_API_KEY is confirmed to
+          # resolve; the rest of the chain still exists for whichever other
+          # name the token was first pasted in as.
+          FULL_MODEL_API_KEY: ${{ secrets.FULL_MODEL_API_KEY || secrets.DEEPINFRA_API_KEY || secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY || secrets.GROQ_API_KEY }}
         # --premarket on the first cron only. Batched, the model stages are
         # asked offline at half price, and the waiting for them has to happen
         # somewhere: before the session, or during it. Starting at 12:35 UTC

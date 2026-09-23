@@ -633,10 +633,23 @@ def test_the_cycle_is_handed_the_full_model_s_key():
 
 def test_the_full_model_key_accepts_the_names_it_may_already_be_stored_under():
     """Same collapsing chain as the screen, for the same reason: a key stored
-    under the name it was first pasted in as is otherwise silent."""
+    under the name it was first pasted in as is otherwise silent -- except
+    SCREENING_API_KEY, which the next test pins out on purpose."""
     cycle = _step("heartbeat.yml", "cycle", "Run one cycle")["env"]
-    for name in ("FULL_MODEL_API_KEY", "DEEPINFRA_API_KEY", *llm.SCREENING_KEY_ENV_VARS):
+    other_names = [n for n in llm.SCREENING_KEY_ENV_VARS if n != "SCREENING_API_KEY"]
+    for name in ("FULL_MODEL_API_KEY", "DEEPINFRA_API_KEY", *other_names):
         assert f"secrets.{name}" in cycle["FULL_MODEL_API_KEY"], name
+
+
+def test_the_full_model_key_does_not_reuse_the_screening_name():
+    """SCREENING_API_KEY reads as 'the screening key' and is one, one step
+    above this. Reusing it here for an unrelated token was the other half of
+    the confusion behind the desk's "Already held" bug on 23 Sep 2026 -- the
+    same word meaning two different things in two unrelated places. This one
+    is pinned out rather than merely dropped, so it cannot quietly come back
+    the next time this chain is copied somewhere else."""
+    cycle = _step("heartbeat.yml", "cycle", "Run one cycle")["env"]
+    assert "secrets.SCREENING_API_KEY" not in cycle["FULL_MODEL_API_KEY"]
 
 
 def test_the_cycle_can_outlast_the_calls_it_has_to_make():
