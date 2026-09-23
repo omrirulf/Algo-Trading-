@@ -274,6 +274,18 @@ def cycle_from(journal: list[dict], day: date) -> dict:
 
     One line per ticker: a ticker judged twice (a duplicate cycle) counts
     its first line, so the funnel is over the watchlist and not over lines.
+
+    A held position and a screened-out one look identical on the two fields
+    that used to tell them apart -- neither has an ``outcome`` (nothing was
+    dispatched) or an ``error`` (nothing failed) -- because both are lines the
+    model was never asked to judge. They used to be rare enough next to each
+    other's numbers that conflating them went unnoticed: a held position is
+    always a small slice of the watchlist, and the screen used to filter most
+    of it. With the screen off since 23 September 2026, every line in that
+    bucket is a held position, and a dashboard that still called the whole
+    bucket "screened out" was reporting a stage that no longer runs. ``held``
+    is on every line regardless of whether the screen is on, so it is what
+    actually tells the two apart.
     """
     prefix = day.isoformat()
     today = [l for l in journal if str(l.get("ts_utc") or "").startswith(prefix)]
@@ -283,7 +295,11 @@ def cycle_from(journal: list[dict], day: date) -> dict:
     lines = list(first.values())
     failed = [t for t, l in first.items() if l.get("error")]
     judged = [l for l in lines if l.get("outcome")]
-    screened_out = [l for l in lines if not l.get("outcome") and not l.get("error")]
+    held = [l for l in lines if l.get("held") and not l.get("error")]
+    screened_out = [
+        l for l in lines
+        if not l.get("outcome") and not l.get("error") and not l.get("held")
+    ]
     directional = []
     for l in judged:
         signal = l.get("signal") or {}
@@ -305,6 +321,7 @@ def cycle_from(journal: list[dict], day: date) -> dict:
         "tickers": len(lines),
         "lines": len(today),
         "failed": sorted(failed),
+        "held": len(held),
         "screened_out": len(screened_out),
         "judged": len(judged),
         "directional": sorted(directional, key=lambda d: -(d["conviction"] or 0)),
@@ -360,7 +377,8 @@ def render(book: dict) -> str:
         out.append("Closed: " + ", ".join(f"{p['ticker']} ({p['last_seen']})" for p in book["closed"]))
     c = book["cycle"]
     out.append("")
-    out.append(f"Cycle {c['day']}: {c['tickers']} tickers, {c['screened_out']} screened out, {c['judged']} judged, "
+    out.append(f"Cycle {c['day']}: {c['tickers']} tickers, {c['held']} already held, "
+               f"{c['screened_out']} screened out, {c['judged']} judged, "
                f"{len(c['directional'])} directional, {len(c['accepted'])} traded, ${c['cost_usd']:.2f}")
     for a in book["alarms"]:
         out.append(f"  [{a['severity']}] {a['title']}")

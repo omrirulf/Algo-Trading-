@@ -37,13 +37,13 @@ def managed(ticker, action, when, price=0.0, gain_r=0.0, remaining=None, new_sto
 
 
 def journal_line(ticker, when, bias="NEUTRAL", conviction=0.2, outcome="REJECTED", equity=None,
-                 error=None, cost=0.04, screen_cost=0.002):
+                 error=None, cost=0.04, screen_cost=0.002, held=False):
     return json.dumps({
-        "ticker": ticker, "ts_utc": when, "error": error,
-        "signal": None if error else {"ticker": ticker, "bias": bias, "conviction": conviction},
-        "outcome": None if (error or outcome is None) else {"status": outcome, "reason": "r", "equity": equity},
-        "usage": {"cost_usd": cost} if not error and outcome is not None else None,
-        "screen": {"usage": {"cost_usd": screen_cost}} if not error else None,
+        "ticker": ticker, "ts_utc": when, "error": error, "held": held,
+        "signal": None if (error or held) else {"ticker": ticker, "bias": bias, "conviction": conviction},
+        "outcome": None if (error or held or outcome is None) else {"status": outcome, "reason": "r", "equity": equity},
+        "usage": {"cost_usd": cost} if not error and not held and outcome is not None else None,
+        "screen": {"usage": {"cost_usd": screen_cost}} if not error and not held else None,
         "context": {"gaps": []},
     })
 
@@ -193,15 +193,34 @@ def test_the_funnel_counts_tickers_once_and_reads_the_whole_cost(logs):
           journal_line("C", "2026-09-17T15:50:00+00:00", bias="BULLISH", conviction=0.7, outcome="ACCEPTED"),
           journal_line("D", "2026-09-17T15:51:00+00:00", bias="BEARISH", conviction=0.5, outcome="REJECTED"),
           journal_line("E", "2026-09-17T15:52:00+00:00", error="context: TimeoutError"),
+          journal_line("F", "2026-09-17T15:53:00+00:00", held=True),                     # already held
           journal_line("B", "2026-09-17T19:10:00+00:00"),                                # a duplicate cycle
           journal_line("Z", "2026-09-16T15:48:00+00:00"))                                # yesterday
     c = book.build(audit, journal, DAY)["cycle"]
-    assert c["tickers"] == 5 and c["lines"] == 6
-    assert c["screened_out"] == 1 and c["judged"] == 3 and c["failed"] == ["E"]
+    assert c["tickers"] == 6 and c["lines"] == 7
+    assert c["held"] == 1 and c["screened_out"] == 1 and c["judged"] == 3 and c["failed"] == ["E"]
     assert [d["ticker"] for d in c["directional"]] == ["C", "D"]
     assert c["accepted"] == ["C"]
     assert c["cost_usd"] == pytest.approx(0.04 * 4 + 0.002 * 5, abs=0.005)
     assert c["started"] == "2026-09-17T15:48:00+00:00" and c["finished"] == "2026-09-17T19:10:00+00:00"
+
+
+def test_a_held_position_is_not_counted_as_screened_out(logs):
+    """A held ticker and a screened-out one are the same two fields (no
+    outcome, no error), so the split lives entirely in `held`. Conflating
+    them read as a live screen right up until the screen was turned off on
+    23 Sep 2026: with it off, every no-outcome/no-error line is a held
+    position, and a dashboard that still called the whole bucket "screened
+    out" was reporting a stage that no longer runs."""
+    audit, journal = logs
+    write(journal,
+          journal_line("A", "2026-09-23T15:48:00+00:00", held=True),
+          journal_line("B", "2026-09-23T15:49:00+00:00", held=True),
+          journal_line("C", "2026-09-23T15:50:00+00:00", bias="BULLISH", conviction=0.6, outcome="ACCEPTED"))
+    c = book.build(audit, journal, date(2026, 9, 23))["cycle"]
+    assert c["held"] == 2
+    assert c["screened_out"] == 0
+    assert c["judged"] == 1
 
 
 def test_the_alarms_ride_along(logs):
