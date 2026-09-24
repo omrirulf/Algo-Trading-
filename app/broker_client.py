@@ -16,12 +16,15 @@ dashboard. A profile that targets LIVE trading is refused outright -- see
 from __future__ import annotations
 
 import logging
+import math
 import os
+import re
 import time
-from dataclasses import dataclass
-from datetime import datetime, timezone
+from dataclasses import asdict, dataclass
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Optional, Protocol
+from typing import Any, Iterable, Iterator, Optional, Protocol
+from zoneinfo import ZoneInfo
 
 import yaml
 
@@ -79,6 +82,28 @@ _INSUFFICIENT_QTY_MARKERS = ("40310000", "insufficient qty available")
 # afford to wait, and the wait ends the instant the order reports terminal.
 CANCEL_SETTLE_ATTEMPTS = 20
 CANCEL_SETTLE_SECONDS = 0.2
+
+# The account snapshot (``AlpacaPaperBroker.account_snapshot``). Fills are
+# read a page at a time; 100 is Alpaca's own page maximum, and 20 pages is a
+# bound on a runaway loop rather than on a real day -- the book holds at most
+# MAX_OPEN_POSITIONS names, so two thousand fills between two heartbeats would
+# be a bug somewhere else. With no earlier snapshot to start from, ten
+# calendar days covers a week of sessions and a long weekend.
+SNAPSHOT_FILL_PAGE_SIZE = 100
+SNAPSHOT_FILL_MAX_PAGES = 20
+SNAPSHOT_FILL_LOOKBACK_DAYS = 10
+# Alpaca answers an order query with 50 orders unless asked for more, and the
+# book may hold 40 positions, each with a stop that can surface both as its
+# own order and as a leg. 500 is the most Alpaca will return in one call.
+SNAPSHOT_OPEN_ORDER_LIMIT = 500
+# Daily portfolio history is stamped in the exchange's day, so the dates are
+# read in the exchange's zone: a stamp late on a New York evening is already
+# the next day in UTC, and would file that close under the wrong session.
+_MARKET_TZ = ZoneInfo("America/New_York")
+# How much of a failure's text a snapshot keeps. One line, bounded: it goes
+# into a committed log, and a whole HTML error page from a proxy is not a
+# record anyone needs.
+_SNAPSHOT_ERROR_CHARS = 300
 
 
 class BrokerError(RuntimeError):
@@ -143,6 +168,73 @@ def _is_insufficient_qty_rejection(exc: Exception) -> bool:
     """True only for "those shares are already spoken for"."""
     message = str(exc).lower()
     return any(marker in message for marker in _INSUFFICIENT_QTY_MARKERS)
+
+
+# --- account snapshot helpers ---------------------------------------------- #
+
+
+def _number(value: Any) -> Optional[float]:
+    """A plain float, or ``None`` for anything that is not a finite number.
+
+    Alpaca sends money as strings and leaves a field out rather than zeroing
+    it. A missing value stays missing: writing 0.0 for "not reported" would
+    tell a calibration the account held no cash.
+    """
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
+
+
+def _enum_text(value: Any) -> str:
+    """An SDK enum's wire value, or the plain string the REST API sent."""
+    return str(getattr(value, "value", value) if value is not None else "")
+
+
+def _field(item: Any, name: str) -> Any:
+    """One field of a REST dict or an SDK model, whichever came back."""
+    if isinstance(item, dict):
+        return item.get(name)
+    return getattr(item, name, None)
+
+
+def _utc_iso(moment: datetime) -> str:
+    """``2026-09-25T15:40:12Z`` -- UTC, with the microseconds only if there are any."""
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    moment = moment.astimezone(timezone.utc)
+    fraction = f".{moment.microsecond:06d}" if moment.microsecond else ""
+    return moment.strftime("%Y-%m-%dT%H:%M:%S") + fraction + "Z"
+
+
+def _parse_utc(text: Any) -> Optional[datetime]:
+    """An ISO timestamp as an aware UTC datetime, or ``None``.
+
+    Alpaca's activity times carry up to nine fractional digits and a ``Z``;
+    ``fromisoformat`` takes six, so the rest is dropped -- nanoseconds do not
+    change which fill came first to anyone reading a daily record.
+    """
+    if not isinstance(text, str) or not text.strip():
+        return None
+    cleaned = re.sub(r"(\.\d{6})\d+", r"\1", text.strip())
+    if cleaned.endswith(("Z", "z")):
+        cleaned = cleaned[:-1] + "+00:00"
+    try:
+        moment = datetime.fromisoformat(cleaned)
+    except ValueError:
+        return None
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return moment.astimezone(timezone.utc)
+
+
+def _failure_text(exc: BaseException) -> str:
+    """``Type: message`` on one bounded line, for a snapshot's errors list."""
+    text = " ".join(f"{type(exc).__name__}: {exc}".split())
+    return text[:_SNAPSHOT_ERROR_CHARS]
 
 
 @dataclass(frozen=True)
@@ -474,7 +566,7 @@ class AlpacaPaperBroker:
         treats it as "leave this one alone and say so", never as permission to
         act unprotected.
         """
-        from alpaca.trading.enums import OrderType, QueryOrderStatus
+        from alpaca.trading.enums import QueryOrderStatus
         from alpaca.trading.requests import GetOrdersRequest
 
         symbol = ticker.strip().upper()
@@ -484,6 +576,18 @@ class AlpacaPaperBroker:
             )
         except Exception as exc:  # noqa: BLE001
             raise BrokerError(f"get_orders failed for {symbol}: {exc}") from exc
+        return next(self._live_stops(orders, symbol), None)
+
+    def _live_stops(self, orders: Optional[Iterable[Any]],
+                    symbol: Optional[str] = None) -> Iterator[StopOrder]:
+        """Every live STOP in an open-orders answer, legs included, each once.
+
+        The one definition of "a live stop" in this module: the position
+        manager's lookup takes the first for its symbol, and the account
+        snapshot records them all (``symbol`` None), so what the record calls
+        a stop is exactly what the ladder would have acted on.
+        """
+        from alpaca.trading.enums import OrderType
 
         seen: set[str] = set()
         for parent in orders or []:
@@ -492,7 +596,8 @@ class AlpacaPaperBroker:
                 if not order_id or order_id in seen:
                     continue
                 seen.add(order_id)
-                if str(getattr(candidate, "symbol", "")).upper() != symbol:
+                candidate_symbol = str(getattr(candidate, "symbol", "")).upper()
+                if symbol is not None and candidate_symbol != symbol:
                     continue
                 kind = getattr(candidate, "order_type", None) or getattr(candidate, "type", None)
                 if str(getattr(kind, "value", kind)) != OrderType.STOP.value:
@@ -504,14 +609,13 @@ class AlpacaPaperBroker:
                 if stop_price is None:
                     continue
                 side = getattr(candidate, "side", "")
-                return StopOrder(
+                yield StopOrder(
                     order_id=order_id,
-                    ticker=symbol,
+                    ticker=symbol if symbol is not None else candidate_symbol,
                     qty=int(float(candidate.qty)),
                     stop_price=float(stop_price),
                     side=str(getattr(side, "value", side)),
                 )
-        return None
 
     def replace_stop_order(self, order_id: str, qty: int, stop_price: float,
                            current_qty: Optional[int] = None) -> StopOrder:
@@ -857,3 +961,173 @@ class AlpacaPaperBroker:
             stop_price=float(placed if placed is not None else stop_price),
             side=side,
         )
+
+    # ------------------------------------------------------------------ #
+    # The account, read for the record
+    # ------------------------------------------------------------------ #
+    # Nothing below places, replaces or cancels anything. It exists so the
+    # shadow funds can be calibrated against the real account -- same engine,
+    # same position manager, simulated broker -- without any measurement
+    # workflow ever holding these keys: the heartbeat, which holds them
+    # anyway, reads the account once a run and commits the answer as a line
+    # of logs/account.jsonl (app/account_snapshot.py). Until this, the record
+    # had no cash, no closing equity, no fill prices and no stop exits: the
+    # audit log says what was asked for, never what the broker did.
+
+    def account_snapshot(self, since: Optional[datetime]) -> dict:
+        """The account as the broker sees it now, in five independent reads.
+
+        ``account`` (equity, cash, long and short market value, last close's
+        equity), ``positions`` (signed quantity, short negative), ``stops``
+        (every live STOP order, by the same rule the position manager uses),
+        ``fills`` (every fill and partial fill after ``since``, or over the
+        last ten calendar days when there is no ``since``, oldest first) and
+        ``history`` (a month of the account's equity at each day's close,
+        dated in New York; read during a session, the last point is today's
+        and still moving).
+
+        Each read stands alone. One that fails leaves its part ``None`` and
+        adds ``{"part", "error"}`` to ``errors``, and the other four are still
+        recorded: a broker that answers four questions out of five has told
+        the record four true things. ``None`` rather than ``[]`` on purpose --
+        an empty list is a real answer ("no open positions"), and a
+        calibration that read a failed read as a flat book would be comparing
+        the simulation with an account that never existed.
+
+        ``fills_after`` says which window ``fills`` covers, so a reader can
+        tell a quiet day from a narrow window. Consecutive windows overlap by
+        the few seconds a snapshot takes (``app.account_snapshot`` stamps the
+        time before it reads), so the same fill can appear in two snapshots;
+        its ``id`` is the key to deduplicate on.
+        """
+        after = since if since is not None else (
+            datetime.now(timezone.utc) - timedelta(days=SNAPSHOT_FILL_LOOKBACK_DAYS)
+        )
+        snapshot: dict[str, Any] = {
+            "account": None, "positions": None, "stops": None, "fills": None,
+            "history": None, "fills_after": _utc_iso(after), "errors": [],
+        }
+        errors: list[dict] = snapshot["errors"]
+        readers = (
+            ("account", self._read_account),
+            ("positions", self._read_positions),
+            ("stops", self._read_stops),
+            ("fills", lambda: self._read_fills(after, errors)),
+            ("history", self._read_history),
+        )
+        for part, read in readers:
+            try:
+                snapshot[part] = read()
+            except Exception as exc:  # noqa: BLE001 -- one part, never the whole record
+                errors.append({"part": part, "error": _failure_text(exc)})
+        return snapshot
+
+    def _read_account(self) -> dict:
+        account = self._client.get_account()
+        # short_market_value is reported as Alpaca sends it: negative for a
+        # short book. Only the position rows are made absolute, as
+        # OpenPosition already is.
+        return {
+            name: _number(getattr(account, name, None))
+            for name in ("equity", "cash", "long_market_value", "short_market_value", "last_equity")
+        }
+
+    def _read_positions(self) -> list[dict]:
+        rows = []
+        for p in self._client.get_all_positions() or []:
+            qty = _number(getattr(p, "qty", None))
+            # Signed by the side, not by trusting the quantity's own sign:
+            # the SDK's model carries a side, and a short must come out
+            # negative whether the number arrived as "-10" or as "10".
+            if qty is not None and _enum_text(getattr(p, "side", "")).lower() == "short":
+                qty = -abs(qty)
+            value = _number(getattr(p, "market_value", None))
+            rows.append({
+                "ticker": str(getattr(p, "symbol", "")).upper(),
+                "qty": qty,
+                "avg_entry_price": _number(getattr(p, "avg_entry_price", None)),
+                "market_value": abs(value) if value is not None else None,
+                "current_price": _number(getattr(p, "current_price", None)),
+            })
+        return rows
+
+    def _read_stops(self) -> list[dict]:
+        from alpaca.trading.enums import QueryOrderStatus
+        from alpaca.trading.requests import GetOrdersRequest
+
+        orders = self._client.get_orders(
+            GetOrdersRequest(status=QueryOrderStatus.OPEN, nested=True,
+                             limit=SNAPSHOT_OPEN_ORDER_LIMIT)
+        )
+        return [asdict(stop) for stop in self._live_stops(orders)]
+
+    def _read_fills(self, after: datetime, errors: list[dict]) -> list[dict]:
+        """Every FILL and PARTIAL_FILL activity after ``after``, oldest first.
+
+        Paged by the last activity's id while a page comes back full. A page
+        that fails fails the whole part, so the snapshot says ``None`` and
+        the next one reads this window again. Hitting the page cap is
+        different: what was read is kept and the truncation is written into
+        ``errors``, because the next window starts after this snapshot and
+        what lay beyond the cap would otherwise vanish without a word.
+        """
+        params: dict[str, Any] = {
+            "after": _utc_iso(after), "direction": "asc", "page_size": SNAPSHOT_FILL_PAGE_SIZE,
+        }
+        fills: list[dict] = []
+        seen: set[str] = set()
+        complete = False
+        for _ in range(SNAPSHOT_FILL_MAX_PAGES):
+            page = self._client.get("/account/activities/FILL", params)
+            if not isinstance(page, list):
+                raise BrokerError(f"fill activities came back as {type(page).__name__}, not a list")
+            for activity in page:
+                fill_id = str(_field(activity, "id") or "")
+                if fill_id and fill_id in seen:
+                    continue
+                seen.add(fill_id)
+                fills.append({
+                    "id": fill_id,
+                    "order_id": str(_field(activity, "order_id") or ""),
+                    "ticker": str(_field(activity, "symbol") or "").upper(),
+                    "side": _enum_text(_field(activity, "side")).lower(),
+                    "qty": _number(_field(activity, "qty")),
+                    "price": _number(_field(activity, "price")),
+                    "at": _field(activity, "transaction_time"),
+                })
+            last_id = _field(page[-1], "id") if page else None
+            if len(page) < SNAPSHOT_FILL_PAGE_SIZE or not last_id:
+                complete = len(page) < SNAPSHOT_FILL_PAGE_SIZE
+                break
+            params = {**params, "page_token": str(last_id)}
+        if not complete:
+            errors.append({
+                "part": "fills",
+                "error": f"stopped after {len(fills)} fills; any later in the window were not read",
+            })
+
+        # Asked for in ascending order already; sorted again on the parsed
+        # time because the record promises oldest first and a lexical sort
+        # of mixed-precision stamps does not keep that promise. A time that
+        # does not parse keeps its place at the end, verbatim.
+        def moment(fill: dict) -> tuple[bool, datetime]:
+            parsed = _parse_utc(fill["at"])
+            return (parsed is None, parsed or datetime.min.replace(tzinfo=timezone.utc))
+
+        fills.sort(key=moment)
+        for fill in fills:
+            parsed = _parse_utc(fill["at"])
+            fill["at"] = _utc_iso(parsed) if parsed is not None else fill["at"]
+        return fills
+
+    def _read_history(self) -> dict:
+        raw = self._client.get("/account/portfolio/history", {"period": "1M", "timeframe": "1D"})
+        if not isinstance(raw, dict):
+            raise BrokerError(f"portfolio history came back as {type(raw).__name__}, not an object")
+        days: list[str] = []
+        equity: list[Optional[float]] = []
+        for stamp, value in zip(raw.get("timestamp") or [], raw.get("equity") or []):
+            moment = datetime.fromtimestamp(int(stamp), tz=timezone.utc).astimezone(_MARKET_TZ)
+            days.append(moment.date().isoformat())
+            equity.append(_number(value))
+        return {"days": days, "equity": equity}
