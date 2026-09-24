@@ -144,6 +144,19 @@ class JournalEntry:
         """The model was asked and gave no usable answer: a failed or timed-out call."""
         return not self.model_answered and not self.held and self.stage != "context"
 
+    @property
+    def failure_kind(self) -> Optional[str]:
+        """For a failed call, ``"setup"`` (our key or configuration) or ``"model"``; else None.
+
+        See ``analysis.call_errors``: only model errors count toward the
+        owner's trigger (c).
+        """
+        if not self.model_failed:
+            return None
+        from analysis.call_errors import failure_kind
+
+        return failure_kind(self.error)
+
     def scores_with_a_source(self) -> dict[str, Optional[float]]:
         """The line's scores, with any score that had no source read as null.
 

@@ -228,6 +228,13 @@ class Fund:
         #: Every line's outcome, kept only when asked for (``keep_actions``):
         #: calibration explains a differing trade with it.
         self.decisions: Optional[list[Decision]] = [] if keep_actions else None
+        #: For the owner's order report (``shadow.order_matters``): every
+        #: order the engine accepted and every signal a portfolio limit
+        #: refused, dated by the cycle day whose list it was. Other refusals
+        #: are not kept -- a thousand funds would carry every NEUTRAL.
+        self.order_events: list = []
+        #: Cycles in which at least one signal was dispatched.
+        self.cycles_dispatched = 0
 
     def session(self, day: date, cycle: Optional[Sequence[Line]]) -> Day:
         """One session. ``cycle`` is the previous day's lines, or None if none ran."""
@@ -275,6 +282,9 @@ class Fund:
                 self.tally.estimated_r += 1
 
     def _enter(self, cycle: Sequence[Line]) -> None:
+        from shadow.order_matters import Event, capacity_kind
+
+        dispatched = False
         for line in cycle:
             signal = self.signal_for(line)
             if line.ticker in self.broker.positions:        # SKIP_HELD_TICKERS
@@ -285,6 +295,10 @@ class Fund:
             if signal is None:
                 continue
             result = self.engine.execute(signal)
+            dispatched = True
+            if result.status is ExecutionStatus.ACCEPTED or capacity_kind(result.reason) is not None:
+                self.order_events.append(Event(line.day, line.ticker, signal.conviction,
+                                               result.status.value, result.reason))
             if self.decisions is not None:
                 self.decisions.append(Decision(self.broker.day, line.day, line.ticker, signal.bias.value,
                                                signal.conviction, result.status.value, result.reason))
@@ -299,6 +313,7 @@ class Fund:
                                                  f"no entry that day")
             else:
                 self.tally.rejected += 1
+        self.cycles_dispatched += dispatched
 
 
 class IndexFund:

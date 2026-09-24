@@ -14,6 +14,7 @@ files, no clock. Read-only in every direction.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Iterable, Mapping, Optional, Sequence
@@ -71,6 +72,13 @@ OUTCOME_TEXT = {
 #: and tell the owner. Nothing here reverts, switches or trades anything.
 WATCH_DAYS = 5
 WATCH_MAX_FAILED_SHARE = 0.05
+#: Trigger (c) counts from this cycle day (Amendment 2026-09-24, the owner's
+#: decision after it tripped on the 2026-09-24 key outage). Earlier days are
+#: shown, never counted.
+FAILURE_WATCH_START = date(2026, 9, 25)
+#: The same-day phone alert: more than this share of one run's model calls
+#: failed, setup and model errors together (``analysis.health``).
+RUN_ALERT_FAILED_SHARE = 0.20
 
 
 # --------------------------------------------------------------------------- #
@@ -332,6 +340,69 @@ def status_line(independent: int, looks: Sequence[Look]) -> str:
 # --------------------------------------------------------------------------- #
 
 
+# --------------------------------------------------------------------------- #
+# O'Brien-Fleming bars for any spacing of the looks
+# --------------------------------------------------------------------------- #
+
+
+def _crossing(bars: Sequence[float], fractions: Sequence[float], points: int) -> float:
+    """P(|Z_k| >= bars[k] at some look) with no effect, by exact recursion on a grid.
+
+    Z_k = S(t_k) / sqrt(t_k) for a Brownian motion S, the joint law of a
+    statistic read at information fractions t_1 < ... < t_K = 1. The density
+    of S over the region still running is carried from one look to the
+    next by the normal kernel of the increment (Armitage, McPherson and Rowe
+    1969), integrated by the trapezoid rule.
+    """
+    import numpy as np
+
+    def phi(x):
+        return np.exp(-0.5 * x * x) / math.sqrt(2.0 * math.pi)
+
+    def tail(x):
+        return 0.5 * np.vectorize(math.erfc)(np.asarray(x) / math.sqrt(2.0))
+
+    def weights(grid):
+        w = np.full(len(grid), grid[1] - grid[0])
+        w[0] = w[-1] = w[0] / 2.0
+        return w
+
+    edge = bars[0] * math.sqrt(fractions[0])
+    total = 2.0 * float(tail(bars[0]))
+    grid = np.linspace(-edge, edge, points)
+    density = phi(grid / math.sqrt(fractions[0])) / math.sqrt(fractions[0])
+    for k in range(1, len(fractions)):
+        sd = math.sqrt(fractions[k] - fractions[k - 1])
+        edge = bars[k] * math.sqrt(fractions[k])
+        mass = weights(grid) * density
+        total += float(np.sum(mass * (tail((edge - grid) / sd) + tail((edge + grid) / sd))))
+        if k < len(fractions) - 1:
+            new = np.linspace(-edge, edge, points)
+            density = (phi((new[:, None] - grid[None, :]) / sd) / sd) @ mass
+            grid = new
+    return total
+
+
+def obrien_fleming_bars(information: Sequence[float], alpha: float = 0.05, points: int = 1001) -> list[float]:
+    """The two-sided O'Brien-Fleming bars for looks at the given amounts of information.
+
+    Bar k is C / sqrt(t_k), t_k the look's share of the final information,
+    with C set so the chance of crossing any bar when nothing is there is
+    exactly ``alpha``. Three equal looks give 3.471, 2.454, 2.004 -- the
+    race's ``CHECKPOINTS``; the fund test's own looks give its own bars.
+    """
+    fractions = [x / information[-1] for x in information]
+    low, high = 1.0, 5.0
+    for _ in range(50):
+        c = (low + high) / 2.0
+        if _crossing([c / math.sqrt(t) for t in fractions], fractions, points) > alpha:
+            low = c
+        else:
+            high = c
+    c = (low + high) / 2.0
+    return [c / math.sqrt(t) for t in fractions]
+
+
 def index_gaps(bars: Sequence[tuple[date, float, float, float]], days: Sequence[date]) -> set[date]:
     """The entry days the index has no bar for and never will: see ``INDEX_GAP_SETTLE_SESSIONS``."""
     have = {bar[0] for bar in bars}
@@ -381,14 +452,24 @@ class WatchDay:
     day: date
     #: Names the model was asked about (not held).
     asked: int
-    #: Of those, no usable answer: a failed or timed-out call.
+    #: Of those, no usable answer because of the model: a timeout, a server
+    #: error, an empty or off-schema answer. What trigger (c) counts.
     failed: int
     #: Of the answers, how many were SHORT.
     shorts: int
+    #: Of those asked, no answer because of our own setup: a bad key, an
+    #: account or model name the provider refused (``analysis.call_errors``).
+    #: Shown, never counted by trigger (c).
+    setup_failed: int = 0
+
+    @property
+    def attempted(self) -> int:
+        """Calls that reached the model: what trigger (c) divides by."""
+        return self.asked - self.setup_failed
 
     @property
     def answered(self) -> int:
-        return self.asked - self.failed
+        return self.asked - self.failed - self.setup_failed
 
 
 @dataclass(frozen=True)
@@ -399,7 +480,10 @@ class Trip:
 
 
 def failure_trips(days: Sequence[WatchDay], max_names_per_day: Optional[int] = None) -> list[Trip]:
-    """Trigger (c): failed or timed-out calls above 5% of names over 5 cycle days.
+    """Trigger (c): model errors above 5% of the calls that reached the model, over 5 cycle days.
+
+    Setup errors (``WatchDay.setup_failed``) are not counted, and days
+    before ``FAILURE_WATCH_START`` are not judged (Amendment 2026-09-24).
 
     With fewer than 5 cycle days so far, the run of days there are is still
     judged when the answer is already certain: if the failures exceed 5% of
@@ -407,9 +491,10 @@ def failure_trips(days: Sequence[WatchDay], max_names_per_day: Optional[int] = N
     ``max_names_per_day`` for each day still to come), no later day can
     bring the window back under. Otherwise it waits for the fifth day.
     """
+    days = [d for d in days if d.day >= FAILURE_WATCH_START]
     trips: list[Trip] = []
     if days and len(days) < WATCH_DAYS and max_names_per_day:
-        asked = sum(d.asked for d in days)
+        asked = sum(d.attempted for d in days)
         failed = sum(d.failed for d in days)
         ceiling = asked + max_names_per_day * (WATCH_DAYS - len(days))
         if failed > WATCH_MAX_FAILED_SHARE * ceiling:
@@ -418,7 +503,7 @@ def failure_trips(days: Sequence[WatchDay], max_names_per_day: Optional[int] = N
                               f"above 5% of any {WATCH_DAYS}-day window that contains them"))
     for i in range(len(days) - WATCH_DAYS + 1):
         run = days[i:i + WATCH_DAYS]
-        asked = sum(d.asked for d in run)
+        asked = sum(d.attempted for d in run)
         failed = sum(d.failed for d in run)
         if asked and failed / asked > WATCH_MAX_FAILED_SHARE:
             trips.append(Trip(run[0].day, run[-1].day,
@@ -461,6 +546,7 @@ __all__ = [
     "CHECKPOINTS",
     "COIN_FLIP_PERCENTILE",
     "DECISION_CUTOFF",
+    "FAILURE_WATCH_START",
     "INDEX_GAP_SETTLE_SESSIONS",
     "INDEX_TICKER",
     "Look",
@@ -469,6 +555,7 @@ __all__ = [
     "NO_ARM",
     "OUTCOME_TEXT",
     "REGISTERED_HORIZON",
+    "RUN_ALERT_FAILED_SHARE",
     "Trip",
     "WATCH_DAYS",
     "WATCH_MAX_FAILED_SHARE",
@@ -487,6 +574,7 @@ __all__ = [
     "next_look",
     "next_trading_day",
     "no_short_trips",
+    "obrien_fleming_bars",
     "status_line",
     "trading_days_after",
 ]

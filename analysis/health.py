@@ -188,6 +188,34 @@ def missized_stops(actions: list[dict]) -> Optional[Alarm]:
                  f"position is unprotected however live the order looks. {detail}")
 
 
+def failed_calls(today: list[dict]) -> Optional[Alarm]:
+    """More than 20% of the run's model calls failed, setup and model errors together.
+
+    The owner's rule of 24 Sep 2026: such a run pings the phone the same day,
+    whichever kind of failure it was. A critical alarm is what the brief's
+    push sends as an urgent notification. The split into setup errors (our
+    key or configuration) and model errors (timeouts, bad or empty answers)
+    is ``analysis.call_errors``; only model errors count toward trigger (c).
+    """
+    from analysis.call_errors import SETUP
+    from analysis.decision_gate import RUN_ALERT_FAILED_SHARE
+    from analysis.reader import entry_from
+
+    asked = [e for e in (entry_from(line) for line in today)
+             if e is not None and not e.held and e.stage != "context"]
+    failed = [e for e in asked if e.model_failed]
+    if not asked or len(failed) / len(asked) <= RUN_ALERT_FAILED_SHARE:
+        return None
+    setup = sum(1 for e in failed if e.failure_kind == SETUP)
+    sample = next((e.error for e in failed if e.error), "no error text")
+    return Alarm(CRITICAL,
+                 f"{len(failed)} of {len(asked)} model calls failed today "
+                 f"({setup} setup, {len(failed) - setup} model)",
+                 f"Above the {RUN_ALERT_FAILED_SHARE:.0%} alert line. Setup errors are our key or "
+                 f"configuration and do not count toward trigger (c); model errors do. "
+                 f"First error: {sample[:200]}")
+
+
 def failed_tickers(today: list[dict]) -> Optional[Alarm]:
     """A ticker that produced no signal is journalled with its error (PR #56).
 
@@ -285,6 +313,7 @@ def check(journal: Path, audit: Path, day: date) -> list[Alarm]:
         no_cycle(today),
         naked_positions(actions),
         missized_stops(actions),
+        failed_calls(today),
         failed_tickers(today),
         screen_errors(today),
         cftc_gaps(today),

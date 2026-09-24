@@ -269,7 +269,20 @@ reverts or trades anything by itself; the owner decides what happens next.
   where Opus shorted;
 - (b) 5 answered cycle days in a row with no SHORT call while SPY fell over
   those days;
-- (c) failed or timed-out calls above 5% of names over any 5 cycle days.
+- (c) model errors above 5% of the calls that reached the model over any 5
+  cycle days, counted from **2026-09-25**.
+
+Failed calls are of two kinds (`analysis/call_errors.py`). **Setup errors**
+are our own: a bad or missing key, an account or a model name the provider
+refuses (HTTP 401, 402, 403, 404 and their wording). They are logged and
+shown on every run and do not count toward (c). **Model errors** are
+everything else — timeouts, server errors, rate limits, empty or off-schema
+answers, an answer about another ticker — and they count. Anything not
+recognised as a setup error is a model error.
+
+Separately, if more than **20%** of one run's calls fail, of either kind,
+the day's record raises a critical alarm, which is pushed to the owner's
+phone that day.
 
 The race prints (b) and (c) on every run. Changing the model because of one
 is a new registration of the model arm, like Amendment 1.
@@ -289,4 +302,6 @@ is a new registration of the model arm, like Amendment 1.
 | 2026-09-24 | **Model watch** (operational, not a decision rule) | The owner replaced a standing "never revert to Opus" instruction with three triggers that stop and go to the owner. Section 10. |
 | 2026-09-24 | **Amendment policy** (new registration) | Asked by the owner, with the rules above. The Status paragraph and section 7 said only bug fixes could amend this file; they now also allow the owner's dated new registrations, each of which must say why and whether any result it could have been fitted to existed. Made before any trade in the decision window resolved. |
 | 2026-09-24 | **Bug fix**: a VT day the price source never prints no longer holds every look | The index test treated any unpriced VT day as an outage and made the look wait. The price source has no VT bar for 2026-09-22 (it has SPY's and NVDA's; confirmed from its raw rows on 2026-09-24), so one such day inside the window would have held every look unreadable for good and the race could never decide. A missing day now makes the look wait until the source has published five later VT sessions without it; then that entry day is left out of the index comparison only, for every arm alike, and the count is printed. Five is a week of data after the gap, well past the day or two a late bar takes. 2026-09-22 is before the cutoff, so no look is affected today; no trade in the decision window had resolved. |
+| 2026-09-24 | **Incident: trigger (c) tripped; the owner decided to continue** | On 2026-09-23 and 2026-09-24, 61 of 123 calls failed: 3 read timeouts on 2026-09-23, and all 58 calls on 2026-09-24 got HTTP 401 because the key chain picked another provider's key (fixed in PR #112). Trigger (c) tripped and the process stopped for the owner, as section 10 requires. The owner decided the failures were our setup, not the model, and the experiment continues. No rule of the race changed. |
+| 2026-09-24 | **Model watch: setup errors are not model errors** (the owner's decision) | Failed calls are split into setup errors (our key or configuration; shown, not counted) and model errors (counted by (c)); (c) counts from 2026-09-25; and a run with more than 20% of its calls failed, of either kind, pages the owner the same day. Section 10. Operational: it touches no decision rule and no result. |
 | 2026-09-24 | **Made consistent with the planned looks** (no rule change) | Section 6 called any partial window exploratory and section 4 counted from the registration date; both now read as the planned looks and the 2026-09-23 cutoff require, so an early stop at a look is not contradicted by this file's own text. |

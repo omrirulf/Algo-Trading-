@@ -22,7 +22,7 @@ from shadow import calibration as calib
 from shadow.audit import live_audit_guarded
 from shadow.calibration import (
     OPEN,
-    PROPOSED_PASS_RULE,
+    PASS_RULE,
     CalibrationResult,
     Difference,
     Integrity,
@@ -696,30 +696,32 @@ def test_matching_prefers_the_same_session_then_the_next():
 
 
 def crafted(closes: int = 15, worst: float = 0.004, real_trades: int = 10, matched: int = 10,
-            differences=(), integrity: Integrity | None = None) -> CalibrationResult:
+            differences=(), integrity: Integrity | None = None, sim_only: int = 0) -> CalibrationResult:
     # The gap drifts steadily out to ``worst`` on the last close: a drift the
     # gap condition sees and the tracking error, a spread, barely does.
     days = [d.date() for d in pd.bdate_range("2026-10-02", periods=closes)]
     series = [SeriesPoint(day, 100_000.0 * (1 + worst * (i + 1) / closes), 100_000.0)
               for i, day in enumerate(days)]
     trades = [Trade(days[0], f"T{i}", OPEN, "buy", 10, 100.0) for i in range(real_trades)]
+    # The sim made the matched trades, and ``sim_only`` the account never made.
+    extra = [Trade(days[0], f"S{i}", OPEN, "buy", 10, 100.0) for i in range(sim_only)]
     return CalibrationResult(
         start=date(2026, 10, 1), series=series, day0=SeriesPoint(date(2026, 10, 1), 100_000.0, 100_000.0),
-        real_trades=trades, matches=[Match(t, t) for t in trades[:matched]], differences=list(differences),
-        integrity=integrity or Integrity(),
+        real_trades=trades, sim_trades=trades[:matched] + extra, matches=[Match(t, t) for t in trades[:matched]],
+        differences=list(differences), integrity=integrity or Integrity(),
     )
 
 
-#: The proposed rule as it would read once approved: what the verdicts are
-#: tested against. The rule itself stays unapproved (see the pinning test).
-APPROVED = dataclasses.replace(PROPOSED_PASS_RULE, approved=True)
+#: The rule as it reads once in force: what the verdicts are tested
+#: against. The flag flips with the start date (see the pinning tests).
+APPROVED = dataclasses.replace(PASS_RULE, approved=True)
 
 
 def test_a_clean_complete_calibration_passes_every_condition():
     passed, lines = calib.evaluate_pass_rule(crafted(), APPROVED)
     assert passed
     assert lines[0].startswith("Approved rule")
-    assert [line.split(":")[1].split()[0] for line in lines[1:]] == ["PASS"] * 5
+    assert [line.split(":")[1].split()[0] for line in lines[1:]] == ["PASS"] * 6
 
 
 def test_an_unapproved_rule_cannot_pass_however_good_the_numbers():
@@ -729,8 +731,8 @@ def test_an_unapproved_rule_cannot_pass_however_good_the_numbers():
     result = crafted()
     passed, lines = calib.evaluate_pass_rule(result)
     assert not passed
-    assert "not approved" in lines[0] and "cannot pass" in lines[1]
-    assert [line.split(":")[1].split()[0] for line in lines[2:]] == ["PASS"] * 5
+    assert "not in force" in lines[0] and "cannot pass" in lines[1]
+    assert [line.split(":")[1].split()[0] for line in lines[2:]] == ["PASS"] * 6
     assert calib.calibration_status(result, (True, lines)) == "failed", "even a forged verdict"
     assert calib.calibration_status(result, (True, lines), APPROVED) == "passed"
 
@@ -742,6 +744,10 @@ def test_an_unapproved_rule_cannot_pass_however_good_the_numbers():
     (crafted(differences=[Difference(date(2026, 10, 2), "X", "none", "bought 1 @ 1.00", "unexplained")]), "4."),
     (crafted(integrity=Integrity(manager_errors=["NVDA: BrokerError"])), "5."),
     (crafted(integrity=Integrity(uncovered=["2026-10-05 NVDA: 50 held, stops cover 40"])), "5."),
+    # Every real trade matched, but the sim made two more the account never
+    # made: 10 of 12 is 83%, under 90% the other way round.
+    (crafted(sim_only=2), "6."),
+    (crafted(sim_only=1), None),                         # 10 of 11 is 91%
 ])
 def test_each_condition_fails_on_its_own(result, failing):
     passed, lines = calib.evaluate_pass_rule(result, APPROVED)
@@ -782,12 +788,15 @@ def test_status_follows_the_verdict_once_complete():
     assert calib.calibration_status(None, None) == "not_started"
 
 
-def test_the_pass_rule_is_proposed_and_not_approved():
-    rule = PROPOSED_PASS_RULE
-    assert rule.approved is False
-    assert "PROPOSED" in rule.text[0] and len(rule.text) == 6
-    assert (rule.closes, rule.max_gap_pct, rule.tracking_error_pct, rule.matched_share, rule.unexplained) == (
-        15, 0.01, 0.002, 0.90, 0)
+def test_the_pass_rule_is_the_owners():
+    """Approved on 2026-09-24 with a sixth condition and a restart-from-zero
+    policy; the flag takes effect with the start date (test_shadow_run)."""
+    rule = PASS_RULE
+    assert "all six hold over 15 trading days" in rule.text[0] and len(rule.text) == 8
+    assert rule.text[6].startswith("6. The other way round: at least 90% of the sim's trades")
+    assert "restart from zero" in rule.text[7] and "turns out to be a bug counts as a fail" in rule.text[7]
+    assert (rule.closes, rule.max_gap_pct, rule.tracking_error_pct, rule.matched_share, rule.unexplained,
+            rule.sim_matched_share) == (15, 0.01, 0.002, 0.90, 0, 0.90)
 
 
 # --------------------------------------------------------------------------- #
@@ -847,7 +856,7 @@ def test_calibration_json_before_the_start_is_not_started():
     assert out["series"] == [] and out["differences"] == []
     assert all(v is None for v in out["metrics"].values())
     assert out["holding_days"] == holding
-    assert out["pass_rule"] == {"text": list(PROPOSED_PASS_RULE.text), "approved": False, "verdicts": []}
+    assert out["pass_rule"] == {"text": list(PASS_RULE.text), "approved": False, "verdicts": []}
 
 
 def test_calibration_json_of_a_run_matches_the_contract():

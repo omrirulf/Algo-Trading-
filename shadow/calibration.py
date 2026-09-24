@@ -11,7 +11,7 @@ the equity at each close, and every trade that differs, with the reason.
 Nothing here trades or writes. The real account is read from what the
 heartbeat recorded (``logs/account.jsonl``, see ``load_snapshots``) and from
 the live audit log, read as text; the only book that changes is the sim's.
-It does not start until the owner has approved ``PROPOSED_PASS_RULE`` and set
+It does not start until the owner has approved ``PASS_RULE`` and set
 ``shadow.schedule.CALIBRATION_START``.
 
 Timing, which everything below depends on
@@ -798,6 +798,11 @@ class Metrics:
     timing: int = 0
     real_trades: int = 0
     matched: int = 0
+    #: The other way round (the owner's condition 6): the sim's trades that
+    #: the real account also made within one session.
+    sim_matched_share: Optional[float] = None
+    sim_trades: int = 0
+    sim_matched: int = 0
 
 
 @dataclass
@@ -839,6 +844,8 @@ class CalibrationResult:
             previous = point
         matched_real = {m.real for m in self.matches}
         matched = sum(1 for t in self.real_trades if t in matched_real)
+        matched_sim = {m.sim for m in self.matches}
+        sim_matched = sum(1 for t in self.sim_trades if t in matched_sim)
         return Metrics(
             max_abs_gap_pct=max(gaps) if gaps else None,
             tracking_error_pct=statistics.pstdev(spreads) if len(spreads) >= 2 else None,
@@ -847,6 +854,9 @@ class CalibrationResult:
             timing=sum(1 for m in self.matches if m.lag),
             real_trades=len(self.real_trades),
             matched=matched,
+            sim_matched_share=sim_matched / len(self.sim_trades) if self.sim_trades else None,
+            sim_trades=len(self.sim_trades),
+            sim_matched=sim_matched,
         )
 
 
@@ -1149,26 +1159,30 @@ def compare_trades(result: CalibrationResult, snapshots: Sequence[Snapshot], aud
 
 
 # --------------------------------------------------------------------------- #
-# h) The pass rule -- PROPOSED, NOT APPROVED
+# h) The pass rule -- approved by the owner on 2026-09-24; in force with the start date
 # --------------------------------------------------------------------------- #
 
 
 @dataclass(frozen=True)
 class PassRule:
     text: tuple[str, ...]
-    #: False until the owner approves it, in a reviewed change to this file
-    #: made together with ``shadow.schedule.CALIBRATION_START``.
+    #: The owner approved the rule on 2026-09-24 and asked for it to take
+    #: effect together with the start date, once the first account snapshot
+    #: exists: this flag and ``shadow.schedule.CALIBRATION_START`` change
+    #: together, in one reviewed change (a test enforces it).
     approved: bool
     closes: int
     max_gap_pct: float
     tracking_error_pct: float
     matched_share: float
     unexplained: int
+    #: Condition 6: the share of the sim's trades the real account also made.
+    sim_matched_share: float = 0.90
 
 
-PROPOSED_PASS_RULE = PassRule(
+PASS_RULE = PassRule(
     text=(
-        "PROPOSED, NOT APPROVED. Calibration passes only if all five hold over 15 trading days:",
+        "Calibration passes only if all six hold over 15 trading days:",
         "1. On every one of the 15 closes, the simulated equity is within 1.0% of the real account's equity.",
         "2. The tracking error of daily returns (the spread of sim minus real, day by day) is at most "
         "0.20% a day.",
@@ -1177,6 +1191,10 @@ PROPOSED_PASS_RULE = PassRule(
         "4. No 'unexplained' difference: every trade that differs names a reason from the fixed list.",
         "5. Integrity: no unexpected engine error, no position-manager error, every sim position's stops "
         "cover it, and no line reached the live audit log.",
+        "6. The other way round: at least 90% of the sim's trades are also made by the real account "
+        "within one session.",
+        "If calibration fails: the cause is fixed and logged in the Amendments table, and the 15 trading "
+        "days restart from zero. A difference whose stated reason turns out to be a bug counts as a fail.",
     ),
     approved=False,
     closes=DAYS_NEEDED,
@@ -1211,6 +1229,10 @@ PROPOSED_PASS_RULE = PassRule(
     unexplained=0,
     # (5) is not statistics: any one of those is a bug, and a sim with a bug
     # proves nothing however close its equity line runs.
+    # (6) The owner's addition of 24 Sep 2026: (3) alone lets a sim that
+    # trades far more than the account pass, as long as it also makes the
+    # account's trades. Asking the same of the sim's trades closes that.
+    sim_matched_share=0.90,
 )
 
 
@@ -1219,7 +1241,7 @@ def _pct(value: float) -> str:
 
 
 def evaluate_pass_rule(result: Optional[CalibrationResult],
-                       rule: PassRule = PROPOSED_PASS_RULE) -> tuple[bool, list[str]]:
+                       rule: PassRule = PASS_RULE) -> tuple[bool, list[str]]:
     """Each condition's verdict (PASS, FAIL or PENDING), and whether the whole rule passed.
 
     The rule passes only on a complete calibration -- ``rule.closes`` closes
@@ -1231,10 +1253,10 @@ def evaluate_pass_rule(result: Optional[CalibrationResult],
     m = result.metrics
     done = result.days_done
     complete = done >= rule.closes
-    header = [f"{'PROPOSED rule, not approved' if not rule.approved else 'Approved rule'}: "
+    header = [f"{'Rule not in force yet' if not rule.approved else 'Approved rule'}: "
               f"{done} of {rule.closes} closes compared."]
     if not rule.approved:
-        header.append("A rule the owner has not approved cannot pass, whatever the numbers say.")
+        header.append("A rule not yet in force cannot pass, whatever the numbers say.")
     header += [f"Note: {p}" for p in result.problems]
     verdicts: list[bool] = []
     lines: list[str] = []
@@ -1293,12 +1315,20 @@ def evaluate_pass_rule(result: Optional[CalibrationResult],
     verdict(False if problems else (True if complete else None), 5, "integrity",
             "; ".join(problems) if problems else "clean so far" if not complete else "clean")
 
+    # 6. The two-way match: the sim's trades found in the real account.
+    what6 = f"at least {rule.sim_matched_share:.0%} of the sim's trades matched in the real account"
+    if m.sim_matched_share is None:
+        verdict(False if complete else None, 6, what6, "no sim trade to match")
+    else:
+        verdict((m.sim_matched_share >= rule.sim_matched_share) if complete else None, 6, what6,
+                f"{m.sim_matched} of {m.sim_trades}, {m.sim_matched_share:.1%}")
+
     passed = rule.approved and complete and all(verdicts)
     return passed, header + lines
 
 
 def calibration_status(result: Optional[CalibrationResult], evaluation: Optional[tuple[bool, list[str]]],
-                       rule: PassRule = PROPOSED_PASS_RULE) -> str:
+                       rule: PassRule = PASS_RULE) -> str:
     """not_started, running (fewer closes than the rule needs), passed or failed.
 
     Passed needs an approved rule as well as the numbers: the funds are
@@ -1472,12 +1502,12 @@ def _round(value: Optional[float], places: int) -> Optional[float]:
 def calibration_json(
     result: Optional[CalibrationResult], status: str, start: Optional[date],
     pass_rule_eval: Optional[tuple[bool, list[str]]], holding: Optional[dict],
-    rule: PassRule = PROPOSED_PASS_RULE,
+    rule: PassRule = PASS_RULE,
 ) -> dict:
     """The ``calibration`` part of the funds JSON.
 
     With no ``start`` it is "not_started" whatever else is passed: no series,
-    no differences, null metrics -- only the proposed rule and the real
+    no differences, null metrics -- only the pass rule and the real
     account's holding times. Two keys beyond the contract: the rule's
     per-condition ``verdicts``, and ``timing`` (trades matched a session
     apart) in the metrics; a reader that does not know them ignores them.
@@ -1507,6 +1537,7 @@ def calibration_json(
             "max_abs_gap_pct": _round(metrics.max_abs_gap_pct, 6) if metrics else None,
             "tracking_error_pct": _round(metrics.tracking_error_pct, 6) if metrics else None,
             "matched_share": _round(metrics.matched_share, 6) if metrics else None,
+            "sim_matched_share": _round(metrics.sim_matched_share, 6) if metrics else None,
             "unexplained": metrics.unexplained if metrics else None,
             "timing": metrics.timing if metrics else None,
         },
@@ -1540,12 +1571,17 @@ def calibration_report(
     feed = SimFeed(bars)
     result = run_calibration(snapshots, entries, bars, feed, start, days_needed, audit_lines, not_shortable)
     evaluation = evaluate_pass_rule(result)
-    return calibration_json(result, calibration_status(result, evaluation), start, evaluation, holding)
+    out = calibration_json(result, calibration_status(result, evaluation), start, evaluation, holding)
+    if result.fund is not None:
+        from shadow.order_matters import fund_summary
+
+        out["order_matters"] = fund_summary(result.fund)
+    return out
 
 
 __all__ = [
     "AccountFill", "AuditRecord", "CALIBRATION_COST_PER_SIDE", "CalibrationResult", "DAYS_NEEDED", "Difference",
-    "Holding", "HeldPosition", "Integrity", "Match", "Metrics", "PROPOSED_PASS_RULE", "PassRule", "REASONS",
+    "Holding", "HeldPosition", "Integrity", "Match", "Metrics", "PASS_RULE", "PassRule", "REASONS",
     "RestingStop", "Seed", "SeedPosition", "SeriesPoint", "Snapshot", "Snapshots", "Trade", "audit_lines_through",
     "audit_records", "book_at_close", "calibration_json", "calibration_report", "calibration_status",
     "compare_trades", "evaluate_pass_rule", "holding_days", "holding_periods", "load_snapshots", "match_trades",

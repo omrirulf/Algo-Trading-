@@ -69,12 +69,35 @@ them. A read that failed is recorded as unknown, never as an empty book, and
 such a line is never used as the starting point. Each part of a line says
 when it was read, so a fill that landed between two reads is counted once.
 
-Calibration starts only after the owner approves its pass rule, and the four
-funds run only after it passes. Both dates live in `shadow/schedule.py` and
+The owner approved the pass rule on 24 Sep 2026: six conditions over 15
+trading days, including a two-way trade match (at least 90% of the real
+account's trades found in the sim, and at least 90% of the sim's trades
+found in the real account, each within one session). If calibration fails,
+the cause is fixed and logged in the pre-registration's Amendments table,
+and the 15 days restart from zero; a difference whose stated reason turns
+out to be a bug counts as a fail. The rule takes effect with the start date,
+once the first account snapshot exists, and the four funds run only after
+calibration passes. Both dates live in `shadow/schedule.py` and
 are set by a reviewed change, never by the code; a test fails if the start
 date is set while the rule is still unapproved, and an unapproved rule can
 never read "passed". During calibration, only the calibration match is
 reported.
+
+## How often the buying order matters (report only)
+
+Each cycle the engine works through the day's signals one at a time, in
+watchlist order. When the book runs out of room part-way -- cash, the gross
+cap, the sleeve budget, an exposure-group cap, the stock-market limit, the
+position count -- the signals left are refused, and which ones got in was
+decided by their place in the list. `shadow/order_matters.py` counts those
+days for the real paper account (from its own audit log) and for every
+simulated fund: the date, the signals skipped with their conviction and the
+limit that was full, and whether a skipped signal had a higher conviction
+than one that was bought. A refusal counts only when a portfolio limit bound
+it; a ticker already at its own cap would have been refused in any order.
+The running count is in `logs/funds.json` (`order_matters`) and on the
+4 Funds page. It changes nothing: the order stays the watchlist order, in the
+simulation and in production.
 
 ## Where to read it
 
