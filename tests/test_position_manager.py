@@ -609,6 +609,90 @@ def test_the_ladder_uses_post_trim_size_not_the_stale_snapshot(broker, market, a
     assert report.positions_seen == 2
 
 
+@dataclass
+class LaggingBroker(SequencedBroker):
+    """A broker whose position list does not yet show a partial close.
+
+    Alpaca on 24 Sep 2026: a trim's market sell is accepted at once but the
+    position's ``qty`` keeps reading the old size until it fills, with the
+    sold shares merely ``held_for_orders``. A stop replace asking for more
+    than the shares not so held is refused, which is what this mirrors.
+    """
+
+    pending: dict[str, int] = field(default_factory=dict)
+
+    def close_position_partially(self, ticker, qty):
+        self.calls.append("close")
+        self.pending[ticker] = self.pending.get(ticker, 0) + qty
+        self.closed.append({"ticker": ticker, "qty": qty})
+        return f"close-{len(self.closed)}"
+
+    def replace_stop_order(self, order_id, qty, stop_price, current_qty=None):
+        for ticker, current in self.stop_orders.items():
+            if current.order_id == order_id:
+                held = next(abs(p.qty) for p in self.positions if p.ticker == ticker)
+                available = held - self.pending.get(ticker, 0)
+                if qty > available:
+                    raise BrokerError(
+                        f"insufficient qty available for order (requested: {qty}, "
+                        f"available: {available})"
+                    )
+        return super().replace_stop_order(order_id, qty, stop_price, current_qty)
+
+
+def test_a_trim_whose_close_is_still_pending_does_not_resize_the_stop_back_up(market, audit):
+    """IEF and TLT, 24 Sep 2026: trimmed 131 -> 120 with the stop resized to
+    120, then the same pass read the position again, still saw 131 because
+    the sell had not filled, and asked the broker to put the stop back to
+    131. The broker refused (only 120 shares were free), the pass recorded
+    an error and the health check reported a position without a working
+    stop -- the trim's own stop, correctly sized, was fine all along.
+
+    What the trim left behind is the size this pass must manage against,
+    however stale the broker's position list still is. Neither leg is near
+    a rung here, so after the trim the pass owes them a trail at most, at
+    the size the trim left.
+    """
+    broker = LaggingBroker()
+    enter(broker, audit, ticker="TLT", qty=183, entry=100.0, stop=104.0, side="sell")
+    enter(broker, audit, ticker="IEF", qty=177, entry=100.0, stop=104.0, side="sell")
+    market.price = 99.0
+    report = manager(broker, market, audit).manage()
+
+    trims = {a.ticker: a for a in report.actions if a.action == pm.GROUP_CAP_TRIMMED}
+    assert set(trims) == {"TLT", "IEF"}
+    assert not [a for a in report.actions if a.action in (pm.ERROR, pm.NO_STOP)]
+    assert not [a for a in report.actions if a.action == pm.STOP_RESIZED]
+    for ticker, trim in trims.items():
+        assert broker.stop_orders[ticker].qty == trim.remaining_qty
+    managed = {
+        a.ticker: a for a in report.actions if a.action in (pm.HELD, pm.STOP_RAISED)
+    }
+    assert managed["TLT"].remaining_qty == trims["TLT"].remaining_qty < 183
+    assert managed["IEF"].remaining_qty == trims["IEF"].remaining_qty < 177
+
+
+def test_a_trim_whose_close_is_still_pending_sizes_the_ladder_off_what_it_left(market, audit):
+    """Same lag, but at +1R: the rung's tranche is a third of the post-trim
+    size, and the stop is walked down from the trim's size, not from the
+    stale one the broker still reports."""
+    broker = LaggingBroker()
+    enter(broker, audit, ticker="TLT", qty=183, entry=100.0, stop=104.0, side="sell")
+    enter(broker, audit, ticker="IEF", qty=177, entry=100.0, stop=104.0, side="sell")
+    market.price = 96.0
+    report = manager(broker, market, audit).manage()
+
+    assert not [a for a in report.actions if a.action in (pm.ERROR, pm.NO_STOP)]
+    trims = {a.ticker: a for a in report.actions if a.action == pm.GROUP_CAP_TRIMMED}
+    rungs = {a.ticker: a for a in report.actions if a.action == pm.TRANCHE_TAKEN}
+    assert trims["TLT"].remaining_qty == 152 and rungs["TLT"].qty_closed == 50
+    assert rungs["TLT"].remaining_qty == 102
+    assert trims["IEF"].remaining_qty == 147 and rungs["IEF"].qty_closed == 49
+    assert rungs["IEF"].remaining_qty == 98
+    for ticker, rung in rungs.items():
+        assert broker.stop_orders[ticker].qty == rung.remaining_qty
+
+
 def test_one_broken_trim_does_not_stop_the_rest_of_the_group(broker, market, audit):
     enter(broker, audit, ticker="TLT", qty=183, entry=100.0, stop=104.0, side="sell")
     enter(broker, audit, ticker="IEF", qty=177, entry=100.0, stop=104.0, side="sell")

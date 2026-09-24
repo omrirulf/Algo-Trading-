@@ -350,6 +350,17 @@ class PositionManager:
             return ManagementReport(actions=(action,))
 
         actions: list[ManagementAction] = []
+        # What each trim left behind, by ticker. The broker's position list
+        # is read again after the trims, but a partial close it has accepted
+        # and not yet filled still shows the old size, with the sold shares
+        # merely held for that order. IEF and TLT on 24 Sep 2026: trimmed
+        # 131 -> 120 with the stop resized to 120, read back as 131, and the
+        # ladder asked the broker to put the stop back to 131 -- refused,
+        # since only 120 were free -- so the day ended with an "error" and
+        # a health alarm over a stop that was right all along. The size the
+        # trim left is the size this pass manages against, whatever the
+        # list says in the meantime.
+        trimmed_to: dict[str, int] = {}
         if not protect_only:
             try:
                 trims = self._trim_over_cap_groups(positions)
@@ -364,6 +375,10 @@ class PositionManager:
                 _record(trims[0])
             if trims:
                 actions += trims
+                trimmed_to = {
+                    t.ticker: t.remaining_qty for t in trims
+                    if t.action == GROUP_CAP_TRIMMED and t.remaining_qty > 0
+                }
                 # Sizes just changed underneath the snapshot taken above; the
                 # ladder below must see what is actually held now, not what
                 # was held before the trim.
@@ -382,7 +397,7 @@ class PositionManager:
                 if protect_only:
                     actions += self._protect_if_naked(position)
                 else:
-                    actions += self._manage_one(position)
+                    actions += self._manage_one(position, trimmed_to.get(position.ticker))
             except (BrokerError, MarketDataError, risk_engine.RiskViolation) as exc:
                 # Almost every failure here happens *before* the live stop is
                 # touched, so the position is still protected and `error` says
@@ -610,9 +625,17 @@ class PositionManager:
         _record(action)
         return action
 
-    def _manage_one(self, position: OpenPosition) -> list[ManagementAction]:
+    def _manage_one(
+        self, position: OpenPosition, trimmed_to: Optional[int] = None
+    ) -> list[ManagementAction]:
         ticker, side = position.ticker, position.side
         qty = int(abs(position.qty))
+        if trimmed_to is not None and trimmed_to < qty:
+            # A trim this pass already sold down to ``trimmed_to``; the
+            # position list is just not showing the fill yet. See
+            # manage_positions. Never the other way round: a list that shows
+            # *fewer* shares than the trim left is telling the truth.
+            qty = trimmed_to
         if qty < 1:
             return []
 
