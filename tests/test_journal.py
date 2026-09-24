@@ -89,3 +89,30 @@ def test_a_line_without_a_blend_says_so_explicitly(_journal_to_tmp, ctx):
     journal.record(ctx, SIGNAL)
     (line,) = read_lines(journal.cfg.SIGNAL_JOURNAL_PATH)
     assert "blend" in line and line["blend"] is None
+
+
+def test_every_line_says_how_it_was_made(_journal_to_tmp, ctx, monkeypatch):
+    """Screening state and reasoning level ride on every line -- a signal, a
+    failure and a held name alike -- so the race can prove from the journal
+    alone that its window was made under the registered settings."""
+    from orchestrator import llm
+
+    journal.record(ctx, SIGNAL)
+    journal.record(ctx, error="timed out")
+    journal.record(ctx, held=True)
+    monkeypatch.setattr(llm, "SCREENING_ENABLED", True)
+    journal.record(ctx, SIGNAL)
+    lines = read_lines(_journal_to_tmp)
+    assert [line["screening"] for line in lines] == [False, False, False, True]
+    assert all(line["reasoning_effort"] == llm.configured_effort() for line in lines)
+    assert llm.configured_effort() == "high"
+
+
+def test_the_effort_recorded_is_the_path_actually_used(monkeypatch):
+    from orchestrator import llm
+
+    monkeypatch.setattr(llm, "MODEL_BASE_URL", "")
+    assert llm.configured_effort() == llm.EFFORT.lower()
+    monkeypatch.setattr(llm, "MODEL_BASE_URL", "https://example.invalid/v1")
+    monkeypatch.setattr(llm, "MODEL_EFFORT", " High ")
+    assert llm.configured_effort() == "high"

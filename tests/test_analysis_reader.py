@@ -206,3 +206,37 @@ def test_a_fund_line_without_an_insider_section_has_an_empty_dict():
     entry = entry_from({"ts_utc": "2026-09-21T15:00:00+00:00", "ticker": "XLE",
                         "context": {"insiders": None}, "signal": {"bias": "NEUTRAL", "conviction": 0.0}})
     assert entry.insiders == {}
+
+
+def _raw(**fields):
+    base = {"ts_utc": "2026-09-23T15:00:00+00:00", "ticker": "NVDA"}
+    base.update(fields)
+    return base
+
+
+def test_the_cost_of_both_calls_comes_through():
+    entry = entry_from(_raw(
+        signal={"bias": "BULLISH", "conviction": 0.6},
+        usage={"model": "m", "cost_usd": 0.0031},
+        screen={"model": "s", "bias": "BULLISH", "conviction": 0.5, "usage": {"cost_usd": 0.0007}},
+    ))
+    assert entry.cost_usd == pytest.approx(0.0031)
+    assert entry.screen_cost_usd == pytest.approx(0.0007)
+    assert entry_from(_raw(usage={"cost_usd": None})).cost_usd is None
+
+
+@pytest.mark.parametrize("fields, expected", [
+    ({"screening": False, "screen": {"model": "s"}}, False),   # the flag wins
+    ({"screening": True}, True),
+    ({"screen": {"model": "s", "bias": "NEUTRAL"}}, True),     # older line: the evidence
+    ({"signal": {"bias": "NEUTRAL", "conviction": 0.1}}, False),
+    ({"error": "timed out"}, None),                            # older line that cannot say
+    ({"held": True}, None),
+])
+def test_whether_the_screen_ran_is_read_from_the_flag_or_else_the_evidence(fields, expected):
+    assert entry_from(_raw(**fields)).screening is expected
+
+
+def test_the_reasoning_level_comes_through():
+    assert entry_from(_raw(reasoning_effort="high")).reasoning_effort == "high"
+    assert entry_from(_raw()).reasoning_effort is None

@@ -23,7 +23,7 @@ from app.schemas import LLMSignal
 from orchestrator.fx import FxRate
 from orchestrator.pricing import Usage
 from config import settings as cfg
-from orchestrator import arms
+from orchestrator import arms, llm
 from orchestrator.context import TickerContext
 
 log = logging.getLogger(__name__)
@@ -61,8 +61,14 @@ def record(
     screen: Optional[dict[str, Any]] = None,
     blend: Optional[dict[str, Any]] = None,
     held: bool = False,
+    stage: Optional[str] = None,
 ) -> None:
-    """Write one journal line. Swallows its own failures by design."""
+    """Write one journal line. Swallows its own failures by design.
+
+    ``stage`` names where a failed line failed, when that was before the
+    model was asked (``"context"``): a news-vendor outage is not a failed
+    model call, and the owner's model-watch trigger counts only those.
+    """
     try:
         now = datetime.now(timezone.utc)
         get_journal_logger().info(
@@ -111,6 +117,16 @@ def record(
                 # skipping held names cost -- and they are the reason a line
                 # with no signal is not automatically a failure.
                 "held": held,
+                # How the line was made, as configured when it was written:
+                # whether the cheap screen stood in front of the full model,
+                # and the reasoning level the full model was asked at. On
+                # every line -- held and failed ones included -- because the
+                # race has to be able to say, from the journal alone, that
+                # no line in its window was made under a different setting
+                # from the one the pre-registration names.
+                "screening": bool(llm.SCREENING_ENABLED),
+                "reasoning_effort": llm.configured_effort(),
+                "stage": stage,
             },
         )
     except Exception:  # noqa: BLE001 - journalling must not break the cycle

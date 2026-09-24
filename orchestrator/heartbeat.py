@@ -909,7 +909,8 @@ def journal_context_failure(ticker: str, exc: object, context: Any = None) -> No
     from orchestrator.context import TickerContext
 
     try:
-        journal.record(context or TickerContext(ticker=ticker), error=str(exc) or repr(exc))
+        journal.record(context or TickerContext(ticker=ticker), error=str(exc) or repr(exc),
+                       stage=CONTEXT_FAILED)
     except Exception:  # noqa: BLE001 - the record is a record, not a dependency
         log.exception("%s: failed to journal the context failure", ticker)
 

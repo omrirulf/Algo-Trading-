@@ -18,7 +18,7 @@ from datetime import date, datetime, timedelta, timezone
 import pandas as pd
 import pytest
 
-from analysis import horse_race
+from analysis import decision_gate, horse_race
 from analysis.horse_race import (
     MODEL_ARM,
     BothSides,
@@ -303,9 +303,15 @@ class FinalAwareFetcher:
         return df[[ts.date() <= self.final_through for ts in df.index]]
 
 
-def _race(tmp_path, monkeypatch, capsys, frames, journal_lines, now, extra=()):
+def _race(tmp_path, monkeypatch, capsys, frames, journal_lines, now, extra=(),
+          cutoff=date(2000, 1, 1)):
+    """Run the race on a tiny journal. These journals are dated early 2026,
+    before the real cutoff, so by default the cutoff is moved back to take
+    them in; a test about the cutoff itself passes ``cutoff=None``."""
     journal = tmp_path / "signal_journal.log"
     journal.write_text("\n".join(json.dumps(l) for l in journal_lines) + "\n", encoding="utf-8")
+    if cutoff is not None:
+        monkeypatch.setattr(decision_gate, "DECISION_CUTOFF", cutoff)
     monkeypatch.setattr(horse_race, "_now", lambda: now)
     monkeypatch.setattr(horse_race, "YFinancePriceSource",
                         lambda final_through=None: FinalAwareSource(frames, final_through))
@@ -521,3 +527,200 @@ def test_the_registered_parameters_are_the_ones_the_code_runs():
         f"the pre-registration does not name {llm.MODEL}; the model arm changed "
         "without an amendment"
     )
+
+    # The model arm's settings. Screening on, or a different reasoning
+    # level, is a different contestant: the file has to say so first.
+    registered_screening = "Screening (`SCREENING_ENABLED`): **off**" in text
+    assert registered_screening or "Screening (`SCREENING_ENABLED`): **on**" in text
+    assert llm.SCREENING_ENABLED is (not registered_screening), (
+        "SCREENING_ENABLED is on but the pre-registration says off; amend the file first"
+    )
+    assert llm.MODEL_EFFORT == "high" and "reasoning level **high**" in text, (
+        f"MODEL_EFFORT is {llm.MODEL_EFFORT!r}; the pre-registration registers 'high'"
+    )
+    assert llm.configured_effort() == "high"
+
+    # The gate: applied by code, and the code's numbers are the file's.
+    from datetime import date
+
+    from analysis import decision_gate as gate
+
+    assert gate.DECISION_CUTOFF == date(2026, 9, 23)
+    assert "lines journalled on or after **2026-09-23**" in text
+    assert gate.MIN_INDEPENDENT_DAYS == 60 and gate.REGISTERED_HORIZON == horse_race.DEFAULT_HORIZON
+    assert "independent days since 2026-09-23: X of 60 (= 180 trading days) — NO DECISION YET" in text
+    assert gate.CHECKPOINTS == ((20, 3.47), (40, 2.45), (60, 2.00))
+    assert "**20, 40 and 60 independent days**" in text and "**t > 3.47, 2.45, 2.00**" in text
+    for independent, bar in gate.CHECKPOINTS:
+        assert f"| {independent} | {independent * 3} | {bar:.2f} |" in text
+    assert gate.CHECKPOINTS[-1][1] == 2.0 and "t above 2.0" in text
+    assert gate.INDEX_TICKER == "VT" and "**VT**" in text
+    assert gate.COIN_FLIP_PERCENTILE == 95.0 and "95th percentile" in text
+    assert horse_race.BAND == (5.0, 95.0)  # the band condition 3 actually reads
+    assert "**no arm trades**" in text
+    assert "**none before the June 2027 verdict.**" in text
+    # No early stop may be contradicted by the file's own text.
+    assert "A partial window, except a planned look" in text
+    assert "except bug fixes and the owner's new registrations" in text
+
+
+# --- the decision gate, applied by the race itself ---------------------------------------
+
+
+def test_lines_before_the_cutoff_never_reach_the_decision(tmp_path, monkeypatch, capsys):
+    """The race applies the cutoff itself. A journal that is all before it
+    has nothing to decide on, says so in the header, and prints the whole
+    journal only after the gate, marked for reading."""
+    warm = _warm_frame()
+    stamp = _at(warm.index[MIN_WARMUP_BARS].date())
+    now = datetime.combine(warm.index[-1].date(), datetime.min.time(), tzinfo=timezone.utc) + timedelta(days=1)
+    code, out = _race(tmp_path, monkeypatch, capsys, {"NVDA": warm}, [_journal_line("NVDA", stamp)],
+                      now, extra=("--seeds", "1000"), cutoff=None)
+    assert code == 0
+    assert ("independent days since 2026-09-23: 0 of 60 (= 180 trading days) — NO DECISION YET"
+            in out)
+    assert "Next checkpoint: 20 independent days (= 60 trading days), estimated" in out
+    assert "bar t > 3.47" in out
+    assert "No trade in the decision window has resolved yet" in out
+    assert out.index("DECISION GATE") < out.index("WHOLE JOURNAL, FOR READING ONLY")
+    assert "== WHOLE JOURNAL, ALL NAMES" in out
+    assert "SENSITIVITY RUN" not in out
+
+
+def test_a_sensitivity_run_says_it_cannot_decide(tmp_path, monkeypatch, capsys):
+    warm = _warm_frame()
+    stamp = _at(warm.index[MIN_WARMUP_BARS].date())
+    now = datetime.combine(warm.index[-1].date(), datetime.min.time(), tzinfo=timezone.utc) + timedelta(days=1)
+    code, out = _race(tmp_path, monkeypatch, capsys, {"NVDA": warm}, [_journal_line("NVDA", stamp)],
+                      now, extra=("--horizon", "5"))
+    assert code == 0
+    assert "SENSITIVITY RUN" in out and "horizon 5 (registered 3)" in out
+
+
+def test_a_line_the_model_did_not_answer_is_offered_to_no_arm(tmp_path, monkeypatch, capsys):
+    """The bug fix of 24 Sep: a timed-out line used to be traded by every
+    rule while the model sat it out. Now it leaves every arm alike."""
+    warm = _warm_frame()
+    stamp = _at(warm.index[MIN_WARMUP_BARS].date())
+    failed = {"ts_utc": (stamp + timedelta(seconds=1)).isoformat(), "ticker": "NVDA",
+              "context": {"technicals": UPTREND}, "error": "timed out"}
+    now = datetime.combine(warm.index[-1].date(), datetime.min.time(), tzinfo=timezone.utc) + timedelta(days=1)
+    code, out = _race(tmp_path, monkeypatch, capsys, {"NVDA": warm},
+                      [_journal_line("NVDA", stamp), failed], now)
+    assert code == 0
+    assert "no model answer, offered to no arm 1" in out
+    rows = {l.split()[0]: l.split() for l in out.splitlines()
+            if l.split() and l.split()[0] in ("model", "momentum", "hybrid", "random")
+            and len(l.split()) == 9 and l.split()[1].isdigit()}
+    assert {name: row[1] for name, row in rows.items()} == {
+        "model": "1", "momentum": "1", "hybrid": "1", "random": "1"}
+
+
+def test_split_answered_keeps_screened_lines():
+    screened = line(bias="NEUTRAL", conviction=0.0)
+    failed = line(signal=False)
+    answered, dropped = horse_race.split_answered([screened, failed])
+    assert answered == [screened] and dropped == [failed]
+
+
+def test_the_race_warns_about_lines_made_under_other_settings(tmp_path, monkeypatch, capsys):
+    warm = _warm_frame()
+    stamp = _at(warm.index[MIN_WARMUP_BARS].date())
+    lines = [
+        dict(_journal_line("NVDA", stamp), screening=True, reasoning_effort="high",
+             usage={"model": "openai/gpt-oss-120b", "cost_usd": 0.004}),
+        dict(_journal_line("LLY", stamp), screening=False, reasoning_effort="low",
+             usage={"model": "claude-opus-5", "cost_usd": 0.041},
+             screen={"model": "h", "usage": {"cost_usd": 0.007}}),
+    ]
+    now = datetime.combine(warm.index[-1].date(), datetime.min.time(), tzinfo=timezone.utc) + timedelta(days=1)
+    code, out = _race(tmp_path, monkeypatch, capsys, {"NVDA": warm, "LLY": warm}, lines, now)
+    assert code == 0
+    assert "WARNING: 1 line(s) in the decision window were made with the screen ON" in out
+    assert "reasoning low, not the registered high" in out
+    assert "came from claude-opus-5, not the registered openai/gpt-oss-120b" in out
+    assert "LLM SPEND over the decision window: $0.05 (model $0.04, screen $0.01)" in out
+
+
+def test_vt_is_printed_beside_spy_and_the_watchlist(tmp_path, monkeypatch, capsys):
+    warm = _warm_frame()
+    stamp = _at(warm.index[MIN_WARMUP_BARS].date())
+    now = datetime.combine(warm.index[-1].date(), datetime.min.time(), tzinfo=timezone.utc) + timedelta(days=1)
+    code, out = _race(tmp_path, monkeypatch, capsys, {"NVDA": warm, "VT": warm, "SPY": warm},
+                      [_journal_line("NVDA", stamp)], now)
+    assert code == 0
+    vt_rows = [l for l in out.splitlines() if l.startswith("VT ")]
+    assert vt_rows and all("world index fund, bought and held" in l for l in vt_rows)
+
+
+def test_the_model_watch_is_printed_every_run(tmp_path, monkeypatch, capsys):
+    warm = _warm_frame()
+    stamp = _at(warm.index[MIN_WARMUP_BARS].date())
+    now = datetime.combine(warm.index[-1].date(), datetime.min.time(), tzinfo=timezone.utc) + timedelta(days=1)
+    _, out = _race(tmp_path, monkeypatch, capsys, {"NVDA": warm}, [_journal_line("NVDA", stamp)], now)
+    assert "MODEL WATCH" in out
+    assert "(b) 5 answered days in a row with no SHORT while SPY fell: not yet judged (1 of 5" in out
+    assert "(c) failed or timed-out calls above 5% of names over 5 cycle days: not yet judged (1 of 5" in out
+
+
+def test_a_news_outage_is_not_a_failed_model_call_and_a_wrong_ticker_answer_is_no_answer():
+    from analysis.reader import entry_from
+
+    stamp = "2026-09-25T15:00:00+00:00"
+    context_failure = entry_from({"ts_utc": stamp, "ticker": "NVDA", "error": "Bright Data unreachable",
+                                  "stage": "context"})
+    timeout = entry_from({"ts_utc": stamp, "ticker": "LLY", "error": "read timed out"})
+    wrong = entry_from({"ts_utc": stamp, "ticker": "MSFT", "error": "answered for NVDA",
+                        "signal": {"bias": "BEARISH", "conviction": 0.8}})
+    fine = entry_from({"ts_utc": stamp, "ticker": "JPM", "signal": {"bias": "BEARISH", "conviction": 0.8}})
+    (day,) = horse_race.watch_days([context_failure, timeout, wrong, fine])
+    assert (day.asked, day.failed, day.shorts) == (3, 2, 1)
+    answered, dropped = horse_race.split_answered([context_failure, timeout, wrong, fine])
+    assert answered == [fine] and len(dropped) == 3
+
+
+def test_the_spend_counts_a_screened_lines_call_once():
+    from analysis.reader import entry_from
+
+    screened_usage = {"model": "claude-haiku-4-5", "cost_usd": 0.007}
+    screened = entry_from({"ts_utc": "2026-09-16T15:00:00+00:00", "ticker": "A",
+                           "signal": {"bias": "NEUTRAL", "conviction": 0.1}, "usage": screened_usage,
+                           "screen": {"model": "claude-haiku-4-5", "bias": "NEUTRAL", "usage": screened_usage}})
+    escalated = entry_from({"ts_utc": "2026-09-16T15:00:00+00:00", "ticker": "B",
+                            "signal": {"bias": "BULLISH", "conviction": 0.6},
+                            "usage": {"model": "claude-opus-5", "cost_usd": 0.041},
+                            "screen": {"model": "claude-haiku-4-5", "bias": "BULLISH",
+                                       "usage": {"model": "claude-haiku-4-5", "cost_usd": 0.007}}})
+    spend = horse_race.llm_spend([screened, escalated])
+    assert spend.model_usd == pytest.approx(0.041)
+    assert spend.screen_usd == pytest.approx(0.014)
+    assert spend.total == pytest.approx(0.055)
+
+
+def _arm(name, trades):
+    return horse_race.ArmResult(name=name, offered=len(trades), directional=len(trades), below_floor=0,
+                                pending=0, acted_on=len(trades), could_not_simulate=0, trades=tuple(trades))
+
+
+def test_a_look_reads_its_own_entry_days_and_nothing_after_them():
+    """Computed from the journal every night, a look must say the same thing
+    every night: trades opened after its last entry day cannot reach it."""
+    days = [date(2026, 3, 2) + timedelta(days=i) for i in range(8)]
+    make = lambda arm, r, d: scored(r, arm=arm, entry=d.isoformat(), ticker=f"T{d.day}",
+                                    stamp=datetime.combine(d, datetime.min.time(), tzinfo=timezone.utc))
+    results = [
+        _arm(MODEL_ARM, [make(MODEL_ARM, 0.02 + 0.001 * i, d) for i, d in enumerate(days)]),
+        _arm(momentum.NAME, [make(momentum.NAME, -0.01 + 0.001 * i, d) for i, d in enumerate(days)]),
+        _arm(hybrid.NAME, [make(hybrid.NAME, 0.0, d) for d in days]),
+        _arm(control.NAME, []),
+    ]
+    index = {d: 0.001 for d in days}
+    first = horse_race.look_inputs(results, {}, days, index, 6, 3, 10)
+    # A wildly different last two days must not move a look over the first six.
+    late = [replace(t, trade=_trade(-0.5, entry=t.entry_day.isoformat())) if t.entry_day > days[5] else t
+            for t in results[0].trades]
+    again = horse_race.look_inputs([_arm(MODEL_ARM, late), *results[1:]], {}, days, index, 6, 3, 10)
+    assert first == again
+    assert first.entry_days == 6 and first.index_days == 6 and first.index_missing == 0
+    assert first.t_model_momentum is not None and first.t_model_momentum > 0
+    assert set(first.t_vs_index) == {MODEL_ARM, momentum.NAME, hybrid.NAME}
