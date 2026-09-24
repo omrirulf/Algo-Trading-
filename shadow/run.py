@@ -7,7 +7,7 @@
 Prints one JSON document (the "funds" contract in ``dashboard/funds.html``).
 What it contains depends on ``shadow/schedule.py`` and nothing else:
 
-* no calibration start set: calibration "not_started", the proposed pass
+* no calibration start set: calibration "not_started", the pass
   rule, the real account's holding times. No fund is run.
 * calibration started: the calibration fund against the real account,
   day by day, with the trades that differ. Still no fund is run -- during
@@ -52,6 +52,7 @@ from shadow.fund import (  # noqa: E402
     run,
 )
 from shadow.market import Bars, SimFeed, calendar  # noqa: E402
+from shadow.order_matters import fund_summary, real_summary  # noqa: E402
 
 log = logging.getLogger("shadow.run")
 
@@ -126,6 +127,9 @@ def summarise(fund, vt_return: Optional[float]) -> dict:
         "win_rate": win_rate,
         "open_positions": open_positions,
         "cash": round(cash, 2),
+        # How often the buying order mattered (the owner's report, 24 Sep
+        # 2026): VT buys once and never meets a limit.
+        "order_matters": None if isinstance(fund, IndexFund) else fund_summary(fund),
     }
 
 
@@ -187,9 +191,10 @@ def _coin_chunk(seeds: Sequence[int]) -> list[tuple[int, list[float], dict]]:
     shared = _SHARED
     feed = SimFeed(shared["bars"])
     funds = [Fund(f"coin-{seed}", coin_signal(seed), feed, shared["bars"],
-                  not_shortable=shared["not_shortable"]) for seed in seeds]
+                  not_shortable=shared["not_shortable"], order_detail=False) for seed in seeds]
     run(funds, shared["sessions"], shared["cycles"], shared["ran"], feed)
-    return [(seed, [d.equity for d in fund.days], integrity([fund])) for seed, fund in zip(seeds, funds)]
+    return [(seed, [d.equity for d in fund.days], integrity([fund]) | {"order_days": fund_summary(fund)["days"]})
+            for seed, fund in zip(seeds, funds)]
 
 
 def coin_funds(count: int, processes: int, bars: Bars, sessions, cycles, ran, shortable_no) -> tuple[list[list[float]], dict]:
@@ -207,8 +212,12 @@ def coin_funds(count: int, processes: int, bars: Bars, sessions, cycles, ran, sh
     problems = [p for _, _, check in results for p in check["problems"]]
     holes = sum(check["data_holes"] for _, _, check in results)
     examples = [e for _, _, check in results for e in check["data_hole_examples"]][:10]
+    order = sorted(check["order_days"] for _, _, check in results)
     return [curve for _, curve, _ in results], {"ok": not problems, "problems": problems[:50],
-                                                "data_holes": holes, "data_hole_examples": examples}
+                                                "data_holes": holes, "data_hole_examples": examples,
+                                                "order_days": {"median": percentile(order, 50.0),
+                                                               "p5": percentile(order, 5.0),
+                                                               "p95": percentile(order, 95.0)}}
 
 
 # --------------------------------------------------------------------------- #
@@ -294,6 +303,10 @@ def build(args: argparse.Namespace, now: datetime) -> dict:
         },
         "integrity": checks,
         "not_shortable": sorted(shortable_no),
+        # The real paper account's own record, always: it is the account,
+        # not a fund result. The calibration fund's is in "calibration" and
+        # each fund's in its own row, shown when those are.
+        "order_matters": {"real": real_summary(audit_lines)},
     }
 
 

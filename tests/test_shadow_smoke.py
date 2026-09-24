@@ -11,7 +11,7 @@ from shadow import smoke
 
 #: What a health row may say. Anything else -- an equity, a return, a win
 #: rate -- would be a fund result shown before the fund test starts.
-ALLOWED = {"name", "sessions", "accepted", "refused", "fills", "open", "problems", "held", "data_holes"}
+ALLOWED = {"name", "sessions", "accepted", "refused", "fills", "open", "problems", "held", "data_holes", "order_days"}
 
 
 class Flat:

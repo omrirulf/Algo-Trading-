@@ -159,7 +159,7 @@ def test_the_funds_page_is_labelled_simulated_and_linked_from_the_desk():
     assert "bar t &gt; " in text
     assert "Fund test:</b> not started (it starts the first trading day after calibration passes)" in text
     assert "Hidden until calibration passes" in text
-    assert "proposed, not approved" in text
+    assert "not in force yet" in text
 
 
 def test_both_pages_build_from_the_seeds(tmp_path):
@@ -602,7 +602,9 @@ def test_the_funds_page_states_its_contract():
                   "open_positions", "cash", "funds.band", "p5[]", "p95[]", "fund_test.status", "fund_test.start",
                   "fund_test.independent", "fund_test.next_checkpoint", "integrity",
                   "status_line", "independent, of", "trading_days", "decided", "outcome_text", "next",
-                  "estimated", "bar", "looks[]", "reached", "reason"):
+                  "estimated", "bar", "looks[]", "reached", "reason",
+                  "order_matters.real", "calibration.order_matters", "funds.list[].order_matters",
+                  "integrity.coin.order_days", "cycle_days", "outranked_days", "by_kind", "outranks[]", "conviction"):
         assert field in comment, field
 
 
@@ -612,3 +614,116 @@ def test_long_alarm_text_wraps_on_the_desk():
     # an alarm pushed the desk wider than a phone. The text box may shrink
     # now, and a long word breaks inside it.
     assert ".stripe > div{min-width:0;overflow-wrap:anywhere}" in desk
+
+
+# --------------------------------------------------------------------------- #
+# How often the buying order mattered (a report only)
+# --------------------------------------------------------------------------- #
+
+def _order(cycle_days, days, outranked, listed=(), **by_kind):
+    return {"cycle_days": cycle_days, "days": days, "skipped": sum(len(d["skipped"]) for d in listed),
+            "outranked_days": outranked, "by_kind": by_kind, "list": list(listed)}
+
+
+ORDER_REAL = _order(7, 2, 1, [
+    {"day": "2026-09-18", "bought": [{"ticker": "TEVA", "conviction": 0.52}, {"ticker": "RSP", "conviction": None}],
+     "skipped": [{"ticker": "XHB", "conviction": 0.4, "kind": "sleeve budget", "outranks": []}]},
+    {"day": "2026-09-22", "bought": [{"ticker": "KRE", "conviction": 0.32}, {"ticker": "<b>X</b>", "conviction": 0.35}],
+     "skipped": [{"ticker": "ASML", "conviction": 0.55, "kind": "sleeve budget", "outranks": ["KRE", "<b>X</b>"]},
+                 {"ticker": "<i>Y</i>", "conviction": None, "kind": "<gross>", "outranks": []}]},
+], **{"sleeve budget": 2, "<gross>": 1})
+
+ORDER_FUNDS = {"start": "2026-10-01", "days": ["2026-10-01"], "band": {"p5": [99000.0], "p95": [101000.0], "funds": 1000},
+               "list": [dict(name=name, label=label, equity=[100000.0], total_return=0.0, vs_vt=None if name == "vt" else 0.0,
+                             max_drawdown=0.0, trades=0, win_rate=None, open_positions=0, cash=100000.0,
+                             order_matters=None if name == "vt" else _order(15, n, k))
+                        for name, label, n, k in (("model", "Model", 3, 1), ("momentum", "Momentum", 5, 0),
+                                                  ("hybrid", "Hybrid", 0, 0), ("vt", "VT", 0, 0))]}
+
+
+def _with_order(status, calibration_order=None, funds=None, coin=None):
+    record = _calibration(status) | {"order_matters": {"real": ORDER_REAL}, "funds": funds}
+    if calibration_order is not None:
+        record["calibration"]["order_matters"] = calibration_order
+    if coin is not None:
+        record["integrity"] = {"four": {"ok": True, "problems": []}, "coin": {"ok": True, "problems": [], "order_days": coin}}
+    return record
+
+
+def _order_cards(tmp_path, page, cases):
+    return _run_js(tmp_path, _page_functions(page, "fundsVisible", "orderHtml"), "CASES.map(orderHtml)", cases)
+
+
+@needs_node
+def test_the_order_report_gives_the_real_account_its_days_and_escapes_every_string(tmp_path, built_funds_page):
+    [card] = _order_cards(tmp_path, built_funds_page, [_with_order("not_started")])
+    assert "<h2>How often the buying order mattered</h2>" in card
+    text = re.sub(r"<[^>]+>", "", card)
+    assert ("Real paper account: ran out of room before the end of the list on 2 of 7 cycle days. "
+            "On 1 of those days, a skipped signal had a higher conviction than one that was bought.") in text
+    # Kinds as chips with their counts, escaped.
+    assert '<span class="chip idle">sleeve budget: <span class="num">2</span></span>' in card
+    assert "&lt;gross&gt;: " in card and "<gross>" not in card
+    # The days, most recent first, with the skipped signal that outranked a bought one highlighted.
+    assert card.index("22 Sep") < card.index("18 Sep")          # "Sep" or "Sept", as the ICU writes it
+    assert "<mark>higher than KRE, &lt;b&gt;X&lt;/b&gt;</mark>" in card
+    assert card.count("<mark>") == 1                           # only where outranks is non-empty
+    assert "<b>X</b>" not in card and "<i>Y</i>" not in card and "&lt;i&gt;Y&lt;/i&gt;" in card
+    assert 'RSP <span class="num">—</span>' in card and 'KRE <span class="num">0.32</span>' in card   # null conviction
+    assert "Report only: the buying order (watchlist order) is not changed." in card
+    # Not started: no calibration copy line, no fund line.
+    assert "Calibration copy" not in card and " fund:" not in card and "Coin-flip" not in card
+
+
+@needs_node
+def test_the_order_report_shows_no_fund_while_calibration_runs(tmp_path, built_funds_page):
+    running = _with_order("running", calibration_order=_order(4, 1, 0), funds=ORDER_FUNDS,
+                          coin={"median": 2.0, "p5": 0.0, "p95": 5.0})
+    failed = _with_order("failed", calibration_order=_order(15, 6, 2), funds=ORDER_FUNDS,
+                         coin={"median": 2.0, "p5": 0.0, "p95": 5.0})
+    not_started = _with_order("not_started", calibration_order=_order(4, 1, 0))     # ignored before it starts
+    cards = _order_cards(tmp_path, built_funds_page, [running, failed, not_started])
+    text = [re.sub(r"<[^>]+>", "", c) for c in cards]
+    assert "Calibration copy: 1 of 4 cycle days (0 with a higher-conviction signal skipped)." in text[0]
+    assert "Calibration copy: 6 of 15 cycle days (2 with a higher-conviction signal skipped)." in text[1]
+    for t in text[:2]:
+        assert "Model fund" not in t and "Momentum fund" not in t and "Coin-flip" not in t
+        assert "3 of 15" not in t
+    assert "Calibration copy" not in text[2]
+
+
+@needs_node
+def test_the_order_report_shows_the_funds_once_calibration_passed(tmp_path, built_funds_page):
+    passed = _with_order("passed", calibration_order=_order(15, 2, 0), funds=ORDER_FUNDS,
+                         coin={"median": 4.5, "p5": 1.0, "p95": 9.0})
+    no_coin = _with_order("passed", funds=ORDER_FUNDS)
+    cards = _order_cards(tmp_path, built_funds_page, [passed, no_coin])
+    text = [re.sub(r"<[^>]+>", "", c) for c in cards]
+    assert "Calibration copy: 2 of 15 cycle days" in text[0]
+    assert "Model fund: 3 of 15 days (1 with a higher-conviction signal skipped)." in text[0]
+    assert "Momentum fund: 5 of 15 days (0 with a higher-conviction signal skipped)." in text[0]
+    assert "Hybrid fund: 0 of 15 days" in text[0]
+    assert "VT fund" not in text[0]
+    assert "Coin-flip funds: median 4.5 days (5th–95th: 1–9)." in text[0]
+    assert "Model fund: 3 of 15 days" in text[1] and "Coin-flip" not in text[1] and "Calibration copy" not in text[1]
+    # The fund cards carry the same count, VT none.
+    source = _page_functions(built_funds_page, "fundsVisible", "orderCell", "renderFunds")
+    [html] = _run_js(tmp_path, source, "CASES.map(c=>{ renderFunds(c); return $(\"funds\").innerHTML; })", [passed])
+    assert html.count("<dt>Order mattered</dt>") == 3
+    assert '<dt>Order mattered</dt><dd class="num">3 of 15 days</dd>' in html
+
+
+@needs_node
+def test_the_order_report_is_absent_without_data_and_says_no_cycle_yet(tmp_path, built_funds_page):
+    old = _calibration("running")                                              # an older file: no order_matters
+    empty = _calibration("passed") | {"order_matters": {}, "funds": ORDER_FUNDS}
+    null = _calibration("passed") | {"order_matters": {"real": None}}
+    zero = _calibration("not_started") | {"order_matters": {"real": _order(0, 0, 0)}}
+    cards = _order_cards(tmp_path, built_funds_page, [old, empty, null, {}, None, zero])
+    assert cards[:5] == ["", "", "", "", ""]
+    text = re.sub(r"<[^>]+>", "", cards[5])
+    assert "Real paper account: No cycle yet." in text
+    assert "<details" not in cards[5] and 'class="kinds"' not in cards[5]
+    assert "Report only" in text
+    # The page draws the section from the same render pass as the rest.
+    assert '<section id="order"' in built_funds_page and '$("order").innerHTML = orderHtml(F)' in built_funds_page

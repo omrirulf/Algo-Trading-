@@ -73,7 +73,31 @@ def test_nothing_starts_until_the_owner_sets_a_date():
 def test_calibration_cannot_start_under_a_rule_the_owner_has_not_approved():
     """Setting the start date is only half the owner's decision. The date
     and the approval change together, in one reviewed change, or not at all."""
-    from shadow.calibration import PROPOSED_PASS_RULE
+    from shadow.calibration import PASS_RULE
 
-    assert (schedule.CALIBRATION_START is None) == (not PROPOSED_PASS_RULE.approved)
+    assert (schedule.CALIBRATION_START is None) == (not PASS_RULE.approved)
     assert schedule.FUND_START is None or schedule.CALIBRATION_START is not None
+
+
+def test_the_fund_tests_bars_come_from_its_own_share_of_the_data():
+    """The owner's decision of 24 Sep 2026. The same calculation gives the
+    race's pinned bars for three equal looks, and the fund test's for its
+    planned 46, 106 and 166 sessions: sessions from its start to each of the
+    race's estimated look days."""
+    from datetime import timedelta
+
+    from analysis import decision_gate as gate
+    from config.market_calendar import is_trading_day
+
+    race = gate.obrien_fleming_bars([1, 2, 3])
+    assert tuple(round(b, 2) for b in race) == tuple(bar for _, bar in gate.CHECKPOINTS)
+
+    def sessions(first, last):
+        return sum(1 for i in range((last - first).days + 1) if is_trading_day(first + timedelta(days=i)))
+
+    looks = (date(2026, 12, 22), date(2027, 3, 22), date(2027, 6, 16))
+    assert tuple(sessions(schedule.FUND_TEST_PLANNED_START, look) for look in looks) == \
+        schedule.FUND_TEST_PLANNED_SESSIONS == (46, 106, 166)
+    exact = gate.obrien_fleming_bars(schedule.FUND_TEST_PLANNED_SESSIONS)
+    assert [round(b, 3) for b in exact] == [3.797, 2.501, 1.999]
+    assert tuple(round(b, 2) for b in exact) == schedule.FUND_TEST_BARS == (3.80, 2.50, 2.00)

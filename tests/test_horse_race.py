@@ -312,6 +312,7 @@ def _race(tmp_path, monkeypatch, capsys, frames, journal_lines, now, extra=(),
     journal.write_text("\n".join(json.dumps(l) for l in journal_lines) + "\n", encoding="utf-8")
     if cutoff is not None:
         monkeypatch.setattr(decision_gate, "DECISION_CUTOFF", cutoff)
+        monkeypatch.setattr(decision_gate, "FAILURE_WATCH_START", cutoff)
     monkeypatch.setattr(horse_race, "_now", lambda: now)
     monkeypatch.setattr(horse_race, "YFinancePriceSource",
                         lambda final_through=None: FinalAwareSource(frames, final_through))
@@ -556,6 +557,8 @@ def test_the_registered_parameters_are_the_ones_the_code_runs():
     assert gate.CHECKPOINTS[-1][1] == 2.0 and "t above 2.0" in text
     assert gate.INDEX_TICKER == "VT" and "**VT**" in text
     assert gate.INDEX_GAP_SETTLE_SESSIONS == 5 and "published five later VT sessions" in text
+    assert gate.FAILURE_WATCH_START == date(2026, 9, 25) and "counted from **2026-09-25**" in text
+    assert gate.RUN_ALERT_FAILED_SHARE == 0.20 and "more than **20%** of one run's calls fail" in text
     assert gate.COIN_FLIP_PERCENTILE == 95.0 and "95th percentile" in text
     assert horse_race.BAND == (5.0, 95.0)  # the band condition 3 actually reads
     assert "**no arm trades**" in text
@@ -661,7 +664,9 @@ def test_the_model_watch_is_printed_every_run(tmp_path, monkeypatch, capsys):
     _, out = _race(tmp_path, monkeypatch, capsys, {"NVDA": warm}, [_journal_line("NVDA", stamp)], now)
     assert "MODEL WATCH" in out
     assert "(b) 5 answered days in a row with no SHORT while SPY fell: not yet judged (1 of 5" in out
-    assert "(c) failed or timed-out calls above 5% of names over 5 cycle days: not yet judged (1 of 5" in out
+    assert "(c) model errors above 5% of the calls that reached the model over 5 cycle days" in out
+    assert "not yet judged (1 of 5 cycle day(s)" in out
+    assert "setup errors (our key or configuration; shown, never counted by (c)): none" in out
 
 
 def test_a_news_outage_is_not_a_failed_model_call_and_a_wrong_ticker_answer_is_no_answer():
@@ -674,8 +679,12 @@ def test_a_news_outage_is_not_a_failed_model_call_and_a_wrong_ticker_answer_is_n
     wrong = entry_from({"ts_utc": stamp, "ticker": "MSFT", "error": "answered for NVDA",
                         "signal": {"bias": "BEARISH", "conviction": 0.8}})
     fine = entry_from({"ts_utc": stamp, "ticker": "JPM", "signal": {"bias": "BEARISH", "conviction": 0.8}})
-    (day,) = horse_race.watch_days([context_failure, timeout, wrong, fine])
-    assert (day.asked, day.failed, day.shorts) == (3, 2, 1)
+    unauthorised = entry_from({"ts_utc": stamp, "ticker": "XOM", "error": (
+        'https://api.deepinfra.com/v1/openai/chat/completions returned HTTP 401: {"error":{"message":'
+        '"User is not authorized"}}')})
+    (day,) = horse_race.watch_days([context_failure, timeout, wrong, fine, unauthorised])
+    assert (day.asked, day.failed, day.shorts, day.setup_failed) == (4, 2, 1, 1)
+    assert (day.attempted, day.answered) == (3, 1)
     answered, dropped = horse_race.split_answered([context_failure, timeout, wrong, fine])
     assert answered == [fine] and len(dropped) == 3
 

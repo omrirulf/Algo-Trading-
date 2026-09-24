@@ -202,8 +202,8 @@ def test_an_unfinished_or_unpriced_window_is_none():
 # --- the owner's model-watch triggers -----------------------------------------------------
 
 
-def day(d, asked=60, failed=0, shorts=1):
-    return WatchDay(day=d, asked=asked, failed=failed, shorts=shorts)
+def day(d, asked=60, failed=0, shorts=1, setup=0):
+    return WatchDay(day=d, asked=asked, failed=failed, shorts=shorts, setup_failed=setup)
 
 
 DAYS = [date(2026, 10, d) for d in (1, 2, 5, 6, 7, 8, 9)]
@@ -301,11 +301,29 @@ def test_after_a_decision_later_looks_are_shown_but_decide_nothing():
 
 
 def test_trigger_c_trips_early_when_the_outcome_is_already_certain():
-    """23 and 24 Sep 2026: 61 of 123 calls failed. Any 5-day window holding
-    those two days can ask at most 123 + 3 x 80 names, and 5% of that is 18."""
-    days = [day(date(2026, 9, 23), asked=65, failed=3), day(date(2026, 9, 24), asked=58, failed=58)]
+    """Two days with 61 model errors in 123 calls: any 5-day window holding
+    them can ask at most 123 + 3 x 80 names, and 5% of that is 18."""
+    first, second = date(2026, 9, 28), date(2026, 9, 29)
+    days = [day(first, asked=65, failed=3), day(second, asked=58, failed=58)]
     assert gate.failure_trips(days) == []            # without a ceiling it waits
     (trip,) = gate.failure_trips(days, max_names_per_day=80)
-    assert (trip.first, trip.last) == (date(2026, 9, 23), date(2026, 9, 24))
-    calm = [day(date(2026, 9, 23), asked=65, failed=3)]
+    assert (trip.first, trip.last) == (first, second)
+    calm = [day(first, asked=65, failed=3)]
     assert gate.failure_trips(calm, max_names_per_day=80) == []
+
+
+def test_trigger_c_counts_model_errors_only_and_from_25_september():
+    """The owner's decision of 24 Sep 2026: the 23-24 Sep failures were a key
+    problem, not the model. Setup errors are shown, never counted, and the
+    count restarts on 25 Sep."""
+    assert gate.FAILURE_WATCH_START == date(2026, 9, 25)
+    assert gate.RUN_ALERT_FAILED_SHARE == 0.20
+    outage = [day(date(2026, 9, 23), asked=65, failed=3), day(date(2026, 9, 24), asked=58, setup=58)]
+    assert gate.failure_trips(outage, max_names_per_day=80) == []
+    # The same 58 setup errors after the restart still count for nothing.
+    later = [day(d, asked=60, setup=58 if i == 0 else 0) for i, d in enumerate(DAYS[:5])]
+    assert gate.failure_trips(later, max_names_per_day=80) == []
+    # 16 model errors of the 242 calls that reached the model is 6.6%: tripped.
+    later[1] = day(DAYS[1], failed=16)
+    (trip,) = gate.failure_trips(later, max_names_per_day=80)
+    assert "16 of 242" in trip.detail

@@ -212,6 +212,33 @@ def test_a_tenth_of_the_watchlist_failing_is_critical(logs):
     assert alarm.is_critical and alarm.title == "2 of 11 ticker(s) produced no signal"
 
 
+UNAUTHORISED = ('https://api.deepinfra.com/v1/openai/chat/completions returned HTTP 401: '
+                '{"error":{"message":"User is not authorized"}}')
+TIMEOUT = "https://api.deepinfra.com/v1/openai/chat/completions unreachable: The read operation timed out"
+
+
+def test_more_than_a_fifth_of_the_runs_calls_failing_pings_the_phone(logs):
+    """The owner's rule of 24 Sep 2026: above 20% of one run's calls failed,
+    of either kind, is a critical alarm, which the brief pushes as urgent."""
+    journal, audit = logs
+    write(journal, *[journal_line(t) for t in "ABCDEFG"], journal_line("X", error=UNAUTHORISED),
+          journal_line("Y", error=UNAUTHORISED), journal_line("Z", error=TIMEOUT))
+    alarms = health.check(journal, audit, DAY)
+    assert alarms[0].is_critical and alarms[0].title == "3 of 10 model calls failed today (2 setup, 1 model)"
+    assert "HTTP 401" in alarms[0].detail
+
+
+def test_exactly_a_fifth_failing_or_a_news_outage_is_not_the_call_alarm(logs):
+    journal, audit = logs
+    write(journal, *[journal_line(t) for t in "ABCDEFGH"], journal_line("X", error=TIMEOUT),
+          journal_line("Y", error=TIMEOUT))                                # 2 of 10: not above 20%
+    assert not [a for a in health.check(journal, audit, DAY) if "model calls failed" in a.title]
+    context = json.loads(journal_line("W", error="Bright Data unreachable"))
+    context["stage"] = "context"                                           # never put to the model
+    write(journal, *[journal_line(t) for t in "ABCD"], json.dumps(context), json.dumps(context))
+    assert not [a for a in health.check(journal, audit, DAY) if "model calls failed" in a.title]
+
+
 def test_a_screen_error_is_a_warning_with_the_first_line_of_the_error(logs):
     journal, audit = logs
     error = "1 validation error for LLMSignal\nanalyst_score\n  Input should be less than or equal to 1"

@@ -71,6 +71,8 @@ from typing import Optional, Sequence
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from analysis import decision_gate as gate  # noqa: E402
+from analysis.call_errors import MODEL as MODEL_ERROR  # noqa: E402
+from analysis.call_errors import SETUP as SETUP_ERROR  # noqa: E402
 from analysis.baseline_compare import (  # noqa: E402
     OhlcFetcher,
     simulate_model_trades,
@@ -844,8 +846,9 @@ def watch_days(entries: Sequence[JournalEntry]) -> list[gate.WatchDay]:
     return [
         gate.WatchDay(
             day=day, asked=len(rows),
-            failed=sum(1 for e in rows if e.model_failed),
+            failed=sum(1 for e in rows if e.failure_kind == MODEL_ERROR),
             shorts=sum(1 for e in rows if e.model_answered and e.bias == "BEARISH"),
+            setup_failed=sum(1 for e in rows if e.failure_kind == SETUP_ERROR),
         )
         for day, rows in sorted(by_day.items())
     ]
@@ -1049,7 +1052,8 @@ def main(argv: list[str] | None = None) -> int:
     spy = {day: price for day, price in basket.closes("SPY", earliest, today).bars}
     trips = {"b": gate.no_short_trips(days, spy),
              "c": gate.failure_trips(days, max_names_per_day=len(DEFAULT_WATCHLIST))}
-    watch_counts = {"b": sum(1 for d in days if d.answered), "c": len(days)}
+    watch_counts = {"b": sum(1 for d in days if d.answered),
+                    "c": sum(1 for d in days if d.day >= gate.FAILURE_WATCH_START)}
     in_window = [e for e in read.entries if e.timestamp is not None and gate.in_window(_line_day(e))]
 
     # The exploratory arms, on their own lines only, at both horizons, over
@@ -1080,6 +1084,7 @@ def main(argv: list[str] | None = None) -> int:
         window_start=decision.window_start, window_end=decision.window_end,
         agreement=agreement, agreed_on=agreed_on, breakdown=breakdown, per_trade=args.per_trade,
         gate_view=view, whole=whole, unanswered=unanswered, trips=trips, watch_counts=watch_counts,
+        watched=days,
         spend=llm_spend(in_window), spend_whole=llm_spend(read.entries),
         warnings=window_warnings(read.entries),
     ))
@@ -1169,7 +1174,7 @@ def render(
     breakdown: Sequence[AgreementDay], per_trade: bool = False,
     gate_view: Optional[GateView] = None, whole: Optional[Race] = None,
     unanswered: Sequence[JournalEntry] = (), trips: Optional[dict[str, list[gate.Trip]]] = None,
-    watch_counts: Optional[dict[str, int]] = None,
+    watch_counts: Optional[dict[str, int]] = None, watched: Sequence[gate.WatchDay] = (),
     spend: Optional[Spend] = None, spend_whole: Optional[Spend] = None,
     warnings: Sequence[str] = (),
 ) -> str:
@@ -1181,7 +1186,7 @@ def render(
     ]
     if gate_view is not None:
         out += _render_gate(gate_view, horizon)
-    out += _render_watch(trips or {}, watch_counts)
+    out += _render_watch(trips or {}, watch_counts, watched)
     if spend is not None:
         out += _render_spend(spend, spend_whole)
     if warnings:
@@ -1377,7 +1382,8 @@ def _render_gate(view: GateView, horizon: int) -> list[str]:
     return out
 
 
-def _render_watch(trips: dict[str, list[gate.Trip]], counts: Optional[dict[str, int]] = None) -> list[str]:
+def _render_watch(trips: dict[str, list[gate.Trip]], counts: Optional[dict[str, int]] = None,
+                  days: Sequence[gate.WatchDay] = ()) -> list[str]:
     """The owner's model-watch triggers. A trip means: stop and tell the owner."""
     out = [
         "",
@@ -1386,8 +1392,8 @@ def _render_watch(trips: dict[str, list[gate.Trip]], counts: Optional[dict[str, 
     ]
     labels = {
         "b": f"(b) {gate.WATCH_DAYS} answered days in a row with no SHORT while SPY fell",
-        "c": f"(c) failed or timed-out calls above {gate.WATCH_MAX_FAILED_SHARE:.0%} of names "
-             f"over {gate.WATCH_DAYS} cycle days",
+        "c": f"(c) model errors above {gate.WATCH_MAX_FAILED_SHARE:.0%} of the calls that reached the model "
+             f"over {gate.WATCH_DAYS} cycle days, counted from {gate.FAILURE_WATCH_START}",
     }
     for key, label in labels.items():
         hits = trips.get(key, [])
@@ -1402,6 +1408,13 @@ def _render_watch(trips: dict[str, list[gate.Trip]], counts: Optional[dict[str, 
         latest = hits[-1]
         out.append(f"{label}: TRIPPED {len(hits)} time(s); latest {latest.first} to {latest.last}: "
                    f"{latest.detail}")
+    setup = [d for d in days if d.setup_failed]
+    if setup:
+        out.append(f"setup errors (our key or configuration; shown, never counted by (c)): "
+                   f"{sum(d.setup_failed for d in setup)} call(s) on {len(setup)} day(s): "
+                   + ", ".join(f"{d.day} {d.setup_failed} of {d.asked}" for d in setup[-5:]))
+    else:
+        out.append("setup errors (our key or configuration; shown, never counted by (c)): none")
     out.append("(a) is read from the zero-shorts replay (model-compare), not from the journal.")
     return out
 

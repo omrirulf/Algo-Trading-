@@ -52,6 +52,7 @@ from shadow.fund import (  # noqa: E402
     run,
 )
 from shadow.market import Bars, SimFeed, calendar  # noqa: E402
+from shadow.order_matters import fund_summary  # noqa: E402
 from shadow.run import INDEX_TICKER, _read_lines, integrity, not_shortable  # noqa: E402
 
 #: Calendar days fetched per session wanted: weekends and holidays, with room.
@@ -75,6 +76,9 @@ def health(fund) -> dict:
         "fills": dict(sorted(kinds.items())),
         "open": len(fund.broker.positions),
         "data_holes": len(fund.tally.data_holes),
+        # Days the book ran out of room before the end of the list (a count
+        # of how the machinery behaved, not how well the fund did).
+        "order_days": fund_summary(fund)["days"],
         "problems": integrity([fund])["problems"],
     }
 
@@ -106,7 +110,7 @@ def smoke(entries, sessions_wanted: int, coin_funds: int, fetcher, final_through
         Fund("momentum", rule_signal("momentum"), feed, bars, not_shortable=shortable_no),
         Fund("hybrid", rule_signal("hybrid"), feed, bars, not_shortable=shortable_no),
         IndexFund("vt", INDEX_TICKER, bars),
-        *(Fund(f"coin-{seed}", coin_signal(seed), feed, bars, not_shortable=shortable_no)
+        *(Fund(f"coin-{seed}", coin_signal(seed), feed, bars, not_shortable=shortable_no, order_detail=False)
           for seed in range(coin_funds)),
     ]
     run(funds, sessions, cycles, ran, feed)
