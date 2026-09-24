@@ -124,6 +124,19 @@ MAX_TOKENS = 16000
 
 REQUEST_TIMEOUT_SECONDS = 120.0
 
+
+def configured_effort() -> Optional[str]:
+    """The reasoning level the full model is asked at, as configured here.
+
+    ``MODEL_EFFORT`` on the OpenAI-compatible path, ``EFFORT`` on the
+    Anthropic one: the two vocabularies reach different fields, and which
+    one applies is decided by ``MODEL_BASE_URL``. Recorded on every journal
+    line, so a line can say how it was made without anyone having to know
+    what the code said on that day.
+    """
+    effort = MODEL_EFFORT if MODEL_BASE_URL else EFFORT
+    return (effort or "").strip().lower() or None
+
 #: The same, for the full model on the OpenAI-compatible path. Separate
 #: because 120 is not a timeout for a reasoning model at high effort, it is a
 #: coin toss: gpt-oss-120b measured ~128s a call, and a 120s deadline lost 286

@@ -21,6 +21,37 @@ reads the journal, fetches prices, and prints. It cannot trade and it cannot
 move a parameter. What it is allowed to decide, and when, is written down in
 the [pre-registration](/horse-race-preregistration) before the numbers.
 
+## The decision gate comes first
+
+Every run opens with the pre-registered gate, applied by
+`analysis/decision_gate.py` rather than by whoever reads the output:
+
+```
+DECISION GATE (pre-registered; applied by this code, not by a reader)
+independent days since 2026-09-23: 0 of 60 (= 180 trading days) — NO DECISION YET
+Next checkpoint: 20 independent days (= 60 trading days), estimated 2026-12-22, bar t > 3.47
+```
+
+- **Only lines journalled on or after 2026-09-23 count**, the day the model
+  arm changed. The race runs everything on that window first, then prints
+  the whole journal after it, marked for reading only.
+- **Independent days** are complete blocks of 3 scored entry days.
+- **Three planned looks**, at 20, 40 and 60 independent days, with
+  O'Brien-Fleming bars of t > 3.47, 2.45 and 2.00. A look is computed on its
+  own first entry days only, so it says the same thing every night after it
+  is reached. Nothing is decided between looks.
+- **Index first.** The arm the rule picks must also beat VT, bought at the
+  same opens and held over the same sessions, at the same bar — or no arm
+  trades and the answer is to hold the index.
+- **Model watch.** The owner's triggers (b) and (c) are printed on every run:
+  five answered days with no SHORT while SPY fell, and failed calls above 5%
+  of names over five cycle days. A trip means stop and tell the owner.
+- It also prints what the model calls cost over the window, and warns if any
+  line in it was made with the screen on or at another reasoning level.
+
+A run with any setting other than the registered ones (horizon, cost,
+floor, seeds, sizing) says **SENSITIVITY RUN** and evaluates no look.
+
 ## The arms
 
 | Arm | Role | What it is | Where it comes from |
@@ -139,13 +170,16 @@ draws for itself.
 
 ## Who gets asked
 
-Every arm is offered every line, except the lines no arm was offered: a
-ticker already in the book, where the model was never asked and a rule
-holding the same book would not have been either. Those are excluded from
-every arm alike.
+Every arm is offered exactly the same lines. Two kinds are offered to no arm:
+a ticker already in the book, where the model was never asked and a rule
+holding the same book would not have been either; and, since 24 Sep 2026, a
+line where the model gave no answer at all (a timeout or a failed call). That
+second one is a bug fix in the pre-registration's Amendments: the rules used
+to trade such a line while the model sat in cash, which compared the arms on
+different lines and charged the model for an outage.
 
-The model then answers on **fewer** lines than the rules, and the coverage
-table reconciles every line so nothing goes missing:
+The coverage table reconciles every line so nothing goes missing. An older
+run, from before that fix, looked like this:
 
 ```
 COVERAGE AND RECONCILIATION
@@ -158,10 +192,10 @@ random         472       0    472       0     211      261       3    258
 
 `offered = neutral + a side`; `a side = below floor + pending + resolved`;
 `resolved = dropped + scored`, and the run says in words whether every
-resolved line is scored or named as dropped. The asymmetry between the model
-and the rules is by design: the screen drops lines before the model sees them,
-and the model fails on some it does see; both are the model's to own, because
-the funnel is part of the design being raced.
+resolved line is scored or named as dropped. Before 2026-09-23 a cheap screen
+answered NEUTRAL on the names it did not escalate; those lines are the
+model's NEUTRAL, because the funnel was the design then. The screen has been
+off since 2026-09-23, and the pre-registration pins it off.
 
 ## What the rule reads, and why that is the point
 
@@ -198,9 +232,9 @@ The momentum arm reads strictly less than the model. The hybrid reads one
 thing more: the `news_score` the model call on that line already produced,
 a number in [-1, 1] for how the headlines read. It is on every line the
 journal has a signal for, so the arm is recomputable over the whole history
-and makes **no new model call**. In the live loop the score would be the
-screening model's, the cheap first stage of the funnel, so the hybrid costs
-the screen and not the full model.
+and makes **no new model call**. The score comes from the same call as the
+model arm's answer, so choosing the hybrid would still need a daily
+news-scoring call; see the pre-registration's "The hybrid is not model-free".
 
 The rule: momentum decides the direction; the score can only stand the arm
 aside. When the score points against the trend the hybrid is NEUTRAL; when it

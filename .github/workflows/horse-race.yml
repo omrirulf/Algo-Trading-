@@ -50,6 +50,8 @@ on:
     paths:
       - "rules/**"
       - "analysis/horse_race.py"
+      - "analysis/decision_gate.py"
+      - "analysis/reader.py"
       - "analysis/baseline_compare.py"
       - "analysis/returns.py"
       - "backtest/simulate.py"

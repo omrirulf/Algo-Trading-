@@ -107,6 +107,20 @@ class JournalEntry:
     #: the prompt offered nothing, ``None`` says the line cannot tell us, and
     #: the two must not be confused -- one nulls a score, the other must not.
     sections: Optional[frozenset[str]] = None
+    #: What the full model's call cost, as journalled (``usage.cost_usd``).
+    #: ``None`` when no model was called or the price was unknown.
+    cost_usd: Optional[float] = None
+    #: What the cheap screen's call cost, when the funnel ran.
+    screen_cost_usd: Optional[float] = None
+    #: Whether the screen stood in front of the full model on this line.
+    #: Journalled explicitly since 24 Sep 2026; on older lines, whether the
+    #: line carries a recorded screen answer -- the funnel wrote one on every
+    #: line it ran on, and nothing else ever did. ``None`` only on a line
+    #: that can say neither (a held or failed line before the field existed).
+    screening: Optional[bool] = None
+    #: The reasoning level the full model was configured at, as journalled.
+    #: ``None`` on lines written before the field existed.
+    reasoning_effort: Optional[str] = None
 
     def scores_with_a_source(self) -> dict[str, Optional[float]]:
         """The line's scores, with any score that had no source read as null.
@@ -271,7 +285,30 @@ def entry_from(payload: Any) -> Optional[JournalEntry]:
         insiders=dict(insider_section),
         held=bool(payload.get("held")),
         sections=_sections(payload),
+        cost_usd=_number(usage.get("cost_usd")),
+        screen_cost_usd=_screen_cost(payload.get("screen")),
+        screening=_screening(payload),
+        reasoning_effort=_text(payload.get("reasoning_effort")),
     )
+
+
+def _screen_cost(screen: Any) -> Optional[float]:
+    if not isinstance(screen, dict) or not isinstance(screen.get("usage"), dict):
+        return None
+    return _number(screen["usage"].get("cost_usd"))
+
+
+def _screening(payload: dict) -> Optional[bool]:
+    """Whether the screen ran on this line: the journalled flag, else the evidence."""
+    flag = payload.get("screening")
+    if isinstance(flag, bool):
+        return flag
+    if isinstance(payload.get("screen"), dict):
+        return True
+    if isinstance(payload.get("signal"), dict):
+        # A full-model answer with no screen beside it: the funnel was off.
+        return False
+    return None
 
 
 def _sections(payload: dict) -> Optional[frozenset[str]]:
