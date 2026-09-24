@@ -160,6 +160,10 @@ class LookInputs:
     #: Days the index could be priced on, and days it could not.
     index_days: int = 0
     index_missing: int = 0
+    #: Why the look cannot be read tonight, if it cannot: a price the race
+    #: needs for the look's own days did not arrive. A data outage is never
+    #: allowed to read as a result; the look waits for the data instead.
+    unreadable: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -213,6 +217,12 @@ def decide(inputs: LookInputs, bar: float, final: bool) -> tuple[Optional[str], 
     it at t < -bar (hold the index) -- or the look decides nothing and the
     race goes on to the next one.
     """
+    problem = inputs.unreadable
+    if problem is None and inputs.index_missing:
+        problem = f"{INDEX_TICKER} could not be priced on {inputs.index_missing} of the look's days"
+    if problem is not None:
+        return None, None, f"this look cannot be read tonight: {problem}"
+
     keep = (
         _above(inputs.t_model_momentum, bar)
         and _above(inputs.t_model_hybrid, bar)
@@ -265,14 +275,22 @@ def evaluate(inputs_by_look: Mapping[int, Optional[LookInputs]]) -> list[Look]:
     decisions between looks, and none after a stop.
     """
     looks: list[Look] = []
+    decided_at: Optional[int] = None
     for independent, bar in CHECKPOINTS:
         final = independent == CHECKPOINTS[-1][0]
         inputs = inputs_by_look.get(independent)
         if inputs is None:
             looks.append(Look(independent, bar, final))
             continue
+        if decided_at is not None:
+            looks.append(Look(independent, bar, final, inputs, None, None,
+                              f"the race was already decided at the {decided_at}-day look; "
+                              "shown for reading only"))
+            continue
         candidate, outcome, reason = decide(inputs, bar, final)
         looks.append(Look(independent, bar, final, inputs, candidate, outcome, reason))
+        if outcome is not None:
+            decided_at = independent
     return looks
 
 
@@ -356,9 +374,24 @@ class Trip:
     detail: str
 
 
-def failure_trips(days: Sequence[WatchDay]) -> list[Trip]:
-    """Trigger (c): failed or timed-out calls above 5% of names over 5 cycle days."""
+def failure_trips(days: Sequence[WatchDay], max_names_per_day: Optional[int] = None) -> list[Trip]:
+    """Trigger (c): failed or timed-out calls above 5% of names over 5 cycle days.
+
+    With fewer than 5 cycle days so far, the run of days there are is still
+    judged when the answer is already certain: if the failures exceed 5% of
+    the most calls a 5-day window could possibly hold (the days so far, plus
+    ``max_names_per_day`` for each day still to come), no later day can
+    bring the window back under. Otherwise it waits for the fifth day.
+    """
     trips: list[Trip] = []
+    if days and len(days) < WATCH_DAYS and max_names_per_day:
+        asked = sum(d.asked for d in days)
+        failed = sum(d.failed for d in days)
+        ceiling = asked + max_names_per_day * (WATCH_DAYS - len(days))
+        if failed > WATCH_MAX_FAILED_SHARE * ceiling:
+            trips.append(Trip(days[0].day, days[-1].day,
+                              f"{failed} of {asked} calls failed in the first {len(days)} cycle day(s); "
+                              f"above 5% of any {WATCH_DAYS}-day window that contains them"))
     for i in range(len(days) - WATCH_DAYS + 1):
         run = days[i:i + WATCH_DAYS]
         asked = sum(d.asked for d in run)

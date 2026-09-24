@@ -244,3 +244,46 @@ def test_a_lost_day_neither_extends_nor_breaks_a_no_short_run():
 def test_a_run_whose_last_close_is_not_final_is_not_judged():
     days = [day(d, shorts=0) for d in DAYS[:5]]
     assert gate.no_short_trips(days, {date(2026, 9, 30): 500.0}) == []
+
+
+# --- a look that cannot be read decides nothing ----------------------------------
+
+
+def test_an_unpriced_index_is_never_read_as_a_result():
+    """A VT outage on the night of the final look must not become 'no arm trades'."""
+    from dataclasses import replace
+
+    kept = inputs(mm=3.0, mh=2.6, model=2.4)
+    assert gate.decide(kept, 2.0, final=True)[1] == "model"
+    outage = replace(kept, index_missing=3)
+    candidate, outcome, reason = gate.decide(outage, 2.0, final=True)
+    assert (candidate, outcome) == (None, None)
+    assert "cannot be read tonight" in reason and "VT" in reason
+
+
+def test_a_look_with_missing_prices_waits_for_them():
+    from dataclasses import replace
+
+    missing = replace(inputs(mm=3.6, mh=3.6, model=3.6), unreadable="no final prices for NVDA")
+    looks = gate.evaluate({20: missing})
+    assert not looks[0].decided and "no final prices for NVDA" in looks[0].reason
+    assert gate.status_line(20, looks).endswith("NO DECISION YET")
+
+
+def test_after_a_decision_later_looks_are_shown_but_decide_nothing():
+    looks = gate.evaluate({20: inputs(mm=3.6, mh=3.6, model=3.6), 40: inputs(momentum=9.0),
+                           60: inputs(momentum=9.0)})
+    assert [look.outcome for look in looks] == ["model", None, None]
+    assert all("already decided at the 20-day look" in look.reason for look in looks[1:])
+    assert gate.first_decision(looks).independent == 20
+
+
+def test_trigger_c_trips_early_when_the_outcome_is_already_certain():
+    """23 and 24 Sep 2026: 61 of 123 calls failed. Any 5-day window holding
+    those two days can ask at most 123 + 3 x 80 names, and 5% of that is 18."""
+    days = [day(date(2026, 9, 23), asked=65, failed=3), day(date(2026, 9, 24), asked=58, failed=58)]
+    assert gate.failure_trips(days) == []            # without a ceiling it waits
+    (trip,) = gate.failure_trips(days, max_names_per_day=80)
+    assert (trip.first, trip.last) == (date(2026, 9, 23), date(2026, 9, 24))
+    calm = [day(date(2026, 9, 23), asked=65, failed=3)]
+    assert gate.failure_trips(calm, max_names_per_day=80) == []

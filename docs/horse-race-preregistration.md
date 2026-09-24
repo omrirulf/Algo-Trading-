@@ -19,7 +19,7 @@ rule; a bug fix re-runs the race over the whole journal.
 | Journal starts | 2026-09-15 |
 | First entry day counted | the first entry day after **2026-09-23**, the date the `model` arm changed (Amendment 1). Days before it are reported but do not count toward the minimum sample or the decision: before 2026-09-22 the rule was not yet written, and on 2026-09-22 a different model was answering. |
 | Decision window | lines journalled on or after **2026-09-23** (UTC). Applied by `analysis/decision_gate.py` (`DECISION_CUTOFF`), not by a reader. The first entry day counted is the session after the first line in it. |
-| Model arm settings | `openai/gpt-oss-120b`, reasoning level **high**. Screening (`SCREENING_ENABLED`): **off**. Every journal line records both since 2026-09-24; the race warns if any line in the window was made otherwise. Turning the screen on, or changing the reasoning level, needs an amendment here first — `tests/test_horse_race.py` fails until there is one. |
+| Model arm settings | `openai/gpt-oss-120b`, reasoning level **high**. Screening (`SCREENING_ENABLED`): **off**. Every journal line records both from the first cycle after this was written (2026-09-25); the lines of 2026-09-23 and 2026-09-24 predate the fields, and the race counts window lines that carry no recorded level. It warns if any line in the window was made otherwise. Turning the screen on, or changing the reasoning level, needs an amendment here first — `tests/test_horse_race.py` fails until there is one. |
 | Planned looks | at **20, 40 and 60 independent days** (60, 120 and 180 trading days), bars **t > 3.47, 2.45, 2.00**. See section 5a. |
 | Real money | **none before the June 2027 verdict.** See section 9. |
 
@@ -111,7 +111,7 @@ The same metric, model minus hybrid, is the second main comparison.
 ## 4. Minimum sample before any decision
 
 **60 non-overlapping entry days** — every 3rd entry day, so about 180 entry
-days, roughly nine months of trading days from the registration date. No
+days, roughly nine months of trading days from 2026-09-23. No
 decision, in either direction, is taken before that, except at a planned
 look whose bar is met (section 5a). A good or bad number between looks is
 reported and ignored.
@@ -222,14 +222,16 @@ fails if any of them differs from this file.
 - **A re-scoring under a changed cost, horizon or floor.** The defaults above
   are the ones the decision reads; other settings may be printed as
   sensitivity.
-- **A partial window.** The primary window runs from the registration date
-  to the day the minimum sample is reached, inclusive of every entry day in
-  it.
+- **A partial window, except a planned look.** The primary window is the
+  lines journalled on or after 2026-09-23, up to the look that decides
+  (section 5a) — its first 60, 120 or 180 entry days, every one of them
+  inclusive. Any other slice of it is for reading only.
 
 ## 7. Locked
 
 From the registration date, **no changes to the arm definitions, the costs
-or the decision rule, except bug fixes.** A bug fix is a change that makes
+or the decision rule, except bug fixes and the owner's new registrations
+logged under the Status rule at the top of this file.** A bug fix is a change that makes
 the code do what this file already says; anything else is a new
 registration. Every bug fix is logged below with its date and reason, and
 the race is re-run over the whole journal so the log and the numbers agree.
@@ -271,11 +273,13 @@ is a new registration of the model arm, like Amendment 1.
 | Date | Kind | Reason |
 | --- | --- | --- |
 | 2026-09-23 | **New registration of the `model` arm** (not a bug fix) | The owner moved production off Claude: `SCREENING_ENABLED` off, and the full model from the `claude-haiku-4-5` → `claude-opus-5` funnel to `openai/gpt-oss-120b` at high reasoning on every name, for cost (~$1.39 a cycle to ~$0.20). Section 7 allows only bug fixes, and this is not one — it replaces the contestant. The metric, the sample size and the decision rule are unchanged. What changed is who the `model` arm is — and, with it, the `news_score` the `hybrid` arm reads, which comes from the same calls (section 2, "The hybrid is not model-free"). `momentum`, `random` and `insiders` are untouched. **The 60-day count therefore restarts from 2026-09-23.** The 2026-09-22 lines stay in the journal and in the printed tables, marked pre-registration, and cannot be added to the new model's days: a mean over two different models is a mean over neither. |
-| 2026-09-24 | **Index first** (new registration of the decision rule, not a bug fix) | Asked by the owner. The arm the rule picks must also beat VT, bought and held, on mean daily net return over the same entry days and 3-session windows, with a Newey-West t above the bar; otherwise no arm trades and the answer is to hold the index. Adds a fourth outcome. **Made before any result for the new `model` arm existed:** its first trades entered on 2026-09-24 and exit at the 2026-09-28 close, so no trade in the decision window had resolved when this was written. |
-| 2026-09-24 | **Planned looks** (new registration, not a bug fix) | Asked by the owner. Three looks at 20, 40 and 60 independent days, O'Brien-Fleming bars 3.47, 2.45, 2.00 (verified: 2.004 × √(3/k)); an early stop in either direction only at a look whose bar is met in that direction; the index test at every look; no decisions between looks. Section 5a. **Made before any result for the new `model` arm existed**, for the same reason as the row above. |
-| 2026-09-24 | **No real money before the verdict** (new registration) | Asked by the owner. No real money in this system before the June 2027 verdict, and then only if the decision rule, including the index test, is met. Section 9. |
+| 2026-09-24 | **Index first** (new registration of the decision rule, not a bug fix) | Asked by the owner. The arm the rule picks must also beat VT, bought and held, on mean daily net return over the same entry days and 3-session windows, with a Newey-West t above the bar; otherwise no arm trades and the answer is to hold the index. Adds a fourth outcome. **Made before any trade in the decision window resolved:** the first ones entered on 2026-09-24 and exit at the 2026-09-28 close. One morning of unrealised paper P&L on the 2026-09-23 calls had been logged by the paper account's position manager (for example XOM at +0.38R), and this rule depends on none of it. |
+| 2026-09-24 | **Planned looks** (new registration, not a bug fix) | Asked by the owner. Three looks at 20, 40 and 60 independent days, O'Brien-Fleming bars 3.47, 2.45, 2.00 (verified: 2.004 × √(3/k)); an early stop in either direction only at a look whose bar is met in that direction; the index test at every look; no decisions between looks. Section 5a. **Made before any trade in the decision window resolved**, as for the row above. |
+| 2026-09-24 | **No real money before the verdict** (new registration) | Asked by the owner. No real money in this system before the June 2027 verdict, and then only if the decision rule, including the index test, is met. Section 9. Made before any trade in the decision window resolved; it depends on no result either way. |
 | 2026-09-24 | **Bug fix**: a line with no model answer is dropped for every arm | Section 3 compares the arms "on the same lines". The code offered a timed-out or failed line to the rules and not to the model, so the rules traded it while the model sat in cash: the paired difference charged the model for an outage and compared the arms on different lines. Such a line is now offered to no arm. On the 2026-09-24 cycle every one of the 58 asked names failed (HTTP 401), so that day is out of the race for every arm. The race is re-run over the whole journal. |
 | 2026-09-24 | **Bug fix**: the gate is applied by code | Sections 4 and 5 were applied by a person reading the race. The cutoff, the minimum sample (counted as complete blocks of 3 scored entry days), the looks, their bars and the index ticker now live in `analysis/decision_gate.py`, are pinned to this file by a test, and the race prints the verdict itself. This makes the code do what the file says; it changes no rule. |
-| 2026-09-24 | **Settings pinned** (enforcement, no rule change) | The model arm's reasoning level (high) and screening (off) are named in the header table and pinned by the test; turning the screen on or changing the level needs an amendment first. Every journal line records both from this date, and the race warns if any line in the window was made otherwise. |
+| 2026-09-24 | **Settings pinned** (enforcement, no rule change) | The model arm's reasoning level (high) and screening (off) are named in the header table and pinned by the test; turning the screen on or changing the level needs an amendment first. Every journal line records both from the first cycle after this change (2026-09-25; the 2026-09-23 and 2026-09-24 lines predate the fields), and the race warns if any line in the window was made otherwise. |
 | 2026-09-24 | **Reporting only** | The race now prints the LLM spend over the window and VT bought and held beside SPY and the watchlist, and its stale note "the screen drops lines" is gone: since 2026-09-23 the screen is off and no-answer lines leave every arm. Section 8. |
 | 2026-09-24 | **Model watch** (operational, not a decision rule) | The owner replaced a standing "never revert to Opus" instruction with three triggers that stop and go to the owner. Section 10. |
+| 2026-09-24 | **Amendment policy** (new registration) | Asked by the owner, with the rules above. The Status paragraph and section 7 said only bug fixes could amend this file; they now also allow the owner's dated new registrations, each of which must say why and whether any result it could have been fitted to existed. Made before any trade in the decision window resolved. |
+| 2026-09-24 | **Made consistent with the planned looks** (no rule change) | Section 6 called any partial window exploratory and section 4 counted from the registration date; both now read as the planned looks and the 2026-09-23 cutoff require, so an early stop at a look is not contradicted by this file's own text. |

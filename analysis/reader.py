@@ -121,6 +121,28 @@ class JournalEntry:
     #: The reasoning level the full model was configured at, as journalled.
     #: ``None`` on lines written before the field existed.
     reasoning_effort: Optional[str] = None
+    #: True when ``cost_usd`` is the screen's own call -- a line the screen
+    #: ended NEUTRAL, where the journal's usage IS the screen's usage -- so a
+    #: spend total counts it once, as screen spend.
+    cost_is_screen: bool = False
+    #: Where a failed line failed, when that was before the model was asked
+    #: (``"context"``). ``None`` on every other line and on older lines.
+    stage: Optional[str] = None
+
+    @property
+    def model_answered(self) -> bool:
+        """The model gave an answer about THIS ticker.
+
+        A signal about a different ticker (journalled with the error
+        "answered for X") is not an answer on this line: production refused
+        it, and so must every reader that races or watches the model.
+        """
+        return self.has_signal and not (self.error or "").startswith("answered for")
+
+    @property
+    def model_failed(self) -> bool:
+        """The model was asked and gave no usable answer: a failed or timed-out call."""
+        return not self.model_answered and not self.held and self.stage != "context"
 
     def scores_with_a_source(self) -> dict[str, Optional[float]]:
         """The line's scores, with any score that had no source read as null.
@@ -286,10 +308,20 @@ def entry_from(payload: Any) -> Optional[JournalEntry]:
         held=bool(payload.get("held")),
         sections=_sections(payload),
         cost_usd=_number(usage.get("cost_usd")),
-        screen_cost_usd=_screen_cost(payload.get("screen")),
+        screen_cost_usd=None if _usage_is_the_screens(payload) else _screen_cost(payload.get("screen")),
+        cost_is_screen=_usage_is_the_screens(payload),
+        stage=_text(payload.get("stage")),
         screening=_screening(payload),
         reasoning_effort=_text(payload.get("reasoning_effort")),
     )
+
+
+def _usage_is_the_screens(payload: dict) -> bool:
+    """A screened-NEUTRAL line: the journal's usage is the screen's own call."""
+    screen = payload.get("screen")
+    usage = payload.get("usage")
+    return (isinstance(screen, dict) and isinstance(usage, dict)
+            and isinstance(screen.get("usage"), dict) and screen["usage"] == usage)
 
 
 def _screen_cost(screen: Any) -> Optional[float]:

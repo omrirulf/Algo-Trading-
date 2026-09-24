@@ -556,8 +556,12 @@ def test_the_registered_parameters_are_the_ones_the_code_runs():
     assert gate.CHECKPOINTS[-1][1] == 2.0 and "t above 2.0" in text
     assert gate.INDEX_TICKER == "VT" and "**VT**" in text
     assert gate.COIN_FLIP_PERCENTILE == 95.0 and "95th percentile" in text
+    assert horse_race.BAND == (5.0, 95.0)  # the band condition 3 actually reads
     assert "**no arm trades**" in text
     assert "**none before the June 2027 verdict.**" in text
+    # No early stop may be contradicted by the file's own text.
+    assert "A partial window, except a planned look" in text
+    assert "except bug fixes and the owner's new registrations" in text
 
 
 # --- the decision gate, applied by the race itself ---------------------------------------
@@ -655,8 +659,42 @@ def test_the_model_watch_is_printed_every_run(tmp_path, monkeypatch, capsys):
     now = datetime.combine(warm.index[-1].date(), datetime.min.time(), tzinfo=timezone.utc) + timedelta(days=1)
     _, out = _race(tmp_path, monkeypatch, capsys, {"NVDA": warm}, [_journal_line("NVDA", stamp)], now)
     assert "MODEL WATCH" in out
-    assert "(b) 5 answered days in a row with no SHORT while SPY fell: not tripped" in out
-    assert "(c) failed or timed-out calls above 5% of names over 5 cycle days: not tripped" in out
+    assert "(b) 5 answered days in a row with no SHORT while SPY fell: not yet judged (1 of 5" in out
+    assert "(c) failed or timed-out calls above 5% of names over 5 cycle days: not yet judged (1 of 5" in out
+
+
+def test_a_news_outage_is_not_a_failed_model_call_and_a_wrong_ticker_answer_is_no_answer():
+    from analysis.reader import entry_from
+
+    stamp = "2026-09-25T15:00:00+00:00"
+    context_failure = entry_from({"ts_utc": stamp, "ticker": "NVDA", "error": "Bright Data unreachable",
+                                  "stage": "context"})
+    timeout = entry_from({"ts_utc": stamp, "ticker": "LLY", "error": "read timed out"})
+    wrong = entry_from({"ts_utc": stamp, "ticker": "MSFT", "error": "answered for NVDA",
+                        "signal": {"bias": "BEARISH", "conviction": 0.8}})
+    fine = entry_from({"ts_utc": stamp, "ticker": "JPM", "signal": {"bias": "BEARISH", "conviction": 0.8}})
+    (day,) = horse_race.watch_days([context_failure, timeout, wrong, fine])
+    assert (day.asked, day.failed, day.shorts) == (3, 2, 1)
+    answered, dropped = horse_race.split_answered([context_failure, timeout, wrong, fine])
+    assert answered == [fine] and len(dropped) == 3
+
+
+def test_the_spend_counts_a_screened_lines_call_once():
+    from analysis.reader import entry_from
+
+    screened_usage = {"model": "claude-haiku-4-5", "cost_usd": 0.007}
+    screened = entry_from({"ts_utc": "2026-09-16T15:00:00+00:00", "ticker": "A",
+                           "signal": {"bias": "NEUTRAL", "conviction": 0.1}, "usage": screened_usage,
+                           "screen": {"model": "claude-haiku-4-5", "bias": "NEUTRAL", "usage": screened_usage}})
+    escalated = entry_from({"ts_utc": "2026-09-16T15:00:00+00:00", "ticker": "B",
+                            "signal": {"bias": "BULLISH", "conviction": 0.6},
+                            "usage": {"model": "claude-opus-5", "cost_usd": 0.041},
+                            "screen": {"model": "claude-haiku-4-5", "bias": "BULLISH",
+                                       "usage": {"model": "claude-haiku-4-5", "cost_usd": 0.007}}})
+    spend = horse_race.llm_spend([screened, escalated])
+    assert spend.model_usd == pytest.approx(0.041)
+    assert spend.screen_usd == pytest.approx(0.014)
+    assert spend.total == pytest.approx(0.055)
 
 
 def _arm(name, trades):

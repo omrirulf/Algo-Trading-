@@ -61,8 +61,14 @@ def record(
     screen: Optional[dict[str, Any]] = None,
     blend: Optional[dict[str, Any]] = None,
     held: bool = False,
+    stage: Optional[str] = None,
 ) -> None:
-    """Write one journal line. Swallows its own failures by design."""
+    """Write one journal line. Swallows its own failures by design.
+
+    ``stage`` names where a failed line failed, when that was before the
+    model was asked (``"context"``): a news-vendor outage is not a failed
+    model call, and the owner's model-watch trigger counts only those.
+    """
     try:
         now = datetime.now(timezone.utc)
         get_journal_logger().info(
@@ -120,6 +126,7 @@ def record(
                 # from the one the pre-registration names.
                 "screening": bool(llm.SCREENING_ENABLED),
                 "reasoning_effort": llm.configured_effort(),
+                "stage": stage,
             },
         )
     except Exception:  # noqa: BLE001 - journalling must not break the cycle

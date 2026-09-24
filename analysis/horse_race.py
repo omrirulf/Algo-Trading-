@@ -103,7 +103,9 @@ DEFAULT_COST_PER_SIDE = 0.001
 
 #: Coin flips drawn per line to put a band around "no information".
 DEFAULT_SEEDS = 1000
-BAND = (5.0, 95.0)
+#: The coin-flip band. Its top is keep-rule condition 3, so it is the
+#: registered percentile and nothing else.
+BAND = (100.0 - gate.COIN_FLIP_PERCENTILE, gate.COIN_FLIP_PERCENTILE)
 
 #: Arm A's name in the report. The rule arms report under their own.
 MODEL_ARM = "model"
@@ -188,8 +190,8 @@ def split_answered(lines: Sequence[JournalEntry]) -> tuple[list[JournalEntry], l
     cash for an outage. A screened line before 2026-09-23 carries the
     screen's NEUTRAL, which was the funnel's answer, and stays.
     """
-    answered = [e for e in lines if e.has_signal]
-    return answered, [e for e in lines if not e.has_signal]
+    answered = [e for e in lines if e.model_answered]
+    return answered, [e for e in lines if not e.model_answered]
 
 
 def decision_window(lines: Sequence[JournalEntry]) -> list[JournalEntry]:
@@ -721,6 +723,35 @@ def look_inputs(
     )
 
 
+def look_data_problem(
+    window: Sequence[JournalEntry], fetcher: OhlcFetcher, grid: Sequence[date],
+    entry_days: int, horizon: int, today: date,
+) -> Optional[str]:
+    """Why a look's own days cannot be read tonight, or None if they can.
+
+    A look reads every trade opened on its first ``entry_days`` entry days.
+    If the price history of any ticker with a line in those days did not
+    arrive -- a yfinance outage for one name -- that name's trades silently
+    leave every arm and the look would read a different sample than it will
+    tomorrow. So the look waits: every such ticker must have final bars
+    through the close of the look's last trades.
+    """
+    cut = grid[entry_days - 1]
+    needed = gate.trading_days_after(cut, max(0, horizon - 1))
+    missing: list[str] = []
+    for ticker in sorted({e.ticker for e in window if _line_day(e) < cut}):
+        frame = fetcher.ohlc(ticker, cut, today)
+        if frame is None or getattr(frame, "empty", True):
+            missing.append(ticker)
+            continue
+        if _day(frame.index[-1]) < needed:
+            missing.append(ticker)
+    if missing:
+        return (f"no final prices through {needed} for {len(missing)} ticker(s): "
+                f"{', '.join(missing[:8])}{'...' if len(missing) > 8 else ''}")
+    return None
+
+
 def registered_mismatches(args: argparse.Namespace) -> list[str]:
     """Every setting of this run that differs from the registered one."""
     registered = (
@@ -757,12 +788,16 @@ def watch_days(entries: Sequence[JournalEntry]) -> list[gate.WatchDay]:
     for entry in entries:
         if entry.timestamp is None or entry.held or not gate.in_window(_line_day(entry)):
             continue
+        # A name whose context never arrived was never put to the model:
+        # a news-vendor outage is not a failed model call.
+        if entry.stage == "context":
+            continue
         by_day.setdefault(_line_day(entry), []).append(entry)
     return [
         gate.WatchDay(
             day=day, asked=len(rows),
-            failed=sum(1 for e in rows if not e.has_signal),
-            shorts=sum(1 for e in rows if e.bias == "BEARISH"),
+            failed=sum(1 for e in rows if e.model_failed),
+            shorts=sum(1 for e in rows if e.model_answered and e.bias == "BEARISH"),
         )
         for day, rows in sorted(by_day.items())
     ]
@@ -783,11 +818,13 @@ class Spend:
 
 
 def llm_spend(entries: Sequence[JournalEntry]) -> Spend:
+    """Every call counted once: on a line the screen ended, the usage IS the screen's."""
     return Spend(
         lines=len(entries),
         priced=sum(1 for e in entries if e.cost_usd is not None or e.screen_cost_usd is not None),
-        model_usd=sum(e.cost_usd or 0.0 for e in entries),
-        screen_usd=sum(e.screen_cost_usd or 0.0 for e in entries),
+        model_usd=sum(e.cost_usd or 0.0 for e in entries if not e.cost_is_screen),
+        screen_usd=sum((e.screen_cost_usd or 0.0) + ((e.cost_usd or 0.0) if e.cost_is_screen else 0.0)
+                       for e in entries),
     )
 
 
@@ -805,6 +842,11 @@ def window_warnings(entries: Sequence[JournalEntry]) -> list[str]:
             f"({', '.join(days)}); the pre-registration says the screen is off, so those lines are "
             "not the model arm it registered"
         )
+    unrecorded = [e for e in window if e.model_answered and e.reasoning_effort is None]
+    if unrecorded:
+        days = sorted({_line_day(e).isoformat() for e in unrecorded})
+        out.append(f"note: {len(unrecorded)} answered line(s) in the decision window predate the "
+                   f"journalled reasoning level ({', '.join(days)}); their settings are the code's on those days")
     efforts = [e for e in window if e.reasoning_effort and e.reasoning_effort != llm.MODEL_EFFORT]
     if efforts:
         seen = sorted({e.reasoning_effort for e in efforts})
@@ -926,8 +968,10 @@ def main(argv: list[str] | None = None) -> int:
         for look_days, _ in gate.CHECKPOINTS:
             needed = gate.entry_days_needed(look_days, args.horizon)
             if entry_days >= needed:
-                inputs[look_days] = look_inputs(decision.results, sides, grid, index, needed,
-                                                args.horizon, args.seeds)
+                computed = look_inputs(decision.results, sides, grid, index, needed,
+                                       args.horizon, args.seeds)
+                problem = look_data_problem(window, fetcher, grid, needed, args.horizon, today)
+                inputs[look_days] = replace(computed, unreadable=problem) if problem else computed
     looks = tuple(gate.evaluate(inputs))
     upcoming = gate.next_look(looks)
     cycle_days = sorted({_line_day(e) for e in window})
@@ -949,7 +993,9 @@ def main(argv: list[str] | None = None) -> int:
     # The owner's model-watch triggers, and what the calls cost.
     days = watch_days(read.entries)
     spy = {day: price for day, price in basket.closes("SPY", earliest, today).bars}
-    trips = {"b": gate.no_short_trips(days, spy), "c": gate.failure_trips(days)}
+    trips = {"b": gate.no_short_trips(days, spy),
+             "c": gate.failure_trips(days, max_names_per_day=len(DEFAULT_WATCHLIST))}
+    watch_counts = {"b": sum(1 for d in days if d.answered), "c": len(days)}
     in_window = [e for e in read.entries if e.timestamp is not None and gate.in_window(_line_day(e))]
 
     # The exploratory arms, on their own lines only, at both horizons, over
@@ -979,7 +1025,7 @@ def main(argv: list[str] | None = None) -> int:
         cost_per_side=args.cost_per_side, seeds=args.seeds, final_through=final_through, now=now,
         window_start=decision.window_start, window_end=decision.window_end,
         agreement=agreement, agreed_on=agreed_on, breakdown=breakdown, per_trade=args.per_trade,
-        gate_view=view, whole=whole, unanswered=unanswered, trips=trips,
+        gate_view=view, whole=whole, unanswered=unanswered, trips=trips, watch_counts=watch_counts,
         spend=llm_spend(in_window), spend_whole=llm_spend(read.entries),
         warnings=window_warnings(read.entries),
     ))
@@ -1069,6 +1115,7 @@ def render(
     breakdown: Sequence[AgreementDay], per_trade: bool = False,
     gate_view: Optional[GateView] = None, whole: Optional[Race] = None,
     unanswered: Sequence[JournalEntry] = (), trips: Optional[dict[str, list[gate.Trip]]] = None,
+    watch_counts: Optional[dict[str, int]] = None,
     spend: Optional[Spend] = None, spend_whole: Optional[Spend] = None,
     warnings: Sequence[str] = (),
 ) -> str:
@@ -1080,7 +1127,7 @@ def render(
     ]
     if gate_view is not None:
         out += _render_gate(gate_view, horizon)
-    out += _render_watch(trips or {})
+    out += _render_watch(trips or {}, watch_counts)
     if spend is not None:
         out += _render_spend(spend, spend_whole)
     if warnings:
@@ -1230,8 +1277,10 @@ def _render_gate(view: GateView, horizon: int) -> list[str]:
             "is evaluated and nothing below can decide anything:",
             *[f"  {m}" for m in view.mismatches],
         ]
-    upcoming = gate.next_look(view.looks)
-    if upcoming is not None:
+    upcoming = None if gate.first_decision(view.looks) else gate.next_look(view.looks)
+    if gate.first_decision(view.looks) is not None:
+        out.append("The race has decided; no later look can change it.")
+    elif upcoming is not None:
         needed = gate.entry_days_needed(upcoming.independent, horizon)
         when = view.next_estimate.isoformat() if view.next_estimate else "n/a"
         out.append(
@@ -1272,7 +1321,7 @@ def _render_gate(view: GateView, horizon: int) -> list[str]:
     return out
 
 
-def _render_watch(trips: dict[str, list[gate.Trip]]) -> list[str]:
+def _render_watch(trips: dict[str, list[gate.Trip]], counts: Optional[dict[str, int]] = None) -> list[str]:
     """The owner's model-watch triggers. A trip means: stop and tell the owner."""
     out = [
         "",
@@ -1286,6 +1335,11 @@ def _render_watch(trips: dict[str, list[gate.Trip]]) -> list[str]:
     }
     for key, label in labels.items():
         hits = trips.get(key, [])
+        have = (counts or {}).get(key)
+        if not hits and have is not None and have < gate.WATCH_DAYS:
+            unit = "answered cycle day(s)" if key == "b" else "cycle day(s)"
+            out.append(f"{label}: not yet judged ({have} of {gate.WATCH_DAYS} {unit} so far)")
+            continue
         if not hits:
             out.append(f"{label}: not tripped")
             continue
