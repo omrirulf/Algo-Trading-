@@ -60,9 +60,11 @@ LABELS = {"model": "Model", "momentum": "Momentum", "hybrid": "Hybrid", "vt": "V
 
 #: The real broker's own refusals, as the live audit log records them. A
 #: shadow fund is refused the same shorts; nothing else is inferred.
+#: The broker quotes the ticker: 'asset "LQD" cannot be sold short'. The
+#: quotes are optional here so a reworded message still reads.
 _NOT_SHORTABLE = (
-    re.compile(r"asset (\w[\w.\-]*) cannot be sold short", re.IGNORECASE),
-    re.compile(r"hard-to-borrow asset (\w[\w.\-]*)", re.IGNORECASE),
+    re.compile(r"asset \\?\"?(\w[\w.\-]*)\\?\"? cannot be sold short", re.IGNORECASE),
+    re.compile(r"hard-to-borrow asset \\?\"?(\w[\w.\-]*)", re.IGNORECASE),
 )
 
 
@@ -155,6 +157,7 @@ def integrity(funds: Sequence) -> dict:
         if isinstance(fund, IndexFund):
             continue
         problems += [f"{fund.name}: {u}" for u in fund.tally.unexpected]
+        problems += [f"{fund.name}: manager: {e}" for e in fund.tally.manager_errors]
         if fund.tally.estimated_r:
             problems.append(f"{fund.name}: {fund.tally.estimated_r} action(s) with an estimated R")
         covered = {}

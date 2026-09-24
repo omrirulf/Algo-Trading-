@@ -26,6 +26,21 @@ def test_the_paper_accounts_own_short_refusals_are_read_from_its_log():
     assert shadow_run.not_shortable(lines) == frozenset({"LQD", "XHB", "USO"})
 
 
+def test_the_brokers_own_wording_with_the_ticker_quoted_is_read():
+    """The paper account's log, verbatim: the broker's message is JSON
+    inside the reason, so the ticker arrives as \\"LQD\\". A pattern that
+    wants a bare ticker reads none of these, and every fund could then
+    short what the paper account cannot."""
+    reasons = [
+        'BrokerError: submit_order failed for LQD: {"code":42210000,"message":"asset \\"LQD\\" cannot be sold short"}',
+        'BrokerError: submit_order failed for TUR: {"code":42210000,"message":"asset \\"TUR\\" cannot be sold short"}',
+        'BrokerError: submit_order failed for USO: {"code":42210000,"message":"only day orders are allowed for '
+        'hard-to-borrow asset \\"USO\\""}',
+        'asset "EWA" cannot be sold short',
+    ]
+    assert shadow_run.not_shortable([_audit(r) for r in reasons]) == frozenset({"LQD", "TUR", "USO", "EWA"})
+
+
 @pytest.mark.parametrize("equity, drawdown", [
     ([100.0, 110.0, 99.0, 120.0], 0.1),
     ([100.0, 90.0, 80.0], 0.2),

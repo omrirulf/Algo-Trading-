@@ -588,8 +588,8 @@ jobs:
               sys.exit("::error::every shadow engine and manager must write and read the fund's own record")
           print("OK: every shadow engine and manager has a record of its own")
           PY
-          if grep -nE 'secrets\.' .github/workflows/funds.yml; then
-            echo "::error::the funds workflow must hold no secret"
+          if grep -nE 'secrets\.' .github/workflows/funds.yml .github/workflows/funds-smoke.yml; then
+            echo "::error::the funds workflows must hold no secret"
             exit 1
           fi
           echo "OK: the shadow funds cannot trade"
