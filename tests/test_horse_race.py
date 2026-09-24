@@ -724,3 +724,43 @@ def test_a_look_reads_its_own_entry_days_and_nothing_after_them():
     assert first.entry_days == 6 and first.index_days == 6 and first.index_missing == 0
     assert first.t_model_momentum is not None and first.t_model_momentum > 0
     assert set(first.t_vs_index) == {MODEL_ARM, momentum.NAME, hybrid.NAME}
+
+
+def test_the_gate_json_is_the_headers_numbers(tmp_path, monkeypatch, capsys):
+    warm = _warm_frame()
+    stamp = _at(warm.index[MIN_WARMUP_BARS].date())
+    now = datetime.combine(warm.index[-1].date(), datetime.min.time(), tzinfo=timezone.utc) + timedelta(days=1)
+    code, out = _race(tmp_path, monkeypatch, capsys, {"NVDA": warm}, [_journal_line("NVDA", stamp)],
+                      now, extra=("--seeds", "1000", "--gate-json"), cutoff=None)
+    assert code == 0
+    data = json.loads(out)
+    assert data["status_line"].startswith("independent days since 2026-09-23: 0 of 60")
+    assert (data["independent"], data["of"], data["trading_days"]) == (0, 60, 180)
+    assert data["decided"] is False and data["outcome"] is None
+    assert data["next"]["independent"] == 20 and data["next"]["bar"] == 3.47
+    assert data["next"]["entry_days"] == 60 and data["next"]["estimated"]
+    assert [look["independent"] for look in data["looks"]] == [20, 40, 60]
+
+
+def test_a_look_waits_for_a_line_written_after_the_close():
+    """A cycle straddling 20:00 UTC: the scorer resolves the late line a night
+    after its simulated trade is dated, so the look must wait for it."""
+    warm = _warm_frame()
+    signal_day = warm.index[MIN_WARMUP_BARS].date()
+    early = replace(line(ticker="AAA", stamp=datetime.combine(signal_day, datetime.min.time(),
+                                                               tzinfo=timezone.utc) + timedelta(hours=19)))
+    late = replace(line(ticker="BBB", stamp=datetime.combine(signal_day, datetime.min.time(),
+                                                              tzinfo=timezone.utc) + timedelta(hours=20, minutes=5)))
+    entry_day = warm.index[MIN_WARMUP_BARS + 1].date()
+    exit_day = warm.index[MIN_WARMUP_BARS + 3].date()
+    frames = {"AAA": warm, "BBB": warm}
+    # Final through the simulated exit only: the late line's scorer exit is one close later.
+    source = FinalAwareSource(frames, exit_day)
+    fetcher = FinalAwareFetcher(frames, exit_day)
+    problem = horse_race.look_data_problem([early, late], fetcher, [entry_day], 1, 3, exit_day,
+                                           source=source)
+    assert problem and "not resolved yet" in problem
+    later = warm.index[MIN_WARMUP_BARS + 4].date()
+    resolved = horse_race.look_data_problem([early, late], FinalAwareFetcher(frames, later), [entry_day], 1, 3,
+                                            later, source=FinalAwareSource(frames, later))
+    assert resolved is None

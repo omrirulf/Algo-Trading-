@@ -9,6 +9,7 @@ to the risk engine, never an instruction to it.
 from __future__ import annotations
 
 import logging
+from typing import Optional
 
 from app import risk_engine
 from app.broker_client import BrokerClient, BrokerError, DuplicateOrderError, OpenPosition
@@ -23,9 +24,18 @@ _SIDE_FOR_BIAS = {Bias.BULLISH: "buy", Bias.BEARISH: "sell"}
 
 
 class ExecutionEngine:
-    def __init__(self, broker: BrokerClient, market_data: MarketDataProvider) -> None:
+    def __init__(
+        self, broker: BrokerClient, market_data: MarketDataProvider,
+        audit_logger: Optional[logging.Logger] = None,
+    ) -> None:
         self._broker = broker
         self._market_data = market_data
+        # Where the decision line goes. ``None`` is the live audit log. Set
+        # only by a simulated book (``shadow/``), which must keep its own
+        # record: the position manager reads that record back as its state,
+        # so a shadow line in the live log would reset a live position's
+        # ladder.
+        self._audit_logger = audit_logger
 
     @property
     def broker(self) -> BrokerClient:
@@ -63,7 +73,7 @@ class ExecutionEngine:
             log.exception("unexpected error while executing %s", signal.ticker)
             result = self._result(signal, ExecutionStatus.ERROR, f"unexpected {type(exc).__name__}: {exc}")
 
-        log_execution(signal, result)
+        log_execution(signal, result, logger=self._audit_logger)
         return result
 
     # ------------------------------------------------------------------ #

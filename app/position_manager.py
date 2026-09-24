@@ -261,12 +261,21 @@ def _history(ticker: str, audit_path: Path) -> tuple[Optional[dict], list[dict]]
     """The latest ``ACCEPTED`` entry for ``ticker`` and every management record after it."""
     entry: Optional[dict] = None
     actions: list[dict] = []
-    try:
-        text = audit_path.read_text(encoding="utf-8")
-    except OSError:
-        return None, []
     symbol = ticker.strip().upper()
-    for raw in text.splitlines():
+    # A record that can hand over one ticker's lines does so: the shadow
+    # funds keep a thousand books, and re-reading every line of a growing
+    # record once per position per day grows with the square of the run.
+    # The lines are parsed below exactly as the whole file would be; the
+    # others could never match ``symbol`` anyway.
+    lines_for = getattr(audit_path, "lines_for", None)
+    if callable(lines_for):
+        raw_lines = list(lines_for(symbol))
+    else:
+        try:
+            raw_lines = audit_path.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            return None, []
+    for raw in raw_lines:
         raw = raw.strip()
         if not raw:
             continue
@@ -298,11 +307,14 @@ def _history(ticker: str, audit_path: Path) -> tuple[Optional[dict], list[dict]]
     return entry, actions
 
 
-def _record(action: ManagementAction) -> None:
+def _record(action: ManagementAction, logger: Optional[logging.Logger] = None) -> None:
     """One audit line per action, written *before* the next rung is considered.
 
     That ordering is the idempotency mechanism: the count of rung records is
     what stops a re-run taking the same tranche twice.
+
+    ``logger`` is the manager's own record when it was given one (a shadow
+    fund's), and the live audit log otherwise.
     """
     try:
         level = logging.ERROR if action.action == ERROR else logging.INFO
@@ -310,7 +322,7 @@ def _record(action: ManagementAction) -> None:
         # test suite redirects the audit log by patching this name, and a
         # binding taken at import would write past the redirect into the
         # repository's own log file.
-        audit_log.get_audit_logger().log(level, EVENT, extra={"action": action.as_dict()})
+        (logger or audit_log.get_audit_logger()).log(level, EVENT, extra={"action": action.as_dict()})
     except Exception:  # noqa: BLE001 - a full disk must not take the cycle down
         log.exception("could not write the audit record for %s", action.ticker)
 
@@ -324,11 +336,16 @@ class PositionManager:
         market_data: MarketDataProvider,
         audit_path: Path = cfg.AUDIT_LOG_PATH,
         ladder: tuple[cfg.LadderRung, ...] = cfg.PROFIT_LADDER,
+        audit_logger: Optional[logging.Logger] = None,
     ) -> None:
         self._broker = broker
         self._market_data = market_data
         self._audit_path = audit_path
         self._ladder = ladder
+        # Where this manager writes what it did. ``None`` is the live audit
+        # log. A shadow fund passes its own, together with an ``audit_path``
+        # that reads the same record back: the two must be the same book.
+        self._audit_logger = audit_logger
 
     def manage(self, protect_only: bool = False) -> ManagementReport:
         """One pass over every open position. Never raises.
@@ -346,7 +363,7 @@ class PositionManager:
             positions = self._broker.get_open_positions()
         except BrokerError as exc:
             action = ManagementAction(ticker="*", action=ERROR, reason=f"{type(exc).__name__}: {exc}")
-            _record(action)
+            _record(action, self._audit_logger)
             return ManagementReport(actions=(action,))
 
         actions: list[ManagementAction] = []
@@ -366,13 +383,13 @@ class PositionManager:
                 trims = self._trim_over_cap_groups(positions)
             except (BrokerError, MarketDataError, risk_engine.RiskViolation) as exc:
                 trims = [ManagementAction(ticker="*", action=ERROR, reason=f"{type(exc).__name__}: {exc}")]
-                _record(trims[0])
+                _record(trims[0], self._audit_logger)
             except Exception as exc:  # noqa: BLE001 - one bad group must not stop the ladder
                 log.exception("unexpected error trimming over-cap exposure groups")
                 trims = [ManagementAction(
                     ticker="*", action=ERROR, reason=f"unexpected {type(exc).__name__}: {exc}"
                 )]
-                _record(trims[0])
+                _record(trims[0], self._audit_logger)
             if trims:
                 actions += trims
                 trimmed_to = {
@@ -388,7 +405,7 @@ class PositionManager:
                     action = ManagementAction(
                         ticker="*", action=ERROR, reason=f"{type(exc).__name__}: {exc}"
                     )
-                    _record(action)
+                    _record(action, self._audit_logger)
                     actions.append(action)
                     return ManagementReport(actions=tuple(actions))
 
@@ -409,7 +426,7 @@ class PositionManager:
                     side=position.side,
                     reason=f"{type(exc).__name__}: {exc}",
                 )
-                _record(action)
+                _record(action, self._audit_logger)
                 actions.append(action)
             except Exception as exc:  # noqa: BLE001 - one position must not stop the rest
                 log.exception("unexpected error managing %s", position.ticker)
@@ -417,7 +434,7 @@ class PositionManager:
                     ticker=position.ticker, action=ERROR, side=position.side,
                     reason=f"unexpected {type(exc).__name__}: {exc}",
                 )
-                _record(action)
+                _record(action, self._audit_logger)
                 actions.append(action)
         return ManagementReport(actions=tuple(actions), positions_seen=len(positions))
 
@@ -482,7 +499,7 @@ class PositionManager:
             old_stop=None, new_stop=placed.stop_price, stop_qty=qty,
             order_id=placed.order_id, r_estimated=estimated, reason=reason,
         )
-        _record(action)
+        _record(action, self._audit_logger)
         return action
 
     def _resize(self, position: OpenPosition, stop: StopOrder, qty: int) -> ManagementAction:
@@ -510,7 +527,7 @@ class PositionManager:
             order_id=placed.order_id,
             reason=f"live stop covered {stop.qty} share(s) against {qty} held; resized",
         )
-        _record(action)
+        _record(action, self._audit_logger)
         return action
 
     def _trim_over_cap_groups(self, positions: list[OpenPosition]) -> list[ManagementAction]:
@@ -569,14 +586,14 @@ class PositionManager:
                     side=position.side,
                     reason=f"{type(exc).__name__}: {exc}",
                 )
-                _record(action)
+                _record(action, self._audit_logger)
             except Exception as exc:  # noqa: BLE001 - one position must not stop the group
                 log.exception("unexpected error trimming %s for the %r group cap", position.ticker, group)
                 action = ManagementAction(
                     ticker=position.ticker, action=ERROR, side=position.side,
                     reason=f"unexpected {type(exc).__name__}: {exc}",
                 )
-                _record(action)
+                _record(action, self._audit_logger)
             if action is not None:
                 actions.append(action)
         return actions
@@ -622,7 +639,7 @@ class PositionManager:
             old_stop=old_stop, new_stop=old_stop, order_id=order_id,
             reason=f"{group!r} group exposure over its cap; trimmed pro-rata",
         )
-        _record(action)
+        _record(action, self._audit_logger)
         return action
 
     def _manage_one(
@@ -702,7 +719,7 @@ class PositionManager:
                     stop_qty=stop.qty,
                     r=round(state.r, 4), r_estimated=state.r_estimated,
                 )
-            _record(action)
+            _record(action, self._audit_logger)
             return before + [action]
 
         actions: list[ManagementAction] = list(before)
@@ -751,7 +768,7 @@ class PositionManager:
                     r=round(state.r, 4), r_estimated=state.r_estimated,
                     reason="too small to split; stop ratcheted only",
                 )
-            _record(action)
+            _record(action, self._audit_logger)
             actions.append(action)
             current_stop, broker_stop, remaining = new_stop, new_stop, after
         return actions

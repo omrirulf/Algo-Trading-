@@ -19,6 +19,8 @@ on:
     paths:
       - "dashboard/**"
       - "logs/book.json"
+      - "logs/funds.json"
+      - "logs/race_gate.json"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 

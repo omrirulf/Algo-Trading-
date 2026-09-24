@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import Optional
 
 from pythonjsonlogger import jsonlogger
 
@@ -33,9 +34,16 @@ def get_audit_logger(path: Path = cfg.AUDIT_LOG_PATH) -> logging.Logger:
     return logger
 
 
-def log_execution(signal: LLMSignal, result: ExecutionResult) -> None:
-    """Write one audit line containing the incoming signal and the decision."""
-    logger = get_audit_logger()
+def log_execution(
+    signal: LLMSignal, result: ExecutionResult, logger: Optional[logging.Logger] = None,
+) -> None:
+    """Write one audit line containing the incoming signal and the decision.
+
+    ``logger`` is for a caller that keeps its own record -- the shadow funds
+    in ``shadow/``, each of which must have a book of its own and must never
+    write into the live account's log. Left out, it is the live audit log.
+    """
+    logger = logger or get_audit_logger()
     level = logging.ERROR if result.status.value == "ERROR" else logging.INFO
     logger.log(
         level,

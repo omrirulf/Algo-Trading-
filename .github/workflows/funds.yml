@@ -1,0 +1,119 @@
+name: shadow funds
+
+# The four-fund experiment, and the race's gate, for the dashboard.
+#
+# Every trading night after the close, two read-only programs write what the
+# "4 Funds" page shows:
+#
+#   analysis/horse_race.py --gate-json  the race's decision gate: independent
+#                                       days so far, the next planned look,
+#                                       its estimated date and its bar.
+#   python -m shadow.run                calibration (the simulated model fund
+#                                       against the real paper account) and,
+#                                       once calibration has passed, the four
+#                                       funds and 1,000 coin-flip funds.
+#
+# NO trading credential of any kind: the funds are SimBrokers in memory
+# driven by the production engine and position manager, prices come from
+# yfinance, and the real account is read from logs/account.jsonl, which the
+# heartbeat records. The only token is the job's own, to commit the two JSON
+# files and publish the desk. CI enforces that shadow/ cannot reach a broker,
+# read a key or write a file ("The shadow funds cannot trade").
+#
+# Neither program writes a file; this workflow redirects their output, and
+# only replaces the committed copy when the new one parses -- a run that
+# fails leaves yesterday's page up rather than a broken one.
+on:
+  # After the horse race (22:35 UTC) and after both heartbeat crons.
+  schedule:
+    - cron: "55 22 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      random:
+        description: "Coin-flip funds for the band"
+        default: "1000"
+
+permissions:
+  contents: write   # only to commit logs/funds.json and logs/race_gate.json and publish the desk
+
+concurrency:
+  group: shadow-funds
+  cancel-in-progress: false
+
+jobs:
+  funds:
+    runs-on: ubuntu-latest
+    # 1,000 coin-flip funds through the real engine and manager: about 15 ms
+    # per fund per session on one core, so about 12 minutes on four at the
+    # 180-session end of the experiment. The ceiling is generous on purpose.
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: The race's gate
+        run: |
+          set -o pipefail
+          python analysis/horse_race.py --gate-json > "$RUNNER_TEMP/race_gate.json"
+          python -c "import json,sys; json.load(open(sys.argv[1]))" "$RUNNER_TEMP/race_gate.json"
+
+      - name: Calibration and the funds
+        env:
+          RANDOM_FUNDS: ${{ inputs.random || '1000' }}
+        run: |
+          set -o pipefail
+          case "$RANDOM_FUNDS" in (*[!0-9]*|'') echo "random must be a number"; exit 2;; esac
+          python -m shadow.run --processes "$(nproc)" --random "$RANDOM_FUNDS" > "$RUNNER_TEMP/funds.json"
+          python -c "import json,sys; json.load(open(sys.argv[1]))" "$RUNNER_TEMP/funds.json"
+
+      - name: Commit the two files
+        run: |
+          cp "$RUNNER_TEMP/race_gate.json" logs/race_gate.json
+          cp "$RUNNER_TEMP/funds.json" logs/funds.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f logs/race_gate.json logs/funds.json
+          if git diff --cached --quiet; then
+            echo "no changes"
+            exit 0
+          fi
+          git commit -m "Shadow funds and race gate at $(date -u +'%Y-%m-%dT%H:%MZ')"
+          # A heartbeat commit may have landed meanwhile; these two files are
+          # whole rewrites that only this workflow writes, so ours win.
+          if ! git pull --rebase --autostash origin "${GITHUB_REF_NAME}"; then
+            git checkout --theirs -- logs/race_gate.json logs/funds.json 2>/dev/null || true
+            git add -f logs/race_gate.json logs/funds.json
+            GIT_EDITOR=true git rebase --continue
+          fi
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+
+      - name: Publish the desk
+        # A push made with the job's own token starts no other workflow, so
+        # the pages workflow would not see these files until the next cycle.
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash dashboard/publish.sh
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo '## Race gate'
+            echo '```'
+            python -c "import json,sys; d=json.load(open(sys.argv[1])); print(d['status_line']); n=d.get('next'); print(n and f\"next checkpoint {n['estimated']}, bar t > {n['bar']:.2f}\" or 'no next checkpoint')" "$RUNNER_TEMP/race_gate.json" 2>/dev/null || echo "(no gate)"
+            echo '```'
+            echo '## Calibration'
+            echo '```'
+            python -c "import json,sys; d=json.load(open(sys.argv[1]))['calibration']; print(d['status'], d.get('days_done'), 'of', d.get('days_needed'))" "$RUNNER_TEMP/funds.json" 2>/dev/null || echo "(no funds file)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
