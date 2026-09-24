@@ -4,23 +4,23 @@ horizon 3 session(s) | entry rule 'auto' | conviction floor 0.30
 
 Coverage
 --------
-journal lines read        712
-entries                   712
+journal lines read        792
+entries                   792
   produced a signal       664
   directional             84  (NEUTRAL: 580)
-  scored                  56
-  unscored, pending         28  (too recent — no outcome yet)
+  scored                  68
+  unscored, pending         16  (too recent — no outcome yet)
 
 Does conviction predict the outcome?
 ------------------------------------
-rank correlation, conviction vs signed return: +0.25 (n=56)
+rank correlation, conviction vs signed return: +0.25 (n=68)
 
 conviction        n   hit rate      mean    median
-0.30-0.45        37      13.5%     -1.2%     -0.6%
-0.45-0.60        19      52.6%     +0.5%     +0.7%
+0.30-0.45        44      27.3%     -0.8%     -0.5%
+0.45-0.60        24      54.2%     +0.8%     +1.1%
 
 Floor at 0.30 — did it filter the right signals?
-  acted on (>= floor)  n=56    hit 26.8%  mean -0.6%
+  acted on (>= floor)  n=68    hit 36.8%  mean -0.2%
   filtered (< floor)   n=0     hit n/a  mean n/a
 
 Which dimension actually carried information?
@@ -28,11 +28,11 @@ Which dimension actually carried information?
 Each score against the ticker's raw forward return.
 
 dimension         n     rank corr
-news             56         -0.17
-technical        56         -0.17
-fundamental      56         +0.06
-analyst          25         +0.29
-insider          19-0.06 — too few
+news             68         -0.05
+technical        68         -0.07
+fundamental      68         +0.21
+analyst          33         +0.37
+insider          26         -0.02
 
 Does the learned blend carry information?
 -----------------------------------------
@@ -43,10 +43,12 @@ was journalled, with whatever weights that cycle had -- the walk-forward
 record, never a refit that has seen the return it is judged on.
 
 policy                n  called     rank corr  hit rate
-model conviction    390      56         -0.12     26.8%
-equal weights       390     389         -0.04     48.1%
-learned blend       124     123         +0.06     55.3%
-  learned composites from fitted weights: 0; from the equal-weight fallback: 124
+model conviction    483      68         -0.06     36.8%
+equal weights       483     479         -0.04     47.0%
+learned blend       165     161         +0.06     54.7%
+  learned composites from fitted weights: 7; from the equal-weight fallback: 158
+
+  model and blend called opposite directions  n=1     model hit 100.0%  blend hit 0.0%
 
   READY TO LEAVE SHADOW: the learned blend carries more information than the model's conviction and than equal weights, and was right more often than not
 
@@ -77,14 +79,14 @@ A model that creeps toward always-confident makes the floor a no-op.
 
 Input health
 ------------
-  cycles with a context gap  4/712 (0.6%)
-    news unavailable                         4
+  cycles with a context gap  16/792 (2.0%)
+    news unavailable                         16
 
   bias distribution (664 signals)
     BULLISH       40  6.0%
     BEARISH       44  6.6%
     NEUTRAL      580  87.3%
-  cycles that produced no signal: 6
+  cycles that produced no signal: 64
 
 How to read this
 ----------------
