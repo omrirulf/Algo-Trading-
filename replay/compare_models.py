@@ -35,7 +35,9 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from datetime import date
 from pathlib import Path
+from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -103,8 +105,133 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                              "because replay/ must not open a file for writing: a "
                              "path argument aimed at the real journal would destroy "
                              "the record this whole harness reads.")
+    parser.add_argument("--answered-by", type=str, default="",
+                        help="replay only lines whose recorded answer came from this "
+                             "model, as the API reported it (e.g. claude-opus-5). "
+                             "Without it, a window straddling a model change grades "
+                             "the candidate against two incumbents at once.")
+    parser.add_argument("--days", type=str, default="",
+                        metavar="FROM..TO",
+                        help="replay only lines journalled on these UTC days, "
+                             "inclusive, e.g. 2026-09-15..2026-09-22")
     parser.add_argument("--json", action="store_true", dest="as_json")
     return parser.parse_args(argv)
+
+
+def parse_days(spec: str) -> tuple[Optional[date], Optional[date]]:
+    """``FROM..TO`` as two dates, either end optional; blank is no bound."""
+    if not spec.strip():
+        return None, None
+    lo, sep, hi = spec.partition("..")
+    if not sep:
+        raise SystemExit(f"--days wants FROM..TO, got {spec!r}")
+    try:
+        first = date.fromisoformat(lo.strip()) if lo.strip() else None
+        last = date.fromisoformat(hi.strip()) if hi.strip() else None
+    except ValueError as exc:
+        raise SystemExit(f"--days: {exc}") from exc
+    if first and last and first > last:
+        raise SystemExit(f"--days: {first} is after {last}")
+    return first, last
+
+
+def select_entries(
+    entries: list, *, answered_by: str = "", first: Optional[date] = None,
+    last: Optional[date] = None, limit: int = 0,
+) -> list:
+    """The recorded lines a run grades against, in journal order.
+
+    Filters first, then keeps the most recent ``limit`` of what is left --
+    so ``--answered-by claude-opus-5 --days 2026-09-15..2026-09-22`` is
+    exactly the lines that model answered in that window, and a ``limit``
+    at or above their number takes all of them. A line with no usable
+    timestamp cannot be placed in a window and is dropped by one.
+    """
+    kept = []
+    for entry in entries:
+        if answered_by and entry.model != answered_by:
+            continue
+        if first or last:
+            day = _day_of(entry.ts_utc)
+            if day is None or (first and day < first) or (last and day > last):
+                continue
+        kept.append(entry)
+    return kept[-limit:] if limit > 0 else kept
+
+
+def _day_of(stamp: Optional[str]) -> Optional[date]:
+    if not stamp:
+        return None
+    try:
+        return date.fromisoformat(str(stamp)[:10])
+    except ValueError:
+        return None
+
+
+#: The three calls, in the order a reader expects them.
+MIX_ORDER = (("BULLISH", "LONG"), ("BEARISH", "SHORT"), ("NEUTRAL", "NEUTRAL"))
+
+
+def bias_mix(cell: Cell) -> dict:
+    """LONG / SHORT / NEUTRAL on both sides, over the lines both answered.
+
+    Only lines where both produced a signal count, on either side: a mix
+    over different lines would compare two samples, not two models. Also
+    how many of the incumbent's SHORT lines the candidate called SHORT too,
+    which is the number the owner's first model trigger reads (a candidate
+    that shorts on fewer than a quarter of them is reported, not reverted).
+    """
+    both = [d for d in cell.diffs if d.before is not None and d.after is not None]
+    incumbent = {label: 0 for _, label in MIX_ORDER}
+    candidate = {label: 0 for _, label in MIX_ORDER}
+    names = dict(MIX_ORDER)
+    for d in both:
+        incumbent[names[d.before.bias.value]] += 1
+        candidate[names[d.after.bias.value]] += 1
+    shorted = [d for d in both if d.before.bias.value == "BEARISH"]
+    kept_short = sum(1 for d in shorted if d.after.bias.value == "BEARISH")
+    agreed = sum(1 for d in both if not d.bias_flipped)
+    return {
+        "lines": len(both),
+        "incumbent": incumbent,
+        "candidate": candidate,
+        "agreement": agreed / len(both) if both else None,
+        "incumbent_shorts": len(shorted),
+        "candidate_also_short": kept_short,
+        "short_retention": kept_short / len(shorted) if shorted else None,
+    }
+
+
+def render_mix(cell: Cell, incumbent_name: str) -> list[str]:
+    mix = bias_mix(cell)
+    out = [
+        "",
+        f"CALL MIX ON THE SAME {mix['lines']} LINES (both answered)",
+        "-" * 82,
+        f"{'call':<10} {incumbent_name:>22} {cell.model:>26}",
+    ]
+    for _, label in MIX_ORDER:
+        a, b = mix["incumbent"][label], mix["candidate"][label]
+        pa = f"{a / mix['lines']:.0%}" if mix["lines"] else "n/a"
+        pb = f"{b / mix['lines']:.0%}" if mix["lines"] else "n/a"
+        out.append(f"{label:<10} {a:>15} ({pa:>4}) {b:>19} ({pb:>4})")
+    agree = mix["agreement"]
+    out.append(f"agreement on the call: {('%.1f%%' % (agree * 100)) if agree is not None else 'n/a'}")
+    retention = mix["short_retention"]
+    out.append(
+        f"where {incumbent_name} said SHORT: {mix['candidate_also_short']} of "
+        f"{mix['incumbent_shorts']} also SHORT from {cell.model}"
+        + (f" ({retention:.0%})" if retention is not None else "")
+    )
+    if retention is not None:
+        out.append(
+            "  below a quarter: the owner's trigger (a) -- report it and stop, do not revert"
+            if retention < 0.25 else
+            "  at or above a quarter: trigger (a) not met"
+        )
+    costs = [u.cost_usd for u in cell.usages if u.cost_usd is not None]
+    out.append(f"measured cost of this run: ${sum(costs):.2f} over {len(cell.usages)} priced call(s)")
+    return out
 
 
 def cells_to_probe(args: argparse.Namespace) -> list[tuple[str, str]]:
@@ -261,7 +388,11 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     lines = args.journal.read_text(encoding="utf-8").splitlines()
-    entries = list(runner.load_entries(lines))[-args.limit:]
+    first, last = parse_days(args.days)
+    entries = select_entries(
+        list(runner.load_entries(lines)), answered_by=args.answered_by,
+        first=first, last=last, limit=args.limit,
+    )
     if not entries:
         print("No replayable entries found.", file=sys.stderr)
         return 1
@@ -299,6 +430,7 @@ def main(argv: list[str] | None = None) -> int:
                     "mean_output_tokens": c.mean_output_tokens,
                     "clears_floor": clears_floor(c, args.floor),
                     "failures": len(c.errors),
+                    "mix": bias_mix(c),
                 }
                 for c in cells
             ],
@@ -309,8 +441,11 @@ def main(argv: list[str] | None = None) -> int:
         # mixing a human report into the stream the caller is about to split
         # would corrupt it. Diagnostics go to stderr, which is where the rest
         # of this tool's progress already goes.
-        print(render(cells, args.floor, args.tickers, incumbent),
-              file=sys.stderr if args.emit_pairs else sys.stdout)
+        report = render(cells, args.floor, args.tickers, incumbent)
+        incumbent_name = args.answered_by or "recorded"
+        for cell in cells:
+            report += "\n" + "\n".join(render_mix(cell, incumbent_name))
+        print(report, file=sys.stderr if args.emit_pairs else sys.stdout)
     return 0
 
 

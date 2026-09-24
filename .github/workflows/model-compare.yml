@@ -42,6 +42,12 @@ on:
       horizon:
         description: "Trading days ahead to score over"
         default: "3"
+      answered_by:
+        description: "Only lines the journal says this model answered, e.g. claude-opus-5 (blank: any)"
+        default: ""
+      days:
+        description: "Only lines journalled on these UTC days, FROM..TO inclusive, e.g. 2026-09-15..2026-09-22 (blank: all)"
+        default: ""
 
 permissions:
   contents: read
@@ -73,6 +79,10 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           CANDIDATE_KEY: ${{ secrets.SCREENING_API_KEY || secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY || secrets.GROQ_API_KEY }}
+          # Through the environment rather than pasted into the script, so a
+          # free-text input cannot become shell.
+          ANSWERED_BY: ${{ inputs.answered_by }}
+          DAYS: ${{ inputs.days }}
         run: |
           set -o pipefail
           python replay/compare_models.py \
@@ -82,6 +92,8 @@ jobs:
             --limit "${{ inputs.limit }}" \
             --concurrency "${{ inputs.concurrency }}" \
             --timeout "${{ inputs.timeout }}" \
+            --answered-by "$ANSWERED_BY" \
+            --days "$DAYS" \
             --emit-pairs \
             > "$RUNNER_TEMP/pairs.jsonl" 2> "$RUNNER_TEMP/report.txt" || status=$?
           # The report is on stderr so stdout can carry only the records the
