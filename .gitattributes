@@ -8,3 +8,7 @@
 logs/signal_journal.log merge=union
 logs/execution_audit.log merge=union
 logs/fund_size.log merge=union
+# One JSON object per line, so a union can interleave two runs' lines and
+# every line still parses. Order is not kept, so each line carries its own
+# "at", and app/account_snapshot.py reads the latest one, not the last line.
+logs/account.jsonl merge=union

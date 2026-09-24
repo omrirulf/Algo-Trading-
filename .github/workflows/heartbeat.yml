@@ -214,6 +214,39 @@ jobs:
             python -m orchestrator.heartbeat --once
           fi
 
+      - name: Record the paper account
+        # The shadow funds run this repository's engine and position manager
+        # against a simulated broker, and before any of them is worth reading
+        # the simulation has to be shown to track the real account. That takes
+        # the account's own numbers -- cash, equity at each day's close, what
+        # filled and at what price, which stops are resting -- and the record
+        # held none of them: the audit log says what was asked for, never
+        # what the broker did.
+        #
+        # One JSON line per run, appended to logs/account.jsonl and committed
+        # with the journal below. The recorder only reads: it places,
+        # replaces and cancels nothing (tests/test_account_snapshot.py holds
+        # it to that). It lives here because this is the one workflow that
+        # already holds the Alpaca keys, so everything that measures the
+        # funds reads the committed file and never needs a key of its own.
+        #
+        # Both modes, and after both of the steps that can change the book,
+        # so the line is what they left behind -- a protection pass included,
+        # since a stop placed after the close is exactly what it should show.
+        # `always()` because a failed cycle may still have traded, and a red
+        # run is the one whose real account most needs looking at. And
+        # continue-on-error, with a short clock, because a recorder must never
+        # be the reason a trading run fails: the script already exits 0 on
+        # every error and writes the error as the line.
+        if: always() && steps.guard.outputs.ran != 'yes'
+        continue-on-error: true
+        timeout-minutes: 3
+        env:
+          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+          MODE: ${{ inputs.mode || 'cycle' }}
+        run: python -m app.account_snapshot --log logs/account.jsonl --mode "$MODE" >> logs/account.jsonl
+
       - name: Render the cycle for a human
         # `always()` for the same reason the commit below is: a cycle that
         # failed some tickers still produced the lines worth reading, and a
@@ -416,7 +449,9 @@ jobs:
           # fund_size.log is the one series nobody publishes: it exists only
           # because every cycle appends to it, so an uncommitted one is a lost
           # day of history that cannot be backfilled.
-          git add -f logs/signal_journal.log logs/execution_audit.log logs/cycle_report.md logs/fund_size.log logs/blend_weights.json logs/score_report.md logs/book.json logs/brief.txt || true
+          # account.jsonl is the same: the account as it stood at each run,
+          # which nobody can read back later.
+          git add -f logs/signal_journal.log logs/execution_audit.log logs/cycle_report.md logs/fund_size.log logs/blend_weights.json logs/score_report.md logs/book.json logs/brief.txt logs/account.jsonl || true
           if git diff --cached --quiet; then
             echo "no journal changes"
             exit 0

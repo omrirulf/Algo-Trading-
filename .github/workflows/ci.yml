@@ -554,6 +554,46 @@ jobs:
           fi
           echo "OK: the backtest only simulates"
 
+      - name: The shadow funds cannot trade
+        # shadow/ runs the production engine and position manager on books
+        # that exist only in memory (shadow/broker.py's SimBroker), to answer
+        # what each arm would have done with a real portfolio. It must never
+        # be able to reach the real one: no Alpaca client, no credential, no
+        # dispatcher, no file written -- and every engine and manager it
+        # builds must be handed the fund's own audit record, because the
+        # live audit log is the live position manager's state and one shadow
+        # line in it would reset a real position's profit ladder.
+        run: |
+          hits=$(grep -rnE '(AlpacaPaperBroker|TradingClient|^[[:space:]]*(from|import)[[:space:]]+alpaca|get_settings|os\.environ|getenv|alpaca_api_key|alpaca_secret_key|post_signal|DirectDispatcher|build_dispatcher|\.write_text\(|\.write_bytes\(|open\([^)]*["'"'"'][wax])' \
+                   shadow --include='*.py' || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::shadow/ must not reach a broker, read a credential or write a file"
+            exit 1
+          fi
+          python3 - <<'PY'
+          import ast, pathlib, sys
+          bad = []
+          for path in sorted(pathlib.Path("shadow").rglob("*.py")):
+              for node in ast.walk(ast.parse(path.read_text())):
+                  if isinstance(node, ast.Call):
+                      name = getattr(node.func, "id", getattr(node.func, "attr", ""))
+                      if name in ("ExecutionEngine", "PositionManager"):
+                          if "audit_logger" not in {k.arg for k in node.keywords}:
+                              bad.append(f"{path}:{node.lineno} {name} without its own audit_logger")
+                          if name == "PositionManager" and "audit_path" not in {k.arg for k in node.keywords}:
+                              bad.append(f"{path}:{node.lineno} PositionManager reading the live audit log")
+          if bad:
+              print("\n".join(bad))
+              sys.exit("::error::every shadow engine and manager must write and read the fund's own record")
+          print("OK: every shadow engine and manager has a record of its own")
+          PY
+          if grep -nE 'secrets\.' .github/workflows/funds.yml .github/workflows/funds-smoke.yml; then
+            echo "::error::the funds workflows must hold no secret"
+            exit 1
+          fi
+          echo "OK: the shadow funds cannot trade"
+
       - name: The replay harness cannot trade
         # replay/ re-asks the model while iterating on a prompt, so it runs
         # often and casually. It must not be able to place an order, and it

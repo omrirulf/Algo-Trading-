@@ -261,6 +261,28 @@ def test_an_unpriced_index_is_never_read_as_a_result():
     assert "cannot be read tonight" in reason and "VT" in reason
 
 
+def test_a_missing_index_bar_waits_while_recent_and_is_left_out_once_settled():
+    """The price source had no VT bar for 22 Sep 2026 while it had SPY's. A
+    missing day is an outage -- the look waits -- until the source has
+    printed five later sessions without it; then it is a gap that will not
+    be filled, and waiting for it would hold every look unreadable for good."""
+    assert gate.INDEX_GAP_SETTLE_SESSIONS == 5
+    days = [date(2026, 9, 21), date(2026, 9, 22), date(2026, 9, 23), date(2026, 9, 24), date(2026, 9, 25),
+            date(2026, 9, 28), date(2026, 9, 29), date(2026, 9, 30)]
+    bar = lambda d: (d, 100.0, 101.0, 0.0)
+    four_after = [bar(d) for d in days[:6] if d != days[1]]            # 23..28 Sep: four later bars
+    assert gate.index_gaps(four_after, days[:3]) == set()
+    five_after = [bar(d) for d in days[:7] if d != days[1]]            # 23..29 Sep: five
+    assert gate.index_gaps(five_after, days[:3]) == {days[1]}
+    assert gate.index_gaps(five_after, days[5:7]) == set()             # days it has are no gap
+
+    from dataclasses import replace
+
+    kept = inputs(mm=3.0, mh=2.6, model=2.4)
+    settled = replace(kept, index_gaps=1)
+    assert gate.decide(settled, 2.0, final=True)[1] == "model"
+
+
 def test_a_look_with_missing_prices_waits_for_them():
     from dataclasses import replace
 

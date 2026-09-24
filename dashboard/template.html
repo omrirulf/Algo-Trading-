@@ -47,6 +47,7 @@ header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-be
 .stripe.clean{background:var(--good-bg);color:var(--good)}
 .stripe strong{font-weight:700}
 .stripe .detail{color:inherit;opacity:.85;font-size:.88rem}
+.stripe > div{min-width:0;overflow-wrap:anywhere}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:14px}
 .tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
 .tile .label{font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-2)}
@@ -98,6 +99,7 @@ button[disabled]{opacity:.55;cursor:default}
 
 <header>
   <div>
+    <nav aria-label="Pages" style="font-size:.88rem;margin-bottom:2px"><a href="index.html" aria-current="page" style="display:inline-block;padding-block:4px;color:var(--ink);font-weight:700;text-decoration:none">Desk</a> <span class="faint">|</span> <a href="funds.html" style="display:inline-block;padding-block:4px;color:var(--accent);font-weight:600">4 Funds</a></nav>
     <h1>Algo Trading Desk</h1>
     <div id="fresh" class="muted">Loading the record…</div>
     <div id="live" class="faint" style="font-size:.84rem">Live updates: starting…</div>

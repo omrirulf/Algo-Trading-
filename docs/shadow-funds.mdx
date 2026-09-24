@@ -1,0 +1,88 @@
+---
+title: "Shadow Funds"
+description: "The four-fund experiment: each arm with a real book, run by the production engine and position manager on simulated money"
+---
+
+The [horse race](/horse-race) judges each arm's calls one trade at a time:
+three sessions each, no portfolio, no cash. It cannot say what an arm does
+with a whole book — the sizing, the stops, the profit ladder, the group caps
+and the cash all interacting. The shadow funds do.
+
+**Simulated, not real money.** Nothing in `shadow/` can trade. CI checks that
+it cannot construct a broker client, read a credential, reach the dispatcher
+or write a file.
+
+## The funds
+
+| Fund | Signals | Run by |
+| --- | --- | --- |
+| model | the journal's own answers | the production `ExecutionEngine` and `PositionManager` |
+| momentum | `rules/momentum.py` on each line's technicals | the same |
+| hybrid | `rules/hybrid.py` on each line's technicals and news score | the same |
+| VT | bought once at the first open with all the cash, then held | outside the engine |
+| 1,000 coin-flip funds | `rules/control.py`, seeds 0 to 999 | the same as the model fund |
+
+Each starts with $100,000. VT stays out of the engine on purpose: the engine
+would size it as one equity at 5% of the book and put a stop under it, which
+is not "hold the index".
+
+## What is real and what is simulated
+
+- **Real, unchanged**: the engine (conviction floor, position count, gross,
+  sleeve, group and stock-market limits, ATR stop, sizing), the position
+  manager (profit ladder, trailing stop, group-cap trims, protection), the
+  ATR method, the audit record format and the parser that reads it back.
+- **Simulated**: the broker (`shadow/broker.py`), which fills, keeps cash and
+  triggers stops on daily bars, and refuses what the paper account refuses;
+  and the market-data feed (`shadow/market.py`), which is the live class
+  with only its history call replaced so that it can never see a later bar.
+
+Two small, behaviour-preserving seams in `app/` make this possible: the
+engine and the manager accept an `audit_logger`, and the manager reads a
+record that can hand over one ticker's lines. Each fund keeps its own
+record, in memory. The live audit log is the live position manager's state,
+so a single shadow line in it would reset a real position's profit ladder.
+A tripwire fails the run if any line reaches it.
+
+## The day
+
+A cycle journalled on day D is acted on at the open of the next session —
+the race's own entry rule. At that open, stops the price gapped through fill
+at the open; the position manager runs; then the entries, in **watchlist
+order**, the only dispatch order production uses. During the session, stops
+the low (or high, for a short) reaches fill at the stop. At the close,
+dividends are paid or charged and the book is marked. Costs are 0.10% of
+notional per side on every fill.
+
+A line the model gave no answer on, or that the paper account held, is
+skipped by every fund that day: the race's own rule.
+
+## Calibration first
+
+Before the funds count, a copy of the model fund starts from the paper
+account's real positions and cash and follows the same signals for 15
+trading days. Each day it shows the equity gap to the real account and every
+trade that differs, with the reason. The real account's closing equity,
+cash, positions, stops and fills are recorded by the heartbeat after every
+run (`logs/account.jsonl`, read-only calls), because nothing else recorded
+them. A read that failed is recorded as unknown, never as an empty book, and
+such a line is never used as the starting point. Each part of a line says
+when it was read, so a fill that landed between two reads is counted once.
+
+Calibration starts only after the owner approves its pass rule, and the four
+funds run only after it passes. Both dates live in `shadow/schedule.py` and
+are set by a reviewed change, never by the code; a test fails if the start
+date is set while the rule is still unapproved, and an unapproved rule can
+never read "passed". During calibration, only the calibration match is
+reported.
+
+## Where to read it
+
+The **4 Funds** page of the desk, and `logs/funds.json`, written nightly by
+**Actions → shadow funds** together with the race's gate
+(`logs/race_gate.json`).
+
+```bash
+python -m shadow.run --processes 4        # the nightly job, JSON to stdout
+python analysis/horse_race.py --gate-json # the race's gate, JSON to stdout
+```

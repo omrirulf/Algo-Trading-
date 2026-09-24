@@ -56,6 +56,7 @@ prices, and prints.
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import math
 import statistics
@@ -161,6 +162,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-position-pct", type=float, default=cfg.MAX_POSITION_PCT)
     parser.add_argument("--per-trade", action="store_true",
                         help="also list every scored trade of every arm")
+    parser.add_argument("--gate-json", action="store_true",
+                        help="print only the decision gate, as JSON (for the dashboard), and stop")
     parser.add_argument("-v", "--verbose", action="store_true", help="log fetch failures")
     return parser
 
@@ -689,6 +692,7 @@ def index_daily(
 def look_inputs(
     results: Sequence[ArmResult], sides: dict[tuple[str, datetime], BothSides],
     grid: Sequence[date], index: dict[date, float], entry_days: int, horizon: int, seeds: int,
+    index_gaps: frozenset[date] = frozenset(),
 ) -> gate.LookInputs:
     """Everything one look reads, on its own first ``entry_days`` entry days only.
 
@@ -706,6 +710,7 @@ def look_inputs(
 
     band = next(b for b in bands_for(trades[MODEL_ARM], sides, days, seeds) if b.metric == "mean/day")
     priced = [i for i, day in enumerate(days) if day in index]
+    gaps = sum(1 for day in days if day not in index and day in index_gaps)
     versus = {
         name: newey_west_t([series[name][i] - index[days[i]] for i in priced], horizon)
         for name in (MODEL_ARM, momentum.NAME, hybrid.NAME)
@@ -719,13 +724,15 @@ def look_inputs(
         model_band_high=band.high,
         t_vs_index=versus,
         index_days=len(priced),
-        index_missing=len(days) - len(priced),
+        index_missing=len(days) - len(priced) - gaps,
+        index_gaps=gaps,
     )
 
 
 def look_data_problem(
     window: Sequence[JournalEntry], fetcher: OhlcFetcher, grid: Sequence[date],
     entry_days: int, horizon: int, today: date,
+    source: Optional[PriceSource] = None, entry_rule: str = ENTRY_AUTO,
 ) -> Optional[str]:
     """Why a look's own days cannot be read tonight, or None if they can.
 
@@ -749,6 +756,19 @@ def look_data_problem(
     if missing:
         return (f"no final prices through {needed} for {len(missing)} ticker(s): "
                 f"{', '.join(missing[:8])}{'...' if len(missing) > 8 else ''}")
+    # Every line the look's days are made of must also be resolved by the
+    # scorer. A line written after the close resolves one night later than
+    # its simulated trade is dated (the scorer's entry rule moves it to the
+    # next close), so a look read the night before would be missing part of
+    # its own last day. The coin flip takes a side on every line, so its
+    # entries are exactly the look's lines.
+    if source is not None:
+        early = [e for e in window if _line_day(e) < cut]
+        _, statuses = score_entries(entries_for_arm(control.NAME, early), source, horizon,
+                                    entry_rule, today)
+        waiting = statuses.get("pending", 0)
+        if waiting:
+            return f"{waiting} line(s) in the look's days have not resolved yet"
     return None
 
 
@@ -780,6 +800,34 @@ class GateView:
     independent: int
     looks: tuple[gate.Look, ...]
     next_estimate: Optional[date]
+
+
+def gate_json(view: GateView, horizon: int, now: datetime) -> dict:
+    """The gate as data, for the dashboard's banner: the same numbers the header prints."""
+    decided = gate.first_decision(view.looks)
+    upcoming = None if decided else gate.next_look(view.looks)
+    return {
+        "generated_at": now.isoformat(),
+        "status_line": gate.status_line(view.independent, view.looks),
+        "registered": view.registered,
+        "independent": min(view.independent, gate.MIN_INDEPENDENT_DAYS),
+        "of": gate.MIN_INDEPENDENT_DAYS,
+        "trading_days": gate.entry_days_needed(gate.MIN_INDEPENDENT_DAYS, horizon),
+        "decided": decided is not None,
+        "outcome": decided.outcome if decided else None,
+        "outcome_text": gate.OUTCOME_TEXT[decided.outcome] if decided else None,
+        "next": None if upcoming is None else {
+            "independent": upcoming.independent,
+            "entry_days": gate.entry_days_needed(upcoming.independent, horizon),
+            "estimated": view.next_estimate.isoformat() if view.next_estimate else None,
+            "bar": upcoming.bar,
+        },
+        "looks": [
+            {"independent": look.independent, "bar": look.bar, "reached": look.reached,
+             "outcome": look.outcome, "reason": look.reason}
+            for look in view.looks
+        ],
+    }
 
 
 def watch_days(entries: Sequence[JournalEntry]) -> list[gate.WatchDay]:
@@ -965,12 +1013,14 @@ def main(argv: list[str] | None = None) -> int:
     inputs: dict[int, Optional[gate.LookInputs]] = {}
     if not mismatches:
         index = index_daily(bars, grid, args.horizon)
+        gaps = frozenset(gate.index_gaps(bars, grid))
         for look_days, _ in gate.CHECKPOINTS:
             needed = gate.entry_days_needed(look_days, args.horizon)
             if entry_days >= needed:
                 computed = look_inputs(decision.results, sides, grid, index, needed,
-                                       args.horizon, args.seeds)
-                problem = look_data_problem(window, fetcher, grid, needed, args.horizon, today)
+                                       args.horizon, args.seeds, index_gaps=gaps)
+                problem = look_data_problem(window, fetcher, grid, needed, args.horizon, today,
+                                            source=source, entry_rule=args.entry)
                 inputs[look_days] = replace(computed, unreadable=problem) if problem else computed
     looks = tuple(gate.evaluate(inputs))
     upcoming = gate.next_look(looks)
@@ -989,6 +1039,10 @@ def main(argv: list[str] | None = None) -> int:
         unanswered_in_window=len(decision_window(unanswered)),
         entry_days=entry_days, independent=independent, looks=looks, next_estimate=estimate,
     )
+
+    if args.gate_json:
+        print(json.dumps(gate_json(view, args.horizon, now)))
+        return 0
 
     # The owner's model-watch triggers, and what the calls cost.
     days = watch_days(read.entries)
@@ -1314,7 +1368,9 @@ def _render_gate(view: GateView, horizon: int) -> list[str]:
             f"{gate.COIN_FLIP_PERCENTILE:.0f}th percentile {_pct(i.model_band_high, 3)}",
             "  t vs " + gate.INDEX_TICKER + ": " + " | ".join(
                 f"{name} {_num(t)}" for name, t in i.t_vs_index.items()
-            ) + f" ({i.index_days} days priced, {i.index_missing} not)",
+            ) + f" ({i.index_days} days priced, {i.index_missing} not yet"
+            + (f", {i.index_gaps} left out: the price source has no {gate.INDEX_TICKER} bar for them"
+               if i.index_gaps else "") + ")",
             f"  -> {gate.OUTCOME_TEXT[look.outcome] if look.decided else 'no decision at this look'}: "
             f"{look.reason}",
         ]

@@ -555,6 +555,7 @@ def test_the_registered_parameters_are_the_ones_the_code_runs():
         assert f"| {independent} | {independent * 3} | {bar:.2f} |" in text
     assert gate.CHECKPOINTS[-1][1] == 2.0 and "t above 2.0" in text
     assert gate.INDEX_TICKER == "VT" and "**VT**" in text
+    assert gate.INDEX_GAP_SETTLE_SESSIONS == 5 and "published five later VT sessions" in text
     assert gate.COIN_FLIP_PERCENTILE == 95.0 and "95th percentile" in text
     assert horse_race.BAND == (5.0, 95.0)  # the band condition 3 actually reads
     assert "**no arm trades**" in text
@@ -724,3 +725,52 @@ def test_a_look_reads_its_own_entry_days_and_nothing_after_them():
     assert first.entry_days == 6 and first.index_days == 6 and first.index_missing == 0
     assert first.t_model_momentum is not None and first.t_model_momentum > 0
     assert set(first.t_vs_index) == {MODEL_ARM, momentum.NAME, hybrid.NAME}
+
+    # A day with no index return is an outage the look waits for, unless the
+    # source will never price it; then it is left out of the index test only.
+    holed = {d: r for d, r in index.items() if d != days[2]}
+    waiting = horse_race.look_inputs(results, {}, days, holed, 6, 3, 10)
+    assert (waiting.index_days, waiting.index_missing, waiting.index_gaps) == (5, 1, 0)
+    settled = horse_race.look_inputs(results, {}, days, holed, 6, 3, 10, index_gaps=frozenset({days[2]}))
+    assert (settled.index_days, settled.index_missing, settled.index_gaps) == (5, 0, 1)
+    assert settled.t_model_momentum == first.t_model_momentum          # the paired arm tests keep the day
+
+
+def test_the_gate_json_is_the_headers_numbers(tmp_path, monkeypatch, capsys):
+    warm = _warm_frame()
+    stamp = _at(warm.index[MIN_WARMUP_BARS].date())
+    now = datetime.combine(warm.index[-1].date(), datetime.min.time(), tzinfo=timezone.utc) + timedelta(days=1)
+    code, out = _race(tmp_path, monkeypatch, capsys, {"NVDA": warm}, [_journal_line("NVDA", stamp)],
+                      now, extra=("--seeds", "1000", "--gate-json"), cutoff=None)
+    assert code == 0
+    data = json.loads(out)
+    assert data["status_line"].startswith("independent days since 2026-09-23: 0 of 60")
+    assert (data["independent"], data["of"], data["trading_days"]) == (0, 60, 180)
+    assert data["decided"] is False and data["outcome"] is None
+    assert data["next"]["independent"] == 20 and data["next"]["bar"] == 3.47
+    assert data["next"]["entry_days"] == 60 and data["next"]["estimated"]
+    assert [look["independent"] for look in data["looks"]] == [20, 40, 60]
+
+
+def test_a_look_waits_for_a_line_written_after_the_close():
+    """A cycle straddling 20:00 UTC: the scorer resolves the late line a night
+    after its simulated trade is dated, so the look must wait for it."""
+    warm = _warm_frame()
+    signal_day = warm.index[MIN_WARMUP_BARS].date()
+    early = replace(line(ticker="AAA", stamp=datetime.combine(signal_day, datetime.min.time(),
+                                                               tzinfo=timezone.utc) + timedelta(hours=19)))
+    late = replace(line(ticker="BBB", stamp=datetime.combine(signal_day, datetime.min.time(),
+                                                              tzinfo=timezone.utc) + timedelta(hours=20, minutes=5)))
+    entry_day = warm.index[MIN_WARMUP_BARS + 1].date()
+    exit_day = warm.index[MIN_WARMUP_BARS + 3].date()
+    frames = {"AAA": warm, "BBB": warm}
+    # Final through the simulated exit only: the late line's scorer exit is one close later.
+    source = FinalAwareSource(frames, exit_day)
+    fetcher = FinalAwareFetcher(frames, exit_day)
+    problem = horse_race.look_data_problem([early, late], fetcher, [entry_day], 1, 3, exit_day,
+                                           source=source)
+    assert problem and "not resolved yet" in problem
+    later = warm.index[MIN_WARMUP_BARS + 4].date()
+    resolved = horse_race.look_data_problem([early, late], FinalAwareFetcher(frames, later), [entry_day], 1, 3,
+                                            later, source=FinalAwareSource(frames, later))
+    assert resolved is None
