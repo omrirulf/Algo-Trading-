@@ -502,8 +502,8 @@ def test_two_runs_are_identical():
 def test_the_run_is_stable_when_a_held_ticker_has_no_bar_on_some_sessions():
     """GLD is missing four sessions while the model fund holds it. Nothing
     raises; its stops still cover it; it is marked at its last close; the
-    only manager errors are the feed's "no bar" for GLD on exactly those
-    days; and it is managed again once its bars return."""
+    feed's "no bar" for GLD on exactly those days is a data hole, not a
+    manager error; and it is managed again once its bars return."""
     missing = [10, 11, 12, 30]
     bars = universe(missing={"GLD": missing})
     sessions = S[:45]
@@ -518,13 +518,15 @@ def test_the_run_is_stable_when_a_held_ticker_has_no_bar_on_some_sessions():
     for f in (model, coin):
         assert f.violations == [] and f.tally.unexpected == [], f.name
         assert sizing_mismatches(f) == [], f.name
-        for error in f.tally.manager_errors:
-            ticker, reason = error.split(": ", 1)
-            assert ticker == "GLD" and reason.startswith("MarketDataError: no bar for GLD on "), error
-            assert date.fromisoformat(reason.rsplit(" ", 1)[1]) in gaps
+        assert f.tally.manager_errors == [], f.name
+        for hole in f.tally.data_holes:
+            day, rest = hole.split(" ", 1)
+            assert rest.startswith("GLD: no bar"), hole
+            assert date.fromisoformat(day) in gaps
     held_through = [k for k in missing if model.days[k].positions and "GLD" in _held_on(model, S[k])]
     assert held_through, "the scenario must have GLD held across a gap"
-    assert len(model.tally.manager_errors) >= len(held_through)
+    managed_holes = [h for h in model.tally.data_holes if "the manager left" in h]
+    assert len(managed_holes) >= len(held_through)
     assert [x for x in model.broker.fills if x.ticker == "GLD" and x.day in gaps] == []
     gld = [a["action"] for a in model.audit.actions if a["ticker"] == "GLD"]
     last_error = max(i for i, action in enumerate(gld) if action == pm.ERROR)
@@ -534,6 +536,18 @@ def test_the_run_is_stable_when_a_held_ticker_has_no_bar_on_some_sessions():
 def _held_on(f: Fund, day: date) -> set[str]:
     """Tickers the fund held at the close of ``day``, rebuilt from its fills."""
     return _held_on_fills([x for x in f.broker.fills if x.day <= day])
+
+
+def test_a_no_bar_error_is_a_data_hole_only_when_the_bar_is_really_missing():
+    """The word "no bar" excuses nothing by itself: a fault that says it
+    while the bars do hold that day stays a manager error."""
+    bars = Bars({"MSFT": flat(), "GLD": flat().drop(index=DAYS[WARM + 1])})
+    feed = SimFeed(bars)
+    f = fund("model", bars, feed)
+    f.broker.day = DAYS[WARM + 1].date()
+    assert f._hole("GLD", "MarketDataError: no bar for GLD on x")
+    assert not f._hole("MSFT", "MarketDataError: no bar for MSFT on x")
+    assert not f._hole("GLD", "BrokerError: refused")
 
 
 def test_a_missing_bar_on_a_line_the_fund_does_not_hold_is_an_engine_error_not_an_unexpected_one():

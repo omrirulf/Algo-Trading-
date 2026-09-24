@@ -151,7 +151,12 @@ def band(curves: Sequence[Sequence[float]]) -> dict:
 
 
 def integrity(funds: Sequence) -> dict:
-    """What would say the simulation itself went wrong, fund by fund."""
+    """What would say the simulation itself went wrong, fund by fund.
+
+    Apart from the problems: ``data_holes``, the ticker-days the price
+    source had no bar for (see ``Tally.data_holes``). A gap in the data is
+    reported, not counted against the machinery.
+    """
     problems: list[str] = []
     for fund in funds:
         if isinstance(fund, IndexFund):
@@ -166,7 +171,8 @@ def integrity(funds: Sequence) -> dict:
         for ticker, pos in fund.broker.positions.items():
             if covered.get(ticker, 0) != abs(pos.qty):
                 problems.append(f"{fund.name}: {ticker} stops cover {covered.get(ticker, 0)} of {abs(pos.qty)}")
-    return {"ok": not problems, "problems": problems[:50]}
+    holes = [f"{fund.name}: {h}" for fund in funds if not isinstance(fund, IndexFund) for h in fund.tally.data_holes]
+    return {"ok": not problems, "problems": problems[:50], "data_holes": len(holes), "data_hole_examples": holes[:10]}
 
 
 # --------------------------------------------------------------------------- #
@@ -199,7 +205,10 @@ def coin_funds(count: int, processes: int, bars: Bars, sessions, cycles, ran, sh
         results = _coin_chunk(seeds)
     results.sort(key=lambda r: r[0])
     problems = [p for _, _, check in results for p in check["problems"]]
-    return [curve for _, curve, _ in results], {"ok": not problems, "problems": problems[:50]}
+    holes = sum(check["data_holes"] for _, _, check in results)
+    examples = [e for _, _, check in results for e in check["data_hole_examples"]][:10]
+    return [curve for _, curve, _ in results], {"ok": not problems, "problems": problems[:50],
+                                                "data_holes": holes, "data_hole_examples": examples}
 
 
 # --------------------------------------------------------------------------- #

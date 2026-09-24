@@ -154,6 +154,12 @@ not a trade every three sessions — and a dividend going ex inside a window
 is added back. **If the winner does not beat VT, no arm trades: the answer is
 to hold the index**, and the repo stays for learning and research.
 
+A day VT cannot be priced is an outage and the look waits for it — unless
+the price source has published five later VT sessions and still not that
+day. Then it is a gap that will not be filled, and that entry day is left
+out of the index comparison only, for every arm alike; the race prints how
+many days were left out (Amendment 2026-09-24, bug fix).
+
 So there are four possible outcomes: keep the model; replace it with
 momentum; replace it with the hybrid; **no arm trades**.
 
@@ -282,4 +288,5 @@ is a new registration of the model arm, like Amendment 1.
 | 2026-09-24 | **Reporting only** | The race now prints the LLM spend over the window and VT bought and held beside SPY and the watchlist, and its stale note "the screen drops lines" is gone: since 2026-09-23 the screen is off and no-answer lines leave every arm. Section 8. |
 | 2026-09-24 | **Model watch** (operational, not a decision rule) | The owner replaced a standing "never revert to Opus" instruction with three triggers that stop and go to the owner. Section 10. |
 | 2026-09-24 | **Amendment policy** (new registration) | Asked by the owner, with the rules above. The Status paragraph and section 7 said only bug fixes could amend this file; they now also allow the owner's dated new registrations, each of which must say why and whether any result it could have been fitted to existed. Made before any trade in the decision window resolved. |
+| 2026-09-24 | **Bug fix**: a VT day the price source never prints no longer holds every look | The index test treated any unpriced VT day as an outage and made the look wait. The price source has no VT bar for 2026-09-22 (it has SPY's and NVDA's; confirmed from its raw rows on 2026-09-24), so one such day inside the window would have held every look unreadable for good and the race could never decide. A missing day now makes the look wait until the source has published five later VT sessions without it; then that entry day is left out of the index comparison only, for every arm alike, and the count is printed. Five is a week of data after the gap, well past the day or two a late bar takes. 2026-09-22 is before the cutoff, so no look is affected today; no trade in the decision window had resolved. |
 | 2026-09-24 | **Made consistent with the planned looks** (no rule change) | Section 6 called any partial window exploratory and section 4 counted from the registration date; both now read as the planned looks and the 2026-09-23 cutoff require, so an early stop at a look is not contradicted by this file's own text. |

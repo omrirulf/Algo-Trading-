@@ -388,6 +388,19 @@ def test_problems_reach_the_owner_in_a_warning_card(tmp_path, built_funds_page):
 
 
 @needs_node
+def test_a_gap_in_the_price_data_is_a_note_not_a_failure(tmp_path, built_funds_page):
+    holed = _calibration("passed") | {"integrity": {
+        "four": {"ok": True, "problems": [], "data_holes": 3,
+                 "data_hole_examples": ["model: 2026-09-22 IEF: no bar; the manager left the position as it was"]},
+        "coin": {"ok": True, "problems": [], "data_holes": 0, "data_hole_examples": []}}}
+    source = _page_functions(built_funds_page, "verdictRow", "problemList", "problemsHtml")
+    [card] = _run_js(tmp_path, source, "CASES.map(problemsHtml)", [holed])
+    assert 'class="alert"' in card and 'class="alert bad"' not in card                # amber, not red
+    assert "3 ticker-day(s) had no price bar" in card and "2026-09-22 IEF" in card
+    assert "coin-flip" not in card
+
+
+@needs_node
 def test_calibration_shows_the_verdicts_and_the_reason_no_day_is_recorded(tmp_path, built_funds_page):
     running = _calibration("running", start="2026-10-01", days_done=0, series=[],
                            problems=["no real close after 2026-10-01 yet"])

@@ -53,8 +53,11 @@
     fund_test.independent        count of independent days, or null
     fund_test.next_checkpoint    null today; the race's next is used instead
                                  (same shape as race_gate.json next)
-    integrity                    null, or {four:{ok, problems[]}, coin:{ok,
-                                 problems[]}}; problems shown when ok is false
+    integrity                    null, or {four:{ok, problems[], data_holes,
+                                 data_hole_examples[]}, coin:{...the same}};
+                                 problems shown when ok is false; data_holes
+                                 (a count of ticker-days with no price bar)
+                                 shown as a note when above 0
 
   logs/race_gate.json, written nightly by analysis/horse_race.py (its gate-json
   option):
@@ -482,6 +485,11 @@ button[disabled]{opacity:.55;cursor:default}
     [["four", "The four funds' integrity check"], ["coin", "The coin-flip funds' integrity check"]].forEach(([k, label])=>{
       const i = integrity[k];
       if(!i || typeof i !== "object") return;
+      const holes = Number(i.data_holes);
+      if(Number.isFinite(holes) && holes > 0){
+        const ex = Array.isArray(i.data_hole_examples) && i.data_hole_examples.length ? ` (for example ${String(i.data_hole_examples[0])})` : "";
+        out.push({where:label, text:`${holes} ticker-day(s) had no price bar in the data: that day the position was left as it was and no entry was made${ex}`, bad:false});
+      }
       const listed = Array.isArray(i.problems) ? i.problems : [];
       if(i.ok !== false && !listed.length) return;
       (listed.length ? listed : ["failed, and the record names no problem"]).forEach(p=>out.push({where:label, text:String(p), bad:true}));

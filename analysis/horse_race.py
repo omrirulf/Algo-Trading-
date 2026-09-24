@@ -692,6 +692,7 @@ def index_daily(
 def look_inputs(
     results: Sequence[ArmResult], sides: dict[tuple[str, datetime], BothSides],
     grid: Sequence[date], index: dict[date, float], entry_days: int, horizon: int, seeds: int,
+    index_gaps: frozenset[date] = frozenset(),
 ) -> gate.LookInputs:
     """Everything one look reads, on its own first ``entry_days`` entry days only.
 
@@ -709,6 +710,7 @@ def look_inputs(
 
     band = next(b for b in bands_for(trades[MODEL_ARM], sides, days, seeds) if b.metric == "mean/day")
     priced = [i for i, day in enumerate(days) if day in index]
+    gaps = sum(1 for day in days if day not in index and day in index_gaps)
     versus = {
         name: newey_west_t([series[name][i] - index[days[i]] for i in priced], horizon)
         for name in (MODEL_ARM, momentum.NAME, hybrid.NAME)
@@ -722,7 +724,8 @@ def look_inputs(
         model_band_high=band.high,
         t_vs_index=versus,
         index_days=len(priced),
-        index_missing=len(days) - len(priced),
+        index_missing=len(days) - len(priced) - gaps,
+        index_gaps=gaps,
     )
 
 
@@ -1010,11 +1013,12 @@ def main(argv: list[str] | None = None) -> int:
     inputs: dict[int, Optional[gate.LookInputs]] = {}
     if not mismatches:
         index = index_daily(bars, grid, args.horizon)
+        gaps = frozenset(gate.index_gaps(bars, grid))
         for look_days, _ in gate.CHECKPOINTS:
             needed = gate.entry_days_needed(look_days, args.horizon)
             if entry_days >= needed:
                 computed = look_inputs(decision.results, sides, grid, index, needed,
-                                       args.horizon, args.seeds)
+                                       args.horizon, args.seeds, index_gaps=gaps)
                 problem = look_data_problem(window, fetcher, grid, needed, args.horizon, today,
                                             source=source, entry_rule=args.entry)
                 inputs[look_days] = replace(computed, unreadable=problem) if problem else computed
@@ -1364,7 +1368,9 @@ def _render_gate(view: GateView, horizon: int) -> list[str]:
             f"{gate.COIN_FLIP_PERCENTILE:.0f}th percentile {_pct(i.model_band_high, 3)}",
             "  t vs " + gate.INDEX_TICKER + ": " + " | ".join(
                 f"{name} {_num(t)}" for name, t in i.t_vs_index.items()
-            ) + f" ({i.index_days} days priced, {i.index_missing} not)",
+            ) + f" ({i.index_days} days priced, {i.index_missing} not yet"
+            + (f", {i.index_gaps} left out: the price source has no {gate.INDEX_TICKER} bar for them"
+               if i.index_gaps else "") + ")",
             f"  -> {gate.OUTCOME_TEXT[look.outcome] if look.decided else 'no decision at this look'}: "
             f"{look.reason}",
         ]

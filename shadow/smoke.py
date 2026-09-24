@@ -31,7 +31,7 @@ import argparse
 import logging
 import sys
 from collections import Counter
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional, Sequence
 
@@ -56,6 +56,10 @@ from shadow.run import INDEX_TICKER, _read_lines, integrity, not_shortable  # no
 
 #: Calendar days fetched per session wanted: weekends and holidays, with room.
 _DAYS_PER_SESSION = 1.6
+#: More of the (ticker, session) pairs missing than this is a fetch that
+#: broke, not a vendor's odd day, and fails the run. A vendor's odd day is
+#: reported and does not.
+MAX_MISSING_SHARE = 0.10
 
 
 def health(fund) -> dict:
@@ -70,8 +74,21 @@ def health(fund) -> dict:
         "refused": fund.tally.rejected + fund.tally.errors,
         "fills": dict(sorted(kinds.items())),
         "open": len(fund.broker.positions),
+        "data_holes": len(fund.tally.data_holes),
         "problems": integrity([fund])["problems"],
     }
+
+
+def missing_bars(bars: Bars, tickers, sessions) -> list[tuple[str, date]]:
+    """(ticker, session) pairs with no bar, inside each ticker's own span of bars."""
+    out = []
+    for ticker in sorted(tickers):
+        have = bars.sessions(ticker, sessions[0], sessions[-1])
+        if not have:
+            out += [(ticker, day) for day in sessions]
+            continue
+        out += [(ticker, day) for day in sessions if have[0] <= day <= have[-1] and day not in set(have)]
+    return out
 
 
 def smoke(entries, sessions_wanted: int, coin_funds: int, fetcher, final_through, shortable_no) -> list[dict]:
@@ -97,7 +114,15 @@ def smoke(entries, sessions_wanted: int, coin_funds: int, fetcher, final_through
     print(f"sessions {sessions[0].isoformat()} to {sessions[-1].isoformat()} ({len(sessions)}); "
           f"cycles acted on: {acted}; tickers fetched: {len(tickers)}; "
           f"refused shorts read from the paper account: {', '.join(sorted(shortable_no)) or 'none'}")
-    return [health(f) for f in funds]
+    gaps = missing_bars(bars, tickers, sessions)
+    share = len(gaps) / (len(tickers) * len(sessions))
+    by_day = Counter(day for _, day in gaps)
+    print(f"missing bars: {len(gaps)} of {len(tickers) * len(sessions)} ticker-sessions ({share:.1%}); "
+          + ("; ".join(f"{day.isoformat()}: {n}" for day, n in sorted(by_day.items())) or "none"))
+    rows = [health(f) for f in funds]
+    if share > MAX_MISSING_SHARE:
+        rows.append({"name": "prices", "problems": [f"{share:.1%} of ticker-sessions have no bar: the fetch broke"]})
+    return rows
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:

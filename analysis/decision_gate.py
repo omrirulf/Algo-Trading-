@@ -43,6 +43,15 @@ CHECKPOINTS: tuple[tuple[int, float], ...] = ((20, 3.47), (40, 2.45), (60, 2.00)
 #: index-first). Held, not traded: no stop, no per-window cost.
 INDEX_TICKER = "VT"
 
+#: A day the price source has no index bar for is an outage -- the look
+#: waits -- until the source has published this many later sessions without
+#: it. After that it is a gap that will not be filled (the source printed a
+#: week of VT after it and never that day), and the day is left out of the
+#: index comparison only, for every arm alike. Without this, one missing row
+#: would hold every look unreadable for good. Amendment 2026-09-24 (bug fix):
+#: the source had no VT bar for 22 Sep 2026 while it had SPY's.
+INDEX_GAP_SETTLE_SESSIONS = 5
+
 #: Keep-rule condition 3: the model's mean daily net return must sit above
 #: this percentile of the coin flip drawn on its own lines. Unchanged at
 #: every look.
@@ -157,9 +166,14 @@ class LookInputs:
     model_band_high: Optional[float]
     #: Newey-West t of (arm minus the index), per arm, over the same days.
     t_vs_index: Mapping[str, Optional[float]] = field(default_factory=dict)
-    #: Days the index could be priced on, and days it could not.
+    #: Days the index could be priced on, and days it could not yet (an
+    #: outage: the look waits for them).
     index_days: int = 0
     index_missing: int = 0
+    #: Days the source will not price: a missing index bar with at least
+    #: ``INDEX_GAP_SETTLE_SESSIONS`` later bars published. Left out of the
+    #: index comparison; they do not hold the look.
+    index_gaps: int = 0
     #: Why the look cannot be read tonight, if it cannot: a price the race
     #: needs for the look's own days did not arrive. A data outage is never
     #: allowed to read as a result; the look waits for the data instead.
@@ -318,6 +332,16 @@ def status_line(independent: int, looks: Sequence[Look]) -> str:
 # --------------------------------------------------------------------------- #
 
 
+def index_gaps(bars: Sequence[tuple[date, float, float, float]], days: Sequence[date]) -> set[date]:
+    """The entry days the index has no bar for and never will: see ``INDEX_GAP_SETTLE_SESSIONS``."""
+    have = {bar[0] for bar in bars}
+    out = set()
+    for day in days:
+        if day not in have and sum(1 for d in have if d > day) >= INDEX_GAP_SETTLE_SESSIONS:
+            out.add(day)
+    return out
+
+
 def index_window_return(
     bars: Sequence[tuple[date, float, float, float]], entry_day: date, horizon: int,
 ) -> Optional[float]:
@@ -437,6 +461,7 @@ __all__ = [
     "CHECKPOINTS",
     "COIN_FLIP_PERCENTILE",
     "DECISION_CUTOFF",
+    "INDEX_GAP_SETTLE_SESSIONS",
     "INDEX_TICKER",
     "Look",
     "LookInputs",
@@ -456,6 +481,7 @@ __all__ = [
     "first_decision",
     "in_window",
     "independent_days",
+    "index_gaps",
     "index_window_return",
     "known_entry_days",
     "next_look",

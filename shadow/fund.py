@@ -198,6 +198,12 @@ class Tally:
     unexpected: list[str] = field(default_factory=list)
     manager_errors: list[str] = field(default_factory=list)
     estimated_r: int = 0
+    #: A ticker the price source has no bar for on a session every other
+    #: ticker trades: the manager left that position as it was and no entry
+    #: was made in it that day. A gap in the data, not a fault of the
+    #: machinery -- and counted only when the bars really lack that day, so
+    #: a fault that says "no bar" is never excused by the word.
+    data_holes: list[str] = field(default_factory=list)
 
 
 class Fund:
@@ -252,11 +258,19 @@ class Fund:
         self.days.append(record)
         return record
 
+    def _hole(self, ticker: str, reason: str) -> bool:
+        """The error is the feed's "no bar", and the bars do lack that ticker today."""
+        return "no bar for" in reason and self.bars.bar(ticker, self.broker.day) is None
+
     def _manage(self) -> None:
         report = self.manager.manage()
         for action in report.actions:
             if action.action == "error":
-                self.tally.manager_errors.append(f"{action.ticker}: {action.reason}")
+                if self._hole(action.ticker, action.reason):
+                    self.tally.data_holes.append(f"{self.broker.day.isoformat()} {action.ticker}: no bar; "
+                                                 f"the manager left the position as it was")
+                else:
+                    self.tally.manager_errors.append(f"{action.ticker}: {action.reason}")
             if action.r_estimated:
                 self.tally.estimated_r += 1
 
@@ -280,6 +294,9 @@ class Fund:
                 self.tally.errors += 1
                 if result.reason.startswith("unexpected"):
                     self.tally.unexpected.append(f"{line.ticker}: {result.reason}")
+                elif self._hole(line.ticker, result.reason):
+                    self.tally.data_holes.append(f"{self.broker.day.isoformat()} {line.ticker}: no bar; "
+                                                 f"no entry that day")
             else:
                 self.tally.rejected += 1
 

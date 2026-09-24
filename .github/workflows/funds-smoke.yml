@@ -55,17 +55,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-      - name: "DIAGNOSTIC (temporary): Yahoo's raw rows around 22 Sep"
-        continue-on-error: true
-        run: |
-          python - <<'PY'
-          import pandas as pd, yfinance as yf
-          pd.set_option("display.width", 200)
-          for t in ["IEF", "RSP", "VGK", "ASML", "RY", "SPY", "VT", "NVDA"]:
-              f = yf.Ticker(t).history(start="2026-09-15", end="2026-09-25", interval="1d", auto_adjust=False)
-              print(t)
-              print(f[["Open", "High", "Low", "Close", "Volume", "Dividends"]].to_string())
-          PY
       - name: The four funds and 20 coin-flip funds on the real journal
         env:
           SESSIONS: ${{ inputs.sessions || '15' }}

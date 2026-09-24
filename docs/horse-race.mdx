@@ -42,7 +42,9 @@ Next checkpoint: 20 independent days (= 60 trading days), estimated 2026-12-22, 
   is reached. Nothing is decided between looks.
 - **Index first.** The arm the rule picks must also beat VT, bought at the
   same opens and held over the same sessions, at the same bar — or no arm
-  trades and the answer is to hold the index.
+  trades and the answer is to hold the index. A VT day the price source has
+  not printed makes the look wait; once five later VT sessions are out and
+  that day still is not, it is left out of the index test and counted.
 - **Model watch.** The owner's triggers (b) and (c) are printed on every run:
   five answered days with no SHORT while SPY fell, and failed calls above 5%
   of names over five cycle days. A trip means stop and tell the owner.

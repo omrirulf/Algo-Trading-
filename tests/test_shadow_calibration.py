@@ -628,6 +628,58 @@ def test_a_stop_is_never_the_one_session_lag():
     assert result.metrics.timing == 1
 
 
+def test_a_sim_entry_a_session_before_the_real_one_is_a_different_decision():
+    """The sim answers a cycle the session after the real account does, so a
+    sim entry a session EARLIER answered an earlier cycle. Only a stop, which
+    rests at the broker in both books, may pair a session earlier."""
+    order = [C0, C1, C2, C3]
+    real_buy = Trade(C2, "JPM", OPEN, "buy", 10, 100.0)
+    assert calib.match_trades([real_buy], [Trade(C1, "JPM", OPEN, "buy", 10, 100.0)], order) == []
+    real_rung = Trade(C2, "JPM", "reduce", "sell", 4, 104.0, frozenset({"market"}))
+    assert calib.match_trades([real_rung], [Trade(C1, "JPM", "reduce", "sell", 4, 104.0,
+                                                  frozenset({"close"}))], order) == []
+
+    real_stop = Trade(C2, "JPM", "reduce", "sell", 10, 95.0, frozenset({"stop"}))
+    [m] = calib.match_trades([real_stop], [Trade(C1, "JPM", "reduce", "sell", 10, 95.0, frozenset({"stop"}))], order)
+    assert m.stop_differs and not m.lag
+    # A later sim entry is the lag; the same one earlier never is.
+    later = Match(real_buy, Trade(C3, "JPM", OPEN, "buy", 10, 100.0))
+    earlier = Match(real_buy, Trade(C1, "JPM", OPEN, "buy", 10, 100.0))
+    assert later.lag and not earlier.lag
+
+
+def test_a_real_stop_on_the_final_session_is_compared_not_left_pending():
+    """Stops fill the same day in both books; the sim has run the final
+    session, so a real stop there with no sim stop is already a difference."""
+    from types import SimpleNamespace
+
+    seed = calib.Seed(C0, utc("2026-10-01T21:00:00"), 0.0, (calib.SeedPosition("AAA", 10, 100.0),), ())
+    snaps = calib.load_snapshots([snapshot_line(
+        "2026-10-06T21:00:00Z", 0.0, stops=[("stop-aaa", "AAA", 10, 95.0, "sell")],
+        fills=[("f1", "stop-aaa", "AAA", "sell", 10, 95.0, "2026-10-06T15:00:00Z")])])
+    result = CalibrationResult(start=C0, seed=seed)
+
+    calib.compare_trades(result, snaps, [], SimpleNamespace(broker=SimpleNamespace(fills=[])),
+                         calib.close_of(C0), [C1, C2, C3])
+
+    assert result.pending == []
+    assert [(d.ticker, d.reason) for d in result.differences] == [("AAA", calib.STOP_DAY)]
+
+
+def test_seeded_stops_never_protect_more_than_is_held():
+    """The recorder lists a stop at its order quantity; a partial fill does
+    not reduce it. Six held under a stop for ten is seeded as a stop for six."""
+    snap = calib.load_snapshots([snapshot_line(
+        "2026-10-01T15:40:00Z", 90_000.0, positions=[("XOM", 6, 100.0), ("NVDA", 6, 100.0)],
+        stops=[("sx", "XOM", 10, 95.0, "sell"), ("n1", "NVDA", 4, 95.0, "sell"), ("n2", "NVDA", 4, 94.0, "sell")],
+    )])[0]
+
+    seed = calib.book_at_close(snap, [])
+
+    assert sorted((s.order_id, s.qty) for s in seed.stops) == [("n1", 4), ("n2", 2), ("sx", 6)]
+    assert any("XOM" in n and "seeded at 6" in n for n in seed.notes)
+
+
 def test_matching_prefers_the_same_session_then_the_next():
     order = [C0, C1, C2, C3]
     real = [Trade(C1, "AAA", OPEN, "buy", 10, 100.0)]

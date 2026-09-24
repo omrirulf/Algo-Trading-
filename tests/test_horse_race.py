@@ -555,6 +555,7 @@ def test_the_registered_parameters_are_the_ones_the_code_runs():
         assert f"| {independent} | {independent * 3} | {bar:.2f} |" in text
     assert gate.CHECKPOINTS[-1][1] == 2.0 and "t above 2.0" in text
     assert gate.INDEX_TICKER == "VT" and "**VT**" in text
+    assert gate.INDEX_GAP_SETTLE_SESSIONS == 5 and "published five later VT sessions" in text
     assert gate.COIN_FLIP_PERCENTILE == 95.0 and "95th percentile" in text
     assert horse_race.BAND == (5.0, 95.0)  # the band condition 3 actually reads
     assert "**no arm trades**" in text
@@ -724,6 +725,15 @@ def test_a_look_reads_its_own_entry_days_and_nothing_after_them():
     assert first.entry_days == 6 and first.index_days == 6 and first.index_missing == 0
     assert first.t_model_momentum is not None and first.t_model_momentum > 0
     assert set(first.t_vs_index) == {MODEL_ARM, momentum.NAME, hybrid.NAME}
+
+    # A day with no index return is an outage the look waits for, unless the
+    # source will never price it; then it is left out of the index test only.
+    holed = {d: r for d, r in index.items() if d != days[2]}
+    waiting = horse_race.look_inputs(results, {}, days, holed, 6, 3, 10)
+    assert (waiting.index_days, waiting.index_missing, waiting.index_gaps) == (5, 1, 0)
+    settled = horse_race.look_inputs(results, {}, days, holed, 6, 3, 10, index_gaps=frozenset({days[2]}))
+    assert (settled.index_days, settled.index_missing, settled.index_gaps) == (5, 0, 1)
+    assert settled.t_model_momentum == first.t_model_momentum          # the paired arm tests keep the day
 
 
 def test_the_gate_json_is_the_headers_numbers(tmp_path, monkeypatch, capsys):

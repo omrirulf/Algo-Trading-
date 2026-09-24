@@ -534,20 +534,35 @@ def book_at_close(
         positions.append(SeedPosition(ticker, whole, float(avg)))
 
     held_sides = {p.ticker: ("sell" if p.qty > 0 else "buy") for p in positions}
+    # What is held and not yet protected. The recorder lists a stop at its
+    # order quantity, which a partial fill does not reduce, so stops can add
+    # up to more than is held; none may protect more than that.
+    room = {p.ticker: abs(p.qty) for p in positions}
     resting: list[RestingStop] = []
+
+    def rest(stop: RestingStop, qty: int) -> None:
+        take = min(int(qty), room[stop.ticker])
+        if take < qty:
+            notes.append(f"{stop.ticker}: a stop for {int(qty)} with {room[stop.ticker]} held and unprotected; "
+                         f"seeded at {take}" if take else
+                         f"{stop.ticker}: a stop for {int(qty)} with every held share already protected; left out")
+        if take:
+            room[stop.ticker] -= take
+            resting.append(RestingStop(stop.order_id, stop.ticker, take, stop.stop_price, stop.side))
+
     for stop, qty in stops:
         if held_sides.get(stop.ticker) != stop.side:
             notes.append(f"{stop.ticker}: a {stop.side} stop with no position it protects was left out")
             continue
-        resting.append(RestingStop(stop.order_id, stop.ticker, int(qty), stop.stop_price, stop.side))
+        rest(stop, qty)
 
     if later_stops is not None:
         protected = {s.ticker for s in resting}
         for stop in later_stops:
             if stop.ticker not in protected and held_sides.get(stop.ticker) == stop.side:
-                resting.append(stop)
                 notes.append(f"{stop.ticker}: no stop in the seeding snapshot; took the next snapshot's "
                              f"{stop.qty} @ {stop.stop_price:.2f}")
+                rest(stop, stop.qty)
     for ticker in sorted(set(held_sides) - {s.ticker for s in resting}):
         notes.append(f"{ticker}: seeded with no known stop; the first management pass protects it")
 
@@ -740,8 +755,13 @@ class Match:
 
     @property
     def lag(self) -> bool:
-        """The same trade a session apart because the sim acts at the next open: not a difference."""
-        return self.timing and not self.stop_differs
+        """The same trade a session later in the sim, because it acts at the next open: not a difference.
+
+        Only later. The sim acts on a cycle the session after the real
+        account does, so a sim entry or ladder close a session *earlier*
+        than the real one answered an earlier cycle: a different decision.
+        """
+        return self.sim.day > self.real.day and not self.stop_differs
 
 
 @dataclass(frozen=True)
@@ -938,6 +958,10 @@ def run_calibration(
     result.integrity.unexpected = list(fund.tally.unexpected)
     result.integrity.manager_errors = list(fund.tally.manager_errors)
     result.integrity.estimated_r = fund.tally.estimated_r
+    if fund.tally.data_holes:
+        holes = fund.tally.data_holes
+        result.problems.append(f"{len(holes)} ticker-day(s) had no price bar, so the sim left those positions "
+                               f"as they were and made no entry in them that day (first: {holes[0]})")
     if run:
         compare_trades(result, snapshots, audit_lines, fund, _seed_cut(start, chosen), run)
     return result
@@ -1007,8 +1031,12 @@ def match_trades(real: Sequence[Trade], sim: Sequence[Trade], order: Sequence[da
     """Each real trade to the sim's same ticker and direction within one session.
 
     Preference, for the same pair: the same session, then the sim a session
-    later (what the one-session lag produces), then a session earlier.
-    Greedy in date order, so the result does not depend on dict order.
+    later (what the one-session lag produces), then -- for a stop only -- a
+    session earlier. An entry or a ladder close the sim made a session
+    before the real account answered an earlier cycle than the real one
+    did, so it is not the same trade; a stop rests at the broker in both
+    books and can fill a day apart on daily bars. Greedy in date order, so
+    the result does not depend on dict order.
     """
     def index(day: date) -> int:
         return bisect_left(order, day)
@@ -1021,7 +1049,7 @@ def match_trades(real: Sequence[Trade], sim: Sequence[Trade], order: Sequence[da
             if i in used or s.ticker != r.ticker or s.direction != r.direction:
                 continue
             gap = index(s.day) - index(r.day)
-            if abs(gap) > 1:
+            if abs(gap) > 1 or (gap == -1 and not (r.is_stop or s.is_stop)):
                 continue
             candidate_rank = {0: 0, 1: 1, -1: 2}[gap]
             if rank is None or candidate_rank < rank:
@@ -1092,7 +1120,10 @@ def compare_trades(result: CalibrationResult, snapshots: Sequence[Snapshot], aud
     matched_sim = {m.sim for m in matches}
 
     final = sessions[-1]
-    result.pending = [t for t in real if t.day == final and t not in matched_real]
+    # A real entry or ladder close on the final session is answered at the
+    # next open, which the run has not reached. A stop is not: it fills the
+    # same day in both books, so an unmatched one is already a difference.
+    result.pending = [t for t in real if t.day == final and t not in matched_real and not t.is_stop]
     result.real_trades = [t for t in real if t not in result.pending]
     result.sim_trades = sim
     result.matches = matches
