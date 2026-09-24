@@ -1,0 +1,757 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#8a5a1e">
+<meta name="description" content="The four-fund experiment: simulated funds that run the real execution engine and position manager against a simulated broker. Simulated, not real money.">
+<title>Algo Trading 4 Funds</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<!--
+  THE CONTRACT: every field this page reads, and its unit.
+  Units throughout: returns, gaps and shares are FRACTIONS (0.012 is 1.2%),
+  money is DOLLARS, days are ISO dates (2026-10-20), times are ISO date-times
+  (UTC unless they carry an offset), counts are plain integers.
+
+  logs/funds.json, written nightly by shadow/run.py (shadow/calibration.py
+  writes the calibration part):
+    generated_at                 ISO date-time the record was written
+    final_through                ISO date of the last final close it covers
+    simulated                    must be true, or the page refuses the file
+    calibration.status           not_started | running | passed | failed
+    calibration.start            ISO date, or null before it starts
+    calibration.days_done        closes compared so far (count)
+    calibration.days_needed      closes the rule needs (count, 15)
+    calibration.pass_rule.text[]      the rule: a heading line, then
+                                      conditions already numbered "1." to "5."
+    calibration.pass_rule.approved    true once the owner approved it
+    calibration.pass_rule.verdicts[]  optional: header and "Note:" lines, then
+                                      "N. condition: PASS|FAIL|PENDING (detail)"
+    calibration.series[]         {day ISO date, sim dollars, real dollars or null,
+                                  diff_pct fraction or null}
+    calibration.differences[]    {day ISO date, ticker, real text, sim text, reason text}
+    calibration.metrics          max_abs_gap_pct fraction, tracking_error_pct
+                                 fraction a day, matched_share fraction,
+                                 unexplained count
+    calibration.holding_days     median, min, max, open_median in trading days;
+                                 closed a count of positions
+    calibration.problems[]       optional: text lines, shown in the warning card
+    funds                        null, or {start ISO date, days[] ISO dates,
+                                 list[], band}; drawn only when calibration passed
+    funds.list[]                 {name model|momentum|hybrid|vt, label,
+                                  equity[] dollars per day, total_return fraction,
+                                  vs_vt fraction (difference of total returns,
+                                  null for vt), max_drawdown fraction (positive),
+                                  trades count, win_rate fraction or null,
+                                  open_positions count, cash dollars}
+    funds.band                   {p5[] dollars, p95[] dollars, funds count of
+                                  coin-flip funds}
+    fund_test.status             not_started | running
+    fund_test.start              ISO date or null
+    fund_test.independent        count of independent days, or null
+    fund_test.next_checkpoint    null today; the race's next is used instead
+                                 (same shape as race_gate.json next)
+    integrity                    null, or {four:{ok, problems[]}, coin:{ok,
+                                 problems[]}}; problems shown when ok is false
+
+  logs/race_gate.json, written nightly by analysis/horse_race.py (its gate-json
+  option):
+    generated_at                 ISO date-time the record was written
+    status_line                  text, shown once the race has decided
+    independent, of              independent days so far, and needed (count, 60)
+    trading_days                 trading days the "of" stands for (count, 180)
+    decided                      true once a look has decided
+    outcome_text                 text, or null
+    next                         null, or {independent count, estimated ISO date
+                                 or null, bar t-statistic}
+    looks[]                      {independent count, bar t-statistic, reached,
+                                  outcome text or null, reason text}
+
+  Not read here: funds.json fund_test.sessions, metrics.timing, not_shortable;
+  race_gate.json registered, outcome, next.entry_days.
+-->
+<style>
+/* The tokens and both dark-mode blocks are the desk's (template.html), copied
+   so the two pages of the site read as one app. The chart colours are added
+   on top: three fund hues checked for colour-blind separation on these
+   surfaces, VT in the secondary ink so the index reads as the yardstick
+   rather than a fourth contender, and a band fill one step off the card. */
+:root{
+  --bg:#f5f4f0;--surface:#ffffff;--surface-2:#eeece6;--line:#d9d6cd;--ink:#1d1f24;--ink-2:#5b5f6b;--ink-3:#8a8e99;
+  --accent:#8a5a1e;--accent-ink:#ffffff;
+  --good:#2f7d4f;--good-bg:#e3f1e8;--warn:#a26a00;--warn-bg:#f7edd3;--bad:#b3352b;--bad-bg:#f8e2df;
+  --bar:#cfcbc0;--bar-fill:#8a5a1e;
+  --sans:"Source Sans 3",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --s-model:#2a78d6;--s-momentum:#eb6834;--s-hybrid:#1baf7a;--s-vt:var(--ink-2);--s-real:#b9b6ad;
+  --band:#e9e6dd;--grid:#ecebe6;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#15171c;--surface:#1d2027;--surface-2:#252932;--line:#343945;--ink:#ecebe6;--ink-2:#aab0bd;--ink-3:#7d8390;
+    --accent:#d9a45b;--accent-ink:#15171c;
+    --good:#6fc48f;--good-bg:#1e3327;--warn:#e0b25a;--warn-bg:#3a2f15;--bad:#f08a7e;--bad-bg:#3d211e;
+    --bar:#343945;--bar-fill:#d9a45b;
+    --s-model:#3987e5;--s-momentum:#d95926;--s-hybrid:#199e70;--s-real:#5d6370;
+    --band:#2b3039;--grid:#282c35;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#15171c;--surface:#1d2027;--surface-2:#252932;--line:#343945;--ink:#ecebe6;--ink-2:#aab0bd;--ink-3:#7d8390;
+  --accent:#d9a45b;--accent-ink:#15171c;
+  --good:#6fc48f;--good-bg:#1e3327;--warn:#e0b25a;--warn-bg:#3a2f15;--bad:#f08a7e;--bad-bg:#3d211e;
+  --bar:#343945;--bar-fill:#d9a45b;
+  --s-model:#3987e5;--s-momentum:#d95926;--s-hybrid:#199e70;--s-real:#5d6370;
+  --band:#2b3039;--grid:#282c35;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.45;padding-inline:16px;padding-block:12px 40px;max-width:1080px;margin-inline:auto;overflow-wrap:break-word}
+h1,h2,h3{text-wrap:balance;margin:0}
+h1{font-size:1.35rem;font-weight:700;letter-spacing:-.01em}
+h2{font-size:1.02rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-2);margin-block:28px 10px}
+h3{font-size:.95rem;font-weight:700}
+p{margin:6px 0 0}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--ink-2)}.faint{color:var(--ink-3)}.small{font-size:.88rem}
+header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 16px;padding-block:6px 14px;border-bottom:1px solid var(--line)}
+#fresh{font-size:.9rem}
+.nav{font-size:.88rem;margin-bottom:2px}
+.nav a{display:inline-block;padding-block:4px;color:var(--accent);font-weight:600}
+.nav a[aria-current="page"]{color:var(--ink);font-weight:700;text-decoration:none}
+.title{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
+/* The label the owner asked to be unmissable: a boxed badge beside the
+   title, in the caution colours, on every state of the page. */
+.sim{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--warn);background:var(--warn-bg);color:var(--ink);border-radius:8px;padding:2px 10px;font-weight:700;font-size:.95rem}
+.sim svg{flex:none;color:var(--warn)}
+.intro{font-size:.9rem;color:var(--ink-2);margin-top:10px}
+.banner{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:8px;padding:10px 12px;margin-top:10px;font-size:.95rem;overflow-wrap:anywhere}
+.banner.idle{border-left-color:var(--ink-3)}
+.banner.decided{border-left-color:var(--good)}
+.banner .sub{font-size:.84rem;color:var(--ink-3);margin-top:2px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.card + .card,.chart + .card,.card + .chart,.tiles + .card,.card + .tiles{margin-top:10px}
+.placeholder{border-style:dashed;text-align:center;padding:22px 16px}
+.placeholder strong{display:block;font-size:1.05rem}
+.st{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
+.chip{display:inline-block;border-radius:999px;padding:1px 8px;font-size:.75rem;font-weight:600;letter-spacing:.02em;vertical-align:middle}
+.chip.idle{background:var(--surface-2);color:var(--ink-2)}
+.chip.run{background:var(--warn-bg);color:var(--warn)}
+.chip.good{background:var(--good-bg);color:var(--good)}
+.chip.bad{background:var(--bad-bg);color:var(--bad)}
+.bar{height:8px;background:var(--bar);border-radius:4px;overflow:hidden;margin-top:8px}
+.bar > i{display:block;height:100%;background:var(--bar-fill);border-radius:4px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:10px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.tile .label{font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-2)}
+.tile .value{font-size:1.2rem;font-weight:600;margin-top:2px;overflow-wrap:anywhere}
+.tile .sub{font-size:.82rem;color:var(--ink-3);margin-top:2px}
+/* The rule's lines carry their own numbers ("1." to "5."), so the list adds
+   none; the number sits in its own column so a long condition wraps under
+   its text, not under the number. */
+.rule-head{font-size:.93rem;margin-top:8px}
+.rule{list-style:none;margin:8px 0 0;padding:0;font-size:.93rem}
+.rule li{display:flex;gap:6px}
+.rule li > .n{flex:none;min-width:1.3em}
+.rule li + li{margin-top:4px}
+.verdicts{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:5px;font-size:.92rem}
+.verdicts li{display:flex;align-items:baseline;gap:8px}
+.verdicts .chip{flex:none;min-width:5.4em;text-align:center}
+/* Problems the record reports: boxed in the caution colours like the
+   "Simulated" badge, and in the alarm colours when a check failed. */
+.alert{background:var(--warn-bg);border:2px solid var(--warn);border-radius:10px;padding:10px 14px;margin-top:10px;color:var(--ink);overflow-wrap:anywhere}
+.alert.bad{background:var(--bad-bg);border-color:var(--bad)}
+.alert h3{display:flex;align-items:center;gap:8px}
+.alert h3 svg{flex:none;color:var(--warn)}
+.alert.bad h3 svg{color:var(--bad)}
+.alert ul{margin:6px 0 0;padding-left:1.2em;font-size:.92rem}
+.alert li + li{margin-top:3px}
+.alert .where{font-weight:600}
+.alert details.data summary{color:var(--ink)}
+.chart{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 12px 8px;margin-top:10px}
+.chart .cap{font-size:.86rem;color:var(--ink-2);margin-top:2px}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:.86rem;margin:8px 0 2px;padding:0;list-style:none}
+.legend li{display:inline-flex;align-items:center;gap:6px}
+.legend svg,.tip svg,.fund .head svg{flex:none}
+.plot{position:relative;touch-action:pan-y;margin-top:4px;border-radius:6px}
+.plot:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.plot > svg{display:block;width:100%;height:auto}
+.plot text{font-family:var(--sans);font-size:12px;fill:var(--ink-3)}
+.plot text.end{fill:var(--ink-2);font-weight:600}
+.plot .grid{stroke:var(--grid);stroke-width:1}
+.plot .axis{stroke:var(--line);stroke-width:1}
+.plot .lead{stroke:var(--ink-3);stroke-width:1}
+.plot .cross{stroke:var(--ink-3);stroke-width:1}
+.tip{position:absolute;top:0;left:0;pointer-events:none;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:.8rem;box-shadow:0 2px 10px rgba(0,0,0,.14);z-index:2;max-width:220px}
+.tip[hidden]{display:none}
+.tip .d{color:var(--ink-2);font-weight:600;margin-bottom:2px}
+.tip .r{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.tip .r b{font-family:var(--mono);font-weight:600;font-variant-numeric:tabular-nums}
+.tip .r span{color:var(--ink-2)}
+details.data{margin-top:8px;font-size:.88rem}
+details.data summary{cursor:pointer;color:var(--ink-2);font-weight:600;padding-block:4px}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
+table{border-collapse:collapse;width:100%;font-size:.84rem}
+th,td{padding:4px 8px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--ink-2);font-weight:600}
+td{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.looks{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:4px}
+.diffs{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px;margin-top:8px}
+.diff{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:.92rem}
+.diff .head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:2px 10px}
+.diff .kv{margin-top:4px}
+.diff .why{color:var(--ink-2);font-size:.86rem;margin-top:4px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin:8px 0 0;font-size:.9rem}
+.kv dt{color:var(--ink-2)}
+.kv dd{margin:0;text-align:right;overflow-wrap:anywhere}
+.diff .kv dd{text-align:left}
+.funds{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:10px}
+.funds > .card{margin:0}
+.fund .head{display:flex;align-items:center;gap:8px;font-weight:700}
+.fund .big{font-size:1.45rem;font-weight:600;margin-top:4px}
+.fund .big + .faint{font-size:.82rem}
+.up{color:var(--good)}.down{color:var(--bad)}
+footer{margin-top:36px;padding-top:12px;border-top:1px solid var(--line);font-size:.84rem;color:var(--ink-3);display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
+button{font:inherit;font-size:.88rem;font-weight:600;color:var(--accent-ink);background:var(--accent);border:0;border-radius:8px;padding:6px 12px;cursor:pointer}
+button:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button[disabled]{opacity:.55;cursor:default}
+#note{font-size:.84rem;color:var(--ink-3)}
+</style>
+
+<header>
+  <div>
+    <nav class="nav" aria-label="Pages"><a href="index.html">Desk</a> <span class="faint">|</span> <a href="funds.html" aria-current="page">4 Funds</a></nav>
+    <div class="title">
+      <h1>4 Funds</h1>
+      <span class="sim" role="note"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 15 14H1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8 6v3.6M8 11.4v.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Simulated, not real money</span>
+    </div>
+    <div id="fresh" class="muted">Loading the record…</div>
+    <div id="live" class="faint" style="font-size:.84rem">Live updates: starting…</div>
+  </div>
+</header>
+
+<p class="intro">Every fund on this page is a simulation: the real execution engine and position manager, trading a simulated broker over daily bars. None of them places an order anywhere. The one real account shown, during calibration, is the paper account, which is not real money either.</p>
+
+<section id="banners" aria-label="Where the tests stand"></section>
+<section id="problems" aria-label="Problems in the record"></section>
+
+<h2>Calibration</h2>
+<div id="calibration"></div>
+
+<h2>The four funds</h2>
+<div id="funds"></div>
+
+<footer>
+  <span id="note">Rebuilt each night from the simulation's record and the decision gate. Nothing on this page is a live quote or a live position.</span>
+  <button id="refresh" type="button">Refresh</button>
+</footer>
+
+<script type="application/json" id="seed-funds">/*__FUNDS__*/{}</script>
+<script type="application/json" id="seed-race">/*__RACE__*/{}</script>
+<script>
+(function(){
+  "use strict";
+  const REPO = {owner:"omrirulf", repo:"Algo-Trading-", ref:"main"};
+  const $ = (id)=>document.getElementById(id);
+  const isNum = (v)=> typeof v === "number" && isFinite(v);
+  const esc = (s)=> String(s??"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const money = (v)=> !isNum(v) ? "n/a" : (v<0?"−":"") + "$" + Math.abs(v).toLocaleString("en-US",{maximumFractionDigits:0});
+  const kMoney = (v)=> !isNum(v) ? "n/a" : Math.abs(v) < 1000 ? money(v) : (v<0?"−":"") + "$" + (Math.abs(v)/1000).toLocaleString("en-US",{maximumFractionDigits:2}) + "k";
+  // Every return and share in both files is a fraction: 0.012 is 1.2%.
+  const signed = (v, d)=> !isNum(v) ? "n/a" : (v>0?"+":v<0?"−":"") + Math.abs(v*100).toFixed(d) + "%";
+  const plain = (v, d)=> !isNum(v) ? "n/a" : (v*100).toFixed(d) + "%";
+  const pts = (v)=> !isNum(v) ? "n/a" : (v>0?"+":v<0?"−":"") + Math.abs(v*100).toFixed(2) + " pts";
+  const tone = (v)=> !isNum(v) || v === 0 ? "" : v > 0 ? "up" : "down";
+  const bar2 = (v)=> isNum(v) ? v.toFixed(2) : "n/a";
+  const day = (iso, year)=>{ if(!iso) return "n/a"; const d = new Date(String(iso).slice(0,10) + "T00:00:00Z"); if(isNaN(d)) return String(iso); return d.toLocaleDateString("en-GB", year ? {timeZone:"UTC",day:"numeric",month:"short",year:"numeric"} : {timeZone:"UTC",day:"numeric",month:"short"}); };
+  const israel = (iso)=>{ if(!iso) return "n/a"; const d=new Date(iso.endsWith("Z")||iso.includes("+")?iso:iso+"Z"); if(isNaN(d)) return iso; return d.toLocaleString("en-GB",{timeZone:"Asia/Jerusalem",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}) + " Israel time"; };
+
+  // Colour follows the fund, never its rank, so a fund keeps its hue on every
+  // chart and card. VT is dashed as well as grey: it is the index held, the
+  // line the other three are measured against.
+  const HUE = {model:"var(--s-model)", momentum:"var(--s-momentum)", hybrid:"var(--s-hybrid)", vt:"var(--s-vt)"};
+  const SHORT = {model:"Model", momentum:"Momentum", hybrid:"Hybrid", vt:"VT"};
+  const DASH = {vt:"6 4"};
+  const key = (color, dash, width)=> `<svg width="18" height="10" viewBox="0 0 18 10" aria-hidden="true"><path d="M1 5H17" style="stroke:${color};stroke-width:${width||2.5};stroke-linecap:round${dash ? ";stroke-dasharray:" + dash : ""}"/></svg>`;
+  const bandKey = `<svg width="18" height="12" viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="1" width="18" height="10" rx="2" style="fill:var(--band)"/></svg>`;
+
+  // ------------------------------------------------------------------ charts
+  // Inline SVG, drawn at the width it is shown at so a 12px label stays 12px
+  // on a phone instead of shrinking with a fixed viewBox. Redrawn on resize.
+  let charts = [];
+  // Margins are measured in the font the labels are drawn in, so a long
+  // name like "Momentum" is never clipped at the right edge on a phone.
+  const measure = document.createElement("canvas").getContext("2d");
+  const textWidth = (text, weight)=>{
+    if(!measure) return text.length * 7.5;
+    measure.font = `${weight} 12px ${getComputedStyle(document.body).fontFamily}`;
+    return measure.measureText(text).width;
+  };
+
+  function niceTicks(lo, hi, count){
+    const raw = (hi - lo) / count;
+    const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    const n = raw / mag;
+    const step = (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * mag;
+    const t0 = Math.floor(lo / step) * step, t1 = Math.ceil(hi / step) * step;
+    const ticks = [];
+    for(let v = t0; v <= t1 + step * 1e-6; v += step) ticks.push(Math.round(v * 1e6) / 1e6);
+    return {lo:t0, hi:t1, ticks};
+  }
+
+  function chart(host, spec){ host.__spec = spec; charts.push(host); draw(host); }
+
+  function draw(host){
+    const s = host.__spec;
+    const n = s.days.length;
+    const W = Math.max(260, Math.floor(host.clientWidth || 320));
+    const narrow = W < 520;
+    const H = narrow ? 210 : 260;
+    const vals = [];
+    s.series.forEach(se=>se.values.forEach(v=>{ if(isNum(v)) vals.push(v); }));
+    if(s.band){ s.band.lo.forEach(v=>{ if(isNum(v)) vals.push(v); }); s.band.hi.forEach(v=>{ if(isNum(v)) vals.push(v); }); }
+    if(!n || !vals.length){ host.innerHTML = `<p class="muted small">Nothing to draw yet.</p>`; return; }
+    let lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+    const pad = Math.max(1, Math.abs(hi) * 0.002);
+    if(hi - lo < pad){ lo -= pad; hi += pad; }
+    const T = niceTicks(lo, hi, narrow ? 3 : 4);
+    const yText = T.ticks.map(kMoney);
+    const ends = s.series.filter(se=>se.end);
+    const left = Math.ceil(Math.max.apply(null, yText.map(t=>textWidth(t, 400)))) + 10;
+    const right = ends.length ? Math.ceil(Math.max.apply(null, ends.map(se=>textWidth(se.end, 600)))) + 16 : 12;
+    const top = 8, bottom = 26;
+    const pw = W - left - right, ph = H - top - bottom;
+    const X = (i)=> left + (n <= 1 ? pw / 2 : i * pw / (n - 1));
+    const Y = (v)=> top + ph - (v - T.lo) / (T.hi - T.lo) * ph;
+    const f1 = (v)=> v.toFixed(1);
+    let svg = "";
+    T.ticks.forEach((t, k)=>{
+      const y = f1(Y(t));
+      svg += `<line class="${k ? "grid" : "axis"}" x1="${left}" x2="${left + pw}" y1="${y}" y2="${y}"/><text x="${left - 6}" y="${y}" dy=".32em" text-anchor="end">${esc(yText[k])}</text>`;
+    });
+    const xCount = Math.min(n, narrow ? 3 : 5);
+    const xIdx = [...new Set(Array.from({length:xCount}, (_, k)=> xCount === 1 ? 0 : Math.round(k * (n - 1) / (xCount - 1))))];
+    xIdx.forEach((i, k)=>{
+      const anchor = n === 1 ? "middle" : k === 0 ? "start" : k === xIdx.length - 1 ? "end" : "middle";
+      svg += `<text x="${f1(X(i))}" y="${H - 8}" text-anchor="${anchor}">${esc(day(s.days[i]))}</text>`;
+    });
+    if(s.band){
+      // The band is drawn run by run, so a missing day leaves a gap rather
+      // than a straight edge across it.
+      let run = [];
+      const flush = ()=>{ if(run.length > 1){ svg += `<path d="M${run.map(i=>f1(X(i)) + " " + f1(Y(s.band.hi[i]))).join("L")}L${run.slice().reverse().map(i=>f1(X(i)) + " " + f1(Y(s.band.lo[i]))).join("L")}Z" style="fill:var(--band)"/>`; } run = []; };
+      for(let i = 0; i < n; i++){ if(isNum(s.band.lo[i]) && isNum(s.band.hi[i])) run.push(i); else flush(); }
+      flush();
+    }
+    s.series.forEach(se=>{
+      let d = "", pen = false;
+      se.values.forEach((v, i)=>{
+        if(i >= n || !isNum(v)){ pen = false; return; }
+        d += (pen ? "L" : "M") + f1(X(i)) + " " + f1(Y(v)); pen = true;
+        if(!isNum(se.values[i-1]) && !isNum(se.values[i+1])) svg += `<circle cx="${f1(X(i))}" cy="${f1(Y(v))}" r="${se.width > 2 ? 3.5 : 2.5}" style="fill:${se.color}"/>`;
+      });
+      if(d) svg += `<path d="${d}" fill="none" style="stroke:${se.color};stroke-width:${se.width || 2};stroke-linejoin:round;stroke-linecap:round${se.dash ? ";stroke-dasharray:" + se.dash : ""}"/>`;
+    });
+    // End labels: one per series at its last value, spread apart when the
+    // lines finish close together, with a thin leader back to the line.
+    const marks = ends.map(se=>{
+      let li = -1; for(let i = Math.min(n, se.values.length) - 1; i >= 0; i--){ if(isNum(se.values[i])){ li = i; break; } }
+      return li < 0 ? null : {se, li, y:Y(se.values[li]), ly:Y(se.values[li])};
+    }).filter(Boolean).sort((a, b)=> a.y - b.y);
+    const gap = 14;
+    marks.forEach((m, k)=>{ if(k) m.ly = Math.max(m.ly, marks[k-1].ly + gap); });
+    for(let k = marks.length - 1; k >= 0; k--){
+      const cap = k === marks.length - 1 ? top + ph : marks[k+1].ly - gap;
+      marks[k].ly = Math.max(top + 4, Math.min(marks[k].ly, cap));
+    }
+    marks.forEach(m=>{
+      const x0 = X(m.li), lx = left + pw + 8;
+      svg += `<circle cx="${f1(x0)}" cy="${f1(m.y)}" r="4" style="fill:${m.se.color};stroke:var(--surface);stroke-width:2"/>`;
+      if(Math.abs(m.ly - m.y) > 1.5 || x0 < left + pw - 1) svg += `<path class="lead" d="M${f1(x0 + 5)} ${f1(m.y)}L${f1(lx - 3)} ${f1(m.ly)}" fill="none"/>`;
+      svg += `<text class="end" x="${lx}" y="${f1(m.ly)}" dy=".32em">${esc(m.se.end)}</text>`;
+    });
+    svg += `<g class="hover" style="display:none"><line class="cross" x1="0" x2="0" y1="${top}" y2="${top + ph}"/>${s.series.map(se=>`<circle r="4" cx="0" cy="0" style="fill:${se.color};stroke:var(--surface);stroke-width:2"/>`).join("")}</g>`;
+    svg += `<rect x="${left}" y="${top}" width="${pw}" height="${ph}" fill="transparent"/>`;
+    host.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(s.aria)}">${svg}</svg><div class="tip" hidden></div>`;
+
+    // Hover, touch and arrow keys all land on the nearest day; the tooltip
+    // only repeats numbers the table below the chart also holds.
+    const el = host.querySelector("svg"), g = el.querySelector(".hover"), tip = host.querySelector(".tip");
+    const dots = g.querySelectorAll("circle"), cross = g.querySelector("line");
+    let current = -1;
+    const at = (i)=>{
+      i = Math.max(0, Math.min(n - 1, i)); current = i;
+      const x = X(i);
+      cross.setAttribute("x1", f1(x)); cross.setAttribute("x2", f1(x));
+      s.series.forEach((se, k)=>{ const v = se.values[i]; dots[k].style.display = isNum(v) ? "" : "none"; if(isNum(v)){ dots[k].setAttribute("cx", f1(x)); dots[k].setAttribute("cy", f1(Y(v))); } });
+      g.style.display = "";
+      let rows = s.series.map(se=>`<div class="r">${key(se.color, se.dash, se.width)}<b>${esc(money(se.values[i]))}</b><span>${esc(se.label)}</span></div>`).join("");
+      if(s.band && isNum(s.band.lo[i])) rows += `<div class="r">${bandKey}<b>${esc(kMoney(s.band.lo[i]))}–${esc(kMoney(s.band.hi[i]))}</b><span>${esc(s.band.short)}</span></div>`;
+      if(s.extra) rows += s.extra(i);
+      tip.innerHTML = `<div class="d">${esc(day(s.days[i], true))}</div>` + rows;
+      tip.hidden = false;
+      const scale = el.getBoundingClientRect().width / W || 1;
+      const px = x * scale, tw = tip.offsetWidth, hostW = host.clientWidth;
+      let lx = px + 12;
+      if(lx + tw > hostW) lx = px - 12 - tw;
+      tip.style.left = Math.max(0, Math.min(hostW - tw, lx)) + "px";
+    };
+    const hide = ()=>{ g.style.display = "none"; tip.hidden = true; };
+    const pick = (e)=>{ const r = el.getBoundingClientRect(); const xv = (e.clientX - r.left) * W / r.width; at(n <= 1 ? 0 : Math.round((xv - left) / pw * (n - 1))); };
+    el.addEventListener("pointermove", pick);
+    el.addEventListener("pointerdown", pick);
+    el.addEventListener("pointerleave", (e)=>{ if(e.pointerType === "mouse") hide(); });
+    host.onkeydown = (e)=>{
+      const step = {ArrowLeft:-1, ArrowRight:1}[e.key];
+      if(step){ at(current < 0 ? n - 1 : current + step); e.preventDefault(); }
+      else if(e.key === "Home"){ at(0); e.preventDefault(); }
+      else if(e.key === "End"){ at(n - 1); e.preventDefault(); }
+      else if(e.key === "Escape") hide();
+    };
+    host.onblur = hide;
+  }
+
+  let lastWidth = window.innerWidth, pending = 0;
+  window.addEventListener("resize", ()=>{
+    if(window.innerWidth === lastWidth) return;
+    lastWidth = window.innerWidth;
+    cancelAnimationFrame(pending);
+    pending = requestAnimationFrame(()=>charts.forEach(draw));
+  });
+  if(document.fonts && document.fonts.ready) document.fonts.ready.then(()=>charts.forEach(draw)).catch(()=>{});
+  document.addEventListener("pointerdown", (e)=>{ charts.forEach(h=>{ if(!h.contains(e.target)){ const g = h.querySelector(".hover"), t = h.querySelector(".tip"); if(g) g.style.display = "none"; if(t) t.hidden = true; } }); });
+
+  const plotHost = (label)=> `<div class="plot" role="group" tabindex="0" aria-label="${esc(label)}. Left and right arrows step through the days."></div>`;
+
+  // ----------------------------------------------------------------- banners
+  function nextText(nx){
+    if(!nx) return "No checkpoint left to reach.";
+    const when = nx.estimated ? esc(day(nx.estimated, true)) : `at ${esc(nx.independent)} independent days (no date estimate yet)`;
+    return `Next checkpoint: ${when}, bar t &gt; ${bar2(nx.bar)}`;
+  }
+
+  function raceBanner(R, from){
+    if(!isNum(R.independent)) return `<div class="banner idle"><b>Race:</b> no decision-gate record yet. The nightly run writes it to logs/race_gate.json.</div>`;
+    const of = R.of || 60, td = R.trading_days || 180;
+    const looks = Array.isArray(R.looks) && R.looks.length ? `<details class="data"><summary>All ${R.looks.length} checkpoints</summary><ul class="looks">${R.looks.map(l=>`<li><span class="num">${esc(l.independent)}</span> independent days · bar t &gt; <span class="num">${bar2(l.bar)}</span> · ${l.reached ? (l.outcome ? "decided: " + esc(l.outcome) : "reached, no decision") : "not reached yet"}${l.reason ? ` <span class="faint">${esc(l.reason)}</span>` : ""}</li>`).join("")}</ul></details>` : "";
+    const written = `<div class="sub">Decision gate written ${esc(israel(R.generated_at))}${from ? " · " + esc(from) : ""}</div>`;
+    if(R.decided){
+      return `<div class="banner decided"><b>Race:</b> ${esc(R.status_line)}${R.outcome_text ? `<div><b>${esc(R.outcome_text)}</b></div>` : ""}${written}${looks}</div>`;
+    }
+    return `<div class="banner"><b>Race:</b> ${esc(R.independent)} of ${esc(of)} independent days (= ${esc(td)} trading days), <b>NO DECISION YET</b>. ${nextText(R.next)}${written}${looks}</div>`;
+  }
+
+  function fundTestBanner(ft, R){
+    ft = ft || {}; R = R || {};
+    if(ft.status !== "running") return `<div class="banner idle"><b>Fund test:</b> not started (it starts the first trading day after calibration passes)</div>`;
+    const of = R.of || 60, td = R.trading_days || 180;
+    // The fund test has no looks of its own: it is read at the race's
+    // looks. So while the record carries no checkpoint of its own (today it
+    // never does), the race's next look is the fund test's next checkpoint,
+    // and "none left" is said only when the race has none left either.
+    let next;
+    if(ft.next_checkpoint) next = nextText(ft.next_checkpoint);
+    else if(R.next) next = `${nextText(R.next)} <span class="faint">(the race's next look; the fund test is read at the race's looks)</span>`;
+    else if(!isNum(R.independent)) next = "Next checkpoint: the race's next look, not known until the decision gate writes its record.";
+    else next = nextText(null);
+    return `<div class="banner"><b>Fund test:</b> ${esc(isNum(ft.independent) ? ft.independent : 0)} of ${esc(of)} independent days (= ${esc(td)} trading days), <b>NO DECISION YET</b>. ${next}${ft.start ? `<div class="sub">Started ${esc(day(ft.start, true))}</div>` : ""}</div>`;
+  }
+
+  // ---------------------------------------------------------------- problems
+  // Everything the record says went wrong, gathered into one card so it
+  // reaches the owner instead of sitting unread in the file: calibration's
+  // own problems, a failed integrity check of the four funds or of the
+  // coin-flip funds, and any pass-rule condition that already reads FAIL.
+  const VERDICT = /^\s*(\d+)\.\s*(.*?):\s*(PASS|FAIL|PENDING)\b\s*(?:\((.*)\))?\s*$/;
+  const warnIcon = `<svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 15 14H1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8 6v3.6M8 11.4v.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>`;
+
+  function verdictRow(line){
+    const text = String(line ?? "");
+    const m = VERDICT.exec(text);
+    return m ? {n:m[1], what:m[2], state:m[3], detail:m[4] || ""} : {text};
+  }
+
+  function problemList(data){
+    data = data && typeof data === "object" ? data : {};
+    const c = data.calibration && typeof data.calibration === "object" ? data.calibration : {};
+    const out = [];
+    (Array.isArray(c.problems) ? c.problems : []).forEach(p=>out.push({where:"Calibration", text:String(p), bad:false}));
+    const integrity = data.integrity && typeof data.integrity === "object" ? data.integrity : {};
+    [["four", "The four funds' integrity check"], ["coin", "The coin-flip funds' integrity check"]].forEach(([k, label])=>{
+      const i = integrity[k];
+      if(!i || typeof i !== "object") return;
+      const listed = Array.isArray(i.problems) ? i.problems : [];
+      if(i.ok !== false && !listed.length) return;
+      (listed.length ? listed : ["failed, and the record names no problem"]).forEach(p=>out.push({where:label, text:String(p), bad:true}));
+    });
+    if(["running", "passed", "failed"].includes(c.status)){
+      const verdicts = c.pass_rule && Array.isArray(c.pass_rule.verdicts) ? c.pass_rule.verdicts : [];
+      verdicts.map(verdictRow).filter(v=>v.state === "FAIL").forEach(v=>
+        out.push({where:"Pass rule", text:`${v.n}. ${v.what}: FAIL${v.detail ? " (" + v.detail + ")" : ""}`, bad:true}));
+    }
+    return out;
+  }
+
+  function problemsHtml(data){
+    const items = problemList(data);
+    if(!items.length) return "";
+    const SHOW = 6;
+    const li = (p)=> `<li><span class="where">${esc(p.where)}:</span> ${esc(p.text)}</li>`;
+    const more = items.length > SHOW ? `<details class="data"><summary>${items.length - SHOW} more</summary><ul>${items.slice(SHOW).map(li).join("")}</ul></details>` : "";
+    return `<div class="alert${items.some(p=>p.bad) ? " bad" : ""}"><h3>${warnIcon}${items.length === 1 ? "1 problem" : esc(items.length) + " problems"} in the record</h3><ul>${items.slice(0, SHOW).map(li).join("")}</ul>${more}</div>`;
+  }
+
+  // The pass rule's own lines: a heading line, then conditions that already
+  // carry their numbers, so the list numbers nothing itself.
+  function ruleHtml(lines){
+    lines = (Array.isArray(lines) ? lines : []).map(t=>String(t ?? ""));
+    const numbered = (t)=> /^\s*\d+\.\s/.test(t);
+    let k = 0;
+    while(k < lines.length && !numbered(lines[k])) k++;
+    if(k === lines.length) k = 0;
+    const head = lines.slice(0, k).map(t=>`<p class="rule-head"><strong>${esc(t)}</strong></p>`).join("");
+    const items = lines.slice(k).map(t=>{
+      const m = /^\s*(\d+\.)\s+(.*)$/.exec(t);
+      return m ? `<li><span class="n num">${esc(m[1])}</span><span>${esc(m[2])}</span></li>` : `<li><span>${esc(t)}</span></li>`;
+    }).join("");
+    return head + (items ? `<ul class="rule">${items}</ul>` : "");
+  }
+
+  // Where each condition of the rule stands, as the evaluator wrote it.
+  function verdictsHtml(lines){
+    const rows = (Array.isArray(lines) ? lines : []).map(verdictRow);
+    if(!rows.length) return "";
+    const chipOf = {PASS:"good", FAIL:"bad", PENDING:"run"};
+    const notes = rows.filter(r=>!r.state), conds = rows.filter(r=>r.state);
+    return `<h3 style="margin-top:14px">Where each condition stands</h3>`
+      + notes.map(r=>`<p class="small muted">${esc(r.text)}</p>`).join("")
+      + (conds.length ? `<ul class="verdicts">${conds.map(r=>`<li><span class="chip ${chipOf[r.state]}">${r.state}</span><span>${esc(r.n)}. ${esc(r.what)}${r.detail ? ` <span class="faint">(${esc(r.detail)})</span>` : ""}</span></li>`).join("")}</ul>` : "");
+  }
+
+  // -------------------------------------------------------------- calibration
+  const tiles = (rows)=> `<div class="tiles">${rows.map(([l, v, sub])=>`<div class="tile"><div class="label">${l}</div><div class="value num">${v}</div><div class="sub">${sub}</div></div>`).join("")}</div>`;
+
+  function renderCalibration(data){
+    const el = $("calibration");
+    const c = data.calibration;
+    if(!c || typeof c !== "object"){
+      el.innerHTML = `<div class="card muted">No calibration record yet. The nightly run writes logs/funds.json; until the first one lands there is nothing to show.</div>`;
+      return [];
+    }
+    const status = c.status || "not_started";
+    const need = isNum(c.days_needed) ? c.days_needed : 15, done = isNum(c.days_done) ? c.days_done : 0;
+    const chip = {not_started:["idle", "not started"], running:["run", "running"], passed:["good", "passed"], failed:["bad", "failed"]}[status] || ["idle", status];
+    const todo = [];
+    let html = "";
+    if(status === "not_started"){
+      html += `<div class="card"><div class="st"><span class="chip ${chip[0]}">${esc(chip[1])}</span></div><p>Calibration has not started. It is waiting for the owner to approve the pass rule below. Once it is approved and a start day is set, the calibration fund runs beside the real paper account for ${esc(need)} trading days, and only those two are shown here.</p></div>`;
+    } else {
+      const say = {
+        running: "The calibration fund starts from the real paper account's book and runs the same journal lines through the real engine and manager. The two lines should lie on top of each other; every trade where they differ is listed below with its reason.",
+        passed: "Calibration passed under the approved rule.",
+        failed: "Calibration failed under the approved rule, so the four funds stay hidden.",
+      }[status] || "";
+      html += `<div class="card"><div class="st"><span class="chip ${chip[0]}">${esc(chip[1])}</span><span>Day <b class="num">${esc(done)}</b> of <span class="num">${esc(need)}</span>${c.start ? ` · started ${esc(day(c.start, true))}` : ""}</span></div><div class="bar" role="img" aria-label="${esc(done)} of ${esc(need)} calibration days done"><i style="width:${Math.max(0, Math.min(100, need ? done / need * 100 : 0))}%"></i></div>${say ? `<p class="small muted">${say}</p>` : ""}</div>`;
+      const series = Array.isArray(c.series) ? c.series : [];
+      const problems = (Array.isArray(c.problems) ? c.problems : []).map(p=>String(p ?? ""));
+      if(series.length){
+        const days = series.map(r=>r.day), sim = series.map(r=>r.sim), real = series.map(r=>r.real);
+        const last = series[series.length - 1];
+        const m = c.metrics || {};
+        const aria = `Calibration fund against the real paper account, ${day(days[0], true)} to ${day(days[days.length-1], true)}. On the last day the simulation was ${money(last.sim)} and the real account ${money(last.real)}; the largest daily gap was ${plain(m.max_abs_gap_pct, 2)}.`;
+        html += `<div class="chart"><h3>The calibration fund against the real account</h3><div class="cap">Equity at each close. Where the real account has no record for a day, its line breaks.</div>
+          <ul class="legend"><li>${key("var(--s-real)", false, 5)}Real paper account</li><li>${key("var(--s-model)")}Calibration fund (simulated)</li></ul>
+          ${plotHost("Calibration chart")}
+          <details class="data"><summary>The numbers by day</summary><div class="scroll"><table><thead><tr><th>Day</th><th>Simulated</th><th>Real</th><th>Gap</th></tr></thead><tbody>${series.map(r=>`<tr><td>${esc(day(r.day, true))}</td><td>${esc(money(r.sim))}</td><td>${esc(money(r.real))}</td><td>${esc(signed(r.diff_pct, 2))}</td></tr>`).join("")}</tbody></table></div></details></div>`;
+        todo.push(["calibration", ()=> chart(el.querySelector(".plot"), {
+          days, aria,
+          // The real account is drawn wide and pale underneath, the
+          // simulation thin on top: where they agree it reads as one line
+          // with a halo, where they part both are plain to see.
+          series: [
+            {label:"Real", values:real, color:"var(--s-real)", width:5, end:"Real"},
+            {label:"Simulated", values:sim, color:"var(--s-model)", width:2, end:"Sim"},
+          ],
+          extra: (i)=> isNum(series[i].diff_pct) ? `<div class="r"><span style="width:18px"></span><b>${esc(signed(series[i].diff_pct, 2))}</b><span>gap</span></div>` : "",
+        })]);
+      } else if(problems.length){
+        // No day to show, and the record says why: say it here, where the
+        // first day would have been, not only in the card above.
+        html += `<div class="alert"><h3>${warnIcon}No calibration day recorded yet</h3><p class="small">The record gives ${problems.length === 1 ? "this reason" : "these reasons"}:</p><ul>${problems.map(p=>`<li>${esc(p)}</li>`).join("")}</ul></div>`;
+      } else {
+        html += `<div class="card muted small">No calibration day recorded yet; the first one lands after the first close.</div>`;
+      }
+      const m = c.metrics || {};
+      html += tiles([
+        ["Largest daily gap", plain(m.max_abs_gap_pct, 2), "simulated against real equity"],
+        ["Tracking error", plain(m.tracking_error_pct, 2), "st. dev. of daily return gaps"],
+        ["Trades matched", plain(m.matched_share, 0), "real trades the simulation also made"],
+        ["Unexplained", isNum(m.unexplained) ? String(m.unexplained) : "n/a", "differences with no reason found"],
+      ]);
+      const diffs = Array.isArray(c.differences) ? c.differences : [];
+      html += `<h3 style="margin-top:16px">Trades that differ <span class="faint" style="font-weight:400">(${diffs.length})</span></h3>`;
+      html += diffs.length ? `<div class="diffs">${diffs.map(d=>`<div class="diff"><div class="head"><b>${esc(d.ticker)}</b><span class="faint">${esc(day(d.day, true))}</span></div><dl class="kv"><dt>Real</dt><dd>${esc(d.real)}</dd><dt>Simulated</dt><dd>${esc(d.sim)}</dd></dl>${d.reason ? `<div class="why">${esc(d.reason)}</div>` : ""}</div>`).join("")}</div>` : `<p class="muted small">No trade differs so far.</p>`;
+    }
+    const rule = c.pass_rule || {};
+    const lines = Array.isArray(rule.text) ? rule.text : [];
+    // The verdicts are the evaluator's, written only once calibration runs.
+    const verdicts = ["running", "passed", "failed"].includes(status) && Array.isArray(rule.verdicts) ? rule.verdicts : [];
+    html += `<div class="card" style="margin-top:12px"><h3>Pass rule ${rule.approved ? `<span class="chip good">approved</span>` : `<span class="chip run">proposed, not approved</span>`}</h3>${lines.length ? ruleHtml(lines) : `<p class="muted small">No pass rule written yet.</p>`}${verdictsHtml(verdicts)}</div>`;
+    const h = c.holding_days || {};
+    const dd = (v)=> isNum(v) ? (Number.isInteger(v) ? String(v) : v.toFixed(1)) : "n/a";
+    html += `<h3 style="margin-top:16px">How long the real account holds a position, in trading days</h3>` + tiles([
+      ["Median, closed", isNum(h.median) ? dd(h.median) + " days" : "n/a", `over ${esc(isNum(h.closed) ? h.closed : 0)} closed position${h.closed === 1 ? "" : "s"}`],
+      ["Range, closed", isNum(h.min) && isNum(h.max) ? `${dd(h.min)}–${dd(h.max)} days` : "n/a", "shortest to longest"],
+      ["Median, still open", isNum(h.open_median) ? dd(h.open_median) + " days" : "n/a", "days held so far"],
+    ]);
+    el.innerHTML = html;
+    return todo;
+  }
+
+  // -------------------------------------------------------------- the funds
+  // The funds stay hidden until calibration has passed, whatever the file
+  // holds: no fund number is drawn while the simulation is still being
+  // checked against the real account.
+  function fundsVisible(data){
+    return !!(data && data.funds && data.calibration && data.calibration.status === "passed");
+  }
+
+  function renderFunds(data){
+    const el = $("funds");
+    if(!fundsVisible(data)){
+      const passed = !!(data.calibration && data.calibration.status === "passed");
+      el.innerHTML = passed
+        ? `<div class="card placeholder"><strong>Waiting for the funds' first close</strong><p class="muted small">Calibration passed. The model, momentum, hybrid and VT funds start on the first trading day after it; no fund record has been written yet.</p></div>`
+        : `<div class="card placeholder"><strong>Hidden until calibration passes</strong><p class="muted small">The model, momentum, hybrid and VT funds, and the coin-flip funds behind them, are neither shown nor compared while the simulation is still being checked against the real account.</p></div>`;
+      return [];
+    }
+    const f = data.funds;
+    const list = Array.isArray(f.list) ? f.list : [];
+    const days = Array.isArray(f.days) ? f.days : [];
+    const b = f.band && Array.isArray(f.band.p5) && f.band.p5.length ? f.band : null;
+    const nf = b && isNum(b.funds) ? b.funds.toLocaleString("en-US") : "the";
+    const hue = (x)=> HUE[x.name] || "var(--ink-3)";
+    const legend = list.map(x=>`<li>${key(hue(x), DASH[x.name])}${esc(x.label || SHORT[x.name] || x.name)} <span class="num muted">${esc(signed(x.total_return, 2))}</span></li>`).join("")
+      + (b ? `<li>${bandKey}Coin-flip funds, 5th to 95th percentile</li>` : "");
+    const summary = list.map(x=>`${x.label || x.name} ${signed(x.total_return, 2)}`).join(", ");
+    const lastBand = b ? b.p5.length - 1 : -1;
+    const aria = `Equity of the four simulated funds from ${day(f.start || days[0], true)} to ${day(days[days.length-1], true)}. Total return: ${summary}.` + (b && lastBand >= 0 ? ` Shaded band: ${nf} coin-flip funds between the 5th and 95th percentile, ${money(b.p5[lastBand])} to ${money(b.p95[lastBand])} on the last day.` : "");
+    const head = ["Day"].concat(list.map(x=>SHORT[x.name] || x.label || x.name)).concat(b ? ["Band 5th", "Band 95th"] : []);
+    const table = days.map((d, i)=>`<tr><td>${esc(day(d, true))}</td>${list.map(x=>`<td>${esc(money((x.equity || [])[i]))}</td>`).join("")}${b ? `<td>${esc(money(b.p5[i]))}</td><td>${esc(money(b.p95[i]))}</td>` : ""}</tr>`).join("");
+    let html = `<div class="chart"><h3>Equity since ${esc(day(f.start || days[0], true))}</h3><div class="cap">Each fund's equity at every close. ${b ? `The shaded band is where the middle 90% of ${esc(nf)} coin-flip funds stood that day: the same journal lines, with a seeded coin flip in place of the signal.` : ""}</div>
+      <ul class="legend">${legend}</ul>
+      ${plotHost("Chart of the four funds")}
+      <details class="data"><summary>The numbers by day</summary><div class="scroll"><table><thead><tr>${head.map(t=>`<th>${esc(t)}</th>`).join("")}</tr></thead><tbody>${table}</tbody></table></div></details></div>`;
+    html += `<div class="funds">${list.map(x=>`<article class="card fund">
+      <div class="head">${key(hue(x), DASH[x.name])}<span>${esc(x.label || x.name)}</span></div>
+      <div class="big num ${tone(x.total_return)}">${esc(signed(x.total_return, 2))}</div><div class="faint">total return</div>
+      <dl class="kv">
+        <dt>vs VT</dt>${x.name === "vt" ? `<dd class="muted">the index itself</dd>` : `<dd class="num ${tone(x.vs_vt)}">${esc(pts(x.vs_vt))}</dd>`}
+        <dt>Max drawdown</dt><dd class="num">${isNum(x.max_drawdown) ? esc(signed(-Math.abs(x.max_drawdown), 1)) : "n/a"}</dd>
+        <dt>Trades</dt><dd class="num">${esc(isNum(x.trades) ? x.trades : "n/a")}</dd>
+        <dt>Win rate</dt>${isNum(x.win_rate) ? `<dd class="num">${esc(plain(x.win_rate, 0))}</dd>` : `<dd class="muted">no closed trade</dd>`}
+        <dt>Open positions</dt><dd class="num">${esc(isNum(x.open_positions) ? x.open_positions : "n/a")}</dd>
+        <dt>Cash</dt><dd class="num">${esc(money(x.cash))}</dd>
+      </dl></article>`).join("")}</div>`;
+    el.innerHTML = html;
+    // VT is drawn first and the model last, so the fund the race is about
+    // sits on top where the lines cross.
+    const order = ["vt", "hybrid", "momentum", "model"];
+    const drawn = list.slice().sort((a, c)=> order.indexOf(a.name) - order.indexOf(c.name));
+    return [["funds", ()=> chart(el.querySelector(".plot"), {
+      days, aria,
+      band: b ? {lo:b.p5, hi:b.p95, short:"coin-flip 5th–95th"} : null,
+      series: drawn.map(x=>({label:SHORT[x.name] || x.label || x.name, values:x.equity || [], color:hue(x), dash:DASH[x.name], width:2, end:SHORT[x.name] || x.name})),
+    })]];
+  }
+
+  // ------------------------------------------------------------------ render
+  const shown = {funds:null, race:null}, source = {funds:"", race:""};
+
+  function render(){
+    const F = shown.funds || {}, R = shown.race || {};
+    charts = [];
+    $("fresh").textContent = F.final_through
+      ? `Record through ${day(F.final_through, true)} · written ${israel(F.generated_at)}${source.funds ? " · " + source.funds : ""}`
+      : "No funds record yet: the nightly run has not written one.";
+    safely("banners", ()=>{ $("banners").innerHTML = raceBanner(R, source.race) + fundTestBanner(F.fund_test, R); return []; });
+    safely("problems", ()=>{ $("problems").innerHTML = problemsHtml(F); return []; });
+    const todo = safely("calibration", ()=>renderCalibration(F)).concat(safely("funds", ()=>renderFunds(F)));
+    todo.forEach(([id, fn])=>safely(id, fn));
+  }
+
+  // A record in a shape this page does not expect breaks one section, says
+  // so there, and leaves the rest of the page and the live updates running.
+  function safely(id, fn){
+    try { return fn() || []; }
+    catch(e){ $(id).innerHTML = `<div class="card muted small">This part of the record could not be drawn (${esc(e && e.message || "unknown error")}).</div>`; return []; }
+  }
+
+  // The page opens on the newest copy it has of each file -- the one saved on
+  // this phone, else the one embedded at build time -- then reads the live
+  // files from GitHub, exactly as the desk does with the book. Nothing here
+  // needs a key: the repository is public and both files are committed nightly.
+  const RAW = "https://raw.githubusercontent.com/" + REPO.owner + "/" + REPO.repo + "/" + REPO.ref + "/";
+  const FILES = {
+    funds: {path:"logs/funds.json", saved:"algo-desk:funds", seed:"seed-funds", mark:/^\s*\/\*__FUNDS__\*\//, what:"funds record",
+            ok:(d)=> !!(d && typeof d === "object" && d.simulated === true && d.calibration && typeof d.calibration === "object")},
+    race:  {path:"logs/race_gate.json", saved:"algo-desk:race", seed:"seed-race", mark:/^\s*\/\*__RACE__\*\//, what:"decision gate",
+            ok:(d)=> !!(d && typeof d === "object" && isNum(d.independent))},
+  };
+  const KINDS = ["funds", "race"];
+  const stamp = (d)=> String(d.final_through || "") + "|" + String(d.generated_at || "");
+  const newer = (a, b)=> !b || stamp(a) > stamp(b);
+  const take = (kind, data, from)=>{
+    if(!FILES[kind].ok(data) || !newer(data, shown[kind])) return false;
+    shown[kind] = data; source[kind] = from; return true;
+  };
+  const live = (text)=>{ $("live").textContent = "Live updates: " + text; };
+  const clock = ()=> new Date().toLocaleTimeString("en-GB",{timeZone:"Asia/Jerusalem",hour:"2-digit",minute:"2-digit"});
+
+  KINDS.forEach(kind=>{
+    const f = FILES[kind];
+    let seed = {}, saved = null;
+    try { seed = JSON.parse($(f.seed).textContent.replace(f.mark, "")) || {}; } catch(_) {}
+    try { saved = JSON.parse(localStorage.getItem(f.saved) || "null"); } catch(_) {}
+    take(kind, seed, "built-in copy");
+    take(kind, saved, "copy saved on this phone");
+  });
+  render();
+
+  async function pullOne(kind){
+    const f = FILES[kind];
+    const r = await fetch(RAW + f.path + "?t=" + Date.now(), {cache:"no-store"});
+    if(r.status === 404) throw new Error("no file on GitHub yet");
+    if(!r.ok) throw new Error("HTTP " + r.status);
+    const data = await r.json();
+    if(!f.ok(data)) throw new Error("not a " + f.what);
+    try { localStorage.setItem(f.saved, JSON.stringify(data)); } catch(_) {}
+    return take(kind, data, "read from GitHub at " + clock());
+  }
+
+  const refresh = $("refresh");
+  async function pull(reason){
+    refresh.disabled = true;
+    live(reason + "…");
+    try {
+      const results = await Promise.allSettled(KINDS.map(pullOne));
+      const changed = results.some(r=>r.status === "fulfilled" && r.value);
+      if(changed) render();
+      const failed = results.map((r, i)=> r.status === "rejected" ? FILES[KINDS[i]].what + ": " + (r.reason && r.reason.message || "unknown") : null).filter(Boolean);
+      if(!failed.length) live("on. " + (changed ? "Read from GitHub" : "GitHub has the same records; checked") + " at " + clock() + " Israel time; checks again every 5 minutes.");
+      else if(navigator.onLine === false) live("offline; showing the last copies on this phone.");
+      else live((failed.length < KINDS.length ? "partly on. " : "") + failed.join("; ") + ". Showing the last copy of each; checked at " + clock() + " Israel time.");
+    } finally { refresh.disabled = false; }
+  }
+  pull("reading the records from GitHub");
+  setInterval(()=>pull("checking GitHub"), 5*60*1000);
+  document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState === "visible") pull("checking GitHub"); });
+  window.addEventListener("online", ()=>pull("back online; checking GitHub"));
+  refresh.addEventListener("click", ()=>pull("checking GitHub"));
+
+  // Installable: the same service worker as the desk keeps this page openable offline.
+  if("serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js").catch(()=>{}); }
+})();
+</script>
