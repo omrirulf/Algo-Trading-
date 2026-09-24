@@ -28,6 +28,7 @@ import pandas as pd
 
 from app.market_data import MarketDataError, YFinanceMarketData
 from config import settings as cfg
+from config.market_calendar import is_trading_day
 
 #: Enough history before the first session for a 90-day ATR window.
 LEAD_DAYS = 150
@@ -157,12 +158,17 @@ class SimFeed(YFinanceMarketData):
 
 
 def calendar(bars: Bars, tickers: Sequence[str], first: date, last: date) -> list[date]:
-    """Sessions: the dates the first of ``tickers`` with any bars has final bars for."""
+    """Sessions: every NYSE trading day in [first, last] any of ``tickers`` has a final bar for.
+
+    The union, not one ticker's dates: a single row yfinance leaves out of
+    VT would otherwise drop that whole session for every fund -- its stops
+    never checked, its cycle never dispatched. A date that is not a trading
+    day by the exchange calendar is left out, whatever a vendor printed.
+    """
+    days: set[date] = set()
     for ticker in tickers:
-        days = bars.sessions(ticker, first, last)
-        if days:
-            return days
-    return []
+        days.update(bars.sessions(ticker, first, last))
+    return sorted(d for d in days if is_trading_day(d))
 
 
 __all__ = ["Bars", "LEAD_DAYS", "SimFeed", "calendar"]

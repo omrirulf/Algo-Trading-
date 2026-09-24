@@ -185,14 +185,22 @@ def live_audit_guarded() -> Iterator[None]:
     attached first, so any code path that forgot its fund's logger lands in
     the tripwire instead of the live file -- and the run fails afterwards
     rather than having quietly reset a live position's ladder.
+
+    The logger's own level is opened to DEBUG for the duration as well. A
+    logger drops a record below its effective level before any handler sees
+    it, and in ``python -m shadow.run`` the live logger is never configured
+    (it inherits the root's ERROR): without this, a forgotten INFO line --
+    every accepted entry and every rung -- would vanish silently instead of
+    tripping the wire.
     """
     live = logging.getLogger(LIVE_AUDIT_LOGGER)
-    saved_handlers, saved_propagate = list(live.handlers), live.propagate
+    saved_handlers, saved_propagate, saved_level = list(live.handlers), live.propagate, live.level
     tripwire = _Tripwire()
     for handler in saved_handlers:
         live.removeHandler(handler)
     live.addHandler(tripwire)
     live.propagate = False
+    live.setLevel(logging.DEBUG)
     try:
         yield
     finally:
@@ -200,6 +208,7 @@ def live_audit_guarded() -> Iterator[None]:
         for handler in saved_handlers:
             live.addHandler(handler)
         live.propagate = saved_propagate
+        live.setLevel(saved_level)
     if tripwire.hits:
         raise LiveAuditLeak(
             f"{len(tripwire.hits)} line(s) reached the live audit logger during a shadow run: "

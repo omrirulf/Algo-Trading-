@@ -65,12 +65,16 @@ trading days. Each day it shows the equity gap to the real account and every
 trade that differs, with the reason. The real account's closing equity,
 cash, positions, stops and fills are recorded by the heartbeat after every
 run (`logs/account.jsonl`, read-only calls), because nothing else recorded
-them.
+them. A read that failed is recorded as unknown, never as an empty book, and
+such a line is never used as the starting point. Each part of a line says
+when it was read, so a fill that landed between two reads is counted once.
 
 Calibration starts only after the owner approves its pass rule, and the four
 funds run only after it passes. Both dates live in `shadow/schedule.py` and
-are set by a reviewed change, never by the code. During calibration, only
-the calibration match is reported.
+are set by a reviewed change, never by the code; a test fails if the start
+date is set while the rule is still unapproved, and an unapproved rule can
+never read "passed". During calibration, only the calibration match is
+reported.
 
 ## Where to read it
 

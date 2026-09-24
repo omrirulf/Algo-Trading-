@@ -91,14 +91,20 @@ def lines_by_day(entries: Iterable[JournalEntry]) -> dict[date, list[Line]]:
     by_day: dict[date, list[Line]] = {}
     seen: dict[tuple[date, str], int] = {}
     for entry in entries:
-        # The race's own rule: held names and names the model gave no answer
-        # on -- a failed call, or an answer about another ticker -- leave
-        # every fund that day.
-        if entry.timestamp is None or entry.held or not entry.model_answered:
+        if entry.timestamp is None:
             continue
         day = _utc_day(entry)
         key = (day, entry.ticker)
+        # A ticker's n-th line of the day is from the day's n-th cycle,
+        # whether or not that line is kept -- a held or failed first-cycle
+        # line still means the next one is the second cycle's, and must not
+        # be dispatched ahead of the other tickers' first-cycle lines.
         seen[key] = seen.get(key, 0) + 1
+        # The race's own rule: held names and names the model gave no answer
+        # on -- a failed call, or an answer about another ticker -- leave
+        # every fund that day.
+        if entry.held or not entry.model_answered:
+            continue
         by_day.setdefault(day, []).append(Line(entry.ticker, day, seen[key], entry))
     return {day: sorted(lines, key=dispatch_order) for day, lines in sorted(by_day.items())}
 
@@ -223,7 +229,7 @@ class Fund:
         broker.day = day
         held_at_open = broker.held_quantities()
         opens, lows, highs, closes, dividends = {}, {}, {}, {}, {}
-        for ticker in set(held_at_open) | {line.ticker for line in cycle or ()}:
+        for ticker in sorted(set(held_at_open) | {line.ticker for line in cycle or ()}):
             bar = self.bars.bar(ticker, day)
             if bar is None:
                 continue
@@ -234,7 +240,7 @@ class Fund:
             self._manage()
             self._enter(cycle)
         # New positions' bars, for their stops and marks.
-        for ticker in broker.positions:
+        for ticker in sorted(broker.positions):
             if ticker not in closes:
                 bar = self.bars.bar(ticker, day)
                 if bar is not None:

@@ -39,7 +39,7 @@ a simplification:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date
 from typing import Callable, Iterable, Optional
 
@@ -266,10 +266,29 @@ class SimBroker:
                 continue
             cash = qty * amount                     # negative for a short
             self.cash += cash
-            if ticker in self.positions:
-                self.positions[ticker].realised += cash
+            self._attribute(ticker, cash)
             self.fills.append(Fill(self.day, ticker, DIVIDEND, "buy" if qty > 0 else "sell",
                                    abs(qty), amount, 0.0))
+
+    def _attribute(self, ticker: str, cash: float) -> None:
+        """Book a dividend to the position that held the shares at the previous close.
+
+        Usually that is the open position. But a stop can fill at the ex-date's
+        open (an open already net of the dividend), and the name can be entered
+        again the same day. The dividend then belongs to the trade that closed,
+        not to the new one: otherwise a win rate would count a long's dividend
+        as the next trade's gain, or a short's charge as a fresh long's loss.
+        """
+        pos = self.positions.get(ticker)
+        if pos is not None and pos.opened != self.day:
+            pos.realised += cash
+            return
+        for i, trade in enumerate(self.closed):
+            if trade.ticker == ticker and trade.closed == self.day and trade.opened != self.day:
+                self.closed[i] = replace(trade, pnl=trade.pnl + cash)
+                return
+        if pos is not None:                         # a seeded book with no earlier record
+            pos.realised += cash
 
     def held_quantities(self) -> dict[str, int]:
         return {ticker: pos.qty for ticker, pos in self.positions.items()}

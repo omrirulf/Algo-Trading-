@@ -302,7 +302,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     args = build_parser().parse_args(argv)
     logging.basicConfig(level=logging.INFO if args.verbose else logging.ERROR,
                         format="%(levelname)s %(name)s: %(message)s")
-    print(json.dumps(build(args, _now()), separators=(",", ":")))
+    # allow_nan=False: NaN is not JSON, and a browser that cannot parse the
+    # file would show nothing at all. A NaN here is a bug to fail on.
+    print(json.dumps(build(args, _now()), separators=(",", ":"), allow_nan=False))
     return 0
 
 

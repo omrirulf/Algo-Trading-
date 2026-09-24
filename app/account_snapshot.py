@@ -27,7 +27,8 @@ Line format (readers must tolerate fields they do not know):
     {"at": "2026-09-25T15:40:12Z", "sha": "<GITHUB_SHA>" | null, "mode": "cycle" | "protect",
      "account": {...} | null, "positions": [...] | null, "stops": [...] | null,
      "fills": [...] | null, "history": {"days": [...], "equity": [...]} | null,
-     "fills_after": "<UTC ISO>", "errors": [{"part", "error"}, ...]}
+     "fills_after": "<UTC ISO>", "reads": {"<part>": {"from": "<UTC ISO>", "to": "<UTC ISO>"}, ...},
+     "errors": [{"part", "error"}, ...]}
 
 Each part is described in ``AlpacaPaperBroker.account_snapshot``.
 """
@@ -39,13 +40,20 @@ import contextlib
 import json
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional, Sequence
 
 from app.broker_client import AlpacaPaperBroker
 
 MODES = ("cycle", "protect")
+#: Each fills window starts this long before the last snapshot that read its
+#: fills. An activity is stamped with the moment it filled, and a fill made
+#: just before one snapshot can reach the activity list just after that
+#: snapshot read it; a window starting at the snapshot would never read it
+#: again. The overlap costs a few fills recorded twice, with the same id,
+#: which every reader deduplicates.
+FILLS_OVERLAP = timedelta(hours=1)
 #: A failure's text is kept to one line of this many characters.
 ERROR_CHARS = 300
 
@@ -71,8 +79,8 @@ def _parse_at(value: object) -> Optional[datetime]:
 
 
 def previous_at(log: Path) -> Optional[datetime]:
-    """Where this snapshot's fills window starts: the latest earlier snapshot
-    that actually read its fills.
+    """The latest earlier snapshot that actually read its fills; this
+    snapshot's fills window starts ``FILLS_OVERLAP`` before it.
 
     Not simply the last line's ``at``. A run whose fills read failed -- its
     ``fills`` is null, or it is an error line with no ``fills`` at all -- read
@@ -121,10 +129,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                         help="which heartbeat run recorded this line")
     args = parser.parse_args(argv)
 
-    # Stamped before the broker is read, so consecutive fills windows overlap
-    # by the seconds a read takes instead of leaving a gap between them. A
-    # fill that lands in the overlap is recorded twice, with the same id; one
-    # that fell in a gap would be recorded never.
+    # Stamped before the broker is read: every part of the line was read
+    # after this moment (``reads`` says exactly when). The next window starts
+    # FILLS_OVERLAP before it, so a fill is recorded twice, with the same id,
+    # rather than never.
     at = utc_stamp(datetime.now(timezone.utc))
     sha = os.environ.get("GITHUB_SHA") or None
     out = sys.stdout
@@ -133,6 +141,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         # to stderr, so the workflow's `>>` appends exactly one line.
         with contextlib.redirect_stdout(sys.stderr):
             since = previous_at(args.log)
+            if since is not None:
+                since -= FILLS_OVERLAP
             body = AlpacaPaperBroker().account_snapshot(since)
         record = {"at": at, "sha": sha, "mode": args.mode, **body}
         line = json.dumps(record, separators=(",", ":"), allow_nan=False)

@@ -995,19 +995,28 @@ class AlpacaPaperBroker:
         the simulation with an account that never existed.
 
         ``fills_after`` says which window ``fills`` covers, so a reader can
-        tell a quiet day from a narrow window. Consecutive windows overlap by
-        the few seconds a snapshot takes (``app.account_snapshot`` stamps the
-        time before it reads), so the same fill can appear in two snapshots;
-        its ``id`` is the key to deduplicate on.
+        tell a quiet day from a narrow window. Consecutive windows overlap
+        (``app.account_snapshot`` starts each one well before the last
+        snapshot), so the same fill can appear in two snapshots; its ``id``
+        is the key to deduplicate on.
+
+        ``reads`` says when each part was read: ``{"from", "to"}``, UTC, the
+        moment the read started and the moment it came back. The five reads
+        are made one after another, so a fill can land between them -- after
+        ``cash`` was read and before ``positions`` was. A reader rolling this
+        book forward through later fills needs to know, part by part, which
+        fills the part already shows: those before its ``from`` are in it,
+        those after its ``to`` are not.
         """
         after = since if since is not None else (
             datetime.now(timezone.utc) - timedelta(days=SNAPSHOT_FILL_LOOKBACK_DAYS)
         )
         snapshot: dict[str, Any] = {
             "account": None, "positions": None, "stops": None, "fills": None,
-            "history": None, "fills_after": _utc_iso(after), "errors": [],
+            "history": None, "fills_after": _utc_iso(after), "reads": {}, "errors": [],
         }
         errors: list[dict] = snapshot["errors"]
+        reads: dict[str, dict] = snapshot["reads"]
         readers = (
             ("account", self._read_account),
             ("positions", self._read_positions),
@@ -1016,10 +1025,12 @@ class AlpacaPaperBroker:
             ("history", self._read_history),
         )
         for part, read in readers:
+            started = datetime.now(timezone.utc)
             try:
                 snapshot[part] = read()
             except Exception as exc:  # noqa: BLE001 -- one part, never the whole record
                 errors.append({"part": part, "error": _failure_text(exc)})
+            reads[part] = {"from": _utc_iso(started), "to": _utc_iso(datetime.now(timezone.utc))}
         return snapshot
 
     def _read_account(self) -> dict:

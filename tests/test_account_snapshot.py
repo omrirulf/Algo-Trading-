@@ -239,6 +239,24 @@ def test_fills_are_paged_by_the_last_id_and_come_back_oldest_first(monkeypatch):
     assert snap["errors"] == []
 
 
+def test_each_part_says_when_it_was_read():
+    """The reads are one after another, so a fill can land between them; a
+    reader rolling the book forward must know which fills each part shows."""
+    before = datetime.now(timezone.utc)
+    snap = _broker(_Sdk(fail={"get_orders"})).account_snapshot(SINCE)
+    after = datetime.now(timezone.utc)
+    parts = ["account", "positions", "stops", "fills", "history"]
+    assert list(snap["reads"]) == parts, "a failed read is timed too"
+    moments = []
+    for part in parts:
+        window = snap["reads"][part]
+        start = datetime.fromisoformat(window["from"].replace("Z", "+00:00"))
+        end = datetime.fromisoformat(window["to"].replace("Z", "+00:00"))
+        moments += [start, end]
+    assert moments == sorted(moments), "each read starts after the one before came back"
+    assert before.replace(microsecond=0) <= moments[0] and moments[-1] <= after
+
+
 def test_with_no_earlier_snapshot_fills_go_back_ten_days():
     sdk = _Sdk()
     before = datetime.now(timezone.utc)
@@ -414,7 +432,8 @@ def test_the_cli_starts_the_fills_window_where_the_last_snapshot_ended(tmp_path,
         encoding="utf-8",
     )
     cli.main(["--log", str(log), "--mode", "cycle"])
-    assert fake_broker.seen_since == [datetime(2026, 9, 23, 15, 5, 9, tzinfo=timezone.utc)]
+    assert fake_broker.seen_since == [datetime(2026, 9, 23, 14, 5, 9, tzinfo=timezone.utc)]
+    assert cli.FILLS_OVERLAP == timedelta(hours=1)
     assert log.stat().st_size == before, "the log is read, never written"
 
 
@@ -430,7 +449,7 @@ def test_a_snapshot_that_read_no_fills_does_not_move_the_window(tmp_path, capsys
         encoding="utf-8",
     )
     cli.main(["--log", str(log), "--mode", "cycle"])
-    assert fake_broker.seen_since == [datetime(2026, 9, 22, 15, 0, tzinfo=timezone.utc)]
+    assert fake_broker.seen_since == [datetime(2026, 9, 22, 14, 0, tzinfo=timezone.utc)]
 
 
 def test_the_latest_at_wins_over_the_last_line(tmp_path, capsys, fake_broker):
@@ -442,7 +461,7 @@ def test_the_latest_at_wins_over_the_last_line(tmp_path, capsys, fake_broker):
         encoding="utf-8",
     )
     cli.main(["--log", str(log), "--mode", "cycle"])
-    assert fake_broker.seen_since == [datetime(2026, 9, 24, 21, 0, tzinfo=timezone.utc)]
+    assert fake_broker.seen_since == [datetime(2026, 9, 24, 20, 0, tzinfo=timezone.utc)]
 
 
 def test_an_empty_log_has_no_window(tmp_path, capsys, fake_broker):

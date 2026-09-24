@@ -53,3 +53,12 @@ def test_nothing_starts_until_the_owner_sets_a_date():
     assert schedule.CALIBRATION_DAYS == 15
     assert schedule.RANDOM_FUNDS == 1000
     assert schedule.FUNDS == ("model", "momentum", "hybrid", "vt")
+
+
+def test_calibration_cannot_start_under_a_rule_the_owner_has_not_approved():
+    """Setting the start date is only half the owner's decision. The date
+    and the approval change together, in one reviewed change, or not at all."""
+    from shadow.calibration import PROPOSED_PASS_RULE
+
+    assert (schedule.CALIBRATION_START is None) == (not PROPOSED_PASS_RULE.approved)
+    assert schedule.FUND_START is None or schedule.CALIBRATION_START is not None
