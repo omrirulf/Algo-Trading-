@@ -188,15 +188,19 @@ jobs:
           # be able to change what gets traded without a diff -- so this key
           # is the only part of that choice living outside the repository.
           #
-          # Same collapsing chain as the screen above, minus SCREENING_API_KEY
-          # itself: that name reads as "the screening key" and is one, in the
-          # step right above this. Reusing it here for an unrelated token was
-          # the other half of the confusion behind the desk's "Already held"
-          # bug on 23 Sep 2026 -- the same word meaning two different things
-          # in two unrelated places. DEEPINFRA_API_KEY is confirmed to
-          # resolve; the rest of the chain still exists for whichever other
-          # name the token was first pasted in as.
-          FULL_MODEL_API_KEY: ${{ secrets.FULL_MODEL_API_KEY || secrets.DEEPINFRA_API_KEY || secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY || secrets.GROQ_API_KEY }}
+          # Same collapsing chain as the screen above, SCREENING_API_KEY
+          # included. The token this model needs is stored under that name:
+          # on 24 Sep 2026 the chain was tried without it, on the belief that
+          # DEEPINFRA_API_KEY held the token, and every one of the 58 asked
+          # names got HTTP 401 from the provider (the chain collapsed to a
+          # different provider's key), so the day produced no signal. Until
+          # the token is pasted in under FULL_MODEL_API_KEY or
+          # DEEPINFRA_API_KEY, the screening name must stay in this chain,
+          # and it must stay ahead of the names further right, which hold
+          # other providers' keys. The name is confusing (it reads as "the
+          # screening key" and is one, in the step above) but confusion is
+          # cheaper than a silent day.
+          FULL_MODEL_API_KEY: ${{ secrets.FULL_MODEL_API_KEY || secrets.DEEPINFRA_API_KEY || secrets.SCREENING_API_KEY || secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY || secrets.GROQ_API_KEY }}
         # --premarket on the first cron only. Batched, the model stages are
         # asked offline at half price, and the waiting for them has to happen
         # somewhere: before the session, or during it. Starting at 12:35 UTC

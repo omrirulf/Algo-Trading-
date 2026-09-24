@@ -633,23 +633,27 @@ def test_the_cycle_is_handed_the_full_model_s_key():
 
 def test_the_full_model_key_accepts_the_names_it_may_already_be_stored_under():
     """Same collapsing chain as the screen, for the same reason: a key stored
-    under the name it was first pasted in as is otherwise silent -- except
-    SCREENING_API_KEY, which the next test pins out on purpose."""
+    under the name it was first pasted in as is otherwise silent. Every name
+    the screen accepts is accepted here too, SCREENING_API_KEY included."""
     cycle = _step("heartbeat.yml", "cycle", "Run one cycle")["env"]
-    other_names = [n for n in llm.SCREENING_KEY_ENV_VARS if n != "SCREENING_API_KEY"]
-    for name in ("FULL_MODEL_API_KEY", "DEEPINFRA_API_KEY", *other_names):
+    for name in ("FULL_MODEL_API_KEY", "DEEPINFRA_API_KEY", *llm.SCREENING_KEY_ENV_VARS):
         assert f"secrets.{name}" in cycle["FULL_MODEL_API_KEY"], name
 
 
-def test_the_full_model_key_does_not_reuse_the_screening_name():
-    """SCREENING_API_KEY reads as 'the screening key' and is one, one step
-    above this. Reusing it here for an unrelated token was the other half of
-    the confusion behind the desk's "Already held" bug on 23 Sep 2026 -- the
-    same word meaning two different things in two unrelated places. This one
-    is pinned out rather than merely dropped, so it cannot quietly come back
-    the next time this chain is copied somewhere else."""
+def test_the_full_model_key_tries_the_screening_name_before_other_providers():
+    """The full model's token is stored under SCREENING_API_KEY. On 24 Sep
+    2026 that name was dropped from this chain, the chain collapsed to
+    another provider's key, all 58 asked names got HTTP 401 and the day
+    produced no signal. A collapsing chain picks the first non-empty name
+    whether or not the provider accepts it, so the names that hold other
+    providers' keys must come after the one that holds this provider's."""
     cycle = _step("heartbeat.yml", "cycle", "Run one cycle")["env"]
-    assert "secrets.SCREENING_API_KEY" not in cycle["FULL_MODEL_API_KEY"]
+    chain = cycle["FULL_MODEL_API_KEY"]
+    screening = chain.index("secrets.SCREENING_API_KEY")
+    for other in ("GEMINI_API_KEY", "GOOGLE_API_KEY", "GROQ_API_KEY"):
+        assert chain.index(f"secrets.{other}") > screening, other
+    for dedicated in ("FULL_MODEL_API_KEY", "DEEPINFRA_API_KEY"):
+        assert chain.index(f"secrets.{dedicated}") < screening, dedicated
 
 
 def test_the_cycle_can_outlast_the_calls_it_has_to_make():
