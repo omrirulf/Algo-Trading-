@@ -28,6 +28,8 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Iterable, Optional, Sequence
 
+from config import settings as cfg
+
 #: The kinds of room a book can run out of, as the report names them.
 GROUP, SLEEVE, GROSS, STOCK_MARKET, POSITIONS, CASH = (
     "exposure group", "sleeve budget", "gross exposure", "stock-market", "position count", "cash")
@@ -35,7 +37,7 @@ GROUP, SLEEVE, GROSS, STOCK_MARKET, POSITIONS, CASH = (
 _NO_ROOM = re.compile(r"^no room under the (?P<limit>.+) limit$")
 _NO_SHARE = re.compile(
     r"^no room for .+? under its (?P<cap>[\d.]+)% cap or the (?P<limit>.+?) limit: "
-    r"equity (?P<equity>[\d.]+), price [\d.]+, existing exposure (?P<existing>[\d.]+), "
+    r"equity (?P<equity>[\d.]+), price (?P<price>[\d.]+), existing exposure (?P<existing>[\d.]+), "
     r"headroom (?P<headroom>[\d.]+)")
 _POSITIONS = re.compile(r"^already holding \d+ positions")
 _CASH = re.compile(r"insufficient buying power|buying power", re.IGNORECASE)
@@ -63,9 +65,12 @@ def capacity_kind(reason: Optional[str]) -> Optional[str]:
     match = _NO_SHARE.match(text)
     if match:
         own_room = float(match.group("equity")) * float(match.group("cap")) / 100.0 - float(match.group("existing"))
-        if float(match.group("headroom")) < own_room:
+        # The portfolio limit bound it only if the ticker's own cap, alone,
+        # would have bought at least one order's worth: otherwise its own cap
+        # refused it and no order of the list would have changed that.
+        if own_room >= float(match.group("price")) * cfg.MIN_ORDER_QTY and float(match.group("headroom")) < own_room:
             return _limit_kind(match.group("limit"))
-        return None                       # the ticker's own cap bound it: no order changes that
+        return None
     if _POSITIONS.match(text):
         return POSITIONS
     if _CASH.search(text):
@@ -73,7 +78,7 @@ def capacity_kind(reason: Optional[str]) -> Optional[str]:
     return None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Event:
     """One dispatched signal and what became of it."""
 
@@ -82,6 +87,8 @@ class Event:
     conviction: Optional[float]
     status: str                # ACCEPTED, REJECTED or ERROR
     reason: str
+    #: The limit, when it is already known (a fund records it, not the reason).
+    kind: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -108,9 +115,14 @@ def order_days(events: Iterable[Event]) -> tuple[list[OrderDay], int]:
     out = []
     for day, rows in sorted(by_day.items()):
         bought = tuple((e.ticker, e.conviction) for e in rows if e.status == "ACCEPTED")
+        bought_names = {t for t, _ in bought}
         skipped = []
         for e in rows:
-            kind = capacity_kind(e.reason) if e.status != "ACCEPTED" else None
+            # A ticker bought that day was not left out, whatever a second
+            # dispatch of it the same day was told (a day with two cycles).
+            if e.status == "ACCEPTED" or e.ticker in bought_names:
+                continue
+            kind = e.kind or capacity_kind(e.reason)
             if kind is None:
                 continue
             lower = tuple(t for t, c in bought
@@ -172,7 +184,14 @@ def real_summary(audit_lines: Iterable[str]) -> dict:
 
 
 def fund_summary(fund) -> dict:
-    """A simulated fund's own record of the same (``Fund.order_events``)."""
+    """A simulated fund's own record of the same (``Fund.order_events``).
+
+    A fund that keeps no detail (the thousand coin-flip funds) kept only the
+    days it ran out of room: its summary is the count, with no list.
+    """
+    if fund.order_events is None:
+        return {"cycle_days": fund.cycles_dispatched, "days": len(fund.order_days_seen), "skipped": None,
+                "outranked_days": None, "by_kind": {}, "list": []}
     days, _ = order_days(fund.order_events)
     return summary(days, fund.cycles_dispatched)
 

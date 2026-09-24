@@ -191,7 +191,7 @@ def _coin_chunk(seeds: Sequence[int]) -> list[tuple[int, list[float], dict]]:
     shared = _SHARED
     feed = SimFeed(shared["bars"])
     funds = [Fund(f"coin-{seed}", coin_signal(seed), feed, shared["bars"],
-                  not_shortable=shared["not_shortable"]) for seed in seeds]
+                  not_shortable=shared["not_shortable"], order_detail=False) for seed in seeds]
     run(funds, shared["sessions"], shared["cycles"], shared["ran"], feed)
     return [(seed, [d.equity for d in fund.days], integrity([fund]) | {"order_days": fund_summary(fund)["days"]})
             for seed, fund in zip(seeds, funds)]

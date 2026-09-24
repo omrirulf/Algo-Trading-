@@ -110,7 +110,7 @@ def smoke(entries, sessions_wanted: int, coin_funds: int, fetcher, final_through
         Fund("momentum", rule_signal("momentum"), feed, bars, not_shortable=shortable_no),
         Fund("hybrid", rule_signal("hybrid"), feed, bars, not_shortable=shortable_no),
         IndexFund("vt", INDEX_TICKER, bars),
-        *(Fund(f"coin-{seed}", coin_signal(seed), feed, bars, not_shortable=shortable_no)
+        *(Fund(f"coin-{seed}", coin_signal(seed), feed, bars, not_shortable=shortable_no, order_detail=False)
           for seed in range(coin_funds)),
     ]
     run(funds, sessions, cycles, ran, feed)

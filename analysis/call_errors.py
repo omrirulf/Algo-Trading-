@@ -27,14 +27,23 @@ from typing import Optional
 SETUP = "setup"
 MODEL = "model"
 
-#: HTTP statuses that mean the provider refused who we are or what we asked
-#: for, before any model ran: unauthorised, payment required, forbidden, not
-#: found (a model or endpoint name it does not know).
-_SETUP_STATUS = re.compile(r"\bHTTP\s*(401|402|403|404)\b", re.IGNORECASE)
+#: What the cycle writes when the model itself answered badly. These quote
+#: the model's own text (or the provider's body), which may contain any word
+#: at all -- "Unauthorized trading scandal..." -- so they are decided by
+#: their prefix and never searched for setup words.
+_MODEL_PREFIXES = ("invalid LLM output:", "model returned non-JSON", "answered for ", "model declined",
+                   "response hit max_tokens")
+#: A status from the provider, in the OpenAI-compatible client's wording
+#: ("returned HTTP 401") or the Anthropic SDK's ("Error code: 401"). When
+#: there is one it decides alone: the body after it is the provider's text.
+_STATUS = re.compile(r"(?:\bHTTP\s*|Error code:\s*)(\d{3})\b")
+#: Unauthorised, payment required, forbidden, not found (a model or endpoint
+#: name the provider does not know): refused before any model ran.
+_SETUP_STATUSES = frozenset({"401", "402", "403", "404"})
 _SETUP_WORDS = re.compile(
     r"not authori[sz]ed|unauthori[sz]ed|authentication|permission denied|forbidden"
-    r"|invalid[ _-]?api[ _-]?key|incorrect api key|no api key|api key (is )?(missing|not set)"
-    r"|missing (api )?key|key not configured|not configured|credentials",
+    r"|invalid[ _-]?api[ _-]?key|incorrect api key|no api key|api[ _-]?key (is )?(missing|not set|empty)"
+    r"|missing (api )?key|key not configured|asked anonymously|credentials",
     re.IGNORECASE,
 )
 #: The SDKs' own class names for the same refusals.
@@ -43,8 +52,13 @@ _SETUP_CLASSES = re.compile(r"\b(AuthenticationError|PermissionDeniedError|NotFo
 
 def failure_kind(error: Optional[str]) -> str:
     """``"setup"`` or ``"model"`` for a failed call's journalled error text."""
-    text = error or ""
-    if _SETUP_STATUS.search(text) or _SETUP_WORDS.search(text) or _SETUP_CLASSES.search(text):
+    text = (error or "").strip()
+    if text.startswith(_MODEL_PREFIXES):
+        return MODEL
+    status = _STATUS.search(text)
+    if status:
+        return SETUP if status.group(1) in _SETUP_STATUSES else MODEL
+    if _SETUP_WORDS.search(text) or _SETUP_CLASSES.search(text):
         return SETUP
     return MODEL
 

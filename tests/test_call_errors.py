@@ -14,6 +14,12 @@ from analysis.call_errors import MODEL, SETUP, failure_kind
     "returned HTTP 404: model gpt-oss-121b not found",
     "AuthenticationError: invalid x-api-key",
     "no API key configured for the full model",
+    # orchestrator/heartbeat.full_model_provider, verbatim: the secret unset.
+    "MODEL_BASE_URL is 'https://api.deepinfra.com/v1/openai' but FULL_MODEL_API_KEY is empty; "
+    "the endpoint that decides what is traded would be asked anonymously",
+    # The Anthropic SDK's wording, and its error class reaching the catch-all.
+    "Error code: 401 - {'type': 'error', 'error': {'type': 'authentication_error'}}",
+    "unexpected AuthenticationError: Error code: 401",
 ])
 def test_our_own_setup_is_a_setup_error(error):
     assert failure_kind(error) == SETUP
@@ -26,6 +32,12 @@ def test_our_own_setup_is_a_setup_error(error):
     "returned HTTP 429: rate limited",
     "the model's answer did not match the schema",
     "answered for NVDA",
+    # Text the model or the provider wrote is never searched for setup words.
+    "invalid LLM output: 1 validation error for LLMSignal rationale String should have at most 2000 "
+    "characters [type=string_too_long, input_value='Unauthorized trading scandal at a bank...', input_type=str]",
+    'https://api.deepinfra.com/v1/openai/chat/completions returned HTTP 500: '
+    '{"error":"upstream authentication service timeout"}',
+    "model declined to answer (category: forbidden content)",
     "",
     None,
 ])

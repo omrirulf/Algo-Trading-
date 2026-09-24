@@ -212,7 +212,7 @@ class Fund:
     def __init__(
         self, name: str, signal_for: SignalFor, feed: SimFeed, bars: Bars, *,
         cash: float = STARTING_CASH, cost_per_side: float = DEFAULT_COST_PER_SIDE,
-        not_shortable: frozenset[str] = frozenset(), keep_actions: bool = False,
+        not_shortable: frozenset[str] = frozenset(), keep_actions: bool = False, order_detail: bool = True,
     ) -> None:
         self.name = name
         self.signal_for = signal_for
@@ -231,8 +231,11 @@ class Fund:
         #: For the owner's order report (``shadow.order_matters``): every
         #: order the engine accepted and every signal a portfolio limit
         #: refused, dated by the cycle day whose list it was. Other refusals
-        #: are not kept -- a thousand funds would carry every NEUTRAL.
-        self.order_events: list = []
+        #: are not kept -- a thousand funds would carry every NEUTRAL. A fund
+        #: with ``order_detail`` off (the coin-flip funds, which are never
+        #: NEUTRAL and so meet a limit nearly every day) keeps only the days.
+        self.order_events: Optional[list] = [] if order_detail else None
+        self.order_days_seen: set = set()
         #: Cycles in which at least one signal was dispatched.
         self.cycles_dispatched = 0
 
@@ -296,9 +299,13 @@ class Fund:
                 continue
             result = self.engine.execute(signal)
             dispatched = True
-            if result.status is ExecutionStatus.ACCEPTED or capacity_kind(result.reason) is not None:
+            accepted = result.status is ExecutionStatus.ACCEPTED
+            kind = None if accepted else capacity_kind(result.reason)
+            if kind is not None:
+                self.order_days_seen.add(line.day)
+            if self.order_events is not None and (accepted or kind is not None):
                 self.order_events.append(Event(line.day, line.ticker, signal.conviction,
-                                               result.status.value, result.reason))
+                                               result.status.value, "", kind))
             if self.decisions is not None:
                 self.decisions.append(Decision(self.broker.day, line.day, line.ticker, signal.bias.value,
                                                signal.conviction, result.status.value, result.reason))
