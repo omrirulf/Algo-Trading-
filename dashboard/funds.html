@@ -58,6 +58,34 @@
                                  problems shown when ok is false; data_holes
                                  (a count of ticker-days with no price bar)
                                  shown as a note when above 0
+    integrity.coin.order_days    optional: {median, p5, p95} days (counts, or null)
+                                 on which a coin-flip fund ran out of room before
+                                 the end of its signal list; shown with the fund
+                                 lines, only once calibration passed
+
+  "How often the buying order mattered" (a report only; nothing changes the
+  order). An OrderSummary is:
+    {cycle_days  count of days a cycle ran,
+     days        count of those days the book ran out of room (cash, gross
+                 exposure, sleeve budget, an exposure group, the stock-market
+                 limit, the position count) before the end of the signal list,
+     skipped     count of signals skipped for lack of room,
+     outranked_days  count of days a skipped signal had a higher conviction
+                 than one that was bought,
+     by_kind     {kind text: count of skipped signals},
+     list[]      chronological {day ISO date,
+                   bought[]  {ticker, conviction},
+                   skipped[] {ticker, conviction, kind text, outranks[] tickers
+                              bought that day with a lower conviction}}}
+    conviction is the signal's score from 0 to 1 (shown to 2 decimals, not a
+    percent), or null.
+  Where the page reads it:
+    order_matters.real           OrderSummary for the real paper account; may be
+                                 missing in older files (then the card is not drawn)
+    calibration.order_matters    OrderSummary for the calibration copy; present
+                                 once calibration has started
+    funds.list[].order_matters   OrderSummary per fund; null for vt; shown only
+                                 once calibration passed
 
   logs/race_gate.json, written nightly by analysis/horse_race.py (its gate-json
   option):
@@ -221,6 +249,21 @@ button{font:inherit;font-size:.88rem;font-weight:600;color:var(--accent-ink);bac
 button:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 button[disabled]{opacity:.55;cursor:default}
 #note{font-size:.84rem;color:var(--ink-3)}
+/* How often the buying order mattered: plain lines, chips per kind, and the
+   days in a list whose ticker runs wrap between tickers on a phone. */
+.order{overflow-wrap:anywhere}
+.order .kinds{display:flex;flex-wrap:wrap;gap:4px 6px;margin-top:8px}
+.order .lines{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:3px;font-size:.93rem}
+.odays{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:8px}
+.odays > li{border-top:1px solid var(--line);padding-top:6px}
+.odays .d{font-weight:600}
+.odays .row{display:flex;gap:6px;margin-top:2px}
+.odays .row > .k{flex:none;color:var(--ink-2);min-width:4.6em}
+.odays .row > .v{min-width:0}
+.odays .t{white-space:nowrap}
+.odays .t .num{color:var(--ink-2);font-size:.86em}
+.odays .kind{color:var(--ink-3)}
+.odays mark{background:var(--warn-bg);color:var(--ink);border-radius:4px;padding:0 4px;font-weight:600;white-space:normal}
 </style>
 
 <header>
@@ -245,6 +288,8 @@ button[disabled]{opacity:.55;cursor:default}
 
 <h2>The four funds</h2>
 <div id="funds"></div>
+
+<section id="order" aria-label="How often the buying order mattered"></section>
 
 <footer>
   <span id="note">Rebuilt each night from the simulation's record and the decision gate. Nothing on this page is a live quote or a live position.</span>
@@ -606,7 +651,7 @@ button[disabled]{opacity:.55;cursor:default}
     const lines = Array.isArray(rule.text) ? rule.text : [];
     // The verdicts are the evaluator's, written only once calibration runs.
     const verdicts = ["running", "passed", "failed"].includes(status) && Array.isArray(rule.verdicts) ? rule.verdicts : [];
-    html += `<div class="card" style="margin-top:12px"><h3>Pass rule ${rule.approved ? `<span class="chip good">approved</span>` : `<span class="chip run">proposed, not approved</span>`}</h3>${lines.length ? ruleHtml(lines) : `<p class="muted small">No pass rule written yet.</p>`}${verdictsHtml(verdicts)}</div>`;
+    html += `<div class="card" style="margin-top:12px"><h3>Pass rule ${rule.approved ? `<span class="chip good">approved</span>` : `<span class="chip run">not in force yet</span>`}</h3>${lines.length ? ruleHtml(lines) : `<p class="muted small">No pass rule written yet.</p>`}${verdictsHtml(verdicts)}</div>`;
     const h = c.holding_days || {};
     const dd = (v)=> isNum(v) ? (Number.isInteger(v) ? String(v) : v.toFixed(1)) : "n/a";
     html += `<h3 style="margin-top:16px">How long the real account holds a position, in trading days</h3>` + tiles([
@@ -624,6 +669,14 @@ button[disabled]{opacity:.55;cursor:default}
   // checked against the real account.
   function fundsVisible(data){
     return !!(data && data.funds && data.calibration && data.calibration.status === "passed");
+  }
+
+  // The fund card's own line of the order report: "3 of 15 days" on which
+  // the fund ran out of room before the end of its list. None for VT.
+  function orderCell(x){
+    const o = x && x.name !== "vt" && x.order_matters && typeof x.order_matters === "object" ? x.order_matters : null;
+    if(!o || !Number.isFinite(o.cycle_days)) return "";
+    return `<dt>Order mattered</dt><dd class="num">${o.cycle_days === 0 ? "no cycle yet" : `${esc(Number.isFinite(o.days) ? o.days : "n/a")} of ${esc(o.cycle_days)} days`}</dd>`;
   }
 
   function renderFunds(data){
@@ -662,6 +715,7 @@ button[disabled]{opacity:.55;cursor:default}
         <dt>Win rate</dt>${isNum(x.win_rate) ? `<dd class="num">${esc(plain(x.win_rate, 0))}</dd>` : `<dd class="muted">no closed trade</dd>`}
         <dt>Open positions</dt><dd class="num">${esc(isNum(x.open_positions) ? x.open_positions : "n/a")}</dd>
         <dt>Cash</dt><dd class="num">${esc(money(x.cash))}</dd>
+        ${orderCell(x)}
       </dl></article>`).join("")}</div>`;
     el.innerHTML = html;
     // VT is drawn first and the model last, so the fund the race is about
@@ -673,6 +727,74 @@ button[disabled]{opacity:.55;cursor:default}
       band: b ? {lo:b.p5, hi:b.p95, short:"coin-flip 5th–95th"} : null,
       series: drawn.map(x=>({label:SHORT[x.name] || x.label || x.name, values:x.equity || [], color:hue(x), dash:DASH[x.name], width:2, end:SHORT[x.name] || x.name})),
     })]];
+  }
+
+  // ------------------------------------------------ how often the order mattered
+  // A report only: on how many cycle days the book ran out of room before it
+  // reached the end of the day's signal list, so the watchlist order decided
+  // which signals got in. The real paper account is always shown; the
+  // calibration copy once calibration runs; the funds only once it passed.
+  function orderHtml(data){
+    data = data && typeof data === "object" ? data : {};
+    const obj = (v)=> v && typeof v === "object" && !Array.isArray(v) ? v : null;
+    const real = obj(obj(data.order_matters) && data.order_matters.real);
+    if(!real) return "";
+    const count = (v)=> Number.isFinite(v) ? String(v) : "n/a";
+    const conv = (v)=> Number.isFinite(v) ? v.toFixed(2) : "—";
+    const daysNum = (v)=> Number.isFinite(v) ? (Number.isInteger(v) ? String(v) : v.toFixed(1)) : "n/a";
+    const b = (v)=> `<b class="num">${esc(count(v))}</b>`;
+    // One short line for a copy or a fund: "X of Y days (Z with ...)".
+    const short = (o, unit)=> o.cycle_days === 0
+      ? "no cycle yet."
+      : `${b(o.days)} of ${b(o.cycle_days)} ${unit} (${b(o.outranked_days)} with a higher-conviction signal skipped).`;
+
+    let head;
+    if(real.cycle_days === 0) head = "No cycle yet.";
+    else {
+      head = `ran out of room before the end of the list on ${b(real.days)} of ${b(real.cycle_days)} cycle days.`;
+      if(real.days !== 0) head += ` On ${b(real.outranked_days)} of those days, a skipped signal had a higher conviction than one that was bought.`;
+    }
+    const kinds = Object.entries(obj(real.by_kind) || {}).filter(([, n])=> Number.isFinite(n) && n > 0)
+      .map(([k, n])=> `<span class="chip idle">${esc(k)}: <span class="num">${esc(n)}</span></span>`).join("");
+
+    const tick = (t)=> `<span class="t">${esc(t && t.ticker)} <span class="num">${esc(conv(t && t.conviction))}</span></span>`;
+    const days = (Array.isArray(real.list) ? real.list : []).filter(obj).slice().reverse().map(d=>{
+      const bought = (Array.isArray(d.bought) ? d.bought : []).filter(obj);
+      const skipped = (Array.isArray(d.skipped) ? d.skipped : []).filter(obj);
+      const skip = skipped.map(s=>{
+        const over = (Array.isArray(s.outranks) ? s.outranks : []).map(String);
+        return `<span class="t">${esc(s.ticker)} <span class="num">${esc(conv(s.conviction))}</span></span> <span class="kind">(${esc(s.kind || "no room")})</span>`
+          + (over.length ? ` <mark>higher than ${esc(over.join(", "))}</mark>` : "");
+      }).join("; ");
+      return `<li><div class="d">${esc(day(d.day, true))}</div>`
+        + `<div class="row"><span class="k">Bought:</span><span class="v">${bought.length ? bought.map(tick).join(", ") : "nothing"}</span></div>`
+        + `<div class="row"><span class="k">Skipped:</span><span class="v">${skip || "nothing"}</span></div></li>`;
+    });
+
+    const lines = [];
+    const c = obj(data.calibration) || {};
+    const cal = obj(c.order_matters);
+    if(cal && ["running", "passed", "failed"].includes(c.status)) lines.push(`<b>Calibration copy:</b> ${short(cal, "cycle days")}`);
+    if(fundsVisible(data)){
+      (Array.isArray(data.funds.list) ? data.funds.list : []).filter(obj).forEach(x=>{
+        const o = obj(x.order_matters);
+        if(x.name === "vt" || !o) return;
+        lines.push(`<b>${esc(SHORT[x.name] || x.label || x.name)} fund:</b> ${short(o, "days")}`);
+      });
+      const coin = obj(obj(data.integrity) && obj(data.integrity.coin) && data.integrity.coin.order_days);
+      if(coin && Number.isFinite(coin.median)){
+        const range = Number.isFinite(coin.p5) && Number.isFinite(coin.p95)
+          ? ` (5th–95th: <span class="num">${esc(daysNum(coin.p5))}–${esc(daysNum(coin.p95))}</span>)` : "";
+        lines.push(`<b>Coin-flip funds:</b> median <b class="num">${esc(daysNum(coin.median))}</b> days${range}.`);
+      }
+    }
+
+    return `<h2>How often the buying order mattered</h2><div class="card order">`
+      + `<p style="margin:0"><b>Real paper account:</b> ${head}</p>`
+      + (kinds ? `<div class="kinds" aria-label="Skipped signals by what ran out">${kinds}</div>` : "")
+      + (days.length ? `<details class="data"><summary>${days.length === 1 ? "The one day" : "The " + esc(days.length) + " days, most recent first"}</summary><ul class="odays">${days.join("")}</ul></details>` : "")
+      + (lines.length ? `<ul class="lines">${lines.map(l=>`<li>${l}</li>`).join("")}</ul>` : "")
+      + `<p class="small muted">Report only: the buying order (watchlist order) is not changed.</p></div>`;
   }
 
   // ------------------------------------------------------------------ render
@@ -687,6 +809,7 @@ button[disabled]{opacity:.55;cursor:default}
     safely("banners", ()=>{ $("banners").innerHTML = raceBanner(R, source.race) + fundTestBanner(F.fund_test, R); return []; });
     safely("problems", ()=>{ $("problems").innerHTML = problemsHtml(F); return []; });
     const todo = safely("calibration", ()=>renderCalibration(F)).concat(safely("funds", ()=>renderFunds(F)));
+    safely("order", ()=>{ $("order").innerHTML = orderHtml(F); return []; });
     todo.forEach(([id, fn])=>safely(id, fn));
   }
 
