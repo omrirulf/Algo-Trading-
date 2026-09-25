@@ -327,3 +327,15 @@ def test_trigger_c_counts_model_errors_only_and_from_25_september():
     later[1] = day(DAYS[1], failed=16)
     (trip,) = gate.failure_trips(later, max_names_per_day=80)
     assert "16 of 242" in trip.detail
+
+
+def test_trigger_a_is_closed_as_the_owner_recorded_it():
+    """The owner's decision of 25 Sep 2026: the zero-shorts replay tripped (a)
+    -- gpt-oss shorted 1 of the 31 lines Opus shorted -- and the owner kept
+    gpt-oss. (a) was a one-time check and is closed; (b) and (c) stay."""
+    assert gate.TRIGGER_A_CLOSED == date(2026, 9, 25)
+    assert gate.TRIGGER_A_RESULT == (1, 31)
+    shorted, of = gate.TRIGGER_A_RESULT
+    assert shorted / of < 0.25, "it tripped: below a quarter"
+    # (b) and (c) are still judged.
+    assert gate.WATCH_DAYS == 5 and gate.WATCH_MAX_FAILED_SHARE == 0.05

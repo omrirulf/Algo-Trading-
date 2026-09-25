@@ -70,11 +70,11 @@ def _trade(return_pct: float, entry="2026-03-03", exit_="2026-03-06", stopped=Fa
 
 
 def scored(return_pct: float, arm="model", ticker="NVDA", entry="2026-03-03",
-           stamp=STAMP, cost=0.001, fund=False, side="buy") -> ScoredTrade:
+           stamp=STAMP, cost=0.001, fund=False, side="buy", conviction=None) -> ScoredTrade:
     return ScoredTrade(
         arm=arm, ticker=ticker, signal_at=stamp, signal_day=stamp.date(),
         entry_day=date.fromisoformat(entry), exit_day=date(2026, 3, 6), fund=fund,
-        trade=_trade(return_pct, entry=entry, side=side), cost_per_side=cost,
+        trade=_trade(return_pct, entry=entry, side=side), cost_per_side=cost, conviction=conviction,
     )
 
 
@@ -559,6 +559,15 @@ def test_the_registered_parameters_are_the_ones_the_code_runs():
     assert gate.INDEX_GAP_SETTLE_SESSIONS == 5 and "published five later VT sessions" in text
     assert gate.FAILURE_WATCH_START == date(2026, 9, 25) and "counted from **2026-09-25**" in text
     assert gate.RUN_ALERT_FAILED_SHARE == 0.20 and "more than **20%** of one run's calls fail" in text
+    # Trigger (a): closed on the owner's decision of 25 Sep, with the replay's own counts.
+    assert gate.TRIGGER_A_CLOSED == date(2026, 9, 25) and "**Closed on 2026-09-25**" in text
+    assert gate.TRIGGER_A_RESULT == (1, 31)
+    assert "gpt-oss shorted 1 of the 31 lines where Opus shorted" in text
+    # The two exploratory reports (reporting only): the owner's groups and "too few" line.
+    assert horse_race.MIN_REPORT_TRADES == 20
+    assert '"too few" until a group or side has 20 trades' in text
+    assert [g[0] for g in horse_race.CONVICTION_GROUPS] == ["0.30-0.40", "0.40-0.50", "0.50-0.60", "0.60+"]
+    assert "(0.30-0.40, 0.40-0.50, 0.50-0.60, 0.60 and above;" in text
     assert gate.COIN_FLIP_PERCENTILE == 95.0 and "95th percentile" in text
     assert horse_race.BAND == (5.0, 95.0)  # the band condition 3 actually reads
     assert "**no arm trades**" in text
@@ -667,6 +676,13 @@ def test_the_model_watch_is_printed_every_run(tmp_path, monkeypatch, capsys):
     assert "(c) model errors above 5% of the calls that reached the model over 5 cycle days" in out
     assert "not yet judged (1 of 5 cycle day(s)" in out
     assert "setup errors (our key or configuration; shown, never counted by (c)): none" in out
+    # Trigger (a) is closed: the watch records how it ended, and no longer
+    # points anyone at the replay to judge it again.
+    start = out.index("MODEL WATCH")
+    watch = out[start:out.index("decision window:", start)]
+    assert ("(a) closed 2026-09-25: the zero-shorts replay tripped it (gpt-oss shorted 1 of the 31 "
+            "lines Opus shorted); the owner kept gpt-oss: the model arm is effectively long-only.") in watch
+    assert "is read from the zero-shorts replay" not in out
 
 
 def test_a_news_outage_is_not_a_failed_model_call_and_a_wrong_ticker_answer_is_no_answer():
@@ -759,6 +775,16 @@ def test_the_gate_json_is_the_headers_numbers(tmp_path, monkeypatch, capsys):
     assert data["next"]["independent"] == 20 and data["next"]["bar"] == 3.47
     assert data["next"]["entry_days"] == 60 and data["next"]["estimated"]
     assert [look["independent"] for look in data["looks"]] == [20, 40, 60]
+    # The exploratory reports ride along: nothing in the window has resolved,
+    # so every slice is empty, and an empty slice's numbers are null, not 0.
+    assert data["report_since"] == "2026-09-23"
+    assert set(data["conviction_groups"]) == {"model", "momentum", "hybrid"}
+    for groups in data["conviction_groups"].values():
+        assert [g["group"] for g in groups] == ["0.30-0.40", "0.40-0.50", "0.50-0.60", "0.60+"]
+        assert all(g == {"group": g["group"], "n": 0, "mean_net": None, "hit_rate": None, "too_few": True}
+                   for g in groups)
+    assert set(data["sides"]) == {"model", "momentum", "hybrid", "random"}
+    assert all(set(per) == {"long", "short"} for per in data["sides"].values())
 
 
 def test_a_look_waits_for_a_line_written_after_the_close():
@@ -783,3 +809,220 @@ def test_a_look_waits_for_a_line_written_after_the_close():
     resolved = horse_race.look_data_problem([early, late], FinalAwareFetcher(frames, later), [entry_day], 1, 3,
                                             later, source=FinalAwareSource(frames, later))
     assert resolved is None
+
+
+# --- the owner's exploratory reports: by conviction, longs and shorts --------------------
+
+
+@pytest.mark.parametrize("conviction, group", [
+    (0.30, "0.30-0.40"),
+    (0.399999, "0.30-0.40"),
+    (0.3999999, "0.40-0.50"),          # rounded to six places: arithmetic noise, not a lower group
+    (0.40, "0.40-0.50"),
+    (0.5, "0.50-0.60"),
+    (0.5999999999, "0.60+"),
+    (0.6, "0.60+"),
+    (0.95, "0.60+"),
+    (1.0, "0.60+"),
+])
+def test_a_trade_is_grouped_by_the_conviction_of_the_line_that_opened_it(conviction, group):
+    assert horse_race.conviction_group(conviction) == group
+
+
+def test_a_trade_below_the_lowest_group_is_left_out_and_counted():
+    assert horse_race.conviction_group(0.2999) is None
+    assert horse_race.conviction_group(None) is None
+    trades = [scored(0.01, conviction=c) for c in (0.25, None, 0.30, 0.45, 0.45, 0.72)]
+    groups, outside = horse_race.by_conviction(trades)
+    assert outside == 2
+    assert [(g.label, g.n) for g in groups] == [("0.30-0.40", 1), ("0.40-0.50", 2), ("0.50-0.60", 0),
+                                                ("0.60+", 1)]
+
+
+def test_a_group_reports_the_per_trade_tables_own_net_and_hit():
+    trades = [scored(0.02, conviction=0.45), scored(-0.01, conviction=0.45), scored(0.5, conviction=0.72)]
+    groups, _ = horse_race.by_conviction(trades)
+    middle = groups[1]
+    assert middle.mean_net == pytest.approx(horse_race.mean_net(trades[:2]))
+    assert middle.mean_net == pytest.approx(statistics.fmean([0.02 - 0.002, -0.01 - 0.002]))
+    assert middle.hit_rate == pytest.approx(0.5)
+    empty = groups[2]
+    assert (empty.n, empty.mean_net, empty.hit_rate, empty.too_few) == (0, None, None, True)
+
+
+def test_too_few_until_a_group_or_a_side_has_twenty_trades():
+    assert horse_race.MIN_REPORT_TRADES == 20
+    nineteen = [scored(0.01, conviction=0.5) for _ in range(19)]
+    twenty = nineteen + [scored(0.01, conviction=0.5)]
+    assert horse_race.by_conviction(nineteen)[0][2].too_few
+    assert not horse_race.by_conviction(twenty)[0][2].too_few
+    assert horse_race.by_side(nineteen)["long"].too_few
+    assert not horse_race.by_side(twenty)["long"].too_few
+
+
+def test_a_slice_with_twenty_trades_shows_its_numbers_in_the_text_and_to_the_page():
+    """The case the reports exist for. Twenty model longs at 0.50 (net +0.80%
+    each, all hits) and nineteen model shorts at 0.72 (net -1.20% each): the
+    0.50-0.60 group and the long side show their numbers, while the 0.60+
+    group and the short side, one trade short, still say "too few"."""
+    trades = ([scored(0.01, conviction=0.5, side="buy") for _ in range(20)]
+              + [scored(-0.01, conviction=0.72, side="sell") for _ in range(19)])
+    splits = horse_race.trade_splits([_arm(MODEL_ARM, trades)])
+    text = horse_race._render_splits(splits)
+    assert "model     0.50-0.60     20    +0.80%   +100.0%" in text
+    assert "model     0.60+        too few (n=19)" in text
+    assert "model     long          20    +0.80%   +100.0%" in text
+    assert "model     short        too few (n=19)" in text
+    assert not any(l.startswith(("model     0.50-0.60", "model     long")) and "too few" in l for l in text)
+
+    view = horse_race.GateView(registered=True, mismatches=(), window_lines=39, window_cycle_days=1,
+                               unanswered_in_window=0, entry_days=1, independent=0,
+                               looks=tuple(decision_gate.evaluate({})), next_estimate=None)
+    data = json.loads(json.dumps(horse_race.gate_json(view, 3, STAMP, splits=splits)))
+    groups = data["conviction_groups"]["model"]
+    assert groups[2] == {"group": "0.50-0.60", "n": 20, "mean_net": pytest.approx(0.008), "hit_rate": 1.0,
+                         "too_few": False}
+    assert groups[3] == {"group": "0.60+", "n": 19, "mean_net": pytest.approx(-0.012), "hit_rate": 0.0,
+                         "too_few": True}
+    assert data["sides"]["model"]["long"] == {"n": 20, "mean_net": pytest.approx(0.008), "hit_rate": 1.0,
+                                              "too_few": False}
+    assert data["sides"]["model"]["short"] == {"n": 19, "mean_net": pytest.approx(-0.012), "hit_rate": 0.0,
+                                               "too_few": True}
+
+
+def test_trades_split_into_longs_and_shorts_by_the_side_they_were_opened_on():
+    trades = [scored(0.02, side="buy"), scored(0.01, side="buy"), scored(-0.03, side="buy"),
+              scored(0.04, side="sell")]
+    split = horse_race.by_side(trades)
+    assert list(split) == ["long", "short"]
+    assert split["long"].n == 3 and split["short"].n == 1
+    assert split["long"].hit_rate == pytest.approx(2 / 3)
+    # The short's return is already signed: a price fall is a gain for it.
+    assert split["short"].mean_net == pytest.approx(0.04 - 0.002)
+    assert split["short"].hit_rate == 1.0
+
+
+def _split_results():
+    make = lambda arm, conviction, side, r: scored(r, arm=arm, conviction=conviction, side=side)
+    return [
+        _arm(MODEL_ARM, [make(MODEL_ARM, 0.72, "buy", 0.01), make(MODEL_ARM, 0.35, "buy", -0.02),
+                         make(MODEL_ARM, 0.25, "sell", 0.03)]),
+        _arm(momentum.NAME, [make(momentum.NAME, 0.5, "buy", 0.01)]),
+        _arm(hybrid.NAME, [make(hybrid.NAME, 0.55, "sell", 0.01)]),
+        _arm(control.NAME, [make(control.NAME, control.CONVICTION, "sell", -0.01)]),
+    ]
+
+
+def test_the_splits_cover_the_owners_arms_and_the_coin_flip_only_by_side():
+    splits = horse_race.trade_splits(_split_results())
+    assert list(splits.conviction) == [MODEL_ARM, momentum.NAME, hybrid.NAME]
+    assert splits.outside == {MODEL_ARM: 1, momentum.NAME: 0, hybrid.NAME: 0}
+    assert list(splits.sides) == [MODEL_ARM, momentum.NAME, hybrid.NAME, control.NAME]
+    assert splits.sides[MODEL_ARM]["short"].n == 1, "a trade outside every group is still a short"
+    assert splits.sides[control.NAME]["short"].n == 1
+    text = "\n".join(horse_race._render_splits(splits))
+    assert "note: 1 trade(s) below 0.30 or with no conviction, left out of every group: model 1" in text
+
+
+def test_the_gate_json_carries_both_reports_and_serialises():
+    splits = horse_race.trade_splits(_split_results())
+    view = horse_race.GateView(registered=True, mismatches=(), window_lines=4, window_cycle_days=1,
+                               unanswered_in_window=0, entry_days=1, independent=0,
+                               looks=tuple(decision_gate.evaluate({})), next_estimate=None)
+    data = json.loads(json.dumps(horse_race.gate_json(view, 3, STAMP, splits=splits)))
+    assert data["report_since"] == decision_gate.DECISION_CUTOFF.isoformat() == "2026-09-23"
+    model = data["conviction_groups"]["model"]
+    assert [g["group"] for g in model] == ["0.30-0.40", "0.40-0.50", "0.50-0.60", "0.60+"]
+    assert model[0] == {"group": "0.30-0.40", "n": 1, "mean_net": pytest.approx(-0.022),
+                        "hit_rate": 0.0, "too_few": True}
+    assert model[1] == {"group": "0.40-0.50", "n": 0, "mean_net": None, "hit_rate": None, "too_few": True}
+    # Numbers are given under "too few" too: the page decides how to show them.
+    assert model[3]["mean_net"] == pytest.approx(0.008) and model[3]["hit_rate"] == 1.0
+    assert set(data["conviction_groups"]) == {"model", "momentum", "hybrid"}
+    assert set(data["sides"]) == {"model", "momentum", "hybrid", "random"}
+    assert data["sides"]["model"]["long"] == {"n": 2, "mean_net": pytest.approx(-0.007), "hit_rate": 0.5,
+                                              "too_few": True}
+    assert data["sides"]["momentum"]["short"] == {"n": 0, "mean_net": None, "hit_rate": None, "too_few": True}
+
+
+def test_the_reports_move_no_look_bar_or_verdict():
+    """A crafted race that decides at the first look: the model clearly worse
+    than momentum, and momentum clearly ahead of the index. The gate's JSON is
+    the same field for field with and without the reports, and the look's
+    inputs are the same computed before and after the split."""
+    days = [date(2026, 10, 1) + timedelta(days=i) for i in range(60)]
+    noise = lambda i: 0.001 * ((i * 7) % 5 - 2)
+    stamp = lambda d: datetime.combine(d, datetime.min.time(), tzinfo=timezone.utc)
+    make = lambda arm, r, d, conviction, side: scored(r, arm=arm, entry=d.isoformat(), ticker=f"T{d.toordinal()}",
+                                                      stamp=stamp(d), conviction=conviction, side=side)
+    results = [
+        _arm(MODEL_ARM, [make(MODEL_ARM, -0.02 + noise(i), d, 0.3 + 0.01 * (i % 40), "buy" if i % 3 else "sell")
+                         for i, d in enumerate(days)]),
+        _arm(momentum.NAME, [make(momentum.NAME, 0.02 + noise(i + 1), d, 0.5, "buy") for i, d in enumerate(days)]),
+        _arm(hybrid.NAME, [make(hybrid.NAME, noise(i + 2), d, 0.55, "buy") for i, d in enumerate(days)]),
+        _arm(control.NAME, []),
+    ]
+    index = {d: 0.0 for d in days}
+    before = horse_race.look_inputs(results, {}, days, index, 60, 3, 10)
+    looks = tuple(decision_gate.evaluate({20: before}))
+    assert looks[0].outcome == momentum.NAME, "the crafted race decides at the first look"
+    view = horse_race.GateView(registered=True, mismatches=(), window_lines=60, window_cycle_days=60,
+                               unanswered_in_window=0, entry_days=60, independent=20, looks=looks,
+                               next_estimate=None)
+    plain = horse_race.gate_json(view, 3, STAMP)
+    splits = horse_race.trade_splits(results)
+    reported = horse_race.gate_json(view, 3, STAMP, splits=splits)
+    new = {"conviction_groups", "sides", "report_since"}
+    assert {k: v for k, v in reported.items() if k not in new} == {k: v for k, v in plain.items() if k not in new}
+    assert horse_race.look_inputs(results, {}, days, index, 60, 3, 10) == before
+    assert sum(g.n for g in splits.conviction[MODEL_ARM]) == 60
+    json.dumps(reported)
+
+
+def test_the_race_prints_both_reports_after_the_per_trade_table(tmp_path, monkeypatch, capsys):
+    warm = _warm_frame()
+    stamp = _at(warm.index[MIN_WARMUP_BARS].date())
+    now = datetime.combine(warm.index[-1].date(), datetime.min.time(), tzinfo=timezone.utc) + timedelta(days=1)
+    code, out = _race(tmp_path, monkeypatch, capsys, {"NVDA": warm}, [_journal_line("NVDA", stamp)], now)
+    assert code == 0
+    head = "BY CONVICTION (exploratory; report only; decides nothing)"
+    sides = "LONGS VS SHORTS (exploratory; report only; decides nothing)"
+    assert out.index("EVERY SCORED TRADE") < out.index(head) < out.index(sides)
+    assert out.index(sides) < out.index("WHOLE JOURNAL, FOR READING ONLY")
+    by_conviction = out[out.index(head):out.index(sides)].splitlines()
+    rows = [l.split() for l in by_conviction if l.split() and l.split()[0] in ("model", "momentum", "hybrid")]
+    assert len(rows) == 12, "one row per arm and group"
+    assert not any(l.startswith("random") for l in by_conviction)
+    # The model's one line was 0.72: one trade in the top group, hidden under "too few".
+    assert "model     0.60+        too few (n=1)" in by_conviction
+    assert "model     0.30-0.40    too few (n=0)" in by_conviction
+    by_side = out[out.index(sides):out.index("WHOLE JOURNAL")].splitlines()
+    assert "model     long         too few (n=1)" in by_side
+    assert "model     short        too few (n=0)" in by_side
+    assert any(l.startswith("random    long") or l.startswith("random    short") for l in by_side)
+    # Hidden in the text under "too few"; given in full to the page.
+    assert not any("%" in l for l in by_conviction + by_side if l.startswith(("model", "momentum", "hybrid",
+                                                                                "random")))
+
+
+def test_the_gate_json_reads_the_decision_races_trades_and_the_gate_is_unchanged(tmp_path, monkeypatch, capsys):
+    warm = _warm_frame()
+    stamp = _at(warm.index[MIN_WARMUP_BARS].date())
+    now = datetime.combine(warm.index[-1].date(), datetime.min.time(), tzinfo=timezone.utc) + timedelta(days=1)
+    lines = [_journal_line("NVDA", stamp)]
+    code, out = _race(tmp_path, monkeypatch, capsys, {"NVDA": warm}, lines, now, extra=("--gate-json",))
+    assert code == 0
+    data = json.loads(out)
+    top = data["conviction_groups"]["model"][3]
+    assert top["group"] == "0.60+" and top["n"] == 1 and top["too_few"] is True
+    assert isinstance(top["mean_net"], float) and top["hit_rate"] in (0.0, 1.0)
+    assert data["sides"]["model"]["long"]["n"] == 1 and data["sides"]["model"]["short"]["n"] == 0
+    assert data["sides"]["random"]["long"]["n"] + data["sides"]["random"]["short"]["n"] == 1
+
+    # With the reports emptied out, every gate field reads the same.
+    monkeypatch.setattr(horse_race, "trade_splits",
+                        lambda results: horse_race.TradeSplits(conviction={}, outside={}, sides={}))
+    _, bare = _race(tmp_path, monkeypatch, capsys, {"NVDA": warm}, lines, now, extra=("--gate-json",))
+    without = json.loads(bare)
+    new = {"conviction_groups", "sides", "report_since"}
+    assert {k: v for k, v in data.items() if k not in new} == {k: v for k, v in without.items() if k not in new}

@@ -23,7 +23,27 @@
     calibration.status           not_started | running | passed | failed
     calibration.start            ISO date, or null before it starts
     calibration.days_done        closes compared so far (count)
-    calibration.days_needed      closes the rule needs (count, 15)
+    calibration.days_needed      closes the rule needs (count: 15, or the last
+                                 fix + 5 days when that is later, so it can
+                                 exceed 15)
+    The owner's fail rule (25 Sep 2026); an older record lacks all of these
+    and the page then says nothing about fixes:
+    calibration.days_passed      calibration days passed so far (count), from
+                                 the first, while every day-by-day check held
+    calibration.fixes[]          {day ISO date, what text}: every fix merged
+                                 after a fail
+    calibration.last_fix         ISO date of the latest fix, or null
+    calibration.days_since_fix   calibration days dated after the last fix
+                                 (count), or null with no fix
+    calibration.days_after_fix_needed  days needed after the last fix (count, 5)
+    calibration.end_estimate     ISO date calibration can end if nothing more
+                                 fails, or null before it starts
+    calibration.fund_test_plan   null, or {start ISO date the fund test would
+                                 start, bars[] its three t-statistic bars (null
+                                 for a look on or before the start),
+                                 registered[] the registered bars,
+                                 registered_start ISO date, matches_registered
+                                 true|false}; an amber note when false
     calibration.pass_rule.text[]      the rule: a heading line, then
                                       conditions already numbered "1." to "5."
     calibration.pass_rule.approved    true once the owner approved it
@@ -40,12 +60,31 @@
     calibration.problems[]       optional: text lines, shown in the warning card
     funds                        null, or {start ISO date, days[] ISO dates,
                                  list[], band}; drawn only when calibration passed
-    funds.list[]                 {name model|momentum|hybrid|vt, label,
+    funds.list[]                 {name model|momentum|hybrid|vt|
+                                  model_by_conviction|model_sized, label,
                                   equity[] dollars per day, total_return fraction,
                                   vs_vt fraction (difference of total returns,
                                   null for vt), max_drawdown fraction (positive),
                                   trades count, win_rate fraction or null,
                                   open_positions count, cash dollars}
+    funds.list[].exploratory     true for the two exploratory funds
+                                 (model_by_conviction, model_sized): they are
+                                 kept out of the chart, the table and the fund
+                                 cards, and shown only against the model fund;
+                                 missing in older files (then false)
+    funds.list[].compare_to      exploratory only: the fund it is compared with
+                                 ("model")
+    funds.list[].vs_model        exploratory only: {total_return_diff fraction
+                                 (its total return minus the model's),
+                                 max_drawdown fraction (positive),
+                                 model_max_drawdown fraction (positive),
+                                 mean_daily_diff fraction a day or null,
+                                 t Newey-West t-statistic or null, days count}
+    funds.list[].sides           null for vt, else {long: Side, short: Side},
+                                 a Side {n count of closed trades, mean_return
+                                 fraction or null, hit_rate fraction or null,
+                                 too_few true below 20 trades: then "too few
+                                 (n=...)" is shown instead of the numbers}
     funds.band                   {p5[] dollars, p95[] dollars, funds count of
                                   coin-flip funds}
     fund_test.status             not_started | running
@@ -58,6 +97,10 @@
                                  problems shown when ok is false; data_holes
                                  (a count of ticker-days with no price bar)
                                  shown as a note when above 0
+    integrity.four               covers the four funds and the two exploratory
+                                 ones (model_by_conviction, model_sized): the
+                                 key keeps its name, and each problem names
+                                 its fund
     integrity.coin.order_days    optional: {median, p5, p95} days (counts, or null)
                                  on which a coin-flip fund ran out of room before
                                  the end of its signal list; shown with the fund
@@ -99,9 +142,21 @@
                                  or null, bar t-statistic}
     looks[]                      {independent count, bar t-statistic, reached,
                                   outcome text or null, reason text}
+    The owner's two race reports (25 Sep 2026), exploratory and report only;
+    missing in older files (then the card is not drawn). A Split is
+    {n count of trades, mean_net fraction after costs or null, hit_rate
+    fraction or null, too_few true below 20 trades: then "too few (n=...)"
+    is shown instead of the numbers}.
+    report_since                 ISO date both reports count trades from
+    conviction_groups            {arm: [Split + group text]}, per arm model,
+                                 momentum, hybrid, the groups in the order
+                                 "0.30-0.40", "0.40-0.50", "0.50-0.60", "0.60+"
+    sides                        {arm: {long: Split, short: Split}}, per arm
+                                 model, momentum, hybrid, random
 
-  Not read here: funds.json fund_test.sessions, metrics.timing, not_shortable;
-  race_gate.json registered, outcome, next.entry_days.
+  Not read here: funds.json fund_test.sessions, metrics.timing, not_shortable,
+  calibration.fund_test_plan.sessions and .exact; race_gate.json registered,
+  outcome, next.entry_days.
 -->
 <style>
 /* The tokens and both dark-mode blocks are the desk's (template.html), copied
@@ -264,6 +319,31 @@ button[disabled]{opacity:.55;cursor:default}
 .odays .t .num{color:var(--ink-2);font-size:.86em}
 .odays .kind{color:var(--ink-3)}
 .odays mark{background:var(--warn-bg);color:var(--ink);border-radius:4px;padding:0 4px;font-weight:600;white-space:normal}
+/* The fail rule's facts, one per line under the progress bar, and the amber
+   note when the fund test's plan has moved off what was registered. A fix's
+   text is free text from the record and may hold one long word (a code path,
+   a link); a grid column is as wide as its widest word unless the word may
+   break, so it breaks anywhere here rather than push the page sideways. */
+.facts{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:2px;font-size:.93rem;overflow-wrap:anywhere}
+.amber{background:var(--warn-bg);border-left:4px solid var(--warn);border-radius:6px;padding:6px 10px;margin-top:6px;font-size:.9rem;color:var(--ink);overflow-wrap:anywhere}
+/* Longs against shorts: one quiet line at the foot of a fund's card. */
+.sides{font-size:.84rem;color:var(--ink-2);margin-top:8px;padding-top:6px;border-top:1px solid var(--line)}
+/* The exploratory funds and the race's two reports sit side by side where
+   there is room and stack on a phone; min() keeps a column from ever being
+   wider than the card, so the page never scrolls sideways. */
+.xfunds{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));gap:12px;margin-top:8px}
+.xfund{border-top:1px solid var(--line);padding-top:8px;min-width:0}
+.xfund .head{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-weight:700}
+.xfund .kv{margin-top:6px}
+/* The label and each "vs the model's" part wrap as whole lines on a phone,
+   rather than breaking mid-phrase or into a two-line pill. */
+.xfund .chip{border-radius:6px}
+.xfund .vs{display:block;font-size:.86em;font-family:var(--sans);white-space:nowrap}
+h4{font-size:.9rem;font-weight:700;margin:14px 0 0}
+.minis{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(250px,100%),1fr));gap:4px 20px;margin-top:2px}
+table.mini caption{text-align:left;font-weight:700;font-size:.9rem;padding:8px 0 2px;color:var(--ink)}
+table.mini th,table.mini td{padding:3px 6px}
+table.mini td.few{text-align:center;color:var(--ink-3);font-family:var(--sans)}
 </style>
 
 <header>
@@ -282,12 +362,14 @@ button[disabled]{opacity:.55;cursor:default}
 
 <section id="banners" aria-label="Where the tests stand"></section>
 <section id="problems" aria-label="Problems in the record"></section>
+<section id="race-reports" aria-label="The race's trades by conviction, and longs against shorts"></section>
 
 <h2>Calibration</h2>
 <div id="calibration"></div>
 
 <h2>The four funds</h2>
 <div id="funds"></div>
+<section id="explore" aria-label="The exploratory funds against the model fund"></section>
 
 <section id="order" aria-label="How often the buying order mattered"></section>
 
@@ -313,6 +395,9 @@ button[disabled]{opacity:.55;cursor:default}
   const pts = (v)=> !isNum(v) ? "n/a" : (v>0?"+":v<0?"−":"") + Math.abs(v*100).toFixed(2) + " pts";
   const tone = (v)=> !isNum(v) || v === 0 ? "" : v > 0 ? "up" : "down";
   const bar2 = (v)=> isNum(v) ? v.toFixed(2) : "n/a";
+  // A plain object, or null: older records lack the newer parts, and a part
+  // in an unexpected shape is treated as missing rather than read.
+  const asObj = (v)=> v && typeof v === "object" && !Array.isArray(v) ? v : null;
   const day = (iso, year)=>{ if(!iso) return "n/a"; const d = new Date(String(iso).slice(0,10) + "T00:00:00Z"); if(isNaN(d)) return String(iso); return d.toLocaleDateString("en-GB", year ? {timeZone:"UTC",day:"numeric",month:"short",year:"numeric"} : {timeZone:"UTC",day:"numeric",month:"short"}); };
   const israel = (iso)=>{ if(!iso) return "n/a"; const d=new Date(iso.endsWith("Z")||iso.includes("+")?iso:iso+"Z"); if(isNaN(d)) return iso; return d.toLocaleString("en-GB",{timeZone:"Asia/Jerusalem",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}) + " Israel time"; };
 
@@ -507,11 +592,56 @@ button[disabled]{opacity:.55;cursor:default}
     return `<div class="banner"><b>Fund test:</b> ${esc(isNum(ft.independent) ? ft.independent : 0)} of ${esc(of)} independent days (= ${esc(td)} trading days), <b>NO DECISION YET</b>. ${next}${ft.start ? `<div class="sub">Started ${esc(day(ft.start, true))}</div>` : ""}</div>`;
   }
 
+  // ------------------------------------------------------------ race reports
+  // The owner's two reports on the race's trades (25 Sep 2026): does a
+  // higher conviction mean a better trade, and how the longs did against the
+  // shorts. Report only: nothing here moves a look, a bar or the verdict. It
+  // is race data, not fund data, so it is drawn whether or not calibration
+  // has passed. A group or a side shows "too few" in place of its numbers
+  // until it has 20 trades, so a handful of trades is never read as a finding.
+  const ARM = {model:"Model", momentum:"Momentum", hybrid:"Hybrid", random:"Random (coin flip)"};
+
+  function raceReportsHtml(R){
+    R = asObj(R);
+    if(!R) return "";
+    const groups = asObj(R.conviction_groups) || {}, sides = asObj(R.sides) || {};
+    // The arms in the race's report order, then any other the record names.
+    const own = (o, k)=> Object.prototype.hasOwnProperty.call(o, k);
+    const arms = (o)=> Object.keys(ARM).filter(k=>own(o, k)).concat(Object.keys(o).filter(k=>!own(ARM, k)));
+    const count = (s)=> Number.isFinite(s.n) ? s.n : null;
+    // The record's own too_few when it gives one, else the owner's 20
+    // trades; and without a count there is nothing to show but "too few".
+    const few = (s)=> count(s) === null || (typeof s.too_few === "boolean" ? s.too_few : count(s) < 20);
+    const cells = (s)=> few(s)
+      ? `<td colspan="3" class="few">too few (n=${esc(count(s) ?? "n/a")})</td>`
+      : `<td>${esc(count(s))}</td><td class="${tone(s.mean_net)}">${esc(signed(s.mean_net, 2))}</td><td>${esc(plain(s.hit_rate, 0))}</td>`;
+    const table = (arm, first, rows)=> `<div class="scroll"><table class="mini"><caption>${esc(own(ARM, arm) ? ARM[arm] : arm)}</caption>`
+      + `<thead><tr><th>${first}</th><th>n</th><th>Mean net</th><th>Hit rate</th></tr></thead>`
+      + `<tbody>${rows.map(([label, s])=>`<tr><td>${esc(label)}</td>${cells(s)}</tr>`).join("")}</tbody></table></div>`;
+    const byConviction = arms(groups).map(arm=>{
+      const rows = (Array.isArray(groups[arm]) ? groups[arm] : []).map(asObj).filter(Boolean).map(s=>[s.group ?? "n/a", s]);
+      return rows.length ? table(arm, "Conviction", rows) : "";
+    }).filter(Boolean);
+    const bySide = arms(sides).map(arm=>{
+      const s = asObj(sides[arm]) || {};
+      const rows = [["Longs", asObj(s.long)], ["Shorts", asObj(s.short)]].filter(([, v])=>v);
+      return rows.length ? table(arm, "Side", rows) : "";
+    }).filter(Boolean);
+    if(!byConviction.length && !bySide.length) return "";
+    const since = typeof R.report_since === "string" && R.report_since ? ` since ${esc(day(R.report_since, true))}` : "";
+    return `<div class="card" style="margin-top:10px"><h3>Race: by conviction, and longs vs shorts <span class="faint" style="font-weight:400">(exploratory, report only)</span></h3>`
+      + `<p class="small muted">The decision race's trades${since}, after costs. A group or side reads "too few" until it has 20 trades. Nothing here moves a look, a bar or the verdict.</p>`
+      + (byConviction.length ? `<h4>Does higher conviction mean better trades?</h4><div class="minis">${byConviction.join("")}</div>` : "")
+      + (bySide.length ? `<h4>Longs vs shorts</h4><div class="minis">${bySide.join("")}</div>` : "")
+      + `</div>`;
+  }
+
   // ---------------------------------------------------------------- problems
   // Everything the record says went wrong, gathered into one card so it
   // reaches the owner instead of sitting unread in the file: calibration's
-  // own problems, a failed integrity check of the four funds or of the
-  // coin-flip funds, and any pass-rule condition that already reads FAIL.
+  // own problems, a failed integrity check of the funds (the four and the
+  // two exploratory) or of the coin-flip funds, and any pass-rule condition
+  // that already reads FAIL.
   const VERDICT = /^\s*(\d+)\.\s*(.*?):\s*(PASS|FAIL|PENDING)\b\s*(?:\((.*)\))?\s*$/;
   const warnIcon = `<svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 15 14H1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8 6v3.6M8 11.4v.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>`;
 
@@ -527,7 +657,9 @@ button[disabled]{opacity:.55;cursor:default}
     const out = [];
     (Array.isArray(c.problems) ? c.problems : []).forEach(p=>out.push({where:"Calibration", text:String(p), bad:false}));
     const integrity = data.integrity && typeof data.integrity === "object" ? data.integrity : {};
-    [["four", "The four funds' integrity check"], ["coin", "The coin-flip funds' integrity check"]].forEach(([k, label])=>{
+    // "four" keeps its name in the record but checks the two exploratory
+    // funds as well, so its label names all six.
+    [["four", "The funds' integrity check (the four and the two exploratory)"], ["coin", "The coin-flip funds' integrity check"]].forEach(([k, label])=>{
       const i = integrity[k];
       if(!i || typeof i !== "object") return;
       const holes = Number(i.data_holes);
@@ -586,6 +718,54 @@ button[disabled]{opacity:.55;cursor:default}
   // -------------------------------------------------------------- calibration
   const tiles = (rows)=> `<div class="tiles">${rows.map(([l, v, sub])=>`<div class="tile"><div class="label">${l}</div><div class="value num">${v}</div><div class="sub">${sub}</div></div>`).join("")}</div>`;
 
+  // The owner's fail rule (25 Sep 2026): a fail is fixed rather than started
+  // over, and calibration runs on to day 15 or to 5 days after the last fix,
+  // whichever is later. So once it has started the card says how many days
+  // have passed, which fix came last and how many days have passed since it,
+  // and where the fund test would start, with which bars, if nothing more
+  // fails. A plan that no longer matches what was registered is said in
+  // amber: it must be re-registered before the fund test starts.
+  function calibrationFixHtml(c){
+    c = asObj(c);
+    if(!c || !["running", "passed", "failed"].includes(c.status)) return "";
+    // An older record carries none of these and says nothing about fixes.
+    if(!["days_passed", "fixes", "last_fix", "days_since_fix", "fund_test_plan"].some(k=>k in c)) return "";
+    const need = Number.isFinite(c.days_needed) ? c.days_needed : 15;
+    const after = Number.isFinite(c.days_after_fix_needed) ? c.days_after_fix_needed : 5;
+    const fixes = (Array.isArray(c.fixes) ? c.fixes : []).map(asObj).filter(f=>f && typeof f.day === "string" && f.day);
+    const last = typeof c.last_fix === "string" && c.last_fix ? c.last_fix : (fixes.map(f=>f.day).sort().pop() || null);
+    const facts = [];
+    if(Number.isFinite(c.days_passed)) facts.push(`Days passed: <b class="num">${esc(c.days_passed)}</b> of <span class="num">${esc(need)}</span>`);
+    if(last){
+      const what = fixes.filter(f=>f.day === last && f.what != null && f.what !== "").map(f=>f.what).pop();
+      facts.push(`Last fix: ${esc(day(last, true))}${what != null ? ` (${esc(what)})` : ""}`);
+      if(Number.isFinite(c.days_since_fix)) facts.push(`Days since the last fix: <b class="num">${esc(c.days_since_fix)}</b> of <span class="num">${esc(after)}</span>`);
+    } else {
+      facts.push("No fix yet");
+    }
+    let html = `<ul class="facts">${facts.map(f=>`<li>${f}</li>`).join("")}</ul>`;
+    const end = typeof c.end_estimate === "string" && c.end_estimate ? ` If nothing more fails, it ends ${esc(day(c.end_estimate, true))}.` : "";
+    html += `<p class="small muted">Calibration ends at day 15 or ${esc(after)} days after the last fix, whichever is later.${end}</p>`;
+    if(fixes.length > 1){
+      html += `<details class="data"><summary>All ${esc(fixes.length)} fixes</summary><ul class="facts">${fixes.map(f=>`<li>${esc(day(f.day, true))}${f.what != null && f.what !== "" ? `: ${esc(f.what)}` : ""}</li>`).join("")}</ul></details>`;
+    }
+    const plan = asObj(c.fund_test_plan);
+    if(plan && typeof plan.start === "string" && plan.start){
+      // A look on or before the start cannot be read by the fund test: it
+      // has no bar, and the record gives null for it.
+      const bars = (v)=>{ const list = (Array.isArray(v) ? v : []).map(b=>Number.isFinite(b) ? b.toFixed(2) : "none"); return list.length ? list.join(", ") : "n/a"; };
+      html += `<p>Fund test would start ${esc(day(plan.start, true))}; bars ${esc(bars(plan.bars))}</p>`;
+      if(plan.matches_registered === false){
+        const was = [typeof plan.registered_start === "string" && plan.registered_start ? `start ${esc(day(plan.registered_start, true))}` : "",
+                     Array.isArray(plan.registered) ? `bars ${esc(bars(plan.registered))}` : ""].filter(Boolean).join("; ");
+        html += `<div class="amber" role="note"><b>This plan differs from the registered start/bars: they must be re-registered before the fund test starts.</b>${was ? ` Registered: ${was}.` : ""}</div>`;
+      } else if(plan.matches_registered === true){
+        html += `<p class="small faint">The same start and bars as registered.</p>`;
+      }
+    }
+    return html;
+  }
+
   function renderCalibration(data){
     const el = $("calibration");
     const c = data.calibration;
@@ -606,7 +786,10 @@ button[disabled]{opacity:.55;cursor:default}
         passed: "Calibration passed under the approved rule.",
         failed: "Calibration failed under the approved rule, so the four funds stay hidden.",
       }[status] || "";
-      html += `<div class="card"><div class="st"><span class="chip ${chip[0]}">${esc(chip[1])}</span><span>Day <b class="num">${esc(done)}</b> of <span class="num">${esc(need)}</span>${c.start ? ` · started ${esc(day(c.start, true))}` : ""}</span></div><div class="bar" role="img" aria-label="${esc(done)} of ${esc(need)} calibration days done"><i style="width:${Math.max(0, Math.min(100, need ? done / need * 100 : 0))}%"></i></div>${say ? `<p class="small muted">${say}</p>` : ""}</div>`;
+      // "Closes compared" rather than "Day": after a fail the days passed
+      // (the fail rule's count, below) stop short of the days compared, and
+      // two different numbers both called days would read as a contradiction.
+      html += `<div class="card"><div class="st"><span class="chip ${chip[0]}">${esc(chip[1])}</span><span><b class="num">${esc(done)}</b> of <span class="num">${esc(need)}</span> closes compared${c.start ? ` · started ${esc(day(c.start, true))}` : ""}</span></div><div class="bar" role="img" aria-label="${esc(done)} of ${esc(need)} calibration closes compared"><i style="width:${Math.max(0, Math.min(100, need ? done / need * 100 : 0))}%"></i></div>${calibrationFixHtml(c)}${say ? `<p class="small muted">${say}</p>` : ""}</div>`;
       const series = Array.isArray(c.series) ? c.series : [];
       const problems = (Array.isArray(c.problems) ? c.problems : []).map(p=>String(p ?? ""));
       if(series.length){
@@ -679,17 +862,85 @@ button[disabled]{opacity:.55;cursor:default}
     return `<dt>Order mattered</dt><dd class="num">${o.cycle_days === 0 ? "no cycle yet" : `${esc(Number.isFinite(o.days) ? o.days : "n/a")} of ${esc(o.cycle_days)} days`}</dd>`;
   }
 
+  // Longs against shorts, for one fund (the owner's report of 25 Sep 2026):
+  // "Longs: 24 trades, mean +0.9%, hit 58% | Shorts: too few (n=7)". A side
+  // shows "too few" in place of its numbers until it has 20 closed trades.
+  function sidesLine(sides){
+    sides = asObj(sides);
+    if(!sides) return "";
+    const one = (label, s)=>{
+      s = asObj(s);
+      if(!s) return "";
+      const n = Number.isFinite(s.n) ? s.n : null;
+      const few = n === null || (typeof s.too_few === "boolean" ? s.too_few : n < 20);
+      if(few) return `${label}: too few (n=${esc(n ?? "n/a")})`;
+      return `${label}: ${esc(n)} trade${n === 1 ? "" : "s"}, mean ${esc(signed(s.mean_return, 1))}, hit ${esc(plain(s.hit_rate, 0))}`;
+    };
+    return [one("Longs", sides.long), one("Shorts", sides.short)].filter(Boolean).join(" | ");
+  }
+
+  // Exploratory funds: the list rows marked exploratory, never one of the
+  // four. Older records carry no flag and no such row.
+  const isExploratory = (x)=> !!(x && x.exploratory === true);
+
+  // The owner's two exploratory funds (25 Sep 2026): the model's own signals
+  // with one thing changed, the buying order (highest conviction first) or
+  // the size (by conviction). Each is set against the model fund only, never
+  // ranked with the four: it cannot change the decision. Shown, like every
+  // fund, only once calibration has passed.
+  function exploratoryHtml(data){
+    if(!fundsVisible(data)) return "";
+    const list = (Array.isArray(data.funds.list) ? data.funds.list : []).map(asObj).filter(Boolean);
+    const rows = list.filter(isExploratory);
+    if(!rows.length) return "";
+    const drawdown = (v)=> Number.isFinite(v) ? signed(-Math.abs(v), 1) : "n/a";
+    const items = rows.map(x=>{
+      const to = typeof x.compare_to === "string" && x.compare_to ? x.compare_to : "model";
+      const base = list.find(m=>m.name === to && !isExploratory(m)) || {};
+      const whose = `the ${Object.prototype.hasOwnProperty.call(SHORT, to) ? SHORT[to].toLowerCase() : to}'s`;
+      const v = asObj(x.vs_model) || {};
+      const daily = Number.isFinite(v.mean_daily_diff) ? signed(v.mean_daily_diff, 3) + " a day" : "n/a";
+      const t = Number.isFinite(v.t) ? v.t.toFixed(2) : "n/a";
+      const over = Number.isFinite(v.days) ? ` <span class="faint vs">over ${esc(v.days)} day${v.days === 1 ? "" : "s"}</span>` : "";
+      // Sizing by conviction is the change that can deepen a loss, so that
+      // fund's drawdown is shown against the model's.
+      const dd = x.name === "model_sized"
+        ? `<dt>Max drawdown</dt><dd class="num">${esc(drawdown(v.max_drawdown))} <span class="faint vs">vs ${esc(whose)} ${esc(drawdown(v.model_max_drawdown))}</span></dd>` : "";
+      const sides = sidesLine(x.sides);
+      return `<div class="xfund"><div class="head"><span>${esc(x.label || x.name)}</span><span class="chip idle">exploratory; cannot change the decision</span></div>
+        <dl class="kv">
+          <dt>Total return</dt><dd class="num"><span class="${tone(x.total_return)}">${esc(signed(x.total_return, 2))}</span> <span class="faint vs">vs ${esc(whose)} ${esc(signed(base.total_return, 2))}</span></dd>
+          <dt>Difference</dt><dd class="num ${tone(v.total_return_diff)}">${esc(pts(v.total_return_diff))}</dd>
+          <dt>Mean daily difference</dt><dd class="num">${esc(daily)}</dd>
+          <dt>t</dt><dd class="num">${esc(t)}${over}</dd>
+          ${dd}
+        </dl>${sides ? `<p class="sides">${sides}</p>` : ""}</div>`;
+    });
+    return `<div class="card" style="margin-top:10px"><h3>Exploratory: does the order or the size matter?</h3>`
+      + `<p class="small muted">The model fund's own signals, with one thing changed in each, set against the model fund day by day over the same days. The t is on the daily difference. Exploratory; cannot change the decision.</p>`
+      + `<div class="xfunds">${items.join("")}</div></div>`;
+  }
+
+  // The fund card's longs-against-shorts line. None for VT: it holds the
+  // index, which is not a signal's trade.
+  function sidesCell(x){
+    const line = x && x.name !== "vt" ? sidesLine(x.sides) : "";
+    return line ? `<p class="sides">${line}</p>` : "";
+  }
+
   function renderFunds(data){
     const el = $("funds");
     if(!fundsVisible(data)){
       const passed = !!(data.calibration && data.calibration.status === "passed");
       el.innerHTML = passed
         ? `<div class="card placeholder"><strong>Waiting for the funds' first close</strong><p class="muted small">Calibration passed. The model, momentum, hybrid and VT funds start on the first trading day after it; no fund record has been written yet.</p></div>`
-        : `<div class="card placeholder"><strong>Hidden until calibration passes</strong><p class="muted small">The model, momentum, hybrid and VT funds, and the coin-flip funds behind them, are neither shown nor compared while the simulation is still being checked against the real account.</p></div>`;
+        : `<div class="card placeholder"><strong>Hidden until calibration passes</strong><p class="muted small">The model, momentum, hybrid and VT funds, the two exploratory funds, and the coin-flip funds behind them, are neither shown nor compared while the simulation is still being checked against the real account.</p></div>`;
       return [];
     }
     const f = data.funds;
-    const list = Array.isArray(f.list) ? f.list : [];
+    // The four only: the exploratory funds have their own card, below, and
+    // the chart, its table and the cards stay exactly the four.
+    const list = (Array.isArray(f.list) ? f.list : []).filter(x=>x && !isExploratory(x));
     const days = Array.isArray(f.days) ? f.days : [];
     const b = f.band && Array.isArray(f.band.p5) && f.band.p5.length ? f.band : null;
     const nf = b && isNum(b.funds) ? b.funds.toLocaleString("en-US") : "the";
@@ -716,7 +967,7 @@ button[disabled]{opacity:.55;cursor:default}
         <dt>Open positions</dt><dd class="num">${esc(isNum(x.open_positions) ? x.open_positions : "n/a")}</dd>
         <dt>Cash</dt><dd class="num">${esc(money(x.cash))}</dd>
         ${orderCell(x)}
-      </dl></article>`).join("")}</div>`;
+      </dl>${sidesCell(x)}</article>`).join("")}</div>`;
     el.innerHTML = html;
     // VT is drawn first and the model last, so the fund the race is about
     // sits on top where the lines cross.
@@ -778,7 +1029,9 @@ button[disabled]{opacity:.55;cursor:default}
     if(fundsVisible(data)){
       (Array.isArray(data.funds.list) ? data.funds.list : []).filter(obj).forEach(x=>{
         const o = obj(x.order_matters);
-        if(x.name === "vt" || !o) return;
+        // The four funds, as in their cards; the exploratory funds are
+        // compared with the model fund in their own card, not here.
+        if(x.name === "vt" || x.exploratory === true || !o) return;
         lines.push(`<b>${esc(SHORT[x.name] || x.label || x.name)} fund:</b> ${short(o, "days")}`);
       });
       const coin = obj(obj(data.integrity) && obj(data.integrity.coin) && data.integrity.coin.order_days);
@@ -808,7 +1061,9 @@ button[disabled]{opacity:.55;cursor:default}
       : "No funds record yet: the nightly run has not written one.";
     safely("banners", ()=>{ $("banners").innerHTML = raceBanner(R, source.race) + fundTestBanner(F.fund_test, R); return []; });
     safely("problems", ()=>{ $("problems").innerHTML = problemsHtml(F); return []; });
+    safely("race-reports", ()=>{ $("race-reports").innerHTML = raceReportsHtml(R); return []; });
     const todo = safely("calibration", ()=>renderCalibration(F)).concat(safely("funds", ()=>renderFunds(F)));
+    safely("explore", ()=>{ $("explore").innerHTML = exploratoryHtml(F); return []; });
     safely("order", ()=>{ $("order").innerHTML = orderHtml(F); return []; });
     todo.forEach(([id, fn])=>safely(id, fn));
   }

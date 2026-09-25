@@ -80,6 +80,15 @@ FAILURE_WATCH_START = date(2026, 9, 25)
 #: failed, setup and model errors together (``analysis.health``).
 RUN_ALERT_FAILED_SHARE = 0.20
 
+#: Trigger (a) was a one-time check on the zero-shorts replay, not on the
+#: journal, so nothing here computes it. It tripped and the owner kept
+#: gpt-oss on this day (Amendment 2026-09-25): the model arm is effectively
+#: long-only. It is closed; (b) and (c) stay active. Kept as constants so the
+#: race prints the owner's record rather than a paraphrase of it.
+TRIGGER_A_CLOSED = date(2026, 9, 25)
+#: What the replay found: (lines gpt-oss shorted, of the lines Opus shorted).
+TRIGGER_A_RESULT = (1, 31)
+
 
 # --------------------------------------------------------------------------- #
 # Which lines, and how many independent days they make
@@ -556,6 +565,8 @@ __all__ = [
     "OUTCOME_TEXT",
     "REGISTERED_HORIZON",
     "RUN_ALERT_FAILED_SHARE",
+    "TRIGGER_A_CLOSED",
+    "TRIGGER_A_RESULT",
     "Trip",
     "WATCH_DAYS",
     "WATCH_MAX_FAILED_SHARE",

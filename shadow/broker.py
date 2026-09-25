@@ -69,6 +69,11 @@ class _Position:
     #: Money in and out of this position so far, costs and dividends included,
     #: for "did this trade make money" once it is closed.
     realised: float = 0.0
+    #: Shares x price of every fill that opened or added to it: the notional
+    #: the trade was opened at (entry quantity x average entry price), which
+    #: turns its pnl into a return. Reductions leave it alone, as they leave
+    #: the average entry price alone.
+    entered: float = 0.0
 
 
 @dataclass
@@ -105,6 +110,11 @@ class ClosedTrade:
     opened: date
     closed: date
     pnl: float
+    #: What it was opened at: entry quantity x average entry price, before
+    #: costs. ``pnl / notional`` is the trade's net return -- costs and
+    #: dividends are in the pnl -- whatever size the fund gave it, so a
+    #: small position and a large one count alike in "longs vs shorts".
+    notional: float
 
 
 @dataclass
@@ -312,6 +322,25 @@ class SimBroker:
     def live_stops(self) -> list[StopOrder]:
         return [StopOrder(s.order_id, s.ticker, s.qty, s.stop_price, s.side) for s in self._stops if s.live]
 
+    def scratch(self) -> "SimBroker":
+        """A copy of the book to try orders on, sharing nothing it could change.
+
+        Same cash, positions, live stops, marks, today's entries and price
+        source; every mutable part is a copy, so an order tried on it leaves
+        this book exactly as it was. The fill and trade lists start empty:
+        nothing done on the copy is ever reported. For the "highest
+        conviction first" fund, which must know whether watchlist order
+        would run out of room before choosing its order (``shadow.fund``).
+        """
+        return replace(
+            self,
+            positions={ticker: replace(pos) for ticker, pos in self.positions.items()},
+            fills=[], closed=[],
+            _stops=[replace(stop) for stop in self._stops],
+            _entries_today=set(self._entries_today),
+            _marks=dict(self._marks),
+        )
+
     # ------------------------------------------------------------------ #
     # Seeding a book that already exists (calibration)
     # ------------------------------------------------------------------ #
@@ -323,7 +352,8 @@ class SimBroker:
         No cash moves: the caller sets ``cash`` to the account's own cash.
         """
         ticker = ticker.strip().upper()
-        self.positions[ticker] = _Position(int(qty), float(avg_entry_price), opened)
+        self.positions[ticker] = _Position(int(qty), float(avg_entry_price), opened,
+                                           entered=abs(int(qty)) * float(avg_entry_price))
         for stop_qty, stop_price in stops:
             self._place_stop(ticker, int(stop_qty), "sell" if qty > 0 else "buy", float(stop_price))
 
@@ -390,20 +420,22 @@ class SimBroker:
         self.fills.append(Fill(self.day, ticker, kind, side, qty, price, cost, gapped))
         pos = self.positions.get(ticker)
         if pos is None:
-            self.positions[ticker] = _Position(signed, price, self.day, realised=-(signed * price) - cost)
+            self.positions[ticker] = _Position(signed, price, self.day, realised=-(signed * price) - cost,
+                                               entered=notional)
             return
         if (pos.qty > 0) == (signed > 0):
             total = abs(pos.qty) + qty
             pos.avg_entry_price = (pos.avg_entry_price * abs(pos.qty) + price * qty) / total
             pos.qty += signed
             pos.realised += -(signed * price) - cost
+            pos.entered += notional
             return
         # A reduction: the cost basis stays; the position may go flat.
         pos.qty += signed
         pos.realised += -(signed * price) - cost
         if pos.qty == 0:
             self.closed.append(ClosedTrade(ticker, "buy" if signed < 0 else "sell", pos.opened,
-                                           self.day, pos.realised))
+                                           self.day, pos.realised, pos.entered))
             del self.positions[ticker]
             for other in self._stops:
                 if other.live and other.ticker == ticker:

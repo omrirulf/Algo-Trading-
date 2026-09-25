@@ -5,8 +5,23 @@ like the account it imitates. Calibration runs the model fund's machinery --
 the production engine and position manager on a ``SimBroker`` over daily
 bars, exactly as ``shadow.fund`` runs every fund -- from the real paper
 account's own positions, cash and stops, on the model's own journalled
-calls, and compares it with the real account every day for 15 trading days:
-the equity at each close, and every trade that differs, with the reason.
+calls, and compares it with the real account every day for 15 trading days
+(longer after a fix, below): the equity at each close, and every trade that
+differs, with the reason.
+
+A fail is fixed, not waited out (the owner's fail rule of 25 Sep 2026, which
+replaced "restart the 15 days from zero"). The cause is fixed and logged in
+the Amendments table, and the day the fix was merged goes into
+``shadow.schedule.CALIBRATION_FIXES`` in the same reviewed change. Nothing
+restarts: the nightly job runs calibration from the same seed snapshot every
+night with the code as it stands that night, so once a fix is merged the
+fixed simulation is re-run over every calibration day recorded so far, and
+every one of those days must pass again. A re-run that fails on an earlier
+day is a new fail, fixed and logged the same way. At least
+``shadow.schedule.AFTER_FIX_DAYS`` (5) calibration days must come after the
+last fix, so calibration ends at day 15 or at the last fix + 5 days,
+whichever is later (``closes_needed``). A difference whose stated reason
+turns out to be a bug is a fail like any other.
 
 Nothing here trades or writes. The real account is read from what the
 heartbeat recorded (``logs/account.jsonl``, see ``load_snapshots``) and from
@@ -48,10 +63,13 @@ from zoneinfo import ZoneInfo
 
 from analysis.reader import JournalEntry
 from config.market_calendar import is_trading_day
+from shadow import schedule
 from shadow.audit import ENTRY_EVENT, MANAGED_EVENT, LiveAuditLeak, live_audit_guarded
 from shadow.broker import ENTRY, STOP, TRANCHE
 from shadow.fund import Decision, Fund, cycle_days, lines_by_day, model_signal
+from shadow.fund_test import fund_test_plan, next_trading_day, sessions_through
 from shadow.market import Bars, SimFeed, calendar
+from shadow.schedule import AFTER_FIX_DAYS
 
 #: The exchange's clock. Account times are UTC; a trading day is a New York day.
 NY = ZoneInfo("America/New_York")
@@ -805,9 +823,45 @@ class Metrics:
     sim_matched: int = 0
 
 
+#: A fix, as ``shadow.schedule.CALIBRATION_FIXES`` records it: (the day it
+#: was merged, one line saying what it fixed).
+Fix = tuple[date, str]
+
+
+def last_fix_day(fixes: Iterable[Fix]) -> Optional[date]:
+    """The day the latest fix was merged, or None when nothing has been fixed."""
+    return max((day for day, _ in fixes), default=None)
+
+
+def closes_needed(compared: Iterable[date], fixes: Iterable[Fix] = (), days: int = DAYS_NEEDED,
+                  after_fix: int = AFTER_FIX_DAYS) -> int:
+    """Calibration days needed: ``days``, or the days up to the last fix + ``after_fix``, whichever is more.
+
+    ``compared`` are the calibration days so far: sessions after the start
+    with a real close compared. A day counts as after a fix only if its date
+    is later than the fix's: a fix merged on day F may have been written with
+    F's close in view, so F is on the fix's side. With no fix it is ``days``
+    (15); a fix after day 12 makes it 17; a fix after day 3 leaves it 15,
+    because five days after it come before day 15 anyway.
+
+    Until the fix's own day has been compared, every day compared is on or
+    before it, so the number is always five more than the days so far: that
+    is what keeps a run going until five days after the fix.
+    """
+    last = last_fix_day(fixes)
+    if last is None:
+        return days
+    return max(days, sum(1 for day in compared if day <= last) + after_fix)
+
+
 @dataclass
 class CalibrationResult:
     start: date
+    #: The latest day the real account has a close for, whether or not the
+    #: run went that far: a fix not merged yet cannot be dated before it.
+    last_real: Optional[date] = None
+    #: The closes the run is asked for when nothing has been fixed (15).
+    #: With a fix it runs on to ``closes_needed``.
     days_needed: int = DAYS_NEEDED
     #: One point per session run; ``real`` is None on a session with no real close.
     series: list[SeriesPoint] = field(default_factory=list)
@@ -827,11 +881,30 @@ class CalibrationResult:
     decisions: list[Decision] = field(default_factory=list)
     problems: list[str] = field(default_factory=list)
     fund: Optional[Fund] = field(default=None, repr=False, compare=False)
+    #: The fixes made after a fail (``shadow.schedule.CALIBRATION_FIXES``).
+    fixes: tuple[Fix, ...] = ()
+    #: Calibration days that must come after the last fix.
+    after_fix_days: int = AFTER_FIX_DAYS
 
     @property
     def days_done(self) -> int:
         """Closes compared: sessions that have a real close."""
         return sum(1 for p in self.series if p.real is not None)
+
+    @property
+    def compared_days(self) -> list[date]:
+        """The calibration days, oldest first: the sessions that have a real close."""
+        return [p.day for p in self.series if p.real is not None]
+
+    @property
+    def last_fix(self) -> Optional[date]:
+        return last_fix_day(self.fixes)
+
+    @property
+    def days_since_fix(self) -> Optional[int]:
+        """Calibration days dated after the last fix; None when nothing has been fixed."""
+        last = self.last_fix
+        return None if last is None else sum(1 for day in self.compared_days if day > last)
 
     @property
     def metrics(self) -> Metrics:
@@ -905,16 +978,23 @@ def run_calibration(
     snapshots: Sequence[Snapshot], entries: Sequence[JournalEntry], bars: Bars, feed: SimFeed, start: date,
     days_needed: int = DAYS_NEEDED, audit_lines: Iterable[str] = (), not_shortable: frozenset[str] = frozenset(),
     *, calendar_tickers: Sequence[str] = CALENDAR_TICKERS, cost_per_side: float = CALIBRATION_COST_PER_SIDE,
+    fixes: Iterable[Fix] = (), after_fix_days: int = AFTER_FIX_DAYS,
 ) -> CalibrationResult:
     """The calibration fund from the real book at ``start``'s close, session by session.
 
     Sessions are the bar sessions after ``start``, through the last day the
-    real account has a close for, until ``days_needed`` of them have a real
-    close to compare with. C1 gets no cycle (C0's is in the seed); every
-    later session acts on the session before it, when a cycle ran that day.
-    ``feed`` must be a ``SimFeed`` over ``bars``.
+    real account has a close for, until as many of them have a real close
+    to compare with as ``closes_needed`` asks: ``days_needed``, or more when
+    a fix leaves fewer than ``after_fix_days`` of them after it. C1 gets no
+    cycle (C0's is in the seed); every later session acts on the session
+    before it, when a cycle ran that day. ``feed`` must be a ``SimFeed``
+    over ``bars``.
+
+    Every run starts again from the same seed with the code as it is, so a
+    run after a fix is the fixed simulation re-run over every day so far.
     """
-    result = CalibrationResult(start=start, days_needed=days_needed)
+    result = CalibrationResult(start=start, days_needed=days_needed, fixes=tuple(fixes),
+                               after_fix_days=after_fix_days)
     audit_lines = list(audit_lines)
     seed, chosen, problems = _choose_seed(snapshots, start)
     result.problems += problems
@@ -928,6 +1008,7 @@ def run_calibration(
     result.day0 = SeriesPoint(start, _marked(seed, bars, start), real.get(start))
 
     last_real = max((d for d in real if d > start), default=None)
+    result.last_real = last_real
     sessions: list[date] = []
     if last_real is None:
         result.problems.append(f"no real close after {start.isoformat()} yet")
@@ -942,9 +1023,9 @@ def run_calibration(
     try:
         with live_audit_guarded():
             previous = start
-            compared = 0
+            compared: list[date] = []
             for session in sessions:
-                if compared >= days_needed:
+                if len(compared) >= closes_needed(compared, result.fixes, days_needed, after_fix_days):
                     break
                 feed.at_open(session)
                 cycle = None
@@ -958,7 +1039,7 @@ def run_calibration(
                 if managed:
                     result.integrity.uncovered += _uncovered(fund, session)
                 if session in real:
-                    compared += 1
+                    compared.append(session)
                 previous = session
     except LiveAuditLeak as exc:
         result.integrity.leak = str(exc)
@@ -1169,7 +1250,8 @@ class PassRule:
     #: The owner approved the rule on 2026-09-24 and asked for it to take
     #: effect together with the start date, once the first account snapshot
     #: exists: this flag and ``shadow.schedule.CALIBRATION_START`` change
-    #: together, in one reviewed change (a test enforces it).
+    #: together, in one reviewed change (a test enforces it). The last line,
+    #: what happens after a fail, is the owner's fail rule of 25 Sep 2026.
     approved: bool
     closes: int
     max_gap_pct: float
@@ -1193,8 +1275,13 @@ PASS_RULE = PassRule(
         "cover it, and no line reached the live audit log.",
         "6. The other way round: at least 90% of the sim's trades are also made by the real account "
         "within one session.",
-        "If calibration fails: the cause is fixed and logged in the Amendments table, and the 15 trading "
-        "days restart from zero. A difference whose stated reason turns out to be a bug counts as a fail.",
+        "If calibration fails: the cause is fixed and logged in the Amendments table. Then the fixed "
+        "simulation is re-run on every calibration day recorded so far, from the same starting snapshot, "
+        "and every day must pass all the conditions again. At least 5 calibration days must come after the "
+        "last fix, so calibration ends at day 15 or at the last fix + 5 days, whichever is later. If a "
+        "re-run fails on an earlier day, that is a new fail: fix, log and re-run again. A difference whose "
+        "stated reason turns out to be a bug still counts as a fail. If the end date moves, the fund test's "
+        "start date and bars are recalculated and logged.",
     ),
     approved=False,
     closes=DAYS_NEEDED,
@@ -1240,31 +1327,65 @@ def _pct(value: float) -> str:
     return f"{value * 100:.2f}%"
 
 
-def evaluate_pass_rule(result: Optional[CalibrationResult],
-                       rule: PassRule = PASS_RULE) -> tuple[bool, list[str]]:
-    """Each condition's verdict (PASS, FAIL or PENDING), and whether the whole rule passed.
+def needed_for(result: CalibrationResult, rule: PassRule = PASS_RULE) -> int:
+    """The closes this calibration needs under ``rule``: its 15, or the last fix + 5, whichever is more.
 
-    The rule passes only on a complete calibration -- ``rule.closes`` closes
-    compared -- with all five conditions met. Before that a condition already
-    broken reads FAIL, and one that could still go either way reads PENDING.
+    This is the number shown, so it counts the sessions still to be compared
+    as well as those already compared. When the last fix is dated after the
+    last close compared -- the account's record lags, or the fix was merged
+    before that day's close came in -- every trading day up to the fix is on
+    or before it too, and will be once its close is compared. Counting only
+    the closes already in would say 15 while ``end_estimate`` says day 17.
+    The run itself uses ``closes_needed`` on what it has compared, which
+    keeps going until five days after the fix either way.
     """
-    if result is None:
-        return False, ["Calibration has not started."]
+    compared = result.compared_days
+    last = result.last_fix
+    if last is None:
+        return rule.closes
+    anchor = compared[-1] if compared else result.start
+    to_come = sessions_through(next_trading_day(anchor), last)   # 0 unless the fix is after ``anchor``
+    return max(rule.closes, sum(1 for day in compared if day <= last) + to_come + result.after_fix_days)
+
+
+def is_complete(result: CalibrationResult, rule: PassRule = PASS_RULE) -> bool:
+    """Every close the rule needs has been compared, the days after the last fix among them."""
+    since = result.days_since_fix
+    return result.days_done >= needed_for(result, rule) and (since is None or since >= result.after_fix_days)
+
+
+@dataclass(frozen=True)
+class Condition:
+    """One of the rule's conditions as it stands today."""
+
+    number: int
+    #: True held, False broken, None could still go either way.
+    ok: Optional[bool]
+    what: str
+    detail: str
+
+    @property
+    def state(self) -> str:
+        return "PENDING" if self.ok is None else ("PASS" if self.ok else "FAIL")
+
+    def line(self) -> str:
+        return f"{self.number}. {self.what}: {self.state} ({self.detail})"
+
+
+def conditions(result: CalibrationResult, rule: PassRule = PASS_RULE) -> list[Condition]:
+    """The six conditions, each PASS, FAIL or PENDING on what has been compared so far.
+
+    A condition already broken reads FAIL on any day -- one close outside
+    the gap, one unexplained difference, one integrity breach cannot heal.
+    The rest are judged only on a complete calibration (``is_complete``) and
+    read PENDING until then.
+    """
     m = result.metrics
-    done = result.days_done
-    complete = done >= rule.closes
-    header = [f"{'Rule not in force yet' if not rule.approved else 'Approved rule'}: "
-              f"{done} of {rule.closes} closes compared."]
-    if not rule.approved:
-        header.append("A rule not yet in force cannot pass, whatever the numbers say.")
-    header += [f"Note: {p}" for p in result.problems]
-    verdicts: list[bool] = []
-    lines: list[str] = []
+    complete = is_complete(result, rule)
+    out: list[Condition] = []
 
     def verdict(ok: Optional[bool], number: int, what: str, detail: str) -> None:
-        state = "PENDING" if ok is None else ("PASS" if ok else "FAIL")
-        verdicts.append(bool(ok))
-        lines.append(f"{number}. {what}: {state} ({detail})")
+        out.append(Condition(number, ok, what, detail))
 
     # 1. Every close within the gap: broken by one close, confirmed only at the end.
     worst = max((p for p in result.series if p.diff_pct is not None), key=lambda p: abs(p.diff_pct),
@@ -1322,14 +1443,50 @@ def evaluate_pass_rule(result: Optional[CalibrationResult],
     else:
         verdict((m.sim_matched_share >= rule.sim_matched_share) if complete else None, 6, what6,
                 f"{m.sim_matched} of {m.sim_trades}, {m.sim_matched_share:.1%}")
+    return out
 
-    passed = rule.approved and complete and all(verdicts)
-    return passed, header + lines
+
+def _progress(result: CalibrationResult, rule: PassRule) -> str:
+    """How many closes are compared, how many are needed, and why that many."""
+    needed = needed_for(result, rule)
+    why = f"day {rule.closes} or the last fix + {result.after_fix_days} days, whichever is later"
+    last, since = result.last_fix, result.days_since_fix
+    fixed = ("no fix so far" if last is None else
+             f"last fix {last.isoformat()}, {since} of {result.after_fix_days} days since")
+    return f"{result.days_done} of {needed} closes compared ({why}; {fixed})."
+
+
+def evaluate_pass_rule(result: Optional[CalibrationResult],
+                       rule: PassRule = PASS_RULE) -> tuple[bool, list[str]]:
+    """Each condition's verdict (PASS, FAIL or PENDING), and whether the whole rule passed.
+
+    The rule passes only on a complete calibration -- ``rule.closes`` closes
+    compared, or more after a fix (``needed_for``), with at least
+    ``after_fix_days`` of them after the last fix -- with all six conditions
+    met. Before that a condition already broken reads FAIL, and one that
+    could still go either way reads PENDING.
+    """
+    if result is None:
+        return False, ["Calibration has not started."]
+    header = [f"{'Rule not in force yet' if not rule.approved else 'Approved rule'}: {_progress(result, rule)}"]
+    if not rule.approved:
+        header.append("A rule not yet in force cannot pass, whatever the numbers say.")
+    header += [f"Note: {p}" for p in result.problems]
+    judged = conditions(result, rule)
+    passed = rule.approved and is_complete(result, rule) and all(c.ok for c in judged)
+    return passed, header + [c.line() for c in judged]
 
 
 def calibration_status(result: Optional[CalibrationResult], evaluation: Optional[tuple[bool, list[str]]],
                        rule: PassRule = PASS_RULE) -> str:
-    """not_started, running (fewer closes than the rule needs), passed or failed.
+    """not_started, running, passed or failed, under the owner's fail rule.
+
+    * failed -- a condition reads FAIL now, on whatever day. A fail needs a
+      fix; once the fix is merged, the nightly re-run from the same seed
+      clears it, or finds it again, or finds a new one on an earlier day.
+    * running -- nothing reads FAIL, and not every close the rule needs has
+      been compared: 15, or five after the last fix when that is later.
+    * passed -- complete, every condition PASS, and the rule in force.
 
     Passed needs an approved rule as well as the numbers: the funds are
     shown only after calibration passes, and an unapproved rule is not the
@@ -1340,9 +1497,113 @@ def calibration_status(result: Optional[CalibrationResult], evaluation: Optional
     """
     if result is None:
         return "not_started"
-    if result.days_done < min(result.days_needed, rule.closes):
+    if any(c.ok is False for c in conditions(result, rule)):
+        return "failed"
+    if not is_complete(result, rule):
         return "running"
     return "passed" if rule.approved and evaluation is not None and evaluation[0] else "failed"
+
+
+def _dated(text: str) -> Optional[date]:
+    """The ISO date a line starts with, or None."""
+    try:
+        return date.fromisoformat(text[:10])
+    except (TypeError, ValueError):
+        return None
+
+
+def days_passed(result: Optional[CalibrationResult], rule: PassRule = PASS_RULE) -> int:
+    """Calibration days passed: counted from the first, as long as every day-by-day check held.
+
+    A calibration day counts when, on it and on every day before it,
+    everything that can be judged day by day held: the close was within
+    ``rule.max_gap_pct`` of the real one (condition 1), no unexplained
+    difference is dated that day (condition 4), and no sim position was
+    left uncovered by its stops that day (condition 5's uncovered list is
+    dated). The first day that breaks one ends the count, so after a fail
+    the count stops short of the failing day until a fix is merged and the
+    re-run passes it.
+
+    What is judged only over the whole period -- the tracking error (2) and
+    the two matched shares (3 and 6) -- and the integrity breaches that carry
+    no date (an engine or manager error, a line in the live audit log) are in
+    the verdict lines, not in this count.
+    """
+    if result is None:
+        return 0
+    broken = [d.day for d in result.differences if d.reason == UNEXPLAINED]
+    broken += [day for day in map(_dated, result.integrity.uncovered) if day is not None]
+    first_broken = min(broken, default=None)
+    count = 0
+    for point in result.series:
+        if point.real is None:
+            continue
+        if first_broken is not None and point.day >= first_broken:
+            break
+        if point.diff_pct is None or abs(point.diff_pct) > rule.max_gap_pct:
+            break
+        count += 1
+    return count
+
+
+def end_estimate(start: date, compared: Sequence[date], fixes: Iterable[Fix] = (), days: int = DAYS_NEEDED,
+                 after_fix: int = AFTER_FIX_DAYS) -> date:
+    """The day calibration can end if nothing more fails: day ``days``, or the last fix + ``after_fix``.
+
+    The later of the day-15 session and the fifth session after the last
+    fix. Days already compared are taken at their own dates; the rest are
+    counted forward in trading days (``config.market_calendar``) from the
+    last day compared, or from the start. A fail not yet fixed moves it
+    again, because its fix comes later still: ``estimated_end`` allows for
+    that.
+    """
+    known = sorted(compared)
+
+    def forward(anchor: date, sessions: int) -> date:
+        for _ in range(sessions):
+            anchor = next_trading_day(anchor)
+        return anchor
+
+    def day_number(n: int) -> date:
+        return known[n - 1] if n <= len(known) else forward(known[-1] if known else start, n - len(known))
+
+    end = day_number(days)
+    last = last_fix_day(fixes)
+    if last is not None:
+        after = [day for day in known if day > last]
+        if len(after) >= after_fix:
+            fifth = after[after_fix - 1]
+        else:
+            fifth = forward(max(last, known[-1] if known else start), after_fix - len(after))
+        end = max(end, fifth)
+    return end
+
+
+#: What the fix an open fail still needs is called while it is only assumed.
+UNMERGED_FIX = "fix not yet merged"
+
+
+def estimated_end(result: CalibrationResult, start: Optional[date] = None, rule: PassRule = PASS_RULE) -> date:
+    """The earliest day this calibration can end: ``end_estimate``, allowing for a fail not yet fixed.
+
+    A condition that reads FAIL now needs a fix, and that fix cannot be
+    dated before the latest real close on record -- it is not merged yet,
+    so it will be dated tonight or later -- and five more calibration days
+    must follow it. So while a fail is open the estimate assumes one more
+    fix, dated that day, the earliest it can be. A fail on day 3 then leaves
+    the end at day 15; a fail on day 15 moves it to day 20, and the fund
+    test's start and bars with it, which is what the 4 Funds page must say
+    before the fix is merged, not after. Not the last close the run
+    compared: a run stops comparing at the days it needs, and a fail left
+    open for weeks would otherwise keep an end date already in the past.
+    """
+    start = result.start if start is None else start
+    compared = result.compared_days
+    fixes = tuple(result.fixes)
+    if any(c.ok is False for c in conditions(result, rule)):
+        seen = max(d for d in (start, compared[-1] if compared else None, result.last_real) if d is not None)
+        fixes = (*fixes, (seen, UNMERGED_FIX))
+    return end_estimate(start, compared, fixes, rule.closes, result.after_fix_days)
 
 
 # --------------------------------------------------------------------------- #
@@ -1511,14 +1772,35 @@ def calibration_json(
     account's holding times. Two keys beyond the contract: the rule's
     per-condition ``verdicts``, and ``timing`` (trades matched a session
     apart) in the metrics; a reader that does not know them ignores them.
+
+    The fail rule's keys: ``days_needed`` is the closes needed now (15, or
+    the last fix + 5 when that is later, see ``needed_for``);
+    ``days_passed`` the calibration days passed so far (``days_passed``);
+    ``fixes`` every fix as ``{day, what}``; ``last_fix`` its ISO date or
+    null; ``days_since_fix`` the calibration days dated after it, null with
+    no fix; ``days_after_fix_needed`` 5. ``end_estimate`` is the ISO date
+    calibration can end if nothing more fails -- while a fail is open, the
+    earliest it can end, with that fail's fix merged on the last day
+    compared (``estimated_end``) -- and ``fund_test_plan`` the fund test's
+    start and bars if it does (``shadow.fund_test.fund_test_plan``); both
+    null before the start.
     """
     started = start is not None and result is not None
     metrics = result.metrics if started else None
+    last = result.last_fix if started else None
+    end = estimated_end(result, start, rule) if started else None
     out = {
         "status": status if start is not None else "not_started",
         "start": start.isoformat() if start is not None else None,
         "days_done": result.days_done if started else 0,
-        "days_needed": result.days_needed if started else rule.closes,
+        "days_needed": needed_for(result, rule) if started else rule.closes,
+        "days_passed": days_passed(result, rule) if started else 0,
+        "fixes": [{"day": day.isoformat(), "what": what} for day, what in (result.fixes if started else ())],
+        "last_fix": last.isoformat() if last is not None else None,
+        "days_since_fix": result.days_since_fix if started else None,
+        "days_after_fix_needed": result.after_fix_days if started else AFTER_FIX_DAYS,
+        "end_estimate": end.isoformat() if end is not None else None,
+        "fund_test_plan": fund_test_plan(end) if end is not None else None,
         "pass_rule": {
             "text": list(rule.text),
             "approved": rule.approved,
@@ -1551,17 +1833,24 @@ def calibration_json(
 def calibration_report(
     *, snapshots: Sequence[Snapshot], entries: Sequence[JournalEntry], audit_lines: Sequence[str], start: date,
     final_through: date, fetcher, not_shortable: frozenset[str] = frozenset(), days_needed: int = DAYS_NEEDED,
-    holding: Optional[dict] = None,
+    holding: Optional[dict] = None, fixes: Optional[Iterable[Fix]] = None,
 ) -> dict:
     """Fetch the bars, run the calibration and return its JSON part: what ``shadow.run`` prints.
 
     Bars are fetched for the seeded positions, every line journalled from
     the start on, and the calendar tickers, through ``fetcher`` (the race's
     ``OhlcFetcher``, cut to final closes at ``final_through``).
+
+    The fixes are ``shadow.schedule.CALIBRATION_FIXES`` unless ``fixes`` is
+    given, read here rather than passed in by the caller, so how long
+    calibration lasts is always the schedule's record of what was fixed.
     """
+    fixes = tuple(schedule.CALIBRATION_FIXES if fixes is None else fixes)
+    after_fix_days = schedule.AFTER_FIX_DAYS
     seed, _, problems = _choose_seed(snapshots, start)
     if seed is None:
-        result = CalibrationResult(start=start, days_needed=days_needed, problems=problems)
+        result = CalibrationResult(start=start, days_needed=days_needed, problems=problems, fixes=fixes,
+                                   after_fix_days=after_fix_days)
         evaluation = evaluate_pass_rule(result)
         return calibration_json(result, calibration_status(result, evaluation), start, evaluation, holding)
     tickers = set(CALENDAR_TICKERS) | seed.tickers() | {
@@ -1569,7 +1858,8 @@ def calibration_report(
     }
     bars = Bars.fetch(tickers, start, final_through, fetcher)
     feed = SimFeed(bars)
-    result = run_calibration(snapshots, entries, bars, feed, start, days_needed, audit_lines, not_shortable)
+    result = run_calibration(snapshots, entries, bars, feed, start, days_needed, audit_lines, not_shortable,
+                             fixes=fixes, after_fix_days=after_fix_days)
     evaluation = evaluate_pass_rule(result)
     out = calibration_json(result, calibration_status(result, evaluation), start, evaluation, holding)
     if result.fund is not None:
@@ -1580,10 +1870,12 @@ def calibration_report(
 
 
 __all__ = [
-    "AccountFill", "AuditRecord", "CALIBRATION_COST_PER_SIDE", "CalibrationResult", "DAYS_NEEDED", "Difference",
-    "Holding", "HeldPosition", "Integrity", "Match", "Metrics", "PASS_RULE", "PassRule", "REASONS",
-    "RestingStop", "Seed", "SeedPosition", "SeriesPoint", "Snapshot", "Snapshots", "Trade", "audit_lines_through",
-    "audit_records", "book_at_close", "calibration_json", "calibration_report", "calibration_status",
-    "compare_trades", "evaluate_pass_rule", "holding_days", "holding_periods", "load_snapshots", "match_trades",
-    "real_closes", "real_trades", "run_calibration", "seed_fund", "sim_trades", "trading_days_between",
+    "AccountFill", "AuditRecord", "CALIBRATION_COST_PER_SIDE", "CalibrationResult", "Condition", "DAYS_NEEDED",
+    "Difference", "Fix", "Holding", "HeldPosition", "Integrity", "Match", "Metrics", "PASS_RULE", "PassRule",
+    "REASONS", "RestingStop", "Seed", "SeedPosition", "SeriesPoint", "Snapshot", "Snapshots", "Trade",
+    "UNMERGED_FIX", "audit_lines_through", "audit_records", "book_at_close", "calibration_json",
+    "calibration_report", "calibration_status", "closes_needed", "compare_trades", "conditions", "days_passed",
+    "end_estimate", "estimated_end", "evaluate_pass_rule", "holding_days", "holding_periods", "is_complete",
+    "last_fix_day", "load_snapshots", "match_trades", "needed_for", "real_closes", "real_trades", "run_calibration",
+    "seed_fund", "sim_trades", "trading_days_between",
 ]

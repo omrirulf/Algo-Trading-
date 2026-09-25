@@ -13,7 +13,9 @@ What it contains depends on ``shadow/schedule.py`` and nothing else:
   day by day, with the trades that differ. Still no fund is run -- during
   calibration only the match is reported.
 * fund start set: the four funds and the 1,000 coin-flip funds, from that
-  day, through the last final close.
+  day, through the last final close -- and, listed after the four, the two
+  exploratory funds (``EXPLORATORY_FUNDS``), each compared with the model
+  fund. Every fund but VT also says how its longs and its shorts did.
 
 Reads the journal, the live audit log (read only), the account snapshots
 and yfinance. Writes nothing: the workflow redirects stdout.
@@ -30,7 +32,7 @@ import statistics
 import sys
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from typing import Iterable, Optional, Sequence
+from typing import Final, Iterable, Optional, Sequence
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -41,6 +43,7 @@ from config import settings as cfg  # noqa: E402
 from shadow import schedule  # noqa: E402
 from shadow.broker import ENTRY  # noqa: E402
 from shadow.fund import (  # noqa: E402
+    CONVICTION_FIRST,
     STARTING_CASH,
     Fund,
     IndexFund,
@@ -57,7 +60,24 @@ from shadow.order_matters import fund_summary, real_summary  # noqa: E402
 log = logging.getLogger("shadow.run")
 
 INDEX_TICKER = "VT"
-LABELS = {"model": "Model", "momentum": "Momentum", "hybrid": "Hybrid", "vt": "VT (world index, held)"}
+LABELS = {"model": "Model", "momentum": "Momentum", "hybrid": "Hybrid", "vt": "VT (world index, held)",
+          "model_by_conviction": "Model, highest conviction first", "model_sized": "Model, sized by conviction"}
+
+#: The owner's two exploratory funds (decisions 3 and 4 of 25 Sep 2026), in
+#: the order they are listed, after the four. The model's own signals, each
+#: with one thing changed: the buying order, then the size. Each is compared
+#: with the model fund, never ranked with the four: it cannot change the
+#: decision.
+EXPLORATORY_FUNDS: Final[tuple[str, ...]] = ("model_by_conviction", "model_sized")
+#: The fund an exploratory fund is compared with: same signals, one change.
+COMPARE_TO: Final[str] = "model"
+#: The lag of the Newey-West t on the daily difference from the model fund:
+#: a week of sessions, as positions held for days make consecutive days'
+#: differences correlated.
+VS_MODEL_LAG: Final[int] = 5
+#: Longs vs shorts (the owner's decision 6 of 25 Sep 2026): a side's mean
+#: return and hit rate read "too few" until it has this many closed trades.
+MIN_SIDE_TRADES: Final[int] = 20
 
 #: The real broker's own refusals, as the live audit log records them. A
 #: shadow fund is refused the same shorts; nothing else is inferred.
@@ -105,9 +125,69 @@ def max_drawdown(equity: Sequence[float]) -> float:
     return worst
 
 
+def total_return(fund) -> float:
+    return fund.days[-1].equity / STARTING_CASH - 1.0 if fund.days else 0.0
+
+
+def daily_returns(fund) -> list[float]:
+    """Close to close, the first session from the starting cash.
+
+    On the equity as printed, to the cent: two books that agree to the cent
+    every day -- as the model fund and the "highest conviction first" fund
+    do until the first cycle watchlist order runs out of room in -- then
+    differ by exactly nothing, not by float noise a t statistic would divide
+    by itself.
+    """
+    equity = [STARTING_CASH] + [round(d.equity, 2) for d in fund.days]
+    return [today / before - 1.0 for before, today in zip(equity, equity[1:])]
+
+
+def sides(closed: Sequence) -> dict:
+    """Longs vs shorts over a fund's closed trades: a report, nothing more.
+
+    A trade's net return is its pnl -- costs and dividends in -- over the
+    notional it was opened at; a hit is a return above zero. Open positions
+    are not counted: their return is not known yet. ``too_few`` until a side
+    has ``MIN_SIDE_TRADES`` trades, and the page says so instead of a number.
+    """
+    out = {}
+    for side, name in (("buy", "long"), ("sell", "short")):
+        returns = [t.pnl / t.notional for t in closed if t.side == side and t.notional > 0]
+        n = len(returns)
+        out[name] = {
+            "n": n,
+            "mean_return": statistics.fmean(returns) if returns else None,
+            "hit_rate": sum(1 for r in returns if r > 0) / n if n else None,
+            "too_few": n < MIN_SIDE_TRADES,
+        }
+    return out
+
+
+def vs_model(fund, model) -> dict:
+    """An exploratory fund against the model fund: same signals, same days, one change.
+
+    The difference is taken day by day, so a market that lifts both funds
+    alike cancels, and its mean is judged by a Newey-West t (the race's own,
+    ``analysis.horse_race.newey_west_t``), since the two books hold the same
+    names for days at a time and consecutive differences are not independent.
+    """
+    from analysis.horse_race import newey_west_t
+
+    diffs = [a - b for a, b in zip(daily_returns(fund), daily_returns(model))]
+    equity, model_equity = [d.equity for d in fund.days], [d.equity for d in model.days]
+    return {
+        "total_return_diff": total_return(fund) - total_return(model),
+        "max_drawdown": max_drawdown(equity),
+        "model_max_drawdown": max_drawdown(model_equity),
+        "mean_daily_diff": statistics.fmean(diffs) if diffs else None,
+        "t": newey_west_t(diffs, VS_MODEL_LAG),
+        "days": len(diffs),
+    }
+
+
 def summarise(fund, vt_return: Optional[float]) -> dict:
     equity = [d.equity for d in fund.days]
-    total = equity[-1] / STARTING_CASH - 1.0 if equity else 0.0
+    total = total_return(fund)
     if isinstance(fund, IndexFund):
         trades, win_rate, open_positions, cash = 1 if fund.qty else 0, None, 1 if fund.qty else 0, fund.cash
     else:
@@ -130,7 +210,29 @@ def summarise(fund, vt_return: Optional[float]) -> dict:
         # How often the buying order mattered (the owner's report, 24 Sep
         # 2026): VT buys once and never meets a limit.
         "order_matters": None if isinstance(fund, IndexFund) else fund_summary(fund),
+        # Longs vs shorts: VT holds one long and is not a signal's trade.
+        "sides": None if isinstance(fund, IndexFund) else sides(fund.broker.closed),
+        "exploratory": fund.name in EXPLORATORY_FUNDS,
     }
+
+
+def summarise_exploratory(fund, model, vt_return: Optional[float]) -> dict:
+    """An exploratory fund's row: every field a fund has, and how it compares with the model fund."""
+    return summarise(fund, vt_return) | {"compare_to": COMPARE_TO, "vs_model": vs_model(fund, model)}
+
+
+def exploratory_funds(feed: SimFeed, bars: Bars, shortable_no: frozenset[str]) -> list[Fund]:
+    """The two exploratory funds: the model fund with one thing changed each.
+
+    Same signals, feed, bars, costs, starting cash and short refusals as the
+    model fund; everything else is the ``Fund`` defaults, which are
+    production's. Simulation only.
+    """
+    return [
+        Fund("model_by_conviction", model_signal, feed, bars, not_shortable=shortable_no,
+             priority=CONVICTION_FIRST),
+        Fund("model_sized", model_signal, feed, bars, not_shortable=shortable_no, sized_by_conviction=True),
+    ]
 
 
 def percentile(values: Sequence[float], p: float) -> Optional[float]:
@@ -248,14 +350,18 @@ def run_funds(
         Fund("hybrid", rule_signal("hybrid"), feed, bars, not_shortable=shortable_no),
         IndexFund("vt", INDEX_TICKER, bars),
     ]
-    run(four, sessions, cycles, ran, feed)
+    explore = exploratory_funds(feed, bars, shortable_no)
+    # One run for all six: the same sessions, cycles and feed clock.
+    run([*four, *explore], sessions, cycles, ran, feed)
     vt = four[-1].days[-1].equity / STARTING_CASH - 1.0 if four[-1].days else None
     curves, coin_check = coin_funds(random_funds, processes, bars, sessions, cycles, ran, shortable_no)
-    check = integrity(four)
+    # The key keeps its name; the check covers the exploratory funds too.
+    check = integrity([*four, *explore])
+    model = next(f for f in four if f.name == COMPARE_TO)
     return {
         "start": start.isoformat(),
         "days": [d.isoformat() for d in sessions],
-        "list": [summarise(f, vt) for f in four],
+        "list": [summarise(f, vt) for f in four] + [summarise_exploratory(f, model, vt) for f in explore],
         "band": band(curves),
     }, {"four": check, "coin": coin_check}
 

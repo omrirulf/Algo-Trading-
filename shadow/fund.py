@@ -34,7 +34,8 @@ model -- a timeout or a failed call removes the name for EVERY fund that
 day, the same rule as the race (Amendment 2026-09-24).
 
 **Priority.** When there is more to buy than the caps allow, the first
-lines dispatched take the room. Every fund uses the one rule production
+lines dispatched take the room. Every fund -- all but the exploratory
+"highest conviction first" one, below -- uses the one rule production
 uses: **watchlist order** (``config.watchlist.DEFAULT_WATCHLIST``), one
 signal at a time, each seeing the fills before it. Production has no other
 rule -- there is no sort by conviction anywhere on the dispatch path -- and
@@ -42,6 +43,28 @@ a calibration fund dispatching in any other order would differ from the
 real account for that reason alone. A day with two cycles is dispatched
 cycle by cycle, each in watchlist order; a second same-side entry in a
 ticker on one day is refused by the broker, as live.
+
+Two exploratory funds
+---------------------
+The owner's decisions of 25 Sep 2026 add two funds that trade the model's
+own signals with the same machinery, start, costs and rules, each changing
+one thing, so that a comparison with the model fund isolates it. Both are
+simulation only and exploratory: they answer a question, they cannot change
+the decision. Production and the calibration copy keep watchlist order and
+the normal size; nothing here is reachable from either.
+
+* **Highest conviction first** (``priority=CONVICTION_FIRST``). The owner's
+  rule: when there is not enough room, it buys in highest-conviction-first
+  order instead of watchlist order. So each cycle is first tried in
+  watchlist order on a copy of the book (``Fund._short_of_room``). If that
+  runs out of room -- a signal a portfolio limit refuses or cuts short --
+  the cycle is dispatched by conviction, highest first, ties in watchlist
+  order; if not, in watchlist order, exactly as the model fund. Its one
+  question: does the buying order matter?
+* **Sized by conviction** (``sized_by_conviction=True``). Each new position's
+  size is the normal size times a factor set by its conviction
+  (``CONVICTION_SIZES``). Watchlist order, as production. See
+  ``Fund._execute`` for how that is done inside the unchanged engine.
 """
 
 from __future__ import annotations
@@ -49,12 +72,14 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 from datetime import date, timezone
-from typing import Callable, Iterable, Optional, Sequence
+from itertools import groupby
+from typing import Callable, Final, Iterable, Optional, Sequence
 
 from analysis.reader import JournalEntry
+from app import risk_engine
 from app.execution_engine import ExecutionEngine
 from app.position_manager import PositionManager
-from app.schemas import Bias, ExecutionStatus, LLMSignal
+from app.schemas import Bias, ExecutionResult, ExecutionStatus, LLMSignal
 from config.watchlist import DEFAULT_WATCHLIST
 from shadow.audit import FundAudit
 from shadow.broker import DEFAULT_COST_PER_SIDE, SimBroker
@@ -84,6 +109,52 @@ _ORDER = {ticker: i for i, ticker in enumerate(DEFAULT_WATCHLIST)}
 def dispatch_order(line: Line) -> tuple:
     """Cycle, then watchlist position (unknown tickers last, by name)."""
     return (line.cycle, _ORDER.get(line.ticker, len(_ORDER)), line.ticker)
+
+
+#: The two buying orders a fund can use. Production's is the watchlist's.
+WATCHLIST_FIRST: Final[str] = "watchlist"
+CONVICTION_FIRST: Final[str] = "conviction"
+
+
+def by_conviction(signals: Sequence[tuple[Line, Optional[LLMSignal]]]) -> list[tuple[Line, Optional[LLMSignal]]]:
+    """Lines, cycle by cycle, highest conviction first within each cycle.
+
+    ``sorted`` is stable, so lines of equal conviction keep the order they
+    came in -- watchlist order. A line with no signal is dispatched to
+    nothing, so where it goes does not matter; it goes last.
+
+    The fund uses this only on a cycle that watchlist order would run out of
+    room in (``Fund._short_of_room``), which is the owner's rule. Sorting
+    every cycle would not be the same thing, though it looks it. The
+    stock-market limit is on the net, longs less shorts, so a short
+    dispatched first makes room for a long after it. By conviction that long
+    can come first and be cut short, on a day watchlist order had room for
+    every line.
+    """
+    def key(pair: tuple[Line, Optional[LLMSignal]]) -> tuple:
+        line, signal = pair
+        return (line.cycle, -signal.conviction if signal is not None else math.inf)
+
+    return sorted(signals, key=key)
+
+
+#: Fund 6's sizes (the owner's decision of 25 Sep 2026): from each
+#: conviction up to the next, the normal size times this factor. Below the
+#: first nothing reaches sizing -- the engine's conviction floor refuses it.
+CONVICTION_SIZES: Final[tuple[tuple[float, float], ...]] = ((0.30, 0.25), (0.40, 0.5), (0.50, 1.0), (0.60, 1.5))
+
+
+def conviction_factor(conviction: float) -> Optional[float]:
+    """The size factor for a conviction, or None below the table.
+
+    Compared at six decimals, so a conviction of 0.4 that arrives as
+    0.39999999 is read as the 0.4 the model said, not the band below it.
+    """
+    value = round(float(conviction), 6)
+    for floor, factor in reversed(CONVICTION_SIZES):
+        if value >= floor:
+            return factor
+    return None
 
 
 def lines_by_day(entries: Iterable[JournalEntry]) -> dict[date, list[Line]]:
@@ -213,10 +284,19 @@ class Fund:
         self, name: str, signal_for: SignalFor, feed: SimFeed, bars: Bars, *,
         cash: float = STARTING_CASH, cost_per_side: float = DEFAULT_COST_PER_SIDE,
         not_shortable: frozenset[str] = frozenset(), keep_actions: bool = False, order_detail: bool = True,
+        priority: str = WATCHLIST_FIRST, sized_by_conviction: bool = False,
     ) -> None:
+        if priority not in (WATCHLIST_FIRST, CONVICTION_FIRST):
+            raise ValueError(f"priority must be {WATCHLIST_FIRST!r} or {CONVICTION_FIRST!r}, got {priority!r}")
         self.name = name
         self.signal_for = signal_for
         self.bars = bars
+        #: The buying order within a cycle. Every fund but the exploratory
+        #: "highest conviction first" one uses production's: watchlist order;
+        #: that one too, on a cycle watchlist order has room for.
+        self.priority = priority
+        #: The exploratory "sized by conviction" fund only: see ``_execute``.
+        self.sized_by_conviction = sized_by_conviction
         self.broker = SimBroker(name=name, cash=cash, quote=feed.get_latest_price,
                                 cost_per_side=cost_per_side, not_shortable=not_shortable)
         self.audit = FundAudit(name, keep_actions=keep_actions)
@@ -288,39 +368,136 @@ class Fund:
         from shadow.order_matters import Event, capacity_kind
 
         dispatched = False
-        for line in cycle:
-            signal = self.signal_for(line)
-            if line.ticker in self.broker.positions:        # SKIP_HELD_TICKERS
-                if self.decisions is not None and signal is not None:
+        signals = [(line, self.signal_for(line)) for line in cycle]
+        # One journal cycle at a time (``lines_by_day`` hands them over cycle
+        # by cycle), so that the "highest conviction first" fund chooses each
+        # cycle's order on the book the cycles before it left. For every
+        # other fund this is the list as it came, in the order it came.
+        for _, batch in groupby(signals, key=lambda pair: pair[0].cycle):
+            batch = list(batch)
+            if self.priority == CONVICTION_FIRST and self._short_of_room(batch):
+                batch = by_conviction(batch)
+            for line, signal in batch:
+                # Held is read at dispatch, whatever the order: a name bought
+                # earlier in this list is held by the time a later line reaches it.
+                if line.ticker in self.broker.positions:        # SKIP_HELD_TICKERS
+                    if self.decisions is not None and signal is not None:
+                        self.decisions.append(Decision(self.broker.day, line.day, line.ticker,
+                                                       signal.bias.value, signal.conviction, "SKIPPED",
+                                                       "already held", False))
+                    continue
+                if signal is None:
+                    continue
+                result, cap = self._execute(signal)
+                dispatched = True
+                accepted = result.status is ExecutionStatus.ACCEPTED
+                kind = None if accepted else capacity_kind(result.reason, cap)
+                if kind is not None:
+                    self.order_days_seen.add(line.day)
+                if self.order_events is not None and (accepted or kind is not None):
+                    self.order_events.append(Event(line.day, line.ticker, signal.conviction,
+                                                   result.status.value, "", kind))
+                if self.decisions is not None:
                     self.decisions.append(Decision(self.broker.day, line.day, line.ticker, signal.bias.value,
-                                                   signal.conviction, "SKIPPED", "already held", False))
-                continue
-            if signal is None:
-                continue
-            result = self.engine.execute(signal)
-            dispatched = True
-            accepted = result.status is ExecutionStatus.ACCEPTED
-            kind = None if accepted else capacity_kind(result.reason)
-            if kind is not None:
-                self.order_days_seen.add(line.day)
-            if self.order_events is not None and (accepted or kind is not None):
-                self.order_events.append(Event(line.day, line.ticker, signal.conviction,
-                                               result.status.value, "", kind))
-            if self.decisions is not None:
-                self.decisions.append(Decision(self.broker.day, line.day, line.ticker, signal.bias.value,
-                                               signal.conviction, result.status.value, result.reason))
-            if result.status is ExecutionStatus.ACCEPTED:
-                self.tally.accepted += 1
-            elif result.status is ExecutionStatus.ERROR:
-                self.tally.errors += 1
-                if result.reason.startswith("unexpected"):
-                    self.tally.unexpected.append(f"{line.ticker}: {result.reason}")
-                elif self._hole(line.ticker, result.reason):
-                    self.tally.data_holes.append(f"{self.broker.day.isoformat()} {line.ticker}: no bar; "
-                                                 f"no entry that day")
-            else:
-                self.tally.rejected += 1
+                                                   signal.conviction, result.status.value, result.reason))
+                if result.status is ExecutionStatus.ACCEPTED:
+                    self.tally.accepted += 1
+                elif result.status is ExecutionStatus.ERROR:
+                    self.tally.errors += 1
+                    if result.reason.startswith("unexpected"):
+                        self.tally.unexpected.append(f"{line.ticker}: {result.reason}")
+                    elif self._hole(line.ticker, result.reason):
+                        self.tally.data_holes.append(f"{self.broker.day.isoformat()} {line.ticker}: no bar; "
+                                                     f"no entry that day")
+                else:
+                    self.tally.rejected += 1
         self.cycles_dispatched += dispatched
+
+    def _short_of_room(self, batch: Sequence[tuple[Line, Optional[LLMSignal]]]) -> bool:
+        """Would this cycle, dispatched in watchlist order, run out of room?
+
+        Asked of a copy of the book (``SimBroker.scratch``) and an engine
+        built on it, whose audit record is thrown away, so the fund itself is
+        exactly as it was. The feed is only read. The copy is dispatched just
+        as ``_enter`` would: held names skipped, each signal seeing the
+        fills before it.
+
+        "Out of room" is a signal a portfolio limit refused (the order
+        report's own test, ``capacity_kind``: a group, the sleeve, the
+        gross, the stock-market limit, the position count or cash), or one
+        a limit cut short of what its own cap alone would have bought.
+        Either way the list held more than the book could take, and its
+        order decided who got what. A signal refused for any other reason,
+        or bought at its own cap's full size, is not a lack of room.
+        """
+        from shadow.order_matters import capacity_kind
+
+        book = self.broker.scratch()
+        engine = ExecutionEngine(book, self.engine.market_data,
+                                 audit_logger=FundAudit(f"{self.name}.trial").logger)
+        for line, signal in batch:
+            if signal is None or line.ticker in book.positions:
+                continue
+            result, cap = self._execute(signal, engine)
+            if result.status is ExecutionStatus.ACCEPTED:
+                own_cap = cap if cap is not None else risk_engine.max_position_pct_for(signal.ticker)
+                alone = risk_engine.calculate_position_size(equity=result.equity, price=result.entry_price,
+                                                            max_position_pct=own_cap)
+                if result.quantity < alone:
+                    return True
+            elif capacity_kind(result.reason, cap) is not None:
+                return True
+        return False
+
+    def _execute(self, signal: LLMSignal,
+                 engine: Optional[ExecutionEngine] = None) -> tuple[ExecutionResult, Optional[float]]:
+        """The production engine's answer to one signal, and the cap it was sized under if this fund scaled it.
+
+        Every fund but one calls the engine as it is. The "sized by
+        conviction" fund changes the one number that sets a position's normal
+        size: the per-ticker cap. There is no other size budget in this
+        system -- the ATR sets only the stop -- and the engine reads the cap
+        in one place, ``risk_engine.max_position_pct_for(signal.ticker)``,
+        once per new entry, just before ``calculate_position_size``. So for
+        the length of this one call, and only this fund's, that function
+        returns the ticker's own cap times the signal's conviction factor,
+        and the original is put back in ``finally``, whatever happens.
+        Everything the engine checks before sizing -- the conviction floor,
+        the position count, the gross, sleeve, exposure-group and
+        stock-market limits -- is computed as for any fund and still bounds
+        the size; the position manager is untouched, and its ladder tranches
+        are fractions of the position, so they scale with it. The engine
+        never learns it was run differently, and nothing in ``app/`` changes.
+
+        The run is one process working through its funds one at a time, so
+        no other fund's engine can run while the cap is scaled.
+
+        ``engine`` is the fund's own unless ``_short_of_room`` is trying the
+        cycle on a copy of the book.
+        """
+        engine = engine if engine is not None else self.engine
+        factor = conviction_factor(signal.conviction) if self.sized_by_conviction else None
+        if factor is None:
+            return engine.execute(signal), None
+        normal = risk_engine.max_position_pct_for
+        applied: list[float] = []
+
+        def scaled(ticker: str) -> float:
+            cap = normal(ticker) * factor
+            # calculate_position_size refuses a cap outside (0, 1] as a risk
+            # violation, which the tally would read as an ordinary refusal.
+            # Raised here it is an "unexpected" error: an integrity problem.
+            if not 0.0 < cap <= 1.0:
+                raise ValueError(f"{ticker}: cap {normal(ticker)} x {factor} is {cap}, outside (0, 1]")
+            applied.append(cap)
+            return cap
+
+        risk_engine.max_position_pct_for = scaled
+        try:
+            result = engine.execute(signal)
+        finally:
+            risk_engine.max_position_pct_for = normal
+        return result, (applied[-1] if applied else None)
 
 
 class IndexFund:
@@ -389,6 +566,7 @@ def run(
 
 
 __all__ = [
-    "Day", "Decision", "Fund", "IndexFund", "Line", "STARTING_CASH", "Tally", "coin_signal", "cycle_days",
+    "CONVICTION_FIRST", "CONVICTION_SIZES", "Day", "Decision", "Fund", "IndexFund", "Line", "STARTING_CASH",
+    "Tally", "WATCHLIST_FIRST", "by_conviction", "coin_signal", "conviction_factor", "cycle_days",
     "dispatch_order", "lines_by_day", "model_signal", "rule_signal", "run",
 ]

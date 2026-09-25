@@ -45,7 +45,10 @@ Next checkpoint: 20 independent days (= 60 trading days), estimated 2026-12-22, 
   trades and the answer is to hold the index. A VT day the price source has
   not printed makes the look wait; once five later VT sessions are out and
   that day still is not, it is left out of the index test and counted.
-- **Model watch.** The owner's triggers (b) and (c) are printed on every run:
+- **Model watch.** Trigger (a), a one-time check on the zero-shorts replay,
+  tripped and was closed on 25 Sep 2026: gpt-oss shorted 1 of the 31 lines
+  where Opus shorted, and the owner kept gpt-oss, so the model arm is
+  effectively long-only. The owner's triggers (b) and (c) are printed on every run:
   five answered days with no SHORT while SPY fell, and model errors above 5%
   of the calls that reached the model over five cycle days, counted from
   25 Sep 2026. Setup errors (our key or configuration) are shown but not
@@ -56,6 +59,19 @@ Next checkpoint: 20 independent days (= 60 trading days), estimated 2026-12-22, 
 
 A run with any setting other than the registered ones (horizon, cost,
 floor, seeds, sizing) says **SENSITIVITY RUN** and evaluates no look.
+
+## Exploratory reports: conviction groups, longs and shorts
+
+From 23 Sep 2026 the race also prints the trades split two ways, report
+only: the model's, momentum's and the hybrid's by the conviction of the line
+that opened them (0.30-0.40, 0.40-0.50, 0.50-0.60, 0.60 and above; the coin
+flip's conviction is one fixed number, so it is not split), and every arm's
+into longs and shorts. Each group
+shows the number of trades, the mean net return and the hit rate, and reads
+"too few" until it has 20 trades. They answer "does higher conviction mean
+better trades?" and "do the longs and the shorts differ?"; they decide
+nothing. The same numbers are in `logs/race_gate.json` and on the 4 Funds
+page.
 
 ## The arms
 

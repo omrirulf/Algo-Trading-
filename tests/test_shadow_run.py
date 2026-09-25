@@ -66,6 +66,11 @@ def test_nothing_starts_until_the_owner_sets_a_date():
     assert schedule.CALIBRATION_START is None
     assert schedule.FUND_START is None
     assert schedule.CALIBRATION_DAYS == 15
+    # The owner's fail rule of 25 Sep 2026: no fix yet, and five calibration
+    # days after the last one. A fix is added only in a reviewed change,
+    # with its row in the Amendments table.
+    assert schedule.CALIBRATION_FIXES == ()
+    assert schedule.AFTER_FIX_DAYS == 5
     assert schedule.RANDOM_FUNDS == 1000
     assert schedule.FUNDS == ("model", "momentum", "hybrid", "vt")
 
@@ -77,6 +82,23 @@ def test_calibration_cannot_start_under_a_rule_the_owner_has_not_approved():
 
     assert (schedule.CALIBRATION_START is None) == (not PASS_RULE.approved)
     assert schedule.FUND_START is None or schedule.CALIBRATION_START is not None
+
+
+def test_every_calibration_fix_is_dated_described_and_in_the_amendments_table():
+    """A fix exists only after calibration started, is dated the day it was
+    merged, says what it fixed, and is logged in the pre-registration's
+    Amendments table on that day (the owner's fail rule)."""
+    from pathlib import Path
+
+    fixes = schedule.CALIBRATION_FIXES
+    assert not fixes or schedule.CALIBRATION_START is not None
+    doc = (Path(__file__).resolve().parents[1] / "docs" / "horse-race-preregistration.md").read_text()
+    amendments = doc.partition("## Amendments")[2]
+    rows = [row for row in amendments.splitlines() if row.startswith("| 20")]
+    for day, what in fixes:
+        assert isinstance(day, date) and isinstance(what, str) and what.strip()
+        assert day > schedule.CALIBRATION_START
+        assert any(row.startswith(f"| {day.isoformat()} |") and "alibration" in row for row in rows), day
 
 
 def test_the_fund_tests_bars_come_from_its_own_share_of_the_data():
@@ -96,6 +118,7 @@ def test_the_fund_tests_bars_come_from_its_own_share_of_the_data():
         return sum(1 for i in range((last - first).days + 1) if is_trading_day(first + timedelta(days=i)))
 
     looks = (date(2026, 12, 22), date(2027, 3, 22), date(2027, 6, 16))
+    assert schedule.FUND_TEST_LOOK_ESTIMATES == looks
     assert tuple(sessions(schedule.FUND_TEST_PLANNED_START, look) for look in looks) == \
         schedule.FUND_TEST_PLANNED_SESSIONS == (46, 106, 166)
     exact = gate.obrien_fleming_bars(schedule.FUND_TEST_PLANNED_SESSIONS)

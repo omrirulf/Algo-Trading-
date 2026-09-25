@@ -232,7 +232,7 @@ def test_a_long_round_trip_moves_cash_by_its_fills_and_costs_and_its_trade_says_
     assert broker.cash == pytest.approx(expected)
     assert broker.positions == {} and broker.live_stops() == []
     [trade] = broker.closed
-    assert trade == ClosedTrade("AAA", "buy", D1, D3, pytest.approx(expected - 100_000.0))
+    assert trade == ClosedTrade("AAA", "buy", D1, D3, pytest.approx(expected - 100_000.0), 1_000.0)
     assert [(f.kind, f.side, f.qty, f.price) for f in broker.fills] == [
         (ENTRY, "buy", 10, 100.0), (TRANCHE, "sell", 4, 105.0), (STOP, "sell", 6, 100.0)]
     assert [f.cost for f in broker.fills] == pytest.approx([1.0, 0.42, 0.60])

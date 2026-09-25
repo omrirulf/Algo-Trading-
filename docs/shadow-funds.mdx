@@ -73,15 +73,47 @@ The owner approved the pass rule on 24 Sep 2026: six conditions over 15
 trading days, including a two-way trade match (at least 90% of the real
 account's trades found in the sim, and at least 90% of the sim's trades
 found in the real account, each within one session). If calibration fails,
-the cause is fixed and logged in the pre-registration's Amendments table,
-and the 15 days restart from zero; a difference whose stated reason turns
-out to be a bug counts as a fail. The rule takes effect with the start date,
+the cause is fixed and logged in the pre-registration's Amendments table
+(and in `shadow/schedule.py`'s `CALIBRATION_FIXES`), and the fixed
+simulation is re-run on every calibration day so far, from the same starting
+snapshot: every day must pass all the conditions again. At least 5
+calibration days must come after the last fix, so calibration ends at day 15
+or the last fix + 5 days, whichever is later; a re-run that fails on an
+earlier day is a new fail, and a difference whose stated reason turns out to
+be a bug counts as a fail (the owner's rule of 25 Sep 2026). If the end
+moves, the fund test's start date and bars are recalculated and logged. The
+4 Funds page shows the days passed, the last fix and the days since it. The
+rule takes effect with the start date,
 once the first account snapshot exists, and the four funds run only after
 calibration passes. Both dates live in `shadow/schedule.py` and
 are set by a reviewed change, never by the code; a test fails if the start
 date is set while the rule is still unapproved, and an unapproved rule can
 never read "passed". During calibration, only the calibration match is
 reported.
+
+## Two exploratory funds
+
+Two more simulated funds use the model's own signals and the same
+machinery, and differ from the model fund in one thing each. They start with
+the others, pay the same costs and follow the same rules, and they cannot
+change any decision: each only answers one question, against the model fund.
+
+- **Model, highest conviction first**: when the book cannot take every
+  signal, it buys in order of conviction, highest first, instead of
+  watchlist order. Does the buying order matter?
+- **Model, sized by conviction**: each new position's size is the normal
+  size times 0.25 (conviction 0.30-0.40), 0.5 (0.40-0.50), 1.0 (0.50-0.60)
+  or 1.5 (0.60 and above). In this system the normal size is the
+  per-ticker cap (5% of equity for a company, 12% for a broad fund, and so
+  on); the ATR only sets the stop. The fund's own engine reads the cap
+  scaled by the signal's conviction, for its own entries only; production
+  code is not changed, and every portfolio limit (exposure groups, sleeve
+  budget, gross exposure, stock-market, position count) still applies. Its
+  maximum drawdown is shown beside the model fund's.
+
+Production and the calibration copy keep watchlist order and the normal
+size. Each fund's closed trades are also split into longs and shorts (the
+number, the mean net return and the hit rate; "too few" under 20).
 
 ## How often the buying order matters (report only)
 

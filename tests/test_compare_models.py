@@ -85,11 +85,21 @@ def test_the_mix_counts_both_sides_on_the_same_lines_only():
     assert "trigger (a) not met" in text  # exactly a quarter is not below it
 
 
-def test_below_a_quarter_says_so():
+def test_below_a_quarter_says_so_and_no_longer_tells_anyone_to_stop():
+    """Trigger (a) was a one-time check on this number. It tripped, the owner
+    kept the model on 2026-09-25, and it is closed: the replay still reports
+    the number, but it no longer tells anyone to stop."""
+    from analysis import decision_gate as gate
+
     cell = Cell(model="m", effort="high", diffs=[
         diff(t, "BEARISH", "NEUTRAL") for t in "ABCDE"
     ])
-    assert "trigger (a) -- report it and stop" in "\n".join(cm.render_mix(cell, "inc"))
+    text = "\n".join(cm.render_mix(cell, "inc"))
+    closed = gate.TRIGGER_A_CLOSED.isoformat()
+    assert closed == "2026-09-25"
+    assert (f"below a quarter (the owner's trigger (a), a one-time check, closed on {closed} "
+            "with the model kept)") in text
+    assert "stop" not in text and "revert" not in text
 
 
 def test_the_workflow_passes_the_filters_through_the_environment():
