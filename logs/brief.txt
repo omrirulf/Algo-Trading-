@@ -1,7 +1,6 @@
-🔴 2 position(s) without a working stop
-Equity $100,338 · 22 positions · $96,474 gross · $2,546 at risk · unrealised +$663
-No directional call today
+🟡 2 warnings: 7 of 80 ticker(s) produced no signal
+Equity $100,872 · 22 positions · $87,626 gross · $2,356 at risk · unrealised +$1,032
+1 directional call, none traded
 Closed: GOOGL, XBI
-No stop on record: TLT, IEF
-Also: 58 of 80 ticker(s) produced no signal; 12 of 80 ticker(s) were judged without news
-Cycle 80 tickers, $0.00 · 2026-09-24
+Also: 4 of 80 ticker(s) were judged without news
+Cycle 80 tickers, $0.13 · 2026-09-25
