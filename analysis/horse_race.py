@@ -47,6 +47,13 @@ or after ``decision_gate.DECISION_CUTOFF`` -- at the planned looks, with
 the bars and the index-first rule in ``analysis/decision_gate.py``. The
 whole journal is printed after it, for reading.
 
+Two exploratory reports follow the decision window's tables (the owner's
+decisions of 2026-09-25): each arm's trades grouped by the conviction of
+the line that opened them, and split into longs and shorts, each with the
+number of trades, the mean net return and the hit rate. They read trades
+the race has already scored, say "too few" below ``MIN_REPORT_TRADES``, and
+decide nothing: no look, bar or verdict reads them.
+
 Nothing here is fitted. The momentum arm's parameters are the textbook
 values and this file never touches them; it judges the rule, it does not
 tune it. Read-only in every direction -- it reads the journal, fetches
@@ -131,6 +138,30 @@ EXPLORATORY_HORIZON = 20
 #: this many distinct entry days. Pre-registered; not a decision threshold.
 EXPLORATORY_MIN_TRADES = 20
 EXPLORATORY_MIN_DAYS = 20
+
+#: The owner's two exploratory reports (25 Sep 2026) -- trades by conviction
+#: group, and longs against shorts -- say "too few" for a group or a side
+#: with fewer trades than this. Report only: nothing that decides reads it.
+MIN_REPORT_TRADES = 20
+
+#: The owner's conviction groups, as (label, lowest, below). Each includes
+#: its bottom and excludes its top; the last has no top. A conviction is
+#: compared rounded to six places, so a 0.40 that arithmetic delivers as
+#: 0.39999999 lands in the group a reader would put it in.
+CONVICTION_GROUPS: tuple[tuple[str, float, Optional[float]], ...] = (
+    ("0.30-0.40", 0.30, 0.40),
+    ("0.40-0.50", 0.40, 0.50),
+    ("0.50-0.60", 0.50, 0.60),
+    ("0.60+", 0.60, None),
+)
+
+#: The arms the conviction report splits. The coin flip is not one of them:
+#: its conviction is one fixed number, so it would fill a single group and
+#: say nothing about conviction.
+CONVICTION_ARMS = (MODEL_ARM, momentum.NAME, hybrid.NAME)
+
+#: The two sides, as (the report's label, the simulated trade's side).
+SIDES = (("long", "buy"), ("short", "sell"))
 
 #: The two halves of the watchlist, raced separately as well as together:
 #: a fund has no analysts, insiders or earnings, so a model reading all of
@@ -344,6 +375,10 @@ class ScoredTrade:
     fund: bool
     trade: Trade
     cost_per_side: float
+    #: The conviction of the line that opened the trade: the model's as
+    #: journalled, a rule's as the rule computed it. Only the exploratory
+    #: conviction report reads it; nothing that decides does.
+    conviction: Optional[float] = None
 
     @property
     def key(self) -> tuple[str, datetime]:
@@ -377,6 +412,7 @@ def scored_trades(
             signal_day=_line_day(signal.entry),
             entry_day=date.fromisoformat(trade.entry_date), exit_day=date.fromisoformat(trade.exit_date),
             fund=is_fund(signal.entry.ticker), trade=trade, cost_per_side=cost_per_side,
+            conviction=signal.entry.conviction,
         )
         for signal, trade in zip(matched, trades)
     ]
@@ -804,8 +840,16 @@ class GateView:
     next_estimate: Optional[date]
 
 
-def gate_json(view: GateView, horizon: int, now: datetime) -> dict:
-    """The gate as data, for the dashboard's banner: the same numbers the header prints."""
+def gate_json(
+    view: GateView, horizon: int, now: datetime, splits: Optional[TradeSplits] = None,
+) -> dict:
+    """The gate as data, for the dashboard's banner: the same numbers the header prints.
+
+    ``splits`` adds the two exploratory reports for the 4 Funds page. They
+    are appended after the gate's own fields and are built from trades the
+    race already scored, so every gate field reads the same with or without
+    them.
+    """
     decided = gate.first_decision(view.looks)
     upcoming = None if decided else gate.next_look(view.looks)
     return {
@@ -829,6 +873,7 @@ def gate_json(view: GateView, horizon: int, now: datetime) -> dict:
              "outcome": look.outcome, "reason": look.reason}
             for look in view.looks
         ],
+        **splits_json(splits),
     }
 
 
@@ -1043,8 +1088,12 @@ def main(argv: list[str] | None = None) -> int:
         entry_days=entry_days, independent=independent, looks=looks, next_estimate=estimate,
     )
 
+    # The owner's two exploratory reports, over the decision race's own
+    # scored trades. Computed after the gate has been read, from trades it
+    # has already read, so they cannot move it; the JSON path returns here.
+    splits = trade_splits(decision.results)
     if args.gate_json:
-        print(json.dumps(gate_json(view, args.horizon, now)))
+        print(json.dumps(gate_json(view, args.horizon, now, splits=splits)))
         return 0
 
     # The owner's model-watch triggers, and what the calls cost.
@@ -1086,7 +1135,7 @@ def main(argv: list[str] | None = None) -> int:
         gate_view=view, whole=whole, unanswered=unanswered, trips=trips, watch_counts=watch_counts,
         watched=days,
         spend=llm_spend(in_window), spend_whole=llm_spend(read.entries),
-        warnings=window_warnings(read.entries),
+        warnings=window_warnings(read.entries), splits=splits,
     ))
     return 0
 
@@ -1161,6 +1210,116 @@ def race_exploratory(
 
 
 # --------------------------------------------------------------------------- #
+# Exploratory reports: by conviction, and longs against shorts
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True)
+class SplitStats:
+    """One slice of an arm's trades: how many, their mean net return, their hit rate."""
+
+    label: str
+    n: int
+    mean_net: Optional[float]
+    hit_rate: Optional[float]
+
+    @property
+    def too_few(self) -> bool:
+        return self.n < MIN_REPORT_TRADES
+
+    def as_json(self) -> dict:
+        return {"n": self.n, "mean_net": self.mean_net, "hit_rate": self.hit_rate, "too_few": self.too_few}
+
+
+def split_stats(label: str, trades: Sequence[ScoredTrade]) -> SplitStats:
+    """The per-trade table's own net return and hit, over one slice of the trades."""
+    return SplitStats(label=label, n=len(trades), mean_net=mean_net(trades), hit_rate=hit_rate(trades))
+
+
+def conviction_group(conviction: Optional[float]) -> Optional[str]:
+    """The owner's group for a line's conviction; None below the lowest, or with none."""
+    if conviction is None:
+        return None
+    value = round(conviction, 6)
+    for label, lowest, below in CONVICTION_GROUPS:
+        if value >= lowest and (below is None or value < below):
+            return label
+    return None
+
+
+def by_conviction(trades: Sequence[ScoredTrade]) -> tuple[list[SplitStats], int]:
+    """An arm's trades in the owner's conviction groups, in order, and how many fit none.
+
+    A trade below the lowest group cannot exist at the registered floor of
+    0.30. If a run with another floor makes one, it is left out and counted,
+    rather than put in a group it does not belong to.
+    """
+    slices: dict[str, list[ScoredTrade]] = {label: [] for label, _, _ in CONVICTION_GROUPS}
+    outside = 0
+    for trade in trades:
+        label = conviction_group(trade.conviction)
+        if label is None:
+            outside += 1
+        else:
+            slices[label].append(trade)
+    return [split_stats(label, slices[label]) for label, _, _ in CONVICTION_GROUPS], outside
+
+
+def by_side(trades: Sequence[ScoredTrade]) -> dict[str, SplitStats]:
+    """An arm's trades split into longs and shorts, by the side each trade was opened on."""
+    return {label: split_stats(label, [t for t in trades if t.trade.side == side]) for label, side in SIDES}
+
+
+@dataclass(frozen=True)
+class TradeSplits:
+    """The two exploratory reports over the decision window. They decide nothing."""
+
+    #: Per arm in ``CONVICTION_ARMS``: the four groups, in ``CONVICTION_GROUPS`` order.
+    conviction: dict[str, list[SplitStats]]
+    #: Per arm in ``CONVICTION_ARMS``: trades that fit no group, left out and counted.
+    outside: dict[str, int]
+    #: Per arm raced, in report order: "long" and "short".
+    sides: dict[str, dict[str, SplitStats]]
+
+
+def trade_splits(results: Sequence[ArmResult]) -> TradeSplits:
+    """Split the decision race's scored trades two ways, for reading only.
+
+    These are the trades the gate reads: lines journalled on or after the
+    cutoff, resolved, through the stop and sizing, after costs. The split
+    only groups them -- it scores nothing new and hands nothing back to the
+    gate -- so no look, bar or verdict can move because of it.
+    """
+    by_name = {r.name: r for r in results}
+    conviction: dict[str, list[SplitStats]] = {}
+    outside: dict[str, int] = {}
+    for name in CONVICTION_ARMS:
+        if name in by_name:
+            conviction[name], outside[name] = by_conviction(by_name[name].trades)
+    sides = {r.name: by_side(r.trades) for r in results}
+    return TradeSplits(conviction=conviction, outside=outside, sides=sides)
+
+
+def splits_json(splits: Optional[TradeSplits]) -> dict:
+    """The two reports as data for the 4 Funds page.
+
+    Fractions (0.012 is 1.2%), null where a slice has no trade. The numbers
+    are given under "too few" as well: the page decides how to show them.
+    """
+    return {
+        "report_since": gate.DECISION_CUTOFF.isoformat(),
+        "conviction_groups": {} if splits is None else {
+            name: [{"group": s.label, **s.as_json()} for s in groups]
+            for name, groups in splits.conviction.items()
+        },
+        "sides": {} if splits is None else {
+            name: {label: s.as_json() for label, s in per_side.items()}
+            for name, per_side in splits.sides.items()
+        },
+    }
+
+
+# --------------------------------------------------------------------------- #
 # Rendering
 # --------------------------------------------------------------------------- #
 
@@ -1176,7 +1335,7 @@ def render(
     unanswered: Sequence[JournalEntry] = (), trips: Optional[dict[str, list[gate.Trip]]] = None,
     watch_counts: Optional[dict[str, int]] = None, watched: Sequence[gate.WatchDay] = (),
     spend: Optional[Spend] = None, spend_whole: Optional[Spend] = None,
-    warnings: Sequence[str] = (),
+    warnings: Sequence[str] = (), splits: Optional[TradeSplits] = None,
 ) -> str:
     held = sum(1 for e in read.entries if e.held)
     no_stamp = sum(1 for e in read.entries if not e.held and e.timestamp is None)
@@ -1280,6 +1439,8 @@ def render(
                     f"{'y' if t.hit else 'n':>4}{'y' if t.stopped else 'n':>5}"
                 )
 
+    out += _render_splits(splits if splits is not None else trade_splits(results))
+
     if whole is not None and whole.reports:
         whole_days = sorted({_line_day(e) for e in whole.lines})
         out += [
@@ -1305,7 +1466,9 @@ def render(
         "selection of lines would have scored with the direction replaced by",
         "chance; an arm inside its band is not reading anything its choice of",
         "lines did not already give it. Buy-and-hold rows are what the direction",
-        "of the market alone was worth over the same days.",
+        "of the market alone was worth over the same days. The conviction and",
+        "long/short splits slice the per-trade rows further, so they carry the",
+        "same caution and more of it; they are exploratory and decide nothing.",
         "",
         f"The {momentum.NAME} arm's parameters are the textbook ones and were not",
         "chosen by looking at this journal. This report judges the rule; it",
@@ -1384,7 +1547,11 @@ def _render_gate(view: GateView, horizon: int) -> list[str]:
 
 def _render_watch(trips: dict[str, list[gate.Trip]], counts: Optional[dict[str, int]] = None,
                   days: Sequence[gate.WatchDay] = ()) -> list[str]:
-    """The owner's model-watch triggers. A trip means: stop and tell the owner."""
+    """The owner's model-watch triggers. A trip means: stop and tell the owner.
+
+    (b) and (c) are judged here, from the journal. (a) was a one-time check
+    on the replay and is closed; its line records how it ended.
+    """
     out = [
         "",
         "MODEL WATCH (the owner's triggers; a trip means stop and tell the owner, never revert)",
@@ -1415,8 +1582,16 @@ def _render_watch(trips: dict[str, list[gate.Trip]], counts: Optional[dict[str, 
                    + ", ".join(f"{d.day} {d.setup_failed} of {d.asked}" for d in setup[-5:]))
     else:
         out.append("setup errors (our key or configuration; shown, never counted by (c)): none")
-    out.append("(a) is read from the zero-shorts replay (model-compare), not from the journal.")
+    out.append(trigger_a_line())
     return out
+
+
+def trigger_a_line() -> str:
+    """Trigger (a), closed: a one-time check on the replay, recorded as the owner decided it."""
+    shorted, of = gate.TRIGGER_A_RESULT
+    return (f"(a) closed {gate.TRIGGER_A_CLOSED.isoformat()}: the zero-shorts replay tripped it "
+            f"(gpt-oss shorted {shorted} of the {of} lines Opus shorted); the owner kept gpt-oss: "
+            "the model arm is effectively long-only.")
 
 
 def _render_spend(spend: Spend, whole: Optional[Spend]) -> list[str]:
@@ -1531,6 +1706,46 @@ def _render_exploratory(per_horizon: Sequence[ExploratoryResult]) -> list[str]:
                 f"{_pct(median_net(row.trades), 2):>9}{_pct(hit_rate(row.trades)):>10}"
                 f"{_pct(stop_rate(row.trades)):>9}"
             )
+    return out
+
+
+def _render_splits(splits: TradeSplits) -> list[str]:
+    """The owner's two exploratory reports. A slice under 'too few' shows its n only."""
+
+    def row(name: str, stats: SplitStats) -> str:
+        head = f"{name:<10}{stats.label:<11}"
+        if stats.too_few:
+            return f"{head}  too few (n={stats.n})"
+        return f"{head}{stats.n:>5}{_pct(stats.mean_net, 2):>10}{_pct(stats.hit_rate):>10}"
+
+    since = gate.DECISION_CUTOFF.isoformat()
+    out = [
+        "",
+        "BY CONVICTION (exploratory; report only; decides nothing)",
+        "-" * 78,
+        f"Scored trades in the decision window (from {since}), grouped by the conviction",
+        "of the line that opened them. Net return and hit as in the per-trade table;",
+        f"'too few' until a group has {MIN_REPORT_TRADES} trades.",
+        f"{'arm':<10}{'group':<11}{'n':>5}{'mean net':>10}{'hit rate':>10}",
+    ]
+    for name, groups in splits.conviction.items():
+        out += [row(name, stats) for stats in groups]
+    left_out = {name: n for name, n in splits.outside.items() if n}
+    if left_out:
+        out.append(
+            f"note: {sum(left_out.values())} trade(s) below {CONVICTION_GROUPS[0][1]:.2f} or with no "
+            "conviction, left out of every group: " + ", ".join(f"{name} {n}" for name, n in left_out.items())
+        )
+    out += [
+        "",
+        "LONGS VS SHORTS (exploratory; report only; decides nothing)",
+        "-" * 78,
+        f"Scored trades in the decision window (from {since}), split by the side each",
+        f"trade was opened on. 'too few' until a side has {MIN_REPORT_TRADES} trades.",
+        f"{'arm':<10}{'side':<11}{'n':>5}{'mean net':>10}{'hit rate':>10}",
+    ]
+    for name, per_side in splits.sides.items():
+        out += [row(name, stats) for stats in per_side.values()]
     return out
 
 

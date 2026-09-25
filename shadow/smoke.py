@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Does the fund machinery hold on the real journal and real prices? Prints no result.
 
-    python -m shadow.smoke                    # the last 15 final sessions, 20 coin-flip funds
+    python -m shadow.smoke                    # the last 15 final sessions: the four funds,
+                                              # the two exploratory ones, 20 coin-flip funds
     python -m shadow.smoke --sessions 30 --random 50
 
 The tests run the funds on made-up bars and made-up lines. This runs them
@@ -53,7 +54,7 @@ from shadow.fund import (  # noqa: E402
 )
 from shadow.market import Bars, SimFeed, calendar  # noqa: E402
 from shadow.order_matters import fund_summary  # noqa: E402
-from shadow.run import INDEX_TICKER, _read_lines, integrity, not_shortable  # noqa: E402
+from shadow.run import INDEX_TICKER, _read_lines, exploratory_funds, integrity, not_shortable  # noqa: E402
 
 #: Calendar days fetched per session wanted: weekends and holidays, with room.
 _DAYS_PER_SESSION = 1.6
@@ -95,7 +96,15 @@ def missing_bars(bars: Bars, tickers, sessions) -> list[tuple[str, date]]:
     return out
 
 
-def smoke(entries, sessions_wanted: int, coin_funds: int, fetcher, final_through, shortable_no) -> list[dict]:
+def smoke(entries, sessions_wanted: int, coin_funds: int, fetcher, final_through, shortable_no, *,
+          exploratory: bool = False) -> list[dict]:
+    """Health rows, fund by fund. ``exploratory`` adds the two exploratory funds after VT.
+
+    The command line always runs them (``main``): their machinery is the
+    model fund's with one thing changed, and a change can break it. Off by
+    default only so a caller asking for the four and the coin-flip funds
+    gets exactly those.
+    """
     cycles = lines_by_day(entries)
     ran = cycle_days(entries)
     first = final_through - timedelta(days=int(sessions_wanted * _DAYS_PER_SESSION) + 7)
@@ -110,6 +119,7 @@ def smoke(entries, sessions_wanted: int, coin_funds: int, fetcher, final_through
         Fund("momentum", rule_signal("momentum"), feed, bars, not_shortable=shortable_no),
         Fund("hybrid", rule_signal("hybrid"), feed, bars, not_shortable=shortable_no),
         IndexFund("vt", INDEX_TICKER, bars),
+        *(exploratory_funds(feed, bars, shortable_no) if exploratory else ()),
         *(Fund(f"coin-{seed}", coin_signal(seed), feed, bars, not_shortable=shortable_no, order_detail=False)
           for seed in range(coin_funds)),
     ]
@@ -141,7 +151,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     final_through = last_final_session(datetime.now(timezone.utc))
     report = smoke(read_journal(args.journal).entries, args.sessions, args.random,
                    OhlcFetcher(final_through=final_through), final_through,
-                   not_shortable(_read_lines(args.audit)))
+                   not_shortable(_read_lines(args.audit)), exploratory=True)
     failed = 0
     for row in report:
         problems = row.pop("problems", [])

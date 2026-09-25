@@ -8,6 +8,7 @@ import re
 import shutil
 import subprocess
 import sys
+from html.parser import HTMLParser
 from pathlib import Path
 
 import pytest
@@ -256,7 +257,7 @@ NODE = shutil.which("node")
 needs_node = pytest.mark.skipif(NODE is None, reason="node is not installed")
 
 #: The helpers the page's pure functions call, in the order they are defined.
-HELPERS = ("isNum", "esc", "money", "kMoney", "signed", "plain", "pts", "tone", "bar2", "day", "israel",
+HELPERS = ("isNum", "esc", "money", "kMoney", "signed", "plain", "pts", "tone", "bar2", "asObj", "day", "israel",
            "HUE", "SHORT", "DASH", "key", "bandKey", "plotHost", "tiles", "VERDICT", "warnIcon")
 
 #: The proposed rule's lines as shadow/calibration.py writes them: a heading,
@@ -361,8 +362,11 @@ def test_problems_reach_the_owner_in_a_warning_card(tmp_path, built_funds_page):
     running = _calibration("running", start="2026-10-01", days_done=0, series=[],
                            problems=["no real close after 2026-10-01 yet", "a <b>tag</b> in a problem"])
     running["calibration"]["pass_rule"]["verdicts"] = VERDICTS
+    # "four" keeps its name but also checks the two exploratory funds
+    # (shadow/run.py), so a problem in one of those is filed under a label
+    # that covers it.
     four_broken = _calibration("passed") | {"integrity": {
-        "four": {"ok": False, "problems": ["model: EWZ stops cover 10 of 40"]},
+        "four": {"ok": False, "problems": ["model: EWZ stops cover 10 of 40", "model_sized: SPY stops cover 0 of 10"]},
         "coin": {"ok": True, "problems": []}}}
     coin_broken = _calibration("passed") | {"integrity": {
         "four": {"ok": True, "problems": []}, "coin": {"ok": False, "problems": []}}}
@@ -381,7 +385,10 @@ def test_problems_reach_the_owner_in_a_warning_card(tmp_path, built_funds_page):
     assert "PENDING" not in card and "PASS" not in card.replace("Pass rule", "")      # only failures are problems
     assert "integrity check" not in card                                             # integrity is null
 
-    assert "The four funds' integrity check:</span> model: EWZ stops cover 10 of 40" in cards[1]
+    label = "The funds' integrity check (the four and the two exploratory):</span> "
+    assert label + "model: EWZ stops cover 10 of 40" in cards[1]
+    assert label + "model_sized: SPY stops cover 0 of 10" in cards[1]
+    assert "The four funds'" not in cards[1]                                         # not a label that rules them out
     assert "coin-flip" not in cards[1]                                               # ok is true: nothing to say
     assert "The coin-flip funds' integrity check:</span> failed, and the record names no problem" in cards[2]
     assert cards[3] == "" and cards[4] == "" and cards[5] == ""
@@ -414,7 +421,8 @@ def test_calibration_shows_the_verdicts_and_the_reason_no_day_is_recorded(tmp_pa
     with_days["calibration"]["pass_rule"]["verdicts"] = VERDICTS
     not_started = _calibration("not_started")
     not_started["calibration"]["pass_rule"]["verdicts"] = VERDICTS
-    source = _page_functions(built_funds_page, "verdictRow", "ruleHtml", "verdictsHtml", "renderCalibration")
+    source = _page_functions(built_funds_page, "verdictRow", "ruleHtml", "verdictsHtml", "calibrationFixHtml",
+                             "renderCalibration")
     pages = _run_js(tmp_path, source, "CASES.map(c=>{ renderCalibration(c); return $(\"calibration\").innerHTML; })",
                     [running, quiet, with_days, not_started])
 
@@ -707,7 +715,8 @@ def test_the_order_report_shows_the_funds_once_calibration_passed(tmp_path, buil
     assert "Coin-flip funds: median 4.5 days (5th–95th: 1–9)." in text[0]
     assert "Model fund: 3 of 15 days" in text[1] and "Coin-flip" not in text[1] and "Calibration copy" not in text[1]
     # The fund cards carry the same count, VT none.
-    source = _page_functions(built_funds_page, "fundsVisible", "orderCell", "renderFunds")
+    source = _page_functions(built_funds_page, "fundsVisible", "orderCell", "isExploratory", "sidesLine", "sidesCell",
+                             "renderFunds")
     [html] = _run_js(tmp_path, source, "CASES.map(c=>{ renderFunds(c); return $(\"funds\").innerHTML; })", [passed])
     assert html.count("<dt>Order mattered</dt>") == 3
     assert '<dt>Order mattered</dt><dd class="num">3 of 15 days</dd>' in html
@@ -727,3 +736,361 @@ def test_the_order_report_is_absent_without_data_and_says_no_cycle_yet(tmp_path,
     assert "Report only" in text
     # The page draws the section from the same render pass as the rest.
     assert '<section id="order"' in built_funds_page and '$("order").innerHTML = orderHtml(F)' in built_funds_page
+
+
+# --------------------------------------------------------------------------- #
+# The owner's decisions of 25 Sep 2026 on the page: the calibration fail rule,
+# the two exploratory funds, longs vs shorts, and the race's two reports
+# --------------------------------------------------------------------------- #
+
+#: A calibration that failed on day 6, was fixed on 12 Oct and has run two
+#: days since: day 15 or the fix + 5 days is now day 17, and the fund test's
+#: plan has moved off the registered one.
+WITH_FIX = {
+    "days_done": 8, "days_needed": 17, "days_passed": 5,
+    "fixes": [{"day": "2026-10-05", "what": "an earlier fix"},
+              {"day": "2026-10-12", "what": "stops re-placed <b>after</b> a partial fill"}],
+    "last_fix": "2026-10-12", "days_since_fix": 2, "days_after_fix_needed": 5, "end_estimate": "2026-10-23",
+    "fund_test_plan": {"start": "2026-10-26", "sessions": [41, 101, 161], "bars": [3.91, 2.52, 2.01],
+                       "exact": [3.912, 2.518, 2.006], "registered": [3.8, 2.5, 2.0],
+                       "registered_start": "2026-10-19", "matches_registered": False},
+}
+#: The same fields with nothing fixed: the plan is still the registered one.
+NO_FIX = {
+    "days_done": 4, "days_needed": 15, "days_passed": 4, "fixes": [], "last_fix": None, "days_since_fix": None,
+    "days_after_fix_needed": 5, "end_estimate": "2026-10-16",
+    "fund_test_plan": {"start": "2026-10-19", "sessions": [46, 106, 166], "bars": [3.8, 2.5, 2.0],
+                       "exact": [3.797, 2.501, 1.999], "registered": [3.8, 2.5, 2.0],
+                       "registered_start": "2026-10-19", "matches_registered": True},
+}
+
+
+def _text(html: str) -> str:
+    """The page's text, as a reader sees it: each tag a space, runs of space as one."""
+    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html)).strip()
+
+
+@needs_node
+def test_calibration_says_the_days_passed_the_last_fix_and_the_days_since_it(tmp_path, built_funds_page):
+    null_bar = json.loads(json.dumps(WITH_FIX))
+    null_bar["fund_test_plan"]["bars"] = [None, 2.6, 2.05]
+    cases = [
+        dict(WITH_FIX, status="running"),
+        dict(NO_FIX, status="running"),
+        dict(WITH_FIX, status="failed"),
+        null_bar | {"status": "running"},
+        {"status": "running", "days_done": 3, "days_needed": 15},                 # an older record: none of the new fields
+        dict(NO_FIX, status="not_started"),                                        # not started: nothing to say yet
+        {}, None, "junk", [1],
+        {"status": "running", "days_passed": "x", "fixes": "no", "last_fix": 5, "fund_test_plan": [1]},
+    ]
+    source = _page_functions(built_funds_page, "calibrationFixHtml")
+    out = _run_js(tmp_path, source, "CASES.map(calibrationFixHtml)", cases)
+    fixed, clean, failed, null_bars = out[0], out[1], out[2], out[3]
+
+    for html in (fixed, failed):
+        text = _text(html)
+        assert "Days passed: 5 of 17" in text
+        assert "Last fix: 12 Oct 2026 (stops re-placed &lt;b&gt;after&lt;/b&gt; a partial fill)" in text
+        assert "<b>after" not in html                                              # the fix's text is escaped
+        assert "Days since the last fix: 2 of 5" in text
+        assert "Calibration ends at day 15 or 5 days after the last fix, whichever is later." in text
+        assert "If nothing more fails, it ends 23 Oct 2026." in text
+        assert "All 2 fixes" in text
+        assert "Fund test would start 26 Oct 2026; bars 3.91, 2.52, 2.01" in text
+        # The plan moved: an amber note, in the owner's words, with what was registered.
+        assert 'class="amber"' in html
+        assert "differs from the registered start/bars: they must be re-registered before the fund test starts" in text
+        assert "Registered: start 19 Oct 2026; bars 3.80, 2.50, 2.00." in text
+
+    text = _text(clean)
+    assert "Days passed: 4 of 15" in text and "No fix yet" in text
+    assert "Days since the last fix" not in text and " of 5" not in text          # "X of 5" only with a fix
+    assert "Calibration ends at day 15 or 5 days after the last fix, whichever is later." in text
+    assert "Fund test would start 19 Oct 2026; bars 3.80, 2.50, 2.00" in text
+    assert 'class="amber"' not in clean and "re-registered" not in text
+    assert "The same start and bars as registered." in text
+    assert "fixes" not in text                                                     # no list of fixes to open
+
+    assert "bars none, 2.60, 2.05" in _text(null_bars)                             # a look before the start has no bar
+
+    assert out[4:10] == ["", "", "", "", "", ""]                                   # old, not started, missing: nothing
+    odd = _text(out[10])
+    assert "No fix yet" in odd and "Days passed" not in odd and "Fund test would start" not in odd
+
+
+@needs_node
+def test_the_calibration_card_carries_the_fail_rule_lines(tmp_path, built_funds_page):
+    running = _calibration("running", start="2026-10-01", series=[])
+    running["calibration"].update(WITH_FIX)
+    old = _calibration("running", start="2026-10-01", days_done=3, series=[])
+    source = _page_functions(built_funds_page, "verdictRow", "ruleHtml", "verdictsHtml", "calibrationFixHtml",
+                             "renderCalibration")
+    pages = _run_js(tmp_path, source, "CASES.map(c=>{ renderCalibration(c); return $(\"calibration\").innerHTML; })",
+                    [running, old])
+    text = _text(pages[0])
+    assert "8 of 17 closes compared · started 1 Oct 2026" in text
+    assert "Days passed: 5 of 17" in text and "Days since the last fix: 2 of 5" in text
+    assert "must be re-registered before the fund test starts" in text
+    old_text = _text(pages[1])
+    assert "3 of 15 closes compared" in old_text
+    assert "Days passed" not in old_text and "No fix yet" not in old_text and "Fund test would start" not in old_text
+
+
+def _css_rules(page: str) -> list[tuple[list[str], str]]:
+    """The page's CSS rules as (selectors, declarations with no spaces); comments dropped."""
+    css = re.sub(r"/\*.*?\*/", "", re.search(r"<style>(.*?)</style>", page, re.S).group(1), flags=re.S)
+    return [([s.strip() for s in sel.split(",")], body.replace(" ", ""))
+            for sel, body in re.findall(r"([^{}]+)\{([^{}]*)\}", css)]
+
+
+class _AroundText(HTMLParser):
+    """For each run of text holding ``needle``, the classes of the elements around it, innermost first."""
+
+    VOID = {"br", "hr", "img", "input", "meta", "link", "wbr"}
+
+    def __init__(self, needle: str):
+        super().__init__()
+        self.needle, self.open, self.found = needle, [], []
+
+    def handle_starttag(self, tag, attrs):
+        if tag not in self.VOID:
+            self.open.append((tag, (dict(attrs).get("class") or "").split()))
+
+    def handle_endtag(self, tag):
+        for at in range(len(self.open) - 1, -1, -1):
+            if self.open[at][0] == tag:
+                del self.open[at:]
+                break
+
+    def handle_data(self, data):
+        if self.needle in data:
+            self.found.append([c for _, classes in reversed(self.open) for c in classes])
+
+
+@needs_node
+def test_a_fix_named_by_one_long_word_wraps_on_a_phone(tmp_path, built_funds_page):
+    # A fix's text is free text from the record, and may be one long word: a
+    # code path or a link. It sits in a grid list, and a grid column is as
+    # wide as its widest word unless the word may break, so at 360px a
+    # 70-character word pushed the page 275px sideways (checked in Chromium).
+    # overflow-wrap is inherited, so the box around the word, or any box
+    # between it and the card, must let it break anywhere.
+    long = "shadow/broker.py::SimBroker._replace_stops_after_partial_fill_and_short_refusal"
+    assert len(long) > 70 and " " not in long
+    fixed = dict(WITH_FIX, status="running")
+    fixed["fixes"] = [{"day": "2026-10-05", "what": "an earlier fix"}, {"day": "2026-10-12", "what": long}]
+    source = _page_functions(built_funds_page, "calibrationFixHtml")
+    [html] = _run_js(tmp_path, source, "CASES.map(calibrationFixHtml)", [fixed])
+
+    around = _AroundText(long)
+    around.feed(html)
+    assert len(around.found) == 2                          # "Last fix: ... (<what>)" and the list of all fixes
+    breaks_anywhere = {sel[1:] for sels, body in _css_rules(built_funds_page) if "overflow-wrap:anywhere" in body
+                       for sel in sels if re.fullmatch(r"\.[\w-]+", sel)}
+    for classes in around.found:
+        assert "facts" in classes
+        assert breaks_anywhere & set(classes), classes     # some box around the word lets it break
+
+
+SIDES ={"long": {"n": 24, "mean_return": 0.0085, "hit_rate": 0.5833, "too_few": False},
+         "short": {"n": 7, "mean_return": -0.0512, "hit_rate": 0.1428, "too_few": True}}
+
+
+@needs_node
+def test_longs_and_shorts_say_too_few_instead_of_the_numbers(tmp_path, built_funds_page):
+    cases = [
+        SIDES,
+        {"long": {"n": 1, "mean_return": -0.02, "hit_rate": 0.0, "too_few": False},
+         "short": {"n": 0, "mean_return": None, "hit_rate": None, "too_few": True}},
+        {"long": {"n": 5, "mean_return": 0.01, "hit_rate": 0.6}},                  # no too_few: the owner's 20 trades
+        {"long": {"n": 25, "mean_return": 0.01, "hit_rate": 0.6}},
+        {"long": {"n": "<b>7</b>", "mean_return": 0.3, "hit_rate": 0.9, "too_few": False}},   # no count: too few
+        None, {}, "x", [], {"long": None, "short": "x"},
+    ]
+    out = _run_js(tmp_path, _page_functions(built_funds_page, "sidesLine"), "CASES.map(sidesLine)", cases)
+    assert out[0] == "Longs: 24 trades, mean +0.9%, hit 58% | Shorts: too few (n=7)"
+    assert "5.1" not in out[0] and "14%" not in out[0]                             # the too-few side's numbers are hidden
+    assert out[1] == "Longs: 1 trade, mean −2.0%, hit 0% | Shorts: too few (n=0)"
+    assert out[2] == "Longs: too few (n=5)"
+    assert out[3] == "Longs: 25 trades, mean +1.0%, hit 60%"
+    assert out[4] == "Longs: too few (n=n/a)" and "<b>" not in out[4] and "30" not in out[4]
+    assert out[5:] == ["", "", "", "", ""]
+
+
+def _fund_row(name, label, total, **extra):
+    row = dict(name=name, label=label, equity=[100000.0, round(100000.0 * (1 + total), 2)], total_return=total,
+               vs_vt=None if name == "vt" else round(total - 0.004, 6), max_drawdown=0.012,
+               trades=1 if name == "vt" else 30, win_rate=None if name == "vt" else 0.55, open_positions=3,
+               cash=40000.0, order_matters=None if name == "vt" else _order(15, 2, 1),
+               sides=None if name == "vt" else SIDES, exploratory=False)
+    return row | extra
+
+
+SIX_FUNDS = {
+    "start": "2026-10-19", "days": ["2026-10-19", "2026-10-20"],
+    "band": {"p5": [99000.0, 98800.0], "p95": [101000.0, 101300.0], "funds": 1000},
+    "list": [
+        _fund_row("model", "Model", 0.012), _fund_row("momentum", "Momentum", 0.004),
+        _fund_row("hybrid", "Hybrid", -0.003), _fund_row("vt", "VT (world index, held)", 0.004),
+        _fund_row("model_by_conviction", "Model, highest conviction first", 0.015, exploratory=True,
+                  compare_to="model",
+                  vs_model={"total_return_diff": 0.003, "max_drawdown": 0.011, "model_max_drawdown": 0.012,
+                            "mean_daily_diff": 0.00015, "t": 1.234, "days": 20}),
+        _fund_row("model_sized", "Model, sized by conviction", 0.009, exploratory=True, compare_to="model",
+                  vs_model={"total_return_diff": -0.003, "max_drawdown": 0.031, "model_max_drawdown": 0.012,
+                            "mean_daily_diff": None, "t": None, "days": 20}),
+    ],
+}
+
+
+@needs_node
+def test_the_exploratory_funds_are_set_against_the_model_fund(tmp_path, built_funds_page):
+    passed = _calibration("passed") | {"funds": SIX_FUNDS}
+    hostile = json.loads(json.dumps(passed))
+    hostile["funds"]["list"][4]["label"] = "<b>Model</b> first"
+    bare = _calibration("passed") | {"funds": {"list": [{"name": "model_sized", "exploratory": True}]}}
+    cases = [passed, hostile,
+             _calibration("running") | {"funds": SIX_FUNDS},                   # calibration not passed: hidden
+             _calibration("failed") | {"funds": SIX_FUNDS},
+             _calibration("passed") | {"funds": ORDER_FUNDS},                  # an older record: no exploratory row
+             _calibration("passed") | {"funds": {"list": "x"}},
+             {}, None, bare]
+    source = _page_functions(built_funds_page, "fundsVisible", "sidesLine", "isExploratory", "exploratoryHtml")
+    out = _run_js(tmp_path, source, "CASES.map(exploratoryHtml)", cases)
+    card, text = out[0], _text(out[0])
+    assert "Exploratory: does the order or the size matter?" in text
+    assert card.count('<span class="chip idle">exploratory; cannot change the decision</span>') == 2
+    assert text.index("Model, highest conviction first") < text.index("Model, sized by conviction")
+    # Highest conviction first: its return against the model's, the difference, the daily mean and its t.
+    first = text.split("Model, sized by conviction")[0]
+    assert "Total return +1.50% vs the model's +1.20%" in first
+    assert "Difference +0.30 pts" in first
+    assert "Mean daily difference +0.015% a day" in first
+    assert "t 1.23 over 20 days" in first
+    assert "Max drawdown" not in first                                         # drawdown only for the sized fund
+    # Sized by conviction: the same, and its max drawdown next to the model's.
+    sized = text.split("Model, sized by conviction")[1]
+    assert "Total return +0.90% vs the model's +1.20%" in sized
+    assert "Difference −0.30 pts" in sized and "Mean daily difference n/a" in sized and "t n/a over 20 days" in sized
+    assert "Max drawdown −3.1% vs the model's −1.2%" in sized
+    assert text.count("Longs: 24 trades, mean +0.9%, hit 58% | Shorts: too few (n=7)") == 2
+
+    assert "&lt;b&gt;Model&lt;/b&gt; first" in out[1] and "<b>Model</b>" not in out[1]
+    assert out[2:8] == ["", "", "", "", "", ""]
+    bare_text = _text(out[8])                                                  # no model row, no vs_model: n/a, no throw
+    assert "Total return n/a vs the model's n/a" in bare_text and "Max drawdown n/a vs the model's n/a" in bare_text
+
+
+@needs_node
+def test_the_chart_table_and_cards_stay_the_four_funds(tmp_path, built_funds_page):
+    passed = _calibration("passed") | {"funds": SIX_FUNDS}
+    source = _page_functions(built_funds_page, "fundsVisible", "orderCell", "isExploratory", "sidesLine", "sidesCell",
+                             "renderFunds")
+    # chart() draws into the DOM; here it only records which lines it was given.
+    probe = ("CASES.map(c=>{ const drawn = []; globalThis.chart = (host, spec)=>drawn.push(spec.series.map(s=>s.label));"
+             " const todo = renderFunds(c); $(\"funds\").querySelector = ()=>null; todo.forEach(([, fn])=>fn());"
+             " return {html: $(\"funds\").innerHTML, drawn}; })")
+    [got] = _run_js(tmp_path, source, probe, [passed])
+    html = got["html"]
+    assert got["drawn"] == [["VT", "Hybrid", "Momentum", "Model"]]             # the chart: exactly the four
+    assert "<th>Day</th><th>Model</th><th>Momentum</th><th>Hybrid</th><th>VT</th><th>Band 5th</th>" in html
+    assert html.count('<article class="card fund">') == 4
+    assert "highest conviction first" not in html and "sized by conviction" not in html
+    # Each fund but VT has its longs-and-shorts line.
+    assert html.count('<p class="sides">') == 3
+    assert "Longs: 24 trades, mean +0.9%, hit 58% | Shorts: too few (n=7)" in html
+    # The order report lists the four as before; the exploratory funds have their own card.
+    [order] = _run_js(tmp_path, _page_functions(built_funds_page, "fundsVisible", "orderHtml"), "CASES.map(orderHtml)",
+                      [passed | {"order_matters": {"real": ORDER_REAL}}])
+    order_text = _text(order)
+    assert "Model fund:" in order_text and "Momentum fund:" in order_text and "Hybrid fund:" in order_text
+    assert "conviction first fund" not in order_text and "sized by conviction fund" not in order_text
+    # The page draws the exploratory card from the same render pass.
+    assert '<section id="explore"' in built_funds_page and '$("explore").innerHTML = exploratoryHtml(F)' in built_funds_page
+
+
+def _split(n, mean, hit, few=None):
+    return {"n": n, "mean_net": mean, "hit_rate": hit, "too_few": n < 20 if few is None else few}
+
+
+RACE_REPORTS = dict(
+    RACE_SAMPLE, report_since="2026-09-23",
+    conviction_groups={
+        "model": [dict(_split(24, 0.0085, 0.5833), group="0.30-0.40"),
+                  dict(_split(7, 0.0512, 0.8571), group="0.40-0.50"),
+                  dict(_split(0, None, None), group="0.50-0.60"),
+                  dict(_split(21, -0.0031, 0.4286), group="0.60+")],
+        "momentum": [dict(_split(n, 0.01, 0.5), group=g)
+                     for n, g in ((3, "0.30-0.40"), (5, "0.40-0.50"), (2, "0.50-0.60"), (1, "0.60+"))],
+        "hybrid": [dict(_split(n, 0.01, 0.5), group=g)
+                   for n, g in ((12, "0.30-0.40"), (4, "0.40-0.50"), (0, "0.50-0.60"), (0, "0.60+"))],
+    },
+    sides={
+        "model": {"long": _split(45, 0.004, 0.53), "short": _split(1, 0.02, 1.0)},
+        "momentum": {"long": _split(10, 0.001, 0.5), "short": _split(9, -0.002, 0.44)},
+        "hybrid": {"long": _split(12, 0.0, 0.5), "short": _split(3, 0.01, 0.67)},
+        "random": {"long": _split(20, -0.001, 0.49), "short": _split(22, 0.0007, 0.5)},
+    },
+)
+
+
+@needs_node
+def test_the_race_reports_show_too_few_until_twenty_trades(tmp_path, built_funds_page):
+    hostile = json.loads(json.dumps(RACE_REPORTS))
+    hostile["conviction_groups"]["<i>x</i>"] = [dict(_split(30, 0.01, 0.5), group="<b>g</b>")]
+    cases = [RACE_REPORTS, hostile,
+             RACE_SAMPLE,                                                       # an older record: no reports
+             {}, None, "x",
+             {"report_since": "2026-09-23", "conviction_groups": {}, "sides": {}},
+             {"conviction_groups": "x", "sides": [1]},
+             {"conviction_groups": {"model": "x"}, "sides": {"model": None}},
+             {"sides": {"model": {"long": {"n": 19, "mean_net": 0.01, "hit_rate": 0.5}}}}]
+    source = _page_functions(built_funds_page, "ARM", "raceReportsHtml")
+    out = _run_js(tmp_path, source, "CASES.map(raceReportsHtml)", cases)
+    card, text = out[0], _text(out[0])
+    assert "Race: by conviction, and longs vs shorts (exploratory, report only)" in text
+    assert re.search(r"The decision race's trades since 23 Sept? 2026, after costs\.", text)   # "Sep" or "Sept"
+    assert 'A group or side reads "too few" until it has 20 trades.' in text
+    assert text.index("Does higher conviction mean better trades?") < text.index("Longs vs shorts")
+    conviction, sides = card.split("<h4>Longs vs shorts</h4>")
+    # A table per arm, in the race's order; the coin flip only in longs vs shorts.
+    assert re.findall(r"<caption>(.*?)</caption>", conviction) == ["Model", "Momentum", "Hybrid"]
+    assert re.findall(r"<caption>(.*?)</caption>", sides) == ["Model", "Momentum", "Hybrid", "Random (coin flip)"]
+    assert "<th>Conviction</th><th>n</th><th>Mean net</th><th>Hit rate</th>" in conviction
+    # Twenty trades or more: the numbers. Fewer: "too few", and none of the numbers.
+    assert '<tr><td>0.30-0.40</td><td>24</td><td class="up">+0.85%</td><td>58%</td></tr>' in card
+    assert '<tr><td>0.60+</td><td>21</td><td class="down">−0.31%</td><td>43%</td></tr>' in card
+    assert '<tr><td>0.40-0.50</td><td colspan="3" class="few">too few (n=7)</td></tr>' in card
+    assert '<tr><td>0.50-0.60</td><td colspan="3" class="few">too few (n=0)</td></tr>' in card
+    assert "+5.12%" not in card and "86%" not in card
+    assert '<tr><td>Longs</td><td>45</td><td class="up">+0.40%</td><td>53%</td></tr>' in sides
+    assert '<tr><td>Shorts</td><td colspan="3" class="few">too few (n=1)</td></tr>' in sides
+    assert "+2.00%" not in sides and "100%" not in sides
+    assert '<tr><td>Longs</td><td>20</td><td class="down">−0.10%</td><td>49%</td></tr>' in sides   # exactly 20: shown
+    # Every string from the record is escaped.
+    assert "&lt;i&gt;x&lt;/i&gt;" in out[1] and "&lt;b&gt;g&lt;/b&gt;" in out[1]
+    assert "<i>x" not in out[1] and "<b>g" not in out[1]
+    # Old, missing or odd records draw nothing, and nothing throws.
+    assert out[2:9] == ["", "", "", "", "", "", ""]
+    assert "too few (n=19)" in out[9] and "+1.00%" not in out[9]               # no too_few given: the owner's 20
+    # Race data, not fund data: drawn from the race record alone, near the race banner.
+    assert '$("race-reports").innerHTML = raceReportsHtml(R)' in built_funds_page
+    assert (built_funds_page.index('<section id="banners"') < built_funds_page.index('<section id="race-reports"')
+            < built_funds_page.index("<h2>Calibration</h2>"))
+
+
+def test_the_contract_names_the_fields_of_the_25_sep_decisions():
+    text = (ROOT / "dashboard" / "funds.html").read_text()
+    start = text.index("<!--")
+    comment = text[start + 4:text.index("-->", start)]
+    assert "<!--" not in comment and "--!>" not in comment
+    for field in ("calibration.days_passed", "calibration.fixes[]", "calibration.last_fix",
+                  "calibration.days_since_fix", "calibration.days_after_fix_needed", "calibration.end_estimate",
+                  "calibration.fund_test_plan", "registered_start", "matches_registered",
+                  "model_by_conviction", "model_sized", "funds.list[].exploratory", "funds.list[].compare_to",
+                  "funds.list[].vs_model", "total_return_diff", "model_max_drawdown", "mean_daily_diff",
+                  "funds.list[].sides", "mean_return", "hit_rate", "too_few",
+                  "report_since", "conviction_groups", "mean_net", '"0.30-0.40"', '"0.60+"', "random",
+                  "integrity.four"):
+        assert field in comment, field

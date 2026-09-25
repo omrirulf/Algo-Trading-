@@ -56,15 +56,22 @@ def _limit_kind(limit: str) -> str:
     return limit
 
 
-def capacity_kind(reason: Optional[str]) -> Optional[str]:
-    """The room the book ran out of, if a portfolio limit refused the signal; else None."""
+def capacity_kind(reason: Optional[str], cap: Optional[float] = None) -> Optional[str]:
+    """The room the book ran out of, if a portfolio limit refused the signal; else None.
+
+    ``cap`` is the ticker's cap as a fraction, when the caller knows it
+    exactly. The engine prints it to a whole percent, which is exact for
+    production's caps but not for the "sized by conviction" fund's scaled
+    ones (5% x 0.25 prints as 1%), and that fund passes its own.
+    """
     text = (reason or "").strip()
     match = _NO_ROOM.match(text)
     if match:
         return _limit_kind(match.group("limit"))
     match = _NO_SHARE.match(text)
     if match:
-        own_room = float(match.group("equity")) * float(match.group("cap")) / 100.0 - float(match.group("existing"))
+        cap_pct = cap if cap is not None else float(match.group("cap")) / 100.0
+        own_room = float(match.group("equity")) * cap_pct - float(match.group("existing"))
         # The portfolio limit bound it only if the ticker's own cap, alone,
         # would have bought at least one order's worth: otherwise its own cap
         # refused it and no order of the list would have changed that.

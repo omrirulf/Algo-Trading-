@@ -178,8 +178,10 @@ def bias_mix(cell: Cell) -> dict:
     Only lines where both produced a signal count, on either side: a mix
     over different lines would compare two samples, not two models. Also
     how many of the incumbent's SHORT lines the candidate called SHORT too,
-    which is the number the owner's first model trigger reads (a candidate
-    that shorts on fewer than a quarter of them is reported, not reverted).
+    which is the number the owner's trigger (a) read. That trigger was a
+    one-time check: it tripped and was closed on 2026-09-25 with the model
+    kept, so a low number here is reported for reading and asks nobody to
+    stop or revert.
     """
     both = [d for d in cell.diffs if d.before is not None and d.after is not None]
     incumbent = {label: 0 for _, label in MIX_ORDER}
@@ -225,7 +227,8 @@ def render_mix(cell: Cell, incumbent_name: str) -> list[str]:
     )
     if retention is not None:
         out.append(
-            "  below a quarter: the owner's trigger (a) -- report it and stop, do not revert"
+            "  below a quarter (the owner's trigger (a), a one-time check, closed on "
+            "2026-09-25 with the model kept)"
             if retention < 0.25 else
             "  at or above a quarter: trigger (a) not met"
         )

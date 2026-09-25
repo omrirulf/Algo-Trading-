@@ -12,7 +12,7 @@ from __future__ import annotations
 import dataclasses
 import json
 import logging
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import pandas as pd
 import pytest
@@ -696,10 +696,10 @@ def test_matching_prefers_the_same_session_then_the_next():
 
 
 def crafted(closes: int = 15, worst: float = 0.004, real_trades: int = 10, matched: int = 10,
-            differences=(), integrity: Integrity | None = None, sim_only: int = 0) -> CalibrationResult:
+            differences=(), integrity: Integrity | None = None, sim_only: int = 0, fixes=()) -> CalibrationResult:
     # The gap drifts steadily out to ``worst`` on the last close: a drift the
     # gap condition sees and the tracking error, a spread, barely does.
-    days = [d.date() for d in pd.bdate_range("2026-10-02", periods=closes)]
+    days = calibration_days(closes)
     series = [SeriesPoint(day, 100_000.0 * (1 + worst * (i + 1) / closes), 100_000.0)
               for i, day in enumerate(days)]
     trades = [Trade(days[0], f"T{i}", OPEN, "buy", 10, 100.0) for i in range(real_trades)]
@@ -708,8 +708,18 @@ def crafted(closes: int = 15, worst: float = 0.004, real_trades: int = 10, match
     return CalibrationResult(
         start=date(2026, 10, 1), series=series, day0=SeriesPoint(date(2026, 10, 1), 100_000.0, 100_000.0),
         real_trades=trades, sim_trades=trades[:matched] + extra, matches=[Match(t, t) for t in trades[:matched]],
-        differences=list(differences), integrity=integrity or Integrity(),
+        differences=list(differences), integrity=integrity or Integrity(), fixes=tuple(fixes),
     )
+
+
+def calibration_days(count: int) -> list[date]:
+    """Calibration day 1 is Friday 2 Oct 2026, day 12 Monday 19 Oct, day 15 Thursday 22 Oct."""
+    return [d.date() for d in pd.bdate_range("2026-10-02", periods=count)]
+
+
+def day(n: int) -> date:
+    """Calibration day ``n``, counted from 1 as the owner counts them."""
+    return calibration_days(n)[-1]
 
 
 #: The rule as it reads once in force: what the verdicts are tested
@@ -789,14 +799,351 @@ def test_status_follows_the_verdict_once_complete():
 
 
 def test_the_pass_rule_is_the_owners():
-    """Approved on 2026-09-24 with a sixth condition and a restart-from-zero
-    policy; the flag takes effect with the start date (test_shadow_run)."""
+    """Approved on 2026-09-24 with a sixth condition; the flag takes effect
+    with the start date (test_shadow_run). Its last line is the owner's fail
+    rule of 25 Sep 2026, which replaced "restart the 15 days from zero"."""
     rule = PASS_RULE
     assert "all six hold over 15 trading days" in rule.text[0] and len(rule.text) == 8
     assert rule.text[6].startswith("6. The other way round: at least 90% of the sim's trades")
-    assert "restart from zero" in rule.text[7] and "turns out to be a bug counts as a fail" in rule.text[7]
+    last = rule.text[7]
+    assert last.startswith("If calibration fails: the cause is fixed and logged in the Amendments table.")
+    assert "re-run on every calibration day recorded so far, from the same starting snapshot" in last
+    assert "every day must pass all the conditions again" in last
+    assert "At least 5 calibration days must come after the last fix" in last
+    assert "ends at day 15 or at the last fix + 5 days, whichever is later" in last
+    assert "If a re-run fails on an earlier day, that is a new fail: fix, log and re-run again." in last
+    assert "turns out to be a bug still counts as a fail" in last
+    assert "restart" not in last
     assert (rule.closes, rule.max_gap_pct, rule.tracking_error_pct, rule.matched_share, rule.unexplained,
             rule.sim_matched_share) == (15, 0.01, 0.002, 0.90, 0, 0.90)
+
+
+# --------------------------------------------------------------------------- #
+# The owner's fail rule of 25 Sep 2026: fix, log, re-run; five days after the last fix
+# --------------------------------------------------------------------------- #
+
+
+def fix_on(n: int, what: str = "a fix") -> tuple[tuple[date, str], ...]:
+    """A fix merged on calibration day ``n``: it may have seen that day's close."""
+    return ((day(n), what),)
+
+
+def test_the_end_rule_is_day_15_or_the_last_fix_plus_5_whichever_is_later():
+    twenty = calibration_days(20)
+    assert calib.closes_needed(twenty) == 15                                # no fix
+    assert calib.closes_needed(twenty, fix_on(12)) == 17                    # after day 12: 12 + 5
+    assert calib.closes_needed(twenty, fix_on(3)) == 15                     # after day 3: 3 + 5 is before 15
+    assert calib.closes_needed(twenty, fix_on(10)) == 15                    # 10 + 5 is exactly 15
+    assert calib.closes_needed(twenty, fix_on(11)) == 16
+    # The last fix is what counts, in whatever order they were listed.
+    assert calib.closes_needed(twenty, fix_on(12) + fix_on(3)) == 17
+    assert calib.closes_needed(twenty, fix_on(3) + fix_on(12)) == 17
+    # A fix merged over a weekend: the Friday is before it, the Monday after.
+    assert calib.closes_needed(twenty, ((day(11) + timedelta(days=1), "Saturday"),)) == 16
+    # Merged on day 12 before its close was compared: five more than so far,
+    # until day 12 is compared and lands on the fix's side.
+    assert calib.closes_needed(twenty[:11], fix_on(12)) == 16
+    assert calib.closes_needed(twenty[:12], fix_on(12)) == 17
+
+
+def test_a_day_on_the_fix_day_is_not_after_it():
+    """A fix merged on day F may have been written with F's close in view."""
+    fixed_on_12 = crafted(closes=16, fixes=fix_on(12))
+    assert fixed_on_12.last_fix == day(12)
+    assert fixed_on_12.days_since_fix == 4                                   # 13, 14, 15, 16: not 12
+    assert calib.needed_for(fixed_on_12) == 17 and not calib.is_complete(fixed_on_12)
+    assert crafted(closes=17, fixes=fix_on(12)).days_since_fix == 5
+    assert crafted(closes=15).days_since_fix is None and crafted(closes=15).last_fix is None
+
+
+def quiet_account(last: date) -> dict:
+    """A book of cash only and a real close every session from C0 to ``last``: nothing trades, nothing differs."""
+    closes = {d.date(): 100_000.0 for d in pd.bdate_range(C0, last)}
+    snaps = calib.load_snapshots([
+        snapshot_line("2026-10-01T15:40:00Z", 100_000.0, history=history({date(2026, 9, 30): 100_000.0})),
+        snapshot_line(f"{last.isoformat()}T21:00:00Z", 100_000.0, history=history(closes)),
+    ])
+    frame = flat_frame(last=last.isoformat())
+    return {"snapshots": snaps, "bars": Bars({"VT": frame, "SPY": frame.copy()})}
+
+
+def run_quiet(account: dict, **kw) -> CalibrationResult:
+    return calib.run_calibration(account["snapshots"], [], account["bars"], SimFeed(account["bars"]), C0, 15, [],
+                                 frozenset(), **kw)
+
+
+def test_the_run_goes_on_until_five_days_after_the_last_fix():
+    """The nightly run is the re-run: same seed, the code as merged, every
+    day so far. A fix after day 12 makes it run to day 17, not stop at 15."""
+    account = quiet_account(date(2026, 10, 30))                              # 21 sessions after C0
+
+    assert run_quiet(account).days_done == 15
+    assert run_quiet(account).series[-1].day == day(15)
+    assert run_quiet(account, fixes=fix_on(3)).days_done == 15
+    fixed = run_quiet(account, fixes=fix_on(12, "the seed's cash sign"))
+    assert fixed.days_done == 17 and fixed.series[-1].day == day(17)
+    assert fixed.fixes == ((day(12), "the seed's cash sign"),) and fixed.days_since_fix == 5
+    assert calib.is_complete(fixed)
+
+    # Until day 17's close exists the run is still going, whatever it passed.
+    short = run_quiet(quiet_account(day(16)), fixes=fix_on(12))
+    assert short.days_done == 16 and short.days_since_fix == 4
+    assert not calib.is_complete(short)
+
+
+def test_a_fail_reads_failed_at_once_and_a_merged_fix_runs_on_five_days_after_it():
+    # Day 9: a close outside 1%. Failed at once, not at day 15.
+    broken = crafted(closes=9, worst=0.03)
+    assert calib.calibration_status(broken, calib.evaluate_pass_rule(broken, APPROVED), APPROVED) == "failed"
+    assert calib.calibration_status(broken, calib.evaluate_pass_rule(broken)) == "failed"
+
+    # The cause is fixed and merged on day 9; the nightly re-run of the same
+    # days from the same seed passes them. Running: five days after the fix.
+    for closes, status in ((9, "running"), (13, "running"), (14, "running"), (15, "passed")):
+        rerun = crafted(closes=closes, fixes=fix_on(9, "the gap on day 9"))
+        evaluation = calib.evaluate_pass_rule(rerun, APPROVED)
+        assert calib.calibration_status(rerun, evaluation, APPROVED) == status, closes
+    # 9 + 5 is 14, so day 15 is the end; passed only under the rule in force.
+    done = crafted(closes=15, fixes=fix_on(9))
+    assert calib.calibration_status(done, calib.evaluate_pass_rule(done)) == "failed"
+
+    # A fix after day 12 moves the end to day 17.
+    late = crafted(closes=15, fixes=fix_on(12))
+    passed, lines = calib.evaluate_pass_rule(late, APPROVED)
+    assert not passed and calib.calibration_status(late, (passed, lines), APPROVED) == "running"
+    assert lines[0] == ("Approved rule: 15 of 17 closes compared (day 15 or the last fix + 5 days, whichever is "
+                        "later; last fix 2026-10-19, 3 of 5 days since).")
+    assert all("FAIL" not in line for line in lines)
+    end = crafted(closes=17, fixes=fix_on(12))
+    passed, lines = calib.evaluate_pass_rule(end, APPROVED)
+    assert passed and calib.calibration_status(end, (passed, lines), APPROVED) == "passed"
+    assert calib.calibration_status(end, calib.evaluate_pass_rule(end)) == "failed"   # the unapproved rule
+
+    # A re-run that fails on an earlier day is a new fail, fix or no fix.
+    again = crafted(closes=15, worst=0.03, fixes=fix_on(12))
+    assert calib.calibration_status(again, calib.evaluate_pass_rule(again, APPROVED), APPROVED) == "failed"
+
+
+def test_the_header_says_how_many_closes_are_needed_and_why():
+    _, lines = calib.evaluate_pass_rule(crafted(closes=8), APPROVED)
+    assert lines[0] == ("Approved rule: 8 of 15 closes compared (day 15 or the last fix + 5 days, whichever is "
+                        "later; no fix so far).")
+
+
+def gapless(closes: int) -> CalibrationResult:
+    """Every close exactly on the real one."""
+    return crafted(closes=closes, worst=0.0)
+
+
+def test_days_passed_counts_from_the_first_day_until_a_day_by_day_check_breaks():
+    assert calib.days_passed(None) == 0
+    assert calib.days_passed(gapless(8)) == 8
+
+    # Condition 1: a close outside 1% on day 4 ends the count at 3, even
+    # though days 5 to 8 were back inside it.
+    outside = gapless(8)
+    outside.series[3] = SeriesPoint(day(4), 101_500.0, 100_000.0)
+    assert calib.days_passed(outside) == 3
+
+    # Condition 4: an unexplained difference dated day 6. An explained one does not count.
+    explained = Difference(day(2), "X", "bought 1 @ 1.00", "none", "sim held it already")
+    unexplained = Difference(day(6), "Y", "none", "bought 1 @ 1.00", calib.UNEXPLAINED)
+    assert calib.days_passed(gapless(8)) == calib.days_passed(crafted(closes=8, worst=0.0,
+                                                                      differences=[explained])) == 8
+    assert calib.days_passed(crafted(closes=8, worst=0.0, differences=[explained, unexplained])) == 5
+
+    # Condition 5: the uncovered list is dated. The undated breaches are in the verdicts, not here.
+    uncovered = Integrity(uncovered=[f"{day(2).isoformat()} NVDA: 50 held, stops cover 40"])
+    assert calib.days_passed(crafted(closes=8, worst=0.0, integrity=uncovered)) == 1
+    undated = Integrity(manager_errors=["NVDA: BrokerError"], unexpected=["boom"])
+    assert calib.days_passed(crafted(closes=8, worst=0.0, integrity=undated)) == 8
+
+    # Judged only over the whole period (2, 3, 6): not in this count.
+    assert calib.days_passed(crafted(closes=8, worst=0.0, matched=5, sim_only=5)) == 8
+
+    # A session with no real close is not a calibration day and breaks nothing.
+    holed = gapless(8)
+    holed.series[3] = SeriesPoint(day(4), 100_000.0, None)
+    assert holed.days_done == 7 and calib.days_passed(holed) == 7
+
+
+def test_the_json_carries_the_fail_rule():
+    fixes = fix_on(12, "the seed applied a fill during the positions read twice")
+    result = crafted(closes=13, fixes=fixes)
+    evaluation = calib.evaluate_pass_rule(result, APPROVED)
+    out = calib.calibration_json(result, calib.calibration_status(result, evaluation, APPROVED),
+                                 date(2026, 10, 1), evaluation, None, APPROVED)
+
+    assert out["status"] == "running"
+    assert (out["days_done"], out["days_needed"], out["days_passed"]) == (13, 17, 13)
+    assert out["fixes"] == [{"day": "2026-10-19", "what": "the seed applied a fill during the positions read twice"}]
+    assert out["last_fix"] == "2026-10-19"
+    assert out["days_since_fix"] == 1 and out["days_after_fix_needed"] == 5
+    # Days 1-13 are known; days 14-17 are counted forward in trading days.
+    assert out["end_estimate"] == day(17).isoformat() == "2026-10-26"
+    plan = out["fund_test_plan"]
+    assert plan["start"] == "2026-10-27" and plan["matches_registered"] is False
+    assert plan["registered"] == [3.80, 2.50, 2.00] and plan["registered_start"] == "2026-10-19"
+    json.dumps(out, allow_nan=False)
+
+
+def test_the_json_without_a_fix():
+    result = crafted(closes=15)
+    evaluation = calib.evaluate_pass_rule(result, APPROVED)
+    out = calib.calibration_json(result, "passed", date(2026, 10, 1), evaluation, None, APPROVED)
+
+    assert (out["days_needed"], out["days_passed"]) == (15, 15)
+    assert out["fixes"] == [] and out["last_fix"] is None and out["days_since_fix"] is None
+    assert out["days_after_fix_needed"] == 5
+    assert out["end_estimate"] == "2026-10-22"
+    assert out["fund_test_plan"]["start"] == "2026-10-23"
+
+
+def test_the_end_estimate_counts_trading_days_from_the_start():
+    """The registered plan: seeded from the 2026-09-25 close, day 15 is
+    2026-10-16, and the fund test starts on 2026-10-19 with its registered
+    bars. A fix moves the end, and with it the fund test's start and bars."""
+    from shadow.fund_test import fund_test_plan
+
+    start = date(2026, 9, 25)
+    planned = calib.end_estimate(start, [])
+    assert planned == date(2026, 10, 16)
+    assert fund_test_plan(planned)["matches_registered"] is True
+
+    # Twelve days compared (to 13 Oct), a fix merged on 14 Oct before its
+    # close: day 15 is 16 Oct, the fifth session after the fix 21 Oct.
+    known = [date(2026, 9, 28), date(2026, 9, 29), date(2026, 9, 30), date(2026, 10, 1), date(2026, 10, 2),
+             date(2026, 10, 5), date(2026, 10, 6), date(2026, 10, 7), date(2026, 10, 8), date(2026, 10, 9),
+             date(2026, 10, 12), date(2026, 10, 13)]
+    assert calib.end_estimate(start, known, ((date(2026, 10, 14), "x"),)) == date(2026, 10, 21)
+    # A fix after day 3 leaves day 15 as the end.
+    assert calib.end_estimate(start, known, ((date(2026, 9, 30), "x"),)) == planned
+    moved = fund_test_plan(date(2026, 10, 21))
+    assert moved["start"] == "2026-10-22" and moved["matches_registered"] is False
+
+
+#: The registered plan's seed: calibration seeded from the 2026-09-25 close.
+REGISTERED_SEED = date(2026, 9, 25)
+
+
+def plan_day(n: int) -> date:
+    """Calibration day ``n`` on the registered plan: day 12 is 13 Oct 2026, day 15 is 16 Oct."""
+    from shadow.fund_test import next_trading_day
+
+    day_n = REGISTERED_SEED
+    for _ in range(n):
+        day_n = next_trading_day(day_n)
+    return day_n
+
+
+def on_the_registered_plan(closes: int, off_on: int | None = None, fixes=(), **kw) -> CalibrationResult:
+    """``crafted`` moved onto the registered plan's calendar, every close on
+    the real one except day ``off_on``, which is 3% off."""
+    series = [SeriesPoint(plan_day(n), 103_000.0 if n == off_on else 100_000.0, 100_000.0)
+              for n in range(1, closes + 1)]
+    return dataclasses.replace(crafted(closes=closes, worst=0.0, fixes=fixes, **kw), start=REGISTERED_SEED,
+                               series=series, day0=SeriesPoint(REGISTERED_SEED, 100_000.0, 100_000.0))
+
+
+def json_of(result: CalibrationResult, rule=APPROVED) -> dict:
+    """The JSON the nightly job would print for ``result``, under ``rule``."""
+    evaluation = calib.evaluate_pass_rule(result, rule)
+    return calib.calibration_json(result, calib.calibration_status(result, evaluation, rule), result.start,
+                                  evaluation, None, rule)
+
+
+def test_an_open_fail_moves_the_end_before_its_fix_is_merged():
+    """A fail needs a fix, the fix cannot be dated before the day the fail
+    was seen, and five days must follow it. So the night a fail on day 15
+    is seen, the page already says the end is a week later and the fund
+    test's registered start and bars no longer hold -- not after the fix."""
+    assert (plan_day(12), plan_day(15)) == (date(2026, 10, 13), date(2026, 10, 16))
+    clean = json_of(on_the_registered_plan(15))
+    assert clean["status"] == "passed" and clean["end_estimate"] == "2026-10-16"
+    assert clean["fund_test_plan"]["matches_registered"] is True
+
+    failed = json_of(on_the_registered_plan(15, off_on=15))
+    assert failed["status"] == "failed"
+    assert failed["end_estimate"] == "2026-10-23"                             # day 20
+    assert failed["fund_test_plan"]["start"] == "2026-10-26"
+    assert failed["fund_test_plan"]["matches_registered"] is False
+    # The fix it assumes is not a fix: nothing about fixes says one was made.
+    assert (failed["fixes"], failed["last_fix"], failed["days_since_fix"], failed["days_needed"]) == (
+        [], None, None, 15)
+
+    # Once the fix is merged that day and the re-run passes, the same end, now from the record.
+    fixed = json_of(on_the_registered_plan(15, fixes=((plan_day(15), "the close on 16 Oct"),)))
+    assert fixed["status"] == "running" and fixed["end_estimate"] == "2026-10-23"
+
+    # A fail first seen on day 11 or later moves the end; on day 10 or before it cannot.
+    assert json_of(on_the_registered_plan(11, off_on=11))["end_estimate"] == plan_day(16).isoformat()
+    for seen in (3, 10):
+        early = json_of(on_the_registered_plan(seen, off_on=seen))
+        assert early["status"] == "failed" and early["end_estimate"] == "2026-10-16", seen
+        assert early["fund_test_plan"]["matches_registered"] is True, seen
+
+    # A condition only a complete calibration can judge (3, the matched share) counts the same.
+    unmatched = json_of(on_the_registered_plan(15, matched=5))
+    assert unmatched["status"] == "failed" and unmatched["end_estimate"] == "2026-10-23"
+
+    # A fail seen before a fix already dated later: the end stays that fix's.
+    behind = on_the_registered_plan(9, off_on=9, fixes=((plan_day(12), "x"),))
+    assert calib.estimated_end(behind) == plan_day(17)
+
+
+def test_days_needed_counts_the_days_still_to_come_up_to_a_later_fix():
+    """The account's record lags: nine closes compared, and a fix merged on
+    day 12 (13 Oct). Days 10 to 12 will be on the fix's side once they are
+    compared, so 17 are needed now, and the end estimate is day 17 too."""
+    lagging = on_the_registered_plan(9, fixes=((plan_day(12), "x"),))
+    out = json_of(lagging)
+    assert (out["status"], out["days_done"], out["days_needed"], out["days_since_fix"]) == ("running", 9, 17, 0)
+    assert out["end_estimate"] == plan_day(17).isoformat() == "2026-10-20"
+    assert out["pass_rule"]["verdicts"][0] == (
+        "Approved rule: 9 of 17 closes compared (day 15 or the last fix + 5 days, whichever is later; "
+        "last fix 2026-10-13, 0 of 5 days since).")
+    # The run counts on what it has compared, and runs on until five days after the fix either way.
+    assert calib.closes_needed(lagging.compared_days, lagging.fixes) == 15 and not calib.is_complete(lagging)
+
+    # A fix merged on a Saturday after Friday's close (day 10): Monday is the first day after it.
+    assert calib.needed_for(on_the_registered_plan(10, fixes=((date(2026, 10, 10), "Saturday"),))) == 15
+
+    # However far the record lags, the number needed and the end estimate agree.
+    for fixed_on in range(1, 21):
+        fixes = ((plan_day(fixed_on), "x"),)
+        results = [CalibrationResult(start=REGISTERED_SEED, fixes=fixes)]
+        results += [on_the_registered_plan(closes, fixes=fixes) for closes in range(1, 16)]
+        for result in results:
+            needed = calib.needed_for(result)
+            assert needed == max(15, fixed_on + 5), (fixed_on, result.days_done)
+            assert calib.estimated_end(result) == plan_day(needed), (fixed_on, result.days_done)
+
+
+def test_calibration_report_reads_the_fixes_from_the_schedule(monkeypatch):
+    """shadow.run does not pass the fixes: the report reads them itself."""
+    from shadow import schedule
+
+    account = quiet_account(date(2026, 10, 30))
+
+    class Fetcher:
+        def ohlc(self, ticker, start, end):
+            return flat_frame(last="2026-10-30")
+
+    def report():
+        return calib.calibration_report(snapshots=account["snapshots"], entries=[], audit_lines=[], start=C0,
+                                        final_through=date(2026, 10, 30), fetcher=Fetcher())
+
+    plain = report()
+    assert (plain["days_done"], plain["days_needed"], plain["last_fix"]) == (15, 15, None)
+    monkeypatch.setattr(schedule, "CALIBRATION_FIXES", fix_on(12, "logged in the Amendments table"))
+    fixed = report()
+    assert (fixed["days_done"], fixed["days_needed"], fixed["last_fix"], fixed["days_since_fix"]) == (
+        17, 17, "2026-10-19", 5)
+    # Complete, and a book that never traded has no trade to match: 3 and 6 fail.
+    assert fixed["status"] == "failed" and fixed["days_passed"] == 17
+    # That fail needs a fix of its own, merged on day 17 at the soonest and
+    # followed by five more days: the end estimate is day 22, not day 17.
+    assert fixed["end_estimate"] == day(22).isoformat() == "2026-11-02"
 
 
 # --------------------------------------------------------------------------- #
@@ -857,6 +1204,12 @@ def test_calibration_json_before_the_start_is_not_started():
     assert all(v is None for v in out["metrics"].values())
     assert out["holding_days"] == holding
     assert out["pass_rule"] == {"text": list(PASS_RULE.text), "approved": False, "verdicts": []}
+    # The fail rule's keys say nothing before the start, whatever result is passed.
+    assert (out["days_passed"], out["fixes"], out["last_fix"], out["days_since_fix"], out["days_after_fix_needed"],
+            out["end_estimate"], out["fund_test_plan"]) == (0, [], None, None, 5, None, None)
+    fixed = calib.calibration_json(crafted(fixes=fix_on(12)), "running", None, (True, ["x"]), holding)
+    assert (fixed["fixes"], fixed["last_fix"], fixed["days_since_fix"], fixed["end_estimate"]) == ([], None, None,
+                                                                                                    None)
 
 
 def test_calibration_json_of_a_run_matches_the_contract():
