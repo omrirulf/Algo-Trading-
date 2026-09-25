@@ -1,24 +1,43 @@
 name: heartbeat
 
+# The Actions list shows this, so a cycle, a protection pass and a cycle the
+# watchdog had to start are told apart without opening each run. A scheduled
+# run has no inputs at all, so every `inputs.*` below is empty on one; the
+# expressions are written so that empty means "a scheduled cycle".
+run-name: ${{ inputs.mode == 'protect' && 'heartbeat protect' || format('heartbeat cycle ({0})', github.event_name == 'schedule' && 'schedule' || inputs.started_by || 'manual') }}
+
 # One cycle per trading day, not one per hour. Fundamentals, analyst targets
 # and insider filings change daily at most and technicals are on daily bars,
 # so hourly runs were seven near-identical answers to the same question at
 # seven times the cost. The holding horizon is days; one look after the open
 # captures the day.
 #
-# 12:35 UTC is 08:35 New York in summer and 07:35 in winter -- before the
-# 09:30 open in both. It starts early because the cycle asks both model stages
-# through the Batch API at half price, and a batch answers when it answers:
-# the hour before the session is where that waiting belongs. Gathering eighty
-# contexts takes most of it, the batch is waited on for up to 35 minutes after
-# that, and anything still outstanding is asked live, so the session is never
-# what pays for the saving.
+# 14:40 UTC is 10:40 New York in summer and 09:40 in winter: after the 09:30
+# open in both seasons.
 #
-# The price of starting early is the cheap market-closed gate, which pre-market
-# would refuse every run. A holiday therefore gathers context and pays for a
-# batch that trades nothing -- the engine's own clock check still refuses the
-# orders -- which is roughly ten cycles a year against a halved bill on the
-# other 250.
+# Until 25 Sep the first cron was 12:35 UTC, before the open, and passed the
+# pre-market flag. It was chosen for the Batch API: both model stages were
+# asked offline at half price, a batch answers when it answers, and the hour
+# before the session was where that waiting belonged. The flag gave up the
+# cheap market-closed gate, which would otherwise have refused every early
+# start.
+#
+# It stopped fitting on 23 Sep, when the full model moved to an endpoint with
+# no batch and began to be asked live, with the screen off. A run started on
+# time at 12:35 would have finished gathering context and asking the model by
+# about 13:05-13:50 UTC and sent its orders then: mostly before the 13:30 UTC
+# open in summer, and always before the 14:30 UTC open in winter. The engine
+# refuses every order into a closed market ("market is closed") and the
+# position manager skips the profit ladder, so an on-time day would have
+# traded little or nothing. That never happened only because GitHub never delivered the
+# cron on time: the 12:35 run arrived at 17:11-18:17 UTC on 21-24 Sep, 4.5 to
+# 5.7 hours late every day, and every cycle since 21 Sep was really started by
+# a Claude Routine at about 15:05. No cycle has ever run before the open.
+#
+# So the cycle now starts after the open, with plain --once, which keeps the
+# market-closed gate. (The pre-market flag is still in
+# orchestrator/heartbeat.py for a batched path that can use it; nothing here
+# passes it, and tests/test_heartbeat_workflow.py keeps it that way.)
 #
 # The second cron is a catch-up, and it exists because on 16 Sep the first one
 # never fired. Not late, not failed -- GitHub created no run at all, and
@@ -26,17 +45,51 @@ name: heartbeat
 # happened to look. A schedule that can silently skip is not a schedule you
 # can build a daily experiment on.
 #
-# 17:35 UTC is five hours after the first cron: long enough that even a cycle
-# that waited out its whole batch deadline has finished (the concurrency group
-# below would queue it anyway),
-# and still comfortably before the 20:00 close, so a rescued day is a real
-# trading day rather than a trade into the bell. It does nothing on the days
-# the first cron works, which is almost all of them.
+# 17:35 UTC is almost three hours after the first cron: longer than any cycle
+# has taken (26-74 minutes from first to last journal line on 21-24 Sep; the
+# concurrency group below would queue it anyway), and before the latest safe
+# start of 14:30 New York (18:30 UTC in summer, 19:30 in winter), so a day it
+# rescues is still a real trading day. It does nothing on a day a cycle is
+# already journalled. In practice GitHub has delivered it about three hours
+# late too, after that latest start, where the guard below stops it.
+#
+# Because the cron cannot be trusted to be on time, it is only the first of
+# three layers, and all three can fire on the same day:
+#
+#   1. The two crons below.
+#   2. heartbeat-watchdog.yml. From 15:10 UTC, 30 minutes after the start is
+#      due, it checks whether a cycle is journalled or on its way. If not, it
+#      starts this workflow itself (started_by: backup) and tells the owner's
+#      phone; if it is too late in the day, it only tells the phone.
+#   3. Claude Routines in the owner's account, which dispatch at fixed times.
+#      A workflow_dispatch is created when it is asked for; it is not held in
+#      GitHub's cron backlog.
+#
+# Every one of those is a request to run, never a cycle by itself. The
+# guarantee: on one trading day only one run reaches "Run one cycle" after the
+# open, and the only way a second one can is a person dispatching with
+# `rerun`. (One that is over before the open found the market shut and placed
+# nothing, so it neither counts nor stops the day's cycle.) It rests on
+# three things. The guard step below, which every cycle run passes through:
+# it stops when the journal on the branch's latest commit already has today,
+# or when GitHub's own record shows that another run today (or an earlier
+# attempt of this one) reached "Run one cycle" after the open, whatever its
+# result. The concurrency group, which never lets two runs overlap, so no two
+# guards decide at once. And the watchdog, which reads the same record and
+# never starts a backup on a day the guard would stop it.
+#
+# GitHub's record is there for the one run the journal cannot show: a cycle
+# that traded and whose commit never reached the branch. The broker refuses
+# a second entry for the same ticker, side and UTC day, but not a second sale
+# of a profit-ladder rung -- the ladder counts the rungs already sold from
+# the audit log, which was lost with the journal. The guarantee needs GitHub
+# to answer when the guard asks; when it does not, the guard decides from
+# the journal alone and says so in the job summary.
 on:
   schedule:
-    - cron: "35 12 * * 1-5"   # pre-market: gather, then wait on the batch
-    - cron: "35 17 * * 1-5"   # catch-up; exits at once if 12:35 already ran
-  workflow_dispatch:        # a manual run: a cycle, or just the protection pass
+    - cron: "40 14 * * 1-5"   # the day's cycle, after the open in both seasons
+    - cron: "35 17 * * 1-5"   # catch-up; stops at the guard if a cycle is journalled
+  workflow_dispatch:        # a manual or backup run: a cycle, or just the protection pass
     inputs:
       mode:
         description: >-
@@ -46,8 +99,35 @@ on:
         type: choice
         default: cycle
         options: [cycle, protect]
+      started_by:
+        description: >-
+          Who is starting this run. manual = any dispatch that does not say
+          otherwise: a person, or a Claude Routine (the default). backup = the
+          watchdog, when GitHub's schedule had not started the day's run. Only
+          a label: both are guarded the same way.
+        type: choice
+        default: manual
+        options: [manual, backup]
+      rerun:
+        description: >-
+          Run a cycle even though the guard would stop it: one is already
+          journalled today, another run today reached its trading step, or it
+          is after the latest safe start -- only for a person re-running a day
+          whose cycle failed, after checking the account. Pressing Re-run on
+          such a run later does not trade again if its first attempt did.
+        type: boolean
+        default: false
 
 # Two runs writing the journal at once would race on the commit below.
+#
+# It is also part of why a day cannot run twice: one run at a time, so what
+# the guard reads -- the journal, and GitHub's record of the other runs --
+# cannot be overtaken by another cycle while it reads. Note what
+# GitHub does with a third arrival: a group holds one running and one
+# pending run, and a newer run cancels the pending one rather than queueing
+# behind it. That never lets a second cycle through (whichever run is left is
+# still guarded), but it can cancel a pending protection pass, which then
+# has to be dispatched again.
 concurrency:
   group: heartbeat
   cancel-in-progress: false
@@ -55,6 +135,7 @@ concurrency:
 permissions:
   contents: write           # only to push the journal back
   issues: write             # only to open the one issue that says the blend may leave shadow
+  actions: read             # only for the guard to read today's heartbeat runs and their steps
 
 jobs:
   cycle:
@@ -95,6 +176,17 @@ jobs:
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        # The branch as it is NOW, not as it was when this run was created.
+        # Left to itself, checkout takes github.sha: the commit the branch
+        # pointed at the moment the run was created. A run that then waited
+        # in the concurrency group behind a running cycle was created before
+        # that cycle committed its journal, so it would read a journal
+        # without today in it, the guard below would say "no cycle yet", and
+        # the day would run twice. Checking out the ref takes its latest
+        # commit when the job starts, which is after the running cycle
+        # pushed. Same pinned action, one input.
+        with:
+          ref: ${{ github.ref }}
 
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
@@ -103,24 +195,179 @@ jobs:
 
       - run: pip install -r requirements.txt
 
-      - name: Has today's cycle already run?
-        # Every scheduled run asks, not only the catch-up. On 16 Sep the 15:05
-        # cron was delivered hours late, after the 17:35 catch-up had already
-        # run the cycle, and because only the catch-up asked, the day's cycle
-        # ran twice. Which cron fired is not the question; whether the journal
-        # already has today is. A manual dispatch is somebody deliberately
-        # asking for a run and is never talked out of it.
+      - name: May this run start a cycle?
+        # Every cycle run asks, whatever started it, not only the catch-up.
+        #
+        # On 16 Sep the 15:05 cron was delivered hours late, after the 17:35
+        # catch-up had already run the cycle, and because only the catch-up
+        # asked, the day's cycle ran twice. Which cron fired is not the
+        # question; whether the journal already has today is. That became
+        # "every scheduled run asks".
+        #
+        # Since 25 Sep a dispatch asks too. The watchdog's backup, the Claude
+        # Routines and a late GitHub cron can all land on one day, and each
+        # of them is only a request to run; this step decides which one
+        # actually runs. A person who wants a second cycle anyway -- a day
+        # whose cycle failed half-way, say -- dispatches with `rerun`, which
+        # is the only way past this step. A protection pass is not a cycle
+        # and never asks.
+        #
+        # Pressing "Re-run" on a run dispatched with `rerun` asks too. A
+        # re-run replays the dispatch, inputs included, so without this the
+        # second attempt of a rescue that traded and then lost its push
+        # would trade the day again. `rerun` was given for the first
+        # attempt, so on a later one this step asks only whether an earlier
+        # attempt of this run reached "Run one cycle" (and stops if it
+        # cannot tell: a person is at the page and can dispatch afresh).
+        #
+        # It reads the journal from the checkout above, which is the
+        # branch's latest commit when this job started (see there for why
+        # that matters), and the concurrency group means no other cycle can
+        # be running while it reads.
+        #
+        # The journal cannot show the run that matters most: one that traded
+        # and whose commit never reached the branch (a refused push, a lost
+        # machine). The broker would refuse its entries a second time, but
+        # the profit ladder counts the rungs already sold from the audit log
+        # that was lost with it, so a second cycle would sell them again.
+        # Until 25 Sep only the watchdog looked for that run, and the late
+        # catch-up cron or a Routine passed this step on such a day. So the
+        # step also asks GitHub for today's heartbeat runs (the New York
+        # day, as the watchdog does) and, for each one, the steps it reached
+        # in every attempt (`filter=all`: a run re-run from GitHub's page
+        # still shows the attempt that traded). Whatever the run's status: a
+        # run that traded and is re-run from its page waits as "pending"
+        # again, and its jobs still hold the attempt that traded, while a run
+        # that has never had a machine lists no jobs and counts as nothing.
+        # If any other run today -- or an earlier attempt of this one --
+        # reached "Run one cycle", whatever its result, the answer is
+        # `already`. A protection pass never runs that step, so it never
+        # stops a cycle, and nor does a "Run one cycle" that began and ended
+        # before the 09:30 open: it found the market shut and placed nothing,
+        # and counting it would let one early start close the whole day.
+        # analysis/cycle_day.py decides, with the watchdog's own helpers, so
+        # the two cannot read that record differently.
+        #
+        # GitHub failing to answer never fails this step and never costs the
+        # day: the answer then rests on the journal alone, as it did before
+        # 25 Sep, and the job summary says so. Only the script itself
+        # breaking fails it. Each call is given 30 seconds (`timeout`): gh
+        # has no time limit of its own, and a stalled answer would otherwise
+        # hold this step, and with it the concurrency group, until the job's
+        # 180 minutes ran out, with every other start waiting behind it. A
+        # call that runs out of time is a call that failed, and is handled
+        # like one.
+        #
+        # Two answers stop the run. `already`: a cycle is journalled for
+        # today, or another run today reached its trading step. `too_late`:
+        # neither, but it is past 14:30 New York (11:30 on a half day), the
+        # latest start that still finishes before the close
+        # (analysis/cycle_day.py:latest_start); a later start would send
+        # orders into a closed market. The watchdog tells the owner's phone
+        # about a lost day, and the step after this one does when it was the
+        # watchdog's own backup that arrived too late.
+        #
+        # The output is `skip`, and every later step tests `skip != 'yes'`:
+        # a guard that did not run (a protection pass, the first attempt of
+        # a rerun) leaves it unset, and unset must mean "go on".
         id: guard
-        if: github.event_name == 'schedule'
+        if: inputs.mode != 'protect' && (inputs.rerun != true || github.run_attempt != '1')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          THIS_RUN: ${{ github.run_id }}
+          THIS_ATTEMPT: ${{ github.run_attempt }}
+          RERUN: ${{ inputs.rerun }}
         run: |
           set -o pipefail
-          ran=$(python analysis/cycle_day.py --journal logs/signal_journal.log)
-          echo "ran=$ran" >> "$GITHUB_OUTPUT"
-          if [ "$ran" = "yes" ]; then
-            echo "A cycle is already journalled for today; this catch-up stops here." >> "$GITHUB_STEP_SUMMARY"
+          record="$RUNNER_TEMP/guard"
+          mkdir -p "$record/jobs"
+          # `created` takes a date and reads it as UTC midnight. The New York
+          # date is never later than the UTC one, so this covers every run of
+          # today's New York day; the script drops the few from the evening
+          # before.
+          if timeout 30 gh api -X GET "repos/${{ github.repository }}/actions/workflows/heartbeat.yml/runs" \
+               -f created=">=$(TZ=America/New_York date +%F)" -f per_page=100 > "$record/runs.json"; then
+            for id in $(jq -r '.workflow_runs[]? | .id | numbers' "$record/runs.json" || true); do
+              timeout 30 gh api "repos/${{ github.repository }}/actions/runs/$id/jobs?filter=all&per_page=100" > "$record/jobs/$id.json" \
+                || { rm -f "$record/jobs/$id.json"; echo "::warning::could not read the steps of run $id; the guard decides without them"; }
+            done
           else
-            echo "No cycle journalled for today. Running one now." >> "$GITHUB_STEP_SUMMARY"
+            rm -f "$record/runs.json"
+            echo "::warning::could not list today's heartbeat runs; the guard decides from the journal alone"
           fi
+          # One word on stdout; the reason, written for the job summary, on
+          # stderr.
+          if ! decision=$(python analysis/cycle_day.py --journal logs/signal_journal.log --decide \
+                            --runs "$record/runs.json" --jobs "$record/jobs" \
+                            --this-run "$THIS_RUN" --this-attempt "$THIS_ATTEMPT" --rerun "$RERUN" \
+                            2> "$record/why.md"); then
+            cat "$record/why.md"
+            echo "::error::the guard's check could not run; see the log above"
+            exit 1
+          fi
+          cat "$record/why.md"
+          cat "$record/why.md" >> "$GITHUB_STEP_SUMMARY"
+          case "$decision" in
+            run)
+              echo "skip=no" >> "$GITHUB_OUTPUT"
+              ;;
+            already)
+              { echo "skip=yes"; echo "why=already"; } >> "$GITHUB_OUTPUT"
+              ;;
+            too_late)
+              { echo "skip=yes"; echo "why=too_late"; } >> "$GITHUB_OUTPUT"
+              echo "::warning::No cycle today: it is past the latest safe start (14:30 New York, 11:30 on a half day)"
+              ;;
+            *)
+              echo "::error::the guard answered '$decision', which is none of run, already, too_late"
+              exit 1
+              ;;
+          esac
+
+      - name: Tell the owner's phone the backup started too late
+        # The watchdog starts a backup only while there is still time
+        # (analysis/watchdog.py stops 15 minutes before the latest safe
+        # start), and its phone message says "the backup has started it, you
+        # do not need to do anything". If GitHub then took longer than that
+        # to bring this run to the guard -- a slow machine, a wait behind a
+        # protection pass -- the guard said too_late and nothing traded, and
+        # without this step the last word the owner had was the all-clear.
+        #
+        # Only for the backup: a late cron or a Routine that reaches the
+        # guard too late promised nothing, and the watchdog's own next check
+        # reports the lost day. Posted exactly like the other phone steps:
+        # the topic goes in the JSON body, never a URL or a log, and the
+        # file that carried it is removed; a phone error never fails the job.
+        if: steps.guard.outputs.why == 'too_late' && inputs.started_by == 'backup'
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "${NTFY_TOPIC:-}" ]; then
+            echo "no phone configured (NTFY_TOPIC secret unset); nothing sent"
+            exit 0
+          fi
+          python - <<'EOF' > "$RUNNER_TEMP/phone.json"
+          import json, os
+          from datetime import datetime, timezone
+          from zoneinfo import ZoneInfo
+          now = datetime.now(timezone.utc)
+          at = f"{now:%H:%M} UTC ({now.astimezone(ZoneInfo('Asia/Jerusalem')):%H:%M} Israel time)"
+          print(json.dumps({"topic": os.environ["NTFY_TOPIC"],
+                            "title": "No trading run today: the backup started too late",
+                            "message": ("The watchdog started today's run as the backup, but GitHub only brought it "
+                                        f"to its start check at {at}, after the latest safe start, so it stopped "
+                                        "without trading. Ignore the earlier message that said the backup had "
+                                        "started it. Nothing is traded today."),
+                            "priority": 5, "tags": ["rotating_light"], "click": os.environ["RUN_URL"]}))
+          EOF
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' \
+                 --data-binary @"$RUNNER_TEMP/phone.json" https://ntfy.sh/ || echo "000")
+          rm -f "$RUNNER_TEMP/phone.json"
+          case "$code" in
+            2*) echo "phone notified (HTTP $code)";;
+            *)  echo "::warning::phone not notified (HTTP $code)";;
+          esac
 
       - name: Protect every open position
         # The one thing worth doing after the close. Fails the run if any
@@ -134,11 +381,12 @@ jobs:
         run: python -m orchestrator.heartbeat --protect-only
 
       - name: Run one cycle
-        # Skipped only when the guard above actually said yes. An unset output
-        # -- which is what a skipped guard leaves -- must run the cycle, so the
-        # test is on 'yes' and not on 'not no'. A protect-only dispatch never
-        # runs a cycle: `inputs.mode` is empty on a scheduled run.
-        if: steps.guard.outputs.ran != 'yes' && inputs.mode != 'protect'
+        # Skipped only when the guard above actually said skip. An unset
+        # output -- which is what a skipped guard leaves -- must run the
+        # cycle, so the test is on 'yes' and not on 'not no'. A protect-only
+        # dispatch never runs a cycle: `inputs.mode` is empty on a scheduled
+        # run.
+        if: steps.guard.outputs.skip != 'yes' && inputs.mode != 'protect'
         env:
           EXECUTION_MODE: direct          # no webhook: nothing to host here
           ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
@@ -201,18 +449,35 @@ jobs:
           # screening key" and is one, in the step above) but confusion is
           # cheaper than a silent day.
           FULL_MODEL_API_KEY: ${{ secrets.FULL_MODEL_API_KEY || secrets.DEEPINFRA_API_KEY || secrets.SCREENING_API_KEY || secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY || secrets.GROQ_API_KEY }}
-        # --premarket on the first cron only. Batched, the model stages are
-        # asked offline at half price, and the waiting for them has to happen
-        # somewhere: before the session, or during it. Starting at 12:35 UTC
-        # puts it before, and gives up the cheap market-closed gate to do it,
-        # which is why only the run that is meant to start early passes the
-        # flag. The catch-up runs after the open and keeps the gate.
+          # What started this run, for the run block below. Not secrets; an
+          # input is empty on a scheduled run, which the script reads as
+          # "the schedule" from the event name.
+          RUN_EVENT: ${{ github.event_name }}
+          RUN_STARTED_BY: ${{ inputs.started_by }}
+          RUN_ID: ${{ github.run_id }}
+        # Always plain --once, whatever started the run. The pre-market flag
+        # gave up the market-closed gate so a 12:35 UTC start could wait on a
+        # batch before the open; since the full model is asked live, starting
+        # early only sends orders into a closed market (see the top of this
+        # file). With the gate kept, a run that somehow starts before the open
+        # stops at once and journals nothing, and it does not use up the day:
+        # a "Run one cycle" that began and ended before 09:30 New York is not
+        # counted by the guard or the watchdog, so the day's cycle still runs
+        # after the open.
+        #
+        # HEARTBEAT_RUN is the run block every journal line of this cycle
+        # carries: schedule, backup or manual; when the day's run was due
+        # (14:40 UTC) and when this one started; how many minutes late; the
+        # run id. Built here, at the moment the cycle starts, so a rerun
+        # (whose first attempt skips the guard) is described too, and
+        # exported to this step's process only. A block that cannot be built
+        # is left out -- never a reason not to trade.
         run: |
-          if [ "${{ github.event.schedule }}" = "35 12 * * 1-5" ]; then
-            python -m orchestrator.heartbeat --once --premarket
-          else
-            python -m orchestrator.heartbeat --once
-          fi
+          HEARTBEAT_RUN=$(python analysis/cycle_day.py --run-block \
+            --event "$RUN_EVENT" --started-by "$RUN_STARTED_BY" --run-id "$RUN_ID") || HEARTBEAT_RUN=""
+          export HEARTBEAT_RUN
+          echo "run block: ${HEARTBEAT_RUN:-none}"
+          python -m orchestrator.heartbeat --once
 
       - name: Record the paper account
         # The shadow funds run this repository's engine and position manager
@@ -238,7 +503,7 @@ jobs:
         # continue-on-error, with a short clock, because a recorder must never
         # be the reason a trading run fails: the script already exits 0 on
         # every error and writes the error as the line.
-        if: always() && steps.guard.outputs.ran != 'yes'
+        if: always() && steps.guard.outputs.skip != 'yes'
         continue-on-error: true
         timeout-minutes: 3
         env:
@@ -253,7 +518,7 @@ jobs:
         # report that only exists when everything worked is a report nobody
         # needs. Never fails the job -- it is a view of the journal, not a
         # second chance to break the cycle.
-        if: always() && steps.guard.outputs.ran != 'yes' && inputs.mode != 'protect'
+        if: always() && steps.guard.outputs.skip != 'yes' && inputs.mode != 'protect'
         run: |
           set -o pipefail
           # Rendered to a temp file first: `> logs/cycle_report.md` would
@@ -277,7 +542,7 @@ jobs:
         # the broker; committed beside them so a page can read it with no
         # key. Never fails the job: a view of the record, not a second
         # chance to break the cycle.
-        if: always() && steps.guard.outputs.ran != 'yes' && inputs.mode != 'protect'
+        if: always() && steps.guard.outputs.skip != 'yes' && inputs.mode != 'protect'
         run: |
           if python -m analysis.book --json > "$RUNNER_TEMP/book.json"; then
             mv "$RUNNER_TEMP/book.json" logs/book.json
@@ -304,7 +569,7 @@ jobs:
         # a log: the message is posted as JSON to ntfy's root, and the file
         # that carried it is removed. Unset, the step says so and sends
         # nothing; it never fails the job.
-        if: always() && steps.guard.outputs.ran != 'yes' && inputs.mode != 'protect'
+        if: always() && steps.guard.outputs.skip != 'yes' && inputs.mode != 'protect'
         id: phone
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
@@ -338,7 +603,7 @@ jobs:
         # return that is not in yet. Never fails the job: a refit that cannot
         # fetch prices leaves the previous weights in place, which the next
         # cycle applies and flags stale after a fortnight.
-        if: always() && steps.guard.outputs.ran != 'yes' && inputs.mode != 'protect'
+        if: always() && steps.guard.outputs.skip != 'yes' && inputs.mode != 'protect'
         run: python learn/fit_weights.py || echo "refit skipped; previous weights left in place"
 
       - name: Score the journal
@@ -349,10 +614,10 @@ jobs:
         # fails the job: a scorer that cannot run leaves the previous report
         # in place and answers "not ready".
         #
-        # Guarded like everything else after the catch-up check: on a day the
-        # 15:05 cycle ran, this already ran with it, and doing it again would
+        # Guarded like everything else after the guard: on a day the cycle
+        # already ran, this already ran with it, and doing it again would
         # re-fetch a price series per ticker to re-commit an identical report.
-        if: always() && steps.guard.outputs.ran != 'yes' && inputs.mode != 'protect'
+        if: always() && steps.guard.outputs.skip != 'yes' && inputs.mode != 'protect'
         id: score
         run: |
           set -o pipefail
@@ -389,7 +654,7 @@ jobs:
         # GitHub will not accept as an assignee (an organisation, say) must not
         # cost the issue, and nothing here may fail a job that has already
         # placed trades.
-        if: always() && steps.guard.outputs.ran != 'yes' && inputs.mode != 'protect' && steps.score.outputs.ready == 'true'
+        if: always() && steps.guard.outputs.skip != 'yes' && inputs.mode != 'protect' && steps.score.outputs.ready == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           OWNER: ${{ github.repository_owner }}
@@ -435,7 +700,7 @@ jobs:
         # red. Skipping this step on failure would discard exactly the record
         # of the failure being investigated. A failed cycle still fails the
         # job -- always() changes what runs, not the verdict.
-        if: always() && steps.guard.outputs.ran != 'yes'
+        if: always() && steps.guard.outputs.skip != 'yes'
         # The runner is discarded, so an uncommitted journal is a lost cycle --
         # and the journal is the only record of what the model saw. Committed
         # rather than uploaded as an artifact so the scorer can read the whole
@@ -464,11 +729,33 @@ jobs:
           # had written were lost from git. The logs merge as a union now
           # (.gitattributes), so the append-only files never conflict; the
           # rendered files are whole rewrites, and this run's is the newer.
-          if ! git pull --rebase --autostash origin "${GITHUB_REF_NAME}"; then
-            git checkout --theirs -- logs/cycle_report.md logs/score_report.md logs/blend_weights.json 2>/dev/null || true
-            git add -f logs/cycle_report.md logs/score_report.md logs/blend_weights.json 2>/dev/null || true
-            GIT_EDITOR=true git rebase --continue
-          fi
+          sync_with_branch() {
+            if ! git pull --rebase --autostash origin "${GITHUB_REF_NAME}"; then
+              git checkout --theirs -- logs/cycle_report.md logs/score_report.md logs/blend_weights.json logs/book.json logs/brief.txt 2>/dev/null || true
+              git add -f logs/cycle_report.md logs/score_report.md logs/blend_weights.json logs/book.json logs/brief.txt 2>/dev/null || true
+              GIT_EDITOR=true git rebase --continue
+            fi
+          }
+          # Three tries, five seconds apart, not one. A push that is refused
+          # for good is the costliest failure this job has: the audit log
+          # that counts the profit-ladder rungs sold today is lost with the
+          # journal, and the guard then stops every other cycle today until
+          # a person checks the account. Most refusals are not for good --
+          # something else pushed to the branch between the pull and the
+          # push, or the network dropped -- and a fresh pull and push a few
+          # seconds later gets through. A try that fails half-way through its
+          # rebase is undone before the next one starts. The last try is
+          # outside the loop so that, if it fails too, the step fails as it
+          # always has: the run goes red and the phone hears about it.
+          for attempt in 1 2; do
+            if sync_with_branch && git push origin "HEAD:${GITHUB_REF_NAME}"; then
+              exit 0
+            fi
+            git rebase --abort 2>/dev/null || true
+            echo "::warning::the journal push did not go through (try $attempt of 3); trying again in 5 seconds"
+            sleep 5
+          done
+          sync_with_branch
           git push origin "HEAD:${GITHUB_REF_NAME}"
 
       - name: Publish the desk
@@ -479,7 +766,7 @@ jobs:
         # commit; never fails the job. The page reads the live snapshot
         # anyway, so this only refreshes the copy it opens on before the
         # first network read.
-        if: always() && steps.guard.outputs.ran != 'yes' && inputs.mode != 'protect'
+        if: always() && steps.guard.outputs.skip != 'yes' && inputs.mode != 'protect'
         env:
           GH_TOKEN: ${{ github.token }}
         run: bash dashboard/publish.sh || echo "::warning::desk not published; the page still reads the live snapshot"
@@ -497,7 +784,7 @@ jobs:
         # After the commit on purpose: the record is safe in git before
         # anything here can go wrong. Never on a protect-only run, which
         # has its own exit code and writes no journal.
-        if: always() && steps.guard.outputs.ran != 'yes' && inputs.mode != 'protect'
+        if: always() && steps.guard.outputs.skip != 'yes' && inputs.mode != 'protect'
         id: health
         env:
           GH_TOKEN: ${{ github.token }}
@@ -535,7 +822,7 @@ jobs:
         # a crash before the record was written, a lost push, a dead
         # provider. When the health step is what failed, the brief above
         # already went out as the urgent alarm and this stays quiet.
-        if: failure() && steps.guard.outputs.ran != 'yes' && steps.health.outcome != 'failure'
+        if: failure() && steps.guard.outputs.skip != 'yes' && steps.health.outcome != 'failure'
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -563,7 +850,7 @@ jobs:
         # Deliberately AFTER the commit above, and `always()` for the same
         # reason it is: the lines a failed cycle wrote belong in the archive
         # too. Note this is not a guard on the secrets -- see below.
-        if: always() && steps.guard.outputs.ran != 'yes' && inputs.mode != 'protect'
+        if: always() && steps.guard.outputs.skip != 'yes' && inputs.mode != 'protect'
         # Two more decisions, unchanged:
         #
         # After, because the journal must already be safe in git before this

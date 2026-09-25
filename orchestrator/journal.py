@@ -12,7 +12,9 @@ the cycle that produced it.
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
@@ -29,6 +31,40 @@ from orchestrator.context import TickerContext
 log = logging.getLogger(__name__)
 
 _JOURNAL_LOGGER_NAME = "signal_journal"
+
+
+def run_block() -> Optional[dict[str, Any]]:
+    """What started this cycle run, as the workflow described it; else None.
+
+    The heartbeat workflow sets HEARTBEAT_RUN on the cycle step to a small
+    JSON object -- the trigger (schedule, backup or manual), when the day's
+    run was scheduled and when this one started, how late that was, and the
+    GitHub run id (built by ``analysis/cycle_day.py``). It rides on every line
+    so the journal alone can answer "which runs were late, and who started
+    them", which GitHub's own run list forgets after a few months.
+
+    Read at write time, not import time, and never trusted: unset, empty, not
+    JSON, or JSON that is not an object all mean "no block", silently. A
+    journal line must never be lost over a label about it.
+
+    The one environment read in this module. The CI guardrail that keeps
+    orchestrator modules away from credentials allows exactly this line: the
+    value describes the run and is not a secret.
+    """
+    raw = os.environ.get("HEARTBEAT_RUN")
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+    except Exception:  # noqa: BLE001 - not JSON (or absurdly nested): no block
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
+def _run_field() -> dict[str, Any]:
+    """``{"run": block}`` when the workflow described the run, else nothing at all."""
+    block = run_block()
+    return {} if block is None else {"run": block}
 
 
 def get_journal_logger(path: Path = cfg.SIGNAL_JOURNAL_PATH) -> logging.Logger:
@@ -127,6 +163,11 @@ def record(
                 "screening": bool(llm.SCREENING_ENABLED),
                 "reasoning_effort": llm.configured_effort(),
                 "stage": stage,
+                # What started this run and how late it was (see run_block).
+                # Last, and absent rather than null when unset, so a line
+                # written without it keeps exactly the keys, in exactly the
+                # order, it had before the block existed.
+                **_run_field(),
             },
         )
     except Exception:  # noqa: BLE001 - journalling must not break the cycle

@@ -50,7 +50,7 @@ def test_a_red_run_reaches_the_phone_unless_the_brief_already_did():
     assert steps["Sound the alarm on anything the record says went quietly wrong"]["id"] == "health"
     step = steps["Push the failure to the owner's phone"]
     _is_a_safe_push(step)
-    assert step["if"] == "failure() && steps.guard.outputs.ran != 'yes' && steps.health.outcome != 'failure'"
+    assert step["if"] == "failure() && steps.guard.outputs.skip != 'yes' && steps.health.outcome != 'failure'"
     assert '"priority": 5' in step["run"] and "run failed" in step["run"]
     names = list(steps)
     assert names.index("Push the failure to the owner's phone") > names.index("Commit the journal")

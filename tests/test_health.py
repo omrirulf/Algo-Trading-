@@ -334,7 +334,7 @@ def test_the_alarm_step_runs_after_the_commit_on_every_cycle_run():
     alarm = names.index("Sound the alarm on anything the record says went quietly wrong")
     assert alarm > names.index("Commit the journal")
     step = steps[alarm]
-    assert step["if"] == "always() && steps.guard.outputs.ran != 'yes' && inputs.mode != 'protect'"
+    assert step["if"] == "always() && steps.guard.outputs.skip != 'yes' && inputs.mode != 'protect'"
     run = step["run"]
     assert "python -m analysis.health --journal logs/signal_journal.log --audit logs/execution_audit.log" in run
     assert "GITHUB_STEP_SUMMARY" in run
@@ -349,12 +349,13 @@ def test_data_sources_runs_daily_before_the_cycle_and_a_dead_mapping_is_red():
     assert cron == "50 11 * * 1-5"
     hb = _heartbeat()
     first_cycle_cron = hb[True]["schedule"][0]["cron"]
-    assert first_cycle_cron == "35 12 * * 1-5"
+    assert first_cycle_cron == "40 14 * * 1-5"
 
     # The property, rather than the two literals above: the probe has to land
     # before the cycle, or a dead source is reported after the model was
     # already fed blanks from it. Both moved back together when the cycle
-    # started running pre-market to wait on its batch.
+    # started running pre-market to wait on its batch; the cycle moved after
+    # the open again on 25 Sep, and the probe simply stays ahead of it.
     def _minutes(expression: str) -> int:
         minute, hour = expression.split()[:2]
         return int(hour) * 60 + int(minute)

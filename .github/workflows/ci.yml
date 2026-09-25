@@ -497,10 +497,18 @@ jobs:
         # read, or attribute access on a credential-shaped name -- rather
         # than any line mentioning the word, so prose about prompt tokens in
         # a comment is not a build failure.
+        #
+        # One environment read is allowed outside that list, and only as the
+        # exact line below: journal.py reads HEARTBEAT_RUN, the description
+        # of the run the heartbeat workflow sets on the cycle step (trigger,
+        # scheduled and actual start, run id). It is not a credential, and
+        # naming the line rather than the file keeps journal.py checked for
+        # every other read.
         run: |
           hits=$(grep -rnE '(get_settings|os\.environ|getenv|\bsettings\.|\.[A-Za-z_]*(secret|api_key|_token|password)\b)' \
                    orchestrator --include='*.py' \
-                 | grep -vE '^orchestrator/(heartbeat|news|llm|dispatch|sources)\.py:' || true)
+                 | grep -vE '^orchestrator/(heartbeat|news|llm|dispatch|sources)\.py:' \
+                 | grep -vE '^orchestrator/journal\.py:[0-9]+:    raw = os\.environ\.get\("HEARTBEAT_RUN"\)$' || true)
           if [ -n "$hits" ]; then
             echo "$hits"
             echo "::error::market context modules must not read credentials"
@@ -593,6 +601,24 @@ jobs:
             exit 1
           fi
           echo "OK: the shadow funds cannot trade"
+
+      - name: The heartbeat watchdog holds the phone topic and nothing else
+        # heartbeat-watchdog.yml can start heartbeat.yml, which trades. That
+        # is exactly why it must not hold a broker or model key itself: it
+        # starts the one workflow that does, through GitHub, and that
+        # workflow's own guard decides whether anything runs. Its only secret
+        # is the ntfy topic it posts to, and it may not pass `rerun`, the one
+        # input that bypasses the guard.
+        run: |
+          if grep -nE 'secrets\.' .github/workflows/heartbeat-watchdog.yml | grep -vE 'secrets\.NTFY_TOPIC \}\}'; then
+            echo "::error::the heartbeat watchdog may read the phone topic and no other secret"
+            exit 1
+          fi
+          if grep -nE '(-f|--field|--raw-field|-F) *rerun' .github/workflows/heartbeat-watchdog.yml; then
+            echo "::error::the heartbeat watchdog must never dispatch a rerun"
+            exit 1
+          fi
+          echo "OK: the watchdog can start a guarded run and read the phone topic, nothing more"
 
       - name: The replay harness cannot trade
         # replay/ re-asks the model while iterating on a prompt, so it runs

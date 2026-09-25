@@ -54,6 +54,17 @@ number of trades, the mean net return and the hit rate. They read trades
 the race has already scored, say "too few" below ``MIN_REPORT_TRADES``, and
 decide nothing: no look, bar or verdict reads them.
 
+A run timing section follows the header's checks (the owner's request of
+2026-09-25): every cycle day, in the decision window and before it, with
+when its lines were written in New York time, where that fell against the
+session, how late the run started against its schedule, and what started
+it (``analysis/run_timing.py``). GitHub delivered the heartbeat's cron runs
+hours late on every day so far, so this is where a reader can see it. It is
+reporting only and nothing that decides reads it: a late run changes when a
+signal is made, never the price it is entered at, because every arm enters
+at the open of the next session after the signal's day
+(``tests/test_race_entry_timing.py``).
+
 Nothing here is fitted. The momentum arm's parameters are the textbook
 values and this file never touches them; it judges the rule, it does not
 tune it. Read-only in every direction -- it reads the journal, fetches
@@ -78,6 +89,7 @@ from typing import Optional, Sequence
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from analysis import decision_gate as gate  # noqa: E402
+from analysis import run_timing  # noqa: E402
 from analysis.call_errors import MODEL as MODEL_ERROR  # noqa: E402
 from analysis.call_errors import SETUP as SETUP_ERROR  # noqa: E402
 from analysis.baseline_compare import (  # noqa: E402
@@ -842,6 +854,7 @@ class GateView:
 
 def gate_json(
     view: GateView, horizon: int, now: datetime, splits: Optional[TradeSplits] = None,
+    timings: Optional[Sequence[run_timing.DayTiming]] = None,
 ) -> dict:
     """The gate as data, for the dashboard's banner: the same numbers the header prints.
 
@@ -849,6 +862,11 @@ def gate_json(
     are appended after the gate's own fields and are built from trades the
     race already scored, so every gate field reads the same with or without
     them.
+
+    ``timings`` adds ``run_timing``: when each cycle day ran against its
+    schedule, the same rows the text prints. Built from the journal's
+    timestamps and run blocks only, after the gate has been evaluated, and
+    read by nothing that decides; ``null`` when not given.
     """
     decided = gate.first_decision(view.looks)
     upcoming = None if decided else gate.next_look(view.looks)
@@ -874,6 +892,8 @@ def gate_json(
             for look in view.looks
         ],
         **splits_json(splits),
+        "run_timing": (None if timings is None
+                       else run_timing.timing_json(timings, cutoff=gate.DECISION_CUTOFF)),
     }
 
 
@@ -1092,8 +1112,13 @@ def main(argv: list[str] | None = None) -> int:
     # scored trades. Computed after the gate has been read, from trades it
     # has already read, so they cannot move it; the JSON path returns here.
     splits = trade_splits(decision.results)
+    # When each cycle ran against its schedule: the journal's timestamps and
+    # run blocks, read after the gate for the same reason as the splits.
+    # Every line counts, held and failed too -- the question is when the
+    # cycle ran, not what it said -- so it reads the whole journal.
+    timings = run_timing.day_timings(read.entries)
     if args.gate_json:
-        print(json.dumps(gate_json(view, args.horizon, now, splits=splits)))
+        print(json.dumps(gate_json(view, args.horizon, now, splits=splits, timings=timings)))
         return 0
 
     # The owner's model-watch triggers, and what the calls cost.
@@ -1135,7 +1160,7 @@ def main(argv: list[str] | None = None) -> int:
         gate_view=view, whole=whole, unanswered=unanswered, trips=trips, watch_counts=watch_counts,
         watched=days,
         spend=llm_spend(in_window), spend_whole=llm_spend(read.entries),
-        warnings=window_warnings(read.entries), splits=splits,
+        warnings=window_warnings(read.entries), splits=splits, timings=timings,
     ))
     return 0
 
@@ -1336,6 +1361,7 @@ def render(
     watch_counts: Optional[dict[str, int]] = None, watched: Sequence[gate.WatchDay] = (),
     spend: Optional[Spend] = None, spend_whole: Optional[Spend] = None,
     warnings: Sequence[str] = (), splits: Optional[TradeSplits] = None,
+    timings: Optional[Sequence[run_timing.DayTiming]] = None,
 ) -> str:
     held = sum(1 for e in read.entries if e.held)
     no_stamp = sum(1 for e in read.entries if not e.held and e.timestamp is None)
@@ -1350,6 +1376,10 @@ def render(
         out += _render_spend(spend, spend_whole)
     if warnings:
         out += ["", *warnings]
+    # After the checks, before the tables: a reader who sees a day's numbers
+    # should already know whether that day's cycle ran on time. Report only.
+    if timings is not None:
+        out += run_timing.render(timings, cutoff=gate.DECISION_CUTOFF)
 
     days = sorted({_line_day(e) for e in lines})
     out += [

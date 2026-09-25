@@ -14,11 +14,12 @@ name: data sources
 # are unauthenticated, no LLM is called, and no order is ever placed.
 on:
   schedule:
-    # Every trading day, forty-five minutes before the cycle's 12:35 UTC cron
-    # (GitHub delivers a cron late, not early). It moved back with the cycle,
-    # which now starts pre-market so its batch can be waited on before the
-    # session: a probe that ran after the cycle would report a dead source the
-    # model had already been fed blanks from. Daily rather than weekly because
+    # Every trading day, well before the cycle's 14:40 UTC cron (GitHub
+    # delivers a cron late, not early; since 25 Sep the cycle starts after the
+    # open, see heartbeat.yml). A probe that ran after the cycle would report
+    # a dead source the model had already been fed blanks from. GitHub has
+    # delivered this cron 3.4-5.4 hours late, so it is kept early rather than
+    # moved later with the cycle. Daily rather than weekly because
     # a source that dies on Monday must not feed the model blanks until the
     # following week's check; the whole run costs about a minute.
     - cron: '50 11 * * 1-5'
