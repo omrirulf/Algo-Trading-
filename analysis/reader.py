@@ -132,6 +132,16 @@ class JournalEntry:
     #: and how late it was (see ``orchestrator/journal.run_block``). Read it
     #: through ``run``; kept raw here so junk on disk is never a parse error.
     run_record: Any = None
+    #: The line's ``live`` record as journalled: the name's price when the
+    #: signal was made (``orchestrator/live_price.py``). Read it through
+    #: ``live``; raw here for the same reason as ``run_record``.
+    live_record: Any = None
+    #: The line's ``management`` record as journalled. Read it through
+    #: ``management_market_closed``.
+    management_record: Any = None
+    #: The engine's reason, as journalled in the line's ``outcome``. Read it
+    #: through ``outcome_reason``.
+    outcome_reason_record: Any = None
 
     @property
     def run(self) -> Optional[dict[str, Any]]:
@@ -145,6 +155,46 @@ class JournalEntry:
         whatever was written; check each one before trusting its type.
         """
         return self.run_record if isinstance(self.run_record, dict) else None
+
+    @property
+    def live(self) -> Optional[dict[str, Any]]:
+        """The name's price when this line's signal was made, or None.
+
+        Keys as written by the cycle: ``price``, ``bid``, ``ask``,
+        ``quote_at`` (the data's own time), ``asked_at`` (ours), ``source``,
+        and ``error`` when no price could be read -- then ``price`` is null.
+        None on lines written before the record existed (it arrived with the
+        cycle after 25 Sep 2026), outside a heartbeat cycle, and on anything
+        that is not an object. As with ``run``, the values inside are not
+        judged here: check each one before trusting its type.
+
+        For study only. The race and the funds enter at the next open and
+        never read this.
+        """
+        return self.live_record if isinstance(self.live_record, dict) else None
+
+    @property
+    def management_market_closed(self) -> Optional[bool]:
+        """Whether this cycle's position-management pass found the market closed.
+
+        True when the pass was skipped for a closed market, False when it was
+        not (it ran, or it failed for another reason). None when the line
+        cannot say: written before the record existed, a pass that reported
+        nothing, or anything that is not a true/false value.
+        """
+        record = self.management_record
+        value = record.get("market_closed") if isinstance(record, dict) else None
+        return value if isinstance(value, bool) else None
+
+    @property
+    def outcome_reason(self) -> Optional[str]:
+        """Why the engine did what it did with this line's signal, as it said.
+
+        ``"market is closed"``, ``"bias is NEUTRAL; no trade"`` and so on,
+        verbatim apart from surrounding blanks. None when the line reached no
+        engine, or the reason is missing, empty or not text.
+        """
+        return _text(self.outcome_reason_record)
 
     @property
     def model_answered(self) -> bool:
@@ -344,6 +394,11 @@ def entry_from(payload: Any) -> Optional[JournalEntry]:
         screening=_screening(payload),
         reasoning_effort=_text(payload.get("reasoning_effort")),
         run_record=dict(payload["run"]) if isinstance(payload.get("run"), dict) else None,
+        live_record=dict(payload["live"]) if isinstance(payload.get("live"), dict) else None,
+        management_record=(
+            dict(payload["management"]) if isinstance(payload.get("management"), dict) else None
+        ),
+        outcome_reason_record=outcome.get("reason"),
     )
 
 

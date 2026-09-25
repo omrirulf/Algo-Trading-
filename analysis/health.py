@@ -18,6 +18,11 @@ can act on:
 
 The rules are deliberately few and each names the day it was learned. A
 check nobody can explain is a check that gets switched off.
+
+One rule reads a third file: the shadow funds' nightly record
+(``logs/funds.json``, committed beside the journal), for a calibration the
+owner's late-run limit has stopped. It is read like the others -- a missing
+or broken file says nothing -- and never written.
 """
 
 from __future__ import annotations
@@ -59,6 +64,12 @@ NAKED_ACTIONS = frozenset({"unmanaged", "error", "no_stop"})
 #: critical. One ticker failing is a bad afternoon; a tenth of the watchlist
 #: is a dead source.
 FAILED_SHARE_CRITICAL = 0.10
+
+#: The shadow funds' nightly record, by its name beside the journal: the
+#: funds workflow commits ``logs/funds.json`` next to
+#: ``logs/signal_journal.log``, so every caller that already passes the
+#: journal reaches it with no new argument (``analysis/book.py`` included).
+FUNDS_FILE = "funds.json"
 
 
 @dataclass(frozen=True)
@@ -293,6 +304,39 @@ def news_gaps(today: list[dict]) -> Optional[Alarm]:
     )
 
 
+def _read_record(path: Path) -> Optional[dict]:
+    """One JSON object from a file, or None when it is missing or not one."""
+    try:
+        record = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return record if isinstance(record, dict) else None
+
+
+def calibration_stopped(funds: Optional[dict]) -> Optional[Alarm]:
+    """25 Sep 2026: calibration stopped, because too many days needed late-run mirroring.
+
+    The owner's rule: when more calibration days than the limit (2) need the
+    sim to mirror a late run of the real account, that is a schedule problem
+    to fix, not something to copy around, so calibration stops and the owner
+    is told. The nightly funds record says "stopped" and why
+    (``shadow.calibration``); this says it to the owner, every day until they
+    decide. A warning, not critical: nothing in the real book is exposed, and
+    a critical alarm would turn the trading run red over a simulation.
+    """
+    calibration = funds.get("calibration") if isinstance(funds, dict) else None
+    if not isinstance(calibration, dict) or calibration.get("status") != "stopped":
+        return None
+    days, limit = calibration.get("mirrored_day_count"), calibration.get("mirror_limit")
+    reason = str(calibration.get("stop_reason") or "the record gives no reason")
+    count = f"{days} days" if isinstance(days, int) and not isinstance(days, bool) else "too many days"
+    cap = f" (limit {limit})" if isinstance(limit, int) and not isinstance(limit, bool) else ""
+    return Alarm(WARNING, f"Calibration stopped: late runs on {count}{cap}",
+                 f"{reason[:300]}. Calibration gives neither a pass nor a fail, and the fund test "
+                 f"cannot start, until the owner decides. From the funds record through "
+                 f"{funds.get('final_through') or 'an unknown date'}.")
+
+
 def duplicate_cycle(today: list[dict]) -> Optional[Alarm]:
     """16 and 17 Sep 2026: a cron delivered hours late ran the day twice."""
     counts = Counter(str(line.get("ticker")) for line in today)
@@ -305,15 +349,23 @@ def duplicate_cycle(today: list[dict]) -> Optional[Alarm]:
                  f"opinions per name. First few: {', '.join(twice[:8])}")
 
 
-def check(journal: Path, audit: Path, day: date) -> list[Alarm]:
-    """Every alarm the day's record raises, critical first."""
+def check(journal: Path, audit: Path, day: date, funds: Optional[Path] = None) -> list[Alarm]:
+    """Every alarm the day's record raises, critical first.
+
+    ``funds`` is the shadow funds' record; by default the ``funds.json``
+    beside the journal (``FUNDS_FILE``).
+    """
     today = journal_lines_on(_read_lines(journal), day)
     actions = audit_actions_on(_read_lines(audit), day)
+    funds_path = Path(funds) if funds is not None else Path(journal).parent / FUNDS_FILE
     found = [
         no_cycle(today),
         naked_positions(actions),
         missized_stops(actions),
         failed_calls(today),
+        # First of the warnings: it waits on the owner, and the brief's
+        # headline names the first warning.
+        calibration_stopped(_read_record(funds_path)),
         failed_tickers(today),
         screen_errors(today),
         cftc_gaps(today),
@@ -352,9 +404,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("--journal", type=Path, required=True)
     parser.add_argument("--audit", type=Path, required=True)
     parser.add_argument("--day", default=None, help="ISO date, default today in UTC")
+    parser.add_argument("--funds", type=Path, default=None,
+                        help="the shadow funds' record, default funds.json beside the journal")
     args = parser.parse_args(argv)
     day = date.fromisoformat(args.day) if args.day else datetime.now(timezone.utc).date()
-    alarms = check(args.journal, args.audit, day)
+    alarms = check(args.journal, args.audit, day, args.funds)
     print(render(alarms, day), end="")
     return exit_code(alarms)
 

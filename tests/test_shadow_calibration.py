@@ -800,11 +800,18 @@ def test_status_follows_the_verdict_once_complete():
 
 def test_the_pass_rule_is_the_owners():
     """Approved on 2026-09-24 with a sixth condition; the flag takes effect
-    with the start date (test_shadow_run). Its last line is the owner's fail
-    rule of 25 Sep 2026, which replaced "restart the 15 days from zero"."""
+    with the start date (test_shadow_run). The line after the conditions is
+    the owner's fail rule of 25 Sep 2026, which replaced "restart the 15 days
+    from zero"; the last is the owner's late-run decision of the same day."""
     rule = PASS_RULE
-    assert "all six hold over 15 trading days" in rule.text[0] and len(rule.text) == 8
+    assert "all six hold over 15 trading days" in rule.text[0] and len(rule.text) == 9
     assert rule.text[6].startswith("6. The other way round: at least 90% of the sim's trades")
+    assert rule.text[8] == (
+        "Late runs: on a day the real account's run fell outside market hours, the sim does not make the "
+        "entries the real broker refused as 'market is closed', nor a profit-ladder pass that could not run; "
+        "each is counted and shown. If more than 2 calibration days need this, calibration stops and the "
+        "owner is told.")
+    assert rule.mirror_limit == calib.MIRROR_LIMIT == 2
     last = rule.text[7]
     assert last.startswith("If calibration fails: the cause is fixed and logged in the Amendments table.")
     assert "re-run on every calibration day recorded so far, from the same starting snapshot" in last

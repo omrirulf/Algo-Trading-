@@ -36,7 +36,7 @@ import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime
-from typing import Any, Final
+from typing import Any, Callable, Final
 from dataclasses import dataclass
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -54,7 +54,7 @@ from config import settings as cfg  # noqa: E402
 from config.instruments import is_fund  # noqa: E402
 from orchestrator.fx import FxRate, fetch_rate as fetch_fx_rate  # noqa: E402
 from config.settings import get_settings  # noqa: E402
-from orchestrator import blend, context, flows, journal  # noqa: E402
+from orchestrator import blend, context, flows, journal, live_price  # noqa: E402
 from orchestrator.context import TickerContext  # noqa: E402
 from orchestrator.llm import (  # noqa: E402
     FULL_MODEL_TIMEOUT_SECONDS,
@@ -1206,22 +1206,28 @@ def judge_answer(
         journal.record(ticker_context, signal, usage=usage, fx=fx, screen=screen, blend=blend_record, error=f"answered for {signal.ticker}")
         return TickerResult(ticker, MODEL_FAILED, gaps=gaps)
 
+    # The name's price at the moment this signal is made: read before the
+    # engine is asked, so it is what a same-day entry would have met rather
+    # than a quote taken after our own order. For the journal only -- the
+    # signal handed to post_signal is the one above, untouched.
+    live = journal.read_live(ticker)
+
     try:
         outcome = post_signal(signal, dispatcher)
     except httpx.HTTPError as exc:
         log.error("%s: webhook unreachable: %s", ticker, exc)
-        journal.record(ticker_context, signal, usage=usage, fx=fx, screen=screen, blend=blend_record, error=f"webhook unreachable: {exc}")
+        journal.record(ticker_context, signal, usage=usage, fx=fx, screen=screen, blend=blend_record, error=f"webhook unreachable: {exc}", live=live)
         return TickerResult(ticker, DISPATCH_FAILED, gaps=gaps)
     except BrokerError as exc:
         # Direct mode only: the engine could not be built or reached at all.
         # Same shape of failure as an unreachable webhook, so it is logged and
         # journalled the same way rather than killing the cycle.
         log.error("%s: engine unavailable: %s", ticker, exc)
-        journal.record(ticker_context, signal, usage=usage, fx=fx, screen=screen, blend=blend_record, error=f"engine unavailable: {exc}")
+        journal.record(ticker_context, signal, usage=usage, fx=fx, screen=screen, blend=blend_record, error=f"engine unavailable: {exc}", live=live)
         return TickerResult(ticker, DISPATCH_FAILED, gaps=gaps)
 
     log.info("%s -> %s %s", ticker, outcome.get("status"), outcome.get("reason", ""))
-    journal.record(ticker_context, signal, outcome=outcome, usage=usage, fx=fx, screen=screen, blend=blend_record)
+    journal.record(ticker_context, signal, outcome=outcome, usage=usage, fx=fx, screen=screen, blend=blend_record, live=live)
     return TickerResult(ticker, COMPLETED, status=outcome.get("status"), gaps=gaps)
 
 
@@ -1518,6 +1524,9 @@ def run_batched_cycle(
     # both batches on exactly that failure: a slow batch used to put position
     # management at risk of never running at all on the day it mattered most.
     positions = manage_positions(dispatcher)
+    # Before the first line: what the pass found, and the price reader, for
+    # every line of this cycle (journal.note_cycle). Changes nothing here.
+    journal.note_cycle(positions, dispatcher)
 
     log.info("batched cycle start: gathering context for %d tickers", len(tickers))
     results: list[TickerResult] = []
@@ -1662,7 +1671,8 @@ def protect_positions(dispatcher: Dispatcher | None = None) -> dict:
 
 
 def run_cycle(
-    dispatcher: Dispatcher | None = None, premarket: bool = False
+    dispatcher: Dispatcher | None = None, premarket: bool = False,
+    prices: Callable[[Dispatcher], live_price.LivePrices | None] | None = None,
 ) -> CycleReport:
     """Run every ticker on the watchlist once, and report what came of it.
 
@@ -1670,9 +1680,23 @@ def run_cycle(
     stages offline at half price; this one asks them live, one ticker at a
     time. They share every step except how the answer is fetched, and both
     refuse to start into a closed market unless ``premarket`` says otherwise.
+
+    ``prices`` builds the reader that puts each name's price on its journal
+    line (``orchestrator/live_price.py``), given the dispatcher the cycle
+    trades through. Only ``main`` passes one: a cycle started from a test or
+    a notebook asks nobody for a price, and its lines carry none.
     """
-    if cfg.USE_BATCH_API:
-        return run_batched_cycle(dispatcher, premarket=premarket)
+    # Every line written inside belongs to this cycle and carries the few
+    # facts it learns about itself (journal.cycle). Opened here, around both
+    # paths, so an exception cannot leave them on the next cycle's lines.
+    with journal.cycle(prices):
+        if cfg.USE_BATCH_API:
+            return run_batched_cycle(dispatcher, premarket=premarket)
+        return _run_live_cycle(dispatcher, premarket)
+
+
+def _run_live_cycle(dispatcher: Dispatcher | None, premarket: bool) -> CycleReport:
+    """``run_cycle`` with the model stages asked live, one ticker at a time."""
     if premarket:
         # Nothing to wait for on the live path, so starting early would only
         # mean judging on yesterday's close and dispatching into a shut market.
@@ -1718,6 +1742,9 @@ def run_cycle(
     # would be. Never fatal: a broker that refuses to be read here costs the
     # ladder one day, not the cycle.
     positions = manage_positions(dispatcher)
+    # Before the first line: what the pass found, and the price reader, for
+    # every line of this cycle (journal.note_cycle). Changes nothing here.
+    journal.note_cycle(positions, dispatcher)
 
     # Read after the ladder, because the ladder can close a position out of
     # the book and a name it just exited is a candidate again today. One read
@@ -1807,7 +1834,7 @@ def main(argv: list[str] | None = None) -> None:
         return
 
     if args.once:
-        report = run_cycle(premarket=args.premarket)
+        report = run_cycle(premarket=args.premarket, prices=live_price.for_dispatcher)
         write_step_summary(report)
         if report.produced_nothing:
             # The whole point of --once mode reporting an exit code. A cycle
@@ -1838,9 +1865,10 @@ def main(argv: list[str] | None = None) -> None:
         id="heartbeat",
         max_instances=1,
         coalesce=True,
+        kwargs={"prices": live_price.for_dispatcher},
     )
     log.info("running first cycle now, then every %d minutes", cfg.HEARTBEAT_INTERVAL_MINUTES)
-    run_cycle()
+    run_cycle(prices=live_price.for_dispatcher)
     try:
         scheduler.start()
     except (KeyboardInterrupt, SystemExit):

@@ -73,6 +73,49 @@ evidence behind it.
   decides which bar [the scorer](/scoring) may honestly use as an entry price.
 </Note>
 
+## The price at signal time, and whether the market was shut
+
+From the first cycle after 25 Sep 2026, every line a heartbeat cycle writes
+carries two more keys. Lines written before that, or outside a cycle, do not
+have them; they are left out rather than set to `null`, so an old line keeps
+exactly the keys it had.
+
+```json
+"live": {
+  "price": 187.42, "bid": 187.40, "ask": 187.45,
+  "quote_at": "2026-09-28T14:52:07.311000+00:00",
+  "asked_at": "2026-09-28T14:52:07.902214+00:00",
+  "source": "alpaca-iex"
+},
+"management": { "market_closed": false }
+```
+
+`live` is the name's price at the moment its signal was made. For a signal
+that goes to the engine it is read just before the engine is asked. That
+includes the full model's NEUTRAL answers: with screening off, every answer
+is sent to the engine, which refuses a NEUTRAL itself. Every other line (a
+screened NEUTRAL, held, failed) is priced when the line is written.
+`asked_at` is our clock when we asked; `quote_at` is the data's own time, so a
+thin name whose last trade is minutes old shows it. The source is Alpaca's IEX
+feed, the real-time feed a paper account may read. When Alpaca cannot answer
+(webhook mode, no key, an error), the source is `yfinance` and the price is the
+close of its latest one-minute bar, with no bid or ask. When no price could be
+read, `price` is `null` and `error` says why. A read never holds up the cycle
+for long: each one has a 5-second limit, a source that fails three times in a
+row is not asked again that cycle, and a cycle spends at most 90 seconds on
+prices in total.
+
+`management.market_closed` says whether the cycle's position-management pass
+(the profit ladder and the stops) was skipped because the market was closed
+when it ran. It is left out when that pass reported nothing.
+
+Nothing that decides anything reads either key. The engine sizes and stops on
+its own market data, and [the race](/horse-race) and
+[the shadow funds](/shadow-funds) still enter at the next session's open —
+the real account buys the same day, about one day earlier. An exploratory
+"same-day entry" table may later be built from `live`, to see how much that
+day costs each arm. It has not been built.
+
 ## Why the whole context is stored
 
 The per-dimension scores are only useful next to the data that produced them.

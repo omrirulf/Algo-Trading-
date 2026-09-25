@@ -91,6 +91,30 @@ date is set while the rule is still unapproved, and an unapproved rule can
 never read "passed". During calibration, only the calibration match is
 reported.
 
+### Late runs
+
+The owner's decision of 25 Sep 2026, for calibration only: the race and the
+funds do not change. When the real account's run falls outside market hours
+(before 09:30 or after the 16:00 close in New York, 13:00 on a half day),
+its broker refuses the entries ("market is closed") and its profit-ladder
+pass cannot run. The calibration copy acts at the next open whatever time
+the run was, so it mirrors the real account instead: it does not make an
+entry the real broker refused as "market is closed" outside hours, and it
+skips a ladder pass the journal says could not run. A refusal during market
+hours is never mirrored (that is a fault of the real account's clock, and
+it stays a difference). The mirror goes line by line: if a later run the
+same day traded the name, the refused line is still not made and the line
+the real engine accepted is traded as usual. Each mirrored entry and pass
+is counted and listed on the 4 Funds page (`calibration.mirrored` in
+`logs/funds.json`), never hidden, and none is a difference. **If more than
+2 calibration days need this, calibration stops**: late runs on that many
+days are a schedule problem to fix, not something to copy around. A day is
+counted the evening its cycle is journalled, without waiting for the copy
+to reach it, so the warning normally comes with the next day's brief. A
+stopped calibration gives neither a pass nor a fail and no end date until
+the owner decides; the 4 Funds page shows it, and the daily health check
+raises a warning that reaches the owner's phone with the brief.
+
 ## Two exploratory funds
 
 Two more simulated funds use the model's own signals and the same
