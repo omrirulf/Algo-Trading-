@@ -20,7 +20,9 @@
     generated_at                 ISO date-time the record was written
     final_through                ISO date of the last final close it covers
     simulated                    must be true, or the page refuses the file
-    calibration.status           not_started | running | passed | failed
+    calibration.status           not_started | running | passed | failed |
+                                 stopped (more late-run days than the owner's
+                                 limit: neither a pass nor a fail)
     calibration.start            ISO date, or null before it starts
     calibration.days_done        closes compared so far (count)
     calibration.days_needed      closes the rule needs (count: 15, or the last
@@ -37,7 +39,8 @@
                                  (count), or null with no fix
     calibration.days_after_fix_needed  days needed after the last fix (count, 5)
     calibration.end_estimate     ISO date calibration can end if nothing more
-                                 fails, or null before it starts
+                                 fails, or null before it starts or once it
+                                 is stopped
     calibration.fund_test_plan   null, or {start ISO date the fund test would
                                  start, bars[] its three t-statistic bars (null
                                  for a look on or before the start),
@@ -58,6 +61,21 @@
     calibration.holding_days     median, min, max, open_median in trading days;
                                  closed a count of positions
     calibration.problems[]       optional: text lines, shown in the warning card
+    Late runs (the owner's decision of 25 Sep 2026); an older record lacks
+    all of these and the page then says nothing about late runs:
+    calibration.mirrored[]       {day ISO date the real run met a closed market,
+                                  ticker text, or null for a ladder pass (a
+                                  pass over the whole book), at ISO date-time,
+                                  what "entry" | "ladder pass", reason text}:
+                                  what the calibration copy did not do because
+                                  the real account could not; never a
+                                  difference, since neither book traded
+    calibration.mirrored_days[]  ISO dates those fell on
+    calibration.mirrored_day_count  count of those days
+    calibration.mirror_limit     the owner's limit (count, 2): more days than
+                                 this stop calibration
+    calibration.stop_reason      text while status is stopped, else null;
+                                 shown on the card and in the warning card
     funds                        null, or {start ISO date, days[] ISO dates,
                                  list[], band}; drawn only when calibration passed
     funds.list[]                 {name model|momentum|hybrid|vt|
@@ -638,10 +656,10 @@ table.mini td.few{text-align:center;color:var(--ink-3);font-family:var(--sans)}
 
   // ---------------------------------------------------------------- problems
   // Everything the record says went wrong, gathered into one card so it
-  // reaches the owner instead of sitting unread in the file: calibration's
-  // own problems, a failed integrity check of the funds (the four and the
-  // two exploratory) or of the coin-flip funds, and any pass-rule condition
-  // that already reads FAIL.
+  // reaches the owner instead of sitting unread in the file: a stopped
+  // calibration and why, calibration's own problems, a failed integrity
+  // check of the funds (the four and the two exploratory) or of the
+  // coin-flip funds, and any pass-rule condition that already reads FAIL.
   const VERDICT = /^\s*(\d+)\.\s*(.*?):\s*(PASS|FAIL|PENDING)\b\s*(?:\((.*)\))?\s*$/;
   const warnIcon = `<svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 15 14H1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8 6v3.6M8 11.4v.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>`;
 
@@ -655,6 +673,11 @@ table.mini td.few{text-align:center;color:var(--ink-3);font-family:var(--sans)}
     data = data && typeof data === "object" ? data : {};
     const c = data.calibration && typeof data.calibration === "object" ? data.calibration : {};
     const out = [];
+    // A stopped calibration waits for the owner, so it heads the card.
+    if(c.status === "stopped"){
+      const why = typeof c.stop_reason === "string" && c.stop_reason ? c.stop_reason : "the record gives no reason";
+      out.push({where:"Calibration stopped", text:why, bad:true});
+    }
     (Array.isArray(c.problems) ? c.problems : []).forEach(p=>out.push({where:"Calibration", text:String(p), bad:false}));
     const integrity = data.integrity && typeof data.integrity === "object" ? data.integrity : {};
     // "four" keeps its name in the record but checks the two exploratory
@@ -671,7 +694,7 @@ table.mini td.few{text-align:center;color:var(--ink-3);font-family:var(--sans)}
       if(i.ok !== false && !listed.length) return;
       (listed.length ? listed : ["failed, and the record names no problem"]).forEach(p=>out.push({where:label, text:String(p), bad:true}));
     });
-    if(["running", "passed", "failed"].includes(c.status)){
+    if(["running", "passed", "failed", "stopped"].includes(c.status)){
       const verdicts = c.pass_rule && Array.isArray(c.pass_rule.verdicts) ? c.pass_rule.verdicts : [];
       verdicts.map(verdictRow).filter(v=>v.state === "FAIL").forEach(v=>
         out.push({where:"Pass rule", text:`${v.n}. ${v.what}: FAIL${v.detail ? " (" + v.detail + ")" : ""}`, bad:true}));
@@ -727,7 +750,7 @@ table.mini td.few{text-align:center;color:var(--ink-3);font-family:var(--sans)}
   // amber: it must be re-registered before the fund test starts.
   function calibrationFixHtml(c){
     c = asObj(c);
-    if(!c || !["running", "passed", "failed"].includes(c.status)) return "";
+    if(!c || !["running", "passed", "failed", "stopped"].includes(c.status)) return "";
     // An older record carries none of these and says nothing about fixes.
     if(!["days_passed", "fixes", "last_fix", "days_since_fix", "fund_test_plan"].some(k=>k in c)) return "";
     const need = Number.isFinite(c.days_needed) ? c.days_needed : 15;
@@ -744,12 +767,16 @@ table.mini td.few{text-align:center;color:var(--ink-3);font-family:var(--sans)}
       facts.push("No fix yet");
     }
     let html = `<ul class="facts">${facts.map(f=>`<li>${f}</li>`).join("")}</ul>`;
-    const end = typeof c.end_estimate === "string" && c.end_estimate ? ` If nothing more fails, it ends ${esc(day(c.end_estimate, true))}.` : "";
-    html += `<p class="small muted">Calibration ends at day 15 or ${esc(after)} days after the last fix, whichever is later.${end}</p>`;
+    // A stopped calibration has no end date, and the fund test's start is
+    // not worked out from it, so the record gives neither and none is shown.
+    const end = c.status !== "stopped" && typeof c.end_estimate === "string" && c.end_estimate ? ` If nothing more fails, it ends ${esc(day(c.end_estimate, true))}.` : "";
+    html += c.status === "stopped"
+      ? `<p class="small muted">Calibration is stopped, so it has no end date, and the fund test's start is not worked out from it.</p>`
+      : `<p class="small muted">Calibration ends at day 15 or ${esc(after)} days after the last fix, whichever is later.${end}</p>`;
     if(fixes.length > 1){
       html += `<details class="data"><summary>All ${esc(fixes.length)} fixes</summary><ul class="facts">${fixes.map(f=>`<li>${esc(day(f.day, true))}${f.what != null && f.what !== "" ? `: ${esc(f.what)}` : ""}</li>`).join("")}</ul></details>`;
     }
-    const plan = asObj(c.fund_test_plan);
+    const plan = c.status === "stopped" ? null : asObj(c.fund_test_plan);
     if(plan && typeof plan.start === "string" && plan.start){
       // A look on or before the start cannot be read by the fund test: it
       // has no bar, and the record gives null for it.
@@ -767,6 +794,25 @@ table.mini td.few{text-align:center;color:var(--ink-3);font-family:var(--sans)}
   }
 
   function renderCalibration(data){
+    // Late runs (the owner's decision of 25 Sep 2026): what the copy did not
+    // do because the real account's run met a closed market. Always shown
+    // once there is any, never folded into the differences, since neither
+    // book traded; the count is set against the owner's limit of days.
+    // Defined in here so this function stays whole on its own.
+    function lateRunsHtml(c){
+      const items = (Array.isArray(c.mirrored) ? c.mirrored : []).map(asObj).filter(Boolean);
+      const count = Number.isFinite(c.mirrored_day_count) ? c.mirrored_day_count : null;
+      if(!items.length && !count) return "";
+      const limit = Number.isFinite(c.mirror_limit) ? c.mirror_limit : 2;
+      const entries = items.filter(m=>m.what === "entry").length, passes = items.filter(m=>m.what === "ladder pass").length;
+      const n = (k, one, many)=> `<b class="num">${esc(k)}</b> ${k === 1 ? one : many}`;
+      const days = count ?? new Set(items.map(m=>m.day)).size;
+      const over = days > limit;
+      const rows = items.map(m=>`<li>${esc(day(m.day, true))}: ${m.what === "ladder pass" ? "ladder pass (the whole book)" : `entry ${esc(m.ticker ?? "n/a")}`}${m.at ? ` <span class="faint">at ${esc(israel(m.at))}</span>` : ""}${m.reason ? ` <span class="faint">(${esc(m.reason)})</span>` : ""}</li>`).join("");
+      return `<div class="${over ? "alert bad" : "amber"}" role="note"><b>Late runs:</b> ${n(entries, "entry", "entries")} and ${n(passes, "ladder pass", "ladder passes")} mirrored on ${n(days, "day", "days")} (limit ${esc(limit)}). The real account's run met a closed market, so the copy did not do what the real account could not.`
+        + (rows ? `<details class="data"><summary>What was mirrored</summary><ul class="facts">${rows}</ul></details>` : "") + `</div>`;
+    }
+
     const el = $("calibration");
     const c = data.calibration;
     if(!c || typeof c !== "object"){
@@ -775,7 +821,7 @@ table.mini td.few{text-align:center;color:var(--ink-3);font-family:var(--sans)}
     }
     const status = c.status || "not_started";
     const need = isNum(c.days_needed) ? c.days_needed : 15, done = isNum(c.days_done) ? c.days_done : 0;
-    const chip = {not_started:["idle", "not started"], running:["run", "running"], passed:["good", "passed"], failed:["bad", "failed"]}[status] || ["idle", status];
+    const chip = {not_started:["idle", "not started"], running:["run", "running"], passed:["good", "passed"], failed:["bad", "failed"], stopped:["bad", "stopped"]}[status] || ["idle", status];
     const todo = [];
     let html = "";
     if(status === "not_started"){
@@ -785,11 +831,14 @@ table.mini td.few{text-align:center;color:var(--ink-3);font-family:var(--sans)}
         running: "The calibration fund starts from the real paper account's book and runs the same journal lines through the real engine and manager. The two lines should lie on top of each other; every trade where they differ is listed below with its reason.",
         passed: "Calibration passed under the approved rule.",
         failed: "Calibration failed under the approved rule, so the four funds stay hidden.",
+        stopped: "Calibration is stopped: too many days needed late-run mirroring. It gives neither a pass nor a fail until the owner decides, and the four funds stay hidden.",
       }[status] || "";
+      const why = status === "stopped" && typeof c.stop_reason === "string" && c.stop_reason
+        ? `<p class="small"><b>Why:</b> ${esc(c.stop_reason)}</p>` : "";
       // "Closes compared" rather than "Day": after a fail the days passed
       // (the fail rule's count, below) stop short of the days compared, and
       // two different numbers both called days would read as a contradiction.
-      html += `<div class="card"><div class="st"><span class="chip ${chip[0]}">${esc(chip[1])}</span><span><b class="num">${esc(done)}</b> of <span class="num">${esc(need)}</span> closes compared${c.start ? ` · started ${esc(day(c.start, true))}` : ""}</span></div><div class="bar" role="img" aria-label="${esc(done)} of ${esc(need)} calibration closes compared"><i style="width:${Math.max(0, Math.min(100, need ? done / need * 100 : 0))}%"></i></div>${calibrationFixHtml(c)}${say ? `<p class="small muted">${say}</p>` : ""}</div>`;
+      html += `<div class="card"><div class="st"><span class="chip ${chip[0]}">${esc(chip[1])}</span><span><b class="num">${esc(done)}</b> of <span class="num">${esc(need)}</span> closes compared${c.start ? ` · started ${esc(day(c.start, true))}` : ""}</span></div><div class="bar" role="img" aria-label="${esc(done)} of ${esc(need)} calibration closes compared"><i style="width:${Math.max(0, Math.min(100, need ? done / need * 100 : 0))}%"></i></div>${calibrationFixHtml(c)}${say ? `<p class="small muted">${say}</p>` : ""}${why}${lateRunsHtml(c)}</div>`;
       const series = Array.isArray(c.series) ? c.series : [];
       const problems = (Array.isArray(c.problems) ? c.problems : []).map(p=>String(p ?? ""));
       if(series.length){
@@ -833,7 +882,7 @@ table.mini td.few{text-align:center;color:var(--ink-3);font-family:var(--sans)}
     const rule = c.pass_rule || {};
     const lines = Array.isArray(rule.text) ? rule.text : [];
     // The verdicts are the evaluator's, written only once calibration runs.
-    const verdicts = ["running", "passed", "failed"].includes(status) && Array.isArray(rule.verdicts) ? rule.verdicts : [];
+    const verdicts = ["running", "passed", "failed", "stopped"].includes(status) && Array.isArray(rule.verdicts) ? rule.verdicts : [];
     html += `<div class="card" style="margin-top:12px"><h3>Pass rule ${rule.approved ? `<span class="chip good">approved</span>` : `<span class="chip run">not in force yet</span>`}</h3>${lines.length ? ruleHtml(lines) : `<p class="muted small">No pass rule written yet.</p>`}${verdictsHtml(verdicts)}</div>`;
     const h = c.holding_days || {};
     const dd = (v)=> isNum(v) ? (Number.isInteger(v) ? String(v) : v.toFixed(1)) : "n/a";
@@ -1025,7 +1074,7 @@ table.mini td.few{text-align:center;color:var(--ink-3);font-family:var(--sans)}
     const lines = [];
     const c = obj(data.calibration) || {};
     const cal = obj(c.order_matters);
-    if(cal && ["running", "passed", "failed"].includes(c.status)) lines.push(`<b>Calibration copy:</b> ${short(cal, "cycle days")}`);
+    if(cal && ["running", "passed", "failed", "stopped"].includes(c.status)) lines.push(`<b>Calibration copy:</b> ${short(cal, "cycle days")}`);
     if(fundsVisible(data)){
       (Array.isArray(data.funds.list) ? data.funds.list : []).filter(obj).forEach(x=>{
         const o = obj(x.order_matters);

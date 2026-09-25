@@ -319,8 +319,15 @@ class Fund:
         #: Cycles in which at least one signal was dispatched.
         self.cycles_dispatched = 0
 
-    def session(self, day: date, cycle: Optional[Sequence[Line]]) -> Day:
-        """One session. ``cycle`` is the previous day's lines, or None if none ran."""
+    def session(self, day: date, cycle: Optional[Sequence[Line]], manage: bool = True) -> Day:
+        """One session. ``cycle`` is the previous day's lines, or None if none ran.
+
+        ``manage`` is for the calibration copy alone: False when the real
+        account's own management pass for that cycle was skipped because
+        the market was closed, so the copy skips it too
+        (``shadow.calibration``, "Late runs"). Every fund leaves it at True,
+        and then a session is exactly what it always was.
+        """
         broker = self.broker
         broker.day = day
         held_at_open = broker.held_quantities()
@@ -333,7 +340,8 @@ class Fund:
 
         broker.fill_gapped_stops(opens)
         if cycle is not None:
-            self._manage()
+            if manage:
+                self._manage()
             self._enter(cycle)
         # New positions' bars, for their stops and marks.
         for ticker in sorted(broker.positions):

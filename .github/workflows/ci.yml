@@ -504,11 +504,22 @@ jobs:
         # scheduled and actual start, run id). It is not a credential, and
         # naming the line rather than the file keeps journal.py checked for
         # every other read.
+        #
+        # Two credential lines are allowed the same way, and only as written
+        # below: the two in live_price.py that put the engine's own Alpaca
+        # key into the headers of a request for a name's latest price, which
+        # every journal line now carries (the owner's request of 25 Sep 2026).
+        # The key is still read from settings only by
+        # app/broker_client.resolve_credentials, and only in direct mode,
+        # where this process holds it anyway. The next step but one holds
+        # live_price.py to reading a price and nothing else.
         run: |
           hits=$(grep -rnE '(get_settings|os\.environ|getenv|\bsettings\.|\.[A-Za-z_]*(secret|api_key|_token|password)\b)' \
                    orchestrator --include='*.py' \
                  | grep -vE '^orchestrator/(heartbeat|news|llm|dispatch|sources)\.py:' \
-                 | grep -vE '^orchestrator/journal\.py:[0-9]+:    raw = os\.environ\.get\("HEARTBEAT_RUN"\)$' || true)
+                 | grep -vE '^orchestrator/journal\.py:[0-9]+:    raw = os\.environ\.get\("HEARTBEAT_RUN"\)$' \
+                 | grep -vE '^orchestrator/live_price\.py:[0-9]+:        return \{"Authorization": "Bearer " \+ credentials\.access_token\}$' \
+                 | grep -vE '^orchestrator/live_price\.py:[0-9]+:    return \{"APCA-API-KEY-ID": credentials\.api_key, "APCA-API-SECRET-KEY": credentials\.secret_key\}$' || true)
           if [ -n "$hits" ]; then
             echo "$hits"
             echo "::error::market context modules must not read credentials"
@@ -533,6 +544,41 @@ jobs:
             exit 1
           fi
           echo "OK: the credentialed module only fetches"
+
+      - name: The price reader can only read a price
+        # live_price.py holds the engine's Alpaca key (see the step before
+        # last) for one job: asking Alpaca's market-data host for a name's
+        # latest trade and bid/ask, for the journal. So it may GET, from that
+        # host only; it may not write a file or render a prompt; and only the
+        # heartbeat may import it, which never hands what it reads to
+        # post_signal -- a price read for the record must not reach a trade.
+        run: |
+          f=orchestrator/live_price.py
+          hits=$(grep -nE '(\.(post|put|patch|delete|request|stream|submit_[a-z_]*|cancel[a-z_]*|replace_order[a-z_]*|close_position[a-z_]*)\(|as_prompt|as_lines|\.write_text\(|\.write_bytes\(|open\([^)]*["'"'"'][wax])' "$f" || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::live_price.py may only read: no other HTTP verb, no order call, no file, no prompt"
+            exit 1
+          fi
+          urls=$(grep -noE 'https?://[^"'"'"' ]+' "$f" | grep -vE '^[0-9]+:https://data\.alpaca\.markets/' || true)
+          if [ -n "$urls" ]; then
+            echo "$urls"
+            echo "::error::live_price.py may talk to Alpaca's market-data host and no other"
+            exit 1
+          fi
+          importers=$(grep -rlE '(from orchestrator import [^#]*\blive_price\b|orchestrator\.live_price|import live_price)' \
+                        app orchestrator config analysis store backtest replay learn rules shadow --include='*.py' \
+                      | grep -vE '^orchestrator/heartbeat\.py$' || true)
+          if [ -n "$importers" ]; then
+            echo "$importers"
+            echo "::error::only orchestrator/heartbeat.py may import live_price.py"
+            exit 1
+          fi
+          if grep -nE 'post_signal\([^)]*live' orchestrator/heartbeat.py; then
+            echo "::error::a live price must not be handed to post_signal"
+            exit 1
+          fi
+          echo "OK: the price reader only reads a price, for the journal"
 
       - name: The scorer is read-only
         # analysis/ grades past decisions. It must never be able to make one:

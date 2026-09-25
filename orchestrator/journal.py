@@ -15,9 +15,11 @@ from __future__ import annotations
 import json
 import logging
 import os
+from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Iterator, Optional
 
 from pythonjsonlogger import jsonlogger
 
@@ -67,6 +69,113 @@ def _run_field() -> dict[str, Any]:
     return {} if block is None else {"run": block}
 
 
+# --------------------------------------------------------------------------- #
+# What a cycle knows about itself, on every line it writes
+# --------------------------------------------------------------------------- #
+
+
+@dataclass
+class _Cycle:
+    """The facts one open cycle adds to each of its lines.
+
+    Held here rather than passed down, because lines are written from a dozen
+    places deep inside the cycle -- held, screened, failed, judged -- and a
+    fact that every call site had to remember is a fact one of them would
+    forget. Nothing that decides a trade reads any of it.
+    """
+
+    #: Builds the price reader, given the dispatcher the cycle trades through.
+    prices_for: Optional[Callable[[Any], Any]] = None
+    #: Has ``read(ticker) -> dict`` and ``close()``; see orchestrator/live_price.py.
+    reader: Any = None
+    #: ``{"market_closed": bool}`` once the position-management pass returned.
+    management: Optional[dict[str, bool]] = None
+
+
+#: The open cycle, or None. Only ``cycle()`` opens one, so a line written by
+#: a test, a replay or a notebook is exactly the line it was before.
+_open: Optional[_Cycle] = None
+
+
+@contextmanager
+def cycle(prices_for: Optional[Callable[[Any], Any]] = None) -> Iterator[None]:
+    """Mark the lines written inside as one cycle's.
+
+    ``prices_for`` builds the reader that prices each line (``None`` reads no
+    price, and the lines carry none). Closed in ``finally`` so a cycle that
+    raised cannot leave its facts on the next cycle's lines -- in scheduler
+    mode one process runs many.
+    """
+    global _open
+    _open = _Cycle(prices_for=prices_for)
+    try:
+        yield
+    finally:
+        closing, _open = _open, None
+        close = getattr(closing.reader, "close", None) if closing else None
+        if close is not None:
+            try:
+                close()
+            except Exception:  # noqa: BLE001 - a connection left open is not worth a crash
+                log.exception("could not close the live price reader")
+
+
+def note_cycle(positions: Any, dispatcher: Any = None) -> None:
+    """Record what the cycle learned before its first line. Never raises.
+
+    Called by the heartbeat once the position-management pass has returned,
+    which in both cycles is before any line is written. Two things come of it:
+
+    * ``management`` -- whether that pass found the market closed, exactly as
+      the pass reported it. It is left off when the pass reported nothing
+      (no manager behind this dispatcher, or it failed outright): unknown is
+      not the same as open.
+    * the price reader, built for the dispatcher this cycle trades through.
+
+    Outside ``cycle()`` it does nothing.
+    """
+    facts = _open
+    if facts is None:
+        return
+    closed = positions.get("market_closed") if isinstance(positions, dict) else None
+    facts.management = {"market_closed": closed} if isinstance(closed, bool) else None
+    if facts.prices_for is not None and facts.reader is None:
+        try:
+            facts.reader = facts.prices_for(dispatcher)
+        except Exception:  # noqa: BLE001 - lines without a price, never a cycle without lines
+            log.exception("could not build the live price reader; lines will carry no price")
+
+
+def read_live(ticker: str) -> Optional[dict[str, Any]]:
+    """``ticker``'s price now, as a line's ``live`` record; None with no reader.
+
+    The heartbeat calls this at the moment a signal is made, just before it is
+    dispatched; ``record`` calls it for every other line when it is written.
+    Never raises: a reader that breaks its own promise costs the line its
+    price, not the line.
+    """
+    reader = _open.reader if _open is not None else None
+    if reader is None:
+        return None
+    try:
+        live = reader.read(ticker)
+    except Exception:  # noqa: BLE001 - see the docstring
+        log.exception("the live price reader failed for %s", ticker)
+        return None
+    return live if isinstance(live, dict) else None
+
+
+def _cycle_fields(live: Optional[dict[str, Any]]) -> dict[str, Any]:
+    """``live`` and ``management``, each only when there is one to write."""
+    fields: dict[str, Any] = {}
+    if live is not None:
+        fields["live"] = live
+    facts = _open
+    if facts is not None and facts.management is not None:
+        fields["management"] = dict(facts.management)
+    return fields
+
+
 def get_journal_logger(path: Path = cfg.SIGNAL_JOURNAL_PATH) -> logging.Logger:
     """Return the journal logger, creating the file handler on first use."""
     logger = logging.getLogger(_JOURNAL_LOGGER_NAME)
@@ -98,15 +207,24 @@ def record(
     blend: Optional[dict[str, Any]] = None,
     held: bool = False,
     stage: Optional[str] = None,
+    live: Optional[dict[str, Any]] = None,
 ) -> None:
     """Write one journal line. Swallows its own failures by design.
 
     ``stage`` names where a failed line failed, when that was before the
     model was asked (``"context"``): a news-vendor outage is not a failed
     model call, and the owner's model-watch trigger counts only those.
+
+    ``live`` is the price read when the line's signal was made, for the one
+    caller that reads it before dispatching (``heartbeat.judge_answer``).
+    Every other line inside a cycle is priced here, as it is written.
     """
     try:
         now = datetime.now(timezone.utc)
+        # After ``now``, so the line's own time -- which decides the day it
+        # belongs to in the race and the funds -- is what it always was.
+        if live is None:
+            live = read_live(context.ticker)
         get_journal_logger().info(
             "signal_generated",
             extra={
@@ -163,6 +281,14 @@ def record(
                 "screening": bool(llm.SCREENING_ENABLED),
                 "reasoning_effort": llm.configured_effort(),
                 "stage": stage,
+                # The price of the name when this line's signal was made, and
+                # whether the cycle's position-management pass found the
+                # market shut (the owner's request of 25 Sep 2026). For later
+                # study only: the race and the funds still enter at the next
+                # open, and nothing in the cycle reads either back. Absent
+                # rather than null outside a cycle, so a line written without
+                # them keeps exactly the keys, in exactly the order, it had.
+                **_cycle_fields(live),
                 # What started this run and how late it was (see run_block).
                 # Last, and absent rather than null when unset, so a line
                 # written without it keeps exactly the keys, in exactly the

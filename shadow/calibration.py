@@ -47,6 +47,29 @@ of the next session* (``shadow.fund``). So:
 
 So a real entry on C1 and the sim's entry at C2's open are the same trade a
 session apart. Such a pair is counted as timing, not as a difference.
+
+Late runs (the owner's decision of 25 Sep 2026). The real account acts
+during D only if its run falls inside market hours. A run that starts
+before the open or runs past the close meets a closed market: the engine
+refuses every entry with "market is closed", and the position manager skips
+its profit-ladder pass. The sim acts at the next open whatever time the
+run was, so without help it would make trades the real account never could,
+and every one would read as a difference with no fault behind it. So, in
+this copy only (the race and the funds do not change), the sim mirrors the
+real account's clock: it does not make an entry the real engine refused as
+"market is closed" when the line was written outside regular New York hours
+(09:30 to 16:00, or 13:00 on a half day), and it skips its management pass
+for a cycle whose real pass was skipped for a closed market
+(``LateRuns``). A refusal made during regular hours is never mirrored: that
+is a fault of the real account's clock, and it must stay a visible
+difference. The mirror goes line by line: a refused line is not traded, and
+a later line of the same day that the real engine accepted is traded as
+usual, so the sim makes the trade the real account made, not the refused
+one. Each mirrored item is counted and shown, never hidden; and if more
+than 2 calibration days need it, calibration stops (``MIRROR_LIMIT``): that
+is a schedule problem to fix, not something to copy around. A day is
+counted as soon as its cycle is journalled, not when the sim reaches it,
+so the stop does not wait for later closes.
 """
 
 from __future__ import annotations
@@ -61,12 +84,13 @@ from datetime import date, datetime, time, timedelta, timezone
 from typing import Any, Iterable, Mapping, Optional, Sequence
 from zoneinfo import ZoneInfo
 
+from analysis.cycle_day import MARKET_OPEN_NY, closes_at, latest_start
 from analysis.reader import JournalEntry
 from config.market_calendar import is_trading_day
 from shadow import schedule
 from shadow.audit import ENTRY_EVENT, MANAGED_EVENT, LiveAuditLeak, live_audit_guarded
 from shadow.broker import ENTRY, STOP, TRANCHE
-from shadow.fund import Decision, Fund, cycle_days, lines_by_day, model_signal
+from shadow.fund import Decision, Fund, Line, cycle_days, lines_by_day, model_signal
 from shadow.fund_test import fund_test_plan, next_trading_day, sessions_through
 from shadow.market import Bars, SimFeed, calendar
 from shadow.schedule import AFTER_FIX_DAYS
@@ -705,6 +729,281 @@ def seed_fund(
 
 
 # --------------------------------------------------------------------------- #
+# d2) Late runs: the real account's closed-market refusals, mirrored
+# --------------------------------------------------------------------------- #
+
+#: The engine's own words when the broker's clock says the market is shut
+#: (``app/execution_engine.py``, step 2). Matched exactly: a reworded
+#: refusal is not this one, and stays a difference.
+MARKET_CLOSED = "market is closed"
+#: The status a mirrored line is recorded under. The line counts as
+#: dispatched, so a later real fill in that ticker reads "unexplained"
+#: (``_why_real_only``), never "sim held it already".
+MIRRORED = "MIRRORED"
+MIRROR_REASON = "late run: real market closed, mirrored"
+MIRROR_ENTRY = "entry"
+MIRROR_LADDER = "ladder pass"
+#: The owner's limit (25 Sep 2026): more calibration days than this needing
+#: late-run mirroring stops calibration.
+MIRROR_LIMIT = 2
+#: How far back from a journal line its engine record may lie. The engine
+#: writes its audit line and the cycle its journal line moments apart; five
+#: minutes is ample and still far shorter than the day between two cycles.
+AUDIT_JOIN = timedelta(minutes=5)
+SCHEDULE_GUARD = "the schedule guard should have prevented this"
+
+
+@dataclass(frozen=True)
+class Mirrored:
+    """One thing the copy did not do because the real account could not: an entry or a ladder pass."""
+
+    #: The cycle day: the day the real account's run met a closed market.
+    day: date
+    #: None for a ladder pass: it is a pass over the whole book.
+    ticker: Optional[str]
+    #: The journal line's time; for a ladder pass, the time of the cycle day's first line.
+    at: datetime
+    what: str               # MIRROR_ENTRY or MIRROR_LADDER
+    reason: str = MIRROR_REASON
+
+
+def _utc(moment: datetime) -> datetime:
+    """``moment`` in UTC; a naive one is read as UTC, as the journal's are."""
+    return (moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)).astimezone(timezone.utc)
+
+
+def in_regular_hours(moment: datetime) -> bool:
+    """Whether ``moment`` falls in a regular New York session.
+
+    09:30 to the close -- 16:00, or 13:00 on a half day -- on a trading day.
+    The close itself is outside: at 16:00:00 the broker's clock already
+    says the market is shut.
+    """
+    local = _utc(moment).astimezone(NY)
+    day = local.date()
+    return is_trading_day(day) and MARKET_OPEN_NY <= local.time() < closes_at(day)
+
+
+def _started_inside_schedule(moment: datetime) -> bool:
+    """A start the schedule allows: from the open to the latest safe start (``analysis.cycle_day``)."""
+    local = _utc(moment).astimezone(NY)
+    return in_regular_hours(moment) and local.time() < latest_start(local.date())
+
+
+def _plural(count: int, one: str, many: str) -> str:
+    return f"{count} {one if count == 1 else many}"
+
+
+class LateRuns:
+    """Which of the real account's closed-market refusals the copy mirrors, cycle by cycle.
+
+    Built once per run from what the real account recorded: the journal
+    (every line, held and failed ones too) and the live audit log. ``cycle``
+    is asked once per cycle day the copy acts on, and says what the copy
+    dispatches and whether it manages.
+
+    An entry is mirrored when both of these hold:
+
+    * the real engine refused the line with status REJECTED and the reason
+      exactly "market is closed" -- from the journal line's own outcome
+      when it carries the reason (``JournalEntry.outcome_reason``), else
+      from the live audit log's ``signal_processed`` record for that ticker,
+      the latest at or before the line within ``AUDIT_JOIN``;
+    * the line, and the refusal, were written outside regular New York
+      hours (``in_regular_hours``). A refusal during the session is the real
+      account's clock at fault, and is left to show as a difference.
+
+    Line by line, never name by name. When a later run the same day traded
+    the name -- the real engine accepted that line -- the refused line is
+    still mirrored and the accepted one is traded as usual. Letting the
+    refused line trade instead would have the sim make the stale call, with
+    its own direction and its first-cycle place in the queue, and then skip
+    the line that really traded as "already held". A real fill in that name
+    that no journal line explains (a trade by hand) is left for the
+    comparison, which reads it as "unexplained": shown, not matched away.
+
+    A management pass is mirrored only on the journal's own word: every line
+    of the cycle day says its pass was skipped because the market was
+    closed (``JournalEntry.management_market_closed`` is True). Lines written
+    before that field existed never cause a skip. The other evidence there
+    is -- no ``position_managed`` line that day, a clock refusal first thing
+    -- is also what a quiet book or a lost commit looks like, and the owner's
+    rule is never to copy on weaker evidence than the record's own. A day
+    without the field keeps its management pass, and any difference that
+    makes shows with its reason.
+    """
+
+    def __init__(self, entries: Iterable[JournalEntry], audit_lines: Iterable[str]) -> None:
+        self._day_lines: dict[date, list[JournalEntry]] = defaultdict(list)
+        for entry in entries:
+            if entry.timestamp is not None:
+                self._day_lines[_utc(entry.timestamp).date()].append(entry)
+        self._refusals: dict[str, list[AuditRecord]] = defaultdict(list)
+        for record in audit_records(audit_lines):
+            if record.event == ENTRY_EVENT and record.at is not None and record.ticker:
+                self._refusals[record.ticker].append(record)
+        for records in self._refusals.values():
+            records.sort(key=lambda r: r.at)
+        self.items: list[Mirrored] = []
+        self.problems: list[str] = []
+        self._flagged: set[date] = set()
+        #: Cycle days already asked about, so a day counted ahead of the sim
+        #: (``count_ahead``) is never counted twice.
+        self._asked: set[date] = set()
+
+    def engine_answer(self, entry: JournalEntry) -> tuple[Optional[str], Optional[str], Optional[datetime]]:
+        """The real engine's (status, reason, when) for one journal line, or Nones when unknown.
+
+        The journal line's own outcome first. Lines written before the reader
+        exposed the reason (``outcome_reason``, read through ``getattr`` so
+        this works before and after that change) are joined to the audit log.
+        """
+        stamp = _utc(entry.timestamp) if entry.timestamp is not None else None
+        reason = getattr(entry, "outcome_reason", None)
+        if isinstance(reason, str) and reason.strip():
+            return entry.outcome_status, reason.strip(), stamp
+        if stamp is None:
+            return None, None, None
+        joined = None
+        for record in self._refusals.get(entry.ticker, ()):
+            if record.at > stamp:
+                break
+            if stamp - record.at <= AUDIT_JOIN:
+                joined = record
+        if joined is None:
+            return None, None, None
+        return (_text(joined.result.get("status")), _text(joined.result.get("reason")), joined.at)
+
+    def _mirrors_entry(self, line: Line) -> bool:
+        entry = line.entry
+        if entry.timestamp is None:
+            return False
+        status, reason, refused_at = self.engine_answer(entry)
+        if status != "REJECTED" or reason != MARKET_CLOSED or refused_at is None:
+            return False
+        return not (in_regular_hours(entry.timestamp) or in_regular_hours(refused_at))
+
+    def management_skipped(self, day: date) -> bool:
+        """Every journal line of ``day`` says its management pass was skipped for a closed market."""
+        flags = [getattr(e, "management_market_closed", None) for e in self._day_lines.get(day, ())]
+        return bool(flags) and all(flag is True for flag in flags)
+
+    def _cycle_start(self, day: date, entry: Optional[JournalEntry] = None) -> Optional[datetime]:
+        """When the run behind ``entry`` started, or the day's first run; None when unknown.
+
+        From the run block every line of a heartbeat run carries. An entry
+        without one (a line from before the block existed, or a local run)
+        has no known start: the day's first line may belong to another run
+        that day, and a note built on it could blame the guard for a run it
+        never saw. For a day's management pass, whose skip every line of the
+        day confirms, the day's first line stands in.
+        """
+        lines = [entry] if entry is not None else self._day_lines.get(day, [])
+        starts = []
+        for e in lines:
+            block = getattr(e, "run", None)
+            started = _instant(block.get("started_at")) if isinstance(block, dict) else None
+            if started is not None:
+                starts.append(started)
+        if starts:
+            return min(starts)
+        if entry is not None:
+            return None
+        stamps = [_utc(e.timestamp) for e in self._day_lines.get(day, []) if e.timestamp is not None]
+        return min(stamps) if stamps else None
+
+    def _check_schedule(self, day: date, entry: Optional[JournalEntry] = None) -> None:
+        """A problem note when a cycle that needed mirroring started inside the schedule."""
+        if day in self._flagged:
+            return
+        started = self._cycle_start(day, entry)
+        if started is None or not _started_inside_schedule(started):
+            return
+        self._flagged.add(day)
+        local = started.astimezone(NY)
+        self.problems.append(f"{day.isoformat()}: late-run mirroring was needed for a cycle that started at "
+                             f"{local:%H:%M} New York, inside the schedule: {SCHEDULE_GUARD}")
+
+    def cycle(self, day: date, session: date, lines: Sequence[Line],
+              fund: Optional[Fund] = None) -> tuple[Optional[list[Line]], bool]:
+        """What the copy does with cycle day ``day``'s lines at ``session``'s open.
+
+        Returns the lines it dispatches and whether it runs its management
+        pass. None for the lines when there is nothing left to do at all --
+        no pass and every line mirrored -- which is exactly a session with
+        no cycle. Each mirrored line is recorded in ``fund``'s decisions as
+        MIRRORED and dispatched, and in ``items``.
+        """
+        self._asked.add(day)
+        kept: list[Line] = []
+        for line in lines:
+            if not self._mirrors_entry(line):
+                kept.append(line)
+                continue
+            entry = line.entry
+            self.items.append(Mirrored(day, line.ticker, _utc(entry.timestamp), MIRROR_ENTRY))
+            if fund is not None and fund.decisions is not None:
+                fund.decisions.append(Decision(session, line.day, line.ticker, entry.bias or "",
+                                               float(entry.conviction or 0.0), MIRRORED, MIRROR_REASON))
+            self._check_schedule(day, entry)
+        manage = not self.management_skipped(day)
+        if not manage:
+            # ``management_skipped`` holds only when the day has lines, so
+            # there is always a first one to date the pass by.
+            first = min(_utc(e.timestamp) for e in self._day_lines[day] if e.timestamp is not None)
+            self.items.append(Mirrored(day, None, first, MIRROR_LADDER))
+            self._check_schedule(day)
+        if not manage and not kept:
+            return None, False
+        return kept, manage
+
+    def count_ahead(self, cycles: Mapping[date, Sequence[Line]], days: Iterable[date]) -> None:
+        """Count cycle days the copy will act on but the sim has not reached yet.
+
+        The sim reaches cycle day D only once the next session's real close
+        is on record -- a day or two later -- so a stop that waited for it
+        would reach the owner two or three sessions after the third late run.
+        What is mirrored depends only on the record (the journal and the
+        engine's answers), never on the sim's book, so it is counted as soon
+        as D is journalled. When the sim reaches D it mirrors exactly this;
+        those days are then asked in ``cycle`` and not counted again.
+        """
+        for day in sorted(days):
+            if day not in self._asked:
+                self.cycle(day, next_trading_day(day), list(cycles.get(day, ())))
+
+
+def _days_ahead(start: date, run: Sequence[date], ran: Iterable[date], remaining: int) -> list[date]:
+    """The cycle days the copy will act on within calibration that it has not acted on yet.
+
+    ``run`` are the sessions run so far and ``remaining`` the calibration
+    closes still needed. The copy acts on cycle day D at the next session, so
+    D counts when that session is among the next ``remaining`` ones. C0's own
+    cycle is in the seed, and a cycle on the last calibration day is acted
+    on only after calibration ends, so neither is ever copied or counted. A
+    day that is not a trading day is never a session, so the copy never acts
+    on its cycle; nor is it counted.
+    """
+    if remaining <= 0:
+        return []
+    anchor = run[-1] if run else start
+    last = anchor
+    for _ in range(remaining):
+        last = next_trading_day(last)
+    return sorted(d for d in set(ran) if d > start and d >= anchor and is_trading_day(d)
+                  and next_trading_day(d) <= last)
+
+
+def mirror_note(mirrored: Sequence[Mirrored], limit: int = MIRROR_LIMIT) -> str:
+    """"N entries and M ladder passes mirrored on K days (limit 2)", for the verdict lines."""
+    entries = sum(1 for m in mirrored if m.what == MIRROR_ENTRY)
+    passes = sum(1 for m in mirrored if m.what == MIRROR_LADDER)
+    days = len({m.day for m in mirrored})
+    return (f"{_plural(entries, 'entry', 'entries')} and {_plural(passes, 'ladder pass', 'ladder passes')} "
+            f"mirrored on {_plural(days, 'day', 'days')} (limit {limit})")
+
+
+# --------------------------------------------------------------------------- #
 # e) The run, and what it produced
 # --------------------------------------------------------------------------- #
 
@@ -885,6 +1184,17 @@ class CalibrationResult:
     fixes: tuple[Fix, ...] = ()
     #: Calibration days that must come after the last fix.
     after_fix_days: int = AFTER_FIX_DAYS
+    #: What the copy mirrored of the real account's late runs (``LateRuns``):
+    #: entries the real broker refused as "market is closed", and management
+    #: passes that could not run. Neither book traded, so none is a difference.
+    #: It includes days journalled that the sim has not reached yet, so the
+    #: owner's limit is counted without waiting for later closes.
+    mirrored: list[Mirrored] = field(default_factory=list)
+
+    @property
+    def mirrored_days(self) -> list[date]:
+        """The cycle days that needed late-run mirroring, oldest first."""
+        return sorted({m.day for m in self.mirrored})
 
     @property
     def days_done(self) -> int:
@@ -992,6 +1302,14 @@ def run_calibration(
 
     Every run starts again from the same seed with the code as it is, so a
     run after a fix is the fixed simulation re-run over every day so far.
+
+    A cycle the real account ran into a closed market is mirrored, not
+    copied blind (``LateRuns``): the entries its broker refused as "market
+    is closed" outside hours are not made, and a management pass it could
+    not run is skipped. Each one is in ``result.mirrored``, and so is each
+    one on a cycle day already journalled that the sim will act on within
+    calibration but has not reached yet (``LateRuns.count_ahead``): the
+    owner's limit counts a late day the night it is journalled.
     """
     result = CalibrationResult(start=start, days_needed=days_needed, fixes=tuple(fixes),
                                after_fix_days=after_fix_days)
@@ -1017,25 +1335,28 @@ def run_calibration(
                             start + timedelta(days=1), last_real)
     cycles = lines_by_day(entries)
     ran = cycle_days(entries)
+    late = LateRuns(entries, audit_lines)
 
     run: list[date] = []
+    compared: list[date] = []
     managed = False
     try:
         with live_audit_guarded():
             previous = start
-            compared: list[date] = []
             for session in sessions:
                 if len(compared) >= closes_needed(compared, result.fixes, days_needed, after_fix_days):
                     break
                 feed.at_open(session)
-                cycle = None
+                cycle: Optional[list[Line]] = None
+                manage = True
                 if previous != start and previous in ran:
-                    cycle = cycles.get(previous, [])
-                fund.session(session, cycle)
+                    cycle, manage = late.cycle(previous, session, cycles.get(previous, []), fund)
+                fund.session(session, cycle, manage=manage)
                 run.append(session)
                 # The seeded book is the real account's, faults and all; from
                 # the first management pass on, its stops are the sim's own.
-                managed = managed or cycle is not None
+                # A pass mirrored away for a late run is not one.
+                managed = managed or (cycle is not None and manage)
                 if managed:
                     result.integrity.uncovered += _uncovered(fund, session)
                 if session in real:
@@ -1044,6 +1365,12 @@ def run_calibration(
     except LiveAuditLeak as exc:
         result.integrity.leak = str(exc)
 
+    # The late days journalled but not reached yet count now, so a third
+    # one stops calibration the night it is journalled.
+    remaining = closes_needed(compared, result.fixes, days_needed, after_fix_days) - len(compared)
+    late.count_ahead(cycles, _days_ahead(start, run, ran, remaining))
+    result.mirrored = list(late.items)
+    result.problems += late.problems
     result.series = [SeriesPoint(d.day, d.equity, real.get(d.day)) for d in fund.days]
     result.decisions = list(fund.decisions or ())
     result.integrity.unexpected = list(fund.tally.unexpected)
@@ -1064,15 +1391,20 @@ def run_calibration(
 
 
 def _group(rows: Iterable[tuple[date, str, str, str, float, float, str]]) -> list[Trade]:
-    """(day, ticker, direction, side, qty, price, kind) rows into one Trade per day, ticker and direction."""
-    totals: dict[tuple[date, str, str], list] = {}
+    """(day, ticker, direction, side, qty, price, kind) rows into one Trade per day, ticker, direction and side.
+
+    The side is part of the key: a long opened and a short opened in one
+    ticker on one day (a stop in between) are two trades, not one lumped
+    under whichever side came first.
+    """
+    totals: dict[tuple[date, str, str, str], list] = {}
     for day, ticker, direction, side, qty, price, kind in rows:
-        entry = totals.setdefault((day, ticker, direction), [side, 0.0, 0.0, set()])
-        entry[1] += qty
-        entry[2] += qty * price
-        entry[3].add(kind)
+        entry = totals.setdefault((day, ticker, direction, side), [0.0, 0.0, set()])
+        entry[0] += qty
+        entry[1] += qty * price
+        entry[2].add(kind)
     return [Trade(day, ticker, direction, side, qty, notional / qty if qty else 0.0, frozenset(kinds))
-            for (day, ticker, direction), (side, qty, notional, kinds) in sorted(totals.items())]
+            for (day, ticker, direction, side), (qty, notional, kinds) in sorted(totals.items())]
 
 
 def real_trades(seed: Seed, fills: Iterable[AccountFill], after: datetime, first: date, last: date,
@@ -1119,7 +1451,11 @@ def sim_trades(fund: Fund) -> list[Trade]:
 
 
 def match_trades(real: Sequence[Trade], sim: Sequence[Trade], order: Sequence[date]) -> list[Match]:
-    """Each real trade to the sim's same ticker and direction within one session.
+    """Each real trade to the sim's same ticker, direction and side within one session.
+
+    The side as well as the direction: a real buy and a sim short sale both
+    open a position, but they are opposite bets. Matched, a sim that flipped
+    a call's direction would pass the trade-match conditions as "timing".
 
     Preference, for the same pair: the same session, then the sim a session
     later (what the one-session lag produces), then -- for a stop only -- a
@@ -1134,10 +1470,10 @@ def match_trades(real: Sequence[Trade], sim: Sequence[Trade], order: Sequence[da
 
     used: set[int] = set()
     matches = []
-    for r in sorted(real, key=lambda t: (t.day, t.ticker, t.direction)):
+    for r in sorted(real, key=lambda t: (t.day, t.ticker, t.direction, t.side)):
         best, rank = None, None
         for i, s in enumerate(sim):
-            if i in used or s.ticker != r.ticker or s.direction != r.direction:
+            if i in used or s.ticker != r.ticker or s.direction != r.direction or s.side != r.side:
                 continue
             gap = index(s.day) - index(r.day)
             if abs(gap) > 1 or (gap == -1 and not (r.is_stop or s.is_stop)):
@@ -1250,8 +1586,10 @@ class PassRule:
     #: The owner approved the rule on 2026-09-24 and asked for it to take
     #: effect together with the start date, once the first account snapshot
     #: exists: this flag and ``shadow.schedule.CALIBRATION_START`` change
-    #: together, in one reviewed change (a test enforces it). The last line,
-    #: what happens after a fail, is the owner's fail rule of 25 Sep 2026.
+    #: together, in one reviewed change (a test enforces it). The line after
+    #: the six conditions, what happens after a fail, is the owner's fail
+    #: rule of 25 Sep 2026; the last, late runs, the owner's decision of the
+    #: same day.
     approved: bool
     closes: int
     max_gap_pct: float
@@ -1260,6 +1598,9 @@ class PassRule:
     unexplained: int
     #: Condition 6: the share of the sim's trades the real account also made.
     sim_matched_share: float = 0.90
+    #: The owner's late-run limit of 25 Sep 2026 (the rule's last line):
+    #: more calibration days than this needing late-run mirroring stops it.
+    mirror_limit: int = MIRROR_LIMIT
 
 
 PASS_RULE = PassRule(
@@ -1282,6 +1623,11 @@ PASS_RULE = PassRule(
         "re-run fails on an earlier day, that is a new fail: fix, log and re-run again. A difference whose "
         "stated reason turns out to be a bug still counts as a fail. If the end date moves, the fund test's "
         "start date and bars are recalculated and logged.",
+        # The owner's decision of 25 Sep 2026 (``LateRuns``).
+        "Late runs: on a day the real account's run fell outside market hours, the sim does not make the "
+        "entries the real broker refused as 'market is closed', nor a profit-ladder pass that could not run; "
+        "each is counted and shown. If more than 2 calibration days need this, calibration stops and the "
+        "owner is told.",
     ),
     approved=False,
     closes=DAYS_NEEDED,
@@ -1352,6 +1698,26 @@ def is_complete(result: CalibrationResult, rule: PassRule = PASS_RULE) -> bool:
     """Every close the rule needs has been compared, the days after the last fix among them."""
     since = result.days_since_fix
     return result.days_done >= needed_for(result, rule) and (since is None or since >= result.after_fix_days)
+
+
+def is_stopped(result: Optional[CalibrationResult], rule: PassRule = PASS_RULE) -> bool:
+    """More calibration days needed late-run mirroring than the owner allows: calibration stops.
+
+    The owner's rule of 25 Sep 2026: that many late runs is a schedule
+    problem to fix, not something to copy around. A stopped calibration
+    gives neither a pass nor a fail, and no end date, until the owner decides.
+    """
+    return result is not None and len(result.mirrored_days) > rule.mirror_limit
+
+
+def stop_reason(result: Optional[CalibrationResult], rule: PassRule = PASS_RULE) -> Optional[str]:
+    """Why calibration stopped, in the owner's words, or None while it has not."""
+    if not is_stopped(result, rule):
+        return None
+    assert result is not None
+    return (f"late-run copying was needed on {len(result.mirrored_days)} calibration days "
+            f"(limit {rule.mirror_limit}): this is a schedule problem to fix, not something to copy around; "
+            f"calibration is stopped until the owner decides")
 
 
 @dataclass(frozen=True)
@@ -1471,16 +1837,25 @@ def evaluate_pass_rule(result: Optional[CalibrationResult],
     header = [f"{'Rule not in force yet' if not rule.approved else 'Approved rule'}: {_progress(result, rule)}"]
     if not rule.approved:
         header.append("A rule not yet in force cannot pass, whatever the numbers say.")
+    stopped = stop_reason(result, rule)
+    if stopped is not None:
+        header.append(f"Stopped: {stopped}. A stopped calibration neither passes nor fails.")
+    if result.mirrored:
+        header.append(f"Note: {mirror_note(result.mirrored, rule.mirror_limit)}")
     header += [f"Note: {p}" for p in result.problems]
     judged = conditions(result, rule)
-    passed = rule.approved and is_complete(result, rule) and all(c.ok for c in judged)
+    passed = rule.approved and stopped is None and is_complete(result, rule) and all(c.ok for c in judged)
     return passed, header + [c.line() for c in judged]
 
 
 def calibration_status(result: Optional[CalibrationResult], evaluation: Optional[tuple[bool, list[str]]],
                        rule: PassRule = PASS_RULE) -> str:
-    """not_started, running, passed or failed, under the owner's fail rule.
+    """not_started, running, passed, failed or stopped, under the owner's fail rule.
 
+    * stopped -- more calibration days needed late-run mirroring than the
+      owner's limit (``is_stopped``). It wins over everything else: a
+      stopped calibration gives neither a pass nor a fail until the owner
+      decides, whatever its conditions read.
     * failed -- a condition reads FAIL now, on whatever day. A fail needs a
       fix; once the fix is merged, the nightly re-run from the same seed
       clears it, or finds it again, or finds a new one on an earlier day.
@@ -1497,6 +1872,8 @@ def calibration_status(result: Optional[CalibrationResult], evaluation: Optional
     """
     if result is None:
         return "not_started"
+    if is_stopped(result, rule):
+        return "stopped"
     if any(c.ok is False for c in conditions(result, rule)):
         return "failed"
     if not is_complete(result, rule):
@@ -1784,11 +2161,24 @@ def calibration_json(
     compared (``estimated_end``) -- and ``fund_test_plan`` the fund test's
     start and bars if it does (``shadow.fund_test.fund_test_plan``); both
     null before the start.
+
+    Late runs (the owner's decision of 25 Sep 2026): ``mirrored`` lists
+    every entry and ladder pass the copy mirrored as ``{day, ticker, at,
+    what, reason}`` (``ticker`` null for a ladder pass, which is over the
+    whole book), a day already journalled but not yet reached by the sim
+    included; ``mirrored_days`` the cycle days they fell on;
+    ``mirrored_day_count`` how many; ``mirror_limit`` the owner's 2. None of
+    them is in ``differences``: neither book traded. Over the limit, the
+    status is "stopped", ``stop_reason`` says why, and ``end_estimate`` and
+    ``fund_test_plan`` are null: a stopped calibration has no end date, and
+    the fund test's start is not worked out from it.
     """
     started = start is not None and result is not None
     metrics = result.metrics if started else None
     last = result.last_fix if started else None
-    end = estimated_end(result, start, rule) if started else None
+    stopped = stop_reason(result, rule) if started else None
+    end = estimated_end(result, start, rule) if started and stopped is None else None
+    mirrored = list(result.mirrored) if started else []
     out = {
         "status": status if start is not None else "not_started",
         "start": start.isoformat() if start is not None else None,
@@ -1824,6 +2214,15 @@ def calibration_json(
             "timing": metrics.timing if metrics else None,
         },
         "holding_days": dict(holding) if holding else dict(EMPTY_HOLDING),
+        "mirrored": [
+            {"day": m.day.isoformat(), "ticker": m.ticker, "at": m.at.isoformat(), "what": m.what,
+             "reason": m.reason}
+            for m in mirrored
+        ],
+        "mirrored_days": [d.isoformat() for d in sorted({m.day for m in mirrored})],
+        "mirrored_day_count": len({m.day for m in mirrored}),
+        "mirror_limit": rule.mirror_limit,
+        "stop_reason": stopped,
     }
     if started and result.problems:
         out["problems"] = list(result.problems)
@@ -1871,11 +2270,13 @@ def calibration_report(
 
 __all__ = [
     "AccountFill", "AuditRecord", "CALIBRATION_COST_PER_SIDE", "CalibrationResult", "Condition", "DAYS_NEEDED",
-    "Difference", "Fix", "Holding", "HeldPosition", "Integrity", "Match", "Metrics", "PASS_RULE", "PassRule",
-    "REASONS", "RestingStop", "Seed", "SeedPosition", "SeriesPoint", "Snapshot", "Snapshots", "Trade",
+    "Difference", "Fix", "Holding", "HeldPosition", "Integrity", "LateRuns", "MARKET_CLOSED", "MIRRORED",
+    "MIRROR_ENTRY", "MIRROR_LADDER", "MIRROR_LIMIT", "MIRROR_REASON", "Match", "Metrics", "Mirrored", "PASS_RULE",
+    "PassRule", "REASONS", "RestingStop", "Seed", "SeedPosition", "SeriesPoint", "Snapshot", "Snapshots", "Trade",
     "UNMERGED_FIX", "audit_lines_through", "audit_records", "book_at_close", "calibration_json",
     "calibration_report", "calibration_status", "closes_needed", "compare_trades", "conditions", "days_passed",
-    "end_estimate", "estimated_end", "evaluate_pass_rule", "holding_days", "holding_periods", "is_complete",
-    "last_fix_day", "load_snapshots", "match_trades", "needed_for", "real_closes", "real_trades", "run_calibration",
-    "seed_fund", "sim_trades", "trading_days_between",
+    "end_estimate", "estimated_end", "evaluate_pass_rule", "holding_days", "holding_periods", "in_regular_hours",
+    "is_complete", "is_stopped", "last_fix_day", "load_snapshots", "match_trades", "mirror_note", "needed_for",
+    "real_closes", "real_trades", "run_calibration", "seed_fund", "sim_trades", "stop_reason",
+    "trading_days_between",
 ]
