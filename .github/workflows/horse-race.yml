@@ -36,7 +36,7 @@ on:
         description: "Cost per side as a fraction of notional, charged to every arm (blank: 0.001)"
         default: ""
   # Nightly on trading days, after the day's session has a closing bar and
-  # after both heartbeat crons (12:35 and 17:35 UTC) have committed the
+  # after both heartbeat crons (14:40 and 17:35 UTC) have committed the
   # day's journal. This is the "keep measuring" half of the experiment: the
   # race re-runs on its own as outcomes resolve, so the table grows without
   # anyone remembering to ask for it.
@@ -54,6 +54,7 @@ on:
       - "analysis/reader.py"
       - "analysis/baseline_compare.py"
       - "analysis/returns.py"
+      - "analysis/run_timing.py"
       - "backtest/simulate.py"
       - ".github/workflows/horse-race.yml"
 

@@ -57,12 +57,15 @@ from orchestrator.news import absolute_url  # noqa: E402
 #: report looked complete and was missing sixteen companies.
 #:
 #: The right bound is structural rather than observed. A cycle cannot outlive
-#: the heartbeat job's `timeout-minutes` (180, sized for the pre-market cycle's
-#: two batch waits) -- that is the true floor this constant must clear, not
-#: the 1440-minute daily cadence: the catch-up cron can fire the same day, and
-#: at 12:35/17:35 UTC the two are only 300 minutes apart. Anything strictly
-#: between 180 and 300 is correct; 240 sits well clear of both ends, so
-#: neither a slow run nor a same-day catch-up is mis-grouped.
+#: the heartbeat job's `timeout-minutes` (180, sized for the batched cycle's
+#: two batch waits) -- that is the true floor this constant must clear. The
+#: ceiling used to be a same-day catch-up cycle 300 minutes after the first
+#: (12:35 and 17:35 UTC). Since 25 Sep every cycle run asks the journal on the
+#: branch's latest commit before it starts, so a second cycle on the same day
+#: happens only when a person asks for one with `rerun` (or when the first
+#: one's journal never reached the branch, leaving nothing to mis-group), and
+#: the gap that matters is the one between days. 240 still sits well clear
+#: of 180.
 CYCLE_WINDOW_MINUTES = 240
 
 #: The report is read from Israel, so it leads with Israel time and keeps UTC
@@ -266,6 +269,52 @@ def _stamp(when: Optional[datetime]) -> str:
         f"{local.strftime('%d %b %Y, %H:%M')} {LOCAL_TZ_LABEL} "
         f"({utc.strftime('%H:%M')} UTC)"
     )
+
+
+#: Who started a run, in words, by the run block's ``trigger``. ``manual`` is
+#: any dispatch that did not say it was the backup -- a person, or one of the
+#: Claude Routines, which dispatch with only ``mode`` and have started every
+#: cycle since 21 Sep -- so it must not read as "by hand".
+_TRIGGER_WORDS = {
+    "schedule": "GitHub's schedule",
+    "backup": "the backup, because GitHub's schedule had not started it",
+    "manual": "a manual dispatch (a person or a Claude Routine)",
+}
+
+
+def run_line(lines: list[Line]) -> Optional[str]:
+    """One sentence on who started this cycle and how late, or None.
+
+    From the ``run`` block the heartbeat workflow puts on every journal line
+    of a cycle, from the first cycle after the change that added it. Older
+    lines have none, and a block that is not what it should be
+    is skipped rather than trusted: this is a label on the report, and it
+    must never be the reason the report fails.
+    """
+    # The journal is append-only, so the last line with a block is the
+    # newest run's -- no sorting, which a mix of zoned and unzoned stamps
+    # would turn into a crash.
+    for line in reversed(lines):
+        block = line.raw.get("run")
+        if isinstance(block, dict):
+            break
+    else:
+        return None
+    who = _TRIGGER_WORDS.get(str(block.get("trigger")), "an unknown trigger")
+    late = block.get("minutes_late")
+    planned = ""
+    try:
+        when = datetime.fromisoformat(str(block.get("scheduled_for")))
+        when = when if when.tzinfo else when.replace(tzinfo=timezone.utc)
+        planned = when.astimezone(timezone.utc).strftime("%H:%M UTC")
+    except (TypeError, ValueError, OverflowError):
+        pass
+    if not isinstance(late, int) or isinstance(late, bool) or not planned:
+        return f"**Run:** started by {who}."
+    if late <= 0:
+        return f"**Run:** started by {who}, on time (planned for {planned})."
+    flag = " — late" if block.get("late") is True else ""
+    return f"**Run:** started by {who}, {late} minutes after the planned {planned}{flag}."
 
 
 def _news_block(context: dict) -> list[str]:
@@ -669,6 +718,9 @@ def render(lines: list[Line], position_actions: Optional[list[dict]] = None) -> 
         f"{len(failed)} with a problem",
         "",
     ]
+    started = run_line(lines)
+    if started:
+        out += [started, ""]
     out += _summary_table(lines)
     out.append("")
     out += render_positions(position_actions or [])

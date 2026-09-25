@@ -73,6 +73,59 @@ better trades?" and "do the longs and the shorts differ?"; they decide
 nothing. The same numbers are in `logs/race_gate.json` and on the 4 Funds
 page.
 
+## Run timing and late runs
+
+GitHub delivered the heartbeat's scheduled runs hours late on every day so
+far, and nothing in the journal said so. Every run of the race now prints,
+after the checks and before the tables, when each cycle day actually ran —
+in the decision window and before it, labelled. `python
+analysis/run_timing.py` prints the same table on its own.
+
+```
+RUN TIMING (when each cycle ran; report only, decides nothing)
+day         part    New York     phase        vs sched  by        source
+2026-09-17  before  11:49-15:23  session       +44 min  unknown   inferred  LATE
+2026-09-22  before  11:07-11:45  session      +152 min  unknown   inferred  LATE
+2026-09-23  window  11:06-12:20  session      +151 min  unknown   inferred  LATE
+late-run days: 8 of 8; lines before the open: 0; after the close: 0
+```
+
+- **One line per cycle day** (the UTC date of its lines): the first and last
+  journal line in New York time; where they fell (`pre_open`, `session`,
+  `after_close`, or `no_session` on a weekend or holiday; half days are not
+  known); minutes after the day's scheduled start; what started the run; and
+  **LATE** when that was more than 30 minutes.
+- **Where the timing comes from.** From the first heartbeat cycle after the
+  change that added it (28 Sep 2026 at the earliest; 25 Sep's cycle ran the
+  code before it), every journal line the heartbeat's cycle step writes
+  carries a run block (`run`: what started it — `schedule`, `backup` or
+  `manual`, where `manual` is any dispatch, a person's or a Claude
+  Routine's — the scheduled start, when the cycle step started, minutes
+  late, and the GitHub run id), and a day that has one is read from it.
+  Earlier days are inferred: the first line against the heartbeat's cron
+  history, written down as `SCHEDULE_HISTORY` in `analysis/run_timing.py`
+  (13:05 UTC on 14 Sep, 15:05 on 15–18 Sep, 12:35 from 21 Sep until the
+  change), and "started by" reads `unknown`. The 14:40 UTC start has no row
+  there: every day under it carries its own scheduled start in the block.
+- **What it showed.** Every cycle day from 15 to 25 Sep was late, by 44 to
+  154 minutes, and every line was written during the session. None ran
+  before the open: the 12:35 UTC pre-market slot never once arrived on time,
+  and from 21 Sep a backup dispatch started each day at about 15:05 UTC. Once
+  the change is merged the run starts at 14:40 UTC, after the open in both
+  seasons.
+- **A late run cannot move an entry price.** Every arm, the coin flip and VT
+  enter at the open of the next session after the signal's day, so a late
+  run changes when a signal is made, never the price it is entered at.
+  `tests/test_race_entry_timing.py` pins it for a line in the session, after
+  the close, after midnight UTC, before the open, on a Friday, before a
+  holiday and on a day the price source never printed. Two of those can wait
+  up to one session longer than strictly needed — a line before the open
+  enters at the next day's open, and a line after midnight UTC (20:00 New
+  York in summer, 19:00 in winter) carries the next UTC date — and neither
+  has ever been written.
+- The same rows are in `logs/race_gate.json` under `run_timing`. Report
+  only: no look, bar or verdict reads them.
+
 ## The arms
 
 | Arm | Role | What it is | Where it comes from |

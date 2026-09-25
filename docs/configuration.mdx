@@ -208,7 +208,7 @@ detail on what each one prevents is in [Guardrails](/guardrails).
 | `PROFIT_LADDER` | `+1R: sell ⅓, stop→entry · +3R: sell ⅓, stop→+1R` | How a winning position is unwound. R is entry-to-stop distance. See [Position management](/position-management). |
 | `MAX_OPEN_POSITIONS` | `40` | Max distinct tickers held at once. Raised from 20 with the profit ladder: a trimmed runner keeps its slot, and the count must not block the cash the ladder frees. |
 | `SKIP_HELD_TICKERS` | `True` | A ticker already in the book is asked nothing, by either model — the ladder and its stop manage it instead. Falls back to reviewing everything if the book cannot be read. See [cost](/cost#stage-zero-what-the-book-already-holds). |
-| `USE_BATCH_API` | `True` | Ask both model stages through the Message Batches API at half price. The cycle starts pre-market so the waiting happens outside the session. See [cost](/cost#half-price-for-waiting). |
+| `USE_BATCH_API` | `True` | Ask both model stages through the Message Batches API at half price. Only a stage whose endpoint offers a batch can use it; since 23 Sep 2026 the full model is asked live, and since 25 Sep the cycle starts after the open (14:40 UTC) rather than pre-market. See [cost](/cost#half-price-for-waiting). |
 | `BATCH_DEADLINE_SECONDS` | `2100` | How long to wait on **one** batch before paying full price for whatever it has not answered — applied once for the screen and once for whatever it escalates, so the job's timeout has to cover it twice. |
 | `ATR_PERIOD` | `14` | Wilder ATR lookback, in trading days. |
 | `ATR_STOP_MULTIPLIER` | `2.0` | Stop-loss distance from entry, in multiples of ATR. |

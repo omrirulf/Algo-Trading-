@@ -503,7 +503,7 @@ def test_the_heartbeat_records_the_account_after_trading_and_before_the_commit()
     assert step["continue-on-error"] is True, "a recorder must never fail a trading run"
     assert step["timeout-minutes"] <= 3
     # Both modes, never a skipped day, and on a red cycle too.
-    assert step["if"] == "always() && steps.guard.outputs.ran != 'yes'"
+    assert step["if"] == "always() && steps.guard.outputs.skip != 'yes'"
     assert "inputs.mode" not in step["if"]
     run = " ".join(step["run"].split())
     assert run.startswith("python -m app.account_snapshot --log logs/account.jsonl --mode ")

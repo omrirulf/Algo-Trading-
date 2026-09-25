@@ -128,6 +128,23 @@ class JournalEntry:
     #: Where a failed line failed, when that was before the model was asked
     #: (``"context"``). ``None`` on every other line and on older lines.
     stage: Optional[str] = None
+    #: The line's ``run`` block as journalled -- what started the cycle run
+    #: and how late it was (see ``orchestrator/journal.run_block``). Read it
+    #: through ``run``; kept raw here so junk on disk is never a parse error.
+    run_record: Any = None
+
+    @property
+    def run(self) -> Optional[dict[str, Any]]:
+        """What started this line's cycle run, or None.
+
+        None on lines written before the block existed (it arrived with the
+        heartbeat change of late September 2026, so the first line with one
+        is the first cycle after that change was merged), on runs the
+        workflow did not describe (a local run, say), and on anything that is not an
+        object -- a reader must never fail over a label. The keys inside are
+        whatever was written; check each one before trusting its type.
+        """
+        return self.run_record if isinstance(self.run_record, dict) else None
 
     @property
     def model_answered(self) -> bool:
@@ -326,6 +343,7 @@ def entry_from(payload: Any) -> Optional[JournalEntry]:
         stage=_text(payload.get("stage")),
         screening=_screening(payload),
         reasoning_effort=_text(payload.get("reasoning_effort")),
+        run_record=dict(payload["run"]) if isinstance(payload.get("run"), dict) else None,
     )
 
 

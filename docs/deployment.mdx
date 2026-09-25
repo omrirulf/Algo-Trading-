@@ -79,7 +79,7 @@ closed-market cycle actually spends money.
 
 ### The one path with no clock to ask
 
-The pre-market cycle (`--premarket`, used to wait on the Batch API before the
+The pre-market cycle (`--premarket`, made to wait on the Batch API before the
 open — see [cost](/cost#half-price-for-waiting)) starts before the market can
 possibly be open, so asking Alpaca's clock would refuse every run. There is a
 third gate for exactly that path: `config/market_calendar.py`'s
@@ -94,6 +94,16 @@ still what refuses the orders. The list needs a year added as each one
 approaches; a year with no entries doesn't stop the cycle, it just logs that
 it's guessing and defaults to running — the same wasted-cycle cost paying for
 a batch bought before this gate existed at all, not a missed session.
+
+<Note>
+  Since 25 Sep 2026 the scheduled workflow no longer uses this path. The full
+  model has been asked live since 23 Sep, so a pre-market start would send its
+  orders into a closed market, where the engine refuses them and the profit
+  ladder is skipped. The cycle now starts after the open with plain `--once`,
+  which keeps Alpaca's clock as the gate. The flag still exists in
+  `orchestrator/heartbeat.py`; the calendar check still runs on every batched
+  cycle.
+</Note>
 
 ## Setting up the scheduled job
 
@@ -121,10 +131,12 @@ a batch bought before this gate existed at all, not a missed session.
 
     | cron (UTC) | what it is |
     | --- | --- |
-    | `5 15 * * 1-5` | the cycle, once a day |
+    | `40 14 * * 1-5` | the cycle, once a day: 10:40 New York in summer, 09:40 in winter |
     | `35 17 * * 1-5` | the catch-up, which usually does nothing |
 
     The second one exists because the first can simply not fire — see below.
+    Neither is trusted to be on time: see
+    [If GitHub skips or delays the run](#if-github-skips-or-delays-the-run).
   </Step>
 </Steps>
 
@@ -141,33 +153,191 @@ a batch bought before this gate existed at all, not a missed session.
 
 ### The catch-up run
 
-A skipped 15:05 costs the whole day: no signals, no journal line, and a gap
-in the history the blend is fitted on. So a second schedule runs two and a
-half hours later and asks one question first — *did a cycle already run
-today?*
+A skipped 14:40 costs the whole day: no signals, no journal line, and a gap
+in the history the blend is fitted on. So a second schedule runs about three
+hours later. Like every cycle run, it asks one question first — *may this run
+start a cycle?*
 
 ```bash
-python analysis/cycle_day.py --journal logs/signal_journal.log   # prints yes or no
+python analysis/cycle_day.py --journal logs/signal_journal.log --decide   # run, already or too_late
 ```
 
-It reads the journal's own timestamps, prints `yes` or `no`, and **always
-exits 0**: a non-zero exit would be indistinguishable from the script itself
-breaking, and "the guard crashed" must not read as "no cycle ran". Every step
-after it in the catch-up run is conditional on `no`, including the ones that
-would otherwise run on failure.
+It reads the journal's own timestamps and, in the workflow, GitHub's record
+of today's other heartbeat runs (`--runs`, `--jobs`; see
+[below](#if-github-skips-or-delays-the-run)), and prints one word:
 
-What makes a re-run safe is not the guard — it is the broker. Every order
-carries a client order id derived from the ticker, the side and the current
-day, so if the 15:05 run *did* place an order and the guard were somehow
-wrong, Alpaca rejects the duplicate rather than doubling the position. See
-[Position Management](/position-management).
+| answer | meaning |
+| --- | --- |
+| `run` | no cycle is journalled for today, no other run today reached its trading step, and there is still time |
+| `already` | a cycle is journalled for today, or another run today reached "Run one cycle" after the open (whatever its result); this run stops |
+| `too_late` | neither, but it is past 14:30 New York (11:30 on a half day); this run stops |
 
-### The 90-minute ceiling
+The reason goes to the job summary: which run stopped this one, or that
+GitHub could not be read and the answer rests on the journal alone.
 
-The job's `timeout-minutes` is 90, raised from 45. The cycle asks the Batch
-API for eighty tickers and waits; a busy batch can take well over an hour,
-and the old ceiling killed the job mid-wait — losing the run *and* the batch
-results that had already been paid for. The collector has its own, shorter
+It **always exits 0**: a non-zero exit would be indistinguishable from the
+script itself breaking, and "the guard crashed" must not read as "no cycle
+ran". Every later step is conditional on the guard not saying skip, including
+the ones that would otherwise run on failure. (Without `--decide` it still
+prints the old `yes` or `no`.)
+
+14:30 New York is the latest safe start because the runs of 21-24 Sep took
+26 to 74 minutes, and orders go out along the way. A cycle started later could
+still be sending orders at the 16:00 close, where the engine refuses them and
+the profit ladder is skipped. On a half day (the day after Thanksgiving, and
+Christmas Eve when it is a weekday) the market closes at 13:00, and the latest
+safe start is 11:30; the half days are listed in `analysis/cycle_day.py` as
+`EARLY_CLOSES`.
+
+What makes a re-run safe for entries is not the guard — it is the broker.
+Every order carries a client order id derived from the ticker, the side and
+the current day, so if the first run *did* place an order and the guard were
+somehow wrong, Alpaca rejects the duplicate rather than doubling the position.
+See [Position Management](/position-management). The profit ladder has no such
+id: it counts the rungs a position has already sold from the audit log, so a
+run whose audit log never reached the branch could have its rungs sold a
+second time. That is why the guard does not trust the journal alone, and why
+the watchdog below never re-runs a day on its own after a run that reached
+its trading step.
+
+## If GitHub skips or delays the run
+
+GitHub's cron has been much worse here than "a few minutes late". In the week
+of 21 Sep the old 12:35 UTC cron arrived 4.5 to 5.7 hours late every day, and
+the 17:35 one about 3 hours late. On 16 Sep a cron never arrived at all. So
+the daily run has three ways to start, and a guard that lets only one of them
+trade:
+
+<Steps>
+  <Step title="The schedule">
+    The two crons above. On a good day the 14:40 cron starts the cycle and
+    nothing else is needed.
+  </Step>
+  <Step title="The watchdog">
+    `heartbeat-watchdog.yml` checks at 15:10, 15:40, 16:40 and 17:40 UTC. It
+    reads the journal and GitHub's list of today's runs
+    (`analysis/watchdog.py` makes the decision; the workflow only acts on it):
+
+    | what it finds | what it does |
+    | --- | --- |
+    | not a trading day, or before 15:10 UTC | nothing |
+    | a cycle already in the journal, or a run on its way | nothing |
+    | a run waiting over 30 minutes for a GitHub machine | tells your phone; starts nothing |
+    | the backup already started twice today, still no cycle | tells your phone; stops trying |
+    | a run today that reached its trading step, whatever its result, and no cycle in the journal | tells your phone urgently that it may have traded; starts nothing |
+    | no cycle, and 14:15 New York or later (11:15 on a half day) | tells your phone that there is no trading today |
+    | no cycle and no run, earlier than that | **starts the run as the backup** and tells your phone |
+
+    The backup stops 15 minutes before the 14:30 latest safe start because
+    that is about how long GitHub can take to bring a dispatched run to its
+    guard, which asks "too late?" again when it gets there. If a backup still
+    arrives too late, heartbeat.yml tells your phone so, rather than leaving
+    "the backup has started it" as the last word.
+
+    A run that reached "Run one cycle" may have placed orders whose record
+    never reached the branch (a refused push, a lost machine). A green one
+    with nothing in the journal most likely ran on another branch, but
+    nothing automatic can tell those apart, and the guard stops every later
+    cycle that day on the same evidence. So the watchdog reads the steps of
+    every finished run from GitHub, every attempt of it, and starts a backup
+    only when none got that far. Otherwise, check the run and the account
+    and, if it placed nothing, start heartbeat by hand with `rerun` ticked.
+    A "Run one cycle" that was over before the 09:30 open does not count: it
+    found the market shut and placed nothing.
+
+    The phone message gives times in UTC and in Israel time. The watchdog's
+    own crons can be late too, for the same reason, so it can also be started
+    by a dispatch (next step).
+  </Step>
+  <Step title="The Claude Routines">
+    Routines in the owner's Claude account dispatch workflows at fixed times.
+    A dispatched run is created the moment it is asked for; it does not wait
+    in GitHub's cron queue. That is what makes "within 30 minutes" real:
+    a Routine that dispatches `heartbeat-watchdog.yml` just after 15:10 UTC.
+  </Step>
+</Steps>
+
+All of these can fire on the same day. The guarantee: **on one trading day,
+only one run reaches "Run one cycle" after the open, and the only way a
+second one can is a person dispatching heartbeat with `rerun`.** A run that
+is over before the open found the market shut and placed nothing, so it
+neither counts nor stops the day's cycle. Path by path:
+
+| what starts the run | what stops a second cycle |
+| --- | --- |
+| the 14:40 cron, on time or hours late | the guard |
+| the 17:35 catch-up cron | the guard |
+| the watchdog's backup | the watchdog, which starts none on a day the guard would stop; then the guard. It never sends `rerun` |
+| a Claude Routine | the guard |
+| a person, Run workflow without `rerun` | the guard |
+| a person, "Re-run" on a run's page | the guard, which also counts that run's own earlier attempts, even on a run dispatched with `rerun` |
+| a protection pass | nothing to stop: it never runs "Run one cycle", so it never stops a cycle either |
+| **a person, Run workflow with `rerun`** | **nothing: the one way past the guard** |
+
+The guard stops a cycle for either of two reasons:
+
+- **The journal already has today.** The workflow checks out the branch's
+  latest commit, not the commit the run was created on, so a run that waited
+  behind a running cycle sees that cycle's journal.
+- **GitHub's record shows another run today reached "Run one cycle"**,
+  whatever its result, or an earlier attempt of this run did. This is the
+  run the journal cannot show: one that traded and whose commit never
+  reached the branch (a refused push, a lost machine). The broker refuses a
+  second entry for the same ticker, side and UTC day, but the profit ladder
+  counts the rungs it has sold from the audit log, which was lost with the
+  journal, so a second cycle could sell them again. Until 25 Sep only the
+  watchdog looked for that run, and a late catch-up cron or a Routine passed
+  the guard on such a day. A run on another branch looks the same from
+  here, and counts the same: the watchdog tells your phone, and you decide.
+  Whatever the run's status: a run that traded and is re-run from its page
+  waits as "pending" again, and still counts. A "Run one cycle" that began
+  and ended before the 09:30 New York open does not: the engine and the
+  profit ladder both refuse to act while the market is shut, so it placed
+  nothing, and counting it would let a pre-market dispatch close the day.
+
+And **runs never overlap**: the `heartbeat` concurrency group runs one at a
+time, so no two guards decide at once.
+
+**"Re-run" on a run dispatched with `rerun`** is guarded too. A re-run
+replays the dispatch, inputs included, so it still carries `rerun`, which
+was given for the first attempt, not for trading the day again. On a second
+or later attempt the guard runs anyway and asks one question: did an
+earlier attempt of this run reach "Run one cycle"? If it did, or GitHub
+cannot say, the run stops; to run another cycle, start heartbeat by hand
+with `rerun` ticked. A run dispatched with `rerun` on an earlier day and
+re-run today is guarded like any other run: its `rerun` was for that day.
+
+The guarantee needs two things to hold:
+
+- **GitHub answers when the guard asks.** If the list of runs, or one run's
+  steps, cannot be read (or takes more than 30 seconds), the guard never
+  fails the run for it. It decides from the journal alone, as it did before
+  25 Sep, and the job summary says so; on that day, a run that traded and
+  lost its record would not be seen. The watchdog errs the other way: a run
+  whose steps it cannot read counts as one that traded. So does the guard
+  of a re-run of a `rerun` run, which stops.
+- **The run was created today.** Runs are counted on the New York day they
+  were created, so a run from an earlier day, re-run today from its page, is
+  seen by later runs only through the journal. Use `rerun` instead.
+
+The journal push is also tried three times, five seconds apart, so a lost
+record is rarer to begin with: most refusals are something else pushing to
+the branch in between, or a dropped connection, and a fresh pull and push a
+moment later gets through.
+
+From the first heartbeat cycle after this change, each journal line the
+cycle writes also says what started its run: a `run` block with the trigger
+(`schedule`, `backup`, or `manual` for any other dispatch, a person's or a
+Claude Routine's), when the day's run was due, when this one started, how
+many minutes late, and the GitHub run id. The daily report shows it in one
+line. Lines from a local run carry no block.
+
+### The job's ceiling
+
+The job's `timeout-minutes` is 180, raised from 45 and then from 90. The cycle
+asked the Batch API for eighty tickers and waited; a busy batch can take well
+over an hour, and the old ceiling killed the job mid-wait — losing the run
+*and* the batch results that had already been paid for. The collector has its own, shorter
 deadline inside that ceiling, so it gives up first and prints a batch id the
 run can be resumed from. Two clocks, deliberately: the outer one is a
 backstop, the inner one is the one that produces something useful.

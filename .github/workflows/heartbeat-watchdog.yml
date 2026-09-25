@@ -1,0 +1,254 @@
+name: heartbeat-watchdog
+
+# Has today's trading run started? If not, start it, and tell the owner.
+#
+# The owner asked for three things: a notification when the scheduled
+# heartbeat has not started within 30 minutes of its time, a backup that
+# starts the run when it is missing, and a guarantee that a day never runs
+# twice. This workflow is the first two. heartbeat.yml's guard is the third.
+#
+# Why a watchdog at all: GitHub's cron is best-effort, and on this repository
+# it has been far worse than the "5-15 minutes late" the docs admit to. On
+# 16 Sep a heartbeat cron was never delivered at all. On 21-24 Sep the 12:35
+# UTC cron arrived at 17:11-18:17 UTC, 4.5 to 5.7 hours late every day, and
+# the 17:35 catch-up about 3 hours late (20:23-21:11 UTC); on 25 Sep nothing
+# had arrived by 15:00. Every cycle that week was started by a Claude Routine
+# dispatching heartbeat.yml at 15:05 UTC. A schedule nobody checks is a
+# schedule that fails in silence.
+#
+# The crons below are subject to exactly the same delays, and that is the
+# honest limit of this file: on its own it cannot promise "within 30
+# minutes". What can is a workflow_dispatch. GitHub creates a dispatched run
+# the moment it is asked for; it is not held in the cron backlog. So the
+# on-time trigger has to be a Claude Routine in the owner's account that
+# dispatches THIS workflow (no inputs) shortly after 15:10 UTC. The crons are
+# the fallback for a day the Routine does not fire. (The Routines that exist
+# on 25 Sep dispatch heartbeat.yml itself, at 15:05 and 15:45 UTC. That still
+# works -- every cycle run is guarded now, dispatches included -- but it is
+# this workflow that tells the phone.) More than one check a day is harmless:
+# each one is a fresh, pure decision from the journal and GitHub's list of
+# runs.
+#
+# Each check (analysis/watchdog.py has the rules and their tests):
+#   - not a trading day in New York, before 15:10 UTC, a cycle already in
+#     the journal, or a heartbeat run already running: nothing.
+#   - a run waiting more than 30 minutes for a GitHub machine: tell the
+#     phone, start nothing (a second run would only wait behind it).
+#   - the backup already started twice today with still no journal line:
+#     tell the phone, stop trying.
+#   - a run today that reached its trading step, whatever its result, with
+#     nothing in the journal: tell the phone urgently, start nothing (see 3.
+#     below). A trading step that was over before the 09:30 open found the
+#     market shut and does not count, here or in the guard.
+#   - within 15 minutes of 14:30 New York, the latest safe start (11:30 on a
+#     half day), or past it: tell the phone the day is lost, start nothing.
+#     The 15 minutes are the time GitHub takes to bring a dispatched run to
+#     its guard, which asks "too late?" again at that moment.
+#   - otherwise: start heartbeat.yml as the backup, and tell the phone.
+#
+# Why starting heartbeat.yml from here can never run a day twice, even when a
+# late GitHub cron and a Routine fire on the same day:
+#   1. Every cycle run of heartbeat.yml asks the journal first, and reads it
+#      from the branch's latest commit, not from the commit the run was
+#      created on. A run that queued behind a running cycle therefore sees
+#      that cycle's journal and stops.
+#   2. heartbeat.yml's concurrency group never lets two runs overlap, so the
+#      journal cannot change under the guard while it reads.
+#   3. The journal cannot show a cycle that traded and whose journal never
+#      reached the branch (a refused push, a lost machine). The broker
+#      refuses a second entry for the same ticker, side and UTC day
+#      (client_order_id), but not a second sale of the same profit-ladder
+#      rung: the ladder counts the rungs already sold from the audit log,
+#      which was lost with the journal. So the guard also reads GitHub's
+#      record of today's runs and stops every cycle after another run today
+#      reached "Run one cycle", whatever its result. This workflow reads the
+#      same record, with the same code, and after any run today has
+#      finished it starts the backup only if that run never reached "Run one
+#      cycle". Otherwise, or if the steps cannot be read, it tells the phone
+#      and starts nothing: the owner checks what the run did, and re-runs
+#      the day by hand with `rerun` if nothing went out.
+# The dispatch here never passes `rerun`, the only input that bypasses the
+# guard; that input is for a person, and a person dispatching with it is the
+# only way a second cycle can run on the same trading day.
+on:
+  schedule:
+    # 30 minutes after the 14:40 UTC start is due, then three more chances
+    # while a rescued day can still finish before the close. All at least 15
+    # minutes before the latest safe start (18:30 UTC in summer, 19:30 in
+    # winter) when on time, so each can still start a backup in time. On a
+    # half day (13:00 close, latest start 16:30 UTC) only the first two can.
+    - cron: "10 15 * * 1-5"
+    - cron: "40 15 * * 1-5"
+    - cron: "40 16 * * 1-5"
+    - cron: "40 17 * * 1-5"
+  workflow_dispatch:        # the on-time trigger: a Claude Routine, or a person
+
+# Two checks at once could both decide "dispatch". The second would be
+# stopped by heartbeat.yml's guard anyway, but not before a second
+# notification had gone out.
+concurrency:
+  group: heartbeat-watchdog
+  cancel-in-progress: false
+
+# actions: write to list heartbeat runs and to start one; contents: read to
+# check out the journal. Nothing else: this workflow cannot push, comment or
+# open an issue, and it holds no broker or model key. The one secret it reads
+# is the phone topic.
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: List today's heartbeat runs
+        # BEFORE the checkout, on purpose. A heartbeat run pushes its journal
+        # before it finishes. Asking GitHub first and reading the journal
+        # second means a run seen here as finished has already pushed, so the
+        # checkout below has its journal. The other order leaves a window in
+        # which a run finishes between the two reads, the journal read looks
+        # empty, the run list says nothing is on its way, and a needless
+        # backup starts (heartbeat.yml's guard would stop it, but only after
+        # a false notification).
+        #
+        # A failed list is not fatal: the watchdog then decides without it
+        # and says so in the notification. Each call is given 30 seconds
+        # (`timeout`), because gh has no time limit of its own: a stalled
+        # answer would otherwise hold this job until its 10 minutes ran out
+        # and it was cancelled, which reaches no phone. Out of time is
+        # handled like any other failed call.
+        #
+        # For each of today's runs that has finished, green or red, it also
+        # asks which steps that run reached, in every attempt (`filter=all`:
+        # a run re-run from GitHub's page otherwise shows only its latest
+        # attempt, which its guard may have stopped). A run that got as far
+        # as "Run one cycle" may have traded, and its journal and audit log
+        # may be lost with it; a backup then could sell profit-ladder rungs a
+        # second time. heartbeat.yml's guard reads the same record and stops
+        # every cycle after such a run, whatever its result, so a backup
+        # would only stop there. A run whose steps cannot be read is treated
+        # as one that did reach it: the watchdog tells the phone and starts
+        # nothing.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! timeout 30 gh api -X GET repos/${{ github.repository }}/actions/workflows/heartbeat.yml/runs \
+               -f created=">=$(date -u +%F)" -f per_page=100 > "$RUNNER_TEMP/runs.json"; then
+            echo "::warning::could not list today's heartbeat runs; deciding without them"
+            echo '{}' > "$RUNNER_TEMP/runs.json"
+          fi
+          mkdir -p "$RUNNER_TEMP/jobs"
+          for id in $(jq -r '.workflow_runs[]? | select(.status == "completed") | .id' "$RUNNER_TEMP/runs.json" || true); do
+            timeout 30 gh api "repos/${{ github.repository }}/actions/runs/$id/jobs?filter=all&per_page=100" > "$RUNNER_TEMP/jobs/$id.json" \
+              || { rm -f "$RUNNER_TEMP/jobs/$id.json"; echo "::warning::could not read the steps of run $id"; }
+          done
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        # The branch's latest commit, not the one this run was created on:
+        # the journal that matters is the one a heartbeat run pushed a minute
+        # ago. Same reason, and same input, as heartbeat.yml's checkout.
+        with:
+          ref: ${{ github.ref }}
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        # No `pip install`: analysis/watchdog.py and everything it imports
+        # (analysis/cycle_day.py, analysis/reader.py, config/market_calendar.py)
+        # use the standard library only, and tests/test_heartbeat_workflow.py
+        # keeps it that way. A PyPI outage or a pin that no longer resolves
+        # must not be able to silence the one workflow that exists to notice
+        # a silent day.
+        with:
+          python-version: "3.12"
+
+      - name: Has today's run started?
+        # Print-only: analysis/watchdog.py reads the two files and prints
+        # key=value lines, which go to the step outputs; its summary goes to
+        # the job page. It starts nothing and sends nothing itself.
+        #
+        # If the script cannot even run, the owner still hears about it: a
+        # watchdog that fails in silence is the thing it exists to replace.
+        id: decide
+        run: |
+          if ! python -m analysis.watchdog --runs "$RUNNER_TEMP/runs.json" --jobs "$RUNNER_TEMP/jobs" \
+               --journal logs/signal_journal.log > "$RUNNER_TEMP/decision.txt" 2> "$RUNNER_TEMP/watchdog.md"; then
+            cat "$RUNNER_TEMP/watchdog.md"
+            printf '%s\n' "action=none" "ping=yes" "priority=4" \
+              "title=The watchdog could not check today's run" \
+              "message=The watchdog script failed to run, so it cannot say whether today's trading run has started. Open the Actions page on GitHub to check." \
+              "reason=the watchdog script failed" >> "$GITHUB_OUTPUT"
+            echo "::error::analysis/watchdog.py failed; see the log above"
+            exit 1
+          fi
+          cat "$RUNNER_TEMP/watchdog.md"
+          cat "$RUNNER_TEMP/watchdog.md" >> "$GITHUB_STEP_SUMMARY"
+          cat "$RUNNER_TEMP/decision.txt" >> "$GITHUB_OUTPUT"
+
+      - name: Start the day's run as the backup
+        # A cycle, labelled as the backup so the run list and the journal's
+        # run block say who started it, and so the watchdog can count its own
+        # attempts. Never `rerun`: the guard in heartbeat.yml must decide.
+        if: steps.decide.outputs.action == 'dispatch'
+        id: dispatch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh workflow run heartbeat.yml --ref "$GITHUB_REF_NAME" -f mode=cycle -f started_by=backup
+          echo "Started heartbeat.yml on $GITHUB_REF_NAME as the backup (mode=cycle, started_by=backup)." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Tell the owner's phone
+        # Posted exactly like heartbeat.yml's phone steps: the topic is the
+        # only secret, it goes in the JSON body to ntfy's root and never in a
+        # URL or a log, and the file that carried it is removed. Unset, the
+        # step says so and sends nothing; a phone error never fails the job.
+        #
+        # `always()` so a failed dispatch still reaches the phone -- as the
+        # more urgent message it then is. `failure()` so a watchdog that broke
+        # before it could decide (the checkout or the Python setup failed)
+        # still says so: the decision's outputs are empty then, and the
+        # message below says the check itself did not happen.
+        if: always() && (steps.decide.outputs.ping == 'yes' || failure())
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          PING: ${{ steps.decide.outputs.ping }}
+          TITLE: ${{ steps.decide.outputs.title }}
+          MESSAGE: ${{ steps.decide.outputs.message }}
+          PRIORITY: ${{ steps.decide.outputs.priority }}
+          DISPATCH: ${{ steps.dispatch.outcome }}
+          RUNS_URL: ${{ github.server_url }}/${{ github.repository }}/actions/workflows/heartbeat.yml
+        run: |
+          if [ -z "${NTFY_TOPIC:-}" ]; then
+            echo "no phone configured (NTFY_TOPIC secret unset); nothing sent"
+            exit 0
+          fi
+          python - <<'EOF' > "$RUNNER_TEMP/phone.json"
+          import json, os
+          title = os.environ.get("TITLE") or "Trading run watchdog"
+          message = os.environ.get("MESSAGE") or title
+          try:
+              priority = int(os.environ.get("PRIORITY") or 4)
+          except ValueError:
+              priority = 4
+          if os.environ.get("PING") != "yes":
+              title = "The watchdog could not check today's run"
+              message = ("The watchdog failed before it could decide, so it cannot say whether today's "
+                         "trading run has started. Open the Actions page on GitHub to check.")
+              priority = 4
+          if os.environ.get("DISPATCH") == "failure":
+              title = "No trading run today yet: the backup could not start it"
+              message = ("The daily trading run has not started, and GitHub refused the watchdog's "
+                         "request to start it. Start it by hand: Actions, heartbeat, Run workflow.")
+              priority = 5
+          tags = {5: ["rotating_light"], 4: ["warning"]}.get(priority, [])
+          print(json.dumps({"topic": os.environ["NTFY_TOPIC"], "title": title, "message": message,
+                            "priority": priority, "tags": tags, "click": os.environ["RUNS_URL"]}))
+          EOF
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' \
+                 --data-binary @"$RUNNER_TEMP/phone.json" https://ntfy.sh/ || echo "000")
+          rm -f "$RUNNER_TEMP/phone.json"
+          case "$code" in
+            2*) echo "phone notified (HTTP $code)";;
+            *)  echo "::warning::phone not notified (HTTP $code)";;
+          esac

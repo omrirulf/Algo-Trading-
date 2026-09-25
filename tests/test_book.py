@@ -271,7 +271,7 @@ def test_the_workflow_writes_and_commits_the_snapshot():
     wf = yaml.safe_load((Path(__file__).resolve().parents[1] / ".github/workflows/heartbeat.yml").read_text())
     steps = {s.get("name"): s for s in wf["jobs"]["cycle"]["steps"]}
     step = steps["Write the book snapshot"]
-    assert step["if"] == "always() && steps.guard.outputs.ran != 'yes' && inputs.mode != 'protect'"
+    assert step["if"] == "always() && steps.guard.outputs.skip != 'yes' && inputs.mode != 'protect'"
     assert "python -m analysis.book --json" in step["run"]
     assert "python -m analysis.brief" in step["run"]
     assert "logs/book.json" in steps["Commit the journal"]["run"]
