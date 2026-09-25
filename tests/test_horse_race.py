@@ -567,7 +567,7 @@ def test_the_registered_parameters_are_the_ones_the_code_runs():
     assert horse_race.MIN_REPORT_TRADES == 20
     assert '"too few" until a group or side has 20 trades' in text
     assert [g[0] for g in horse_race.CONVICTION_GROUPS] == ["0.30-0.40", "0.40-0.50", "0.50-0.60", "0.60+"]
-    assert "(0.30-0.40, 0.40-0.50, 0.50-0.60, 0.60 and above)" in text
+    assert "(0.30-0.40, 0.40-0.50, 0.50-0.60, 0.60 and above;" in text
     assert gate.COIN_FLIP_PERCENTILE == 95.0 and "95th percentile" in text
     assert horse_race.BAND == (5.0, 95.0)  # the band condition 3 actually reads
     assert "**no arm trades**" in text

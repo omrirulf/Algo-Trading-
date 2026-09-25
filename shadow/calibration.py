@@ -857,6 +857,9 @@ def closes_needed(compared: Iterable[date], fixes: Iterable[Fix] = (), days: int
 @dataclass
 class CalibrationResult:
     start: date
+    #: The latest day the real account has a close for, whether or not the
+    #: run went that far: a fix not merged yet cannot be dated before it.
+    last_real: Optional[date] = None
     #: The closes the run is asked for when nothing has been fixed (15).
     #: With a fix it runs on to ``closes_needed``.
     days_needed: int = DAYS_NEEDED
@@ -1005,6 +1008,7 @@ def run_calibration(
     result.day0 = SeriesPoint(start, _marked(seed, bars, start), real.get(start))
 
     last_real = max((d for d in real if d > start), default=None)
+    result.last_real = last_real
     sessions: list[date] = []
     if last_real is None:
         result.problems.append(f"no real close after {start.isoformat()} yet")
@@ -1583,18 +1587,22 @@ def estimated_end(result: CalibrationResult, start: Optional[date] = None, rule:
     """The earliest day this calibration can end: ``end_estimate``, allowing for a fail not yet fixed.
 
     A condition that reads FAIL now needs a fix, and that fix cannot be
-    dated before the last close compared, the day the fail was seen at the
-    latest; five more calibration days must follow it. So while a fail is
-    open the estimate assumes one more fix, dated that day, the earliest it
-    can be. A fail on day 3 then leaves the end at day 15; a fail on day 15
-    moves it to day 20, and the fund test's start and bars with it, which is
-    what the 4 Funds page must say before the fix is merged, not after.
+    dated before the latest real close on record -- it is not merged yet,
+    so it will be dated tonight or later -- and five more calibration days
+    must follow it. So while a fail is open the estimate assumes one more
+    fix, dated that day, the earliest it can be. A fail on day 3 then leaves
+    the end at day 15; a fail on day 15 moves it to day 20, and the fund
+    test's start and bars with it, which is what the 4 Funds page must say
+    before the fix is merged, not after. Not the last close the run
+    compared: a run stops comparing at the days it needs, and a fail left
+    open for weeks would otherwise keep an end date already in the past.
     """
     start = result.start if start is None else start
     compared = result.compared_days
     fixes = tuple(result.fixes)
     if any(c.ok is False for c in conditions(result, rule)):
-        fixes = (*fixes, (compared[-1] if compared else start, UNMERGED_FIX))
+        seen = max(d for d in (start, compared[-1] if compared else None, result.last_real) if d is not None)
+        fixes = (*fixes, (seen, UNMERGED_FIX))
     return end_estimate(start, compared, fixes, rule.closes, result.after_fix_days)
 
 

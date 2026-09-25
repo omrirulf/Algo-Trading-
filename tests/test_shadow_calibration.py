@@ -1141,9 +1141,29 @@ def test_calibration_report_reads_the_fixes_from_the_schedule(monkeypatch):
         17, 17, "2026-10-19", 5)
     # Complete, and a book that never traded has no trade to match: 3 and 6 fail.
     assert fixed["status"] == "failed" and fixed["days_passed"] == 17
-    # That fail needs a fix of its own, merged on day 17 at the soonest and
-    # followed by five more days: the end estimate is day 22, not day 17.
-    assert fixed["end_estimate"] == day(22).isoformat() == "2026-11-02"
+    # That fail needs a fix of its own, not merged yet, so dated no earlier
+    # than the latest real close (day 21, 30 Oct) and followed by five more
+    # days: the end estimate is day 26, not day 17 or 22.
+    assert fixed["end_estimate"] == day(26).isoformat() == "2026-11-06"
+
+
+def test_an_open_fail_keeps_moving_the_end_while_it_waits_for_its_fix():
+    """The run stops comparing at the days it needs; a fail left open must
+    not keep an end date that is already past (the integration review)."""
+    ends = []
+    for last in (date(2026, 10, 30), date(2026, 11, 13), date(2026, 12, 18)):
+        account = quiet_account(last)
+
+        class Fetcher:
+            def ohlc(self, ticker, start, end, _last=last):
+                return flat_frame(last=_last.isoformat())
+
+        out = calib.calibration_report(snapshots=account["snapshots"], entries=[], audit_lines=[], start=C0,
+                                       final_through=last, fetcher=Fetcher())
+        assert out["status"] == "failed" and out["days_done"] == 15
+        ends.append(date.fromisoformat(out["end_estimate"]))
+        assert ends[-1] > last
+    assert ends == sorted(ends) and len(set(ends)) == 3
 
 
 # --------------------------------------------------------------------------- #
