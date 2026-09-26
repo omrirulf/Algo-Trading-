@@ -743,6 +743,7 @@ def test_a_scheduled_run_on_time():
                       started_at=datetime(2026, 9, 28, 14, 41, 12, 345678, tzinfo=UTC))
     assert block == {
         "trigger": "schedule",
+        "source": "github-schedule",
         "scheduled_for": "2026-09-28T14:40:00+00:00",
         "started_at": "2026-09-28T14:41:12+00:00",
         "minutes_late": 1,

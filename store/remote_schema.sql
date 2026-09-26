@@ -124,8 +124,10 @@ alter view public.decisions set (security_invoker = on);
 --
 -- That combination denies every request carrying the publishable (anon) key,
 -- which is the key that is safe to leak precisely because it should be able to
--- do nothing here. The push uses the service-role key, which bypasses RLS and
--- lives only in a GitHub Actions secret.
+-- do nothing here. The push uses a secret key (sb_secret_..., named
+-- github-archive), which acts as the service_role Postgres role, bypasses RLS,
+-- and lives only in a GitHub Actions secret. (Not the legacy JWT service_role
+-- key: Supabase switches legacy keys off at the end of 2026.)
 --
 -- The alternative -- an insert-only policy for anon -- would let anyone who
 -- read the publishable key append rows to the record of what this system

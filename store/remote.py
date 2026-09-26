@@ -47,8 +47,64 @@ SIGNALS = "signals"
 EXECUTIONS = "executions"
 
 
+def _is_legacy_jwt(key: str) -> bool:
+    """Whether ``key`` is one of the old JWT-based keys (``anon``/``service_role``).
+
+    A JWT is three base64url parts joined by dots, and a JSON header always
+    base64-encodes to a string starting ``eyJ``. The new keys look nothing like
+    that: ``sb_secret_...`` and ``sb_publishable_...`` are opaque strings.
+    """
+    parts = key.split(".")
+    return key.startswith("eyJ") and len(parts) == 3 and all(parts)
+
+
+def auth_headers(key: str) -> dict[str, str]:
+    """The headers that authenticate a request with ``key``, for either kind of key.
+
+    Supabase has two kinds of API key. The legacy ``service_role`` key is a JWT
+    and was sent twice: as ``apikey`` and as ``Authorization: Bearer``. The new
+    secret key (``sb_secret_...``) is not a JWT, and Supabase's migration guide
+    says to send it on the ``apikey`` header **only**: "If you also pass the key
+    on the Authorization: Bearer header ... the platform tries to parse it as a
+    JWT and rejects the request". The legacy keys keep working only until the
+    end of 2026 (the same guide), and this archive has to outlive that, so the
+    push must work with the new key.
+
+    Measured against this project on 26 Sep 2026, from inside its own database
+    through pg_net, with the new-format publishable key (which follows the same
+    header rule as the secret key):
+
+    * the key on ``apikey`` alone: HTTP 200;
+    * the key on ``apikey`` and the SAME value on ``Bearer``: HTTP 200 -- the
+      gateway tolerates an exact copy, although the guide says not to rely on
+      it (and Edge Functions do reject it);
+    * a DIFFERENT non-JWT value on ``Bearer``: HTTP 401, PostgREST's
+      "Expected 3 parts in JWT; got 1";
+    * a made-up ``sb_secret_`` key on ``apikey``: HTTP 401 "Invalid API key" --
+      the gateway checks the new keys itself.
+
+    So: ``apikey`` always, ``Authorization`` only for a legacy JWT key, where it
+    is still what the old key needs. Nothing else about the request changes.
+    """
+    headers = {"apikey": key}
+    if _is_legacy_jwt(key):
+        headers["Authorization"] = f"Bearer {key}"
+    return headers
+
+
 class RemoteArchiveError(RuntimeError):
-    """The remote refused, or could not be reached."""
+    """The remote refused, or could not be reached.
+
+    ``status`` is the HTTP status the remote answered with, or None when it
+    never answered (a refused connection, a timeout, a name that does not
+    resolve). Carried apart from the message so a caller can say what went
+    wrong in a few words -- "HTTP 401", "project paused or unreachable" --
+    without repeating the message, which holds the remote's own text.
+    """
+
+    def __init__(self, message: str, status: Optional[int] = None) -> None:
+        super().__init__(message)
+        self.status = status
 
 
 @dataclass
@@ -146,6 +202,19 @@ class RemoteArchive:
         value = row.get("ts_utc") if isinstance(row, dict) else None
         return value if isinstance(value, str) and value.strip() else None
 
+    def rows(self, table: str, params: dict[str, str]) -> list[dict[str, Any]]:
+        """The rows a PostgREST query on ``table`` returns, as dicts.
+
+        A read for the heartbeat's own bookkeeping (``store/starter_status.py``
+        reads the Supabase starter's log with it), through the same one
+        reader of the key as every push. An answer that is not a list of
+        objects is an empty list: the caller says "no row", it does not guess.
+        """
+        payload = self._json(self._request("GET", table, params=params))
+        if not isinstance(payload, list):
+            return []
+        return [row for row in payload if isinstance(row, dict)]
+
     def count(self, table: str) -> Optional[int]:
         """Row count, from the Content-Range header PostgREST returns."""
         response = self._request(
@@ -200,11 +269,8 @@ class RemoteArchive:
         json: Any = None,
     ) -> httpx.Response:
         url = f"{self._url}/rest/v1/{table}"
-        merged = {
-            "apikey": self._key,
-            "Authorization": f"Bearer {self._key}",
-            **(headers or {}),
-        }
+        # The new secret key goes on ``apikey`` only; see auth_headers.
+        merged = {**auth_headers(self._key), **(headers or {})}
         try:
             if self._client is not None:
                 response = self._client.request(
@@ -224,7 +290,8 @@ class RemoteArchive:
             # problem often enough to be worth the extra 300 characters.
             raise RemoteArchiveError(
                 f"{method} {table} returned HTTP {response.status_code}: "
-                f"{response.text[:300]}"
+                f"{response.text[:300]}",
+                status=response.status_code,
             )
         return response
 
@@ -234,6 +301,34 @@ class RemoteArchive:
             return response.json()
         except ValueError:
             return None
+
+
+#: What a caller writes down when the remote is not set up at all.
+NOT_CONFIGURED = "not configured"
+
+#: What a caller writes down when the project did not answer as a database:
+#: no answer at all (a refused connection, a timeout, a name that does not
+#: resolve), a gateway that could not reach it (502, 503, 504), or one of
+#: the 52x-59x answers a proxy in front of a stopped backend gives. A free
+#: Supabase project that nothing touched for a week is paused, and a paused
+#: project answers this way until someone restores it (Supabase answers a
+#: paused project's API with its own 540). The owner is told to restore it.
+UNREACHABLE = "project paused or unreachable"
+
+
+def describe_failure(exc: RemoteArchiveError) -> str:
+    """A remote failure in a few words, never the remote's own text.
+
+    ``project paused or unreachable`` or ``HTTP <code>``. Only the status
+    number is used: the message can hold the project's URL and whatever the
+    server said, and this text is committed to a public repository and sent
+    to a phone. The key is never in either, but a few fixed words are
+    easier to prove safe than a truncated message.
+    """
+    status = getattr(exc, "status", None)
+    if not isinstance(status, int) or status in (502, 503, 504) or status >= 520:
+        return UNREACHABLE
+    return f"HTTP {status}"
 
 
 def _batched(rows: Sequence[dict[str, Any]], size: int) -> Iterable[Sequence[dict]]:
@@ -303,9 +398,12 @@ def _moment(value: str) -> Optional[datetime]:
 __all__ = [
     "BATCH_SIZE",
     "EXECUTIONS",
+    "NOT_CONFIGURED",
     "SIGNALS",
+    "UNREACHABLE",
     "PushResult",
     "RemoteArchive",
     "RemoteArchiveError",
+    "describe_failure",
     "select_new",
 ]

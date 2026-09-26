@@ -23,7 +23,19 @@ Two rules read a nightly record committed beside the journal: the shadow
 funds' (``logs/funds.json``), for a calibration the owner's late-run limit
 has stopped, and the race's gate (``logs/race_gate.json``), for the owner's
 trigger (d) on the paper account. They are read like the others -- a
-missing or broken file says nothing -- and never written.
+missing or broken file says nothing -- and never written. Trigger (d) is
+judged on closing equity only: a mid-day reading below its line is in the
+race's record as a separate "mid-day" warning, and raises no alarm here.
+
+Three rules, from 26 Sep 2026, watch the machinery that starts the day and
+keeps its record, now that the main starter is a job in the Supabase
+project rather than GitHub's cron: which starter actually started today's
+run (the journal's run block), whether the archive push to Supabase is set
+up and working (``logs/archive_status.json``, written by
+``store/push_remote.py``), and how long the GitHub token the starter uses
+has left (``config.settings.GITHUB_DISPATCH_TOKEN_EXPIRES``). The first two
+are read like the nightly records; the starter's own request result
+(``logs/starter_status.json``) only adds detail to the first.
 """
 
 from __future__ import annotations
@@ -31,6 +43,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import re
 import sys
 from collections import Counter, defaultdict
 from dataclasses import dataclass
@@ -76,6 +89,28 @@ FUNDS_FILE = "funds.json"
 #: The race's nightly gate record, committed beside the journal by the same
 #: workflow (``analysis/horse_race.py --gate-json``). Read for trigger (d).
 RACE_GATE_FILE = "race_gate.json"
+
+#: What the Supabase starter's own request did today, as the heartbeat read
+#: it from the starter's log just before the snapshot (``store/starter_status.py``).
+STARTER_FILE = "starter_status.json"
+
+#: How the last archive push to Supabase went (``store/push_remote.py
+#: --status``). Written after the push, which is the heartbeat's last step,
+#: so what this run reads is the previous run's push.
+ARCHIVE_FILE = "archive_status.json"
+
+#: The day's main starter, as the run block names it
+#: (``analysis/cycle_day.py:PRIMARY_SOURCE``). Any other source that started
+#: a run is a backup that had to step in.
+PRIMARY_SOURCE = "supabase-cron"
+
+#: A run block's ``source`` as this module may print it; anything else is
+#: "an unknown source" (the same token rule as ``analysis/cycle_day.py``).
+_SAFE_SOURCE = re.compile(r"[a-z0-9-]{1,40}")
+
+#: The few shapes ``store/push_remote.py`` writes as a push's error. Only
+#: these are repeated in an alarm; anything else is "an unrecognised error".
+_ARCHIVE_ERRORS = re.compile(r"not configured|project paused or unreachable|HTTP [0-9]{3}|push crashed \([A-Za-z]+\)")
 
 
 @dataclass(frozen=True)
@@ -144,10 +179,23 @@ def audit_actions_on(lines: Iterable[dict], day: date) -> list[dict]:
 # --------------------------------------------------------------------------- #
 
 
-def no_cycle(today: list[dict]) -> Optional[Alarm]:
-    """16 Sep 2026: the schedule never fired and nothing noticed."""
+def no_cycle(today: list[dict], day: Optional[date] = None) -> Optional[Alarm]:
+    """16 Sep 2026: the schedule never fired and nothing noticed.
+
+    Not on a weekend or a market holiday (``day`` given): the cycle stands
+    down by design there (``orchestrator/heartbeat.py``,
+    ``skip_for_non_trading_day``) and writes nothing, and every weekday
+    starter -- GitHub's cron, the Supabase starter, the Routines -- still
+    fires on a holiday. Without this, each holiday would turn the run red
+    and page the owner urgently about a day the market was shut.
+    """
     if today:
         return None
+    if day is not None:
+        from config.market_calendar import is_trading_day
+
+        if not is_trading_day(day):
+            return None
     return Alarm(CRITICAL, "No cycle ran today",
                  "The journal has no line dated today. No ticker was judged and the open book was not managed.")
 
@@ -388,6 +436,149 @@ def drawdown_tripped(race: Optional[dict]) -> Optional[Alarm]:
                  f"{race.get('generated_at') or 'an unknown time'}.")
 
 
+def _first_run_block(today: list[dict]) -> Optional[dict]:
+    """The run block of the day's first run: the first line today that has one."""
+    for line in today:
+        block = line.get("run")
+        if isinstance(block, dict):
+            return block
+    return None
+
+
+#: What the starter's request result means, in words, for the codes that
+#: have happened or will: GitHub answers a dispatch it accepted with 204.
+_STARTER_CODES = {
+    204: "GitHub accepted it",
+    401: "GitHub refused the token: it has expired or was revoked",
+    403: "GitHub refused the token: it may not start workflows on this repository",
+    404: "GitHub could not find the workflow with that token: check its repository access",
+    422: "GitHub refused the dispatch: the workflow's inputs or branch do not match",
+}
+
+
+def starter_result(starter: Optional[dict]) -> Optional[str]:
+    """The Supabase starter's own request today, in one sentence; None with no record.
+
+    Only the status code and a short, already-checked error text
+    (``store/starter_status.py``) are used -- never anything else from the file.
+    """
+    if not isinstance(starter, dict):
+        return None
+    if starter.get("status") == "unknown":
+        why = starter.get("why")
+        return f"The starter's own request today could not be read ({why if isinstance(why, str) else 'no reason given'})."
+    code = starter.get("status_code")
+    if isinstance(code, int) and not isinstance(code, bool):
+        meaning = _STARTER_CODES.get(code, "an answer the starter does not expect")
+        return f"The starter's own request today: HTTP {code} ({meaning})."
+    error = starter.get("error")
+    if isinstance(error, str) and error:
+        return f"The starter's own request today got no answer from GitHub: {error[:160]}."
+    return "The starter's own request today has no answer recorded."
+
+
+def started_elsewhere(today: list[dict], starter: Optional[dict] = None) -> Optional[Alarm]:
+    """26 Sep 2026: the day's run should be started by the Supabase starter.
+
+    The owner moved the day's start off GitHub's cron, which was hours late
+    on every day it was measured, to a pg_cron job in the Supabase project
+    that dispatches heartbeat.yml at 14:40 UTC. GitHub's cron, the Claude
+    Routines, a temporary Claude bridge at 14:42 and the watchdog stay as
+    backups, and the guard lets only one of them run the day. So a day
+    started by any of those still ran once -- but the main starter failed,
+    and the owner wants to hear it the same day. A warning, not critical:
+    the day traded.
+
+    Judged on the run block of today's first run (the one that traded).
+    Says nothing when there is no block, or a block from before its
+    ``source`` existed: an unknown starter is not evidence of a failed one.
+    """
+    block = _first_run_block(today)
+    if block is None or "source" not in block:
+        return None
+    source = block.get("source")
+    if source == PRIMARY_SOURCE:
+        return None
+    shown = source if isinstance(source, str) and _SAFE_SOURCE.fullmatch(source) else "an unknown source"
+    detail = [f"Today's run was started by {shown}, a backup, not by the Supabase starter "
+              f"(the pg_cron job that dispatches the run at 14:40 UTC). The day still ran once: "
+              f"every starter goes through the same guard."]
+    said = starter_result(starter)
+    if said:
+        detail.append(said)
+    detail.append("Its log is the table public.starter_log in the Supabase project.")
+    return Alarm(WARNING, f"The Supabase starter did not start today's run; {shown} did", " ".join(detail))
+
+
+def archive_problem(archive: Optional[dict]) -> Optional[Alarm]:
+    """26 Sep 2026: the Supabase project was paused because nothing wrote to it.
+
+    The heartbeat's archive push printed "No remote archive configured" on
+    every run -- the two secrets were never set -- so nothing touched the
+    free project and Supabase paused it. The Supabase starter lives in that
+    project, so a paused project is also a day with no main starter. The
+    owner wants the project kept awake, so "not configured" is a warning
+    every day, and so is a push that failed (it was already sent to the
+    phone the same day, by the heartbeat's own step after the push).
+
+    Read from the push's own record, which the heartbeat writes after this
+    check runs: what it says is the previous run's push. A missing or
+    unreadable record says nothing.
+    """
+    if not isinstance(archive, dict) or archive.get("ok") is not False:
+        return None
+    error = archive.get("error")
+    error = error if isinstance(error, str) and _ARCHIVE_ERRORS.fullmatch(error) else "an unrecognised error"
+    last = archive.get("last_success")
+    since = (f"The last push that worked was on {last[:10]}." if isinstance(last, str) and last
+             else "No push has worked yet.")
+    if error == "not configured":
+        return Alarm(WARNING, "Archive not configured: the Supabase project will pause",
+                     "The heartbeat's push to Supabase found no SUPABASE_URL / SUPABASE_SERVICE_KEY "
+                     "secret, so nothing reaches the archive and nothing keeps the free project "
+                     "awake. Supabase pauses a free project after about a week without activity, "
+                     "and the Supabase starter stops with it. Add the two secrets in GitHub "
+                     f"(Settings, Secrets and variables, Actions). {since}")
+    advice = (" The Supabase project may be paused; restore it from the Supabase dashboard."
+              if error == "project paused or unreachable" else "")
+    return Alarm(WARNING, f"The archive push to Supabase failed: {error}",
+                 f"The heartbeat's last push to the Supabase archive failed ({error}).{advice} "
+                 f"No line is lost: the journal is in git, and the next push that works sends "
+                 f"everything the archive is missing. {since}")
+
+
+def dispatch_token_expiry(expires: Optional[date], day: date) -> Optional[Alarm]:
+    """26 Sep 2026: the Supabase starter's GitHub token has an end date.
+
+    ``expires`` is ``config.settings.GITHUB_DISPATCH_TOKEN_EXPIRES``, the
+    one fact about the token this repository keeps (the token itself is only
+    in Supabase Vault, as ``github_heartbeat_dispatch``). A warning from
+    ``GITHUB_DISPATCH_TOKEN_WARN_DAYS`` days before, and critical from the
+    day itself: GitHub refuses an expired token with HTTP 401, and the day's
+    run then waits for a backup. The day itself counts as expired, the safe
+    reading of "expires on".
+    """
+    from config.settings import GITHUB_DISPATCH_TOKEN_WARN_DAYS
+
+    if not isinstance(expires, date):
+        return None
+    left = (expires - day).days
+    how = ("Make a new fine-grained token (this repository only, Actions: read and write), put it in "
+           "Supabase Vault under the same name, github_heartbeat_dispatch, and write its expiry date "
+           "in config/settings.py (GITHUB_DISPATCH_TOKEN_EXPIRES).")
+    if left <= 0:
+        return Alarm(CRITICAL,
+                     f"The GitHub token the Supabase starter uses expired on {expires.isoformat()}: make a new one",
+                     f"GitHub refuses the Supabase starter's dispatch with an expired token (HTTP 401), so "
+                     f"every day's run now waits for a backup. {how}")
+    if left > GITHUB_DISPATCH_TOKEN_WARN_DAYS:
+        return None
+    return Alarm(WARNING,
+                 f"The GitHub token the Supabase starter uses expires on {expires.isoformat()}: make a new one",
+                 f"{left} day{'s' if left != 1 else ''} left. After that GitHub refuses the starter's "
+                 f"dispatch (HTTP 401) and every day's run waits for a backup. {how}")
+
+
 def duplicate_cycle(today: list[dict]) -> Optional[Alarm]:
     """16 and 17 Sep 2026: a cron delivered hours late ran the day twice."""
     counts = Counter(str(line.get("ticker")) for line in today)
@@ -400,20 +591,33 @@ def duplicate_cycle(today: list[dict]) -> Optional[Alarm]:
                  f"opinions per name. First few: {', '.join(twice[:8])}")
 
 
+#: ``check``'s default for the token's expiry: read from config.settings.
+_FROM_SETTINGS = object()
+
+
 def check(journal: Path, audit: Path, day: date, funds: Optional[Path] = None,
-          race: Optional[Path] = None) -> list[Alarm]:
+          race: Optional[Path] = None, *, starter: Optional[Path] = None,
+          archive: Optional[Path] = None, token_expires: object = _FROM_SETTINGS) -> list[Alarm]:
     """Every alarm the day's record raises, critical first.
 
     ``funds`` is the shadow funds' record; by default the ``funds.json``
     beside the journal (``FUNDS_FILE``). ``race`` is the race's gate record;
     by default the ``race_gate.json`` beside it (``RACE_GATE_FILE``).
+    ``starter`` and ``archive`` are the Supabase starter's and the archive
+    push's records, by default beside the journal too (``STARTER_FILE``,
+    ``ARCHIVE_FILE``). ``token_expires`` is the starter's token's expiry,
+    by default ``config.settings.GITHUB_DISPATCH_TOKEN_EXPIRES``.
     """
     today = journal_lines_on(_read_lines(journal), day)
     actions = audit_actions_on(_read_lines(audit), day)
     funds_path = Path(funds) if funds is not None else Path(journal).parent / FUNDS_FILE
     race_path = Path(race) if race is not None else Path(journal).parent / RACE_GATE_FILE
+    starter_path = Path(starter) if starter is not None else Path(journal).parent / STARTER_FILE
+    archive_path = Path(archive) if archive is not None else Path(journal).parent / ARCHIVE_FILE
+    if token_expires is _FROM_SETTINGS:
+        from config.settings import GITHUB_DISPATCH_TOKEN_EXPIRES as token_expires
     found = [
-        no_cycle(today),
+        no_cycle(today, day),
         naked_positions(actions),
         missized_stops(actions),
         failed_calls(today),
@@ -427,6 +631,13 @@ def check(journal: Path, audit: Path, day: date, funds: Optional[Path] = None,
         cftc_gaps(today),
         news_gaps(today),
         duplicate_cycle(today),
+        # The machinery that starts the day and keeps its record, after
+        # everything about the day's trading: the brief names the first
+        # warning, and a day that traded badly is the bigger news. The
+        # brief has its own lines for the starter and the archive anyway.
+        dispatch_token_expiry(token_expires if isinstance(token_expires, date) else None, day),
+        started_elsewhere(today, _read_record(starter_path)),
+        archive_problem(_read_record(archive_path)),
     ]
     alarms = [a for a in found if a is not None]
     return sorted(alarms, key=lambda a: 0 if a.is_critical else 1)

@@ -21,13 +21,21 @@ name: heartbeat-watchdog
 # minutes". What can is a workflow_dispatch. GitHub creates a dispatched run
 # the moment it is asked for; it is not held in the cron backlog. So the
 # on-time trigger has to be a Claude Routine in the owner's account that
-# dispatches THIS workflow (no inputs) shortly after 15:10 UTC. The crons are
-# the fallback for a day the Routine does not fire. (The Routines that exist
-# on 25 Sep dispatch heartbeat.yml itself, at 15:05 and 15:45 UTC. That still
-# works -- every cycle run is guarded now, dispatches included -- but it is
-# this workflow that tells the phone.) More than one check a day is harmless:
-# each one is a fresh, pure decision from the journal and GitHub's list of
-# runs.
+# dispatches THIS workflow (no inputs) shortly after 15:10 UTC -- there is
+# one, at 15:12. The crons are the fallback for a day the Routine does not
+# fire. (Routines also dispatch heartbeat.yml itself, at 15:05 and 15:45 UTC.
+# That still works -- every cycle run is guarded, dispatches included -- but
+# it is this workflow that tells the phone.) More than one check a day is
+# harmless: each one is a fresh, pure decision from the journal and GitHub's
+# list of runs.
+#
+# Since 26 Sep the day's MAIN starter is not GitHub at all: a pg_cron job in
+# the Supabase project dispatches heartbeat.yml at 14:40 UTC
+# (supabase/heartbeat_starter.sql; started_by: scheduler, source:
+# supabase-cron), with a temporary Claude Routine "bridge" at 14:42. This
+# workflow is unchanged by that: it still asks, from 15:10, whether a cycle
+# is journalled or on its way, whoever started it, and a run the Supabase
+# starter started is never counted as one of its own backups.
 #
 # Each check (analysis/watchdog.py has the rules and their tests):
 #   - not a trading day in New York, before 15:10 UTC, a cycle already in
@@ -188,15 +196,18 @@ jobs:
       - name: Start the day's run as the backup
         # A cycle, labelled as the backup so the run list and the journal's
         # run block say who started it, and so the watchdog can count its own
-        # attempts. Never `rerun`: the guard in heartbeat.yml must decide.
+        # attempts ("heartbeat cycle (backup) via watchdog"). `source` names
+        # this workflow as the starter, so the daily brief can say the main
+        # starter (the Supabase one) did not start the day and the watchdog
+        # did. Never `rerun`: the guard in heartbeat.yml must decide.
         if: steps.decide.outputs.action == 'dispatch'
         id: dispatch
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          gh workflow run heartbeat.yml --ref "$GITHUB_REF_NAME" -f mode=cycle -f started_by=backup
-          echo "Started heartbeat.yml on $GITHUB_REF_NAME as the backup (mode=cycle, started_by=backup)." >> "$GITHUB_STEP_SUMMARY"
+          gh workflow run heartbeat.yml --ref "$GITHUB_REF_NAME" -f mode=cycle -f started_by=backup -f source=watchdog
+          echo "Started heartbeat.yml on $GITHUB_REF_NAME as the backup (mode=cycle, started_by=backup, source=watchdog)." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Tell the owner's phone
         # Posted exactly like heartbeat.yml's phone steps: the topic is the

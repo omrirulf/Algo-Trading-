@@ -366,7 +366,8 @@ def test_the_json_is_strict_json_and_labels_each_day_against_the_cutoff():
         "first_new_york": "12:54", "last_new_york": "15:10", "phase": "session",
         "phases": {"pre_open": 0, "session": 3, "after_close": 0, "no_session": 0},
         "scheduled_for": "2026-09-15T15:05:00+00:00", "started_at": "2026-09-15T16:54:47+00:00",
-        "minutes_late": 109, "late": True, "started_by": "unknown", "source": INFERRED, "runs": 0,
+        "minutes_late": 109, "late": True, "started_by": "unknown", "source": INFERRED,
+        "run_source": "unknown", "runs": 0,
     }
     assert timing_json(timings)["days"][0]["part"] is None, "no cutoff, no label"
 

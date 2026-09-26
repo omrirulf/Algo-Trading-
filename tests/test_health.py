@@ -527,3 +527,148 @@ def test_trigger_d_heads_the_brief_that_goes_to_the_phone(logs):
     text = brief.compose(snapshot, date(2026, 10, 8))
     assert text.splitlines()[0] == ("🟡 2 warnings: Trigger (d) tripped: the paper account is 8.5% below "
                                     "its peak on 2026-10-08")
+
+
+def test_a_mid_day_reading_below_the_line_raises_no_trigger_d_alarm(logs):
+    """26 Sep 2026: (d) trips on closing equity only. A mid-day reading below
+    the 8% line is in the race record as a warning marked mid-day, and the
+    health check stays quiet about it: the close decides."""
+    record = race_record(tripped=False)
+    record["watch"]["d"]["midday_warning"] = {"day": "2026-10-08", "mid_day": True, "trips_d": False,
+                                              "below_peak": True, "behind_vt": False, "detail": "mid-day ..."}
+    journal, audit = _day_with_a_record(logs, record)
+    assert health.check(journal, audit, date(2026, 10, 8), token_expires=None) == []
+
+
+# --------------------------------------------------------------------------- #
+# The Supabase starter, the archive and the token (26 Sep 2026)
+# --------------------------------------------------------------------------- #
+
+
+def started_line(source, when="2026-09-28T14:50:00+00:00", trigger="scheduler", ticker="AAPL"):
+    payload = json.loads(journal_line(ticker, when=when))
+    payload["run"] = {"trigger": trigger, "scheduled_for": "2026-09-28T14:40:00+00:00",
+                      "started_at": "2026-09-28T14:43:00+00:00", "minutes_late": 3, "late": False, "run_id": "1"}
+    if source is not None:
+        payload["run"]["source"] = source
+    return json.dumps(payload)
+
+
+SEP28 = date(2026, 9, 28)
+
+
+def _starter_day(logs, *lines, starter=None, archive=None):
+    journal, audit = logs
+    write(journal, *lines)
+    if starter is not None:
+        (journal.parent / health.STARTER_FILE).write_text(json.dumps(starter))
+    if archive is not None:
+        (journal.parent / health.ARCHIVE_FILE).write_text(json.dumps(archive))
+    return health.check(journal, audit, SEP28, token_expires=None)
+
+
+def test_a_day_the_supabase_starter_started_is_clean(logs):
+    assert _starter_day(logs, started_line("supabase-cron"),
+                        starter={"day": "2026-09-28", "status_code": 204},
+                        archive={"ok": True, "error": None, "last_success": "2026-09-25T15:30:00+00:00"}) == []
+
+
+def test_a_day_a_backup_started_is_a_warning_with_the_starters_own_answer(logs):
+    alarms = _starter_day(logs, started_line("claude-bridge", trigger="manual"),
+                          starter={"day": "2026-09-28", "requested_at": "2026-09-28T14:40:00+00:00",
+                                   "status_code": 401, "error": None})
+    (alarm,) = alarms
+    assert alarm.severity == health.WARNING
+    assert alarm.title == "The Supabase starter did not start today's run; claude-bridge did"
+    assert "HTTP 401 (GitHub refused the token: it has expired or was revoked)" in alarm.detail
+    assert "The day still ran once" in alarm.detail
+    assert health.exit_code(alarms) == 1
+
+
+def test_the_first_run_of_the_day_is_the_one_judged(logs):
+    """A person re-running a day the starter started is not a failed starter."""
+    assert _starter_day(logs, started_line("supabase-cron"),
+                        started_line("manual", when="2026-09-28T17:00:00+00:00", trigger="manual",
+                                     ticker="XOM")) == []
+
+
+@pytest.mark.parametrize("source, shown", [("github-schedule", "github-schedule"), ("watchdog", "watchdog"),
+                                           ("unknown", "unknown"), ("<b>bad</b>", "an unknown source"),
+                                           (5, "an unknown source")])
+def test_any_other_starter_is_named_and_junk_is_not_echoed(logs, source, shown):
+    (alarm,) = _starter_day(logs, started_line(source))
+    assert alarm.title == f"The Supabase starter did not start today's run; {shown} did"
+
+
+def test_no_source_says_nothing_about_the_starter(logs):
+    """A block from before the field, or no block at all, is not a failed starter."""
+    assert _starter_day(logs, started_line(None)) == []
+    assert _starter_day(logs, journal_line("AAPL", when="2026-09-28T14:50:00+00:00")) == []
+
+
+def test_an_unreadable_starter_record_is_said_in_the_detail(logs):
+    (alarm,) = _starter_day(logs, started_line("watchdog"),
+                            starter={"day": "2026-09-28", "status": "unknown", "why": "project paused or unreachable"})
+    assert "could not be read (project paused or unreachable)" in alarm.detail
+
+
+def test_an_archive_that_is_not_configured_is_a_warning_every_day(logs):
+    (alarm,) = _starter_day(logs, started_line("supabase-cron"),
+                            archive={"ok": False, "error": "not configured", "last_success": None})
+    assert alarm.severity == health.WARNING
+    assert alarm.title == "Archive not configured: the Supabase project will pause"
+    assert "SUPABASE_URL / SUPABASE_SERVICE_KEY" in alarm.detail and "No push has worked yet." in alarm.detail
+
+
+def test_a_failed_archive_push_is_a_warning_that_says_restore_when_paused(logs):
+    (alarm,) = _starter_day(logs, started_line("supabase-cron"),
+                            archive={"ok": False, "error": "project paused or unreachable",
+                                     "last_success": "2026-09-20T15:00:00+00:00"})
+    assert alarm.title == "The archive push to Supabase failed: project paused or unreachable"
+    assert "may be paused; restore it" in alarm.detail and "2026-09-20" in alarm.detail
+    (odd,) = _starter_day(logs, started_line("supabase-cron"), archive={"ok": False, "error": "secret=abc"})
+    assert odd.title == "The archive push to Supabase failed: an unrecognised error" and "abc" not in odd.detail
+    assert _starter_day(logs, started_line("supabase-cron"), archive={"ok": True}) == []
+    assert _starter_day(logs, started_line("supabase-cron"), archive=["not", "a", "record"]) == []
+
+
+@pytest.mark.parametrize("today, severity, title", [
+    (date(2026, 10, 1), None, None),
+    (date(2026, 10, 12), health.WARNING,
+     "The GitHub token the Supabase starter uses expires on 2026-10-26: make a new one"),
+    (date(2026, 10, 25), health.WARNING,
+     "The GitHub token the Supabase starter uses expires on 2026-10-26: make a new one"),
+    (date(2026, 10, 26), health.CRITICAL,
+     "The GitHub token the Supabase starter uses expired on 2026-10-26: make a new one"),
+    (date(2026, 11, 3), health.CRITICAL,
+     "The GitHub token the Supabase starter uses expired on 2026-10-26: make a new one"),
+])
+def test_the_starters_token_warns_fourteen_days_before_and_is_critical_once_expired(today, severity, title):
+    alarm = health.dispatch_token_expiry(date(2026, 10, 26), today)
+    if severity is None:
+        assert alarm is None
+        return
+    assert (alarm.severity, alarm.title) == (severity, title)
+    assert "github_heartbeat_dispatch" in alarm.detail and "GITHUB_DISPATCH_TOKEN_EXPIRES" in alarm.detail
+    assert health.dispatch_token_expiry(None, today) is None
+
+
+def test_the_token_date_comes_from_the_settings_by_default(logs, monkeypatch):
+    from config import settings
+
+    journal, audit = logs
+    write(journal, journal_line("AAPL", when="2026-09-28T14:50:00+00:00"))
+    monkeypatch.setattr(settings, "GITHUB_DISPATCH_TOKEN_EXPIRES", date(2026, 10, 1))
+    assert [a.title for a in health.check(journal, audit, SEP28)] == [
+        "The GitHub token the Supabase starter uses expires on 2026-10-01: make a new one"]
+    monkeypatch.setattr(settings, "GITHUB_DISPATCH_TOKEN_EXPIRES", None)
+    assert health.check(journal, audit, SEP28) == []
+
+
+def test_a_weekend_or_holiday_with_no_cycle_is_not_an_alarm(logs):
+    """Every weekday starter fires on a holiday and the cycle stands down by
+    design: no line is the right record, not a lost day."""
+    journal, audit = logs
+    assert health.check(journal, audit, date(2026, 11, 26), token_expires=None) == []   # Thanksgiving
+    assert health.check(journal, audit, date(2026, 9, 27), token_expires=None) == []    # a Sunday
+    assert [a.title for a in health.check(journal, audit, SEP28, token_expires=None)] == ["No cycle ran today"]

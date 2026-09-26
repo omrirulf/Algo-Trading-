@@ -12,7 +12,10 @@ from store.remote import RemoteArchive
 from tests.test_store_loader import AUDIT_LINE, JOURNAL_LINE, line
 
 URL = "https://proj.supabase.co"
-KEY = "service-role-key"
+#: The shape of the key the heartbeat really uses: a new-style secret key
+#: ("github-archive"), sent on the apikey header only. Not a real key.
+#: Assembled at runtime so no secret scanner mistakes this file for a leak.
+KEY = "sb_" + "secret_" + "TESTONLY" + "0" * 24
 
 
 @pytest.fixture
@@ -215,3 +218,98 @@ def test_a_refused_push_exits_non_zero_with_the_reason(tmp_path, capsys, configu
     err = capsys.readouterr().err
     assert "Remote archive push failed" in err
     assert "no such table" in err
+
+
+# --------------------------------------------------------------------------- #
+# --status: the push writes down how it went (26 Sep 2026)
+# --------------------------------------------------------------------------- #
+
+
+def _status(path):
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def test_a_push_that_worked_is_recorded_as_the_last_success(tmp_path, configured, monkeypatch):
+    wire(monkeypatch, lambda r: httpx.Response(200, json=[] if r.method == "GET" else [{"line_hash": "x"}]))
+    journal, audit = logs(tmp_path)
+    record = tmp_path / "archive_status.json"
+    assert push_remote.main(args(journal, audit, "--status", str(record))) == 0
+    status = _status(record)
+    assert status["ok"] is True and status["error"] is None
+    assert status["last_success"] == status["last_attempt"] and status["last_attempt"].endswith("+00:00")
+
+
+def test_not_configured_is_recorded_and_keeps_the_last_success(tmp_path, unconfigured):
+    """Not a failure of the run -- it still exits 0 -- but written down, so the
+    brief can warn every day that the Supabase project will pause."""
+    journal, audit = logs(tmp_path)
+    record = tmp_path / "archive_status.json"
+    record.write_text(json.dumps({"last_success": "2026-09-20T15:00:00+00:00", "ok": True}))
+    assert push_remote.main(args(journal, audit, "--status", str(record))) == 0
+    status = _status(record)
+    assert (status["ok"], status["error"], status["last_success"]) == (False, "not configured",
+                                                                      "2026-09-20T15:00:00+00:00")
+
+
+@pytest.mark.parametrize("answer, said", [
+    (httpx.ConnectError("name or service not known"), "project paused or unreachable"),
+    (httpx.ReadTimeout("timed out"), "project paused or unreachable"),
+    (httpx.Response(540, text="project paused"), "project paused or unreachable"),
+    (httpx.Response(503, text="unavailable"), "project paused or unreachable"),
+    (httpx.Response(401, text='{"message":"Invalid API key"}'), "HTTP 401"),
+    (httpx.Response(404, text="no table"), "HTTP 404"),
+])
+def test_a_failed_push_is_classified_in_a_few_words_and_the_last_success_is_kept(
+        tmp_path, configured, monkeypatch, answer, said):
+    def handler(request):
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+    wire(monkeypatch, handler)
+    journal, audit = logs(tmp_path)
+    record = tmp_path / "archive_status.json"
+    record.write_text(json.dumps({"last_success": "2026-09-20T15:00:00+00:00"}))
+    assert push_remote.main(args(journal, audit, "--status", str(record))) == 1, "still fails loudly"
+    status = _status(record)
+    assert (status["ok"], status["error"], status["last_success"]) == (False, said, "2026-09-20T15:00:00+00:00")
+    text = record.read_text()
+    assert KEY not in text and URL not in text and "Invalid API key" not in text
+
+
+def test_a_record_that_is_not_ours_is_not_copied_forward(tmp_path, unconfigured):
+    journal, audit = logs(tmp_path)
+    record = tmp_path / "archive_status.json"
+    for junk in ("{broken", "[1, 2]", json.dumps({"last_success": {"nested": KEY}})):
+        record.write_text(junk)
+        assert push_remote.main(args(journal, audit, "--status", str(record))) == 0
+        assert _status(record)["last_success"] is None
+
+
+def test_a_crashed_push_still_says_so_and_still_crashes(tmp_path, configured, monkeypatch):
+    journal, audit = logs(tmp_path)
+    record = tmp_path / "archive_status.json"
+
+    def boom(*a, **k):
+        raise RuntimeError("the loader broke")
+
+    monkeypatch.setattr(push_remote, "rows_from", boom)
+    wire(monkeypatch, lambda r: httpx.Response(200, json=[]))
+    with pytest.raises(RuntimeError):
+        push_remote.main(args(journal, audit, "--status", str(record)))
+    assert _status(record)["error"] == "push crashed (RuntimeError)"
+
+
+def test_a_dry_run_or_no_status_flag_writes_no_record(tmp_path, configured, monkeypatch):
+    wire(monkeypatch, lambda r: httpx.Response(200, json=[]))
+    journal, audit = logs(tmp_path)
+    record = tmp_path / "archive_status.json"
+    assert push_remote.main(args(journal, audit, "--status", str(record), "--dry-run")) == 0
+    assert push_remote.main(args(journal, audit)) == 0
+    assert not record.exists()
+
+
+def test_an_unwritable_record_never_fails_the_push(tmp_path, unconfigured, capsys):
+    journal, audit = logs(tmp_path)
+    assert push_remote.main(args(journal, audit, "--status", str(tmp_path / "missing" / "status.json"))) == 0
+    assert "could not write the push record" in capsys.readouterr().err

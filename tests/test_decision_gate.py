@@ -424,3 +424,48 @@ def test_no_account_close_judges_nothing_and_bad_numbers_are_skipped():
     assert before_only.days == ()
     noisy = {SEP[0]: 100_000.0, SEP[1]: float("nan"), SEP[2]: 0.0, SEP[3]: -5.0, SEP[4]: 99_000.0}
     assert [d.day for d in gate.drawdown_watch(noisy, {}).days] == [SEP[0], SEP[4]]
+
+
+# --- trigger (d): closing equity only; a mid-day reading warns (26 Sep 2026) ---------------
+
+
+def test_a_mid_day_reading_below_the_line_never_trips_d():
+    """The owner's rule: (d) trips only on final closes. At 11:00 the account
+    can be 9% down and at the 16:00 close 3% down; the close decides."""
+    closes = {SEP[0]: 100_000.0, SEP[1]: 101_000.0}
+    watch = gate.drawdown_watch(closes, {SEP[0]: 100.0, SEP[1]: 100.0}, midday=(SEP[2], 91_000.0))
+    assert watch.trips == () and gate.drawdown_trips(closes, {}, (SEP[2], 91_000.0)) == []
+    assert [d.day for d in watch.days] == SEP[:2], "a mid-day reading is never a day of (d)"
+    assert watch.latest.day == SEP[1]
+    assert watch.midday.day == SEP[2] and watch.midday.too_deep
+    assert watch.midday.peak == 101_000.0 and watch.midday.peak_day == SEP[1]
+    warning = watch.midday_warning
+    assert warning.startswith("mid-day 2026-09-25: equity 91,000.00 is 9.90% below its peak 101,000.00")
+    assert warning.endswith("A mid-day reading, not a close: it does not trip (d)")
+
+
+def test_a_mid_day_reading_behind_vt_is_measured_against_vts_last_final_close():
+    closes = {SEP[0]: 100_000.0, SEP[1]: 100_000.0}
+    vt = {SEP[0]: 100.0, SEP[1]: 104.0}                         # no final VT close for the 25th yet
+    watch = gate.drawdown_watch(closes, vt, midday=(SEP[2], 98_500.0))
+    assert watch.trips == ()
+    assert watch.midday.gap == pytest.approx(-0.055) and watch.midday.too_far_behind
+    assert "5.50 points behind VT" in watch.midday_warning and "last final close" in watch.midday_warning
+
+
+def test_a_calm_mid_day_reading_warns_of_nothing_and_a_stale_one_is_ignored():
+    closes = {SEP[0]: 100_000.0, SEP[1]: 101_000.0}
+    calm = gate.drawdown_watch(closes, {}, midday=(SEP[2], 102_000.0))
+    assert calm.midday.drawdown == 0.0 and calm.midday_warning is None
+    # A reading for a day that already has a close, or before the start, is not a mid-day reading.
+    assert gate.drawdown_watch(closes, {}, midday=(SEP[1], 50_000.0)).midday is None
+    assert gate.drawdown_watch(closes, {}, midday=(date(2026, 9, 22), 50_000.0)).midday is None
+    assert gate.drawdown_watch(closes, {}, midday=(SEP[2], float("nan"))).midday is None
+    assert gate.drawdown_watch(closes, {}).midday is None and gate.drawdown_watch(closes, {}).midday_warning is None
+
+
+def test_the_close_that_follows_a_bad_mid_day_is_what_trips():
+    """The same day, once its close is in, is judged like any other close."""
+    closes = {SEP[0]: 100_000.0, SEP[1]: 101_000.0, SEP[2]: 92_000.0}
+    (trip,) = gate.drawdown_trips(closes, {})
+    assert trip.last == SEP[2]

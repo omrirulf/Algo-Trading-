@@ -97,13 +97,76 @@ def test_the_insert_is_idempotent_by_line_hash():
     assert "return=representation" in prefer
 
 
-def test_the_service_key_is_sent_both_ways_supabase_expects():
-    remote_archive, seen = archive(lambda request: ok([]))
-    remote_archive.latest_timestamp(SIGNALS)
+#: A new-style secret key, the shape Supabase issues since 2025. Not a real one,
+#: and assembled at runtime so no secret scanner mistakes this file for a leak.
+NEW_SECRET_KEY = "sb_" + "secret_" + "TESTONLY" + "0" * 24
+#: A legacy JWT-shaped service_role key: three base64url parts. Not a real one.
+LEGACY_KEY = ".".join(["eyJ" + "hbGciOiJIUzI1NiJ9", "eyJ" + "yb2xlIjoidGVzdCJ9", "c2lnbmF0dXJl"])
 
+
+def _sent_with(key: str, call) -> httpx.Request:
+    seen: list[httpx.Request] = []
+
+    def recording(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return ok([])
+
+    client = httpx.Client(transport=httpx.MockTransport(recording))
+    call(RemoteArchive(URL, key, client=client))
     (request,) = seen
-    assert request.headers["apikey"] == KEY
-    assert request.headers["Authorization"] == f"Bearer {KEY}"
+    return request
+
+
+def test_a_new_secret_key_goes_on_the_apikey_header_only():
+    """Supabase: "Send publishable and secret keys on the apikey header only" --
+    the same key as a Bearer token is parsed as a JWT and refused. The legacy
+    keys stop working at the end of 2026, before the experiment ends, so the
+    archive has to run on the new key."""
+    request = _sent_with(NEW_SECRET_KEY, lambda a: a.latest_timestamp(SIGNALS))
+    assert request.headers["apikey"] == NEW_SECRET_KEY
+    assert "Authorization" not in request.headers
+
+
+def test_a_legacy_jwt_key_is_still_sent_both_ways_it_needs():
+    """Until it is switched off, the old service_role key keeps working as before."""
+    request = _sent_with(LEGACY_KEY, lambda a: a.latest_timestamp(SIGNALS))
+    assert request.headers["apikey"] == LEGACY_KEY
+    assert request.headers["Authorization"] == f"Bearer {LEGACY_KEY}"
+
+
+def test_every_kind_of_request_uses_the_same_rule():
+    """The push, the watermark read and the starter-log read all go through one
+    place, so no request can quietly fall back to the Bearer header."""
+    row = loader.signal_row(line(JOURNAL_LINE))
+    for call in (
+        lambda a: a.latest_timestamp(SIGNALS),
+        lambda a: a.push(SIGNALS, [row]),
+    ):
+        request = _sent_with(NEW_SECRET_KEY, call)
+        assert "Authorization" not in request.headers
+        assert request.headers["apikey"] == NEW_SECRET_KEY
+
+
+@pytest.mark.parametrize(
+    "key, legacy",
+    [
+        (LEGACY_KEY, True),
+        (NEW_SECRET_KEY, False),
+        ("sb_" + "publishable_TESTONLY", False),
+        ("service-role-key", False),      # not a JWT: three dot-separated parts needed
+        ("eyJonly.two", False),
+        ("eyJa..c", False),               # an empty part is not a JWT
+    ],
+)
+def test_only_a_jwt_shaped_key_is_treated_as_legacy(key, legacy):
+    assert remote._is_legacy_jwt(key) is legacy
+    assert ("Authorization" in remote.auth_headers(key)) is legacy
+
+
+def test_the_key_never_appears_in_the_url():
+    """Supabase: never pass a secret key in URLs or query params, which get logged."""
+    request = _sent_with(NEW_SECRET_KEY, lambda a: a.latest_timestamp(SIGNALS))
+    assert NEW_SECRET_KEY not in str(request.url)
 
 
 def test_the_row_sent_is_the_row_the_local_index_would_store():

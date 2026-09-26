@@ -22,9 +22,12 @@ so. Two sources, in order of trust:
 * **the journal run block** -- from the first heartbeat cycle after the
   change that added it (28 Sep 2026 at the earliest; 25 Sep's cycle ran the
   code before it), every line the heartbeat's cycle step writes carries
-  ``run``: what started it (``schedule``, ``backup`` or ``manual``), the
-  day's scheduled start, when the cycle step started, how many minutes late
-  that was, and the GitHub run id. When a day has one, it wins.
+  ``run``: what started it (``schedule``, ``scheduler``, ``backup`` or
+  ``manual``), the day's scheduled start, when the cycle step started, how
+  many minutes late that was, and the GitHub run id; from 26 Sep 2026 also
+  ``source``, which starter asked for the run (``supabase-cron``, the main
+  one; ``claude-bridge``, ``claude-routine``, ``watchdog``, ``manual`` or
+  ``github-schedule``). When a day has one, it wins.
 * **inferred from the first line** -- every earlier day has no run block,
   so its start is taken to be its first journal line and its scheduled
   start comes from ``SCHEDULE_HISTORY`` below, which is the heartbeat's own
@@ -40,6 +43,7 @@ from __future__ import annotations
 
 import argparse
 import math
+import re
 import sys
 from dataclasses import dataclass
 from datetime import date, datetime, time, timezone
@@ -82,8 +86,15 @@ PHASES = (PRE_OPEN, SESSION, AFTER_CLOSE, NO_SESSION)
 LATE_AFTER_MINUTES = 30
 
 #: What may have started a run, as the journal run block records it.
-TRIGGERS = ("schedule", "backup", "manual")
+#: ``scheduler`` is an outside scheduler that is the day's main start (the
+#: Supabase starter, from 26 Sep 2026), not a rescue.
+TRIGGERS = ("schedule", "scheduler", "backup", "manual")
 UNKNOWN = "unknown"
+
+#: A run block's ``source``: which starter asked for the run. The same short
+#: safe token ``analysis/cycle_day.py:SOURCE_PATTERN`` writes; read again
+#: here because a line is read months after another process wrote it.
+SOURCE_PATTERN = re.compile(r"[a-z0-9-]{1,40}")
 
 #: Where a day's timing came from. Printed in full in the JSON, shortened
 #: in the text table.
@@ -196,6 +207,9 @@ class RunBlock:
     minutes_late: Optional[int]
     late: Optional[bool]
     run_id: Optional[str]
+    #: Which starter asked for the run; None on a block from before the
+    #: field existed, ``unknown`` when it is not a short safe token.
+    source: Optional[str] = None
 
     @property
     def has_timing(self) -> bool:
@@ -208,15 +222,19 @@ def parse_run_block(value: Any) -> Optional[RunBlock]:
 
     Each field is taken only if it has the type the agreed format gives it;
     a field of the wrong type is dropped, not coerced, and the rest of the
-    block still counts. A trigger outside the three known ones is
-    ``unknown`` rather than printed: the text is a report, and a report
-    should not echo whatever a line happened to carry.
+    block still counts. A trigger outside the known ones is ``unknown``
+    rather than printed, and so is a ``source`` that is not a short safe
+    token: the text is a report, and a report should not echo whatever a
+    line happened to carry.
     """
     if not isinstance(value, dict):
         return None
     trigger = value.get("trigger")
     run_id = value.get("run_id")
     late = value.get("late")
+    source = value.get("source")
+    if source is not None:
+        source = source if isinstance(source, str) and SOURCE_PATTERN.fullmatch(source) else UNKNOWN
     block = RunBlock(
         trigger=trigger if isinstance(trigger, str) and trigger in TRIGGERS else None,
         scheduled_for=to_utc(value.get("scheduled_for")),
@@ -225,6 +243,7 @@ def parse_run_block(value: Any) -> Optional[RunBlock]:
         late=late if isinstance(late, bool) else None,
         run_id=(str(run_id) if isinstance(run_id, (str, int)) and not isinstance(run_id, bool)
                 and str(run_id).strip() else None),
+        source=source,
     )
     if block.trigger is None and block.run_id is None and not block.has_timing:
         return None
@@ -315,6 +334,12 @@ class DayTiming:
     late: Optional[bool]
     started_by: str
     source: str
+    #: Which starter asked for the day's first run (the run block's
+    #: ``source``: ``supabase-cron``, ``claude-bridge``, ``watchdog``...);
+    #: ``unknown`` on a day with no block, or a block from before the field.
+    #: Not to be confused with ``source`` above, which says where this
+    #: row's timing came from.
+    run_source: str
     #: Distinct GitHub run ids the day's run blocks name. 0 on a day with
     #: none; more than 1 means more than one cycle wrote lines that day.
     runs: int
@@ -384,6 +409,7 @@ def _one_day(day: date, rows: list[tuple[datetime, Any]]) -> DayTiming:
         scheduled_for=scheduled, started_at=started, minutes_late=minutes, late=late,
         started_by=(block.trigger if block and block.trigger else UNKNOWN),
         source=FROM_RUN_BLOCK if timed is not None else INFERRED,
+        run_source=(block.source if block and block.source else UNKNOWN),
         runs=len({b.run_id for b in blocks if b.run_id}),
     )
 
@@ -442,6 +468,7 @@ def timing_json(timings: Sequence[DayTiming], cutoff: Optional[date] = None) -> 
                 "late": t.late,
                 "started_by": t.started_by,
                 "source": t.source,
+                "run_source": t.run_source,
                 "runs": t.runs,
             }
             for t in timings
@@ -463,7 +490,8 @@ def render(timings: Sequence[DayTiming], cutoff: Optional[date] = None) -> list[
         "time, where in the session they fell, minutes after the scheduled start, what",
         f"started it, and LATE when that was more than {LATE_AFTER_MINUTES} minutes. 'run block' is the",
         "journal's own record of the run; 'inferred' is the first line against the",
-        "heartbeat's cron history.",
+        "heartbeat's cron history. 'via' is the starter that asked for the run, when",
+        "the run block names it: supabase-cron is the main one, anything else a backup.",
     ]
     if not timings:
         return out + ["no cycle day with a timestamp in the journal", "", ENTRY_SENTENCE]
@@ -474,7 +502,11 @@ def render(timings: Sequence[DayTiming], cutoff: Optional[date] = None) -> list[
     ).rstrip())
     for t in timings:
         vs = "n/a" if t.minutes_late is None else f"{t.minutes_late:+d} min"
-        marks = ("LATE" if t.late else "") + (f" ({t.runs} runs)" if t.runs > 1 else "")
+        marks = " ".join(mark for mark in (
+            "LATE" if t.late else "",
+            f"({t.runs} runs)" if t.runs > 1 else "",
+            f"via {t.run_source}" if t.run_source != UNKNOWN else "",
+        ) if mark)
         out.append((
             f"{t.day.isoformat():<12}" + (f"{part_of(t.day, cutoff):<8}" if labelled else "")
             + f"{t.first_new_york:%H:%M}-{t.last_new_york:%H:%M}  {t.phase:<12}{vs:>9}  "

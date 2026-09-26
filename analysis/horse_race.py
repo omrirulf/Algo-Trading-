@@ -73,7 +73,9 @@ it would only say SPY fell), (c) counts model errors from the journal, and
 (``--account``) against its own peak and against VT's final closes
 (``decision_gate.drawdown_watch``). (d) is in the gate JSON under
 ``watch.d``; like the reports, it is computed after the gate and nothing
-that decides reads it.
+that decides reads it. Only closes trip it: a reading taken during the
+session is shown on its own line, and in the JSON as ``midday`` with a
+``midday_warning`` when it is below a line, marked mid-day, never a trip.
 
 Nothing here is fitted. The momentum arm's parameters are the textbook
 values and this file never touches them; it judges the rule, it does not
@@ -1084,10 +1086,19 @@ class AccountWatch:
 
 
 def account_watch(record: Optional[AccountRecord], vt_close: dict[date, float]) -> AccountWatch:
-    """Trigger (d) on the account record and VT's final closes; nothing that decides reads it."""
+    """Trigger (d) on the account record and VT's final closes; nothing that decides reads it.
+
+    Closing equity only (the owner's rule, amended 26 Sep 2026): the
+    record's intraday number, when it has one, is handed to the gate apart
+    from the closes, as the mid-day reading it is. It is shown and can
+    warn; it never trips (d).
+    """
     if record is None:
         return AccountWatch(None, None)
-    return AccountWatch(record, gate.drawdown_watch(record.equity, vt_close))
+    closes = {day: value for day, value in record.equity.items() if day != record.intraday}
+    midday = ((record.intraday, record.equity[record.intraday])
+              if record.intraday is not None and record.intraday in record.equity else None)
+    return AccountWatch(record, gate.drawdown_watch(closes, vt_close, midday))
 
 
 def _round(value: Optional[float], digits: int) -> Optional[float]:
@@ -1137,6 +1148,17 @@ def account_watch_json(account: AccountWatch) -> dict:
         ],
         "latest": row(watch.latest if watch else None),
         "latest_vt": row(watch.latest_vt if watch else None),
+        # The latest reading taken during a session, when it is newer than
+        # every close: shown beside (d), never part of it. ``midday_warning``
+        # is set when it is below the 8% line or behind by more than 5
+        # points, and says so as a mid-day warning -- (d) is not tripped by
+        # it, and the daily health check raises no alarm for it.
+        "midday": row(watch.midday if watch else None),
+        "midday_warning": None if watch is None or watch.midday is None or watch.midday_warning is None else {
+            "day": watch.midday.day.isoformat(), "mid_day": True, "trips_d": False,
+            "below_peak": watch.midday.too_deep, "behind_vt": watch.midday.too_far_behind,
+            "detail": watch.midday_warning,
+        },
         "record_at": None if account.record is None else account.record.at.isoformat(),
     }
 
@@ -1863,10 +1885,7 @@ def account_lines(account: AccountWatch) -> list[str]:
     else:
         out = [f"{label}: not tripped"]
     now = watch.latest
-    intraday = account.record.intraday == now.day
-    when = (f"{now.day} (intraday, recorded {account.record.at:%H:%M} UTC)" if intraday
-            else f"{now.day} close")
-    out.append(f"    now {when}: equity {now.equity:,.2f} | peak {now.peak:,.2f} on {now.peak_day} | "
+    out.append(f"    now {now.day} close: equity {now.equity:,.2f} | peak {now.peak:,.2f} on {now.peak_day} | "
                f"{abs(now.drawdown):.2%} below the peak (trips beyond {gate.MAX_DRAWDOWN:.0%})")
     vt = watch.latest_vt
     since = f"since the {gate.DRAWDOWN_START} close"
@@ -1879,6 +1898,17 @@ def account_lines(account: AccountWatch) -> list[str]:
         out.append(f"    vs {gate.INDEX_TICKER} {since}, at the {vt.day} close{note}: account "
                    f"{vt.account_return:+.2%}, {gate.INDEX_TICKER} {vt.vt_return:+.2%}: "
                    f"{vt.gap * 100:+.2f} points (trips below -{gate.MAX_BEHIND_VT * 100:.0f})")
+    mid = watch.midday
+    if mid is not None:
+        # Shown, never judged: (d) trips on closes only (the owner's rule,
+        # amended 26 Sep 2026). A reading below a line is a warning marked
+        # mid-day, and the close decides.
+        out.append(f"    mid-day {mid.day} (recorded {account.record.at:%H:%M} UTC, not a close; never "
+                   f"trips (d)): equity {mid.equity:,.2f} | {abs(mid.drawdown):.2%} below the peak"
+                   + (f" | {mid.gap * 100:+.2f} points against {gate.INDEX_TICKER}'s last final close"
+                      if mid.gap is not None else ""))
+        if watch.midday_warning:
+            out.append(f"    WARNING (mid-day, does not trip (d)): {watch.midday_warning}")
     return out
 
 

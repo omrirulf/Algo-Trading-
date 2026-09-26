@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from collections import Counter, defaultdict
 from datetime import date, datetime, timezone
@@ -333,6 +334,93 @@ def cycle_from(journal: list[dict], day: date) -> dict:
 
 
 # --------------------------------------------------------------------------- #
+# Who started today's run, and the Supabase side of it
+# --------------------------------------------------------------------------- #
+
+#: A run block's ``source`` as the snapshot may carry it (the token rule of
+#: ``analysis/cycle_day.py``); anything else is ``unknown``.
+_SAFE_SOURCE = re.compile(r"[a-z0-9-]{1,40}")
+
+
+def _short(value: Any, limit: int = 200) -> Optional[str]:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    return " ".join(value.split())[:limit]
+
+
+def _int(value: Any) -> Optional[int]:
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def run_from(journal: list[dict], day: date) -> Optional[dict]:
+    """Today's first run, as its run block describes it; None with no block today.
+
+    The first run of the day is the one that traded; a second one exists
+    only when a person re-ran the day. ``source`` is the starter that asked
+    for it -- ``supabase-cron`` is the main one since 26 Sep 2026 -- and is
+    ``unknown`` when it is not a short safe token, None on a block from
+    before the field existed.
+    """
+    prefix = day.isoformat()
+    for line in journal:
+        block = line.get("run")
+        if not str(line.get("ts_utc") or "").startswith(prefix) or not isinstance(block, dict):
+            continue
+        source = block.get("source")
+        if source is not None:
+            source = source if isinstance(source, str) and _SAFE_SOURCE.fullmatch(source) else "unknown"
+        return {
+            "source": source,
+            "trigger": _short(block.get("trigger"), 20),
+            "scheduled_for": _short(block.get("scheduled_for"), 40),
+            "started_at": _short(block.get("started_at"), 40),
+            "minutes_late": _int(block.get("minutes_late")),
+        }
+    return None
+
+
+def _record(path: Path) -> Optional[dict]:
+    try:
+        record = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return record if isinstance(record, dict) else None
+
+
+def starter_from(path: Path) -> Optional[dict]:
+    """The Supabase starter's own request today (``logs/starter_status.json``), checked field by field.
+
+    Only the status code, the time, and a short error or reason are kept:
+    the file is committed and the brief sends it to a phone.
+    """
+    record = _record(path)
+    if record is None:
+        return None
+    if record.get("status") == "unknown":
+        return {"day": _short(record.get("day"), 10), "status": "unknown", "why": _short(record.get("why"))}
+    return {
+        "day": _short(record.get("day"), 10),
+        "requested_at": _short(record.get("requested_at"), 40),
+        "status_code": _int(record.get("status_code")),
+        "error": _short(record.get("error"), 160),
+    }
+
+
+def archive_from(path: Path) -> Optional[dict]:
+    """How the last archive push went (``logs/archive_status.json``), checked field by field."""
+    record = _record(path)
+    if record is None:
+        return None
+    ok = record.get("ok")
+    return {
+        "last_attempt": _short(record.get("last_attempt"), 40),
+        "last_success": _short(record.get("last_success"), 40),
+        "ok": ok if isinstance(ok, bool) else None,
+        "error": _short(record.get("error"), 60),
+    }
+
+
+# --------------------------------------------------------------------------- #
 # The snapshot
 # --------------------------------------------------------------------------- #
 
@@ -353,6 +441,13 @@ def build(audit_path: Path, journal_path: Path, day: Optional[date] = None) -> d
         "closed": sorted(closed, key=lambda p: p["last_seen"], reverse=True)[:20],
         "exposure": exposure_from(open_positions, equity),
         "cycle": cycle_from(journal, day),
+        # Who started today's run, what the Supabase starter's own request
+        # did, and when the archive last took a push: the brief's lines
+        # about the machinery (26 Sep 2026). Read beside the journal, like
+        # the health check's own records.
+        "run": run_from(journal, day),
+        "starter": starter_from(Path(journal_path).parent / health.STARTER_FILE),
+        "archive": archive_from(Path(journal_path).parent / health.ARCHIVE_FILE),
         "alarms": [{"severity": a.severity, "title": a.title, "detail": a.detail} for a in alarms],
         "ladder": [{"take_at_r": r.take_at_r, "take_fraction": r.take_fraction, "stop_to_r": r.stop_to_r}
                    for r in cfg.PROFIT_LADDER],

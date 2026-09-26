@@ -126,12 +126,15 @@ a batch bought before this gate existed at all, not a missed session.
     empty headlines. See [Testing](/testing).
   </Step>
   <Step title="Let the schedule take over">
-    Two crons, both on weekdays, and the job exits immediately when Alpaca
-    says the market is shut:
+    The day's main start is not GitHub's: since 26 Sep 2026 it is
+    [the Supabase starter](#the-supabase-starter), a job in the Supabase
+    project that asks GitHub for the run at 14:40 UTC. GitHub's own two
+    crons stay, on weekdays, as backups, and the job exits immediately when
+    Alpaca says the market is shut:
 
     | cron (UTC) | what it is |
     | --- | --- |
-    | `40 14 * * 1-5` | the cycle, once a day: 10:40 New York in summer, 09:40 in winter |
+    | `40 14 * * 1-5` | the day's time, once a day: 10:40 New York in summer, 09:40 in winter |
     | `35 17 * * 1-5` | the catch-up, which usually does nothing |
 
     The second one exists because the first can simply not fire — see below.
@@ -200,18 +203,112 @@ second time. That is why the guard does not trust the journal alone, and why
 the watchdog below never re-runs a day on its own after a run that reached
 its trading step.
 
+## The Supabase starter
+
+The day's **main** start, from 26 Sep 2026 (the owner's decision). GitHub's
+cron was hours late on every day it was measured, while a `workflow_dispatch`
+is created the moment it is asked for. So a job outside GitHub asks for it:
+a `pg_cron` job in the Supabase project **algo-trading-archive** calls
+`public.start_heartbeat()` at **14:40 UTC, Monday to Friday**. That function
+sends GitHub one request, through `pg_net`, to dispatch `heartbeat.yml` on
+`main` with `mode: cycle`, `started_by: scheduler` and
+`source: supabase-cron`. Everything else is a backup, and every starter goes
+through the same guard, so a day never runs twice.
+
+The layers, all of which can fire on the same day:
+
+| starter | when (UTC) | `source` in the journal |
+| --- | --- | --- |
+| **the Supabase starter** (main) | 14:40 | `supabase-cron` |
+| a Claude Routine, the temporary "bridge" | 14:42 | `claude-bridge` |
+| GitHub's own cron | 14:40 and 17:35, when GitHub delivers them | `github-schedule` |
+| Claude Routines dispatching heartbeat | 15:05 and 15:45 | `claude-routine` (or `manual` if the Routine does not say) |
+| the watchdog, itself started by a Routine at 15:12 and by its own crons | 15:10 to 17:40 | `watchdog` |
+| a person, Run workflow | any time | `manual` |
+
+**Where the token lives.** The request needs a GitHub token allowed to start
+workflows on this repository (a fine-grained token for this repository only,
+"Actions: Read and write"). It lives **only in Supabase Vault**, as the secret
+named exactly `github_heartbeat_dispatch`. It is not in this repository, not
+in a workflow, not in a GitHub secret and not in any log: only
+`start_heartbeat()` reads it, and hands it straight to the request. GitHub
+makes such a token expire, so its expiry date is the one fact the repository
+keeps: `GITHUB_DISPATCH_TOKEN_EXPIRES` in `config/settings.py`. The daily
+health check warns 14 days before ("the GitHub token the Supabase starter
+uses expires on …: make a new one") and raises a critical alarm once it has
+expired. To replace it, update the same Vault secret and the date.
+
+**Setting it up.** `supabase/heartbeat_starter.sql` was applied to the project
+on 26 Sep 2026 (through the Supabase connection, as the migration
+`heartbeat_starter`), and the security advisor is clean apart from the
+intended "RLS enabled, no policy". It is idempotent, so running it again in
+the SQL editor is safe: it enables `pg_cron` and `pg_net` (in the
+`extensions` schema), creates the log table and the two functions, and
+schedules `heartbeat-start` (14:40) and `heartbeat-start-status` (14:43),
+replacing any earlier copy of either job. Until the token is in Vault, each
+14:40 run only logs "no token in vault" and sends nothing. Nothing in this
+repository applies it.
+
+**How to see what it did.** Every request writes a row to
+`public.starter_log` (`requested_at`, `source`, `request_id`); at 14:43
+`public.record_starter_status()` copies the status code of GitHub's answer
+onto it, or `pg_net`'s own error text when no answer came, and nothing else.
+GitHub answers a dispatch it accepted with **204** (No Content); a 401 is an
+expired or revoked token. The table has row-level security on and no policy,
+so only the `service_role` Postgres role can read it — which is what the
+heartbeat's secret key (`github-archive`) acts as. In the SQL editor:
+
+```sql
+select * from public.starter_log order by requested_at desc limit 10;
+select * from cron.job_run_details order by start_time desc limit 10;
+```
+
+The heartbeat reads today's row too, read-only, just before it writes the
+book snapshot (`store/starter_status.py`, "Read the Supabase starter's log"),
+and commits it as `logs/starter_status.json`. The daily brief then says:
+
+- `Started by supabase-cron at 14:41 UTC (1 min after 14:40)` — from the
+  journal's run block, which carries the `source`;
+- a warning when it was not the Supabase starter: "The Supabase starter did
+  not start today's run; claude-bridge did" (a warning, not critical: the
+  day still ran once);
+- `Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-09-25` — the
+  starter's own status code (never anything else it sent or got back) and
+  the date of the last archive push that worked.
+
+**Keeping the project awake.** A free Supabase project with no activity for
+about a week is paused, and a paused project runs no cron job, so the main
+starter would stop in silence (the backups would still start the day). That
+is how the project was found paused on 26 Sep: the heartbeat's "Push the
+archive to Supabase" step had printed "No remote archive configured" on
+every run, because the `SUPABASE_URL` and `SUPABASE_SERVICE_KEY` secrets were
+never set. With them set, every trading day's archive push and starter-log
+read go through the API. `SUPABASE_SERVICE_KEY` holds a new-style **secret
+key** (`sb_secret_…`) made for this job alone, named `github-archive`, sent on
+the `apikey` header only — not the legacy `service_role` key, which Supabase
+switches off at the end of 2026, six months before the experiment ends (see
+[Database](/database)). The push now also writes `logs/archive_status.json`
+(last attempt, last success, and a short reason: "not configured", "project
+paused or unreachable" or "HTTP 401"), committed in a small commit of its own
+that never fails the run. A push that fails pages the phone the same day
+("⚠️ Archive push to Supabase failed", with "the Supabase project may be
+paused; restore it" when it did not answer), and "not configured" is a
+warning in the brief every day until the secrets are there.
+
 ## If GitHub skips or delays the run
 
 GitHub's cron has been much worse here than "a few minutes late". In the week
 of 21 Sep the old 12:35 UTC cron arrived 4.5 to 5.7 hours late every day, and
-the 17:35 one about 3 hours late. On 16 Sep a cron never arrived at all. So
-the daily run has three ways to start, and a guard that lets only one of them
+the 17:35 one about 3 hours late. On 16 Sep a cron never arrived at all. That
+is why the main start is [the Supabase starter](#the-supabase-starter), with
+the temporary Claude bridge two minutes behind it. GitHub's side has three
+more ways to start the run, and a guard that lets only one of all of them
 trade:
 
 <Steps>
   <Step title="The schedule">
-    The two crons above. On a good day the 14:40 cron starts the cycle and
-    nothing else is needed.
+    The two crons above, now backups. On a day the Supabase starter worked,
+    the 14:40 cron (whenever GitHub delivers it) stops at the guard.
   </Step>
   <Step title="The watchdog">
     `heartbeat-watchdog.yml` checks at 15:10, 15:40, 16:40 and 17:40 UTC. It
@@ -250,10 +347,11 @@ trade:
     by a dispatch (next step).
   </Step>
   <Step title="The Claude Routines">
-    Routines in the owner's Claude account dispatch workflows at fixed times.
-    A dispatched run is created the moment it is asked for; it does not wait
-    in GitHub's cron queue. That is what makes "within 30 minutes" real:
-    a Routine that dispatches `heartbeat-watchdog.yml` just after 15:10 UTC.
+    Routines in the owner's Claude account dispatch workflows at fixed times:
+    the temporary bridge at 14:42 UTC and heartbeat at 15:05 and 15:45, and
+    `heartbeat-watchdog.yml` at 15:12. A dispatched run is created the moment
+    it is asked for; it does not wait in GitHub's cron queue. That is what
+    makes "within 30 minutes" real for the watchdog.
   </Step>
 </Steps>
 
@@ -265,6 +363,8 @@ neither counts nor stops the day's cycle. Path by path:
 
 | what starts the run | what stops a second cycle |
 | --- | --- |
+| the Supabase starter, at 14:40 | the guard |
+| the Claude bridge, at 14:42 | the guard |
 | the 14:40 cron, on time or hours late | the guard |
 | the 17:35 catch-up cron | the guard |
 | the watchdog's backup | the watchdog, which starts none on a day the guard would stop; then the guard. It never sends `rerun` |
@@ -327,10 +427,16 @@ moment later gets through.
 
 From the first heartbeat cycle after this change, each journal line the
 cycle writes also says what started its run: a `run` block with the trigger
-(`schedule`, `backup`, or `manual` for any other dispatch, a person's or a
-Claude Routine's), when the day's run was due, when this one started, how
-many minutes late, and the GitHub run id. The daily report shows it in one
-line. Lines from a local run carry no block.
+(`schedule`, `scheduler` for the Supabase starter, `backup`, or `manual` for
+any other dispatch, a person's or a Claude Routine's), the `source` (which
+starter asked: `supabase-cron`, `claude-bridge`, `claude-routine`,
+`watchdog`, `manual` or `github-schedule`; anything that is not a short
+token of lower-case letters, digits and hyphens is recorded as `unknown`),
+when the day's run was due, when this one started, how many minutes late,
+and the GitHub run id. The run's title on the Actions page names the source
+too ("heartbeat cycle (scheduler) via supabase-cron"). The daily report and
+the brief show it in one line. Lines from a local run carry no block. The
+source is only a label: the guard never reads it.
 
 ### The job's ceiling
 

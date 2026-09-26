@@ -11,8 +11,9 @@ Two kinds of values live here, and the distinction is deliberate:
 
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
-from typing import Final, NamedTuple
+from typing import Final, NamedTuple, Optional
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -552,6 +553,33 @@ BLEND_WEIGHTS_PATH: Final[Path] = LOG_DIR / "blend_weights.json"
 #: without a refit is a broken job, not a quiet market.
 BLEND_STALE_AFTER_DAYS: Final[int] = 14
 
+# --------------------------------------------------------------------------- #
+# The Supabase starter
+# --------------------------------------------------------------------------- #
+
+#: The day the GitHub token the Supabase starter dispatches with stops
+#: working, or None until the owner writes it here.
+#:
+#: Since 26 Sep 2026 the day's run is started by a pg_cron job in the Supabase
+#: project "algo-trading-archive" (``supabase/heartbeat_starter.sql``), which
+#: asks GitHub to dispatch heartbeat.yml. That needs a GitHub token allowed to
+#: start workflows on this repository, and GitHub makes such a token expire.
+#: The day it does, every request is refused with HTTP 401 and a backup has
+#: to start the run -- quietly, if nothing warned in advance.
+#:
+#: The token itself lives only in Supabase Vault, as the secret named
+#: ``github_heartbeat_dispatch``. It is never in this repository, in a
+#: workflow, in a GitHub secret or in a log, and nothing here can read it:
+#: only the database function that sends the request does. This date is the
+#: one fact about it the repository keeps, so the daily health check can warn
+#: 14 days before (and raise a critical alarm once it has expired): "make a
+#: new one". When you make a new token, put it in Vault under the same name
+#: and change this date in the same breath.
+GITHUB_DISPATCH_TOKEN_EXPIRES: Final[Optional[date]] = None
+
+#: How many days before that date the health check starts to warn.
+GITHUB_DISPATCH_TOKEN_WARN_DAYS: Final[int] = 14
+
 from config.watchlist import default_watchlist_csv
 
 # --------------------------------------------------------------------------- #
@@ -670,10 +698,14 @@ class Settings(BaseSettings):
     supabase_service_key: str = Field(
         default="",
         description=(
-            "Supabase service-role key, used only by store/remote.py to push "
-            "the archive. It bypasses row-level security, which is what lets "
-            "the tables keep RLS on with no policies -- so the publishable "
-            "key can do nothing at all. Never put this in client code"
+            "Supabase secret key (the new-style key named github-archive), "
+            "used only by store/remote.py to push the archive and read the "
+            "starter log. Sent on the apikey header only (store.remote."
+            "auth_headers); the legacy JWT service_role key still works until "
+            "Supabase switches legacy keys off at the end of 2026. Either kind "
+            "bypasses row-level security, which is what lets the tables keep "
+            "RLS on with no policies -- so the publishable key can do nothing "
+            "at all. Never put this in client code"
         ),
     )
     brightdata_unlocker_zone: str = Field(

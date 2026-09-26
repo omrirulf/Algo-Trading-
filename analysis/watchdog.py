@@ -160,21 +160,42 @@ def _title(run: dict) -> str:
     return str(run.get("display_title") or run.get("name") or "")
 
 
+#: How heartbeat.yml's ``run-name`` begins, for a protection pass and for
+#: the watchdog's own backup. Matched at the start of the title only.
+#:
+#: Since 26 Sep 2026 a cycle's title also names the starter that asked for
+#: it ("heartbeat cycle (scheduler) via supabase-cron"), and that part is
+#: free text from the dispatch's ``source`` input -- GitHub builds the title
+#: before any step can validate it. Matching anywhere in the title would let
+#: a source such as "protect-test" make a real cycle read as a protection
+#: pass, which the guard does not count, so a second cycle could trade the
+#: same day; or let "(backup)" in a source eat into the watchdog's cap. The
+#: prefixes are written by heartbeat.yml itself, before the source.
+PROTECT_TITLE = "heartbeat protect"
+BACKUP_TITLE = "heartbeat cycle (backup)"
+
+
 def is_cycle_run(run: dict) -> bool:
     """A heartbeat run that is (or may be) a trading cycle.
 
     Every run created after heartbeat.yml gained its ``run-name`` names
-    itself ("heartbeat cycle (backup)", "heartbeat protect"). Runs from
-    before that (25 Sep 2026 and earlier) are all titled plain "heartbeat",
-    and cannot say which they were; they count as cycles, which is the
-    direction that errs towards waiting rather than dispatching.
+    itself ("heartbeat cycle (backup) via watchdog", "heartbeat protect").
+    Runs from before that (25 Sep 2026 and earlier) are all titled plain
+    "heartbeat", and cannot say which they were; they count as cycles, which
+    is the direction that errs towards waiting rather than dispatching.
     """
-    return "protect" not in _title(run).lower()
+    return not _title(run).strip().lower().startswith(PROTECT_TITLE)
 
 
 def is_backup_run(run: dict) -> bool:
-    """A run the watchdog started -- its title says so."""
-    return "(backup)" in _title(run).lower()
+    """A run the watchdog started -- its title says so, at its start.
+
+    Only ``started_by: backup`` makes that title. The Supabase starter
+    dispatches with ``started_by: scheduler`` ("heartbeat cycle
+    (scheduler)"), and a Routine or a person with ``manual``: neither is the
+    watchdog's rescue, so neither counts toward ``max_backups``.
+    """
+    return _title(run).strip().lower().startswith(BACKUP_TITLE)
 
 
 def _status(run: dict) -> str:
