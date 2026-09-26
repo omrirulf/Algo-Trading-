@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#8a5a1e">
+<meta name="description" content="The paper-trading book: positions against their stops, the risk caps, today's cycle and the alarms. Rebuilt from the record after each cycle.">
+<title>Algo Trading Desk</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root{
+  --bg:#f5f4f0;--surface:#ffffff;--surface-2:#eeece6;--line:#d9d6cd;--ink:#1d1f24;--ink-2:#5b5f6b;--ink-3:#8a8e99;
+  --accent:#8a5a1e;--accent-ink:#ffffff;
+  --good:#2f7d4f;--good-bg:#e3f1e8;--warn:#a26a00;--warn-bg:#f7edd3;--bad:#b3352b;--bad-bg:#f8e2df;
+  --bar:#cfcbc0;--bar-fill:#8a5a1e;
+  --sans:"Source Sans 3",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#15171c;--surface:#1d2027;--surface-2:#252932;--line:#343945;--ink:#ecebe6;--ink-2:#aab0bd;--ink-3:#7d8390;
+    --accent:#d9a45b;--accent-ink:#15171c;
+    --good:#6fc48f;--good-bg:#1e3327;--warn:#e0b25a;--warn-bg:#3a2f15;--bad:#f08a7e;--bad-bg:#3d211e;
+    --bar:#343945;--bar-fill:#d9a45b;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#15171c;--surface:#1d2027;--surface-2:#252932;--line:#343945;--ink:#ecebe6;--ink-2:#aab0bd;--ink-3:#7d8390;
+  --accent:#d9a45b;--accent-ink:#15171c;
+  --good:#6fc48f;--good-bg:#1e3327;--warn:#e0b25a;--warn-bg:#3a2f15;--bad:#f08a7e;--bad-bg:#3d211e;
+  --bar:#343945;--bar-fill:#d9a45b;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.45;padding-inline:16px;padding-block:12px 40px;max-width:1080px;margin-inline:auto}
+h1,h2,h3{text-wrap:balance;margin:0}
+h1{font-size:1.35rem;font-weight:700;letter-spacing:-.01em}
+h2{font-size:1.02rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-2);margin-block:28px 10px}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--ink-2)}.faint{color:var(--ink-3)}
+header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 16px;padding-block:6px 14px;border-bottom:1px solid var(--line)}
+#fresh{font-size:.9rem}
+.stripe{display:flex;gap:10px;align-items:flex-start;border-radius:8px;padding:10px 12px;margin-top:14px;font-size:.95rem}
+.stripe.critical{background:var(--bad-bg);color:var(--bad)}
+.stripe.warning{background:var(--warn-bg);color:var(--warn)}
+.stripe.clean{background:var(--good-bg);color:var(--good)}
+.stripe strong{font-weight:700}
+.stripe .detail{color:inherit;opacity:.85;font-size:.88rem}
+.stripe > div{min-width:0;overflow-wrap:anywhere}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:14px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.tile .label{font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-2)}
+.tile .value{font-size:1.45rem;font-weight:600;margin-top:2px}
+.tile .value.text{font-size:1rem;font-family:var(--sans);color:var(--ink-2)}
+.tile .sub{font-size:.82rem;color:var(--ink-3);margin-top:2px}
+.pos{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:grid;grid-template-columns:1fr auto;gap:4px 12px}
+.pos + .pos{margin-top:8px}
+.pos .name{font-weight:700}
+.pos .name small{font-weight:400;color:var(--ink-2);margin-left:6px}
+.pos .pnl{text-align:right;font-weight:600}
+.pos .row{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:4px 16px;font-size:.88rem;color:var(--ink-2)}
+.pos .row b{color:var(--ink);font-weight:600}
+.pos .stopbar{grid-column:1/-1;margin-top:6px}
+.chip{display:inline-block;border-radius:999px;padding:1px 8px;font-size:.75rem;font-weight:600;letter-spacing:.02em;vertical-align:middle}
+.chip.long{background:var(--good-bg);color:var(--good)}
+.chip.short{background:var(--bad-bg);color:var(--bad)}
+.chip.nostop{background:var(--bad);color:#fff}
+.chip.rung{background:var(--surface-2);color:var(--ink-2)}
+.bar{height:8px;background:var(--bar);border-radius:4px;overflow:hidden;position:relative}
+.bar > i{display:block;height:100%;background:var(--bar-fill);border-radius:4px}
+.bar > i.hot{background:var(--bad)}
+.bar > i.warm{background:var(--warn)}
+.stopbar .bar > i{background:var(--ink-3)}
+.stopbar .cap{display:flex;justify-content:space-between;font-size:.78rem;color:var(--ink-3);margin-top:3px}
+.caps{display:grid;gap:10px}
+.cap-row{display:grid;grid-template-columns:150px 1fr auto;gap:10px;align-items:center;font-size:.92rem}
+.cap-row .lbl{font-weight:600}
+.cap-row .amt{text-align:right;color:var(--ink-2);white-space:nowrap}
+.funnel{display:grid;gap:8px}
+.funnel .step{display:grid;grid-template-columns:130px 1fr 44px;gap:10px;align-items:center;font-size:.92rem}
+.funnel .step .n{text-align:right;font-weight:600}
+.calls{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:6px}
+.calls li{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;font-size:.92rem;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 12px}
+.calls .why{width:100%;color:var(--ink-2);font-size:.86rem}
+.closed{font-size:.92rem;color:var(--ink-2)}
+footer{margin-top:36px;padding-top:12px;border-top:1px solid var(--line);font-size:.84rem;color:var(--ink-3);display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
+button{font:inherit;font-size:.88rem;font-weight:600;color:var(--accent-ink);background:var(--accent);border:0;border-radius:8px;padding:6px 12px;cursor:pointer}
+button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button[disabled]{opacity:.55;cursor:default}
+#note{font-size:.84rem;color:var(--ink-3)}
+@media (max-width:560px){
+  .cap-row{grid-template-columns:1fr auto;grid-template-areas:"lbl amt" "bar bar"}
+  .cap-row .lbl{grid-area:lbl}.cap-row .amt{grid-area:amt}.cap-row .bar{grid-area:bar}
+  .funnel .step{grid-template-columns:110px 1fr 40px}
+}
+@media (prefers-reduced-motion:no-preference){.bar > i{transition:width .4s ease}}
+</style>
+
+<header>
+  <div>
+    <nav aria-label="Pages" style="font-size:.88rem;margin-bottom:2px"><a href="index.html" aria-current="page" style="display:inline-block;padding-block:4px;color:var(--ink);font-weight:700;text-decoration:none">Desk</a> <span class="faint">|</span> <a href="funds.html" style="display:inline-block;padding-block:4px;color:var(--accent);font-weight:600">4 Funds</a></nav>
+    <h1>Algo Trading Desk</h1>
+    <div id="fresh" class="muted">Loading the record…</div>
+    <div id="live" class="faint" style="font-size:.84rem">Live updates: starting…</div>
+  </div>
+  <div id="equity-head" class="num" style="font-size:1.1rem;font-weight:600"></div>
+</header>
+
+<div id="alarms"></div>
+
+<section class="tiles" id="tiles"></section>
+
+<h2>Open positions</h2>
+<div id="positions"></div>
+
+<h2>Room under the risk caps</h2>
+<div class="caps" id="caps"></div>
+<h3 class="muted" style="font-size:.9rem;margin-top:16px;font-weight:600">By exposure group</h3>
+<div class="caps" id="groups" style="margin-top:8px"></div>
+
+<h2>Today's cycle</h2>
+<div class="funnel" id="funnel"></div>
+<ul class="calls" id="calls"></ul>
+
+<h2>Closed positions</h2>
+<div class="closed" id="closed"></div>
+
+<footer>
+  <span id="note">Rebuilt from the journal and the audit log after each cycle. Marks are what the position manager saw on its last pass, not live quotes.</span>
+  <button id="refresh" type="button">Refresh</button>
+</footer>
+
+<script type="application/json" id="seed">/*__SEED__*/{"generated_at":"2026-09-25T16:21:22+00:00","day":"2026-09-25","equity":100872.44,"equity_at":"2026-09-25T16:21:19.965496+00:00","positions":[{"ticker":"UUP","name":"US dollar","sleeve":"Index fund","kind":"broad fund","group":"US dollar","side":"buy","quantity":282,"opened":"2026-09-16T19:04:07","entry_price":28.375,"entry_stop":28.16,"stop":28.5,"r":0.21499999999999986,"rungs_taken":1,"mark":28.625,"marked_at":"2026-09-25T15:07:13","gain_r":1.14,"unrealised":70.5,"market_value":8072.25,"risk_to_stop":35.25,"stop_distance_pct":0.44,"last_seen":"2026-09-25","last_action":"held","has_stop":true},{"ticker":"EMB","name":"Developing country bonds","sleeve":"Index fund","kind":"broad fund","group":"Credit","side":"sell","quantity":86,"opened":"2026-09-16T16:07:54","entry_price":93.3949966430664,"entry_stop":94.18,"stop":92.8,"r":0.7850033569336006,"rungs_taken":1,"mark":91.875,"marked_at":"2026-09-25T15:07:08","gain_r":1.93,"unrealised":130.72,"market_value":7901.25,"risk_to_stop":79.55,"stop_distance_pct":1.01,"last_seen":"2026-09-25","last_action":"stop_raised","has_stop":true},{"ticker":"IEF","name":"US government bonds, 7-10 years","sleeve":"Index fund","kind":"broad fund","group":"Duration","side":"sell","quantity":80,"opened":"2026-09-16T16:04:28","entry_price":91.125,"entry_stop":91.87,"stop":90.57,"r":0.7450000000000045,"rungs_taken":1,"mark":89.67500305175781,"marked_at":"2026-09-25T15:07:09","gain_r":1.94,"unrealised":116.0,"market_value":7174.0,"risk_to_stop":71.6,"stop_distance_pct":1.0,"last_seen":"2026-09-25","last_action":"tranche_taken","has_stop":true},{"ticker":"TLT","name":"US government bonds, 20+ years","sleeve":"Index fund","kind":"broad fund","group":"Duration","side":"sell","quantity":90,"opened":"2026-09-16T16:05:07","entry_price":81.1050033569336,"entry_stop":82.41,"stop":80.48,"r":1.3049966430664028,"rungs_taken":1,"mark":78.98500061035156,"marked_at":"2026-09-25T15:07:13","gain_r":1.62,"unrealised":190.8,"market_value":7108.65,"risk_to_stop":134.55,"stop_distance_pct":1.89,"last_seen":"2026-09-25","last_action":"tranche_taken","has_stop":true},{"ticker":"XLY","name":"US shopping and leisure","sleeve":"Sector or country","kind":"focused fund","group":"Consumer","side":"sell","quantity":63,"opened":"2026-09-16T19:10:45","entry_price":110.1500015258789,"entry_stop":113.36,"stop":113.13,"r":3.209998474121093,"rungs_taken":0,"mark":110.2699966430664,"marked_at":"2026-09-25T15:07:13","gain_r":-0.04,"unrealised":-7.56,"market_value":6947.01,"risk_to_stop":180.18,"stop_distance_pct":2.59,"last_seen":"2026-09-25","last_action":"held","has_stop":true},{"ticker":"TEVA","name":"Teva Pharmaceutical","sleeve":"Company","kind":"equity","group":"Health care","side":"buy","quantity":128,"opened":"2026-09-18T16:22:42","entry_price":38.869998931884766,"entry_stop":36.63,"stop":37.12,"r":2.239998931884763,"rungs_taken":0,"mark":39.1150016784668,"marked_at":"2026-09-25T15:07:12","gain_r":-0.12,"unrealised":31.36,"market_value":5006.72,"risk_to_stop":255.36,"stop_distance_pct":5.1,"last_seen":"2026-09-25","last_action":"held","has_stop":true},{"ticker":"NVO","name":"Novo Nordisk","sleeve":"Company","kind":"equity","group":"Health care","side":"sell","quantity":123,"opened":"2026-09-21T15:34:05","entry_price":39.77000045776367,"entry_stop":42.61,"stop":41.12,"r":2.8399995422363276,"rungs_taken":0,"mark":38.64500045776367,"marked_at":"2026-09-25T15:07:11","gain_r":0.39,"unrealised":138.38,"market_value":4753.34,"risk_to_stop":304.42,"stop_distance_pct":6.4,"last_seen":"2026-09-25","last_action":"held","has_stop":true},{"ticker":"LLY","name":"Eli Lilly","sleeve":"Company","kind":"equity","group":"Health care","side":"buy","quantity":4,"opened":"2026-09-16T15:57:33","entry_price":1147.18994140625,"entry_stop":1085.29,"stop":1130.7,"r":61.899941406250036,"rungs_taken":0,"mark":1164.760009765625,"marked_at":"2026-09-25T15:07:10","gain_r":0.28,"unrealised":70.28,"market_value":4659.04,"risk_to_stop":136.24,"stop_distance_pct":2.92,"last_seen":"2026-09-25","last_action":"held","has_stop":true},{"ticker":"GLD","name":"Gold","sleeve":"Commodity","kind":"commodity fund","group":"Precious metals","side":"sell","quantity":10,"opened":"2026-09-16T19:26:42","entry_price":389.2300109863281,"entry_stop":404.87,"stop":403.77,"r":15.63998901367188,"rungs_taken":0,"mark":392.3399963378906,"marked_at":"2026-09-25T15:07:08","gain_r":-0.2,"unrealised":-31.1,"market_value":3923.4,"risk_to_stop":114.3,"stop_distance_pct":2.91,"last_seen":"2026-09-25","last_action":"held","has_stop":true},{"ticker":"KRE","name":"US regional banks","sleeve":"Sector or country","kind":"focused fund","group":"Financials","side":"sell","quantity":53,"opened":"2026-09-22T15:45:12","entry_price":71.3499984741211,"entry_stop":73.81,"stop":72.54,"r":2.4600015258789085,"rungs_taken":0,"mark":71.4800033569336,"marked_at":"2026-09-25T15:07:10","gain_r":-0.05,"unrealised":-6.89,"market_value":3788.44,"risk_to_stop":56.18,"stop_distance_pct":1.48,"last_seen":"2026-09-25","last_action":"held","has_stop":true},{"ticker":"EWT","name":"Taiwan","sleeve":"Sector or country","kind":"focused fund","group":"Emerging markets","side":"buy","quantity":33,"opened":"2026-09-22T15:45:13","entry_price":114.81999969482422,"entry_stop":110.28,"stop":110.28,"r":4.539999694824218,"rungs_taken":0,"mark":114.58000183105469,"marked_at":"2026-09-25T15:07:08","gain_r":-0.06,"unrealised":-7.92,"market_value":3781.14,"risk_to_stop":141.9,"stop_distance_pct":3.75,"last_seen":"2026-09-25","last_action":"held","has_stop":true},{"ticker":"MSFT","name":"Microsoft","sleeve":"Company","kind":"equity","group":"Technology","side":"buy","quantity":7,"opened":"2026-09-21T15:34:05","entry_price":491.7799987792969,"entry_stop":471.19,"stop":492.61,"r":20.589998779296877,"rungs_taken":1,"mark":515.8856811523438,"marked_at":"2026-09-25T15:07:11","gain_r":1.17,"unrealised":168.74,"market_value":3611.2,"risk_to_stop":162.93,"stop_distance_pct":4.51,"last_seen":"2026-09-25","last_action":"tranche_taken","has_stop":true},{"ticker":"NVDA","name":"Nvidia","sleeve":"Company","kind":"equity","group":"Technology","side":"buy","quantity":16,"opened":"2026-09-16T18:48:50","entry_price":215.0,"entry_stop":201.8,"stop":216.23,"r":13.199999999999989,"rungs_taken":1,"mark":224.625,"marked_at":"2026-09-25T15:07:11","gain_r":0.73,"unrealised":154.0,"market_value":3594.0,"risk_to_stop":134.32,"stop_distance_pct":3.74,"last_seen":"2026-09-25","last_action":"held","has_stop":true},{"ticker":"RSP","name":"S&P 500, equal weight","sleeve":"Index fund","kind":"broad fund","group":"US broad equity","side":"sell","quantity":14,"opened":"2026-09-18T16:25:56","entry_price":211.97000122070312,"entry_stop":215.78,"stop":214.01,"r":3.809998779296876,"rungs_taken":0,"mark":210.7899932861328,"marked_at":"2026-09-25T15:07:11","gain_r":0.31,"unrealised":16.52,"market_value":2951.06,"risk_to_stop":45.08,"stop_distance_pct":1.53,"last_seen":"2026-09-25","last_action":"held","has_stop":true},{"ticker":"XOM","name":"Exxon Mobil","sleeve":"Company","kind":"equity","group":"Energy","side":"buy","quantity":13,"opened":"2026-09-23T16:20:36","entry_price":161.17999267578125,"entry_stop":153.51,"stop":156.5,"r":7.669992675781259,"rungs_taken":0,"mark":161.3000946044922,"marked_at":"2026-09-25T15:07:13","gain_r":0.01,"unrealised":1.56,"market_value":2096.9,"risk_to_stop":62.4,"stop_distance_pct":2.98,"last_seen":"2026-09-25","last_action":"held","has_stop":true},{"ticker":"HDB","name":"HDFC Bank","sleeve":"Company","kind":"equity","group":"Emerging markets","side":"buy","quantity":90,"opened":"2026-09-23T16:20:35","entry_price":23.325000762939453,"entry_stop":22.23,"stop":22.23,"r":1.0950007629394527,"rungs_taken":0,"mark":22.96500015258789,"marked_at":"2026-09-25T15:07:09","gain_r":-0.33,"unrealised":-32.4,"market_value":2066.85,"risk_to_stop":66.15,"stop_distance_pct":3.2,"last_seen":"2026-09-25","last_action":"held","has_stop":true},{"ticker":"PG","name":"Procter & Gamble","sleeve":"Company","kind":"equity","group":"Consumer","side":"buy","quantity":14,"opened":"2026-09-23T16:20:36","entry_price":147.39999389648438,"entry_stop":142.78,"stop":143.18,"r":4.619993896484374,"rungs_taken":0,"mark":145.82000732421875,"marked_at":"2026-09-25T15:07:11","gain_r":-0.34,"unrealised":-22.12,"market_value":2041.48,"risk_to_stop":36.96,"stop_distance_pct":1.81,"last_seen":"2026-09-25","last_action":"held","has_stop":true},{"ticker":"JPM","name":"JPMorgan Chase","sleeve":"Company","kind":"equity","group":"Financials","side":"buy","quantity":6,"opened":"2026-09-23T16:20:35","entry_price":337.92999267578125,"entry_stop":323.48,"stop":327.15,"r":14.449992675781232,"rungs_taken":0,"mark":340.2149963378906,"marked_at":"2026-09-25T15:07:09","gain_r":0.15,"unrealised":13.71,"market_value":2041.29,"risk_to_stop":78.39,"stop_distance_pct":3.84,"last_seen":"2026-09-25","last_action":"stop_raised","has_stop":true},{"ticker":"RY","name":"Royal Bank of Canada","sleeve":"Company","kind":"equity","group":"Financials","side":"buy","quantity":10,"opened":"2026-09-23T16:20:35","entry_price":201.3350067138672,"entry_stop":194.59,"stop":194.59,"r":6.745006713867184,"rungs_taken":0,"mark":200.47000122070312,"marked_at":"2026-09-25T15:07:12","gain_r":-0.15,"unrealised":-8.65,"market_value":2004.7,"risk_to_stop":58.8,"stop_distance_pct":2.93,"last_seen":"2026-09-25","last_action":"held","has_stop":true},{"ticker":"ASML","name":"ASML","sleeve":"Company","kind":"equity","group":"Technology","side":"buy","quantity":1,"opened":"2026-09-23T16:20:35","entry_price":1726.510009765625,"entry_stop":1619.35,"stop":1640.82,"r":107.16000976562509,"rungs_taken":0,"mark":1745.4749755859375,"marked_at":"2026-09-25T15:07:07","gain_r":0.17,"unrealised":18.96,"market_value":1745.47,"risk_to_stop":104.65,"stop_distance_pct":6.0,"last_seen":"2026-09-25","last_action":"stop_raised","has_stop":true},{"ticker":"CAT","name":"Caterpillar","sleeve":"Company","kind":"equity","group":"Industrials","side":"buy","quantity":2,"opened":"2026-09-23T16:20:35","entry_price":805.7949829101562,"entry_stop":757.24,"stop":768.09,"r":48.55498291015624,"rungs_taken":0,"mark":813.6300048828125,"marked_at":"2026-09-25T15:07:08","gain_r":0.16,"unrealised":15.67,"market_value":1627.26,"risk_to_stop":91.08,"stop_distance_pct":5.6,"last_seen":"2026-09-25","last_action":"stop_raised","has_stop":true},{"ticker":"TIP","name":"US inflation-linked bonds","sleeve":"Index fund","kind":"broad fund","group":"Duration","side":"sell","quantity":7,"opened":"2026-09-16T16:05:45","entry_price":105.93000030517578,"entry_stop":106.56,"stop":105.14,"r":0.629999694824221,"rungs_taken":1,"mark":104.36499786376953,"marked_at":"2026-09-25T15:07:12","gain_r":2.47,"unrealised":10.96,"market_value":730.55,"risk_to_stop":5.43,"stop_distance_pct":0.74,"last_seen":"2026-09-25","last_action":"stop_raised","has_stop":true}],"closed":[{"ticker":"GOOGL","name":"Alphabet (Google)","sleeve":"Company","kind":"equity","group":"Technology","side":"buy","quantity":14,"opened":"2026-09-17T15:50:05","entry_price":346.6700134277344,"entry_stop":330.44,"stop":341.79,"r":16.230013427734377,"rungs_taken":0,"mark":358.7200012207031,"marked_at":"2026-09-22T15:07:06","gain_r":0.74,"unrealised":168.7,"market_value":5022.08,"risk_to_stop":237.02,"stop_distance_pct":4.72,"last_seen":"2026-09-22","last_action":"stop_raised","has_stop":true,"closed_reason":"not seen by the manager since 2026-09-22"},{"ticker":"XBI","name":"Biotech","sleeve":"Sector or country","kind":"focused fund","group":"Health care","side":"sell","quantity":45,"opened":"2026-09-16T19:07:11","entry_price":153.3350067138672,"entry_stop":161.15,"stop":161.15,"r":7.814993286132818,"rungs_taken":0,"mark":158.32000732421875,"marked_at":"2026-09-21T15:07:42","gain_r":-0.65,"unrealised":-224.33,"market_value":7124.4,"risk_to_stop":127.35,"stop_distance_pct":1.79,"last_seen":"2026-09-21","last_action":"held","has_stop":true,"closed_reason":"not seen by the manager since 2026-09-21"}],"exposure":{"gross":87626.0,"at_risk":2355.72,"unrealised":1031.52,"positions":22,"max_positions":40,"caps":[{"label":"Whole account","used":87626.0,"cap_pct":0.95,"cap":95828.82,"headroom":8202.82,"share":91.4},{"label":"Funds","used":52377.75,"cap_pct":0.7,"cap":70610.71,"headroom":18232.96,"share":74.2},{"label":"Single names","used":35248.25,"cap_pct":0.25,"cap":25218.11,"headroom":0.0,"share":139.8},{"label":"Stock market (net long, by beta)","used":10923.77,"cap_pct":0.6,"cap":60523.46,"headroom":49599.69,"share":18.0}],"groups":[{"label":"Duration","used":20149.01,"cap_pct":0.3,"cap":30261.73,"headroom":10112.72,"share":66.6},{"label":"Health care","used":14419.1,"cap_pct":0.25,"cap":25218.11,"headroom":10799.01,"share":57.2},{"label":"Consumer","used":8988.49,"cap_pct":0.25,"cap":25218.11,"headroom":16229.62,"share":35.6},{"label":"Technology","used":8950.67,"cap_pct":0.25,"cap":25218.11,"headroom":16267.44,"share":35.5},{"label":"US dollar","used":8072.25,"cap_pct":0.25,"cap":25218.11,"headroom":17145.86,"share":32.0},{"label":"Credit","used":7901.25,"cap_pct":0.25,"cap":25218.11,"headroom":17316.86,"share":31.3},{"label":"Financials","used":7834.43,"cap_pct":0.25,"cap":25218.11,"headroom":17383.68,"share":31.1},{"label":"Emerging markets","used":5847.99,"cap_pct":0.25,"cap":25218.11,"headroom":19370.12,"share":23.2},{"label":"Precious metals","used":3923.4,"cap_pct":0.25,"cap":25218.11,"headroom":21294.71,"share":15.6},{"label":"US broad equity","used":2951.06,"cap_pct":0.25,"cap":25218.11,"headroom":22267.05,"share":11.7},{"label":"Energy","used":2096.9,"cap_pct":0.25,"cap":25218.11,"headroom":23121.21,"share":8.3},{"label":"Industrials","used":1627.26,"cap_pct":0.25,"cap":25218.11,"headroom":23590.85,"share":6.5}]},"cycle":{"day":"2026-09-25","tickers":80,"lines":80,"failed":["ARGT","CORN","DBC","EZA","INDA","SLV","UNG"],"held":22,"screened_out":0,"judged":51,"directional":[{"ticker":"GOOGL","name":"Alphabet (Google)","bias":"BULLISH","conviction":0.6,"status":"REJECTED","reason":"no room under the sleeve budget limit"}],"accepted":[],"cost_usd":0.13,"started":"2026-09-25T15:09:04.878728+00:00","finished":"2026-09-25T16:21:20.002573+00:00"},"alarms":[{"severity":"warning","title":"7 of 80 ticker(s) produced no signal","detail":"ARGT, CORN, DBC, EZA, INDA, SLV, UNG. First error: https://api.deepinfra.com/v1/openai/chat/completions unreachable: The read operation timed out (gave up after 4 attempt(s))"},{"severity":"warning","title":"4 of 80 ticker(s) were judged without news","detail":"EWG, MSFT, TM, XLK. They still produced signals, on their other sections. First gap: news unavailable: Bright Data returned an empty body with its 200; nothing to parse"}],"ladder":[{"take_at_r":1.0,"take_fraction":0.3333333333333333,"stop_to_r":0.0},{"take_at_r":3.0,"take_fraction":0.3333333333333333,"stop_to_r":1.0}]}</script>
+<script>
+(function(){
+  const REPO = {owner:"omrirulf", repo:"Algo-Trading-", path:"logs/book.json", ref:"refs/heads/main"};
+  const $ = (id)=>document.getElementById(id);
+  const money = (v)=> v==null ? "n/a" : (v<0?"−":"") + "$" + Math.abs(v).toLocaleString("en-US",{maximumFractionDigits:0});
+  const money2 = (v)=> v==null ? "n/a" : (v<0?"−":"+") + "$" + Math.abs(v).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+  const px = (v)=> v==null ? "not yet" : v.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
+  const pct = (v)=> v==null ? "n/a" : v.toFixed(1)+"%";
+  const israel = (iso)=>{ if(!iso) return "n/a"; const d=new Date(iso.endsWith("Z")||iso.includes("+")?iso:iso+"Z"); if(isNaN(d)) return iso; return d.toLocaleString("en-GB",{timeZone:"Asia/Jerusalem",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}) + " Israel time"; };
+  const esc = (s)=> String(s??"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const heat = (share)=> share==null ? "" : share>=90 ? "hot" : share>=70 ? "warm" : "";
+
+  function render(book, source){
+    const e = book.exposure || {};
+    const marks = (book.positions||[]).map(p=>p.marked_at).filter(Boolean).sort();
+    $("fresh").textContent = `Record of ${book.day} · written ${israel(book.generated_at)}` + (marks.length ? ` · marks as of ${israel(marks[marks.length-1])}` : "") + (source ? ` · ${source}` : "");
+    $("equity-head").textContent = book.equity ? "Equity " + money(book.equity) : "";
+
+    // alarms
+    const alarms = book.alarms || [];
+    const critical = alarms.filter(a=>a.severity==="critical").length;
+    if(!alarms.length){
+      $("alarms").innerHTML = `<div class="stripe clean"><strong>Clean.</strong><span class="detail">Every position has a stop, every ticker was judged once, every mapped source answered.</span></div>`;
+    } else {
+      $("alarms").innerHTML = alarms.map(a=>`<div class="stripe ${esc(a.severity)}"><span>${a.severity==="critical"?"🔴":"🟡"}</span><div><strong>${esc(a.title)}.</strong> <span class="detail">${esc(a.detail)}</span></div></div>`).join("");
+    }
+
+    // tiles
+    const tiles = [
+      ["Equity", book.equity ? money(book.equity) : "not yet recorded", book.equity_at ? "as of " + israel(book.equity_at) : "recorded from tomorrow's cycle on"],
+      ["Gross exposure", money(e.gross), e.caps && e.caps[0] && e.caps[0].share!=null ? pct(e.caps[0].share) + " of the whole-account cap" : `${e.positions} of ${e.max_positions} slots`],
+      ["At risk to the stops", money(e.at_risk), "if every stop fires at once"],
+      ["Unrealised", money2(e.unrealised), "positions with a mark only"],
+    ];
+    $("tiles").innerHTML = tiles.map(([l,v,s])=>`<div class="tile"><div class="label">${l}</div><div class="value num${/^[^$−+\d]/.test(v)?" text":""}">${v}</div><div class="sub">${s}</div></div>`).join("");
+
+    // positions
+    const ps = book.positions || [];
+    $("positions").innerHTML = ps.length ? ps.map(p=>{
+      const long = p.side==="buy";
+      const ref = p.mark ?? p.entry_price;
+      const dist = p.stop_distance_pct;
+      const ladder = (book.ladder||[]);
+      const nextRung = ladder[p.rungs_taken] ? `next rung at +${ladder[p.rungs_taken].take_at_r}R` : "ladder complete";
+      const ahead = p.gain_r!=null ? `${p.gain_r>=0?"+":""}${p.gain_r.toFixed(2)}R` : "no mark yet";
+      return `<div class="pos">
+        <div class="name">${esc(p.ticker)}<small>${esc(p.name)} · ${esc(p.sleeve)}</small>
+          <span class="chip ${long?"long":"short"}">${long?"long":"short"}</span>
+          ${p.has_stop ? "" : `<span class="chip nostop">no stop on record</span>`}
+          ${p.rungs_taken ? `<span class="chip rung">${p.rungs_taken} rung${p.rungs_taken>1?"s":""} taken</span>` : ""}
+        </div>
+        <div class="pnl num" style="color:${p.unrealised==null?"var(--ink-3)":p.unrealised>=0?"var(--good)":"var(--bad)"}">${p.unrealised==null?"no mark":money2(p.unrealised)}</div>
+        <div class="row"><span>${p.quantity} sh · <b class="num">${money(p.market_value)}</b></span><span>entry <b class="num">${px(p.entry_price)}</b></span><span>mark <b class="num">${px(p.mark)}</b></span><span>stop <b class="num">${px(p.stop)}</b></span><span>risk <b class="num">${money(p.risk_to_stop)}</b></span><span>${ahead} · ${nextRung}</span></div>
+        <div class="stopbar"><div class="bar"><i style="width:${Math.max(4,Math.min(100, dist==null?0:100-Math.min(dist,10)*10))}%"></i></div><div class="cap"><span>stop ${dist==null?"n/a":dist.toFixed(1)+"% away"}</span><span>opened ${esc((p.opened||"").slice(0,10))} · last pass: ${esc(p.last_action||"none")} on ${esc(p.last_seen||"")}</span></div></div>
+      </div>`;
+    }).join("") : `<div class="muted">No open positions on record.</div>`;
+
+    // caps
+    const capRow = (c)=>`<div class="cap-row"><div class="lbl">${esc(c.label)} <span class="faint">cap ${Math.round(c.cap_pct*100)}%</span></div><div class="bar"><i class="${heat(c.share)}" style="width:${c.share==null?0:Math.min(100,c.share)}%"></i></div><div class="amt num">${money(c.used)}${c.cap!=null?` of ${money(c.cap)} · ${pct(c.share)}`:" · cap needs equity"}</div></div>`;
+    $("caps").innerHTML = (e.caps||[]).map(capRow).join("");
+    $("groups").innerHTML = (e.groups||[]).map(capRow).join("") || `<div class="muted">Nothing held.</div>`;
+
+    // cycle
+    const c = book.cycle || {};
+    const total = c.tickers || 0;
+    // "Already held" and "Screened out" are the same two journal fields
+    // (no outcome, no error) split by `held`: a held position is checked
+    // before any new trade and never asked at all, where a screened-out one
+    // was asked cheaply and said NEUTRAL. Both read as zero cost and zero
+    // outcome, so they looked identical here until the split -- with the
+    // screen off since 23 Sep 2026, "Screened out" would otherwise show every
+    // held position as if a screening stage had run one that no longer does.
+    const steps = [["On the watchlist", total], ["Already held", c.held||0], ["Screened out", c.screened_out||0], ["Judged in full", c.judged||0], ["Directional calls", (c.directional||[]).length], ["Trades placed", (c.accepted||[]).length]];
+    if((c.failed||[]).length) steps.push(["Failed", c.failed.length]);
+    $("funnel").innerHTML = steps.map(([l,n])=>`<div class="step"><span>${l}</span><div class="bar"><i class="${l==="Failed"?"hot":""}" style="width:${total?Math.max(1,n/total*100):0}%"></i></div><span class="n num">${n}</span></div>`).join("")
+      + `<div class="muted" style="font-size:.88rem;margin-top:4px">${c.day||""} · ran ${israel(c.started)} → ${c.finished?new Date(c.finished).toLocaleTimeString("en-GB",{timeZone:"Asia/Jerusalem",hour:"2-digit",minute:"2-digit"}):"n/a"} · model cost $${(c.cost_usd??0).toFixed(2)}${(c.failed||[]).length?` · failed: ${c.failed.join(", ")}`:""}${c.lines>c.tickers?` · ${c.lines-c.tickers} duplicate lines (a second cycle ran)`:""}</div>`;
+    $("calls").innerHTML = (c.directional||[]).map(d=>`<li><b>${esc(d.ticker)}</b><span class="muted">${esc(d.name)}</span><span class="chip ${d.bias==="BULLISH"?"long":"short"}">${esc(d.bias)}</span><span class="num">conviction ${d.conviction!=null?d.conviction.toFixed(2):"n/a"}</span><span class="${d.status==="ACCEPTED"?"":"muted"}"><b>${d.status==="ACCEPTED"?"traded":"not traded"}</b></span><span class="why">${esc(d.reason||"")}</span></li>`).join("") || `<li class="muted">No directional call today.</li>`;
+
+    // closed
+    const cl = book.closed || [];
+    $("closed").innerHTML = cl.length ? cl.map(p=>`<div><b>${esc(p.ticker)}</b> ${esc(p.name)} · ${p.side==="buy"?"long":"short"} ${p.quantity} sh from ${px(p.entry_price)} · last seen ${esc(p.last_seen)} · ${esc(p.closed_reason)}</div>`).join("") : `<div class="muted">Nothing closed on record. A position the manager stops seeing appears here with the last day it was seen.</div>`;
+  }
+
+  // The page opens on the newest copy it has -- the one saved on this phone,
+  // else the one embedded at build time -- then reads the live file from
+  // GitHub. Nothing here needs a key: the repository is public and the
+  // snapshot is committed after every cycle.
+  const RAW = "https://raw.githubusercontent.com/" + REPO.owner + "/" + REPO.repo + "/main/" + REPO.path;
+  const SAVED = "algo-desk:book";
+  const live = (text)=>{ $("live").textContent = "Live updates: " + text; };
+  const clock = ()=> new Date().toLocaleTimeString("en-GB",{timeZone:"Asia/Jerusalem",hour:"2-digit",minute:"2-digit"});
+  let shown = null;
+  const newer = (a, b)=> !b || !b.day || (a && a.day && (a.day > b.day || (a.day === b.day && String(a.generated_at||"") >= String(b.generated_at||""))));
+  const show = (book, source)=>{ if(book && book.day && newer(book, shown)){ shown = book; render(book, source); } };
+
+  let seed = {};
+  try { seed = JSON.parse($("seed").textContent.replace(/^\s*\/\*__SEED__\*\//, "")) || {}; } catch(_) {}
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(SAVED) || "null"); } catch(_) {}
+  show(seed, "built-in copy");
+  show(saved, "copy saved on this phone");
+
+  const refresh = $("refresh");
+  async function pull(reason){
+    refresh.disabled = true;
+    live(reason + "…");
+    try {
+      const r = await fetch(RAW + "?t=" + Date.now(), {cache:"no-store"});
+      if(!r.ok) throw new Error("HTTP " + r.status);
+      const book = await r.json();
+      if(!book || !book.day) throw new Error("not a snapshot");
+      try { localStorage.setItem(SAVED, JSON.stringify(book)); } catch(_) {}
+      if(newer(book, shown)){ shown = null; show(book, "read from GitHub at " + clock()); live("on. Read from GitHub at " + clock() + " Israel time; checks again every 5 minutes."); }
+      else { live("on. GitHub has the same record (" + book.day + "); checked at " + clock() + " Israel time."); }
+    } catch(e){
+      live((navigator.onLine === false ? "offline" : "GitHub did not answer (" + (e && e.message || "unknown") + ")") + "; showing the last copy from " + (shown && shown.day || "never") + ".");
+    } finally { refresh.disabled = false; }
+  }
+  pull("reading the record from GitHub");
+  setInterval(()=>pull("checking GitHub"), 5*60*1000);
+  document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState === "visible") pull("checking GitHub"); });
+  window.addEventListener("online", ()=>pull("back online; checking GitHub"));
+  refresh.addEventListener("click", ()=>pull("checking GitHub"));
+
+  // Installable: the service worker keeps the page itself openable offline.
+  if("serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js").catch(()=>{}); }
+})();
+</script>
