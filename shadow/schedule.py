@@ -70,8 +70,9 @@ FUND_TEST_LOOK_ESTIMATES: Final[tuple[date, date, date]] = (
 #: The O'Brien-Fleming-type alpha-spending rule (Lan-DeMets, the owner's
 #: decision of 26 Sep 2026; ``analysis.decision_gate.spending_bars``), two-
 #: sided 5% overall, at shares 60/180, 120/180 and 1 of the planned final
-#: sessions: exactly 3.395, 2.407 and 2.015, printed as the pre-registration
-#: prints them (``analysis.decision_gate.rounded_bar``). If a look moves, or
+#: sessions: exactly 3.3948, 2.4067 and 2.0152, rounded up to two decimals
+#: so a registered bar is never below the exact one
+#: (``analysis.decision_gate.rounded_bar``). If a look moves, or
 #: is skipped because calibration has not passed, the bar is computed at the
 #: look by the same rule from the fund sessions actually there, with the
 #: bars already used kept, and logged in the Amendments table the day it is

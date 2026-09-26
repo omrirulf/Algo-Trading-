@@ -485,14 +485,14 @@ def spending_bars(shares: Sequence[float], alpha: float = 0.05, used: Sequence[f
 
 
 def rounded_bar(bar: float) -> float:
-    """A bar as the pre-registration prints it: the exact value to three
-    decimals, and that to two, half up -- the way the race's 3.471, 2.454
-    and 2.004 became 3.47, 2.45 and 2.00. For the fund test's 3.3948 this
-    gives 3.395 and then 3.40, the planned bar the owner approved (rounding
-    3.3948 straight to two decimals would give 3.39)."""
-    from decimal import ROUND_HALF_UP, Decimal
-
-    return float(Decimal(repr(round(bar, 3))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+    """A fund-test bar as the pre-registration registers it: rounded UP to
+    two decimals, so a registered bar is never below the exact one and the
+    rounding can only make the test stricter. The fund test's 3.3948,
+    2.4067 and 2.0152 become 3.40, 2.41 and 2.02. (The race's own bars,
+    section 5a, were rounded to nearest and are not touched.) A tiny
+    tolerance keeps a value that is already on two decimals, such as 2.0,
+    from being pushed up by floating-point noise."""
+    return math.ceil(round(bar * 100, 6)) / 100
 
 
 def index_gaps(bars: Sequence[tuple[date, float, float, float]], days: Sequence[date]) -> set[date]:

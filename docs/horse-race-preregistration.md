@@ -514,7 +514,7 @@ earlier looks, which never change. The share is the look's actual fund
 sessions ÷ the planned final sessions (180); the final look always counts
 as share 1. Computed exactly by numerical integration
 (`analysis.decision_gate.spending_bars`, the same integration that gives the
-race's bars), rounded to two decimals as the race's are.
+race's bars), rounded up to two decimals, so a registered bar is never below the exact one.
 
 With the planned sessions this gives:
 
