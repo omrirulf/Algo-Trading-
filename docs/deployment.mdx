@@ -305,10 +305,11 @@ model calls as an artifact"), so a failed upload is retried with
 other way round: `horse-race.yml` and `funds.yml` hold no secret and hand
 their price tables over as the artifact `scoring-prices`, and
 `scoring-prices.yml` (Supabase secrets and the phone topic only) pushes them
-after each scheduled run on `main`. Before the first push that carries any of
-this, run `supabase/2026-09-26_archive_capture.sql` once in the SQL editor,
-then the two `vacuum full` lines it names on their own; until then the new
-tables answer 404 and the push says so (the phone message names the file).
+after each scheduled run on `main`. `supabase/2026-09-26_archive_capture.sql`
+made the new tables and the bucket; it was applied on 26 Sep 2026, before
+this code was merged (on a new project, run it once in the SQL editor;
+until then the new tables answer 404 and the push says so, and the phone
+message names the file).
 See [Database](/database#what-else-it-keeps).
 
 ## If GitHub skips or delays the run

@@ -3,6 +3,10 @@
 -- Run once, by hand, in the SQL editor of the Supabase project
 -- "algo-trading-archive" (as the postgres role), BEFORE the code that
 -- pushes to the new tables is merged. Nothing in this repository applies it.
+--
+-- APPLIED to algo-trading-archive on 26 Sep 2026 (migration
+-- "archive_capture"), before this code was merged. Both tables were still
+-- empty then, so the two `vacuum full` lines below were not needed.
 -- Safe to run again: every statement is idempotent. It brings a project
 -- made from the earlier store/remote_schema.sql to the current one.
 --
