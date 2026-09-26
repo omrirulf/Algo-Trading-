@@ -142,3 +142,17 @@ product. These are the honest gaps.
 true. Removing that safety is an explicit, reviewable code change — not a
 setting, not an environment variable. See [Guardrails](/guardrails) for why
 that design choice was made deliberately.
+
+<Warning>
+  **To do before any real money: decide whether to make the repository
+  private.** Recorded 26 Sep 2026, at the owner's request. The repository is
+  public today, and so is everything it keeps: the journal (every prompt's
+  context and every answer), the account snapshots, and the 90-day workflow
+  artifact `model-io-<run>-<attempt>` with every model call's full request,
+  answer and reasoning text, which any signed-in GitHub user can download.
+  For a paper account that is acceptable, and the owner chose to keep the
+  artifact as the backup for failed uploads (credentials are kept out by two
+  checks, `config/redaction.py`). With real money the same record would show
+  live positions and intentions. No real money goes in before the June 2027
+  verdict (pre-registration, section 9), so this decision is due before then.
+</Warning>

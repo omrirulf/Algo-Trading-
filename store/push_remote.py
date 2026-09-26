@@ -313,7 +313,7 @@ def push_model_io(archive: RemoteArchive, args: argparse.Namespace, outcome: Out
         try:
             print(f"{archive.push(MODEL_CALLS, package.rows, key='call_id').describe()}{note}")
             stored = archive.upload_object(MODEL_IO_BUCKET, package.object_path, package.data,
-                                           "application/gzip")
+                                           model_calls.MEDIA_TYPE)
             print(f"{MODEL_IO_BUCKET}/{package.object_path}: "
                   f"{'stored' if stored else 'already there'} ({len(package.data)} bytes)")
             archive.push(MODEL_IO_FILES, [package.file_row(model_calls.run_of(package.rows))],

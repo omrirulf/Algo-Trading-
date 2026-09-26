@@ -190,7 +190,7 @@ create index if not exists account_fills_order on public.account_fills (order_id
 -- ask -- retries, timeouts, refusals and off-schema answers included --
 -- with the parameters, the token counts and the SHA-256 of the request body
 -- sent and the response body received. The bodies themselves (every
--- message, the reasoning text) are gzip JSON lines in the private Storage
+-- message, the reasoning text) are xz JSON lines in the private Storage
 -- bucket `model-io`, at `object_path`; `model_io_files` names each object.
 -- The journal line of the ticker carries the same call id and hashes, so a
 -- copy of a body is checkable from git alone. Never a header, never a key:
@@ -240,7 +240,7 @@ create table if not exists public.model_io_files (
     withheld     integer,
     unreadable   integer,
     raw_bytes    bigint,
-    gz_bytes     bigint,
+    compressed_bytes  bigint,
     sha256       text not null
 );
 
@@ -308,12 +308,12 @@ alter table public.scoring_runs enable row level security;
 
 -- The private Storage bucket for the model calls' bodies. Private: no public
 -- URL, and storage.objects keeps RLS on with no policy for it, so only the
--- secret key's role can read or write an object. Objects are gzip, one per
--- heartbeat run (`YYYY/MM/YYYY-MM-DD/<run id>-<HHMMSS>.jsonl.gz`), never
+-- secret key's role can read or write an object. Objects are xz, one per
+-- heartbeat run (`YYYY/MM/YYYY-MM-DD/<run id>-<HHMMSS>.jsonl.xz`), never
 -- overwritten. 50 MB is the free plan's ceiling per object; a day's file is
 -- well under 1 MB.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('model-io', 'model-io', false, 52428800, array['application/gzip'])
+values ('model-io', 'model-io', false, 52428800, array['application/x-xz'])
 on conflict (id) do update
     set public = false,
         file_size_limit = excluded.file_size_limit,

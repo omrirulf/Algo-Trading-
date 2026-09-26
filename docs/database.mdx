@@ -265,7 +265,7 @@ secret, key or token is ever in what it stores.
 | `account_fills` | fill the snapshots read, keyed on the broker's fill id | the heartbeat's push |
 | `model_calls` | HTTP ask to a model — retries, timeouts, refusals, off-schema answers included | the heartbeat's push |
 | `model_io_files` | Storage object: its path, size, SHA-256, calls, withheld | the heartbeat's push |
-| Storage `model-io/YYYY/MM/YYYY-MM-DD/<run>-<HHMMSS>.jsonl.gz` | heartbeat run: every call's full request and response body | the heartbeat's push |
+| Storage `model-io/YYYY/MM/YYYY-MM-DD/<run>-<HHMMSS>.jsonl.xz` | heartbeat run: every call's full request and response body | the heartbeat's push |
 | `scoring_prices` | distinct daily bar the race or the funds scored with | `scoring-prices.yml` |
 | `scoring_runs` | race or funds run: its `prices_sha256` and what it covered | `scoring-prices.yml` |
 
@@ -288,8 +288,8 @@ bodies — the Storage object, the 90-day workflow artifact
 `model-io-<run>-<attempt>` — can be checked with nothing but git:
 
 ```python
-import gzip, hashlib, json
-for line in gzip.open("1812...-144012.jsonl.gz", "rt"):
+import hashlib, json, lzma
+for line in lzma.open("1812...-144012.jsonl.xz", "rt"):
     call = json.loads(line)
     assert hashlib.sha256(call["request"].encode()).hexdigest() == call["prompt_sha256"]
     # ... and against the journal line whose model_calls names call["call_id"]
@@ -298,10 +298,10 @@ for line in gzip.open("1812...-144012.jsonl.gz", "rt"):
 `model_calls` holds everything but the bodies (who, when, provider, model,
 attempt, outcome, HTTP status or error class, latency, token counts, batch id,
 parameters, the two hashes); the bodies are in the private Storage bucket
-`model-io`, one gzip object per run, named with the run id and its start time
+`model-io`, one xz object per run, named with the run id and its start time
 so a re-run attempt never overwrites a file. The push is idempotent: rows are
 keyed on the call id, an object is never overwritten (a re-send is "already
-there"), and the same file always gzips to the same bytes. A Storage upload
+there"), and the same file always compresses to the same bytes. A Storage upload
 that fails fails the push like any other, so the phone hears about it the same
 day, and `archive-push.yml` with `model_io_run` sends that run's artifact
 again.
@@ -326,6 +326,12 @@ and the journal's own month of prompts trips none of the shapes (a test).
   Storage alone means it did not accept the key that way; the rows still
   arrive, and the artifact keeps the bodies for 90 days.
 </Warning>
+
+The artifact is public, like the repository: any signed-in GitHub user can
+download it. The owner decided on 26 Sep 2026 to keep it, as the backup for a
+failed upload; it holds nothing more private than the journal, and both key
+checks stay. Whether to make the repository private is a to-do before any
+real money ([Next steps](/next-steps#going-live-dont-yet-but-heres-what-it-takes)).
 
 ### The prices a night scored with
 
@@ -378,7 +384,13 @@ code that pushes (one real gpt-oss day rebuilt as the capture records it):
 | `account_snapshots` + fills (2 a day) | ~9 KB | ~7 MB |
 | `scoring_runs` (3 a night) | 4.5 KB | ~3 MB |
 | **Database** | | **~200 MB of 500 MB** |
-| Storage `model-io` (~70 asks a day) | 11.7 KB a call, gzip | **~205 MB of 1 GB** |
+| Storage `model-io` (~70 asks a day) | about 7 KB a call, xz | **~125 MB of 1 GB** |
+
+The objects are **xz** (the owner's choice of 26 Sep 2026: stronger than gzip,
+in a format any computer opens: `xz -d` / `unxz` on Linux and macOS, the
+Archive Utility on macOS, 7-Zip on Windows, `lzma` in Python). On the
+journal's own text xz is about 40% smaller than gzip at its best setting, so
+Storage is about 125 MB a year instead of about 205 MB.
 
 Most of the database is the journal itself; the size fix above is what keeps
 it from being twice that. Most of the Storage is the reasoning text (about
