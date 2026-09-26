@@ -22,9 +22,9 @@ mock transport:
 
 from __future__ import annotations
 
-import gzip
 import hashlib
 import json
+import lzma
 from pathlib import Path
 
 import httpx
@@ -281,9 +281,9 @@ def test_the_archive_side_withholds_what_the_capture_let_through(tmp_path):
     (day / "1-150000.jsonl").write_text(json.dumps(leaked) + "\n" + json.dumps(fine) + "\n{cut sh")
     package = model_calls.package(day / "1-150000.jsonl", tmp_path / "io")
     assert (package.withheld, package.unreadable, len(package.rows)) == (1, 1, 2)
-    stored = gzip.decompress(package.data).decode()
+    stored = lzma.decompress(package.data).decode()
     assert GITHUB_SHAPED not in stored and sha(f"here: {GITHUB_SHAPED}") in stored
-    assert package.object_path == "2026/09/2026-09-26/1-150000.jsonl.gz"
+    assert package.object_path == "2026/09/2026-09-26/1-150000.jsonl.xz"
     assert [r["withheld"] is not None for r in package.rows] == [True, False]
 
 
@@ -377,7 +377,7 @@ def test_the_model_io_push_is_idempotent_and_sends_the_key_on_apikey_only(
     first_objects = dict(supabase.objects)
     assert len(supabase.rows["model_calls"]) == 5 and len(supabase.rows["model_io_files"]) == 1
     (key,) = first_objects
-    assert key.startswith("model-io/") and key.endswith(".jsonl.gz")
+    assert key.startswith("model-io/") and key.endswith(".jsonl.xz")
 
     assert _push(tmp_path, *args) == 0                       # the same push again
     out = capsys.readouterr().out
@@ -390,13 +390,13 @@ def test_the_model_io_push_is_idempotent_and_sends_the_key_on_apikey_only(
     for request in supabase.requests:
         assert request.headers["apikey"] == SECRET_KEY
         assert "authorization" not in request.headers        # the new key: apikey only
-    assert all(r.headers["x-upsert"] == "false" and r.headers["content-type"] == "application/gzip"
+    assert all(r.headers["x-upsert"] == "false" and r.headers["content-type"] == "application/x-xz"
                for r in uploads)
 
     # What Storage holds checks out against the journal, with nothing else.
     lines = [json.loads(l) for l in _journal_to_tmp.read_text().splitlines() if l.strip()]
     stored = {json.loads(l)["call_id"]: json.loads(l)
-              for l in gzip.decompress(first_objects[key]).decode().splitlines()}
+              for l in lzma.decompress(first_objects[key]).decode().splitlines()}
     for line in lines:
         for ref in line["model_calls"]:
             assert sha(stored[ref["call_id"]]["request"]) == ref["prompt_sha256"]
@@ -414,7 +414,7 @@ def test_withheld_records_are_counted_in_the_push_status(tmp_path, supabase):
     status = tmp_path / "status.json"
     assert _push(tmp_path, "--model-io", str(tmp_path / "io"), "--status", str(status)) == 0
     assert json.loads(status.read_text())["withheld"] == 1
-    assert all(SUPABASE_SHAPED.encode() not in gzip.decompress(b) for b in supabase.objects.values())
+    assert all(SUPABASE_SHAPED.encode() not in lzma.decompress(b) for b in supabase.objects.values())
 
 
 def test_a_failed_upload_fails_the_push_with_its_few_words(tmp_path, supabase, monkeypatch):
@@ -440,7 +440,7 @@ def test_an_unsafe_object_path_is_refused():
     archive = RemoteArchive(URL, SECRET_KEY, client=httpx.Client(transport=httpx.MockTransport(
         lambda r: httpx.Response(200))))
     with pytest.raises(Exception, match="unsafe"):
-        archive.upload_object("model-io", "../other-bucket/x.gz", b"", "application/gzip")
+        archive.upload_object("model-io", "../other-bucket/x.xz", b"", "application/x-xz")
 
 
 # --------------------------------------------------------------------------- #
@@ -497,3 +497,28 @@ def test_the_account_snapshots_and_their_fills_reach_the_archive(tmp_path, supab
     assert (fill["fill_id"], fill["ticker"], fill["price"]) == ("f1", "LLY", 1147.72)
     row = next(iter(supabase.rows["account_snapshots"].values()))
     assert row["equity"] == 100873.22 and row["positions"] == 1 and json.loads(row["raw"])["sha"] == "abc"
+
+
+def test_the_objects_are_xz_that_any_computer_opens_and_the_same_lines_make_the_same_bytes(tmp_path):
+    """26 Sep 2026: the owner chose stronger compression in a common format.
+
+    xz (``.xz``, ``application/x-xz``) opens with ``xz -d``/``unxz``, macOS's
+    Archive Utility, 7-Zip and Python's ``lzma``. Packing the same file twice
+    gives the same bytes, so a re-sent object is the same object.
+    """
+    import lzma as _lzma
+
+    from store import model_calls
+
+    directory = tmp_path / "model_io"
+    path = directory / "2026" / "09" / "2026-09-28" / "7-144000.jsonl"
+    path.parent.mkdir(parents=True)
+    record = {"call_id": "c1", "ts": "2026-09-28T14:40:00+00:00", "ticker": "NVDA",
+              "request": "{\"messages\":[]}", "response": "{\"choices\":[]}"}
+    path.write_text(json.dumps(record) + "\n")
+    first, second = model_calls.package(path, directory), model_calls.package(path, directory)
+    assert first.object_path.endswith(".jsonl.xz") and model_calls.MEDIA_TYPE == "application/x-xz"
+    assert first.data[:6] == b"\xfd7zXZ\x00"   # the xz magic number
+    assert first.data == second.data and first.sha256 == second.sha256
+    assert json.loads(_lzma.decompress(first.data).decode())["call_id"] == "c1"
+    assert first.file_row("7")["compressed_bytes"] == len(first.data)

@@ -599,9 +599,12 @@ BLEND_STALE_AFTER_DAYS: Final[int] = 14
 #: new one". When you make a new token, put it in Vault under the same name
 #: and change this date in the same breath.
 #:
-#: 31 Jul 2027: the owner's choice of 26 Sep 2026 -- the end of the
-#: experiment (June 2027) plus a month, inside GitHub's one-year limit.
-GITHUB_DISPATCH_TOKEN_EXPIRES: Final[Optional[date]] = date(2027, 7, 31)
+#: The owner chose 31 Jul 2027 on 26 Sep 2026 -- the end of the experiment
+#: (June 2027) plus a month, inside GitHub's one-year limit. GitHub dates it
+#: 2027-07-30 21:00 UTC (midnight at the start of 31 Jul, the owner's time),
+#: as its own reply to the first test dispatch said
+#: (github-authentication-token-expiration), so the UTC day is the 30th.
+GITHUB_DISPATCH_TOKEN_EXPIRES: Final[Optional[date]] = date(2027, 7, 30)
 
 #: How many days before that date the health check starts to warn.
 GITHUB_DISPATCH_TOKEN_WARN_DAYS: Final[int] = 14

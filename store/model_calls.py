@@ -7,8 +7,8 @@ one such file into what the archive keeps of it:
 
 * one ``model_calls`` row per line: who was asked, when, how it ended, the
   token counts, the parameters, and the two SHA-256 hashes -- never a body;
-* one gzip object in the private Storage bucket ``model-io``, at the same
-  relative path plus ``.gz``, holding the lines themselves;
+* one xz object in the private Storage bucket ``model-io``, at the same
+  relative path plus ``.xz``, holding the lines themselves;
 * one ``model_io_files`` row naming that object, its size and its hash.
 
 Every line is checked for credentials again here, on the way out, with the
@@ -22,9 +22,9 @@ touches the network; ``store/push_remote.py`` does the sending.
 
 from __future__ import annotations
 
-import gzip
 import hashlib
 import json
+import lzma
 import math
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -34,9 +34,16 @@ from typing import Any, Optional
 from config.redaction import credential_shape
 from orchestrator.model_io import checked_text, withhold
 
-#: gzip settings fixed so the same lines always make the same bytes, and a
-#: re-sent object is the same object (``mtime=0``: no timestamp in the header).
-GZIP_LEVEL = 9
+#: xz (LZMA2), the owner's choice of 26 Sep 2026: about 60% smaller than
+#: gzip on these files (~85 MB a year instead of ~205 MB), and a format any
+#: computer opens -- ``xz -d`` or ``unxz`` on Linux and macOS, the Archive
+#: Utility on macOS, 7-Zip on Windows, ``lzma`` in Python's standard
+#: library. The settings are fixed, and xz writes no timestamp, so the same
+#: lines always make the same bytes and a re-sent object is the same object.
+XZ_PRESET = 9
+#: The object's suffix and its media type, as Storage is told.
+SUFFIX = ".xz"
+MEDIA_TYPE = "application/x-xz"
 
 #: How much of a call's ``error`` the table keeps. The capture writes short
 #: ones (an exception class, an HTTP status, a parse complaint).
@@ -48,7 +55,7 @@ class Package:
     """One capture file, ready to send."""
 
     source: Path
-    #: The object's path inside the bucket: ``YYYY/MM/YYYY-MM-DD/<run>.jsonl.gz``.
+    #: The object's path inside the bucket: ``YYYY/MM/YYYY-MM-DD/<run>.jsonl.xz``.
     object_path: str
     data: bytes
     sha256: str
@@ -70,7 +77,7 @@ class Package:
             "withheld": self.withheld + self.withheld_before,
             "unreadable": self.unreadable,
             "raw_bytes": self.raw_bytes,
-            "gz_bytes": len(self.data),
+            "compressed_bytes": len(self.data),
             "sha256": self.sha256,
         }
 
@@ -84,9 +91,9 @@ def capture_files(directory: Path) -> list[Path]:
 
 
 def object_path(path: Path, directory: Path) -> str:
-    """The Storage path for ``path``: its place under ``directory``, plus ``.gz``."""
+    """The Storage path for ``path``: its place under ``directory``, plus ``.xz``."""
     relative = Path(path).resolve().relative_to(Path(directory).resolve())
-    return "/".join(relative.parts) + ".gz"
+    return "/".join(relative.parts) + SUFFIX
 
 
 def redact(record: dict[str, Any]) -> tuple[dict[str, Any], bool]:
@@ -129,7 +136,7 @@ def package(path: Path, directory: Path) -> Package:
         lines_out.append(json.dumps(record, ensure_ascii=False, separators=(",", ":")))
         rows.append(call_row(record, key))
     body = ("\n".join(lines_out) + "\n").encode("utf-8") if lines_out else b""
-    data = gzip.compress(body, compresslevel=GZIP_LEVEL, mtime=0)
+    data = lzma.compress(body, format=lzma.FORMAT_XZ, check=lzma.CHECK_CRC64, preset=XZ_PRESET)
     return Package(
         source=Path(path), object_path=key, data=data, sha256=hashlib.sha256(data).hexdigest(),
         rows=rows, withheld=withheld, withheld_before=withheld_before, unreadable=unreadable,

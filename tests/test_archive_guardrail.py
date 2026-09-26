@@ -23,6 +23,7 @@ import yaml
 ROOT = Path(__file__).resolve().parent.parent
 STEP = "Nothing that scores or trades can read the archive"
 MIGRATION = ROOT / "supabase" / "2026-09-26_archive_capture.sql"
+XZ_MIGRATION = ROOT / "supabase" / "2026-09-26_model_io_xz.sql"
 SCHEMA = ROOT / "store" / "remote_schema.sql"
 NEW_TABLES = ("account_snapshots", "account_fills", "model_calls", "model_io_files",
               "scoring_prices", "scoring_runs")
@@ -123,8 +124,13 @@ def _table(sql: str, name: str) -> str:
 
 def test_the_migration_and_the_schema_make_the_same_new_tables():
     migration, schema = MIGRATION.read_text(), SCHEMA.read_text()
+    # The later migration (xz, the same day) renames one column; a project
+    # brought up to date by both files matches a fresh schema.
+    later = XZ_MIGRATION.read_text()
+    assert "rename column gz_bytes to compressed_bytes" in later
+    migration_after = migration.replace("    gz_bytes     bigint,", "    compressed_bytes  bigint,")
     for name in NEW_TABLES:
-        assert _table(migration, name) == _table(schema, name), name
+        assert _table(migration_after, name) == _table(schema, name), name
         assert f"alter table public.{name} enable row level security;" in migration
         assert f"alter table public.{name} enable row level security;" in schema
 
@@ -175,7 +181,7 @@ def test_every_column_a_row_builder_sends_exists_in_the_schema():
     assert set(loader.account_row(snapshot)) == columns("account_snapshots")
     assert set(loader.fill_rows(snapshot)[0]) == columns("account_fills")
     assert set(model_calls.call_row({"call_id": "c"}, "x")) == columns("model_calls")
-    package = model_calls.Package(source=Path("x"), object_path="2026/09/2026-09-26/x.jsonl.gz", data=b"",
+    package = model_calls.Package(source=Path("x"), object_path="2026/09/2026-09-26/x.jsonl.xz", data=b"",
                                   sha256="0")
     assert set(package.file_row("1")) == columns("model_io_files")
     tape = {"consumer": "funds", "prices_sha256": "0" * 64, "coverage": {},
