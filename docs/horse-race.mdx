@@ -48,11 +48,23 @@ Next checkpoint: 20 independent days (= 60 trading days), estimated 2026-12-22, 
 - **Model watch.** Trigger (a), a one-time check on the zero-shorts replay,
   tripped and was closed on 25 Sep 2026: gpt-oss shorted 1 of the 31 lines
   where Opus shorted, and the owner kept gpt-oss, so the model arm is
-  effectively long-only. The owner's triggers (b) and (c) are printed on every run:
-  five answered days with no SHORT while SPY fell, and model errors above 5%
-  of the calls that reached the model over five cycle days, counted from
-  25 Sep 2026. Setup errors (our key or configuration) are shown but not
-  counted. A trip means stop and tell the owner. A run with more than 20% of
+  effectively long-only. Trigger (b), five answered days with no SHORT while
+  SPY fell, was retired on 26 Sep 2026 by the owner's decision: with a
+  long-only model it would only say that SPY fell. The owner's triggers (c)
+  and (d) are printed on every run. (c): model errors above 5% of the calls
+  that reached the model over five cycle days, counted from 25 Sep 2026;
+  setup errors (our key or configuration) are shown but not counted. (d):
+  the real paper account's equity more than 8% below its highest close since
+  23 Sep 2026, or its return since the 23 Sep close more than 5 percentage
+  points behind VT's (VT final closes only; a day with no final VT close is
+  not judged on that part). The race reads the account from
+  `logs/account.jsonl` and prints the current drawdown from the peak and
+  the gap to VT in points even when nothing has tripped; with no usable
+  record it says "not judged: no account record". (d) is in
+  `logs/race_gate.json` under `watch.d`, and when that says it tripped the
+  daily health check raises a warning that the brief sends to the owner's
+  phone. A trip means stop and tell the owner; nothing reverts or trades,
+  and nothing that decides the race reads it. A run with more than 20% of
   its calls failed, of either kind, pages the owner's phone the same day.
 - It also prints what the model calls cost over the window, and warns if any
   line in it was made with the screen on or at another reasoning level.

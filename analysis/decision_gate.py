@@ -83,11 +83,31 @@ RUN_ALERT_FAILED_SHARE = 0.20
 #: Trigger (a) was a one-time check on the zero-shorts replay, not on the
 #: journal, so nothing here computes it. It tripped and the owner kept
 #: gpt-oss on this day (Amendment 2026-09-25): the model arm is effectively
-#: long-only. It is closed; (b) and (c) stay active. Kept as constants so the
-#: race prints the owner's record rather than a paraphrase of it.
+#: long-only. It is closed. Kept as constants so the race prints the owner's
+#: record rather than a paraphrase of it.
 TRIGGER_A_CLOSED = date(2026, 9, 25)
 #: What the replay found: (lines gpt-oss shorted, of the lines Opus shorted).
 TRIGGER_A_RESULT = (1, 31)
+
+#: Trigger (b) -- 5 answered cycle days in a row with no SHORT while SPY
+#: fell -- was retired on this day (the owner's decision, Amendment
+#: 2026-09-26). The model is long-only by the owner's decision of 25 Sep, so
+#: (b) could only ever say that SPY fell. Nothing computes it any more; it is
+#: replaced by trigger (d), the paper account's drawdown.
+TRIGGER_B_RETIRED = date(2026, 9, 26)
+
+#: Trigger (d), the real paper account (Amendment 2026-09-26): its closing
+#: equity from this day on. Also the base of the comparison with VT: the
+#: first day of the period with a close for both the account and VT (the
+#: period starts here, and the price source has no VT bar for 22 Sep).
+DRAWDOWN_START = date(2026, 9, 23)
+#: (d) trips when equity is more than this far below its highest close since
+#: ``DRAWDOWN_START``: equity < peak x (1 - 0.08).
+MAX_DRAWDOWN = 0.08
+#: (d) trips when the account's return since the base close trails VT's over
+#: the same days by more than this, in percentage points of return (0.05 is
+#: 5 points): account return - VT return < -0.05.
+MAX_BEHIND_VT = 0.05
 
 
 # --------------------------------------------------------------------------- #
@@ -520,30 +540,142 @@ def failure_trips(days: Sequence[WatchDay], max_names_per_day: Optional[int] = N
     return trips
 
 
-def no_short_trips(days: Sequence[WatchDay], spy_close: Mapping[date, float]) -> list[Trip]:
-    """Trigger (b): 5 answered cycle days in a row with no SHORT while SPY fell.
+def _usable(value: object) -> bool:
+    """A price or an equity that can be divided by: a finite number above zero."""
+    return (isinstance(value, (int, float)) and not isinstance(value, bool)
+            and math.isfinite(value) and value > 0)
 
-    A day with no answered line at all is skipped rather than counted: a
-    lost day says nothing about whether the model would have shorted. "SPY
-    fell" is the close of the last day against the last close before the
-    first. A run whose closes are not final yet is not judged.
+
+@dataclass(frozen=True)
+class DrawdownDay:
+    """One day of trigger (d): the account's equity against its peak, and against VT."""
+
+    day: date
+    equity: float
+    #: The highest closing equity from ``DRAWDOWN_START`` to this day,
+    #: this day included, and the day it was set.
+    peak: float
+    peak_day: date
+    #: Both since the base close (``DRAWDOWN_START``). ``None`` on a day VT
+    #: has no final close, or when either base close is missing: that day's
+    #: VT part is not judged.
+    account_return: Optional[float] = None
+    vt_return: Optional[float] = None
+
+    @property
+    def drawdown(self) -> float:
+        """``equity / peak - 1``: 0 at a new high, -0.05 five per cent below it."""
+        return self.equity / self.peak - 1.0
+
+    @property
+    def gap(self) -> Optional[float]:
+        """Account return minus VT return, as a fraction (-0.05 is 5 points behind)."""
+        if self.account_return is None or self.vt_return is None:
+            return None
+        return self.account_return - self.vt_return
+
+    # Both compared rounded to ten places, so float noise can never make
+    # exactly 8% (or exactly 5 points) read as more than it.
+    @property
+    def too_deep(self) -> bool:
+        return round(self.drawdown, 10) < -MAX_DRAWDOWN
+
+    @property
+    def too_far_behind(self) -> bool:
+        gap = self.gap
+        return gap is not None and round(gap, 10) < -MAX_BEHIND_VT
+
+
+@dataclass(frozen=True)
+class DrawdownWatch:
+    """Trigger (d) over every day of the period, and the days it tripped on."""
+
+    days: tuple[DrawdownDay, ...]
+    trips: tuple[Trip, ...]
+    #: Why the VT part can judge no day at all, if it cannot: a base close
+    #: is missing. ``None`` when it judges every day VT has a final close.
+    vt_problem: Optional[str] = None
+
+    @property
+    def latest(self) -> Optional[DrawdownDay]:
+        return self.days[-1] if self.days else None
+
+    @property
+    def latest_vt(self) -> Optional[DrawdownDay]:
+        """The latest day the VT part was judged on."""
+        return next((d for d in reversed(self.days) if d.gap is not None), None)
+
+
+def drawdown_watch(equity: Mapping[date, float], vt_close: Mapping[date, float]) -> DrawdownWatch:
+    """Trigger (d): the real paper account, more than 8% below its peak or 5 points behind VT.
+
+    The owner's decision of 26 Sep 2026, replacing (b). A trip means stop and
+    tell the owner; nothing here reverts, switches or trades anything.
+
+    ``equity`` is the account's closing equity per trading day, as the
+    heartbeat recorded Alpaca's daily portfolio history in
+    ``logs/account.jsonl``, plus the latest record's own equity for its day
+    when that day is newer than every close (so the latest day can be an
+    intraday number). ``vt_close`` is VT's close per day, final closes only.
+    Days before ``DRAWDOWN_START`` are ignored in both, and so is any value
+    that is not a finite number above zero.
+
+    Drawdown: the peak is the highest closing equity from ``DRAWDOWN_START``
+    to the day, that day included. The day trips when equity < peak x (1 -
+    ``MAX_DRAWDOWN``), i.e. more than 8% below the peak; exactly 8% does not.
+
+    Behind VT: both returns are measured from the same base, the close of
+    ``DRAWDOWN_START`` (2026-09-23) -- the first day of the period with a
+    close for both, since the price source has no VT bar for 22 Sep -- to
+    the same day's close: account equity / base equity - 1 and VT close /
+    base VT close - 1. The day trips when account return - VT return <
+    -``MAX_BEHIND_VT``, i.e. more than 5 percentage points behind; exactly 5
+    does not. A day VT has no final close for is not judged on this part
+    (the drawdown part still is); if either base close is missing, no day is.
+
+    Every day that trips is one ``Trip``, both reasons in its detail when
+    both apply. The latest values are in ``days`` whether or not anything
+    tripped, so the owner can see how close it is.
     """
-    answered = [d for d in days if d.answered > 0]
-    closes = sorted(spy_close.items())
+    closes = sorted((day, float(value)) for day, value in equity.items()
+                    if day >= DRAWDOWN_START and _usable(value))
+    vt = {day: float(value) for day, value in vt_close.items() if day >= DRAWDOWN_START and _usable(value)}
+    base_account = dict(closes).get(DRAWDOWN_START)
+    base_vt = vt.get(DRAWDOWN_START)
+    vt_problem: Optional[str] = None
+    if base_account is None:
+        vt_problem = f"the account has no close for {DRAWDOWN_START.isoformat()}, the base"
+    elif base_vt is None:
+        vt_problem = f"no final {INDEX_TICKER} close for {DRAWDOWN_START.isoformat()}, the base"
+
+    days: list[DrawdownDay] = []
     trips: list[Trip] = []
-    for i in range(len(answered) - WATCH_DAYS + 1):
-        run = answered[i:i + WATCH_DAYS]
-        if any(d.shorts for d in run):
-            continue
-        before = [price for day, price in closes if day < run[0].day]
-        end = spy_close.get(run[-1].day)
-        if not before or end is None:
-            continue
-        if end < before[-1]:
-            trips.append(Trip(run[0].day, run[-1].day,
-                              f"no SHORT on {WATCH_DAYS} answered days while SPY fell "
-                              f"{end / before[-1] - 1.0:+.2%}"))
-    return trips
+    peak, peak_day = 0.0, DRAWDOWN_START
+    for day, value in closes:
+        if value > peak:
+            peak, peak_day = value, day
+        account_return = vt_return = None
+        if vt_problem is None and day in vt:
+            account_return = value / base_account - 1.0
+            vt_return = vt[day] / base_vt - 1.0
+        row = DrawdownDay(day, value, peak, peak_day, account_return, vt_return)
+        days.append(row)
+        reasons = []
+        if row.too_deep:
+            reasons.append(f"equity {value:,.2f} is {-row.drawdown:.2%} below its peak {peak:,.2f} "
+                           f"of {peak_day.isoformat()} (more than {MAX_DRAWDOWN:.0%})")
+        if row.too_far_behind:
+            reasons.append(f"the account is {-row.gap * 100:.2f} points behind {INDEX_TICKER} since the "
+                           f"{DRAWDOWN_START.isoformat()} close (account {account_return:+.2%}, "
+                           f"{INDEX_TICKER} {vt_return:+.2%}; more than {MAX_BEHIND_VT * 100:.0f} points)")
+        if reasons:
+            trips.append(Trip(day, day, "; ".join(reasons)))
+    return DrawdownWatch(tuple(days), tuple(trips), vt_problem)
+
+
+def drawdown_trips(equity: Mapping[date, float], vt_close: Mapping[date, float]) -> list[Trip]:
+    """Trigger (d)'s trips only: see ``drawdown_watch`` for the definitions."""
+    return list(drawdown_watch(equity, vt_close).trips)
 
 
 def known_entry_days(cycle_days: Iterable[date]) -> list[date]:
@@ -555,11 +687,16 @@ __all__ = [
     "CHECKPOINTS",
     "COIN_FLIP_PERCENTILE",
     "DECISION_CUTOFF",
+    "DRAWDOWN_START",
+    "DrawdownDay",
+    "DrawdownWatch",
     "FAILURE_WATCH_START",
     "INDEX_GAP_SETTLE_SESSIONS",
     "INDEX_TICKER",
     "Look",
     "LookInputs",
+    "MAX_BEHIND_VT",
+    "MAX_DRAWDOWN",
     "MIN_INDEPENDENT_DAYS",
     "NO_ARM",
     "OUTCOME_TEXT",
@@ -567,11 +704,14 @@ __all__ = [
     "RUN_ALERT_FAILED_SHARE",
     "TRIGGER_A_CLOSED",
     "TRIGGER_A_RESULT",
+    "TRIGGER_B_RETIRED",
     "Trip",
     "WATCH_DAYS",
     "WATCH_MAX_FAILED_SHARE",
     "WatchDay",
     "decide",
+    "drawdown_trips",
+    "drawdown_watch",
     "entry_days_needed",
     "estimated_readable",
     "evaluate",
@@ -584,7 +724,6 @@ __all__ = [
     "known_entry_days",
     "next_look",
     "next_trading_day",
-    "no_short_trips",
     "obrien_fleming_bars",
     "status_line",
     "trading_days_after",

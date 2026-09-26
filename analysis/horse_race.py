@@ -65,10 +65,20 @@ signal is made, never the price it is entered at, because every arm enters
 at the open of the next session after the signal's day
 (``tests/test_race_entry_timing.py``).
 
+The model watch follows the gate: the owner's triggers, where a trip means
+stop and tell the owner and nothing reverts or trades. (a) is closed, (b)
+is retired (the owner's decision of 2026-09-26: the model is long-only, so
+it would only say SPY fell), (c) counts model errors from the journal, and
+(d) reads the real paper account's closing equity from ``logs/account.jsonl``
+(``--account``) against its own peak and against VT's final closes
+(``decision_gate.drawdown_watch``). (d) is in the gate JSON under
+``watch.d``; like the reports, it is computed after the gate and nothing
+that decides reads it.
+
 Nothing here is fitted. The momentum arm's parameters are the textbook
 values and this file never touches them; it judges the rule, it does not
-tune it. Read-only in every direction -- it reads the journal, fetches
-prices, and prints.
+tune it. Read-only in every direction -- it reads the journal and the
+account record, fetches prices, and prints.
 """
 
 from __future__ import annotations
@@ -81,9 +91,10 @@ import statistics
 import sys
 from collections import Counter
 from dataclasses import dataclass, replace
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from typing import Optional, Sequence
+from zoneinfo import ZoneInfo
 
 # Allow ``python analysis/horse_race.py`` from the repo root.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -111,6 +122,7 @@ from backtest.simulate import Trade  # noqa: E402
 from backtest.sweep import MIN_TRADES  # noqa: E402
 from config import settings as cfg  # noqa: E402
 from config.instruments import FUNDS, SINGLE_NAMES, is_fund  # noqa: E402
+from config.market_calendar import is_trading_day  # noqa: E402
 from config.watchlist import DEFAULT_WATCHLIST  # noqa: E402
 from orchestrator.insiders import InsiderSnapshot  # noqa: E402
 from orchestrator.technicals import TechnicalSnapshot  # noqa: E402
@@ -180,6 +192,15 @@ SIDES = (("long", "buy"), ("short", "sell"))
 #: those may behave differently on the two.
 GROUPS = ("all", "funds", "companies")
 
+#: The real paper account as the heartbeat records it after every run
+#: (``app/account_snapshot.py``). Read for trigger (d) only.
+ACCOUNT_LOG = cfg.LOG_DIR / "account.jsonl"
+
+#: Alpaca stamps its daily portfolio history in the exchange's day.
+NEW_YORK = ZoneInfo("America/New_York")
+#: A history value is a close only once the session is over.
+SESSION_CLOSE = time(16, 0)
+
 log = logging.getLogger("horse_race")
 
 
@@ -207,6 +228,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-position-pct", type=float, default=cfg.MAX_POSITION_PCT)
     parser.add_argument("--per-trade", action="store_true",
                         help="also list every scored trade of every arm")
+    parser.add_argument("--account", type=Path, default=None,
+                        help="the paper account's record, for trigger (d) only (default: %s)" % ACCOUNT_LOG)
     parser.add_argument("--gate-json", action="store_true",
                         help="print only the decision gate, as JSON (for the dashboard), and stop")
     parser.add_argument("-v", "--verbose", action="store_true", help="log fetch failures")
@@ -855,6 +878,7 @@ class GateView:
 def gate_json(
     view: GateView, horizon: int, now: datetime, splits: Optional[TradeSplits] = None,
     timings: Optional[Sequence[run_timing.DayTiming]] = None,
+    account: Optional[AccountWatch] = None,
 ) -> dict:
     """The gate as data, for the dashboard's banner: the same numbers the header prints.
 
@@ -867,6 +891,11 @@ def gate_json(
     schedule, the same rows the text prints. Built from the journal's
     timestamps and run blocks only, after the gate has been evaluated, and
     read by nothing that decides; ``null`` when not given.
+
+    ``account`` adds ``watch.d``: the owner's trigger (d) on the real paper
+    account (``account_watch_json``). Computed from the account record and
+    VT's closes after the gate has been evaluated, and read by nothing that
+    decides; ``watch`` is ``null`` when not given.
     """
     decided = gate.first_decision(view.looks)
     upcoming = None if decided else gate.next_look(view.looks)
@@ -894,6 +923,7 @@ def gate_json(
         **splits_json(splits),
         "run_timing": (None if timings is None
                        else run_timing.timing_json(timings, cutoff=gate.DECISION_CUTOFF)),
+        "watch": None if account is None else {"d": account_watch_json(account)},
     }
 
 
@@ -917,6 +947,198 @@ def watch_days(entries: Sequence[JournalEntry]) -> list[gate.WatchDay]:
         )
         for day, rows in sorted(by_day.items())
     ]
+
+
+# --------------------------------------------------------------------------- #
+# Trigger (d): the real paper account
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True)
+class AccountRecord:
+    """The paper account's equity per day, as ``logs/account.jsonl`` recorded it."""
+
+    #: Closing equity per trading day (New York), and possibly one more day:
+    #: the latest record's own equity, when its day is newer than every close.
+    equity: dict[date, float]
+    #: When the latest record was taken.
+    at: datetime
+    #: The day whose number is the latest record's own equity taken during
+    #: the session, not a close; ``None`` when every number is a close.
+    intraday: Optional[date] = None
+
+
+def _close_of(day: date) -> datetime:
+    return datetime.combine(day, SESSION_CLOSE, tzinfo=NEW_YORK).astimezone(timezone.utc)
+
+
+def _stamp(value: object) -> Optional[datetime]:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    text = value.strip()
+    if text.endswith(("Z", "z")):
+        text = text[:-1] + "+00:00"
+    try:
+        moment = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return moment.astimezone(timezone.utc)
+
+
+def _equity_value(value: object) -> Optional[float]:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    value = float(value)
+    return value if math.isfinite(value) and value > 0 else None
+
+
+def read_account(path: Path) -> Optional[AccountRecord]:
+    """The account's equity per day from the heartbeat's record, or None if it has none.
+
+    Every line's ``history`` (Alpaca's daily closing equity) is read, oldest
+    record first, so a later record wins a day both give. That is the
+    latest line's history wherever it reaches; the older lines only supply
+    days that have fallen out of its one-month window, which trigger (d)
+    still needs from 2026-09-23. A history value is taken only from a record
+    made after that day's 16:00 in New York, as ``shadow.calibration`` reads
+    it: one taken during the session is that session's equity so far, not a
+    close. The latest record's own ``account.equity`` is added for its New
+    York day when that is a trading day newer than every close, and marked
+    intraday if it was taken before the close.
+
+    Never raises: a missing or unreadable file, a line that is not JSON,
+    and a number that is not a finite amount above zero are all skipped.
+    The file is only read (the lines merge as a union, so order is not kept
+    and each line's ``at`` says when it was taken).
+    """
+    try:
+        text = Path(path).read_text(encoding="utf-8", errors="replace")
+    except (OSError, ValueError):
+        return None
+    records: list[tuple[datetime, dict]] = []
+    for raw in text.splitlines():
+        raw = raw.strip()
+        if not raw:
+            continue
+        try:
+            record = json.loads(raw)
+        except ValueError:
+            continue
+        at = _stamp(record.get("at")) if isinstance(record, dict) else None
+        if at is not None:
+            records.append((at, record))
+    records.sort(key=lambda pair: pair[0])
+    closes: dict[date, float] = {}
+    for at, record in records:
+        history = record.get("history")
+        if not isinstance(history, dict):
+            continue
+        days, values = history.get("days"), history.get("equity")
+        if not isinstance(days, list) or not isinstance(values, list):
+            continue
+        for day_text, value in zip(days, values):
+            try:
+                day = date.fromisoformat(day_text) if isinstance(day_text, str) else None
+            except ValueError:
+                day = None
+            number = _equity_value(value)
+            if day is not None and number is not None and at >= _close_of(day):
+                closes[day] = number
+    latest = next(((at, record) for at, record in reversed(records)
+                   if isinstance(record.get("account"), dict)
+                   and _equity_value(record["account"].get("equity")) is not None), None)
+    intraday: Optional[date] = None
+    if latest is not None:
+        at, record = latest
+        day = at.astimezone(NEW_YORK).date()
+        if is_trading_day(day) and (not closes or day > max(closes)):
+            closes[day] = _equity_value(record["account"]["equity"])
+            intraday = day if at < _close_of(day) else None
+    if not closes:
+        return None
+    last_at = records[-1][0]
+    return AccountRecord(equity=dict(sorted(closes.items())), at=last_at, intraday=intraday)
+
+
+@dataclass(frozen=True)
+class AccountWatch:
+    """Trigger (d) as the race saw it: the account record, and what the gate made of it."""
+
+    record: Optional[AccountRecord]
+    watch: Optional[gate.DrawdownWatch]
+
+    @property
+    def problem(self) -> Optional[str]:
+        """Why (d) is not judged at all tonight, or None when it is."""
+        if self.record is None:
+            return "no account record"
+        if self.watch is None or not self.watch.days:
+            return f"no account close on or after {gate.DRAWDOWN_START.isoformat()}"
+        return None
+
+    @property
+    def tripped(self) -> bool:
+        return bool(self.watch and self.watch.trips)
+
+
+def account_watch(record: Optional[AccountRecord], vt_close: dict[date, float]) -> AccountWatch:
+    """Trigger (d) on the account record and VT's final closes; nothing that decides reads it."""
+    if record is None:
+        return AccountWatch(None, None)
+    return AccountWatch(record, gate.drawdown_watch(record.equity, vt_close))
+
+
+def _round(value: Optional[float], digits: int) -> Optional[float]:
+    return None if value is None else round(value, digits)
+
+
+def _tripped_days(watch: gate.DrawdownWatch) -> list[tuple[gate.Trip, gate.DrawdownDay]]:
+    by_day = {d.day: d for d in watch.days}
+    return [(t, by_day[t.last]) for t in watch.trips]
+
+
+def account_watch_json(account: AccountWatch) -> dict:
+    """Trigger (d) as data: every number finite, so it dumps with ``allow_nan=False``.
+
+    Fractions throughout (-0.031 is 3.1% below the peak; a ``gap`` of -0.012
+    is 1.2 points behind VT). ``latest`` is the newest day, VT part or not;
+    ``latest_vt`` the newest day the VT part was judged on.
+    """
+    def row(d: Optional[gate.DrawdownDay]) -> Optional[dict]:
+        if d is None:
+            return None
+        return {
+            "day": d.day.isoformat(), "equity": round(d.equity, 2),
+            "intraday": account.record is not None and d.day == account.record.intraday,
+            "peak": round(d.peak, 2), "peak_day": d.peak_day.isoformat(),
+            "drawdown": round(d.drawdown, 6),
+            "account_return": _round(d.account_return, 6), "vt_return": _round(d.vt_return, 6),
+            "gap": _round(d.gap, 6),
+        }
+
+    watch = account.watch
+    return {
+        "rule": (f"the paper account: more than {gate.MAX_DRAWDOWN:.0%} below its peak since "
+                 f"{gate.DRAWDOWN_START.isoformat()}, or more than {gate.MAX_BEHIND_VT * 100:.0f} "
+                 f"points behind {gate.INDEX_TICKER}"),
+        "start": gate.DRAWDOWN_START.isoformat(),
+        "max_drawdown": gate.MAX_DRAWDOWN,
+        "max_behind_vt": gate.MAX_BEHIND_VT,
+        "judged": account.problem is None,
+        "not_judged": account.problem,
+        "vt_not_judged": watch.vt_problem if watch is not None and account.problem is None else None,
+        "tripped": account.tripped,
+        "trips": [] if watch is None else [
+            {"day": t.last.isoformat(), "detail": t.detail, "below_peak": d.too_deep,
+             "behind_vt": d.too_far_behind, "drawdown": round(d.drawdown, 6), "gap": _round(d.gap, 6)}
+            for t, d in _tripped_days(watch)
+        ],
+        "latest": row(watch.latest if watch else None),
+        "latest_vt": row(watch.latest_vt if watch else None),
+        "record_at": None if account.record is None else account.record.at.isoformat(),
+    }
 
 
 @dataclass(frozen=True)
@@ -1117,17 +1339,22 @@ def main(argv: list[str] | None = None) -> int:
     # Every line counts, held and failed too -- the question is when the
     # cycle ran, not what it said -- so it reads the whole journal.
     timings = run_timing.day_timings(read.entries)
+    # Trigger (d): the real paper account against its own peak and against
+    # VT's final closes, which the basket already holds. Read after the gate
+    # for the same reason as the splits: nothing that decides reads it.
+    vt_close = {day: price for day, price in
+                basket.closes(gate.INDEX_TICKER, min(earliest, gate.DRAWDOWN_START), today).bars}
+    account = account_watch(read_account(args.account or ACCOUNT_LOG), vt_close)
     if args.gate_json:
-        print(json.dumps(gate_json(view, args.horizon, now, splits=splits, timings=timings)))
+        print(json.dumps(gate_json(view, args.horizon, now, splits=splits, timings=timings,
+                                   account=account)))
         return 0
 
-    # The owner's model-watch triggers, and what the calls cost.
+    # The owner's model-watch triggers, and what the calls cost. Trigger (b)
+    # was retired on 26 Sep 2026 and is not evaluated.
     days = watch_days(read.entries)
-    spy = {day: price for day, price in basket.closes("SPY", earliest, today).bars}
-    trips = {"b": gate.no_short_trips(days, spy),
-             "c": gate.failure_trips(days, max_names_per_day=len(DEFAULT_WATCHLIST))}
-    watch_counts = {"b": sum(1 for d in days if d.answered),
-                    "c": sum(1 for d in days if d.day >= gate.FAILURE_WATCH_START)}
+    trips = {"c": gate.failure_trips(days, max_names_per_day=len(DEFAULT_WATCHLIST))}
+    watch_counts = {"c": sum(1 for d in days if d.day >= gate.FAILURE_WATCH_START)}
     in_window = [e for e in read.entries if e.timestamp is not None and gate.in_window(_line_day(e))]
 
     # The exploratory arms, on their own lines only, at both horizons, over
@@ -1158,7 +1385,7 @@ def main(argv: list[str] | None = None) -> int:
         window_start=decision.window_start, window_end=decision.window_end,
         agreement=agreement, agreed_on=agreed_on, breakdown=breakdown, per_trade=args.per_trade,
         gate_view=view, whole=whole, unanswered=unanswered, trips=trips, watch_counts=watch_counts,
-        watched=days,
+        watched=days, account=account,
         spend=llm_spend(in_window), spend_whole=llm_spend(read.entries),
         warnings=window_warnings(read.entries), splits=splits, timings=timings,
     ))
@@ -1362,6 +1589,7 @@ def render(
     spend: Optional[Spend] = None, spend_whole: Optional[Spend] = None,
     warnings: Sequence[str] = (), splits: Optional[TradeSplits] = None,
     timings: Optional[Sequence[run_timing.DayTiming]] = None,
+    account: Optional[AccountWatch] = None,
 ) -> str:
     held = sum(1 for e in read.entries if e.held)
     no_stamp = sum(1 for e in read.entries if not e.held and e.timestamp is None)
@@ -1371,7 +1599,7 @@ def render(
     ]
     if gate_view is not None:
         out += _render_gate(gate_view, horizon)
-    out += _render_watch(trips or {}, watch_counts, watched)
+    out += _render_watch(trips or {}, watch_counts, watched, account)
     if spend is not None:
         out += _render_spend(spend, spend_whole)
     if warnings:
@@ -1576,11 +1804,12 @@ def _render_gate(view: GateView, horizon: int) -> list[str]:
 
 
 def _render_watch(trips: dict[str, list[gate.Trip]], counts: Optional[dict[str, int]] = None,
-                  days: Sequence[gate.WatchDay] = ()) -> list[str]:
+                  days: Sequence[gate.WatchDay] = (), account: Optional[AccountWatch] = None) -> list[str]:
     """The owner's model-watch triggers. A trip means: stop and tell the owner.
 
-    (b) and (c) are judged here, from the journal. (a) was a one-time check
-    on the replay and is closed; its line records how it ended.
+    (c) is judged here, from the journal, and (d) from the paper account's
+    record and VT's closes. (a) was a one-time check on the replay and is
+    closed, and (b) is retired; their lines record how each ended.
     """
     out = [
         "",
@@ -1588,7 +1817,6 @@ def _render_watch(trips: dict[str, list[gate.Trip]], counts: Optional[dict[str, 
         "-" * 78,
     ]
     labels = {
-        "b": f"(b) {gate.WATCH_DAYS} answered days in a row with no SHORT while SPY fell",
         "c": f"(c) model errors above {gate.WATCH_MAX_FAILED_SHARE:.0%} of the calls that reached the model "
              f"over {gate.WATCH_DAYS} cycle days, counted from {gate.FAILURE_WATCH_START}",
     }
@@ -1596,8 +1824,7 @@ def _render_watch(trips: dict[str, list[gate.Trip]], counts: Optional[dict[str, 
         hits = trips.get(key, [])
         have = (counts or {}).get(key)
         if not hits and have is not None and have < gate.WATCH_DAYS:
-            unit = "answered cycle day(s)" if key == "b" else "cycle day(s)"
-            out.append(f"{label}: not yet judged ({have} of {gate.WATCH_DAYS} {unit} so far)")
+            out.append(f"{label}: not yet judged ({have} of {gate.WATCH_DAYS} cycle day(s) so far)")
             continue
         if not hits:
             out.append(f"{label}: not tripped")
@@ -1612,8 +1839,53 @@ def _render_watch(trips: dict[str, list[gate.Trip]], counts: Optional[dict[str, 
                    + ", ".join(f"{d.day} {d.setup_failed} of {d.asked}" for d in setup[-5:]))
     else:
         out.append("setup errors (our key or configuration; shown, never counted by (c)): none")
+    out += account_lines(account if account is not None else AccountWatch(None, None))
+    out.append(trigger_b_line())
     out.append(trigger_a_line())
     return out
+
+
+def trigger_d_label() -> str:
+    return (f"(d) the paper account: more than {gate.MAX_DRAWDOWN:.0%} below its peak since "
+            f"{gate.DRAWDOWN_START.isoformat()}, or more than {gate.MAX_BEHIND_VT * 100:.0f} points "
+            f"behind {gate.INDEX_TICKER}")
+
+
+def account_lines(account: AccountWatch) -> list[str]:
+    """Trigger (d), with tonight's numbers whether or not it tripped."""
+    label = trigger_d_label()
+    if account.problem is not None:
+        return [f"{label}: not judged: {account.problem}"]
+    watch = account.watch
+    if watch.trips:
+        latest = watch.trips[-1]
+        out = [f"{label}: TRIPPED {len(watch.trips)} time(s); latest {latest.last}: {latest.detail}"]
+    else:
+        out = [f"{label}: not tripped"]
+    now = watch.latest
+    intraday = account.record.intraday == now.day
+    when = (f"{now.day} (intraday, recorded {account.record.at:%H:%M} UTC)" if intraday
+            else f"{now.day} close")
+    out.append(f"    now {when}: equity {now.equity:,.2f} | peak {now.peak:,.2f} on {now.peak_day} | "
+               f"{abs(now.drawdown):.2%} below the peak (trips beyond {gate.MAX_DRAWDOWN:.0%})")
+    vt = watch.latest_vt
+    since = f"since the {gate.DRAWDOWN_START} close"
+    if watch.vt_problem is not None:
+        out.append(f"    vs {gate.INDEX_TICKER}: not judged: {watch.vt_problem}")
+    elif vt is None:
+        out.append(f"    vs {gate.INDEX_TICKER}: not judged: no final {gate.INDEX_TICKER} close on an account day yet")
+    else:
+        note = "" if vt.day == now.day else f" (no final {gate.INDEX_TICKER} close for {now.day} yet)"
+        out.append(f"    vs {gate.INDEX_TICKER} {since}, at the {vt.day} close{note}: account "
+                   f"{vt.account_return:+.2%}, {gate.INDEX_TICKER} {vt.vt_return:+.2%}: "
+                   f"{vt.gap * 100:+.2f} points (trips below -{gate.MAX_BEHIND_VT * 100:.0f})")
+    return out
+
+
+def trigger_b_line() -> str:
+    """Trigger (b), retired: recorded as the owner decided it."""
+    return (f"(b) retired {gate.TRIGGER_B_RETIRED.isoformat()} (owner's decision: the model is long-only, "
+            "so (b) would only say SPY fell); replaced by (d)")
 
 
 def trigger_a_line() -> str:

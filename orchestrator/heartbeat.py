@@ -71,6 +71,7 @@ from orchestrator.llm import (  # noqa: E402
     OpenAICompatibleProvider,
     SignalProvider,
     batch_custom_id,
+    call_label,
 )
 from app.broker_client import BrokerError  # noqa: E402
 from config.market_calendar import is_trading_day  # noqa: E402
@@ -1276,7 +1277,10 @@ def _ask(call, prepared: PreparedTicker) -> "Completion | BaseException":
     and a batched one are the same kind of thing to everything downstream.
     """
     try:
-        return call(prepared.system_prompt, prepared.user_prompt, SIGNAL_JSON_SCHEMA)
+        # The ticker's name on every model call it makes, in the call log
+        # (orchestrator/llm.py ``_log_call``). Changes nothing about the call.
+        with call_label(prepared.ticker):
+            return call(prepared.system_prompt, prepared.user_prompt, SIGNAL_JSON_SCHEMA)
     except (LLMError, json.JSONDecodeError, ValidationError) as exc:
         return exc
 

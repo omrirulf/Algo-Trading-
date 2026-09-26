@@ -15,7 +15,10 @@ import json
 import time
 import logging
 import re
+import threading
+from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Optional, Protocol
 
 import anthropic
@@ -645,13 +648,60 @@ HTTP_ATTEMPTS = 4
 #: retry worth counting separately from the statuses above.
 TRANSPORT_ATTEMPTS = 2
 
-#: The ceiling on that second ask. A call that hung for the full 300s once is
-#: not likely to be quick, and the rest of the watchlist is queued behind it.
-TRANSPORT_RETRY_TIMEOUT_SECONDS = 120.0
+#: The ceiling on that second ask: the same as the first (bug fix, 26 Sep
+#: 2026, logged in the pre-registration's Amendments table).
+#:
+#: It was 120s, on the reasoning that a call which hung for the full 300s once
+#: is unlikely to be quick. The production log said otherwise. Only 29-45% of
+#: the full model's *successful* answers on 23 and 25 Sep arrived within 120s
+#: (median 130-146s at high effort), so a retry cut to 120s could almost never
+#: succeed: on 25 Sep it failed 7 times out of 7, and every one of those
+#: tickers was lost. A fresh ask on a fresh connection is a new call and gets
+#: a new call's ceiling. It changes no model, provider, prompt, answer length
+#: or reasoning effort -- only how long we wait.
+#:
+#: ``min`` with the caller's own timeout below still applies, so the screening
+#: path (asked at REQUEST_TIMEOUT_SECONDS) keeps its shorter ceiling.
+TRANSPORT_RETRY_TIMEOUT_SECONDS = FULL_MODEL_TIMEOUT_SECONDS
 
 #: Asks per call when the answer parsed as the wrong shape. Two: the first is
 #: the question, the second is the question with the complaint stated.
 SCHEMA_ATTEMPTS = 2
+
+#: Which ticker the current thread is asking about, for the call log below.
+#: Set by the cycle around each live call (``call_label``); thread-local
+#: because the full model is asked four tickers at a time.
+_CALL = threading.local()
+
+
+@contextmanager
+def call_label(label: str):
+    """Name the model calls made inside this block in the call log."""
+    previous = getattr(_CALL, "label", None)
+    _CALL.label = label
+    try:
+        yield
+    finally:
+        _CALL.label = previous
+
+
+def _log_call(ask: int, kind: str, started: datetime, seconds: float, outcome: str,
+              output_tokens: Optional[int]) -> None:
+    """One line per HTTP ask to an OpenAI-compatible model.
+
+    Added 26 Sep 2026 because the timeouts of 23 and 25 Sep could only be
+    diagnosed by rebuilding each call's start and end from a queue model of
+    the four workers: the log had no ticker, no duration and no attempt
+    number. With this line the next cycle says directly how many first asks
+    timed out, how many second asks rescued a ticker, and whether a name is
+    slow because it answers at length or because the provider stalled.
+    """
+    log.info(
+        "model call: %s ask %d (%s) started %s, %.1fs, %s, output tokens %s",
+        getattr(_CALL, "label", None) or "-", ask, kind,
+        started.strftime("%H:%M:%SZ"), seconds, outcome,
+        "n/a" if output_tokens is None else output_tokens,
+    )
 
 OFF_SCHEMA_INSTRUCTION = (
     "\n\nYour previous answer could not be parsed. Reply with the JSON object "
@@ -767,6 +817,12 @@ class OpenAICompatibleProvider:
         delay = RETRY_BASE_SECONDS
         last = ""
         transport_asks = 1
+        # How many times the server was actually asked. The error below used
+        # to print ``self._attempts`` (4) whatever happened, so a ticker lost
+        # after two asks -- a timeout and its one retry -- read "gave up after
+        # 4 attempt(s)". The count now says what was done.
+        asks = 0
+        kind = "first"
         # Local, never self._timeout: a provider is reused across tickers,
         # and one slow call must not quietly shorten every call after it.
         timeout = self._timeout
@@ -774,6 +830,9 @@ class OpenAICompatibleProvider:
             if attempt:
                 self._sleep(delay)
                 delay = min(delay * 2, RETRY_CAP_SECONDS)
+            asks += 1
+            started = datetime.now(timezone.utc)
+            clock = time.monotonic()
             try:
                 if self._client is None:
                     with new_http_client(timeout) as client:
@@ -781,6 +840,8 @@ class OpenAICompatibleProvider:
                 else:
                     response = self._client.post(self._url, json=body, headers=headers)
             except httpx.HTTPError as exc:
+                _log_call(asks, kind, started, time.monotonic() - clock,
+                          f"{type(exc).__name__} after a {timeout:.0f}s limit", None)
                 # Retried once, and only once, since 23 Sep 2026. It was not
                 # retried at all before that, on an argument that the first
                 # production cycle disproved: the worst case was taken to be
@@ -802,23 +863,32 @@ class OpenAICompatibleProvider:
                 if transport_asks >= TRANSPORT_ATTEMPTS:
                     break
                 transport_asks += 1
-                # A fresh connection, not another long wait: a call that hung
-                # for the full ceiling once is unlikely to be quick, and the
-                # stage has other tickers waiting.
+                # A fresh connection, with a new call's ceiling (see
+                # TRANSPORT_RETRY_TIMEOUT_SECONDS for why it is no longer cut).
                 timeout = min(timeout, TRANSPORT_RETRY_TIMEOUT_SECONDS)
+                kind = "retry after a timeout"
                 continue
+            seconds = time.monotonic() - clock
             if response.status_code == 200:
                 try:
-                    return response.json()
+                    payload = response.json()
                 except ValueError as exc:
+                    _log_call(asks, kind, started, seconds, "HTTP 200, body not JSON", None)
                     raise LLMError(f"{self._url} returned a non-JSON body: {exc}") from exc
+                usage = payload.get("usage") if isinstance(payload, dict) else None
+                tokens = usage.get("completion_tokens") if isinstance(usage, dict) else None
+                _log_call(asks, kind, started, seconds, "HTTP 200",
+                          tokens if isinstance(tokens, int) else None)
+                return payload
+            _log_call(asks, kind, started, seconds, f"HTTP {response.status_code}", None)
             last = f"{self._url} returned HTTP {response.status_code}: {response.text[:300]}"
             if response.status_code not in RETRY_STATUSES:
                 break              # 400, 401, 404: asking again changes nothing
+            kind = f"retry after HTTP {response.status_code}"
             told = self._retry_after(response)
             if told is not None:
                 delay = told
-        raise LLMError(f"{last} (gave up after {self._attempts} attempt(s))")
+        raise LLMError(f"{last} (gave up after {asks} attempt(s))")
 
     def _body(
         self,
