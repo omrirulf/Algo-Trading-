@@ -626,6 +626,15 @@ def test_the_shadow_run_does_not_run_the_funds_on_a_stopped_calibration(monkeypa
     monkeypatch.setattr(calib, "calibration_report", lambda **kw: stopped)
     called = []
     monkeypatch.setattr(shadow_run, "run_funds", lambda *a, **kw: called.append(1))
+
+    class NoPrices:                                     # the price-gap report fetches; no network here
+        def __init__(self, **kw):
+            pass
+
+        def ohlc(self, ticker, start, end):
+            return pd.DataFrame()
+
+    monkeypatch.setattr(shadow_run, "OhlcFetcher", NoPrices)
     journal = tmp_path / "journal.log"
     journal.write_text("")
     args = SimpleNamespace(journal=journal, audit=tmp_path / "audit.log", account=tmp_path / "account.jsonl",
@@ -696,9 +705,9 @@ def test_every_fund_is_the_same_with_the_manage_switch_left_alone(monkeypatch):
 
     session, calls = Fund.session, []
 
-    def explicit(self, day, cycle, manage=True):
+    def explicit(self, day, cycle, manage=True, today=None):
         calls.append(manage)
-        return session(self, day, cycle, manage=True)
+        return session(self, day, cycle, manage=True, today=today)
 
     monkeypatch.setattr(Fund, "session", explicit)
     forced = json.dumps(synthetic_funds(), sort_keys=True, allow_nan=False)
@@ -707,7 +716,7 @@ def test_every_fund_is_the_same_with_the_manage_switch_left_alone(monkeypatch):
     assert calls and all(calls)                         # no fund ever asked to skip its pass
     record = json.loads(plain)["funds"]
     assert {f["name"] for f in record["list"]} == {"model", "momentum", "hybrid", "vt", "model_by_conviction",
-                                                   "model_sized"}
+                                                   "model_sized", "model_same_day"}
     assert sum(f["trades"] for f in record["list"]) > 20            # the funds did trade
 
 

@@ -84,15 +84,15 @@ from datetime import date, datetime, time, timedelta, timezone
 from typing import Any, Iterable, Mapping, Optional, Sequence
 from zoneinfo import ZoneInfo
 
-from analysis.cycle_day import MARKET_OPEN_NY, closes_at, latest_start
+from analysis.cycle_day import latest_start
 from analysis.reader import JournalEntry
 from config.market_calendar import is_trading_day
 from shadow import schedule
 from shadow.audit import ENTRY_EVENT, MANAGED_EVENT, LiveAuditLeak, live_audit_guarded
 from shadow.broker import ENTRY, STOP, TRANCHE
-from shadow.fund import Decision, Fund, Line, cycle_days, lines_by_day, model_signal
+from shadow.fund import Decision, Fund, Line, Refusals, cycle_days, lines_by_day, model_signal
 from shadow.fund_test import fund_test_plan, next_trading_day, sessions_through
-from shadow.market import Bars, SimFeed, calendar
+from shadow.market import Bars, SimFeed, calendar, in_regular_hours
 from shadow.schedule import AFTER_FIX_DAYS
 
 #: The exchange's clock. Account times are UTC; a trading day is a New York day.
@@ -690,7 +690,7 @@ def _no_quote(ticker: str) -> float:
 
 def seed_fund(
     seed: Seed, feed: SimFeed, bars: Bars, audit_lines: Iterable[str],
-    not_shortable: frozenset[str] = frozenset(), *, cost_per_side: float = CALIBRATION_COST_PER_SIDE,
+    not_shortable: Refusals = frozenset(), *, cost_per_side: float = CALIBRATION_COST_PER_SIDE,
 ) -> Fund:
     """The model fund, holding the seeded book, with the live record of those positions.
 
@@ -704,9 +704,15 @@ def seed_fund(
     does not hold, so the position manager sees exactly the held positions'
     entries, rungs taken and last stops -- R from the real entry, not an
     estimate -- and nothing about a name it may buy later.
+
+    ``not_shortable`` is the paper account's short refusals, dated
+    (``shadow.run.not_shortable``): the copy, like every fund, is refused a
+    short only from the day the real account was first refused it, never
+    backwards -- the real account could not know a refusal before it
+    happened either (``shadow.fund``, "Short refusals are dated").
     """
     fund = Fund(NAME, model_signal, feed, bars, cash=seed.cash, cost_per_side=cost_per_side,
-                not_shortable=frozenset(not_shortable), keep_actions=True)
+                not_shortable=not_shortable, keep_actions=True)
     broker = fund.broker
     quote, broker.quote = broker.quote, _no_quote
     try:
@@ -770,18 +776,6 @@ class Mirrored:
 def _utc(moment: datetime) -> datetime:
     """``moment`` in UTC; a naive one is read as UTC, as the journal's are."""
     return (moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)).astimezone(timezone.utc)
-
-
-def in_regular_hours(moment: datetime) -> bool:
-    """Whether ``moment`` falls in a regular New York session.
-
-    09:30 to the close -- 16:00, or 13:00 on a half day -- on a trading day.
-    The close itself is outside: at 16:00:00 the broker's clock already
-    says the market is shut.
-    """
-    local = _utc(moment).astimezone(NY)
-    day = local.date()
-    return is_trading_day(day) and MARKET_OPEN_NY <= local.time() < closes_at(day)
 
 
 def _started_inside_schedule(moment: datetime) -> bool:
@@ -1286,7 +1280,7 @@ def _uncovered(fund: Fund, day: date) -> list[str]:
 
 def run_calibration(
     snapshots: Sequence[Snapshot], entries: Sequence[JournalEntry], bars: Bars, feed: SimFeed, start: date,
-    days_needed: int = DAYS_NEEDED, audit_lines: Iterable[str] = (), not_shortable: frozenset[str] = frozenset(),
+    days_needed: int = DAYS_NEEDED, audit_lines: Iterable[str] = (), not_shortable: Refusals = frozenset(),
     *, calendar_tickers: Sequence[str] = CALENDAR_TICKERS, cost_per_side: float = CALIBRATION_COST_PER_SIDE,
     fixes: Iterable[Fix] = (), after_fix_days: int = AFTER_FIX_DAYS,
 ) -> CalibrationResult:
@@ -1622,7 +1616,8 @@ PASS_RULE = PassRule(
         "last fix, so calibration ends at day 15 or at the last fix + 5 days, whichever is later. If a "
         "re-run fails on an earlier day, that is a new fail: fix, log and re-run again. A difference whose "
         "stated reason turns out to be a bug still counts as a fail. If the end date moves, the fund test's "
-        "start date and bars are recalculated and logged.",
+        "start does not (it is fixed: the 2026-09-28 cycle, from the 2026-09-29 open); a look that comes "
+        "before calibration has passed is skipped, and the bars are computed by the fund test's rule.",
         # The owner's decision of 25 Sep 2026 (``LateRuns``).
         "Late runs: on a day the real account's run fell outside market hours, the sim does not make the "
         "entries the real broker refused as 'market is closed', nor a profit-ladder pass that could not run; "
@@ -2159,8 +2154,9 @@ def calibration_json(
     calibration can end if nothing more fails -- while a fail is open, the
     earliest it can end, with that fail's fix merged on the last day
     compared (``estimated_end``) -- and ``fund_test_plan`` the fund test's
-    start and bars if it does (``shadow.fund_test.fund_test_plan``); both
-    null before the start.
+    fixed start, and its looks and bars if it ends then: a look on or before
+    that end is skipped (``shadow.fund_test.fund_test_plan``); both null
+    before the start.
 
     Late runs (the owner's decision of 25 Sep 2026): ``mirrored`` lists
     every entry and ladder pass the copy mirrored as ``{day, ticker, at,
@@ -2171,7 +2167,7 @@ def calibration_json(
     them is in ``differences``: neither book traded. Over the limit, the
     status is "stopped", ``stop_reason`` says why, and ``end_estimate`` and
     ``fund_test_plan`` are null: a stopped calibration has no end date, and
-    the fund test's start is not worked out from it.
+    which looks the fund test can read is not worked out from it.
     """
     started = start is not None and result is not None
     metrics = result.metrics if started else None
@@ -2231,7 +2227,7 @@ def calibration_json(
 
 def calibration_report(
     *, snapshots: Sequence[Snapshot], entries: Sequence[JournalEntry], audit_lines: Sequence[str], start: date,
-    final_through: date, fetcher, not_shortable: frozenset[str] = frozenset(), days_needed: int = DAYS_NEEDED,
+    final_through: date, fetcher, not_shortable: Refusals = frozenset(), days_needed: int = DAYS_NEEDED,
     holding: Optional[dict] = None, fixes: Optional[Iterable[Fix]] = None,
 ) -> dict:
     """Fetch the bars, run the calibration and return its JSON part: what ``shadow.run`` prints.

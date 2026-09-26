@@ -13,10 +13,24 @@ What it contains depends on ``shadow/schedule.py`` and nothing else:
 * calibration started: the calibration fund against the real account,
   day by day, with the trades that differ. Still no fund is run -- during
   calibration only the match is reported.
-* fund start set: the four funds and the 1,000 coin-flip funds, from that
-  day, through the last final close -- and, listed after the four, the two
-  exploratory funds (``EXPLORATORY_FUNDS``), each compared with the model
-  fund. Every fund but VT also says how its longs and its shorts did.
+* calibration passed: the four funds and the 1,000 coin-flip funds, from
+  the fixed fund start (``schedule.FUND_START``, acting first on the cycle
+  of ``schedule.FUND_FIRST_CYCLE``), through the last final close -- and,
+  listed after the four, the three exploratory funds
+  (``EXPLORATORY_FUNDS``), each compared with the model fund. Every fund but
+  VT also says how its longs and its shorts did.
+
+**The hard gate** (the owner's decision of 26 Sep 2026): the fund start is
+fixed, but the fund test counts only after calibration passes. Until the
+calibration verdict is "passed", no fund is run: nothing about a fund's
+book, equity or trades is calculated, and ``funds`` and ``integrity`` are
+null (``build``). A delayed calibration delays the reading, never the start.
+
+Two reports that are not fund results are in every document from the fund
+start on, whatever calibration says: ``price_gaps`` (the price source's
+missing ticker-days per calendar month over the watchlist) and
+``held_names`` (the names the paper account held, so no fund could trade
+them, per cycle day).
 
 Reads the journal, the live audit log (read only), the account snapshots
 and yfinance. Writes nothing: the workflow redirects stdout.
@@ -42,10 +56,16 @@ from analysis.baseline_compare import OhlcFetcher  # noqa: E402
 from analysis.reader import JournalEntry, read_journal  # noqa: E402
 from analysis.returns import last_final_session  # noqa: E402
 from config import settings as cfg  # noqa: E402
+from config.market_calendar import is_trading_day  # noqa: E402
+from config.watchlist import DEFAULT_WATCHLIST  # noqa: E402
 from shadow import schedule  # noqa: E402
 from shadow.broker import ENTRY  # noqa: E402
 from shadow.fund import (  # noqa: E402
     CONVICTION_FIRST,
+    NO_PRICE,
+    OTHER_DAY,
+    OUTSIDE_HOURS,
+    SAME_DAY,
     STARTING_CASH,
     Fund,
     IndexFund,
@@ -63,14 +83,19 @@ log = logging.getLogger("shadow.run")
 
 INDEX_TICKER = "VT"
 LABELS = {"model": "Model", "momentum": "Momentum", "hybrid": "Hybrid", "vt": "VT (world index, held)",
-          "model_by_conviction": "Model, highest conviction first", "model_sized": "Model, sized by conviction"}
+          "model_by_conviction": "Model, highest conviction first", "model_sized": "Model, sized by conviction",
+          "model_same_day": "Model, entered the same day"}
 
-#: The owner's two exploratory funds (decisions 3 and 4 of 25 Sep 2026), in
-#: the order they are listed, after the four. The model's own signals, each
-#: with one thing changed: the buying order, then the size. Each is compared
+#: The owner's exploratory funds (decisions 3 and 4 of 25 Sep 2026, and
+#: ``model_same_day`` of 26 Sep 2026), in the order they are listed, after
+#: the four. The model's own signals, each with one thing changed: the
+#: buying order, the size, then the day and price of entry. Each is compared
 #: with the model fund, never ranked with the four: it cannot change the
 #: decision.
-EXPLORATORY_FUNDS: Final[tuple[str, ...]] = ("model_by_conviction", "model_sized")
+EXPLORATORY_FUNDS: Final[tuple[str, ...]] = ("model_by_conviction", "model_sized", "model_same_day")
+#: The same-day fund's lines not entered, by reason, as the JSON names them.
+NOT_ENTERED_KEYS: Final[dict[str, str]] = {NO_PRICE: "no_price", OUTSIDE_HOURS: "outside_hours",
+                                           OTHER_DAY: "other_day"}
 #: The fund an exploratory fund is compared with: same signals, one change.
 COMPARE_TO: Final[str] = "model"
 #: The lag of the Newey-West t on the daily difference from the model fund:
@@ -95,9 +120,31 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def not_shortable(audit_lines: Iterable[str]) -> frozenset[str]:
-    """Tickers the paper account has refused to short, from its own audit log."""
-    found: set[str] = set()
+def _refused_on(record: dict) -> date:
+    """The UTC day an audit line was written: its ``ts`` (UTC), else its result's timestamp.
+
+    UTC because the funds date a cycle by its UTC day (``shadow.fund.lines_by_day``),
+    and a refusal happens during the cycle that asked for the short. A line
+    that carries neither is dated ``date.min``: refused from the start, as
+    every refusal was before refusals were dated.
+    """
+    from shadow.calibration import _audit_instant, _instant
+
+    result = record.get("result") if isinstance(record.get("result"), dict) else {}
+    moment = _audit_instant(record.get("ts")) or _instant(result.get("timestamp"))
+    return moment.astimezone(timezone.utc).date() if moment is not None else date.min
+
+
+def not_shortable(audit_lines: Iterable[str]) -> dict[str, date]:
+    """Tickers the paper account has refused to short, from its own audit log: name -> first refusal day.
+
+    The day is the audit line's UTC day, the calendar the funds date cycles
+    on. A fund acting on a cycle journalled on day D is refused only the
+    names refused on D or earlier (``shadow.fund.refused_by``): a refusal
+    counts from the day it happened, never backwards (the owner's decision
+    of 26 Sep 2026).
+    """
+    found: dict[str, date] = {}
     for raw in audit_lines:
         if "short" not in raw and "borrow" not in raw:
             continue
@@ -105,12 +152,15 @@ def not_shortable(audit_lines: Iterable[str]) -> frozenset[str]:
             record = json.loads(raw)
         except json.JSONDecodeError:
             continue
+        if not isinstance(record, dict):
+            continue
         reason = str(((record.get("result") or {}).get("reason")) or "")
         for pattern in _NOT_SHORTABLE:
             match = pattern.search(reason)
             if match:
-                found.add(match.group(1).upper())
-    return frozenset(found)
+                ticker, day = match.group(1).upper(), _refused_on(record)
+                found[ticker] = min(day, found.get(ticker, day))
+    return dict(sorted(found.items()))
 
 
 # --------------------------------------------------------------------------- #
@@ -219,12 +269,21 @@ def summarise(fund, vt_return: Optional[float]) -> dict:
 
 
 def summarise_exploratory(fund, model, vt_return: Optional[float]) -> dict:
-    """An exploratory fund's row: every field a fund has, and how it compares with the model fund."""
-    return summarise(fund, vt_return) | {"compare_to": COMPARE_TO, "vs_model": vs_model(fund, model)}
+    """An exploratory fund's row: every field a fund has, and how it compares with the model fund.
+
+    The same-day fund's row also counts the directional lines it did not
+    enter, by reason (``not_entered``): no usable recorded price, recorded
+    outside regular New York hours, recorded on another day.
+    """
+    row = summarise(fund, vt_return) | {"compare_to": COMPARE_TO, "vs_model": vs_model(fund, model)}
+    if getattr(fund, "entry", None) == SAME_DAY:
+        counts = {key: fund.not_entered.get(reason, 0) for reason, key in NOT_ENTERED_KEYS.items()}
+        row["not_entered"] = counts | {"total": sum(counts.values())}
+    return row
 
 
-def exploratory_funds(feed: SimFeed, bars: Bars, shortable_no: frozenset[str]) -> list[Fund]:
-    """The two exploratory funds: the model fund with one thing changed each.
+def exploratory_funds(feed: SimFeed, bars: Bars, shortable_no) -> list[Fund]:
+    """The three exploratory funds: the model fund with one thing changed each.
 
     Same signals, feed, bars, costs, starting cash and short refusals as the
     model fund; everything else is the ``Fund`` defaults, which are
@@ -234,6 +293,7 @@ def exploratory_funds(feed: SimFeed, bars: Bars, shortable_no: frozenset[str]) -
         Fund("model_by_conviction", model_signal, feed, bars, not_shortable=shortable_no,
              priority=CONVICTION_FIRST),
         Fund("model_sized", model_signal, feed, bars, not_shortable=shortable_no, sized_by_conviction=True),
+        Fund("model_same_day", model_signal, feed, bars, not_shortable=shortable_no, entry=SAME_DAY),
     ]
 
 
@@ -296,13 +356,15 @@ def _coin_chunk(seeds: Sequence[int]) -> list[tuple[int, list[float], dict]]:
     feed = SimFeed(shared["bars"])
     funds = [Fund(f"coin-{seed}", coin_signal(seed), feed, shared["bars"],
                   not_shortable=shared["not_shortable"], order_detail=False) for seed in seeds]
-    run(funds, shared["sessions"], shared["cycles"], shared["ran"], feed)
+    run(funds, shared["sessions"], shared["cycles"], shared["ran"], feed, shared.get("first_cycle"))
     return [(seed, [d.equity for d in fund.days], integrity([fund]) | {"order_days": fund_summary(fund)["days"]})
             for seed, fund in zip(seeds, funds)]
 
 
-def coin_funds(count: int, processes: int, bars: Bars, sessions, cycles, ran, shortable_no) -> tuple[list[list[float]], dict]:
-    _SHARED.update(bars=bars, sessions=sessions, cycles=cycles, ran=ran, not_shortable=shortable_no)
+def coin_funds(count: int, processes: int, bars: Bars, sessions, cycles, ran, shortable_no,
+               first_cycle: Optional[date] = None) -> tuple[list[list[float]], dict]:
+    _SHARED.update(bars=bars, sessions=sessions, cycles=cycles, ran=ran, not_shortable=shortable_no,
+                   first_cycle=first_cycle)
     seeds = list(range(count))
     chunks = [seeds[i::max(1, processes)] for i in range(max(1, processes))]
     if processes > 1:
@@ -325,6 +387,78 @@ def coin_funds(count: int, processes: int, bars: Bars, sessions, cycles, ran, sh
 
 
 # --------------------------------------------------------------------------- #
+# Two reports that are not fund results: price gaps, held names
+# --------------------------------------------------------------------------- #
+
+
+def price_gaps(fetcher, first: date, last: date, tickers: Sequence[str] = tuple(DEFAULT_WATCHLIST)) -> dict:
+    """The price source's missing ticker-days, per calendar month (the owner's decision of 26 Sep 2026).
+
+    A ticker-day is missing when a watchlist ticker has no final bar on a
+    trading day (the exchange calendar: every watchlist name trades every
+    session). The share for a month is missing ticker-days / (watchlist
+    tickers x that month's sessions), over the sessions from ``first`` to
+    ``last``. Every fund leaves such a ticker's position as it was that day
+    (``shadow.fund``); this says how often it happened, not what it cost.
+    Bars come through the run's own fetcher (the race's ``OhlcFetcher``),
+    so a ticker the run already fetched is not fetched again. ``over`` is
+    the month's share above the owner's 2%
+    (``config.settings.MAX_PRICE_GAP_SHARE``), the line the daily health
+    check warns at.
+    """
+    MAX_PRICE_GAP_SHARE = cfg.MAX_PRICE_GAP_SHARE
+
+    sessions = [first + timedelta(days=i) for i in range((last - first).days + 1)]
+    sessions = [d for d in sessions if is_trading_day(d)]
+    out = {"from": first.isoformat(), "through": last.isoformat(), "tickers": len(tickers),
+           "limit": MAX_PRICE_GAP_SHARE, "months": []}
+    if not sessions:
+        return out
+    bars = Bars.fetch(tickers, first, last, fetcher)
+    months: dict[str, dict] = {}
+    for day in sessions:
+        month = months.setdefault(day.strftime("%Y-%m"), {"sessions": 0, "missing": 0, "days": {}})
+        month["sessions"] += 1
+        missing = [t for t in sorted(tickers) if bars.bar(t, day) is None]
+        month["missing"] += len(missing)
+        if missing:
+            month["days"][day.isoformat()] = len(missing)
+    for name, month in months.items():
+        share = month["missing"] / (len(tickers) * month["sessions"])
+        out["months"].append({"month": name, "sessions": month["sessions"], "missing": month["missing"],
+                              "share": share, "over": share > MAX_PRICE_GAP_SHARE, "by_day": month["days"]})
+    return out
+
+
+def held_names(entries: Iterable[JournalEntry], first: date) -> dict:
+    """Per cycle day from ``first``: the names the paper account held, so no fund could trade them.
+
+    The model is not asked about a name the paper account holds, so the
+    line is ``held`` and every fund skips it that day (the race's rule,
+    ``shadow.fund.lines_by_day``). A report, nothing more: the known
+    limitation of section 11.1, counted every day. ``names`` is the distinct
+    tickers, ``lines`` the held lines (a second cycle can repeat a name).
+    Days are the funds' own: UTC cycle days.
+    """
+    days: dict[date, dict] = {}
+    for entry in entries:
+        if entry.timestamp is None:
+            continue
+        stamp = entry.timestamp
+        day = (stamp.astimezone(timezone.utc) if stamp.tzinfo else stamp).date()
+        if day < first:
+            continue
+        row = days.setdefault(day, {"names": set(), "lines": 0, "asked": set()})
+        row["asked"].add(entry.ticker)
+        if entry.held:
+            row["names"].add(entry.ticker)
+            row["lines"] += 1
+    return {"from": first.isoformat(),
+            "days": [{"day": day.isoformat(), "names": len(row["names"]), "lines": row["lines"],
+                      "of": len(row["asked"])} for day, row in sorted(days.items())]}
+
+
+# --------------------------------------------------------------------------- #
 # Main
 # --------------------------------------------------------------------------- #
 
@@ -338,8 +472,16 @@ def _read_lines(path: Path) -> list[str]:
 
 def run_funds(
     entries: Sequence[JournalEntry], start: date, final_through: date, fetcher, *,
-    random_funds: int, processes: int, shortable_no: frozenset[str],
+    random_funds: int, processes: int, shortable_no, first_cycle: Optional[date] = None,
 ) -> tuple[dict, dict]:
+    """Every fund from ``start`` through ``final_through``. Called only once calibration has passed (``build``).
+
+    ``first_cycle`` is the cycle day the first session acts on at its open
+    (the fund test's 2026-09-28); without one, the first session acts on no
+    cycle. ``shortable_no`` is the paper account's refusals, name -> first
+    refusal day (``not_shortable``), or a plain set of names refused from
+    the start.
+    """
     cycles = lines_by_day(entries)
     ran = cycle_days(entries)
     tickers = {line.ticker for lines in cycles.values() for line in lines} | {INDEX_TICKER}
@@ -353,10 +495,11 @@ def run_funds(
         IndexFund("vt", INDEX_TICKER, bars),
     ]
     explore = exploratory_funds(feed, bars, shortable_no)
-    # One run for all six: the same sessions, cycles and feed clock.
-    run([*four, *explore], sessions, cycles, ran, feed)
+    # One run for all seven: the same sessions, cycles and feed clock.
+    run([*four, *explore], sessions, cycles, ran, feed, first_cycle)
     vt = four[-1].days[-1].equity / STARTING_CASH - 1.0 if four[-1].days else None
-    curves, coin_check = coin_funds(random_funds, processes, bars, sessions, cycles, ran, shortable_no)
+    curves, coin_check = coin_funds(random_funds, processes, bars, sessions, cycles, ran, shortable_no,
+                                    first_cycle)
     # The key keeps its name; the check covers the exploratory funds too.
     check = integrity([*four, *explore])
     model = next(f for f in four if f.name == COMPARE_TO)
@@ -393,13 +536,22 @@ def build(args: argparse.Namespace, now: datetime, fetchers: Optional[list] = No
             days_needed=schedule.CALIBRATION_DAYS, holding=holding,
         )
 
+    # The hard gate (the owner's decision of 26 Sep 2026): the fund start is
+    # fixed, but nothing about a fund is computed until calibration's
+    # verdict is a pass. Then every fund runs from the fixed start, with the
+    # code as merged.
     funds, checks = None, None
     fund_start = schedule.FUND_START
     passed = calibration.get("status") == "passed"
     if fund_start is not None and passed and fund_start <= final_through:
         funds, checks = run_funds(read.entries, fund_start, final_through, fetcher,
                                   random_funds=args.random, processes=args.processes,
-                                  shortable_no=shortable_no)
+                                  shortable_no=shortable_no, first_cycle=schedule.FUND_FIRST_CYCLE)
+    # Not fund results: the price source's gaps and the names no fund could
+    # trade, from the fund start on, whatever calibration says. After the
+    # funds and calibration, so their bars are fetched as they always were.
+    gaps = price_gaps(fetcher, fund_start, final_through) if fund_start is not None else None
+    held = held_names(read.entries, schedule.FUND_FIRST_CYCLE)
     return {
         "generated_at": now.isoformat(),
         "final_through": final_through.isoformat(),
@@ -412,9 +564,18 @@ def build(args: argparse.Namespace, now: datetime, fetchers: Optional[list] = No
             "sessions": len(funds["days"]) if funds else 0,
             "independent": (len(funds["days"]) // 3) if funds else None,
             "next_checkpoint": None,
+            "first_cycle": schedule.FUND_FIRST_CYCLE.isoformat(),
+            # Why nothing is shown yet, when nothing is: the gate, not the date.
+            "waiting_for": None if funds else ("calibration" if not passed else "the first session"),
         },
         "integrity": checks,
         "not_shortable": sorted(shortable_no),
+        # The day of each name's first refusal: a fund acting on a cycle of
+        # day D is refused only the names refused on D or earlier.
+        "not_shortable_since": ({t: (d.isoformat() if d != date.min else None) for t, d in shortable_no.items()}
+                                if isinstance(shortable_no, dict) else None),
+        "price_gaps": gaps,
+        "held_names": held,
         # The real paper account's own record, always: it is the account,
         # not a fund result. The calibration fund's is in "calibration" and
         # each fund's in its own row, shown when those are.

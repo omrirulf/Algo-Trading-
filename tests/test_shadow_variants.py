@@ -87,24 +87,29 @@ def entries_of(f: Fund) -> list[tuple[str, int]]:
 # --------------------------------------------------------------------------- #
 
 
-def test_the_two_exploratory_funds_are_named_labelled_and_listed_after_the_four():
-    assert shadow_run.EXPLORATORY_FUNDS == ("model_by_conviction", "model_sized")
+def test_the_exploratory_funds_are_named_labelled_and_listed_after_the_four():
+    from shadow.fund import NEXT_OPEN, SAME_DAY
+
+    assert shadow_run.EXPLORATORY_FUNDS == ("model_by_conviction", "model_sized", "model_same_day")
     assert shadow_run.LABELS["model_by_conviction"] == "Model, highest conviction first"
     assert shadow_run.LABELS["model_sized"] == "Model, sized by conviction"
+    assert shadow_run.LABELS["model_same_day"] == "Model, entered the same day"
     assert shadow_run.COMPARE_TO == "model" and shadow_run.VS_MODEL_LAG == 5
     feed = SimFeed(Bars({"MSFT": flat()}))
     funds = shadow_run.exploratory_funds(feed, feed._bars, frozenset({"LQD"}))
     assert [f.name for f in funds] == list(shadow_run.EXPLORATORY_FUNDS)
-    by_order, sized = funds
-    assert (by_order.priority, by_order.sized_by_conviction) == (CONVICTION_FIRST, False)
-    assert (sized.priority, sized.sized_by_conviction) == (WATCHLIST_FIRST, True)
+    by_order, sized, same_day = funds
+    assert (by_order.priority, by_order.sized_by_conviction, by_order.entry) == (CONVICTION_FIRST, False, NEXT_OPEN)
+    assert (sized.priority, sized.sized_by_conviction, sized.entry) == (WATCHLIST_FIRST, True, NEXT_OPEN)
+    assert (same_day.priority, same_day.sized_by_conviction, same_day.entry) == (WATCHLIST_FIRST, False, SAME_DAY)
     for f in funds:                                                 # same cash, costs and refusals
         assert f.broker.cash == STARTING_CASH and f.broker.not_shortable == frozenset({"LQD"})
         assert f.signal_for is model_signal
     # A fund built without saying otherwise -- every other fund, and the
     # calibration copy -- keeps production's order and size.
     plain = Fund("model", model_signal, feed, feed._bars)
-    assert (plain.priority, plain.sized_by_conviction) == (WATCHLIST_FIRST, False)
+    assert (plain.priority, plain.sized_by_conviction, plain.entry) == (WATCHLIST_FIRST, False, NEXT_OPEN)
+    assert plain.quotes is None                                     # it reads the feed itself
 
 
 def test_the_size_factors_are_the_owners_and_cover_everything_the_floor_lets_through():
@@ -622,7 +627,7 @@ class Walks:
         return frame.copy() if frame is not None else pd.DataFrame()
 
 
-def test_the_fund_output_lists_the_two_after_the_four_compared_with_the_model_fund(monkeypatch):
+def test_the_fund_output_lists_the_three_after_the_four_compared_with_the_model_fund(monkeypatch):
     bars = wider()
     sessions = S[:40]
     entries = journal_with_every_band(sessions)
@@ -638,11 +643,16 @@ def test_the_fund_output_lists_the_two_after_the_four_compared_with_the_model_fu
     json.dumps(checks, allow_nan=False)
     rows = {r["name"]: r for r in funds["list"]}
     assert [r["name"] for r in funds["list"]] == ["model", "momentum", "hybrid", "vt",
-                                                   "model_by_conviction", "model_sized"]
-    assert [r["exploratory"] for r in funds["list"]] == [False] * 4 + [True] * 2
-    assert [r["label"] for r in funds["list"]][4:] == ["Model, highest conviction first", "Model, sized by conviction"]
-    # The integrity check covers all six (the key keeps its name).
-    assert ["model", "momentum", "hybrid", "vt", "model_by_conviction", "model_sized"] in checked
+                                                   "model_by_conviction", "model_sized", "model_same_day"]
+    assert [r["exploratory"] for r in funds["list"]] == [False] * 4 + [True] * 3
+    assert [r["label"] for r in funds["list"]][4:] == ["Model, highest conviction first", "Model, sized by conviction",
+                                                       "Model, entered the same day"]
+    # The integrity check covers all seven (the key keeps its name).
+    assert ["model", "momentum", "hybrid", "vt", "model_by_conviction", "model_sized", "model_same_day"] in checked
+    # This journal has no recorded prices: the same-day fund enters nothing, and says why.
+    assert rows["model_same_day"]["trades"] == 0
+    assert rows["model_same_day"]["not_entered"]["no_price"] == rows["model_same_day"]["not_entered"]["total"] > 0
+    assert all("not_entered" not in rows[n] for n in ("model", "model_by_conviction", "model_sized"))
     assert checks["four"]["ok"], checks["four"]["problems"]
     model = rows["model"]
     assert model["order_matters"]["days"] > 0                                # the order had room to matter
@@ -668,17 +678,19 @@ def test_the_fund_output_lists_the_two_after_the_four_compared_with_the_model_fu
     assert [round(d.equity, 2) for d in alone.days] == model["equity"]
 
 
-def test_the_smoke_check_runs_the_two_exploratory_funds_and_reports_only_health(monkeypatch, capsys, tmp_path):
+def test_the_smoke_check_runs_the_three_exploratory_funds_and_reports_only_health(monkeypatch, capsys, tmp_path):
     from tests.test_shadow_smoke import ALLOWED, Flat, entry
 
     entries = [entry(1, "NVDA"), entry(1, "XOM", "BEARISH"), entry(2, "MSFT"), entry(5, "LQD", "BEARISH")]
     report = smoke.smoke(entries, 5, 2, Flat(), date(2026, 10, 7), frozenset({"LQD"}), exploratory=True)
     assert [r["name"] for r in report] == ["model", "momentum", "hybrid", "vt", "model_by_conviction",
-                                           "model_sized", "coin-0", "coin-1"]
+                                           "model_sized", "model_same_day", "coin-0", "coin-1"]
     for row in report:
         assert set(row) <= ALLOWED, row
     for row in report[4:6]:
         assert row["problems"] == [] and row["sessions"] == 5 and row["accepted"] == 3
+    # These lines carry no recorded price: the same-day fund enters none of them.
+    assert report[6]["problems"] == [] and report[6]["sessions"] == 5 and report[6]["accepted"] == 0
 
     # The command line always asks for them.
     asked = {}

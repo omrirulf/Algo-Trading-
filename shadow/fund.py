@@ -65,15 +65,54 @@ the normal size; nothing here is reachable from either.
   size is the normal size times a factor set by its conviction
   (``CONVICTION_SIZES``). Watchlist order, as production. See
   ``Fund._execute`` for how that is done inside the unchanged engine.
+
+A third, the owner's decision of 26 Sep 2026:
+
+* **Same day** (``entry=SAME_DAY``). Each line is entered on its own
+  session, at the price recorded on the journal line when its signal was
+  made (its ``live`` record, ``orchestrator/live_price.py``), instead of at
+  the next open: a buy at the recorded ask, a short at the recorded bid, or
+  at the recorded last trade when that side is missing, plus the same cost.
+  The day is the one above with the entries moved: at the open, stops the
+  price gapped through and the manager (on the previous cycle, as every
+  fund); during the session, the stops of the positions already held;
+  THEN the day's own lines, through the same production engine, which sizes
+  and stops them on the recorded price (``RecordedQuote``); at the close,
+  the marks. So a new position's stop is first checked at the next
+  session's open. Its ATR is the production method on the bars known at the
+  session's open, as for every fund: daily bars say nothing about the range
+  between the open and the moment the signal was made. The rest of the book
+  is valued at the session's open when the engine sizes, as at every
+  fund's entries. A directional line with no usable recorded price (no
+  ``live`` record, one with an ``error``, no positive price for its side,
+  or no readable ``asked_at``), recorded outside regular New York hours
+  (09:30 to 16:00, 13:00 on a half day; ``shadow.market.in_regular_hours``),
+  or recorded on another New York day than its session, is not entered, and
+  each is counted by reason (``Fund.not_entered``). Its first cycle is the
+  one journalled on its first session: the cycle of the day before, which
+  the others enter at that first open, it would have entered the day
+  before, outside the sample.
+
+Short refusals are dated
+------------------------
+A fund is refused a short in a name the paper account was refused one in
+(``shadow.run.not_shortable``: name -> the UTC day of its first refusal,
+the calendar the cycles are dated on). A refusal counts only from the day it
+happened, never backwards: a cycle journalled on day D is blocked only by
+refusals recorded on day D or earlier (the owner's decision of 26 Sep 2026),
+so a new refusal can never change a past result. A plain set of names, with
+no day, is refused from the start.
 """
 
 from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from datetime import date, timezone
+from collections import Counter
+from datetime import date, datetime, timezone
 from itertools import groupby
-from typing import Callable, Final, Iterable, Optional, Sequence
+from typing import Callable, Final, Iterable, Mapping, Optional, Sequence, Union
+from zoneinfo import ZoneInfo
 
 from analysis.reader import JournalEntry
 from app import risk_engine
@@ -83,7 +122,7 @@ from app.schemas import Bias, ExecutionResult, ExecutionStatus, LLMSignal
 from config.watchlist import DEFAULT_WATCHLIST
 from shadow.audit import FundAudit
 from shadow.broker import DEFAULT_COST_PER_SIDE, SimBroker
-from shadow.market import Bars, SimFeed
+from shadow.market import Bars, SimFeed, in_regular_hours
 
 STARTING_CASH = 100_000.0
 
@@ -114,6 +153,99 @@ def dispatch_order(line: Line) -> tuple:
 #: The two buying orders a fund can use. Production's is the watchlist's.
 WATCHLIST_FIRST: Final[str] = "watchlist"
 CONVICTION_FIRST: Final[str] = "conviction"
+
+#: When a fund enters a cycle's lines: at the next session's open, as the
+#: race and every fund but one; or on the line's own session, at the price
+#: recorded when its signal was made (the exploratory ``model_same_day``).
+NEXT_OPEN: Final[str] = "next_open"
+SAME_DAY: Final[str] = "same_day"
+
+#: Why the same-day fund did not enter a directional line.
+NO_PRICE: Final[str] = "no recorded price"
+OUTSIDE_HOURS: Final[str] = "recorded outside regular hours"
+OTHER_DAY: Final[str] = "recorded on another day"
+NOT_ENTERED_REASONS: Final[tuple[str, ...]] = (NO_PRICE, OUTSIDE_HOURS, OTHER_DAY)
+
+_NY = ZoneInfo("America/New_York")
+
+#: Refusals as a fund takes them: name -> the day of the first refusal, or
+#: a plain set of names refused from the start.
+Refusals = Union[Mapping[str, date], Iterable[str]]
+
+
+def refusal_days(refusals: Refusals) -> dict[str, date]:
+    """Name -> the first day a short in it was refused; ``date.min`` for an undated name."""
+    if isinstance(refusals, Mapping):
+        return {str(t).strip().upper(): d for t, d in refusals.items()}
+    return {str(t).strip().upper(): date.min for t in refusals}
+
+
+def refused_by(refusals: Mapping[str, date], cycle_day: date) -> frozenset[str]:
+    """The names a fund acting on ``cycle_day``'s cycle may not short: refused on that day or earlier."""
+    return frozenset(t for t, d in refusals.items() if d <= cycle_day)
+
+
+def _positive(value: object) -> Optional[float]:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    number = float(value)
+    return number if math.isfinite(number) and number > 0 else None
+
+
+def _moment(value: object) -> Optional[datetime]:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    text = value.strip()
+    try:
+        moment = datetime.fromisoformat(text[:-1] + "+00:00" if text.endswith(("Z", "z")) else text)
+    except ValueError:
+        return None
+    return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+
+
+def recorded_fill(entry: JournalEntry, side: str, session: date) -> tuple[Optional[float], Optional[str]]:
+    """The price a same-day entry fills at, from the line's ``live`` record, or why there is none.
+
+    ``side`` is the entry's: "buy" fills at the recorded ask, "sell" (a
+    short) at the recorded bid, either at the recorded last trade when that
+    side is missing. Returns ``(price, None)``, or ``(None, reason)`` with a
+    reason from ``NOT_ENTERED_REASONS``.
+    """
+    live = entry.live
+    if live is None or live.get("error") is not None:
+        return None, NO_PRICE
+    price = _positive(live.get("ask" if side == "buy" else "bid")) or _positive(live.get("price"))
+    asked = _moment(live.get("asked_at"))
+    if price is None or asked is None:
+        return None, NO_PRICE
+    if not in_regular_hours(asked):
+        return None, OUTSIDE_HOURS
+    if asked.astimezone(_NY).date() != session:
+        return None, OTHER_DAY
+    return price, None
+
+
+class RecordedQuote:
+    """The shared feed, except for the one line being entered at the price recorded for it.
+
+    The same-day fund's engine, broker and manager read prices through
+    this. ``price`` holds at most one ticker, and only while that line is
+    dispatched (``Fund._enter``); otherwise every answer is the feed's own.
+    """
+
+    def __init__(self, feed: SimFeed) -> None:
+        self._feed = feed
+        self.price: dict[str, float] = {}
+
+    def get_latest_price(self, ticker: str) -> float:
+        recorded = self.price.get(ticker.strip().upper())
+        return recorded if recorded is not None else self._feed.get_latest_price(ticker)
+
+    def get_atr(self, ticker: str) -> float:
+        return self._feed.get_atr(ticker)
+
+    def __getattr__(self, name: str):
+        return getattr(self._feed, name)
 
 
 def by_conviction(signals: Sequence[tuple[Line, Optional[LLMSignal]]]) -> list[tuple[Line, Optional[LLMSignal]]]:
@@ -283,11 +415,15 @@ class Fund:
     def __init__(
         self, name: str, signal_for: SignalFor, feed: SimFeed, bars: Bars, *,
         cash: float = STARTING_CASH, cost_per_side: float = DEFAULT_COST_PER_SIDE,
-        not_shortable: frozenset[str] = frozenset(), keep_actions: bool = False, order_detail: bool = True,
-        priority: str = WATCHLIST_FIRST, sized_by_conviction: bool = False,
+        not_shortable: Refusals = frozenset(), keep_actions: bool = False, order_detail: bool = True,
+        priority: str = WATCHLIST_FIRST, sized_by_conviction: bool = False, entry: str = NEXT_OPEN,
     ) -> None:
         if priority not in (WATCHLIST_FIRST, CONVICTION_FIRST):
             raise ValueError(f"priority must be {WATCHLIST_FIRST!r} or {CONVICTION_FIRST!r}, got {priority!r}")
+        if entry not in (NEXT_OPEN, SAME_DAY):
+            raise ValueError(f"entry must be {NEXT_OPEN!r} or {SAME_DAY!r}, got {entry!r}")
+        if entry == SAME_DAY and priority != WATCHLIST_FIRST:
+            raise ValueError("a same-day fund dispatches in watchlist order")
         self.name = name
         self.signal_for = signal_for
         self.bars = bars
@@ -297,8 +433,18 @@ class Fund:
         self.priority = priority
         #: The exploratory "sized by conviction" fund only: see ``_execute``.
         self.sized_by_conviction = sized_by_conviction
+        #: When this fund enters a cycle's lines (``NEXT_OPEN`` or ``SAME_DAY``).
+        self.entry = entry
+        #: Name -> the day of the paper account's first refusal to short it.
+        #: The broker is refused the names refused by the day of the cycle
+        #: being dispatched, set in ``_enter``; until then, every name.
+        self.refused_on = refusal_days(not_shortable)
+        #: The same-day fund's prices: the feed's, but the recorded price for
+        #: the line being entered. Every other fund reads the feed itself.
+        self.quotes: Optional[RecordedQuote] = RecordedQuote(feed) if entry == SAME_DAY else None
+        feed = self.quotes if self.quotes is not None else feed
         self.broker = SimBroker(name=name, cash=cash, quote=feed.get_latest_price,
-                                cost_per_side=cost_per_side, not_shortable=not_shortable)
+                                cost_per_side=cost_per_side, not_shortable=frozenset(self.refused_on))
         self.audit = FundAudit(name, keep_actions=keep_actions)
         self.engine = ExecutionEngine(self.broker, feed, audit_logger=self.audit.logger)
         self.manager = PositionManager(self.broker, feed, audit_path=self.audit,
@@ -318,8 +464,12 @@ class Fund:
         self.order_days_seen: set = set()
         #: Cycles in which at least one signal was dispatched.
         self.cycles_dispatched = 0
+        #: The same-day fund only: directional lines it did not enter, by
+        #: reason (``NOT_ENTERED_REASONS``).
+        self.not_entered: Counter = Counter()
 
-    def session(self, day: date, cycle: Optional[Sequence[Line]], manage: bool = True) -> Day:
+    def session(self, day: date, cycle: Optional[Sequence[Line]], manage: bool = True,
+                today: Optional[Sequence[Line]] = None) -> Day:
         """One session. ``cycle`` is the previous day's lines, or None if none ran.
 
         ``manage`` is for the calibration copy alone: False when the real
@@ -327,6 +477,11 @@ class Fund:
         the market was closed, so the copy skips it too
         (``shadow.calibration``, "Late runs"). Every fund leaves it at True,
         and then a session is exactly what it always was.
+
+        ``today`` is this session's own lines, or None if no cycle ran
+        today: read by the same-day fund alone, which enters them after the
+        session's stops (see the module docstring). Every other fund enters
+        ``cycle`` at the open and ignores it.
         """
         broker = self.broker
         broker.day = day
@@ -342,7 +497,8 @@ class Fund:
         if cycle is not None:
             if manage:
                 self._manage()
-            self._enter(cycle)
+            if self.entry == NEXT_OPEN:
+                self._enter(cycle)
         # New positions' bars, for their stops and marks.
         for ticker in sorted(broker.positions):
             if ticker not in closes:
@@ -350,6 +506,15 @@ class Fund:
                 if bar is not None:
                     opens[ticker], highs[ticker], lows[ticker], closes[ticker], dividends[ticker] = bar
         broker.fill_touched_stops(lows, highs)
+        if self.entry == SAME_DAY and today is not None:
+            # After the session's stops: a new position's stop is first
+            # checked at the next open. Its bar is read for the close's mark.
+            self._enter(today, recorded=True)
+            for ticker in sorted(broker.positions):
+                if ticker not in closes:
+                    bar = self.bars.bar(ticker, day)
+                    if bar is not None:
+                        opens[ticker], highs[ticker], lows[ticker], closes[ticker], dividends[ticker] = bar
         broker.pay_dividends({t: d for t, d in dividends.items() if d}, held_at_open)
         broker.remember_marks(closes)
         record = Day(day, broker.equity(closes), broker.cash, broker.gross(closes), len(broker.positions))
@@ -372,17 +537,23 @@ class Fund:
             if action.r_estimated:
                 self.tally.estimated_r += 1
 
-    def _enter(self, cycle: Sequence[Line]) -> None:
+    def _enter(self, cycle: Sequence[Line], recorded: bool = False) -> None:
+        """Dispatch a cycle's lines; ``recorded``: the same-day fund, each at its recorded price."""
         from shadow.order_matters import Event, capacity_kind
 
         dispatched = False
         signals = [(line, self.signal_for(line)) for line in cycle]
+        refused_for: Optional[date] = None
         # One journal cycle at a time (``lines_by_day`` hands them over cycle
         # by cycle), so that the "highest conviction first" fund chooses each
         # cycle's order on the book the cycles before it left. For every
         # other fund this is the list as it came, in the order it came.
         for _, batch in groupby(signals, key=lambda pair: pair[0].cycle):
             batch = list(batch)
+            if batch[0][0].day != refused_for:
+                # Dated refusals: only those recorded on the cycle's day or before.
+                refused_for = batch[0][0].day
+                self.broker.not_shortable = refused_by(self.refused_on, refused_for)
             if self.priority == CONVICTION_FIRST and self._short_of_room(batch):
                 batch = by_conviction(batch)
             for line, signal in batch:
@@ -396,7 +567,23 @@ class Fund:
                     continue
                 if signal is None:
                     continue
-                result, cap = self._execute(signal)
+                if recorded and signal.bias is not Bias.NEUTRAL:
+                    price, why = recorded_fill(line.entry, "buy" if signal.bias is Bias.BULLISH else "sell",
+                                               self.broker.day)
+                    if why is not None:
+                        self.not_entered[why] += 1
+                        if self.decisions is not None:
+                            self.decisions.append(Decision(self.broker.day, line.day, line.ticker,
+                                                           signal.bias.value, signal.conviction, "SKIPPED",
+                                                           why, False))
+                        continue
+                    self.quotes.price[line.ticker] = price
+                    try:
+                        result, cap = self._execute(signal)
+                    finally:
+                        self.quotes.price.clear()
+                else:
+                    result, cap = self._execute(signal)
                 dispatched = True
                 accepted = result.status is ExecutionStatus.ACCEPTED
                 kind = None if accepted else capacity_kind(result.reason, cap)
@@ -552,29 +739,37 @@ class IndexFund:
 
 def run(
     funds: Sequence, sessions: Sequence[date], cycles: dict[date, list[Line]],
-    ran: set[date], feed: SimFeed,
+    ran: set[date], feed: SimFeed, previous: Optional[date] = None,
 ) -> None:
     """Every fund through every session, the feed's clock moved once per session.
 
     ``cycles`` maps a cycle day to its actionable lines; ``ran`` is every
-    cycle day at all. A session acts on the cycle of the session before it.
+    cycle day at all. A session acts on the cycle of the session before it;
+    the first session on the cycle of ``previous``, when one is given (the
+    fund test's first cycle, 2026-09-28, acted on at the 2026-09-29 open).
+    A same-day fund (``SAME_DAY``) is also handed the session's own cycle.
     """
     from shadow.audit import live_audit_guarded
 
-    previous: Optional[date] = None
     with live_audit_guarded():
         for session in sessions:
             feed.at_open(session)
             cycle: Optional[list[Line]] = None
             if previous is not None and previous in ran:
                 cycle = cycles.get(previous, [])
+            today = cycles.get(session, []) if session in ran else None
             for fund in funds:
-                fund.session(session, cycle)
+                if getattr(fund, "entry", NEXT_OPEN) == SAME_DAY:
+                    fund.session(session, cycle, today=today)
+                else:
+                    fund.session(session, cycle)
             previous = session
 
 
 __all__ = [
-    "CONVICTION_FIRST", "CONVICTION_SIZES", "Day", "Decision", "Fund", "IndexFund", "Line", "STARTING_CASH",
-    "Tally", "WATCHLIST_FIRST", "by_conviction", "coin_signal", "conviction_factor", "cycle_days",
-    "dispatch_order", "lines_by_day", "model_signal", "rule_signal", "run",
+    "CONVICTION_FIRST", "CONVICTION_SIZES", "Day", "Decision", "Fund", "IndexFund", "Line", "NEXT_OPEN",
+    "NOT_ENTERED_REASONS", "NO_PRICE", "OTHER_DAY", "OUTSIDE_HOURS", "RecordedQuote", "Refusals", "SAME_DAY",
+    "STARTING_CASH", "Tally", "WATCHLIST_FIRST", "by_conviction", "coin_signal", "conviction_factor",
+    "cycle_days", "dispatch_order", "lines_by_day", "model_signal", "recorded_fill", "refusal_days",
+    "refused_by", "rule_signal", "run",
 ]

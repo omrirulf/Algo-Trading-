@@ -432,6 +432,69 @@ def obrien_fleming_bars(information: Sequence[float], alpha: float = 0.05, point
     return [c / math.sqrt(t) for t in fractions]
 
 
+def spent_by(share: float, alpha: float = 0.05) -> float:
+    """The O'Brien-Fleming-type spending function (Lan and DeMets 1983) at a share of the data.
+
+    alpha(t) = 2 - 2 Phi(z_{1 - alpha/2} / sqrt(t)): almost nothing early,
+    all of ``alpha`` at t = 1 and after.
+    """
+    from statistics import NormalDist
+
+    if share >= 1.0:
+        return alpha
+    if share <= 0.0:
+        return 0.0
+    normal = NormalDist()
+    return min(alpha, 2.0 - 2.0 * normal.cdf(normal.inv_cdf(1.0 - alpha / 2.0) / math.sqrt(share)))
+
+
+def spending_bars(shares: Sequence[float], alpha: float = 0.05, used: Sequence[float] = (),
+                  points: int = 1001) -> list[float]:
+    """Two-sided bars by an O'Brien-Fleming-type alpha-spending rule, one look at a time.
+
+    ``shares`` are the looks' shares of the final data, increasing; the
+    last look read counts as 1. ``used`` are the bars already used at the
+    first looks, which never change: they are returned as given, and each
+    later bar is the one that brings the chance of having crossed any bar so
+    far, when there is no effect, exactly to ``spent_by(t_k)`` -- found by
+    bisection on the same grid integration that gives the race's bars
+    (``_crossing``). A look that was skipped is simply not in ``shares``: it
+    used no bar and spent nothing, and the next look's bar spends what the
+    rule allows by its own share.
+
+    The fund test's bars (the owner's decision of 26 Sep 2026). The race's
+    bars stay ``obrien_fleming_bars``.
+    """
+    shares = [float(s) for s in shares]
+    if any(b <= a for a, b in zip(shares, shares[1:])) or (shares and shares[0] <= 0.0):
+        raise ValueError(f"shares must be positive and increasing, got {shares}")
+    bars = [float(b) for b in used]
+    if len(bars) > len(shares):
+        raise ValueError(f"{len(bars)} bars used for {len(shares)} looks")
+    for k in range(len(bars), len(shares)):
+        target = spent_by(shares[k], alpha)
+        low, high = 0.0, 60.0
+        for _ in range(80):
+            mid = (low + high) / 2.0
+            if _crossing([*bars, mid], shares[:k + 1], points) > target:
+                low = mid
+            else:
+                high = mid
+        bars.append((low + high) / 2.0)
+    return bars
+
+
+def rounded_bar(bar: float) -> float:
+    """A bar as the pre-registration prints it: the exact value to three
+    decimals, and that to two, half up -- the way the race's 3.471, 2.454
+    and 2.004 became 3.47, 2.45 and 2.00. For the fund test's 3.3948 this
+    gives 3.395 and then 3.40, the planned bar the owner approved (rounding
+    3.3948 straight to two decimals would give 3.39)."""
+    from decimal import ROUND_HALF_UP, Decimal
+
+    return float(Decimal(repr(round(bar, 3))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+
 def index_gaps(bars: Sequence[tuple[date, float, float, float]], days: Sequence[date]) -> set[date]:
     """The entry days the index has no bar for and never will: see ``INDEX_GAP_SETTLE_SESSIONS``."""
     have = {bar[0] for bar in bars}
@@ -801,6 +864,9 @@ __all__ = [
     "next_look",
     "next_trading_day",
     "obrien_fleming_bars",
+    "rounded_bar",
+    "spending_bars",
+    "spent_by",
     "status_line",
     "trading_days_after",
 ]

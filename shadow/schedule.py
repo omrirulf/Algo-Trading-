@@ -1,17 +1,23 @@
 """When calibration and the fund test start. Set by the owner's decision, never by the code.
 
-Both are ``None`` until the owner says otherwise, in a reviewed change to
-this file:
-
 * ``CALIBRATION_START`` -- the trading day whose close seeds the calibration
-  fund from the real paper account. It is set only after the owner has
-  approved the pass rule in ``shadow.calibration.PASS_RULE``; until
-  then calibration has not started, whatever the code could compute.
-* ``FUND_START`` -- the first trading day after calibration passes, and the
-  day the four funds (and the thousand coin-flip funds) start with $100,000
-  each. Until it is set, no fund is run and nothing about how the funds
-  compare is printed: during calibration, only the calibration match is
-  reported.
+  fund from the real paper account. ``None`` until the owner sets it, in a
+  reviewed change to this file, and only after the owner has approved the
+  pass rule in ``shadow.calibration.PASS_RULE``; until then calibration has
+  not started, whatever the code could compute.
+* ``FUND_START`` -- the first fund session: the day the four funds (the
+  exploratory funds and the thousand coin-flip funds too) start with
+  $100,000 each. Fixed by the owner's decision of 26 Sep 2026: the funds act
+  on the cycle journalled on ``FUND_FIRST_CYCLE`` (Monday 28 Sep 2026) at the
+  next open, so the first fund session is 29 Sep 2026, and the fund test's
+  sample runs from it. It does not move when calibration is delayed.
+* The fund test still **counts only after calibration passes**. Until the
+  calibration verdict is a pass, no fund is run and no fund result is
+  calculated or shown (``shadow.run.build``): during calibration only the
+  calibration match is reported. When it passes, every fund is run from
+  ``FUND_FIRST_CYCLE`` with the code as merged -- after a calibration fix,
+  with the fixed code only -- so a delayed calibration delays the reading,
+  never the start.
 
 ``CALIBRATION_FIXES`` is the third thing only a reviewed change sets: the
 record of every fix made after a calibration fail (the owner's fail rule of
@@ -40,33 +46,43 @@ CALIBRATION_FIXES: Final[tuple[tuple[date, str], ...]] = ()
 #: day ``CALIBRATION_DAYS`` or at the last fix + 5 days, whichever is later.
 AFTER_FIX_DAYS: Final[int] = 5
 
-FUND_START: Optional[date] = None
+#: The cycle day whose lines the funds act on first, at the next open (the
+#: owner's decision of 26 Sep 2026).
+FUND_FIRST_CYCLE: Final[date] = date(2026, 9, 28)
+#: The first fund session: the trading day after ``FUND_FIRST_CYCLE``. The
+#: fund test's sample runs from it.
+FUND_START: Final[date] = date(2026, 9, 29)
 
 #: The fund test's three looks are read on the race's look days, with bars
 #: from the fund test's OWN share of its data at each (the owner's decision
-#: of 24 Sep 2026), not the race's. Planned: calibration seeded from the
-#: 2026-09-25 close, 15 sessions to 2026-10-16, the funds starting on the
-#: next session, 2026-10-19; the race's looks estimated at 2026-12-22,
-#: 2027-03-22 and 2027-06-16. That is 46, 106 and 166 fund sessions.
-FUND_TEST_PLANNED_START: Final[date] = date(2026, 10, 19)
-FUND_TEST_PLANNED_SESSIONS: Final[tuple[int, int, int]] = (46, 106, 166)
+#: of 24 Sep 2026), not the race's. The start is fixed (above), so the plan
+#: does not depend on when calibration ends: from the 2026-09-29 session to
+#: the race's looks, estimated at 2026-12-22, 2027-03-22 and 2027-06-16, that
+#: is 60, 120 and 180 fund sessions.
+FUND_TEST_PLANNED_START: Final[date] = FUND_START
+FUND_TEST_PLANNED_SESSIONS: Final[tuple[int, int, int]] = (60, 120, 180)
 #: The race's estimated look days, as above: the registered sessions and
 #: bars were computed from these. ``shadow.fund_test.fund_test_plan``
-#: counts from them again when calibration's end moves.
+#: counts from them again, and skips a look that comes before calibration
+#: has passed.
 FUND_TEST_LOOK_ESTIMATES: Final[tuple[date, date, date]] = (
     date(2026, 12, 22), date(2027, 3, 22), date(2027, 6, 16))
-#: O'Brien-Fleming for those shares, two-sided 5% overall
-#: (``analysis.decision_gate.obrien_fleming_bars``): exactly 3.797, 2.501
-#: and 1.999, rounded as the race's are. If the start or the look days move,
-#: these are recomputed by the same function and the change is logged in the
-#: pre-registration's Amendments table before the fund test starts.
-FUND_TEST_BARS: Final[tuple[float, float, float]] = (3.80, 2.50, 2.00)
+#: The O'Brien-Fleming-type alpha-spending rule (Lan-DeMets, the owner's
+#: decision of 26 Sep 2026; ``analysis.decision_gate.spending_bars``), two-
+#: sided 5% overall, at shares 60/180, 120/180 and 1 of the planned final
+#: sessions: exactly 3.395, 2.407 and 2.015, printed as the pre-registration
+#: prints them (``analysis.decision_gate.rounded_bar``). If a look moves, or
+#: is skipped because calibration has not passed, the bar is computed at the
+#: look by the same rule from the fund sessions actually there, with the
+#: bars already used kept, and logged in the Amendments table the day it is
+#: used. The race's bars are not these (``analysis.decision_gate.CHECKPOINTS``).
+FUND_TEST_BARS: Final[tuple[float, float, float]] = (3.40, 2.41, 2.02)
 
 #: The four funds, in the order they are reported.
 FUNDS: Final[tuple[str, ...]] = ("model", "momentum", "hybrid", "vt")
 #: Coin-flip funds drawn for the band of what luck alone does.
 RANDOM_FUNDS: Final[int] = 1000
 
-__all__ = ["AFTER_FIX_DAYS", "CALIBRATION_DAYS", "CALIBRATION_FIXES", "CALIBRATION_START", "FUNDS", "FUND_START",
-           "FUND_TEST_BARS", "FUND_TEST_LOOK_ESTIMATES", "FUND_TEST_PLANNED_SESSIONS", "FUND_TEST_PLANNED_START",
-           "RANDOM_FUNDS"]
+__all__ = ["AFTER_FIX_DAYS", "CALIBRATION_DAYS", "CALIBRATION_FIXES", "CALIBRATION_START", "FUNDS",
+           "FUND_FIRST_CYCLE", "FUND_START", "FUND_TEST_BARS", "FUND_TEST_LOOK_ESTIMATES",
+           "FUND_TEST_PLANNED_SESSIONS", "FUND_TEST_PLANNED_START", "RANDOM_FUNDS"]

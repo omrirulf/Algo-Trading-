@@ -606,6 +606,14 @@ BLEND_STALE_AFTER_DAYS: Final[int] = 14
 #: (github-authentication-token-expiration), so the UTC day is the 30th.
 GITHUB_DISPATCH_TOKEN_EXPIRES: Final[Optional[date]] = date(2027, 7, 30)
 
+#: The owner's line for the price source's gaps (26 Sep 2026; the fund
+#: test's pre-registration, section 11.2): a calendar month whose missing
+#: ticker-days are more than 2% of watchlist tickers x sessions raises a
+#: warning in the daily health check (``analysis.health.price_gaps``).
+#: ``shadow/run.py`` writes each month's share into ``logs/funds.json``
+#: (``price_gaps``) and marks it against this.
+MAX_PRICE_GAP_SHARE: Final[float] = 0.02
+
 #: How many days before that date the health check starts to warn.
 GITHUB_DISPATCH_TOKEN_WARN_DAYS: Final[int] = 14
 

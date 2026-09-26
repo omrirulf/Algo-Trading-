@@ -988,9 +988,11 @@ def test_the_json_carries_the_fail_rule():
     assert out["days_since_fix"] == 1 and out["days_after_fix_needed"] == 5
     # Days 1-13 are known; days 14-17 are counted forward in trading days.
     assert out["end_estimate"] == day(17).isoformat() == "2026-10-26"
+    # The fund test's start is fixed (the owner's decision of 26 Sep 2026):
+    # a later end moves nothing but which looks come before it.
     plan = out["fund_test_plan"]
-    assert plan["start"] == "2026-10-27" and plan["matches_registered"] is False
-    assert plan["registered"] == [3.80, 2.50, 2.00] and plan["registered_start"] == "2026-10-19"
+    assert plan["start"] == "2026-09-29" and plan["matches_registered"] is True
+    assert plan["registered"] == [3.40, 2.41, 2.02] and plan["registered_start"] == "2026-09-29"
     json.dumps(out, allow_nan=False)
 
 
@@ -1003,13 +1005,13 @@ def test_the_json_without_a_fix():
     assert out["fixes"] == [] and out["last_fix"] is None and out["days_since_fix"] is None
     assert out["days_after_fix_needed"] == 5
     assert out["end_estimate"] == "2026-10-22"
-    assert out["fund_test_plan"]["start"] == "2026-10-23"
+    assert out["fund_test_plan"]["start"] == "2026-09-29"
 
 
 def test_the_end_estimate_counts_trading_days_from_the_start():
-    """The registered plan: seeded from the 2026-09-25 close, day 15 is
-    2026-10-16, and the fund test starts on 2026-10-19 with its registered
-    bars. A fix moves the end, and with it the fund test's start and bars."""
+    """Seeded from the 2026-09-25 close, day 15 is 2026-10-16. A fix moves
+    the end; the fund test's start (2026-09-29) and its planned bars do not
+    move with it (the owner's decision of 26 Sep 2026)."""
     from shadow.fund_test import fund_test_plan
 
     start = date(2026, 9, 25)
@@ -1026,7 +1028,7 @@ def test_the_end_estimate_counts_trading_days_from_the_start():
     # A fix after day 3 leaves day 15 as the end.
     assert calib.end_estimate(start, known, ((date(2026, 9, 30), "x"),)) == planned
     moved = fund_test_plan(date(2026, 10, 21))
-    assert moved["start"] == "2026-10-22" and moved["matches_registered"] is False
+    assert moved["start"] == "2026-09-29" and moved["matches_registered"] is True
 
 
 #: The registered plan's seed: calibration seeded from the 2026-09-25 close.
@@ -1062,8 +1064,9 @@ def json_of(result: CalibrationResult, rule=APPROVED) -> dict:
 def test_an_open_fail_moves_the_end_before_its_fix_is_merged():
     """A fail needs a fix, the fix cannot be dated before the day the fail
     was seen, and five days must follow it. So the night a fail on day 15
-    is seen, the page already says the end is a week later and the fund
-    test's registered start and bars no longer hold -- not after the fix."""
+    is seen, the page already says the end is a week later -- not after the
+    fix. The fund test's start and planned bars hold all the same: its start
+    is fixed, and no look comes before the new end."""
     assert (plan_day(12), plan_day(15)) == (date(2026, 10, 13), date(2026, 10, 16))
     clean = json_of(on_the_registered_plan(15))
     assert clean["status"] == "passed" and clean["end_estimate"] == "2026-10-16"
@@ -1072,8 +1075,8 @@ def test_an_open_fail_moves_the_end_before_its_fix_is_merged():
     failed = json_of(on_the_registered_plan(15, off_on=15))
     assert failed["status"] == "failed"
     assert failed["end_estimate"] == "2026-10-23"                             # day 20
-    assert failed["fund_test_plan"]["start"] == "2026-10-26"
-    assert failed["fund_test_plan"]["matches_registered"] is False
+    assert failed["fund_test_plan"]["start"] == "2026-09-29"
+    assert failed["fund_test_plan"]["matches_registered"] is True
     # The fix it assumes is not a fix: nothing about fixes says one was made.
     assert (failed["fixes"], failed["last_fix"], failed["days_since_fix"], failed["days_needed"]) == (
         [], None, None, 15)
