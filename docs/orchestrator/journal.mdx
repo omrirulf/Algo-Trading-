@@ -137,6 +137,30 @@ the real account buys the same day, about one day earlier. An exploratory
 "same-day entry" table may later be built from `live`, to see how much that
 day costs each arm. It has not been built.
 
+## The model calls behind a line
+
+From the first cycle after 26 Sep 2026, a line whose ticker the model was
+asked about carries one more key, `model_calls`: one entry per HTTP ask made
+for it — a retry after a 429 or a timeout, and the re-ask after an
+off-schema answer, are entries of their own.
+
+```json
+"model_calls": [
+  {"call_id": "5f0c…", "prompt_sha256": "9a1e…", "answer_sha256": "c47b…"}
+]
+```
+
+The bodies themselves — the request exactly as sent, every message and
+parameter, and the response exactly as received, reasoning text included —
+are too large to commit. They are written by `orchestrator/model_io.py` to
+`logs/model_io/` (gitignored), kept as a 90-day workflow artifact and pushed
+to the archive's private Storage bucket ([Database](/database#every-model-call-in-full)).
+The two hashes make any copy of them checkable against this line with git
+alone: `prompt_sha256` is the SHA-256 of the request body as canonical JSON,
+`answer_sha256` of the response body. A line with no call (held, a context
+failure, a cycle run outside the heartbeat) has no `model_calls` key at all.
+Nothing that decides anything reads it.
+
 ## Why the whole context is stored
 
 The per-dimension scores are only useful next to the data that produced them.

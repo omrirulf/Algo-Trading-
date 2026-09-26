@@ -70,7 +70,12 @@ def logs(tmp_path, journal_lines=2):
 
 
 def args(journal, audit, *extra):
-    return ["--journal", str(journal), "--audit", str(audit), *extra]
+    # The account log and the model-call captures are pointed at nothing, so
+    # these tests send the two logs they are about and never read the
+    # repository's own logs/ (tests/test_archive_capture.py covers the rest).
+    nowhere = journal.parent / "not-here"
+    return ["--journal", str(journal), "--audit", str(audit),
+            "--account", str(nowhere / "account.jsonl"), "--model-io", str(nowhere), *extra]
 
 
 # --------------------------------------------------------------------------- #

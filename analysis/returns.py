@@ -226,15 +226,31 @@ class YFinancePriceSource:
 
     def __init__(self, final_through: Optional[date] = None) -> None:
         self._cache: dict[str, PriceSeries] = {}
+        self._fetched_at: dict[str, str] = {}
         self.final_through = final_through
 
     def closes(self, ticker: str, start: date, end: date) -> PriceSeries:
         cached = self._cache.get(ticker)
         if cached is not None:
             return cached
+        fetched_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
         series = PriceSeries(ticker, final_bars(self._fetch(ticker, start, end), self.final_through))
         self._cache[ticker] = series
+        self._fetched_at[ticker] = fetched_at
         return series
+
+    def recorded(self) -> tuple[str, dict[str, list[dict]], dict[str, str]]:
+        """Every close this source handed out, and when each ticker was fetched.
+
+        Exactly what a caller could have read -- the cached, final-only
+        series -- so a night's scoring prices can be written down and
+        hashed (``analysis/price_tape.py``). Reading it changes nothing.
+        """
+        bars = {
+            ticker: [{"date": day.isoformat(), "close": close} for day, close in series.bars]
+            for ticker, series in self._cache.items()
+        }
+        return "close", bars, dict(self._fetched_at)
 
     def _fetch(self, ticker: str, start: date, end: date) -> list[tuple[date, float]]:
         try:

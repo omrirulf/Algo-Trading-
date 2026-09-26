@@ -255,6 +255,22 @@ def _journal_to_tmp(tmp_path, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _model_io_to_tmp(tmp_path, monkeypatch):
+    """Point the model-call capture at tmp_path, and never leave one open.
+
+    Only ``heartbeat.main`` opens a capture, into ``cfg.MODEL_IO_DIR``; a test
+    that drives ``main`` for real must not write into the repo's logs/.
+    """
+    from config import settings
+    from orchestrator import model_io
+
+    path = tmp_path / "model_io"
+    monkeypatch.setattr(settings, "MODEL_IO_DIR", path, raising=True)
+    yield path
+    model_io._sink = None
+
+
+@pytest.fixture(autouse=True)
 def _audit_log_to_tmp(tmp_path, monkeypatch):
     """Redirect the audit log so tests never write into the repo's logs/ dir."""
     import logging

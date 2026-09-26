@@ -455,6 +455,30 @@ only), which bypasses RLS and belongs in a GitHub Actions secret; the legacy
 JWT `service_role` key stops working at the end of 2026. The `decisions` view is
 `security_invoker`, without which it would read straight through that RLS.
 
+Since 26 Sep 2026 it keeps what cannot be got back later and what a result
+would need to be checked again (the SQL is
+`supabase/2026-09-26_archive_capture.sql`, run once by hand):
+
+- **every model call in full** — the request body as sent and the response
+  as received, reasoning text included — one row per ask in `model_calls`
+  and the bodies in the private Storage bucket `model-io`
+  (`orchestrator/model_io.py`, `store/model_calls.py`); each journal line
+  carries the call ids and the SHA-256 of both bodies, so any copy is
+  checkable from git alone; never a header or key, and a credential-shaped
+  record is withheld whole and counted;
+- **the paper account** (`account_snapshots`, `account_fills`) and the audit
+  log's ladder lines, which the loader used to drop;
+- **the prices the race and the funds scored with** (`scoring_prices`,
+  `scoring_runs`), handed over by those credential-free runs as an artifact
+  and pushed by `scoring-prices.yml`; their `prices_sha256` is committed in
+  `logs/funds.json` and `logs/race_gate.json`.
+
+The stored `raw_json` copy of every line is gone (a view, `signals_json`,
+parses `raw` on read). The git journal stays the official record: nothing
+that scores or trades can import the archive's side of `store/` (a CI
+guardrail). Sizes, the checks and what is still to verify live are in
+[`docs/database.mdx`](docs/database.mdx#what-else-it-keeps).
+
 ## Score the signals
 
 ```bash

@@ -118,15 +118,45 @@ class OhlcFetcher:
 
     def __init__(self, final_through: Optional[date] = None) -> None:
         self._cache: dict[str, pd.DataFrame] = {}
+        self._fetched_at: dict[str, str] = {}
         self.final_through = final_through
 
     def ohlc(self, ticker: str, start: date, end: date) -> pd.DataFrame:
         cached = self._cache.get(ticker)
         if cached is not None:
             return cached
+        fetched_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
         frame = self.final_only(self._fetch(ticker, start, end))
         self._cache[ticker] = frame
+        self._fetched_at[ticker] = fetched_at
         return frame
+
+    def recorded(self) -> tuple[str, dict[str, list[dict]], dict[str, str]]:
+        """Every bar this fetcher handed out, and when each ticker was fetched.
+
+        The columns a scorer reads -- open, high and low for the stop and
+        the gap, the close, and the dividend the index return adds back --
+        from the cached, final-only frames, so a night's scoring prices can
+        be written down and hashed (``analysis/price_tape.py``). ``Close``
+        is the raw close (``auto_adjust=False``); the adjusted close is not
+        read by anything, so it is not recorded. Reading this changes nothing.
+        """
+        bars: dict[str, list[dict]] = {}
+        for ticker, frame in self._cache.items():
+            rows = []
+            if frame is not None and not frame.empty:
+                has_dividends = "Dividends" in frame.columns
+                for stamp, row in frame.iterrows():
+                    rows.append({
+                        "date": _as_date(stamp).isoformat(),
+                        "open": float(row["Open"]),
+                        "high": float(row["High"]),
+                        "low": float(row["Low"]),
+                        "close": float(row["Close"]),
+                        "dividends": float(row["Dividends"]) if has_dividends else None,
+                    })
+            bars[ticker] = rows
+        return "ohlc", bars, dict(self._fetched_at)
 
     def final_only(self, frame: pd.DataFrame) -> pd.DataFrame:
         """``frame`` without any bar dated after ``final_through``."""

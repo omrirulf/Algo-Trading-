@@ -123,14 +123,34 @@ def signal_row(raw: str) -> Optional[dict[str, Any]]:
 
 
 def execution_row(raw: str) -> Optional[dict[str, Any]]:
-    """One ``execution_audit.log`` line as a row, or None if unreadable."""
+    """One ``execution_audit.log`` line as a row, or None if unreadable.
+
+    Two kinds of line share the file. A ``signal_processed`` line carries
+    the engine's verdict under ``result``. A ``position_managed`` line --
+    the profit ladder and the stops (``app/position_manager.py``) -- carries
+    its ticker under ``action`` and has no ``result`` at all, and until 26
+    Sep 2026 this function dropped every one of them as unreadable: the
+    remote archive held no record of a stop raised or a tranche sold. Such a
+    line is now a row too, with ``status`` the action (``stop_raised``,
+    ``tranche_taken``, ``held`` ...), ``quantity`` what it closed and
+    ``stop_price`` the stop it left, and the whole line in ``raw``.
+
+    Its order id is the ladder's own order (a partial close, a stop), never
+    the entry order a journal line records, so the ``decisions`` join on
+    order id does not pick these rows up.
+    """
     payload = _load_json(raw)
     if payload is None:
         return None
 
     result = _dict(payload.get("result"))
     signal = _dict(payload.get("signal"))
+    action = _dict(payload.get("action"))
     ticker = _text(result.get("ticker")) or _text(signal.get("ticker"))
+    if not ticker and not result:
+        ticker = _text(action.get("ticker"))
+        if ticker:
+            return _action_row(raw, payload, action, ticker)
     if not ticker:
         return None
 
@@ -155,6 +175,103 @@ def execution_row(raw: str) -> Optional[dict[str, Any]]:
         "level": _text(payload.get("level")),
         "raw": raw.strip(),
     }
+
+
+def _action_row(raw: str, payload: dict, action: dict, ticker: str) -> dict[str, Any]:
+    """A ``position_managed`` line as an ``executions`` row. See ``execution_row``."""
+    timestamp, exact = parse_timestamp(payload)
+    return {
+        "line_hash": line_hash(raw),
+        "ingested_at": _now(),
+        "ts_utc": timestamp.isoformat() if timestamp else None,
+        "ts_exact": int(exact),
+        "trade_date": timestamp.date().isoformat() if timestamp else None,
+        "ticker": ticker.upper(),
+        "status": _text(action.get("action")),
+        "reason": _text(action.get("reason")),
+        "bias": None,
+        "conviction": None,
+        "quantity": _integer(action.get("qty_closed")),
+        "side": _text(action.get("side")),
+        "entry_price": None,
+        "stop_price": _number(action.get("new_stop")),
+        "atr": None,
+        "order_id": _text(action.get("order_id")),
+        "level": _text(payload.get("level")),
+        "raw": raw.strip(),
+    }
+
+
+def account_row(raw: str) -> Optional[dict[str, Any]]:
+    """One ``logs/account.jsonl`` snapshot as an ``account_snapshots`` row, or None.
+
+    The paper account as the heartbeat read it after a run
+    (``app/account_snapshot.py``): cash, equity, the book, the resting
+    stops and what filled since the last snapshot. The columns are the few
+    numbers worth filtering on; the snapshot itself is ``raw``, verbatim.
+    Remote only: the local index has no table for it.
+    """
+    payload = _load_json(raw)
+    if payload is None:
+        return None
+    at = _text(payload.get("at"))
+    moment = _instant(at)
+    if moment is None:
+        return None
+    account = _dict(payload.get("account"))
+    return {
+        "line_hash": line_hash(raw),
+        "ingested_at": _now(),
+        "ts_utc": moment.isoformat(),
+        "trade_date": moment.date().isoformat(),
+        "mode": _text(payload.get("mode")),
+        "sha": _text(payload.get("sha")),
+        "equity": _number(account.get("equity")),
+        "cash": _number(account.get("cash")),
+        "long_market_value": _number(account.get("long_market_value")),
+        "short_market_value": _number(account.get("short_market_value")),
+        "last_equity": _number(account.get("last_equity")),
+        "positions": _count(payload.get("positions")),
+        "stops": _count(payload.get("stops")),
+        "fills": _count(payload.get("fills")),
+        "errors": _count(payload.get("errors")),
+        "raw": raw.strip(),
+    }
+
+
+def fill_rows(raw: str) -> list[dict[str, Any]]:
+    """Every fill in one account snapshot, as ``account_fills`` rows keyed on the broker's fill id.
+
+    A fill is read by two snapshots when their windows overlap (on purpose,
+    ``FILLS_OVERLAP``), with the same id both times, so the id is the key and
+    the second copy is ignored on arrival. A fill with no id is left out: it
+    cannot be told apart from its own repeat. Remote only, like the snapshot.
+    """
+    payload = _load_json(raw)
+    fills = payload.get("fills") if payload is not None else None
+    if not isinstance(fills, list):
+        return []
+    source = line_hash(raw)
+    rows = []
+    for fill in fills:
+        if not isinstance(fill, dict):
+            continue
+        fill_id = _text(fill.get("id"))
+        if not fill_id:
+            continue
+        moment = _instant(_text(fill.get("at")))
+        rows.append({
+            "fill_id": fill_id,
+            "ingested_at": _now(),
+            "ts_utc": moment.isoformat() if moment else None,
+            "order_id": _text(fill.get("order_id")),
+            "ticker": (_text(fill.get("ticker")) or "").upper() or None,
+            "side": _text(fill.get("side")),
+            "qty": _number(fill.get("qty")),
+            "price": _number(fill.get("price")),
+            "snapshot_hash": source,
+        })
+    return rows
 
 
 def _execution_timestamp(payload: dict, result: dict) -> tuple[Optional[datetime], bool]:
@@ -304,6 +421,23 @@ def _integer(value: Any) -> Optional[int]:
 
 def _text(value: Any) -> Optional[str]:
     return value.strip() if isinstance(value, str) and value.strip() else None
+
+
+def _count(value: Any) -> Optional[int]:
+    return len(value) if isinstance(value, list) else None
+
+
+def _instant(value: Optional[str]) -> Optional[datetime]:
+    """An ISO-8601 instant in UTC; a value with no offset is taken as UTC. None if unreadable."""
+    if not value:
+        return None
+    try:
+        moment = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return moment.astimezone(timezone.utc)
 
 
 def _now() -> str:

@@ -24,3 +24,9 @@ logs/*.db-shm
 # The journal, one file per UTC month (config/journal_files.py). Committed
 # by the heartbeat with `git add -f`, like the single file it replaced.
 logs/journal/*.log
+
+# Every model call's full request and response (orchestrator/model_io.py).
+# Never committed: about ten times the journal's size, and git size is
+# already the problem. It goes to a 90-day workflow artifact and the
+# archive's private Storage bucket; the journal carries each body's SHA-256.
+logs/model_io/

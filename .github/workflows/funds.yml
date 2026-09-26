@@ -60,11 +60,24 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      # Both programs run with --with-prices, which changes no number in
+      # either file: the file gains one field, prices_sha256, the SHA-256 of
+      # the daily prices it was computed from, and the program prints that
+      # price table as one more, last, line (analysis/price_tape.py). The
+      # line is split off here into $RUNNER_TEMP/scoring-prices/, handed over as an
+      # artifact below, and copied into the archive by scoring-prices.yml --
+      # the one workflow with the archive's key. The hash is committed with
+      # the file, so a later check of either needs only git and the table.
       - name: The race's gate
         run: |
           set -o pipefail
-          python analysis/horse_race.py --gate-json > "$RUNNER_TEMP/race_gate.json"
+          python analysis/horse_race.py --gate-json --with-prices > "$RUNNER_TEMP/race_gate.out"
+          mkdir -p "$RUNNER_TEMP/scoring-prices"
+          head -n 1 "$RUNNER_TEMP/race_gate.out" > "$RUNNER_TEMP/race_gate.json"
+          tail -n 1 "$RUNNER_TEMP/race_gate.out" > "$RUNNER_TEMP/scoring-prices/race-gate.json"
+          test "$(wc -l < "$RUNNER_TEMP/race_gate.out")" = "2"
           python -c "import json,sys; json.load(open(sys.argv[1]))" "$RUNNER_TEMP/race_gate.json"
+          python -c "import json,sys; t=json.load(open(sys.argv[1])); assert t['kind']=='scoring-prices'" "$RUNNER_TEMP/scoring-prices/race-gate.json"
 
       - name: Calibration and the funds
         env:
@@ -72,8 +85,23 @@ jobs:
         run: |
           set -o pipefail
           case "$RANDOM_FUNDS" in (*[!0-9]*|'') echo "random must be a number"; exit 2;; esac
-          python -m shadow.run --processes "$(nproc)" --random "$RANDOM_FUNDS" > "$RUNNER_TEMP/funds.json"
+          python -m shadow.run --processes "$(nproc)" --random "$RANDOM_FUNDS" --with-prices > "$RUNNER_TEMP/funds.out"
+          mkdir -p "$RUNNER_TEMP/scoring-prices"
+          head -n 1 "$RUNNER_TEMP/funds.out" > "$RUNNER_TEMP/funds.json"
+          tail -n 1 "$RUNNER_TEMP/funds.out" > "$RUNNER_TEMP/scoring-prices/funds.json"
+          test "$(wc -l < "$RUNNER_TEMP/funds.out")" = "2"
           python -c "import json,sys; json.load(open(sys.argv[1]))" "$RUNNER_TEMP/funds.json"
+          python -c "import json,sys; t=json.load(open(sys.argv[1])); assert t['kind']=='scoring-prices'" "$RUNNER_TEMP/scoring-prices/funds.json"
+
+      - name: Hand the scoring prices over
+        # Read by scoring-prices.yml once this run has finished. 90 days, so
+        # a copy that failed can be retried by hand. No secret is involved.
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: scoring-prices
+          path: ${{ runner.temp }}/scoring-prices/
+          retention-days: 90
+          if-no-files-found: ignore
 
       - name: Commit the two files
         run: |

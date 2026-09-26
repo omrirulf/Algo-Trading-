@@ -360,19 +360,24 @@ def test_the_raw_line_is_stored_verbatim_not_as_jsonb():
     """jsonb reformats: key order, whitespace, number rendering.
 
     The archive's claim is that it kept what was written, so ``raw`` stays
-    text and the parsed form rides alongside in a generated column.
+    text -- and is stored once. The parsed form is a view that parses it on
+    read (26 Sep 2026): the stored generated copy beside it was a second full
+    copy of every line, about 185 MB a year of a 500 MB plan.
     """
     sql = read_remote_schema().lower()
     assert "raw                text not null" in sql or "raw          text not null" in sql
-    assert "generated always as (raw::jsonb) stored" in sql
+    assert "generated always as" not in sql
+    for table in ("signals", "executions"):
+        assert f"create or replace view public.{table}_json as\nselect" in sql
+        assert f".raw::jsonb as raw_json from public.{table} " in sql
 
 
 def test_the_remote_key_is_the_content_hash():
     """What makes a re-send free, and therefore the whole push design work."""
     sql = read_remote_schema().lower()
-    assert sql.count("line_hash          text primary key") + sql.count(
-        "line_hash    text primary key"
-    ) == 2
+    for table in ("signals", "executions"):
+        body = sql.split(f"create table if not exists public.{table} (", 1)[1].split(");", 1)[0]
+        assert body.strip().startswith("line_hash") and "text primary key" in body.splitlines()[1]
 
 
 def test_the_watermark_survives_postgres_trimming_trailing_zeros():

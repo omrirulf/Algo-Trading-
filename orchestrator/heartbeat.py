@@ -54,7 +54,7 @@ from config import settings as cfg  # noqa: E402
 from config.instruments import is_fund  # noqa: E402
 from orchestrator.fx import FxRate, fetch_rate as fetch_fx_rate  # noqa: E402
 from config.settings import get_settings  # noqa: E402
-from orchestrator import blend, context, flows, journal, live_price  # noqa: E402
+from orchestrator import blend, context, flows, journal, live_price, model_io  # noqa: E402
 from orchestrator.context import TickerContext  # noqa: E402
 from orchestrator.llm import (  # noqa: E402
     FULL_MODEL_TIMEOUT_SECONDS,
@@ -1677,6 +1677,7 @@ def protect_positions(dispatcher: Dispatcher | None = None) -> dict:
 def run_cycle(
     dispatcher: Dispatcher | None = None, premarket: bool = False,
     prices: Callable[[Dispatcher], live_price.LivePrices | None] | None = None,
+    model_io_dir: Path | None = None,
 ) -> CycleReport:
     """Run every ticker on the watchlist once, and report what came of it.
 
@@ -1689,11 +1690,18 @@ def run_cycle(
     line (``orchestrator/live_price.py``), given the dispatcher the cycle
     trades through. Only ``main`` passes one: a cycle started from a test or
     a notebook asks nobody for a price, and its lines carry none.
+
+    ``model_io_dir`` is where every model call's full request and response
+    are written (``orchestrator/model_io.py``). Only ``main`` passes one, for
+    the same reason: a cycle started anywhere else records no call.
     """
     # Every line written inside belongs to this cycle and carries the few
     # facts it learns about itself (journal.cycle). Opened here, around both
     # paths, so an exception cannot leave them on the next cycle's lines.
-    with journal.cycle(prices):
+    # The capture is opened the same way, and named after the run the
+    # workflow described (journal.run_block).
+    run_id = str((journal.run_block() or {}).get("run_id") or "") or None
+    with journal.cycle(prices), model_io.capture(model_io_dir, run_id):
         if cfg.USE_BATCH_API:
             return run_batched_cycle(dispatcher, premarket=premarket)
         return _run_live_cycle(dispatcher, premarket)
@@ -1838,7 +1846,8 @@ def main(argv: list[str] | None = None) -> None:
         return
 
     if args.once:
-        report = run_cycle(premarket=args.premarket, prices=live_price.for_dispatcher)
+        report = run_cycle(premarket=args.premarket, prices=live_price.for_dispatcher,
+                           model_io_dir=cfg.MODEL_IO_DIR)
         write_step_summary(report)
         if report.produced_nothing:
             # The whole point of --once mode reporting an exit code. A cycle
@@ -1869,10 +1878,10 @@ def main(argv: list[str] | None = None) -> None:
         id="heartbeat",
         max_instances=1,
         coalesce=True,
-        kwargs={"prices": live_price.for_dispatcher},
+        kwargs={"prices": live_price.for_dispatcher, "model_io_dir": cfg.MODEL_IO_DIR},
     )
     log.info("running first cycle now, then every %d minutes", cfg.HEARTBEAT_INTERVAL_MINUTES)
-    run_cycle(prices=live_price.for_dispatcher)
+    run_cycle(prices=live_price.for_dispatcher, model_io_dir=cfg.MODEL_IO_DIR)
     try:
         scheduler.start()
     except (KeyboardInterrupt, SystemExit):

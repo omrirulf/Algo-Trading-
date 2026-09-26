@@ -96,6 +96,17 @@ filled trades rather than about paper moves.
 It is a `LEFT JOIN` on purpose: most signals never become orders, and a
 rejection is data.
 
+Since 26 Sep 2026 `executions` also holds the audit log's `position_managed`
+lines — the profit ladder and the stops — which the loader used to drop as
+unreadable, because their ticker is under `action.ticker` rather than
+`result.ticker`. `status` is the action (`stop_raised`, `tranche_taken`,
+`held`, ...), `quantity` what it closed, `stop_price` the stop it left. That
+is the only change to the local index: the `executions` row count grows by
+those lines (146 in the first month), and `decisions` is unchanged, because a
+ladder order is never the entry order a journal line records (checked on the
+real logs by `tests/test_archive_capture.py`). Nothing that scores reads the
+index.
+
 ## Canned queries
 
 Each is ordinary SQL, printed with `--explain`. They are starting points to
@@ -221,15 +232,157 @@ malformed cycles most worth reading.
 
 ### Verbatim, and queryable
 
-`raw` is `text` remotely too, byte-for-byte as written. Storing it as `jsonb`
-would silently reformat the line — key order, whitespace, number rendering —
-and the archive's whole claim is that it kept what was written. A generated
-column carries the parsed form alongside:
+`raw` is `text` remotely too, byte-for-byte as written, and stored once.
+Storing it as `jsonb` would silently reformat the line — key order,
+whitespace, number rendering — and the archive's whole claim is that it kept
+what was written. The parsed form is a view that parses `raw` when it is
+read, `signals_json` (and `executions_json`):
 
 ```sql
 select ticker, raw_json -> 'context' -> 'technicals' ->> 'rsi14' as rsi
-from signals order by ts_utc desc limit 20;
+from signals_json order by ts_utc desc limit 20;
 ```
+
+Until 26 Sep 2026 it was a stored generated column, `signals.raw_json` — a
+second full copy of every line. Measured on the real journal in Postgres 16,
+that took a line from 6.7 KB to 12.6 KB (table, TOAST and indexes): about
+120 MB a year at 80 lines a day, of a 500 MB plan, for nothing. The migration
+`supabase/2026-09-26_archive_capture.sql` drops it, makes the views, and makes
+`decisions` again around the change.
+
+## What else it keeps
+
+The owner's rule of 26 Sep 2026: **store what cannot be got back later, and
+what a result would need to be checked again**. The git journal stays the
+official record; the archive is a backup and a place to search. Nothing in the
+race, the funds or the pre-registration reads it (a CI guardrail, below). No
+secret, key or token is ever in what it stores.
+
+| Table / object | One row per | Written by |
+| --- | --- | --- |
+| `signals`, `executions` | journal line, audit line (ladder lines included) | the heartbeat's push |
+| `account_snapshots` | `logs/account.jsonl` line: the paper account after a run | the heartbeat's push |
+| `account_fills` | fill the snapshots read, keyed on the broker's fill id | the heartbeat's push |
+| `model_calls` | HTTP ask to a model — retries, timeouts, refusals, off-schema answers included | the heartbeat's push |
+| `model_io_files` | Storage object: its path, size, SHA-256, calls, withheld | the heartbeat's push |
+| Storage `model-io/YYYY/MM/YYYY-MM-DD/<run>-<HHMMSS>.jsonl.gz` | heartbeat run: every call's full request and response body | the heartbeat's push |
+| `scoring_prices` | distinct daily bar the race or the funds scored with | `scoring-prices.yml` |
+| `scoring_runs` | race or funds run: its `prices_sha256` and what it covered | `scoring-prices.yml` |
+
+### Every model call, in full
+
+`orchestrator/model_io.py` records every ask the cycle makes: the request
+**body** exactly as sent (every message, `model`, `max_tokens`,
+`reasoning_effort`, the response format) and the response body exactly as
+received — for gpt-oss that includes `reasoning_content`, for Claude the
+thinking blocks. Never a header, never the client or its configuration, never
+a key. It is off unless the heartbeat's `main` opens it, it writes a local
+file only (`logs/model_io/`, gitignored), and every function swallows its own
+errors, like `journal.record`: a capture that breaks costs the record of a
+call, never the call.
+
+Each journal line carries, as `model_calls`, the id of every call made for it
+and the SHA-256 of both bodies (`prompt_sha256` over the request as canonical
+JSON, `answer_sha256` over the response as received). So any copy of the
+bodies — the Storage object, the 90-day workflow artifact
+`model-io-<run>-<attempt>` — can be checked with nothing but git:
+
+```python
+import gzip, hashlib, json
+for line in gzip.open("1812...-144012.jsonl.gz", "rt"):
+    call = json.loads(line)
+    assert hashlib.sha256(call["request"].encode()).hexdigest() == call["prompt_sha256"]
+    # ... and against the journal line whose model_calls names call["call_id"]
+```
+
+`model_calls` holds everything but the bodies (who, when, provider, model,
+attempt, outcome, HTTP status or error class, latency, token counts, batch id,
+parameters, the two hashes); the bodies are in the private Storage bucket
+`model-io`, one gzip object per run, named with the run id and its start time
+so a re-run attempt never overwrites a file. The push is idempotent: rows are
+keyed on the call id, an object is never overwritten (a re-send is "already
+there"), and the same file always gzips to the same bytes. A Storage upload
+that fails fails the push like any other, so the phone hears about it the same
+day, and `archive-push.yml` with `model_io_run` sends that run's artifact
+again.
+
+**Redaction.** Every record is checked twice for anything credential-shaped —
+by the capture before it writes, and by the push before it sends
+(`config/redaction.py`: the providers' key prefixes, JSON web tokens, a
+`Bearer` or `apikey:` header with a value, and the exact key the provider was
+built with). A record that matches is **withheld whole**: its bodies are
+dropped, its hashes and a `withheld` marker naming the shape are kept, and the
+push counts it in `logs/archive_status.json` (`"withheld"`). A header shape
+needs its value too, on purpose: "Emergency Use Authorization" is a headline,
+and the journal's own month of prompts trips none of the shapes (a test).
+
+<Warning>
+  **The model-io bucket and the new key.** Supabase documents that the new
+  secret keys work on the `apikey` header alone across its APIs, Storage
+  included — the gateway turns the key into the role the service sees. That
+  was measured here for PostgREST, not for Storage. The first push after the
+  migration is the measurement: its log says `model-io/...: stored`, and
+  `logs/archive_status.json` says `"ok": true`. An `HTTP 403` or `401` from
+  Storage alone means it did not accept the key that way; the rows still
+  arrive, and the artifact keeps the bodies for 90 days.
+</Warning>
+
+### The prices a night scored with
+
+The race (`horse-race.yml`) and the funds (`funds.yml`) score against daily
+prices fetched from yfinance that night — prices a vendor may revise or drop
+later. Both now run with `--with-prices` (`analysis/price_tape.py`), which
+changes no number: their output gains one field, `prices_sha256`, the SHA-256
+of the exact bars every price source handed out, and prints that table as one
+last line. The workflow splits it off into the artifact `scoring-prices`; the
+funds run commits the hash in `logs/funds.json` and `logs/race_gate.json`. A
+test runs each output twice, with and without the flag, and compares them byte
+for byte apart from that field.
+
+Neither workflow holds a secret, so neither can reach the archive.
+`scoring-prices.yml` does: it runs after them (only for their scheduled or
+hand-started runs on `main`, never a pull request's), downloads the table,
+and pushes it with `push_remote.py --only prices`, which refuses a table that
+does not hash to its own `prices_sha256`. `scoring_prices` keeps each distinct
+bar once, keyed on what it says, so a year of nights is not a year of copies;
+`scoring_runs` keeps each run's hash and, per source and ticker, the dates and
+bar count it covered. A night is rebuilt from those two and must hash to the
+committed `prices_sha256`; the one case the rebuild cannot tell apart — a bar
+revised and then revised back — the hash catches, and the artifact holds the
+exact table for 90 days.
+
+### Nothing that decides can read it
+
+A CI guardrail, "Nothing that scores or trades can read the archive": no
+module in `analysis/`, `shadow/`, `rules/`, `learn/`, `replay/` or
+`orchestrator/` may import `store.remote`, `store.push_remote`,
+`store.starter_status`, `store.model_calls` or `store.scoring_prices`; no
+module the race or the funds import, however deep, may name
+`starter_status.json`, `archive_status.json` or the capture directory; and the
+race and funds workflows hold no secret at all. The two status files are read
+by the daily brief and the health check (`analysis/book.py`,
+`analysis/health.py`) to tell the owner how the archive is doing — neither is
+behind the race or the funds.
+
+### How big it gets
+
+Measured on 26 Sep 2026 from the real logs, in Postgres 16 and through the
+code that pushes (one real gpt-oss day rebuilt as the capture records it):
+
+| Part | Per item | Per year (252 trading days) |
+| --- | --- | --- |
+| `signals` (80 lines a day) | 6.7 KB a line | ~135 MB |
+| `executions` (~55 a day) | 1.7 KB | ~23 MB |
+| `model_calls` (~70 asks a day) | 0.8 KB | ~15 MB |
+| `scoring_prices` (~86 tickers x 2 kinds) | 0.3 KB | ~14 MB |
+| `account_snapshots` + fills (2 a day) | ~9 KB | ~7 MB |
+| `scoring_runs` (3 a night) | 4.5 KB | ~3 MB |
+| **Database** | | **~200 MB of 500 MB** |
+| Storage `model-io` (~70 asks a day) | 11.7 KB a call, gzip | **~205 MB of 1 GB** |
+
+Most of the database is the journal itself; the size fix above is what keeps
+it from being twice that. Most of the Storage is the reasoning text (about
+22 k characters a call at high effort).
 
 ### Nobody can read it but you
 
