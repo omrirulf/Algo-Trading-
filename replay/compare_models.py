@@ -41,6 +41,7 @@ from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from config import journal_files  # noqa: E402
 from config import settings as cfg  # noqa: E402
 from replay import runner  # noqa: E402
 from replay.compare_configs import (  # noqa: E402
@@ -385,12 +386,12 @@ def main(argv: list[str] | None = None) -> int:
         print("Use --only MODEL:EFFORT to probe one cell.")
         return 0
 
-    if not args.journal.exists():
+    if not journal_files.exists(args.journal):
         print(f"No journal at {args.journal}. Run some cycles first -- this "
               f"compares configurations on real recorded context.", file=sys.stderr)
         return 1
 
-    lines = args.journal.read_text(encoding="utf-8").splitlines()
+    lines = journal_files.read_text(args.journal).splitlines()
     first, last = parse_days(args.days)
     entries = select_entries(
         list(runner.load_entries(lines)), answered_by=args.answered_by,

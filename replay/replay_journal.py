@@ -25,6 +25,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from config import journal_files  # noqa: E402
 from config import settings as cfg  # noqa: E402
 from replay import runner  # noqa: E402
 from replay.compare import ReplaySummary  # noqa: E402
@@ -125,11 +126,11 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
     args = parse_args(argv)
 
-    if not args.journal.exists():
+    if not journal_files.exists(args.journal):
         print(f"No journal at {args.journal}. Run some cycles first.", file=sys.stderr)
         return 1
 
-    lines = args.journal.read_text(encoding="utf-8").splitlines()
+    lines = journal_files.read_text(args.journal).splitlines()
     entries = list(runner.load_entries(lines, ticker=args.ticker))
     if not entries:
         print("No replayable entries found.", file=sys.stderr)

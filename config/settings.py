@@ -515,7 +515,17 @@ AUDIT_LOG_PATH: Final[Path] = LOG_DIR / "execution_audit.log"
 #: Orchestrator-side record of the context each signal was produced from, for
 #: judging signal quality after the fact. Separate from the execution audit:
 #: that one records what the engine did, this one records what the model saw.
-SIGNAL_JOURNAL_PATH: Final[Path] = LOG_DIR / "signal_journal.log"
+#:
+#: A directory of one file per UTC month (``2026-09.log``, ...) since
+#: 26 Sep 2026, so no file comes near GitHub's 100 MB limit before the
+#: experiment ends. Readers join the months through
+#: ``config/journal_files.py`` and see the old single file, byte for byte.
+SIGNAL_JOURNAL_PATH: Final[Path] = LOG_DIR / "journal"
+
+#: Where the journal lived before the split. Nothing writes it any more; the
+#: daily health check warns if it ever reappears (an old checkout or a
+#: workflow that was missed), because its lines would be read by nobody.
+LEGACY_SIGNAL_JOURNAL_PATH: Final[Path] = LOG_DIR / "signal_journal.log"
 
 #: The one thing this project has to remember for itself. Nowhere free
 #: publishes a share-count series for an ETF, so the cycle records today's
@@ -575,7 +585,10 @@ BLEND_STALE_AFTER_DAYS: Final[int] = 14
 #: 14 days before (and raise a critical alarm once it has expired): "make a
 #: new one". When you make a new token, put it in Vault under the same name
 #: and change this date in the same breath.
-GITHUB_DISPATCH_TOKEN_EXPIRES: Final[Optional[date]] = None
+#:
+#: 31 Jul 2027: the owner's choice of 26 Sep 2026 -- the end of the
+#: experiment (June 2027) plus a month, inside GitHub's one-year limit.
+GITHUB_DISPATCH_TOKEN_EXPIRES: Final[Optional[date]] = date(2027, 7, 31)
 
 #: How many days before that date the health check starts to warn.
 GITHUB_DISPATCH_TOKEN_WARN_DAYS: Final[int] = 14

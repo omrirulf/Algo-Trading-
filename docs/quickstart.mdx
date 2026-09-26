@@ -84,7 +84,7 @@ cycle:
 
 ```bash
 tail -f logs/execution_audit.log   # what the engine did: accepted / rejected / error
-tail -f logs/signal_journal.log    # what the model saw, and what it concluded
+tail -f logs/journal/$(date -u +%Y-%m).log    # what the model saw, and what it concluded
 ```
 
 Every decision the engine makes is one JSON line in the first file; every

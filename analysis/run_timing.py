@@ -1,7 +1,7 @@
 """When each cycle actually ran, against when it was scheduled to.
 
     python analysis/run_timing.py
-    python analysis/run_timing.py --journal logs/signal_journal.log
+    python analysis/run_timing.py --journal logs/journal
 
 The race scores a signal from the moment the journal says it was made, so
 the one thing a late run could corrupt is the entry: a signal made at 15:00

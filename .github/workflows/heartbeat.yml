@@ -332,7 +332,7 @@ jobs:
           fi
           # One word on stdout; the reason, written for the job summary, on
           # stderr.
-          if ! decision=$(python analysis/cycle_day.py --journal logs/signal_journal.log --decide \
+          if ! decision=$(python analysis/cycle_day.py --journal logs/journal --decide \
                             --runs "$record/runs.json" --jobs "$record/jobs" \
                             --this-run "$THIS_RUN" --this-attempt "$THIS_ATTEMPT" --rerun "$RERUN" \
                             2> "$record/why.md"); then
@@ -569,7 +569,7 @@ jobs:
           if python -m analysis.cycle_report > "$RUNNER_TEMP/cycle_report.md"; then
             mv "$RUNNER_TEMP/cycle_report.md" logs/cycle_report.md
             {
-              echo '<!-- Rendered from logs/signal_journal.log by analysis/cycle_report.py -->'
+              echo '<!-- Rendered from logs/journal/ by analysis/cycle_report.py -->'
               cat logs/cycle_report.md
             } >> "$GITHUB_STEP_SUMMARY"
           else
@@ -704,7 +704,7 @@ jobs:
              && python analysis/score_journal.py --json > "$RUNNER_TEMP/score.json"; then
             mv "$RUNNER_TEMP/score_report.md" logs/score_report.md
             {
-              echo '<!-- Rendered from logs/signal_journal.log by analysis/score_journal.py -->'
+              echo '<!-- Rendered from logs/journal/ by analysis/score_journal.py -->'
               echo '```text'
               cat logs/score_report.md
               echo '```'
@@ -794,7 +794,7 @@ jobs:
           # day of history that cannot be backfilled.
           # account.jsonl is the same: the account as it stood at each run,
           # which nobody can read back later.
-          git add -f logs/signal_journal.log logs/execution_audit.log logs/cycle_report.md logs/fund_size.log logs/blend_weights.json logs/score_report.md logs/book.json logs/brief.txt logs/account.jsonl || true
+          git add -f logs/journal logs/execution_audit.log logs/cycle_report.md logs/fund_size.log logs/blend_weights.json logs/score_report.md logs/book.json logs/brief.txt logs/account.jsonl || true
           # starter_status.json is what the Supabase starter's own request
           # got back today, read just before the book (26 Sep). Added on its
           # own line, on purpose: `git add` with one path that does not exist
@@ -875,7 +875,7 @@ jobs:
           OWNER: ${{ github.repository_owner }}
         run: |
           set +e
-          python -m analysis.health --journal logs/signal_journal.log --audit logs/execution_audit.log > "$RUNNER_TEMP/health.md"
+          python -m analysis.health --journal logs/journal --audit logs/execution_audit.log > "$RUNNER_TEMP/health.md"
           code=$?
           set -e
           cat "$RUNNER_TEMP/health.md" >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,130 @@
+name: journal split check
+
+# The owner's condition for splitting the journal into monthly files
+# (26 Sep 2026): the race and the funds must say exactly the same thing
+# before and after the split.
+#
+# "Before" is the code and the single file as they were on main at 0768262,
+# the last commit with logs/signal_journal.log. "After" is this checkout:
+# the new code reading logs/journal/, one file per month. Each side runs
+# the full race report, the race's gate JSON and the funds' JSON (which
+# carries calibration) -- and the outputs must be byte-identical.
+#
+# Prices come from yfinance, which a second fetch could answer slightly
+# differently. So every price request is recorded on a tape the first time
+# it is made and answered from that tape afterwards: both sides score
+# against the same bars, and any difference left is the journal's. The
+# clock each tool reads (its own _now) is frozen to one moment for the
+# same reason.
+#
+# No credential of any kind: the journal is in the repo and yfinance is
+# unauthenticated. Writes only to the runner's temp directory.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/journal-split-check.yml"
+      - "config/journal_files.py"
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Check out the code and the single file from before the split
+        run: |
+          git worktree add "$RUNNER_TEMP/before" 0768262f63abbcb42a1c0df755a77b6e6305c1af
+          test -f "$RUNNER_TEMP/before/logs/signal_journal.log"
+          echo "before: $(sha256sum < "$RUNNER_TEMP/before/logs/signal_journal.log")"
+          echo "after:  $(cat logs/journal/*.log | head -c "$(stat -c %s "$RUNNER_TEMP/before/logs/signal_journal.log")" | sha256sum)  (the same many bytes of the joined months)"
+
+      - name: Write the price tape
+        run: |
+          cat > "$RUNNER_TEMP/tape.py" <<'EOF'
+          """Run a race or funds main() with recorded prices and a frozen clock."""
+          import importlib, pickle, sys
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          tape_path, module_name, *argv = sys.argv[1:]
+          tape = pickle.loads(Path(tape_path).read_bytes()) if Path(tape_path).exists() else {}
+          sys.path.insert(0, ".")
+          import yfinance
+
+          original_history = yfinance.Ticker.history
+          original_download = yfinance.download
+
+          def history(self, *args, **kwargs):
+              key = ("history", self.ticker, args, tuple(sorted(kwargs.items())))
+              if key not in tape:
+                  tape[key] = original_history(self, *args, **kwargs)
+              return tape[key].copy()
+
+          def download(*args, **kwargs):
+              key = ("download", repr(args), repr(sorted(kwargs.items())))
+              if key not in tape:
+                  tape[key] = original_download(*args, **kwargs)
+              return tape[key].copy()
+
+          yfinance.Ticker.history = history
+          yfinance.download = download
+          module = importlib.import_module(module_name)
+          frozen = datetime(2026, 9, 26, 20, 0, tzinfo=timezone.utc)
+          if hasattr(module, "_now"):
+              module._now = lambda: frozen
+          try:
+              code = module.main(argv)
+          finally:
+              Path(tape_path).write_bytes(pickle.dumps(tape))
+          sys.exit(code or 0)
+          EOF
+
+      - name: Before the split
+        working-directory: ${{ runner.temp }}/before
+        run: |
+          set -o pipefail
+          tape="$RUNNER_TEMP/prices.tape"
+          python "$RUNNER_TEMP/tape.py" "$tape" analysis.horse_race > "$RUNNER_TEMP/before_race.txt" || echo "race exit $?"
+          python "$RUNNER_TEMP/tape.py" "$tape" analysis.horse_race --gate-json > "$RUNNER_TEMP/before_gate.json"
+          python "$RUNNER_TEMP/tape.py" "$tape" shadow.run --processes 1 > "$RUNNER_TEMP/before_funds.json"
+
+      - name: After the split
+        run: |
+          set -o pipefail
+          tape="$RUNNER_TEMP/prices.tape"
+          python "$RUNNER_TEMP/tape.py" "$tape" analysis.horse_race > "$RUNNER_TEMP/after_race.txt" || echo "race exit $?"
+          python "$RUNNER_TEMP/tape.py" "$tape" analysis.horse_race --gate-json > "$RUNNER_TEMP/after_gate.json"
+          python "$RUNNER_TEMP/tape.py" "$tape" shadow.run --processes 1 > "$RUNNER_TEMP/after_funds.json"
+
+      - name: The outputs must be identical
+        run: |
+          status=0
+          echo "## Journal split check" >> "$GITHUB_STEP_SUMMARY"
+          for name in race.txt gate.json funds.json; do
+            before="$RUNNER_TEMP/before_$name" after="$RUNNER_TEMP/after_$name"
+            test -s "$before" && test -s "$after"
+            b=$(sha256sum < "$before" | cut -c1-16) a=$(sha256sum < "$after" | cut -c1-16)
+            if cmp -s "$before" "$after"; then
+              echo "- $name: identical ($(wc -c < "$after") bytes, sha256 $a...)" >> "$GITHUB_STEP_SUMMARY"
+              echo "$name: identical, sha256 $a"
+            else
+              echo "- $name: **DIFFERENT** (before $b..., after $a...)" >> "$GITHUB_STEP_SUMMARY"
+              diff -u "$before" "$after" | head -80
+              status=1
+            fi
+          done
+          exit "$status"

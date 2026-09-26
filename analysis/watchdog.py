@@ -1,8 +1,8 @@
 """Has today's trading run started? If not, say so -- and say what to do.
 
-    python -m analysis.watchdog --runs runs.json --journal logs/signal_journal.log
-    python -m analysis.watchdog --runs runs.json --journal logs/signal_journal.log --now 2026-09-25T15:10:00Z
-    python -m analysis.watchdog --runs runs.json --jobs jobs/ --journal logs/signal_journal.log
+    python -m analysis.watchdog --runs runs.json --journal logs/journal
+    python -m analysis.watchdog --runs runs.json --journal logs/journal --now 2026-09-25T15:10:00Z
+    python -m analysis.watchdog --runs runs.json --jobs jobs/ --journal logs/journal
 
 GitHub's cron is not a clock. In the week of 21 Sep the heartbeat's 12:35 UTC
 cron was delivered 4.5 to 5.7 hours late every single day, and the 17:35 one

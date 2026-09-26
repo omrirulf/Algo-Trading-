@@ -501,8 +501,8 @@ def _run_the_commit(tmp_path: Path, *, refuse: int) -> tuple[int, str, Path]:
     git("init", "-q", "--bare", "-b", "main", "origin.git")
     work = tmp_path / "work"
     git("clone", "-q", str(tmp_path / "origin.git"), str(work))
-    (work / "logs").mkdir()
-    for name in ("signal_journal.log", "execution_audit.log", "cycle_report.md", "fund_size.log",
+    (work / "logs" / "journal").mkdir(parents=True)
+    for name in ("journal/2026-09.log", "execution_audit.log", "cycle_report.md", "fund_size.log",
                  "blend_weights.json", "score_report.md", "book.json", "brief.txt", "account.jsonl"):
         (work / "logs" / name).write_text(f"yesterday's {name}\n")
     (work / ".gitattributes").write_text((ROOT / ".gitattributes").read_text())
@@ -518,7 +518,7 @@ def _run_the_commit(tmp_path: Path, *, refuse: int) -> tuple[int, str, Path]:
     bin_dir.mkdir()
     (bin_dir / "sleep").write_text("#!/bin/sh\nexit 0\n")
     (bin_dir / "sleep").chmod(0o755)
-    with (work / "logs" / "signal_journal.log").open("a") as journal:
+    with (work / "logs" / "journal" / "2026-09.log").open("a") as journal:
         journal.write("today's line\n")
     script = _commit_step().replace("${{ inputs.mode == 'protect' && 'protection pass' || 'cycle' }}", "cycle")
     assert "${{" not in script
@@ -545,11 +545,11 @@ def test_every_rendered_file_that_conflicts_is_taken_from_this_run(tmp_path):
 
     rendered = ("cycle_report.md", "score_report.md", "blend_weights.json", "book.json", "brief.txt",
                 "starter_status.json")
-    logs = ("signal_journal.log", "execution_audit.log", "fund_size.log", "account.jsonl")
+    logs = ("journal/2026-09.log", "execution_audit.log", "fund_size.log", "account.jsonl")
     git("init", "-q", "--bare", "-b", "main", "origin.git")
     work, other = tmp_path / "work", tmp_path / "other"
     git("clone", "-q", str(tmp_path / "origin.git"), str(work))
-    (work / "logs").mkdir()
+    (work / "logs" / "journal").mkdir(parents=True)
     for name in rendered + logs:
         (work / "logs" / name).write_text(f"yesterday's {name}\n")
     (work / ".gitattributes").write_text((ROOT / ".gitattributes").read_text())
@@ -560,7 +560,7 @@ def test_every_rendered_file_that_conflicts_is_taken_from_this_run(tmp_path):
     git("clone", "-q", str(tmp_path / "origin.git"), str(other))
     for name in rendered:
         (other / "logs" / name).write_text(f"the other run's {name}\n")
-    with (other / "logs" / "signal_journal.log").open("a") as journal:
+    with (other / "logs" / "journal" / "2026-09.log").open("a") as journal:
         journal.write("the other run's line\n")
     git("add", "-f", "logs", cwd=other)
     git("commit", "-qm", "the other run", cwd=other)
@@ -568,7 +568,7 @@ def test_every_rendered_file_that_conflicts_is_taken_from_this_run(tmp_path):
     # This run rewrote them too, from the older checkout.
     for name in rendered:
         (work / "logs" / name).write_text(f"this run's {name}\n")
-    with (work / "logs" / "signal_journal.log").open("a") as journal:
+    with (work / "logs" / "journal" / "2026-09.log").open("a") as journal:
         journal.write("this run's line\n")
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
@@ -582,7 +582,7 @@ def test_every_rendered_file_that_conflicts_is_taken_from_this_run(tmp_path):
     origin = ["--git-dir", str(tmp_path / "origin.git")]
     for name in rendered:
         assert git(*origin, "show", f"main:logs/{name}") == f"this run's {name}\n", name
-    journal = git(*origin, "show", "main:logs/signal_journal.log")
+    journal = git(*origin, "show", "main:logs/journal/2026-09.log")
     assert "the other run's line" in journal and "this run's line" in journal
 
 
@@ -591,7 +591,7 @@ def test_a_refused_push_is_tried_again_and_the_third_refusal_fails_the_step(tmp_
     code, log, origin = _run_the_commit(tmp_path, refuse=refuse)
     assert (code == 0) is pushed, log
     assert log.count("::warning::the journal push did not go through") == min(refuse, 2)
-    remote = subprocess.run(["git", "--git-dir", str(origin), "show", "main:logs/signal_journal.log"],
+    remote = subprocess.run(["git", "--git-dir", str(origin), "show", "main:logs/journal/2026-09.log"],
                             capture_output=True, text=True, check=True).stdout
     assert ("today's line" in remote) is pushed
 
@@ -684,6 +684,9 @@ def _imports(path: Path) -> set[str]:
             found |= {alias.name for alias in node.names}
         elif isinstance(node, ast.ImportFrom) and node.module and not node.level:
             found.add(node.module)
+            # ``from config import journal_files`` imports a module too.
+            found |= {f"{node.module}.{alias.name}" for alias in node.names
+                      if (ROOT / node.module.replace(".", "/") / f"{alias.name}.py").exists()}
     return found
 
 
@@ -704,11 +707,13 @@ def test_the_watchdog_needs_nothing_from_pypi():
         for name in _imports(ROOT / (module.replace(".", "/") + ".py")):
             top = name.split(".")[0]
             if top in ("analysis", "config", "orchestrator", "app", "rules"):
-                assert (ROOT / (name.replace(".", "/") + ".py")).exists(), name
-                todo.append(name)
+                source = ROOT / (name.replace(".", "/") + ".py")
+                package = ROOT / name.replace(".", "/") / "__init__.py"
+                assert source.exists() or package.exists(), name
+                todo.append(name if source.exists() else f"{name}.__init__")
             else:
                 assert top in sys.stdlib_module_names or top == "__future__", f"{module} imports {name}"
-    assert {"analysis.cycle_day", "analysis.reader", "config.market_calendar"} <= seen
+    assert {"analysis.cycle_day", "analysis.reader", "config.market_calendar", "config.journal_files"} <= seen
 
 
 def test_the_watchdog_decides_in_python_and_the_outputs_feed_the_rest():
@@ -716,7 +721,7 @@ def test_the_watchdog_decides_in_python_and_the_outputs_feed_the_rest():
     decide = steps["Has today's run started?"]
     assert decide["id"] == "decide"
     assert "python -m analysis.watchdog --runs \"$RUNNER_TEMP/runs.json\"" in decide["run"]
-    assert "--journal logs/signal_journal.log" in decide["run"]
+    assert "--journal logs/journal " in decide["run"]
     assert '>> "$GITHUB_OUTPUT"' in decide["run"] and '>> "$GITHUB_STEP_SUMMARY"' in decide["run"]
 
 

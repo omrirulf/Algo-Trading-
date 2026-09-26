@@ -86,6 +86,7 @@ from typing import Optional, Sequence
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.schemas import LLMSignal  # noqa: E402
+from config import journal_files  # noqa: E402
 from config import settings as cfg  # noqa: E402
 from replay import runner  # noqa: E402
 from replay.compare_configs import error_kinds  # noqa: E402
@@ -644,12 +645,12 @@ def print_pairs(entries: list[ReplayEntry], pairs: list[Ablation]) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    if not args.journal.exists():
+    if not journal_files.exists(args.journal):
         print(f"No journal at {args.journal}. Run some cycles first -- this asks "
               f"the model about real recorded context.", file=sys.stderr)
         return 1
 
-    lines = args.journal.read_text(encoding="utf-8").splitlines()
+    lines = journal_files.read_text(args.journal).splitlines()
     entries = eligible(list(runner.load_entries(lines)))[-args.limit:]
     if not entries:
         print("No entry in this journal carries headlines, so there is nothing to "

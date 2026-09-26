@@ -8,11 +8,32 @@ There are two logs, and they answer different questions.
 | Log | Written by | Answers |
 |---|---|---|
 | `logs/execution_audit.log` | `app/logger.py` | What did the engine *do* with this signal? |
-| `logs/signal_journal.log` | `orchestrator/journal.py` | What was in front of the model when it said that? |
+| `logs/journal/` (one file per month) | `orchestrator/journal.py` | What was in front of the model when it said that? |
 
 The audit log is the compliance record. The journal is the one you need in
 order to answer the question the README has always raised and never been able
 to settle: **are the signals any good?**
+
+## One file per month
+
+Until 26 Sep 2026 the journal was one file, `logs/signal_journal.log`. It
+grows by about 0.64 MB a trading day, and GitHub refuses a push carrying a
+file over 100 MB, which one file would have reached in spring 2027, before
+the experiment ends. So each line now goes into its UTC month's file:
+`logs/journal/2026-09.log`, `logs/journal/2026-10.log`, and so on.
+
+This is a storage change, not a change to the record. A line is written
+exactly as before. Every reader goes through `config/journal_files.py`,
+which joins the months in order, so every reader sees the old single file,
+byte for byte. On 26 Sep the old file was moved whole to `2026-09.log`
+(every line in it was from September). `tests/test_journal_files.py` pins
+that the joined months hash to the old file, and
+`.github/workflows/journal-split-check.yml` showed that the race, its gate
+and the funds (calibration included) give identical output before and after
+the split. If `logs/signal_journal.log` ever reappears, the daily health
+check raises a critical alarm, because nothing reads it any more.
+
+To read the journal yourself, join the months: `cat logs/journal/*.log`.
 
 ## One JSON object per ticker per cycle
 

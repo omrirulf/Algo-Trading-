@@ -34,6 +34,7 @@ from typing import Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.schemas import Bias  # noqa: E402
+from config import journal_files  # noqa: E402
 from config import settings as cfg  # noqa: E402
 from replay import runner  # noqa: E402
 from replay.runner import ReplayResult  # noqa: E402
@@ -206,11 +207,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.repeats < 2:
         print("--repeats must be at least 2: one answer cannot disagree with itself.", file=sys.stderr)
         return 2
-    if not args.journal.exists():
+    if not journal_files.exists(args.journal):
         print(f"No journal at {args.journal}.", file=sys.stderr)
         return 1
 
-    lines = args.journal.read_text(encoding="utf-8").splitlines()
+    lines = journal_files.read_text(args.journal).splitlines()
     entries = list(runner.load_entries(lines))[-args.limit:]
     if not entries:
         print("No replayable entries found.", file=sys.stderr)

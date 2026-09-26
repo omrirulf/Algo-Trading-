@@ -180,7 +180,7 @@ jobs:
         id: decide
         run: |
           if ! python -m analysis.watchdog --runs "$RUNNER_TEMP/runs.json" --jobs "$RUNNER_TEMP/jobs" \
-               --journal logs/signal_journal.log > "$RUNNER_TEMP/decision.txt" 2> "$RUNNER_TEMP/watchdog.md"; then
+               --journal logs/journal > "$RUNNER_TEMP/decision.txt" 2> "$RUNNER_TEMP/watchdog.md"; then
             cat "$RUNNER_TEMP/watchdog.md"
             printf '%s\n' "action=none" "ping=yes" "priority=4" \
               "title=The watchdog could not check today's run" \

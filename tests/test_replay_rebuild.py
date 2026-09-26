@@ -18,6 +18,7 @@ from typing import get_args, get_type_hints
 
 import pytest
 
+from config import journal_files
 from config.instruments import is_fund
 from orchestrator import (
     analysts, carry, crops, earnings, energy, flows, fundamentals, funds,
@@ -456,20 +457,20 @@ def test_a_nested_record_missing_a_required_field_is_refused():
 def test_every_recorded_fund_line_in_the_archive_rebuilds():
     """The real journal, not a fixture -- the lines the harness will meet.
 
-    ``logs/signal_journal.log`` is committed, so this is a real archive with
+    ``logs/journal/`` is committed, so this is a real archive with
     the schema drift four months of live cycles actually produced, which no
     hand-written payload would think to reproduce. Read through the repo root
     rather than ``cfg``: the autouse fixture in ``conftest`` redirects
     ``SIGNAL_JOURNAL_PATH`` to a tmp dir so no test can write into ``logs/``,
     and that redirect is worth keeping even though this test only reads.
     """
-    path = Path(__file__).resolve().parents[1] / "logs" / "signal_journal.log"
-    if not path.exists():
+    path = Path(__file__).resolve().parents[1] / "logs" / "journal"
+    if not journal_files.exists(path):
         pytest.skip("no signal journal in this checkout")
 
     seen = 0
     enriched = 0
-    for number, line in enumerate(path.read_text().splitlines(), start=1):
+    for number, line in enumerate(journal_files.read_text(path).splitlines(), start=1):
         line = line.strip()
         if not line:
             continue

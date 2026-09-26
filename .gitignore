@@ -20,3 +20,7 @@ logs/*.log.*
 logs/*.db
 logs/*.db-wal
 logs/*.db-shm
+
+# The journal, one file per UTC month (config/journal_files.py). Committed
+# by the heartbeat with `git add -f`, like the single file it replaced.
+logs/journal/*.log

@@ -40,6 +40,7 @@ from typing import Any, Optional, Sequence
 # Allow ``python store/push_remote.py`` from the repo root.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from config import journal_files  # noqa: E402
 from config import settings as cfg  # noqa: E402
 from store import loader, remote  # noqa: E402
 from store.remote import (  # noqa: E402
@@ -211,19 +212,19 @@ def rows_from(path: Path, build_row) -> list[dict[str, Any]]:
     loader already reports them, and this tool's job is to move what parses,
     not to re-audit the file.
     """
-    if not path.exists():
+    if not journal_files.exists(path):
         return []
     rows: list[dict[str, Any]] = []
     seen: set[str] = set()
-    with path.open(encoding="utf-8") as handle:
-        for line in handle:
-            if not line.strip():
-                continue
-            row = build_row(line)
-            if row is None or row["line_hash"] in seen:
-                continue
-            seen.add(row["line_hash"])
-            rows.append(row)
+    # The journal's monthly files joined in order, or one plain file.
+    for line in journal_files.iter_lines(path):
+        if not line.strip():
+            continue
+        row = build_row(line)
+        if row is None or row["line_hash"] in seen:
+            continue
+        seen.add(row["line_hash"])
+        rows.append(row)
     return rows
 
 
