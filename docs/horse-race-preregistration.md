@@ -260,8 +260,9 @@ every arm is shadow-only and the book is Alpaca's paper account.
 
 ## 10. Model watch (Amendment 2026-09-24; operational, not a decision rule)
 
-Three triggers stop the process and go to the owner. None of them switches,
-reverts or trades anything by itself; the owner decides what happens next.
+The owner's triggers stop the process and go to the owner. None of them
+switches, reverts or trades anything by itself; the owner decides what
+happens next.
 
 - (a) the zero-shorts replay — `openai/gpt-oss-120b` re-asked, with the
   production settings, on the lines `claude-opus-5` answered from 2026-09-15
@@ -270,9 +271,15 @@ reverts or trades anything by itself; the owner decides what happens next.
   (gpt-oss shorted 1 of the 31 lines where Opus shorted), and the owner kept
   gpt-oss (see the Amendments table);
 - (b) 5 answered cycle days in a row with no SHORT call while SPY fell over
-  those days;
+  those days. **Retired on 2026-09-26** (the owner's decision): the model is
+  long-only by the owner's decision of 2026-09-25, so (b) would only say that
+  SPY fell. Replaced by (d) (see the Amendments table);
 - (c) model errors above 5% of the calls that reached the model over any 5
-  cycle days, counted from **2026-09-25**.
+  cycle days, counted from **2026-09-25**;
+- (d) the real paper account: its equity more than **8%** below its highest
+  close since **2026-09-23**, or its return more than **5 percentage
+  points** behind VT's over the same period. From 2026-09-26; the exact
+  definitions are in the Amendments table.
 
 Failed calls are of two kinds (`analysis/call_errors.py`). **Setup errors**
 are our own: a bad or missing key, an account or a model name the provider
@@ -286,8 +293,11 @@ Separately, if more than **20%** of one run's calls fail, of either kind,
 the day's record raises a critical alarm, which is pushed to the owner's
 phone that day.
 
-The race prints (b) and (c) on every run. Changing the model because of one
-is a new registration of the model arm, like Amendment 1.
+The race prints (c) and (d) on every run, with (d)'s current numbers whether
+or not it tripped, and (d) is in `logs/race_gate.json` under `watch.d`; when
+that record says (d) tripped, the daily health check raises a warning that
+reaches the owner's phone through the brief. Changing the model because of
+one is a new registration of the model arm, like Amendment 1.
 
 ## Amendments
 
@@ -312,3 +322,5 @@ is a new registration of the model arm, like Amendment 1.
 | 2026-09-25 | **Calibration fail rule** (the owner's decision; calibration of the shadow funds, not a rule of the race) | Replaces "restart the 15 days from zero". A fail is fixed and logged in this table; the fixed simulation is re-run on every calibration day so far from the same starting snapshot and every day must pass again; at least 5 calibration days must come after the last fix, so calibration ends at day 15 or the last fix + 5 days, whichever is later; a re-run that fails on an earlier day is a new fail; a "reason" that turns out to be a bug is a fail. If the end moves, the fund test's start date and bars are recalculated and logged. `docs/shadow-funds.mdx`. |
 | 2026-09-25 | **Run timing and late runs** (operational, not a decision rule) | GitHub delivered the heartbeat's scheduled runs hours late on every day so far: the 12:35 UTC pre-market slot arrived between 17:11 and 18:17 UTC on 21-24 Sep and had not arrived by 15:00 UTC on 25 Sep, and every cycle since 21 Sep was started by a backup dispatch at about 15:05 UTC. Every cycle day so far (2026-09-15 to 2026-09-25) ran during the session, 44 to 154 minutes after its schedule; **none ran before the open.** The daily run now starts after the open (14:40 UTC: 10:40 New York in summer, 09:40 in winter), with a watchdog that starts a missing run and pages the owner, and no cycle starts after 14:30 New York (11:30 on a half day) unless a person re-runs the day by hand. From the first heartbeat cycle after this change, every journal line the cycle writes records what started its run and how late it was (the run block), and the race prints each cycle day's timing with late-run days marked (`analysis/run_timing.py`; `run_timing` in `logs/race_gate.json`); nothing that decides reads it. **The entry rule is unchanged**: every arm, the coin flip and VT enter at the open of the next session after the signal's day, checked by reading the code and pinned by `tests/test_race_entry_timing.py` for lines in the session, after the close, after midnight UTC, before the open, on a Friday, before a holiday and on a day the price source never printed, so a late run changes when a signal is made, never the price it is entered at. The code reads section 2's "the session after the signal" as the first session after the signal's UTC calendar day: a line written before the open, or after midnight UTC (20:00 New York in summer, 19:00 in winter), can enter up to one session later than the earliest open after it, never earlier; no line has been written at either time. No decision rule changes. This file stated no run time, so nothing else in it needed correcting. |
 | 2026-09-25 | **Calibration: late-run mirroring** (the owner's decision; calibration of the shadow funds, not a rule of the race) | Changes calibration only: not the race, not the funds. On a day the real paper account's run fell outside market hours (before 09:30 or after the close in New York: 16:00, or 13:00 on a half day), the calibration copy does not make the entries the real broker refused as "market is closed", nor a profit-ladder pass the journal says could not run; each is counted and shown on the 4 Funds page, and none is a difference. A refusal made during market hours is never mirrored: it stays a difference. The mirror goes line by line: when a later run the same day traded the name, the refused line is still not made and the accepted line is traded as usual. **If more than 2 calibration days need this, calibration stops** and the owner is told (a warning in the daily health check and the brief): late runs on that many days are a schedule problem to fix, not something to copy around. A day is counted the evening its cycle is journalled, not when the copy reaches it. A stopped calibration gives neither a pass nor a fail and no end date, and the fund test's start is not worked out from it, until the owner decides. The line is added to the calibration pass rule (`shadow/calibration.py`) and to `docs/shadow-funds.mdx`. Made before calibration started: no calibration day exists yet. |
+| 2026-09-26 | **Trigger (b) retired, drawdown trigger (d) added** (the owner's decision; operational, not a decision rule) | The owner's words: "Trigger (b): replace it. The model is now long-only by my decision, so (b) would only tell us that SPY fell. Retire it. Replace it with a drawdown trigger on the real paper account: stop and tell me if equity falls more than 8% below its highest point since 23 Sep, or if it falls more than 5 percentage points behind VT over the same period." (b) is no longer evaluated; the race prints that it is retired. (a) stays closed and (c) is unchanged, its window not reset. **Definitions of (d)** (`analysis/decision_gate.py`, `drawdown_watch`): the account's equity is its daily closing equity as Alpaca's portfolio history reports it, recorded read-only after every heartbeat run in `logs/account.jsonl` (every line's history, a later line winning a day, and a value taken only from a line recorded after that day's 16:00 New York close), plus the latest line's own equity for its New York day when that is a trading day newer than every close (an intraday number when recorded before the close, marked so); days before 2026-09-23 are ignored. *Drawdown*: the peak is the highest closing equity from 2026-09-23 to the day, that day included; the day trips when equity < peak × (1 − 0.08), i.e. more than 8% below the peak (exactly 8% does not). *Behind VT*: both returns run from the same base, the 2026-09-23 close, to the same day's close: account equity ÷ its 2026-09-23 close − 1, and VT's close ÷ its 2026-09-23 close − 1, VT final closes only. 2026-09-23 is the base because it is the first day of the period with a close for both (the price source has no VT bar for 2026-09-22). The day trips when account return − VT return < −0.05, i.e. more than 5 percentage points behind (exactly 5 does not). A day with no final VT close is not judged on this part; the drawdown part still is. Every day that trips counts; the race shows the latest drawdown from the peak and the latest gap to VT in points whether or not it tripped, and a missing or unreadable account record reads "not judged: no account record". A trip means stop and tell the owner: the race prints it, `logs/race_gate.json` carries it (`watch.d`), and the daily health check raises a warning (not critical) that the brief sends to the owner's phone. Nothing reverts or trades because of it, and nothing that decides the race reads it: no look, bar or verdict changes. |
+| 2026-09-26 | **Bug fix**: the model call's retry had a limit it could almost never meet (the owner's decision) | A full-model call that timed out was asked once more with a 120-second limit, against 300 seconds for the first ask. Only 29-45% of the model's successful answers on 23 and 25 Sep arrived within 120 seconds (median 130-146 s), so the second try almost never succeeded: on 25 Sep it failed 7 times out of 7, and all 7 names were lost. The second try now gets the same 300 seconds (`orchestrator/llm.py`, `TRANSPORT_RETRY_TIMEOUT_SECONDS`). This changes no model, provider, prompt, answer length or reasoning effort; only how long we wait. Each ask is now logged (ticker, first or second try, start, duration, answer length), and the error text counts the asks actually made. Trigger (c) is unchanged: its window is not reset and timeouts still count as model errors. No decision rule changes. |

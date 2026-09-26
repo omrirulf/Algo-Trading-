@@ -223,27 +223,13 @@ def test_fewer_than_five_days_are_never_judged():
     assert gate.failure_trips([day(DAYS[0], failed=60)]) == []
 
 
-def test_five_days_without_a_short_trip_only_when_spy_fell():
-    days = [day(d, shorts=0) for d in DAYS[:5]]
-    falling = {date(2026, 9, 30): 500.0, DAYS[4]: 490.0}
-    rising = {date(2026, 9, 30): 500.0, DAYS[4]: 510.0}
-    assert len(gate.no_short_trips(days, falling)) == 1
-    assert gate.no_short_trips(days, rising) == []
-    days[3] = day(DAYS[3], shorts=1)
-    assert gate.no_short_trips(days, falling) == []
-
-
-def test_a_lost_day_neither_extends_nor_breaks_a_no_short_run():
-    days = [day(d, shorts=0) for d in DAYS[:3]] + [day(DAYS[3], failed=60, shorts=0)] + \
-           [day(d, shorts=0) for d in DAYS[4:6]]
-    falling = {date(2026, 9, 30): 500.0, DAYS[5]: 480.0}
-    (trip,) = gate.no_short_trips(days, falling)
-    assert (trip.first, trip.last) == (DAYS[0], DAYS[5])
-
-
-def test_a_run_whose_last_close_is_not_final_is_not_judged():
-    days = [day(d, shorts=0) for d in DAYS[:5]]
-    assert gate.no_short_trips(days, {date(2026, 9, 30): 500.0}) == []
+def test_trigger_b_is_retired_and_nothing_computes_it():
+    """The owner's decision of 26 Sep 2026: the model is long-only, so (b)
+    -- no SHORT on 5 answered days while SPY fell -- could only say that SPY
+    fell. It is retired, not merely unused, and (d) replaces it."""
+    assert gate.TRIGGER_B_RETIRED == date(2026, 9, 26)
+    assert not hasattr(gate, "no_short_trips")
+    assert "no_short_trips" not in gate.__all__
 
 
 # --- a look that cannot be read decides nothing ----------------------------------
@@ -332,10 +318,109 @@ def test_trigger_c_counts_model_errors_only_and_from_25_september():
 def test_trigger_a_is_closed_as_the_owner_recorded_it():
     """The owner's decision of 25 Sep 2026: the zero-shorts replay tripped (a)
     -- gpt-oss shorted 1 of the 31 lines Opus shorted -- and the owner kept
-    gpt-oss. (a) was a one-time check and is closed; (b) and (c) stay."""
+    gpt-oss. (a) was a one-time check and is closed; (c) stays."""
     assert gate.TRIGGER_A_CLOSED == date(2026, 9, 25)
     assert gate.TRIGGER_A_RESULT == (1, 31)
     shorted, of = gate.TRIGGER_A_RESULT
     assert shorted / of < 0.25, "it tripped: below a quarter"
-    # (b) and (c) are still judged.
+    # (c) is still judged.
     assert gate.WATCH_DAYS == 5 and gate.WATCH_MAX_FAILED_SHARE == 0.05
+
+
+# --- trigger (d): the real paper account ---------------------------------------------------
+
+D0 = date(2026, 9, 23)
+SEP = [date(2026, 9, d) for d in (23, 24, 25, 28, 29, 30)]
+
+
+def test_trigger_d_is_the_owners_numbers():
+    assert gate.DRAWDOWN_START == date(2026, 9, 23) == gate.DECISION_CUTOFF
+    assert (gate.MAX_DRAWDOWN, gate.MAX_BEHIND_VT) == (0.08, 0.05)
+
+
+def test_the_peak_is_the_highest_close_so_far_and_the_drawdown_is_measured_from_it():
+    equity = dict(zip(SEP, [100_000.0, 104_000.0, 101_000.0, 105_000.0, 99_000.0, 106_000.0]))
+    watch = gate.drawdown_watch(equity, {})
+    assert [(d.peak, d.peak_day) for d in watch.days] == [
+        (100_000.0, SEP[0]), (104_000.0, SEP[1]), (104_000.0, SEP[1]), (105_000.0, SEP[3]),
+        (105_000.0, SEP[3]), (106_000.0, SEP[5])]
+    assert watch.days[4].drawdown == pytest.approx(99_000 / 105_000 - 1)
+    assert watch.latest.drawdown == 0.0 and watch.trips == ()
+
+
+def test_exactly_eight_percent_below_the_peak_does_not_trip_and_more_does():
+    exactly = {SEP[0]: 100_000.0, SEP[1]: 92_000.0}
+    assert gate.drawdown_trips(exactly, {}) == []
+    assert not gate.drawdown_watch(exactly, {}).latest.too_deep
+    more = {SEP[0]: 100_000.0, SEP[1]: 91_999.99}
+    (trip,) = gate.drawdown_trips(more, {})
+    assert (trip.first, trip.last) == (SEP[1], SEP[1])
+    assert "8.00% below its peak 100,000.00 of 2026-09-23" in trip.detail
+    # The peak is the highest close since the start, not the first one.
+    later = {SEP[0]: 100_000.0, SEP[1]: 110_000.0, SEP[2]: 101_000.0}
+    (trip,) = gate.drawdown_trips(later, {})
+    assert trip.last == SEP[2] and "peak 110,000.00 of 2026-09-24" in trip.detail
+
+
+def test_every_day_that_trips_is_a_trip_and_a_recovery_does_not_erase_one():
+    equity = dict(zip(SEP[:4], [100_000.0, 90_000.0, 91_000.0, 99_000.0]))
+    trips = gate.drawdown_trips(equity, {})
+    assert [t.last for t in trips] == [SEP[1], SEP[2]]
+    assert not gate.drawdown_watch(equity, {}).latest.too_deep
+
+
+def test_more_than_five_points_behind_vt_trips_from_the_23_september_close():
+    """Both returns from the same base, the 2026-09-23 close, to the same day's close."""
+    equity = {SEP[0]: 100_000.0, SEP[1]: 99_000.0, SEP[2]: 97_000.0}
+    vt = {SEP[0]: 100.0, SEP[1]: 103.0, SEP[2]: 103.0}
+    watch = gate.drawdown_watch(equity, vt)
+    assert [d.gap for d in watch.days] == pytest.approx([0.0, -0.04, -0.06])
+    (trip,) = watch.trips
+    assert trip.last == SEP[2]
+    assert "6.00 points behind VT since the 2026-09-23 close (account -3.00%, VT +3.00%" in trip.detail
+    assert "below its peak" not in trip.detail, "3% below the peak is not a drawdown trip"
+    # Exactly five points behind does not trip.
+    exactly = gate.drawdown_watch({SEP[0]: 100_000.0, SEP[1]: 95_000.0}, {SEP[0]: 100.0, SEP[1]: 100.0})
+    assert exactly.latest.gap == pytest.approx(-0.05) and exactly.trips == ()
+
+
+def test_both_reasons_on_one_day_are_one_trip():
+    equity = {SEP[0]: 100_000.0, SEP[1]: 90_000.0}
+    vt = {SEP[0]: 100.0, SEP[1]: 100.0}
+    (trip,) = gate.drawdown_trips(equity, vt)
+    assert "below its peak" in trip.detail and "points behind VT" in trip.detail
+
+
+def test_a_day_with_no_final_vt_close_is_not_judged_against_vt():
+    equity = {SEP[0]: 100_000.0, SEP[1]: 99_000.0, SEP[2]: 93_000.0}
+    vt = {SEP[0]: 100.0, SEP[1]: 101.0}                         # the 25th is not final yet
+    watch = gate.drawdown_watch(equity, vt)
+    assert watch.trips == () and watch.vt_problem is None
+    assert watch.latest.day == SEP[2] and watch.latest.gap is None
+    assert watch.latest_vt.day == SEP[1] and watch.latest_vt.gap == pytest.approx(-0.02)
+    # Without a VT close for the base day, no day is judged against VT; the drawdown still is.
+    no_base = gate.drawdown_watch({SEP[0]: 100_000.0, SEP[1]: 91_000.0}, {SEP[1]: 120.0})
+    assert "no final VT close for 2026-09-23" in no_base.vt_problem
+    assert no_base.latest_vt is None
+    (trip,) = no_base.trips
+    assert "below its peak" in trip.detail and "VT" not in trip.detail
+
+
+def test_days_before_the_start_are_ignored():
+    """A higher close on 22 Sep is not the peak, and a lower one is not the base."""
+    equity = {date(2026, 9, 21): 150_000.0, date(2026, 9, 22): 50_000.0, SEP[0]: 100_000.0, SEP[1]: 99_000.0}
+    vt = {date(2026, 9, 22): 10.0, SEP[0]: 100.0, SEP[1]: 100.0}
+    watch = gate.drawdown_watch(equity, vt)
+    assert [d.day for d in watch.days] == SEP[:2]
+    assert watch.days[0].peak == 100_000.0 and watch.trips == ()
+    assert watch.latest.account_return == pytest.approx(-0.01) and watch.latest.vt_return == 0.0
+
+
+def test_no_account_close_judges_nothing_and_bad_numbers_are_skipped():
+    empty = gate.drawdown_watch({}, {})
+    assert empty.days == () and empty.trips == () and empty.latest is None and empty.latest_vt is None
+    assert gate.drawdown_trips({}, {SEP[0]: 100.0}) == []
+    before_only = gate.drawdown_watch({date(2026, 9, 22): 100_000.0}, {})
+    assert before_only.days == ()
+    noisy = {SEP[0]: 100_000.0, SEP[1]: float("nan"), SEP[2]: 0.0, SEP[3]: -5.0, SEP[4]: 99_000.0}
+    assert [d.day for d in gate.drawdown_watch(noisy, {}).days] == [SEP[0], SEP[4]]

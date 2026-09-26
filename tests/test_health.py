@@ -445,3 +445,85 @@ def test_the_alarm_reaches_the_report(tmp_path):
     audit.write_text("", encoding="utf-8")
     alarms = health.check(journal, audit, date(2026, 9, 17))
     assert any("without news" in a.title for a in alarms)
+
+
+# --------------------------------------------------------------------------- #
+# Trigger (d): the owner's drawdown trigger on the paper account (26 Sep 2026)
+# --------------------------------------------------------------------------- #
+
+
+def race_record(tripped=True, trips=None):
+    trips = trips if trips is not None else [
+        {"day": "2026-10-08", "detail": "equity 91,500.00 is 8.50% below its peak 100,000.00 of 2026-09-24 "
+                                        "(more than 8%)",
+         "below_peak": True, "behind_vt": False, "drawdown": -0.085, "gap": -0.031},
+    ]
+    return {"generated_at": "2026-10-08T22:56:00+00:00", "status_line": "…",
+            "watch": {"d": {"start": "2026-09-23", "tripped": tripped, "trips": trips if tripped else []}}}
+
+
+def _day_with_a_record(logs, race):
+    journal, audit = logs
+    write(journal, journal_line("AAPL", when="2026-10-08T15:00:00+00:00"))
+    if race is not None:
+        (journal.parent / health.RACE_GATE_FILE).write_text(race if isinstance(race, str) else json.dumps(race))
+    return journal, audit
+
+
+def test_a_tripped_trigger_d_is_a_warning_with_a_clear_headline(logs):
+    journal, audit = _day_with_a_record(logs, race_record())
+    alarms = health.check(journal, audit, date(2026, 10, 8))
+    [alarm] = alarms
+    assert alarm.severity == health.WARNING and not alarm.is_critical
+    assert alarm.title == "Trigger (d) tripped: the paper account is 8.5% below its peak on 2026-10-08"
+    assert "8.50% below its peak 100,000.00" in alarm.detail
+    assert "Stop and tell the owner; nothing reverts or trades" in alarm.detail
+    assert health.exit_code(alarms) == 1
+    assert "Trigger (d) tripped" in health.render(alarms, date(2026, 10, 8))
+
+
+def test_trigger_d_names_both_reasons_when_both_tripped():
+    both = race_record(trips=[{"day": "2026-10-08", "detail": "x; y", "below_peak": True, "behind_vt": True,
+                               "drawdown": -0.09, "gap": -0.062}])
+    alarm = health.drawdown_tripped(both)
+    assert alarm.title == "Trigger (d) tripped: the paper account is 9.0% below its peak and 6.2 points behind VT on 2026-10-08"
+    behind = race_record(trips=[{"day": "2026-10-08", "detail": "z", "below_peak": False, "behind_vt": True,
+                                 "drawdown": -0.02, "gap": -0.051}])
+    assert health.drawdown_tripped(behind).title == \
+        "Trigger (d) tripped: the paper account is 5.1 points behind VT on 2026-10-08"
+    # A record that says tripped but lost its detail still warns.
+    bare = {"watch": {"d": {"tripped": True, "trips": "?"}}}
+    assert health.drawdown_tripped(bare).title == "Trigger (d) tripped: the paper account is past the owner's limit"
+
+
+@pytest.mark.parametrize("race", [
+    None, "not json", "[1, 2]", {"watch": None}, {"watch": {"d": None}}, {"watch": {"d": {"tripped": "yes"}}},
+    race_record(tripped=False), {"status_line": "an older record, from before (d)"},
+])
+def test_no_trip_no_trigger_d_alarm(logs, race):
+    journal, audit = _day_with_a_record(logs, race)
+    assert health.check(journal, audit, date(2026, 10, 8)) == []
+
+
+def test_the_cli_reads_the_race_record_beside_the_journal_or_the_one_it_is_given(logs, tmp_path):
+    journal, audit = _day_with_a_record(logs, race_record())
+    calm = tmp_path / "elsewhere.json"
+    calm.write_text(json.dumps(race_record(tripped=False)))
+    args = ["--journal", str(journal), "--audit", str(audit), "--day", "2026-10-08"]
+    assert health.main(args) == 1
+    assert health.main(args + ["--race", str(calm)]) == 0
+
+
+def test_trigger_d_heads_the_brief_that_goes_to_the_phone(logs):
+    """The heartbeat writes the book, the brief reads its alarms, and the
+    phone step sends the brief: the real account's trigger is the headline,
+    ahead of a stopped calibration."""
+    from analysis import book, brief
+
+    journal, audit = _day_with_a_record(logs, race_record())
+    (journal.parent / health.FUNDS_FILE).write_text(json.dumps(
+        {"calibration": {"status": "stopped", "mirrored_day_count": 3, "mirror_limit": 2}}))
+    snapshot = book.build(audit, journal, date(2026, 10, 8))
+    text = brief.compose(snapshot, date(2026, 10, 8))
+    assert text.splitlines()[0] == ("🟡 2 warnings: Trigger (d) tripped: the paper account is 8.5% below "
+                                    "its peak on 2026-10-08")

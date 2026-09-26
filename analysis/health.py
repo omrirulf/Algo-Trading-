@@ -19,16 +19,18 @@ can act on:
 The rules are deliberately few and each names the day it was learned. A
 check nobody can explain is a check that gets switched off.
 
-One rule reads a third file: the shadow funds' nightly record
-(``logs/funds.json``, committed beside the journal), for a calibration the
-owner's late-run limit has stopped. It is read like the others -- a missing
-or broken file says nothing -- and never written.
+Two rules read a nightly record committed beside the journal: the shadow
+funds' (``logs/funds.json``), for a calibration the owner's late-run limit
+has stopped, and the race's gate (``logs/race_gate.json``), for the owner's
+trigger (d) on the paper account. They are read like the others -- a
+missing or broken file says nothing -- and never written.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from collections import Counter, defaultdict
 from dataclasses import dataclass
@@ -70,6 +72,10 @@ FAILED_SHARE_CRITICAL = 0.10
 #: ``logs/signal_journal.log``, so every caller that already passes the
 #: journal reaches it with no new argument (``analysis/book.py`` included).
 FUNDS_FILE = "funds.json"
+
+#: The race's nightly gate record, committed beside the journal by the same
+#: workflow (``analysis/horse_race.py --gate-json``). Read for trigger (d).
+RACE_GATE_FILE = "race_gate.json"
 
 
 @dataclass(frozen=True)
@@ -337,6 +343,51 @@ def calibration_stopped(funds: Optional[dict]) -> Optional[Alarm]:
                  f"{funds.get('final_through') or 'an unknown date'}.")
 
 
+def _fraction(value: object) -> Optional[float]:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value) if math.isfinite(value) else None
+
+
+def drawdown_tripped(race: Optional[dict]) -> Optional[Alarm]:
+    """26 Sep 2026: the owner's trigger (d) on the real paper account tripped.
+
+    The owner's rule, replacing trigger (b): stop and tell the owner if the
+    account's equity falls more than 8% below its highest close since
+    2026-09-23, or its return since the 2026-09-23 close falls more than 5
+    percentage points behind VT's. The race computes it every night
+    (``analysis.decision_gate.drawdown_watch``) and records it in its gate
+    record under ``watch.d``; this says it to the owner, every day the record
+    says it tripped, until they decide. A warning, not critical, as for a
+    stopped calibration: it is a question for the owner, not an exposed
+    position, and nothing reverts or trades because of it.
+    """
+    from analysis.decision_gate import DRAWDOWN_START, INDEX_TICKER, MAX_BEHIND_VT, MAX_DRAWDOWN
+
+    watch = race.get("watch") if isinstance(race, dict) else None
+    d = watch.get("d") if isinstance(watch, dict) else None
+    if not isinstance(d, dict) or d.get("tripped") is not True:
+        return None
+    listed = d.get("trips")
+    trips = [t for t in listed if isinstance(t, dict)] if isinstance(listed, list) else []
+    last = trips[-1] if trips else {}
+    drawdown, gap = _fraction(last.get("drawdown")), _fraction(last.get("gap"))
+    parts = []
+    if last.get("below_peak") is True and drawdown is not None:
+        parts.append(f"{abs(drawdown):.1%} below its peak")
+    if last.get("behind_vt") is True and gap is not None:
+        parts.append(f"{abs(gap) * 100:.1f} points behind {INDEX_TICKER}")
+    what = " and ".join(parts) or "past the owner's limit"
+    when = f" on {last['day']}" if isinstance(last.get("day"), str) else ""
+    detail = str(last.get("detail") or "the record gives no detail")
+    return Alarm(WARNING, f"Trigger (d) tripped: the paper account is {what}{when}",
+                 f"{detail[:300]}. The owner's trigger (d): more than {MAX_DRAWDOWN:.0%} below the "
+                 f"peak since {DRAWDOWN_START.isoformat()}, or more than {MAX_BEHIND_VT * 100:.0f} points "
+                 f"behind {INDEX_TICKER}. Stop and tell the owner; nothing reverts or trades. Tripped on "
+                 f"{len(trips) or 'at least one'} day(s); from the race gate record of "
+                 f"{race.get('generated_at') or 'an unknown time'}.")
+
+
 def duplicate_cycle(today: list[dict]) -> Optional[Alarm]:
     """16 and 17 Sep 2026: a cron delivered hours late ran the day twice."""
     counts = Counter(str(line.get("ticker")) for line in today)
@@ -349,22 +400,27 @@ def duplicate_cycle(today: list[dict]) -> Optional[Alarm]:
                  f"opinions per name. First few: {', '.join(twice[:8])}")
 
 
-def check(journal: Path, audit: Path, day: date, funds: Optional[Path] = None) -> list[Alarm]:
+def check(journal: Path, audit: Path, day: date, funds: Optional[Path] = None,
+          race: Optional[Path] = None) -> list[Alarm]:
     """Every alarm the day's record raises, critical first.
 
     ``funds`` is the shadow funds' record; by default the ``funds.json``
-    beside the journal (``FUNDS_FILE``).
+    beside the journal (``FUNDS_FILE``). ``race`` is the race's gate record;
+    by default the ``race_gate.json`` beside it (``RACE_GATE_FILE``).
     """
     today = journal_lines_on(_read_lines(journal), day)
     actions = audit_actions_on(_read_lines(audit), day)
     funds_path = Path(funds) if funds is not None else Path(journal).parent / FUNDS_FILE
+    race_path = Path(race) if race is not None else Path(journal).parent / RACE_GATE_FILE
     found = [
         no_cycle(today),
         naked_positions(actions),
         missized_stops(actions),
         failed_calls(today),
-        # First of the warnings: it waits on the owner, and the brief's
-        # headline names the first warning.
+        # First of the warnings: they wait on the owner, and the brief's
+        # headline names the first warning. The real account before the
+        # simulation.
+        drawdown_tripped(_read_record(race_path)),
         calibration_stopped(_read_record(funds_path)),
         failed_tickers(today),
         screen_errors(today),
@@ -406,9 +462,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("--day", default=None, help="ISO date, default today in UTC")
     parser.add_argument("--funds", type=Path, default=None,
                         help="the shadow funds' record, default funds.json beside the journal")
+    parser.add_argument("--race", type=Path, default=None,
+                        help="the race's gate record, default race_gate.json beside the journal")
     args = parser.parse_args(argv)
     day = date.fromisoformat(args.day) if args.day else datetime.now(timezone.utc).date()
-    alarms = check(args.journal, args.audit, day, args.funds)
+    alarms = check(args.journal, args.audit, day, args.funds, args.race)
     print(render(alarms, day), end="")
     return exit_code(alarms)
 

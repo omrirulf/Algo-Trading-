@@ -304,12 +304,23 @@ class FinalAwareFetcher:
 
 
 def _race(tmp_path, monkeypatch, capsys, frames, journal_lines, now, extra=(),
-          cutoff=date(2000, 1, 1)):
+          cutoff=date(2000, 1, 1), account=None):
     """Run the race on a tiny journal. These journals are dated early 2026,
     before the real cutoff, so by default the cutoff is moved back to take
-    them in; a test about the cutoff itself passes ``cutoff=None``."""
+    them in; a test about the cutoff itself passes ``cutoff=None``.
+
+    ``account`` is the paper account's record for trigger (d): lines to
+    write, or raw text; by default there is none, so no test here reads the
+    repository's own ``logs/account.jsonl``."""
     journal = tmp_path / "signal_journal.log"
     journal.write_text("\n".join(json.dumps(l) for l in journal_lines) + "\n", encoding="utf-8")
+    record = tmp_path / "account.jsonl"
+    if account is None:
+        record.unlink(missing_ok=True)
+    else:
+        record.write_text(account if isinstance(account, str)
+                          else "\n".join(json.dumps(l) for l in account) + "\n", encoding="utf-8")
+    extra = ("--account", str(record), *extra)
     if cutoff is not None:
         monkeypatch.setattr(decision_gate, "DECISION_CUTOFF", cutoff)
         monkeypatch.setattr(decision_gate, "FAILURE_WATCH_START", cutoff)
@@ -563,6 +574,13 @@ def test_the_registered_parameters_are_the_ones_the_code_runs():
     assert gate.TRIGGER_A_CLOSED == date(2026, 9, 25) and "**Closed on 2026-09-25**" in text
     assert gate.TRIGGER_A_RESULT == (1, 31)
     assert "gpt-oss shorted 1 of the 31 lines where Opus shorted" in text
+    # Trigger (b): retired on the owner's decision of 26 Sep; (d) replaces it, with the file's numbers.
+    assert gate.TRIGGER_B_RETIRED == date(2026, 9, 26) and "**Retired on 2026-09-26**" in text
+    assert gate.DRAWDOWN_START == date(2026, 9, 23) and gate.MAX_DRAWDOWN == 0.08
+    assert "more than **8%** below its highest close since **2026-09-23**" in text
+    assert gate.MAX_BEHIND_VT == 0.05 and "more than **5 percentage points** behind VT's" in text
+    assert "| 2026-09-26 | **Trigger (b) retired, drawdown trigger (d) added**" in text
+    assert "equity < peak × (1 − 0.08)" in text and "account return − VT return < −0.05" in text
     # The two exploratory reports (reporting only): the owner's groups and "too few" line.
     assert horse_race.MIN_REPORT_TRADES == 20
     assert '"too few" until a group or side has 20 trades' in text
@@ -672,7 +690,12 @@ def test_the_model_watch_is_printed_every_run(tmp_path, monkeypatch, capsys):
     now = datetime.combine(warm.index[-1].date(), datetime.min.time(), tzinfo=timezone.utc) + timedelta(days=1)
     _, out = _race(tmp_path, monkeypatch, capsys, {"NVDA": warm}, [_journal_line("NVDA", stamp)], now)
     assert "MODEL WATCH" in out
-    assert "(b) 5 answered days in a row with no SHORT while SPY fell: not yet judged (1 of 5" in out
+    # Trigger (b) is retired (the owner's decision of 26 Sep 2026): recorded, never evaluated.
+    assert ("(b) retired 2026-09-26 (owner's decision: the model is long-only, so (b) would only say "
+            "SPY fell); replaced by (d)") in out
+    assert "no SHORT" not in out
+    assert ("(d) the paper account: more than 8% below its peak since 2026-09-23, or more than 5 points "
+            "behind VT: not judged: no account record") in out
     assert "(c) model errors above 5% of the calls that reached the model over 5 cycle days" in out
     assert "not yet judged (1 of 5 cycle day(s)" in out
     assert "setup errors (our key or configuration; shown, never counted by (c)): none" in out
@@ -1026,3 +1049,161 @@ def test_the_gate_json_reads_the_decision_races_trades_and_the_gate_is_unchanged
     without = json.loads(bare)
     new = {"conviction_groups", "sides", "report_since"}
     assert {k: v for k, v in data.items() if k not in new} == {k: v for k, v in without.items() if k not in new}
+
+
+# --- trigger (d): the real paper account ---------------------------------------------------
+
+
+def _account_line(at, days, equity, now_equity=None, **extra):
+    return {"at": at, "sha": None, "mode": "cycle",
+            "account": None if now_equity is None else {"equity": now_equity, "cash": 1.0},
+            "history": {"days": days, "equity": equity}, **extra}
+
+
+SEP_DAYS = ["2026-09-22", "2026-09-23", "2026-09-24", "2026-09-25", "2026-09-28", "2026-09-29", "2026-09-30"]
+
+
+def _vt_frame():
+    """VT from 21 Sep 2026: 100 on 23 Sep, 104 on 30 Sep."""
+    closes = [99.0, 99.5, 100.0, 101.0, 102.0, 103.0, 103.5, 104.0]       # 21 Sep .. 30 Sep
+    return frame([(c, c + 1, c - 1, c) for c in closes], start="2026-09-21")
+
+
+def test_read_account_takes_closes_from_every_line_and_the_latest_equity_for_its_day(tmp_path):
+    path = tmp_path / "account.jsonl"
+    lines = [
+        # Written during the 24 Sep session: its history ends with that
+        # session's equity so far, which is not a close.
+        _account_line("2026-09-24T17:00:00Z", SEP_DAYS[:3], [0.0, 100_000.0, 123_456.0], 100_500.0),
+        "not json",
+        {"at": "2026-09-29T15:00:00Z", "sha": None, "mode": "cycle", "error": "RuntimeError: boom"},
+        # A later record wins a day both give; the union may list it first.
+        _account_line("2026-09-25T19:15:32Z", SEP_DAYS[1:3], [100_000.0, 101_000.0], 102_000.0),
+    ]
+    path.write_text("\n".join(l if isinstance(l, str) else json.dumps(l) for l in reversed(lines)) + "\n")
+    record = horse_race.read_account(path)
+    assert record.equity == {date(2026, 9, 23): 100_000.0, date(2026, 9, 24): 101_000.0,
+                             date(2026, 9, 25): 102_000.0}
+    assert record.intraday == date(2026, 9, 25)
+    assert record.at == datetime(2026, 9, 29, 15, tzinfo=timezone.utc)
+
+
+def test_an_old_lines_history_keeps_days_the_latest_month_no_longer_reaches(tmp_path):
+    """Alpaca's history is one month: by late October the latest line no
+    longer holds 23 Sep, and (d) still needs it as the peak's start and the base."""
+    path = tmp_path / "account.jsonl"
+    old = _account_line("2026-09-24T21:00:00Z", ["2026-09-23", "2026-09-24"], [100_000.0, 101_000.0], 101_000.0)
+    new = _account_line("2026-10-27T21:00:00Z", ["2026-10-26", "2026-10-27"], [99_000.0, 98_000.0], 98_000.0)
+    path.write_text(json.dumps(old) + "\n" + json.dumps(new) + "\n")
+    record = horse_race.read_account(path)
+    assert list(record.equity) == [date(2026, 9, 23), date(2026, 9, 24), date(2026, 10, 26), date(2026, 10, 27)]
+    assert record.intraday is None, "a record taken after the close carries closes only"
+
+
+@pytest.mark.parametrize("text", [None, "", "garbage\n{\n[1]\n", json.dumps({"at": "2026-09-25T19:00:00Z"}),
+                                  json.dumps(_account_line("2026-09-25T19:00:00Z", [], [], float("nan")))])
+def test_a_missing_or_useless_account_record_is_no_record_never_an_error(tmp_path, text):
+    path = tmp_path / "account.jsonl"
+    if text is not None:
+        path.write_text(text)
+    assert horse_race.read_account(path) is None
+    watch = horse_race.account_watch(None, {})
+    assert watch.problem == "no account record" and not watch.tripped
+    data = horse_race.account_watch_json(watch)
+    assert data["judged"] is False and data["not_judged"] == "no account record" and data["tripped"] is False
+    json.dumps(data, allow_nan=False)
+
+
+def _sep_account(equity_by_day, at="2026-09-30T21:00:00Z"):
+    days = list(equity_by_day)
+    return [_account_line(at, days, [equity_by_day[d] for d in days], equity_by_day[days[-1]])]
+
+
+def _race_sep(tmp_path, monkeypatch, capsys, account, extra=()):
+    warm = _warm_frame()
+    stamp = _at(warm.index[MIN_WARMUP_BARS].date())
+    now = datetime(2026, 10, 1, 2, tzinfo=timezone.utc)
+    return _race(tmp_path, monkeypatch, capsys, {"NVDA": warm, "VT": _vt_frame()},
+                 [_journal_line("NVDA", stamp)], now, extra=extra, account=account)
+
+
+def test_trigger_d_is_printed_with_tonights_numbers_when_it_has_not_tripped(tmp_path, monkeypatch, capsys):
+    account = _sep_account(dict(zip(SEP_DAYS, [99_000.0, 100_000.0, 101_000.0, 103_000.0, 102_000.0,
+                                               101_500.0, 101_000.0])))
+    code, out = _race_sep(tmp_path, monkeypatch, capsys, account)
+    assert code == 0
+    watch = out[out.index("MODEL WATCH"):out.index("decision window:", out.index("MODEL WATCH"))]
+    assert ("(d) the paper account: more than 8% below its peak since 2026-09-23, or more than 5 points "
+            "behind VT: not tripped") in watch
+    assert ("    now 2026-09-30 close: equity 101,000.00 | peak 103,000.00 on 2026-09-25 | "
+            "1.94% below the peak (trips beyond 8%)") in watch
+    assert ("    vs VT since the 2026-09-23 close, at the 2026-09-30 close: account +1.00%, VT +4.00%: "
+            "-3.00 points (trips below -5)") in watch
+    assert watch.index("(d) the paper account") < watch.index("(b) retired") < watch.index("(a) closed")
+
+
+def test_trigger_d_trips_in_the_text_and_the_gate_json(tmp_path, monkeypatch, capsys):
+    account = _sep_account(dict(zip(SEP_DAYS, [99_000.0, 100_000.0, 101_000.0, 100_000.0, 98_000.0,
+                                               98_500.0, 98_900.0])))
+    # 28 and 29 Sep are exactly 5 points behind VT (-2.00% against +3.00%,
+    # -1.50% against +3.50%), which does not trip; 30 Sep is 5.10 behind.
+    _, out = _race_sep(tmp_path, monkeypatch, capsys, account)
+    assert ("behind VT: TRIPPED 1 time(s); latest 2026-09-30: the account is 5.10 points behind VT since "
+            "the 2026-09-23 close (account -1.10%, VT +4.00%; more than 5 points)") in out
+    _, raw = _race_sep(tmp_path, monkeypatch, capsys, account, extra=("--gate-json",))
+    d = json.loads(raw)["watch"]["d"]
+    assert d["judged"] is True and d["tripped"] is True and d["vt_not_judged"] is None
+    assert [t["day"] for t in d["trips"]] == ["2026-09-30"]
+    assert d["trips"][-1]["behind_vt"] is True and d["trips"][-1]["below_peak"] is False
+    assert d["latest"] == {"day": "2026-09-30", "equity": 98_900.0, "intraday": False, "peak": 101_000.0,
+                           "peak_day": "2026-09-24", "drawdown": pytest.approx(98_900 / 101_000 - 1, abs=1e-6),
+                           "account_return": pytest.approx(-0.011), "vt_return": pytest.approx(0.04),
+                           "gap": pytest.approx(-0.051)}
+    assert d["latest_vt"]["day"] == "2026-09-30"
+    assert (d["start"], d["max_drawdown"], d["max_behind_vt"]) == ("2026-09-23", 0.08, 0.05)
+    json.dumps(d, allow_nan=False)
+
+
+def test_trigger_d_moves_no_look_bar_or_verdict(tmp_path, monkeypatch, capsys):
+    """Nothing that decides the race reads (d): every gate field reads the
+    same with no account record, a calm one, a tripped one and a garbage one."""
+    calm = _sep_account(dict(zip(SEP_DAYS, [99_000.0, 100_000.0, 101_000.0, 103_000.0, 102_000.0,
+                                            101_500.0, 101_000.0])))
+    tripped = _sep_account(dict(zip(SEP_DAYS, [99_000.0, 100_000.0, 80_000.0, 70_000.0, 60_000.0,
+                                               50_000.0, 40_000.0])))
+    runs = {}
+    for name, account in (("none", None), ("calm", calm), ("tripped", tripped), ("garbage", "{{nope\n")):
+        _, raw = _race_sep(tmp_path, monkeypatch, capsys, account, extra=("--gate-json",))
+        runs[name] = json.loads(raw)
+    assert runs["none"]["watch"]["d"]["not_judged"] == "no account record"
+    assert runs["garbage"]["watch"]["d"]["not_judged"] == "no account record"
+    assert runs["tripped"]["watch"]["d"]["tripped"] is True and runs["calm"]["watch"]["d"]["tripped"] is False
+    strip = lambda data: {k: v for k, v in data.items() if k not in ("watch", "generated_at")}
+    assert strip(runs["none"]) == strip(runs["calm"]) == strip(runs["tripped"]) == strip(runs["garbage"])
+    # And gate_json itself: the same fields with and without the account.
+    view = horse_race.GateView(registered=True, mismatches=(), window_lines=1, window_cycle_days=1,
+                               unanswered_in_window=0, entry_days=0, independent=0,
+                               looks=tuple(decision_gate.evaluate({})), next_estimate=None)
+    record = horse_race.AccountRecord(equity={date(2026, 9, 23): 100_000.0, date(2026, 9, 24): 50_000.0},
+                                      at=STAMP)
+    with_d = horse_race.gate_json(view, 3, STAMP, account=horse_race.account_watch(record, {}))
+    without = horse_race.gate_json(view, 3, STAMP)
+    assert without["watch"] is None and with_d["watch"]["d"]["tripped"] is True
+    assert {k: v for k, v in with_d.items() if k != "watch"} == {k: v for k, v in without.items() if k != "watch"}
+    json.dumps(with_d, allow_nan=False)
+
+
+def test_an_intraday_record_is_marked_and_a_missing_vt_close_is_said(tmp_path):
+    record = horse_race.AccountRecord(
+        equity={date(2026, 9, 23): 100_000.0, date(2026, 9, 24): 100_800.0, date(2026, 9, 25): 100_926.06},
+        at=datetime(2026, 9, 25, 19, 15, 32, tzinfo=timezone.utc), intraday=date(2026, 9, 25))
+    vt = {date(2026, 9, 23): 100.0, date(2026, 9, 24): 100.5}
+    lines = horse_race.account_lines(horse_race.account_watch(record, vt))
+    assert lines[1].startswith("    now 2026-09-25 (intraday, recorded 19:15 UTC): equity 100,926.06")
+    assert ("vs VT since the 2026-09-23 close, at the 2026-09-24 close (no final VT close for 2026-09-25 "
+            "yet): account +0.80%, VT +0.50%: +0.30 points") in lines[2]
+    no_base = horse_race.account_lines(horse_race.account_watch(record, {date(2026, 9, 24): 100.5}))
+    assert no_base[2] == "    vs VT: not judged: no final VT close for 2026-09-23, the base"
+    before = horse_race.AccountRecord(equity={date(2026, 9, 22): 100_000.0}, at=STAMP)
+    assert horse_race.account_lines(horse_race.account_watch(before, vt)) == [
+        horse_race.trigger_d_label() + ": not judged: no account close on or after 2026-09-23"]
