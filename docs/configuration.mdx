@@ -226,7 +226,7 @@ questions:
 | Constant | Path | Written by |
 |---|---|---|
 | `AUDIT_LOG_PATH` | `logs/execution_audit.log` | `app/logger.py` — what the *engine* did with each signal. |
-| `SIGNAL_JOURNAL_PATH` | `logs/signal_journal.log` | `orchestrator/journal.py` — what the *model* saw before it produced one. |
+| `SIGNAL_JOURNAL_PATH` | `logs/journal/` (one file per UTC month) | `orchestrator/journal.py` — what the *model* saw before it produced one. |
 
 See [Signal Journal](/orchestrator/journal) for why the second one exists and
 what it makes answerable.

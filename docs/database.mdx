@@ -7,7 +7,7 @@ Two append-only JSON-lines files hold everything this system has ever seen:
 
 | File | Written by | Answers |
 |---|---|---|
-| `logs/signal_journal.log` | `orchestrator/journal.py` | What was in front of the model when it said that? |
+| `logs/journal/` (one file per month, read joined) | `orchestrator/journal.py` | What was in front of the model when it said that? |
 | `logs/execution_audit.log` | `app/logger.py` | What did the engine *do* with the signal? |
 
 They are excellent at being a record and poor at being asked questions. `grep`

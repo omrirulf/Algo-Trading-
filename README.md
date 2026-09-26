@@ -87,7 +87,7 @@ algo-trading-system/
 │   └── test_llm.py            # schema derivation + every LLM failure mode
 └── logs/
     ├── execution_audit.log    # what the engine did      (generated at runtime)
-    ├── signal_journal.log     # what the model saw       (generated at runtime)
+    ├── journal/2026-09.log    # what the model saw, one file per month (generated at runtime)
     └── trading.db             # index over both  (derived; gitignored, rebuildable)
 ```
 

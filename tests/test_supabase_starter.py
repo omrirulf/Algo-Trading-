@@ -370,7 +370,7 @@ def test_the_starters_log_is_read_before_the_book_and_never_fails_the_run():
 def test_the_journal_commit_carries_the_starters_record_on_its_own_line():
     run = _named(HEARTBEAT, "cycle")["Commit the journal"]["run"]
     assert "git add -f logs/starter_status.json 2>/dev/null || true" in run
-    main_add = next(line for line in run.splitlines() if line.strip().startswith("git add -f logs/signal_journal.log"))
+    main_add = next(line for line in run.splitlines() if line.strip().startswith("git add -f logs/journal "))
     assert "starter_status" not in main_add, "one missing path would make that add add nothing"
     assert "logs/starter_status.json" in run[run.index("sync_with_branch()"):]
 
@@ -388,14 +388,14 @@ def test_the_journal_commit_adds_the_starters_record_when_there_is_one(tmp_path)
     git("init", "-q", "--bare", "-b", "main", "origin.git")
     work = tmp_path / "work"
     git("clone", "-q", str(tmp_path / "origin.git"), str(work))
-    (work / "logs").mkdir()
-    for name in ("signal_journal.log", "execution_audit.log", "cycle_report.md", "fund_size.log",
+    (work / "logs" / "journal").mkdir(parents=True)
+    for name in ("journal/2026-09.log", "execution_audit.log", "cycle_report.md", "fund_size.log",
                  "blend_weights.json", "score_report.md", "book.json", "brief.txt", "account.jsonl"):
         (work / "logs" / name).write_text("yesterday\n")
     git("add", "-f", ".", cwd=work)
     git("commit", "-qm", "yesterday", cwd=work)
     git("push", "-q", "origin", "HEAD:main", cwd=work)
-    (work / "logs" / "signal_journal.log").write_text("yesterday\ntoday\n")
+    (work / "logs" / "journal" / "2026-09.log").write_text("yesterday\ntoday\n")
     (work / "logs" / "starter_status.json").write_text('{"day": "2026-09-28", "status_code": 204}\n')
     script = _named(HEARTBEAT, "cycle")["Commit the journal"]["run"].replace(
         "${{ inputs.mode == 'protect' && 'protection pass' || 'cycle' }}", "cycle")
@@ -403,7 +403,7 @@ def test_the_journal_commit_adds_the_starters_record_when_there_is_one(tmp_path)
                           timeout=60)
     assert done.returncode == 0, done.stdout + done.stderr
     origin = ["--git-dir", str(tmp_path / "origin.git")]
-    assert "today" in git(*origin, "show", "main:logs/signal_journal.log")
+    assert "today" in git(*origin, "show", "main:logs/journal/2026-09.log")
     assert "204" in git(*origin, "show", "main:logs/starter_status.json")
 
 

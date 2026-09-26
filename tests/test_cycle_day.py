@@ -198,7 +198,7 @@ def test_the_guard_test_is_on_yes_rather_than_not_no():
 def test_the_guard_asks_the_three_way_question_and_names_each_answer():
     guard = next(s for s in _heartbeat()["jobs"]["cycle"]["steps"] if s.get("id") == "guard")
     run = guard["run"]
-    assert "python analysis/cycle_day.py --journal logs/signal_journal.log --decide" in run
+    assert "python analysis/cycle_day.py --journal logs/journal --decide" in run
     for answer in ("run)", "already)", "too_late)"):
         assert answer in run, answer
     assert 'echo "skip=no"' in run

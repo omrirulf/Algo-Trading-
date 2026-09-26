@@ -49,7 +49,7 @@ For each ticker, `process_ticker()` runs a small pipeline:
   </Step>
   <Step title="Journal the cycle">
     `journal.record()` writes the full context, the signal and the engine's
-    response to `logs/signal_journal.log` — see
+    response to the month's file in `logs/journal/` — see
     [Signal Journal](/orchestrator/journal). Cycles that produced *no* signal
     are recorded too, with the reason.
   </Step>

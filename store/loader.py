@@ -32,6 +32,7 @@ from pathlib import Path
 from typing import Any, Iterable, Optional
 
 from analysis.reader import SCORE_FIELDS, entry_from, parse_timestamp
+from config import journal_files
 
 
 @dataclass
@@ -81,7 +82,7 @@ def line_hash(raw: str) -> str:
 
 
 def signal_row(raw: str) -> Optional[dict[str, Any]]:
-    """One ``signal_journal.log`` line as a row, or None if unreadable."""
+    """One journal line as a row, or None if unreadable."""
     payload = _load_json(raw)
     if payload is None:
         return None
@@ -214,11 +215,11 @@ def load_file(connection: sqlite3.Connection, path: Path | str, kind: str) -> Lo
     engine, so a journal can legitimately exist with no audit beside it.
     """
     path = Path(path)
-    if not path.exists():
+    if not journal_files.exists(path):
         return LoadResult()
     loader = load_signals if kind == "signals" else load_executions
-    with path.open(encoding="utf-8") as handle:
-        return loader(connection, handle)
+    # The journal's monthly files joined in order, or one plain file.
+    return loader(connection, journal_files.iter_lines(path))
 
 
 def _load(

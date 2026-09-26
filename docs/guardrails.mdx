@@ -37,7 +37,7 @@ that last part works.
 | A retried order cannot double a position | `broker_client.build_client_order_id()` — one stable `client_order_id` per ticker, side and heartbeat window, so a submit Alpaca already accepted is refused rather than repeated. |
 | Full audit trail | `app/logger.py` → `logs/execution_audit.log`, every decision logged as JSON. |
 | The scorer cannot trade | CI greps `analysis/` for any order path (`submit_order`, `ExecutionEngine`, `post_signal`) or file write. It grades past decisions and must never be able to make one — see [Scoring](/scoring). |
-| Full record of what the model saw | `orchestrator/journal.py` → `logs/signal_journal.log`, one JSON line per ticker per cycle — including the cycles that produced no signal. |
+| Full record of what the model saw | `orchestrator/journal.py` → `logs/journal/` (one file per month), one JSON line per ticker per cycle — including the cycles that produced no signal. |
 
 ## Saying more without being trusted more
 

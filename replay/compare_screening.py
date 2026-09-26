@@ -54,6 +54,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.schemas import Bias  # noqa: E402
+from config import journal_files  # noqa: E402
 from config import settings as cfg  # noqa: E402
 from orchestrator.llm import AnthropicSignalProvider, OpenAICompatibleProvider  # noqa: E402
 from replay import runner  # noqa: E402
@@ -134,11 +135,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def _comparable_entries(journal: Path, limit: int) -> tuple[list, int]:
     """Loaded entries that have a recorded screen to compare against, and a skip count."""
-    if not journal.exists():
+    if not journal_files.exists(journal):
         print(f"No journal at {journal}. Run some cycles first -- this compares "
               f"against real recorded screens.", file=sys.stderr)
         raise SystemExit(1)
-    lines = journal.read_text(encoding="utf-8").splitlines()
+    lines = journal_files.read_text(journal).splitlines()
     loaded = list(runner.load_entries(lines))[-limit:]
     comparable = [e for e in loaded if runner.recorded_screen_signal(e) is not None]
     return comparable, len(loaded) - len(comparable)

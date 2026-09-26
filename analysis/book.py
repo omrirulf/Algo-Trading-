@@ -42,6 +42,7 @@ from typing import Any, Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from analysis import health  # noqa: E402
+from config import journal_files  # noqa: E402
 from config import settings as cfg  # noqa: E402
 from config.instruments import (  # noqa: E402
     InstrumentKind, duration_rate_weight, equity_risk_beta, group_for, kind_for,
@@ -73,7 +74,8 @@ def _num(value: Any) -> Optional[float]:
 
 def _lines(path: Path) -> list[dict]:
     try:
-        text = path.read_text(encoding="utf-8")
+        # The journal's monthly files joined, or one plain file (the audit).
+        text = journal_files.read_text(path)
     except OSError:
         return []
     out = []

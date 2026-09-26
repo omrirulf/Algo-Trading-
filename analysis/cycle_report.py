@@ -41,6 +41,7 @@ from typing import Any, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from config import journal_files  # noqa: E402
 from config import settings as cfg  # noqa: E402
 from config.instruments import InstrumentKind, kind_for, name_for, sleeve_label  # noqa: E402
 from orchestrator import (  # noqa: E402
@@ -218,7 +219,8 @@ def read_lines(path: Path) -> list[Line]:
     """Every parsable line in the journal. A bad line is skipped, not fatal."""
     out: list[Line] = []
     try:
-        text = path.read_text(encoding="utf-8")
+        # The monthly files joined in order: the old single file, byte for byte.
+        text = journal_files.read_text(path)
     except OSError:
         return out
     for raw in text.splitlines():

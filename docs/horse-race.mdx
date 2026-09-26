@@ -152,7 +152,7 @@ late-run days: 8 of 8; lines before the open: 0; after the close: 0
 
 | Arm | Role | What it is | Where it comes from |
 | --- | --- | --- | --- |
-| **model** | incumbent | The full model's answer, exactly as journalled | `logs/signal_journal.log` |
+| **model** | incumbent | The full model's answer, exactly as journalled | `logs/journal/` |
 | **momentum** | main comparator | Time-series momentum with the textbook parameters | `rules/momentum.py`, recomputed from the line's own technicals |
 | **hybrid** | second main comparator | Momentum, with the line's own news score allowed one veto | `rules/hybrid.py`, recomputed from the technicals and the journalled `news_score` |
 | **random** | floor | A coin flip, seeded from the ticker and the day | `rules/control.py`, recomputed the same way |

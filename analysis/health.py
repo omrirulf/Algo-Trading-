@@ -53,6 +53,8 @@ from typing import Iterable, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from config import journal_files  # noqa: E402  (standard library only)
+
 CRITICAL = "critical"
 WARNING = "warning"
 
@@ -81,9 +83,9 @@ NAKED_ACTIONS = frozenset({"unmanaged", "error", "no_stop"})
 FAILED_SHARE_CRITICAL = 0.10
 
 #: The shadow funds' nightly record, by its name beside the journal: the
-#: funds workflow commits ``logs/funds.json`` next to
-#: ``logs/signal_journal.log``, so every caller that already passes the
-#: journal reaches it with no new argument (``analysis/book.py`` included).
+#: funds workflow commits ``logs/funds.json`` next to the journal directory
+#: ``logs/journal/``, so every caller that already passes the journal
+#: reaches it with no new argument (``analysis/book.py`` included).
 FUNDS_FILE = "funds.json"
 
 #: The race's nightly gate record, committed beside the journal by the same
@@ -98,6 +100,12 @@ STARTER_FILE = "starter_status.json"
 #: --status``). Written after the push, which is the heartbeat's last step,
 #: so what this run reads is the previous run's push.
 ARCHIVE_FILE = "archive_status.json"
+
+#: The one file the journal was before 26 Sep 2026, beside the monthly
+#: directory (``config.settings.LEGACY_SIGNAL_JOURNAL_PATH``; a test pins
+#: the two together). Written here as a name so this module keeps to the
+#: standard library.
+LEGACY_JOURNAL_FILE = "signal_journal.log"
 
 #: The day's main starter, as the run block names it
 #: (``analysis/cycle_day.py:PRIMARY_SOURCE``). Any other source that started
@@ -131,7 +139,8 @@ def _read_lines(path: Path) -> list[dict]:
     what an empty record means (for the journal, "no cycle today").
     """
     try:
-        text = path.read_text(encoding="utf-8")
+        # The journal's monthly files joined, or one plain file (the audit).
+        text = journal_files.read_text(path)
     except OSError:
         return []
     out: list[dict] = []
@@ -510,6 +519,26 @@ def started_elsewhere(today: list[dict], starter: Optional[dict] = None) -> Opti
     return Alarm(WARNING, f"The Supabase starter did not start today's run; {shown} did", " ".join(detail))
 
 
+def legacy_journal(journal: Path) -> Optional[Alarm]:
+    """The old single journal file is back, beside the monthly directory.
+
+    Since 26 Sep 2026 the journal is one file per month in ``logs/journal/``
+    and every reader joins those. Nothing reads ``logs/signal_journal.log``
+    any more, so a line written there -- by an old checkout, or a workflow
+    step the split missed -- is a line the race, the funds and this check
+    never see. Critical, because it needs a person: move its lines into the
+    right month's file, in order, and find what wrote it.
+    """
+    journal = Path(journal)
+    stray = journal.parent / LEGACY_JOURNAL_FILE
+    if not journal.is_dir() or not stray.is_file():
+        return None
+    return Alarm(CRITICAL, "The old journal file is back",
+                 f"{stray} exists beside the monthly journal directory {journal}. Nothing reads it, "
+                 "so its lines are missing from the race, the funds and this check. Move them into "
+                 "the month's file in logs/journal/ (in order) and find what wrote the old file.")
+
+
 def archive_problem(archive: Optional[dict]) -> Optional[Alarm]:
     """26 Sep 2026: the Supabase project was paused because nothing wrote to it.
 
@@ -617,6 +646,7 @@ def check(journal: Path, audit: Path, day: date, funds: Optional[Path] = None,
     if token_expires is _FROM_SETTINGS:
         from config.settings import GITHUB_DISPATCH_TOKEN_EXPIRES as token_expires
     found = [
+        legacy_journal(journal),
         no_cycle(today, day),
         naked_positions(actions),
         missized_stops(actions),

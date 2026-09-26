@@ -27,6 +27,7 @@ from pythonjsonlogger import jsonlogger
 from app.schemas import LLMSignal
 from orchestrator.fx import FxRate
 from orchestrator.pricing import Usage
+from config import journal_files
 from config import settings as cfg
 from orchestrator import arms, llm
 from orchestrator.context import TickerContext
@@ -196,14 +197,51 @@ def _cycle_fields(live: Optional[dict[str, Any]]) -> dict[str, Any]:
     return fields
 
 
+class MonthlyFileHandler(logging.FileHandler):
+    """Append each line to its UTC month's file in the journal directory.
+
+    A plain FileHandler whose file is chosen per line: the month of the
+    moment the line is written (``config/journal_files.py``). Lines are
+    written exactly as before; only which file receives them changes, and
+    the switch happens between two lines, never inside one.
+    """
+
+    def __init__(self, directory: Path) -> None:
+        self.directory = Path(directory)
+        self.directory.mkdir(parents=True, exist_ok=True)
+        super().__init__(journal_files.month_file(self.directory), encoding="utf-8", delay=True)
+
+    def emit(self, record: logging.LogRecord) -> None:
+        when = datetime.fromtimestamp(record.created, tz=timezone.utc)
+        target = os.path.abspath(journal_files.month_file(self.directory, when))
+        if target != self.baseFilename:
+            self.acquire()
+            try:
+                if self.stream is not None:
+                    self.stream.close()
+                    self.stream = None
+                self.baseFilename = target
+            finally:
+                self.release()
+        super().emit(record)
+
+
 def get_journal_logger(path: Path = cfg.SIGNAL_JOURNAL_PATH) -> logging.Logger:
-    """Return the journal logger, creating the file handler on first use."""
+    """Return the journal logger, creating the file handler on first use.
+
+    ``path`` is the monthly directory (the default) or, for tests and
+    tools, one plain file.
+    """
     logger = logging.getLogger(_JOURNAL_LOGGER_NAME)
     if logger.handlers:
         return logger
 
-    path.parent.mkdir(parents=True, exist_ok=True)
-    handler = logging.FileHandler(path, encoding="utf-8")
+    path = Path(path)
+    if journal_files.is_split(path):
+        handler: logging.FileHandler = MonthlyFileHandler(path)
+    else:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        handler = logging.FileHandler(path, encoding="utf-8")
     handler.setFormatter(
         jsonlogger.JsonFormatter(
             "%(asctime)s %(levelname)s %(message)s",

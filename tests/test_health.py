@@ -336,7 +336,7 @@ def test_the_alarm_step_runs_after_the_commit_on_every_cycle_run():
     step = steps[alarm]
     assert step["if"] == "always() && steps.guard.outputs.skip != 'yes' && inputs.mode != 'protect'"
     run = step["run"]
-    assert "python -m analysis.health --journal logs/signal_journal.log --audit logs/execution_audit.log" in run
+    assert "python -m analysis.health --journal logs/journal --audit logs/execution_audit.log" in run
     assert "GITHUB_STEP_SUMMARY" in run
     assert "--label health-alarm" in run and "--assignee \"$OWNER\"" in run
     assert 'if [ "$code" = "2" ]' in run and "exit 1" in run
@@ -378,7 +378,7 @@ def test_data_sources_runs_daily_before_the_cycle_and_a_dead_mapping_is_red():
 def test_the_append_only_logs_merge_as_a_union():
     """17 Sep 2026: a rebase conflict on the end of the audit log lost eleven stop records."""
     attributes = (Path(__file__).resolve().parents[1] / ".gitattributes").read_text()
-    for log in ("logs/signal_journal.log", "logs/execution_audit.log", "logs/fund_size.log"):
+    for log in ("logs/journal/*.log", "logs/execution_audit.log", "logs/fund_size.log"):
         assert f"{log} merge=union" in attributes, log
 
 

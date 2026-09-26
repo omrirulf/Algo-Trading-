@@ -27,6 +27,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
+from config import journal_files
+
 #: Score fields the model reports, in the order they are shown in reports.
 SCORE_FIELDS = (
     "news_score",
@@ -285,12 +287,15 @@ class JournalRead:
 
 
 def read_journal(path: Path | str) -> JournalRead:
-    """Parse every usable line of a journal file."""
+    """Parse every usable line of a journal: its monthly directory, or a file.
+
+    The months are joined in order (``config/journal_files.py``), so the
+    lines parsed are the old single file's, byte for byte.
+    """
     path = Path(path)
-    if not path.exists():
+    if not journal_files.exists(path):
         raise FileNotFoundError(f"no journal at {path}")
-    with path.open(encoding="utf-8") as handle:
-        return read_lines(handle)
+    return read_lines(journal_files.iter_lines(path))
 
 
 def read_database(path: Path | str, since: Optional[str] = None) -> JournalRead:

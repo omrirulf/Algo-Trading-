@@ -37,7 +37,7 @@ from typing import Final
 SCHEMA_VERSION: Final[int] = 1
 
 #: One row per journalled cycle: what the model saw, said, and what came back.
-#: Source: ``logs/signal_journal.log`` (``orchestrator/journal.py``).
+#: Source: ``logs/journal/`` (``orchestrator/journal.py``), one file per month.
 SIGNALS_DDL: Final[str] = """
 CREATE TABLE IF NOT EXISTS signals (
     id                 INTEGER PRIMARY KEY,
