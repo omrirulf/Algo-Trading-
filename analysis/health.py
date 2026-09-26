@@ -19,9 +19,10 @@ can act on:
 The rules are deliberately few and each names the day it was learned. A
 check nobody can explain is a check that gets switched off.
 
-Two rules read a nightly record committed beside the journal: the shadow
+Three rules read a nightly record committed beside the journal: the shadow
 funds' (``logs/funds.json``), for a calibration the owner's late-run limit
-has stopped, and the race's gate (``logs/race_gate.json``), for the owner's
+has stopped and for a month in which the price source is missing more than
+2% of the watchlist's ticker-days (26 Sep 2026), and the race's gate (``logs/race_gate.json``), for the owner's
 trigger (d) on the paper account. They are read like the others -- a
 missing or broken file says nothing -- and never written. Trigger (d) is
 judged on closing equity only: a mid-day reading below its line is in the
@@ -406,6 +407,51 @@ def _fraction(value: object) -> Optional[float]:
     return float(value) if math.isfinite(value) else None
 
 
+def _count(value: object) -> Optional[int]:
+    return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else None
+
+
+def price_gaps(funds: Optional[dict]) -> Optional[Alarm]:
+    """26 Sep 2026: the price source is missing too many ticker-days this month.
+
+    The owner's rule for the shadow funds: on a day the price source has no
+    bar for a ticker that traded, every fund leaves that position as it was
+    and marks it at its last close (on 22 Sep 2026 the source had no bar
+    for 27 names). The nightly funds record counts the missing ticker-days
+    per calendar month over the watchlist (``price_gaps``); when the latest
+    month's share -- missing ticker-days / (watchlist tickers x sessions) --
+    is above ``config.settings.MAX_PRICE_GAP_SHARE`` (2%), the owner is
+    told. A warning: it is the data getting worse, not a position exposed.
+    The share is recomputed here from the counts when they are there, so a
+    record that says one thing and counts another cannot hide a month.
+    """
+    from config.settings import MAX_PRICE_GAP_SHARE
+
+    record = funds.get("price_gaps") if isinstance(funds, dict) else None
+    months = record.get("months") if isinstance(record, dict) else None
+    rows = [m for m in months if isinstance(m, dict) and isinstance(m.get("month"), str)] \
+        if isinstance(months, list) else []
+    if not rows:
+        return None
+    latest = max(rows, key=lambda m: m["month"])
+    missing, sessions, tickers = (_count(latest.get("missing")), _count(latest.get("sessions")),
+                                  _count(record.get("tickers")))
+    if missing is not None and sessions and tickers:
+        share: Optional[float] = missing / (sessions * tickers)
+    else:
+        share = _fraction(latest.get("share"))
+    if share is None or share <= MAX_PRICE_GAP_SHARE:
+        return None
+    month = re.sub(r"[^0-9-]", "", latest["month"])[:7] or "the latest month"
+    counted = (f"{missing} of {tickers * sessions} ticker-days ({tickers} watchlist tickers x {sessions} "
+               f"sessions)" if missing is not None and sessions and tickers else "the record's count")
+    return Alarm(WARNING, f"Price gaps: {share:.1%} of ticker-days missing in {month}",
+                 f"The price source had no bar on {counted} in {month}, above the owner's "
+                 f"{MAX_PRICE_GAP_SHARE:.0%}. On each such day every shadow fund leaves that position as "
+                 f"it was and marks it at its last close. From the funds record through "
+                 f"{funds.get('final_through') or 'an unknown date'}.")
+
+
 def drawdown_tripped(race: Optional[dict]) -> Optional[Alarm]:
     """26 Sep 2026: the owner's trigger (d) on the real paper account tripped.
 
@@ -656,6 +702,7 @@ def check(journal: Path, audit: Path, day: date, funds: Optional[Path] = None,
         # simulation.
         drawdown_tripped(_read_record(race_path)),
         calibration_stopped(_read_record(funds_path)),
+        price_gaps(_read_record(funds_path)),
         failed_tickers(today),
         screen_errors(today),
         cftc_gaps(today),

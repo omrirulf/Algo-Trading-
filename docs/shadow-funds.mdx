@@ -55,7 +55,30 @@ dividends are paid or charged and the book is marked. Costs are 0.10% of
 notional per side on every fill.
 
 A line the model gave no answer on, or that the paper account held, is
-skipped by every fund that day: the race's own rule.
+skipped by every fund that day: the race's own rule. The names skipped
+because the paper account held them are counted every cycle day
+(`held_names` in `logs/funds.json`, and on the 4 Funds page): a name the
+real account holds for weeks is out of every fund's reach for those weeks.
+
+- **Shorts.** A fund may not short a name the paper account has been
+  refused a short in (read from the live audit log). A refusal counts only
+  from the day it happened, never backwards: a fund acting on a cycle
+  journalled on day D is blocked only by refusals recorded on day D or
+  earlier, both dated by their UTC day, the calendar the funds date cycles
+  on (`not_shortable_since` in `logs/funds.json`). The calibration copy
+  reads them the same way: the real account could not know a refusal before
+  it happened either.
+- **Price gaps.** On a day the price source has no bar for a ticker that
+  traded, that ticker's position is left as it was and marked at its last
+  close, the same for every fund. The share of missing ticker-days is
+  reported for each calendar month (missing ticker-days ÷ watchlist tickers
+  × sessions, from the fund test's first session; `price_gaps` in
+  `logs/funds.json`, and on the 4 Funds page). Above 2% in the latest month
+  (`MAX_PRICE_GAP_SHARE` in `config/settings.py`), the daily health check
+  raises a warning that reaches the owner's phone with the brief.
+
+Neither report is a fund result, so both are shown before calibration
+passes.
 
 ## Calibration first
 
@@ -80,16 +103,42 @@ snapshot: every day must pass all the conditions again. At least 5
 calibration days must come after the last fix, so calibration ends at day 15
 or the last fix + 5 days, whichever is later; a re-run that fails on an
 earlier day is a new fail, and a difference whose stated reason turns out to
-be a bug counts as a fail (the owner's rule of 25 Sep 2026). If the end
-moves, the fund test's start date and bars are recalculated and logged. The
-4 Funds page shows the days passed, the last fix and the days since it. The
-rule takes effect with the start date,
-once the first account snapshot exists, and the four funds run only after
-calibration passes. Both dates live in `shadow/schedule.py` and
-are set by a reviewed change, never by the code; a test fails if the start
-date is set while the rule is still unapproved, and an unapproved rule can
-never read "passed". During calibration, only the calibration match is
-reported.
+be a bug counts as a fail (the owner's rule of 25 Sep 2026). The 4 Funds
+page shows the days passed, the last fix and the days since it. The rule
+takes effect with the calibration start date, once the first complete
+account snapshot exists; that date lives in `shadow/schedule.py` and is set
+by a reviewed change, never by the code; a test fails if it is set while the
+rule is still unapproved, and an unapproved rule can never read "passed".
+
+## The fund test's start, and the gate
+
+The fund test's start is fixed (the owner's decision of 26 Sep 2026): the
+funds act on the cycle journalled on **Monday 28 Sep 2026**, from the next
+open, so the first fund session is **29 Sep 2026** and the sample runs from
+it (`FUND_FIRST_CYCLE` and `FUND_START` in `shadow/schedule.py`). It does
+not move when calibration is delayed; only the reading waits.
+
+The fund test **counts only after calibration passes**. Until calibration's
+verdict is "passed", no fund is run: nothing about a fund's book, equity or
+trades is calculated or shown, in `logs/funds.json`, on the 4 Funds page or
+in any log (`shadow.run.build`; a test proves no fund number appears). The
+smoke check (`python -m shadow.smoke`) keeps to the same gate: until the
+funds record says calibration passed, it runs only sessions before 29 Sep.
+When calibration passes, every fund is run from 28 Sep with the code as
+merged: after a calibration fix, with the fixed code only. A fix made during
+calibration can only be motivated by a calibration difference, since no
+fund result exists before it passes.
+
+The fund test is read on the race's look days (estimated 22 Dec 2026,
+22 Mar 2027 and 16 Jun 2027): 60, 120 and 180 fund sessions as planned. Its
+bars come from an O'Brien-Fleming-type alpha-spending rule (Lan-DeMets,
+`analysis.decision_gate.spending_bars`) at its own share of the planned 180
+sessions: 3.40, 2.41 and 2.02 as planned (exactly 3.395, 2.407, 2.015). A
+look that comes before calibration has passed is skipped: it is not read and
+spends none of the 5%, and the next look's bar comes from the same rule with
+the bars actually used before it. The race's own bars (3.47, 2.45, 2.00) are
+unchanged. The 4 Funds page shows the plan beside calibration
+(`calibration.fund_test_plan`), with any skipped look.
 
 ### Late runs
 
@@ -115,12 +164,14 @@ stopped calibration gives neither a pass nor a fail and no end date until
 the owner decides; the 4 Funds page shows it, and the daily health check
 raises a warning that reaches the owner's phone with the brief.
 
-## Two exploratory funds
+## Three exploratory funds
 
-Two more simulated funds use the model's own signals and the same
+Three more simulated funds use the model's own signals and the same
 machinery, and differ from the model fund in one thing each. They start with
 the others, pay the same costs and follow the same rules, and they cannot
-change any decision: each only answers one question, against the model fund.
+change any decision: each only answers one question, against the model fund
+(its total return beside the model fund's, and the mean daily difference
+with its Newey-West t, lag 5).
 
 - **Model, highest conviction first**: when the book cannot take every
   signal, it buys in order of conviction, highest first, instead of
@@ -134,6 +185,25 @@ change any decision: each only answers one question, against the model fund.
   code is not changed, and every portfolio limit (exposure groups, sleeve
   budget, gross exposure, stock-market, position count) still applies. Its
   maximum drawdown is shown beside the model fund's.
+- **Model, entered the same day** (`model_same_day`, the owner's decision
+  of 26 Sep 2026): each line is entered on its own day, as the paper account
+  does, at the price recorded on the journal line when its signal was made
+  (the line's `live` record, on every cycle line since 28 Sep 2026): a buy
+  at the recorded ask, a short at the recorded bid, or at the recorded last
+  trade when there is no quote, plus the same 0.10%. The entry is made after
+  that session's stop checks for the positions already held, so a new
+  position's stop is first checked at the next session's open; the position
+  manager runs at the next open, as for the model fund. The engine sizes
+  and stops it on the recorded price, with the ATR as known at that
+  session's open (daily bars say nothing about the range before the moment
+  the signal was made). A line with no usable recorded price, or recorded
+  outside regular New York hours (09:30 to 16:00, 13:00 on a half day), is
+  not entered, and each is counted by reason on the 4 Funds page. Does
+  buying on the signal's own day change the result? Its first cycle is the
+  one journalled on the first fund session: the 28 Sep cycle, which the
+  others enter at the 29 Sep open, it would have entered on 28 Sep, before
+  the sample. A test proves every other fund's output is byte-identical with
+  and without it.
 
 Production and the calibration copy keep watchlist order and the normal
 size. Each fund's closed trades are also split into longs and shorts (the

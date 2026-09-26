@@ -21,11 +21,13 @@ read the same numbers.
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Iterable, Optional, Sequence
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 
+from analysis.cycle_day import MARKET_OPEN_NY, closes_at
 from app.market_data import MarketDataError, YFinanceMarketData
 from config import settings as cfg
 from config.market_calendar import is_trading_day
@@ -171,4 +173,21 @@ def calendar(bars: Bars, tickers: Sequence[str], first: date, last: date) -> lis
     return sorted(d for d in days if is_trading_day(d))
 
 
-__all__ = ["Bars", "LEAD_DAYS", "SimFeed", "calendar"]
+def in_regular_hours(moment: datetime) -> bool:
+    """Whether ``moment`` falls in a regular New York session.
+
+    09:30 to the close -- 16:00, or 13:00 on a half day
+    (``analysis.cycle_day.closes_at``) -- on a trading day. The close itself
+    is outside: at 16:00:00 the broker's clock already says the market is
+    shut. A naive ``moment`` is read as UTC, as the journal's are.
+    """
+    utc = moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+    local = utc.astimezone(_NY)
+    day = local.date()
+    return is_trading_day(day) and MARKET_OPEN_NY <= local.time() < closes_at(day)
+
+
+_NY = ZoneInfo("America/New_York")
+
+
+__all__ = ["Bars", "LEAD_DAYS", "SimFeed", "calendar", "in_regular_hours"]

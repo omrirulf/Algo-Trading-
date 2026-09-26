@@ -2,7 +2,7 @@
 """Does the fund machinery hold on the real journal and real prices? Prints no result.
 
     python -m shadow.smoke                    # the last 15 final sessions: the four funds,
-                                              # the two exploratory ones, 20 coin-flip funds
+                                              # the three exploratory ones, 20 coin-flip funds
     python -m shadow.smoke --sessions 30 --random 50
 
 The tests run the funds on made-up bars and made-up lines. This runs them
@@ -21,14 +21,24 @@ that reached the live audit log. Never an equity, a return, a win rate or a
 comparison between funds: those belong to the fund test, from its start
 date, and are not computed for display before it.
 
+**The hard gate** (the owner's decision of 26 Sep 2026): no fund result is
+calculated before calibration passes. The fund test's sample starts on the
+fixed ``shadow.schedule.FUND_START`` (29 Sep 2026), so until the nightly
+funds record (``logs/funds.json``, read only) says calibration has passed,
+the sessions run here end before that day: the machinery is checked on
+real prices and the real journal, never on a session of the fund test's
+sample. Once the record says "passed", the last final sessions are run as
+before.
+
 Exit status 1 when any fund has an integrity problem, so the workflow that
-runs this goes red. Reads the journal, the live audit log (read only) and
-yfinance. Writes nothing.
+runs this goes red. Reads the journal, the live audit log (read only), the
+funds record (read only) and yfinance. Writes nothing.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import sys
 from collections import Counter
@@ -52,6 +62,7 @@ from shadow.fund import (  # noqa: E402
     rule_signal,
     run,
 )
+from shadow import schedule  # noqa: E402
 from shadow.market import Bars, SimFeed, calendar  # noqa: E402
 from shadow.order_matters import fund_summary  # noqa: E402
 from shadow.run import INDEX_TICKER, _read_lines, exploratory_funds, integrity, not_shortable  # noqa: E402
@@ -62,6 +73,24 @@ _DAYS_PER_SESSION = 1.6
 #: broke, not a vendor's odd day, and fails the run. A vendor's odd day is
 #: reported and does not.
 MAX_MISSING_SHARE = 0.10
+
+
+def calibration_passed(funds_record: Optional[str]) -> bool:
+    """Whether the nightly funds record says calibration has passed. Anything unreadable says no."""
+    try:
+        record = json.loads(funds_record or "")
+    except ValueError:
+        return False
+    calibration = record.get("calibration") if isinstance(record, dict) else None
+    return isinstance(calibration, dict) and calibration.get("status") == "passed"
+
+
+def gated_through(final_through: date, passed: bool, fund_start: Optional[date] = None) -> date:
+    """The last session the smoke may run: before the fund test's first session until calibration passes."""
+    start = fund_start if fund_start is not None else schedule.FUND_START
+    if passed or start is None or final_through < start:
+        return final_through
+    return start - timedelta(days=1)
 
 
 def health(fund) -> dict:
@@ -98,7 +127,11 @@ def missing_bars(bars: Bars, tickers, sessions) -> list[tuple[str, date]]:
 
 def smoke(entries, sessions_wanted: int, coin_funds: int, fetcher, final_through, shortable_no, *,
           exploratory: bool = False) -> list[dict]:
-    """Health rows, fund by fund. ``exploratory`` adds the two exploratory funds after VT.
+    """Health rows, fund by fund. ``exploratory`` adds the three exploratory funds after VT.
+
+    ``final_through`` is the last session run: ``main`` passes the gated
+    one (``gated_through``), so no session of the fund test's sample is run
+    before calibration has passed.
 
     The command line always runs them (``main``): their machinery is the
     model fund's with one thing changed, and a change can break it. Off by
@@ -145,10 +178,20 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--audit", type=Path, default=cfg.AUDIT_LOG_PATH)
     parser.add_argument("--sessions", type=int, default=15)
     parser.add_argument("--random", type=int, default=20, help="coin-flip funds (default: %(default)s)")
+    parser.add_argument("--funds", type=Path, default=Path(cfg.LOG_DIR) / "funds.json",
+                        help="the nightly funds record, read for calibration's verdict (default: %(default)s)")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.ERROR, format="%(levelname)s %(name)s: %(message)s")
 
-    final_through = last_final_session(datetime.now(timezone.utc))
+    try:
+        record = args.funds.read_text(encoding="utf-8")
+    except OSError:
+        record = None
+    final_through = gated_through(last_final_session(datetime.now(timezone.utc)), calibration_passed(record))
+    print(f"sessions through {final_through.isoformat()}"
+          + ("" if calibration_passed(record) else
+             f" (calibration has not passed: nothing from the fund test's first session, "
+             f"{schedule.FUND_START.isoformat()}, is run)"))
     report = smoke(read_journal(args.journal).entries, args.sessions, args.random,
                    OhlcFetcher(final_through=final_through), final_through,
                    not_shortable(_read_lines(args.audit)), exploratory=True)

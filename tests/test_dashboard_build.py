@@ -158,7 +158,8 @@ def test_the_funds_page_is_labelled_simulated_and_linked_from_the_desk():
     # The banners in the owner's words.
     assert "independent days (= " in text and "NO DECISION YET" in text and "Next checkpoint: " in text
     assert "bar t &gt; " in text
-    assert "Fund test:</b> not started (it starts the first trading day after calibration passes)" in text
+    # The owner's decision of 26 Sep 2026: a fixed start, read only after calibration passes.
+    assert "and counts only after calibration passes. Until then no fund result is calculated or shown" in text
     assert "Hidden until calibration passes" in text
     assert "not in force yet" in text
 
@@ -362,7 +363,7 @@ def test_problems_reach_the_owner_in_a_warning_card(tmp_path, built_funds_page):
     running = _calibration("running", start="2026-10-01", days_done=0, series=[],
                            problems=["no real close after 2026-10-01 yet", "a <b>tag</b> in a problem"])
     running["calibration"]["pass_rule"]["verdicts"] = VERDICTS
-    # "four" keeps its name but also checks the two exploratory funds
+    # "four" keeps its name but also checks the three exploratory funds
     # (shadow/run.py), so a problem in one of those is filed under a label
     # that covers it.
     four_broken = _calibration("passed") | {"integrity": {
@@ -385,7 +386,7 @@ def test_problems_reach_the_owner_in_a_warning_card(tmp_path, built_funds_page):
     assert "PENDING" not in card and "PASS" not in card.replace("Pass rule", "")      # only failures are problems
     assert "integrity check" not in card                                             # integrity is null
 
-    label = "The funds' integrity check (the four and the two exploratory):</span> "
+    label = "The funds' integrity check (the four and the three exploratory):</span> "
     assert label + "model: EWZ stops cover 10 of 40" in cards[1]
     assert label + "model_sized: SPY stops cover 0 of 10" in cards[1]
     assert "The four funds'" not in cards[1]                                         # not a label that rules them out
@@ -468,7 +469,9 @@ def test_the_fund_test_is_read_at_the_races_next_look(tmp_path, built_funds_page
     assert "Next checkpoint: 1 Mar 2027, bar t &gt; 2.50" in out[1]                    # its own, when it has one
     assert "No checkpoint left to reach" not in out[2] and "decision gate writes its record" in out[2]
     assert "No checkpoint left to reach" in out[3]                                     # the race has no look left
-    assert "not started" in out[4]
+    # Not running: the fixed start, and the reading waits for calibration.
+    assert "starts 29 Sept 2026 (the funds act on the 28 Sept 2026 cycle at the next open)" in out[4]
+    assert "counts only after calibration passes" in out[4]
 
 
 def test_a_seed_holding_script_markup_cannot_break_out_of_its_block(tmp_path):
@@ -744,24 +747,27 @@ def test_the_order_report_is_absent_without_data_and_says_no_cycle_yet(tmp_path,
 # --------------------------------------------------------------------------- #
 
 #: A calibration that failed on day 6, was fixed on 12 Oct and has run two
-#: days since: day 15 or the fix + 5 days is now day 17, and the fund test's
-#: plan has moved off the registered one.
+#: days since: day 15 or the fix + 5 days is now day 17. The fund test's
+#: start is fixed; this plan is one whose calibration ran past the first
+#: look, so that look is skipped and the bars are off the planned ones.
 WITH_FIX = {
     "days_done": 8, "days_needed": 17, "days_passed": 5,
     "fixes": [{"day": "2026-10-05", "what": "an earlier fix"},
               {"day": "2026-10-12", "what": "stops re-placed <b>after</b> a partial fill"}],
     "last_fix": "2026-10-12", "days_since_fix": 2, "days_after_fix_needed": 5, "end_estimate": "2026-10-23",
-    "fund_test_plan": {"start": "2026-10-26", "sessions": [41, 101, 161], "bars": [3.91, 2.52, 2.01],
-                       "exact": [3.912, 2.518, 2.006], "registered": [3.8, 2.5, 2.0],
-                       "registered_start": "2026-10-19", "matches_registered": False},
+    "fund_test_plan": {"start": "2026-09-29", "first_cycle": "2026-09-28", "sessions": [60, 120, 180],
+                       "skipped": [True, False, False], "bars": [None, 2.4, 2.01],
+                       "exact": [None, 2.4, 2.015], "registered": [3.4, 2.41, 2.02],
+                       "registered_start": "2026-09-29", "matches_registered": False},
 }
-#: The same fields with nothing fixed: the plan is still the registered one.
+#: The same fields with nothing fixed: the plan is still the planned one.
 NO_FIX = {
     "days_done": 4, "days_needed": 15, "days_passed": 4, "fixes": [], "last_fix": None, "days_since_fix": None,
     "days_after_fix_needed": 5, "end_estimate": "2026-10-16",
-    "fund_test_plan": {"start": "2026-10-19", "sessions": [46, 106, 166], "bars": [3.8, 2.5, 2.0],
-                       "exact": [3.797, 2.501, 1.999], "registered": [3.8, 2.5, 2.0],
-                       "registered_start": "2026-10-19", "matches_registered": True},
+    "fund_test_plan": {"start": "2026-09-29", "first_cycle": "2026-09-28", "sessions": [60, 120, 180],
+                       "skipped": [False, False, False], "bars": [3.4, 2.41, 2.02],
+                       "exact": [3.395, 2.407, 2.015], "registered": [3.4, 2.41, 2.02],
+                       "registered_start": "2026-09-29", "matches_registered": True},
 }
 
 
@@ -774,6 +780,7 @@ def _text(html: str) -> str:
 def test_calibration_says_the_days_passed_the_last_fix_and_the_days_since_it(tmp_path, built_funds_page):
     null_bar = json.loads(json.dumps(WITH_FIX))
     null_bar["fund_test_plan"]["bars"] = [None, 2.6, 2.05]
+    null_bar["fund_test_plan"]["skipped"] = "junk"
     cases = [
         dict(WITH_FIX, status="running"),
         dict(NO_FIX, status="running"),
@@ -797,26 +804,27 @@ def test_calibration_says_the_days_passed_the_last_fix_and_the_days_since_it(tmp
         assert "Calibration ends at day 15 or 5 days after the last fix, whichever is later." in text
         assert "If nothing more fails, it ends 23 Oct 2026." in text
         assert "All 2 fixes" in text
-        assert "Fund test would start 26 Oct 2026; bars 3.91, 2.52, 2.01" in text
-        # The plan moved: an amber note, in the owner's words, with what was registered.
+        assert "Fund test starts 29 Sept 2026 (fixed); bars none, 2.40, 2.01; look 1 skipped" in text
+        # The plan moved: an amber note, with the planned bars and the rule that replaces them.
         assert 'class="amber"' in html
-        assert "differs from the registered start/bars: they must be re-registered before the fund test starts" in text
-        assert "Registered: start 19 Oct 2026; bars 3.80, 2.50, 2.00." in text
+        assert "differs from the planned bars (3.40, 2.41, 2.02): each bar is computed at its look" in text
+        assert "logged in the Amendments table the day it is used" in text
 
     text = _text(clean)
     assert "Days passed: 4 of 15" in text and "No fix yet" in text
     assert "Days since the last fix" not in text and " of 5" not in text          # "X of 5" only with a fix
     assert "Calibration ends at day 15 or 5 days after the last fix, whichever is later." in text
-    assert "Fund test would start 19 Oct 2026; bars 3.80, 2.50, 2.00" in text
-    assert 'class="amber"' not in clean and "re-registered" not in text
-    assert "The same start and bars as registered." in text
+    assert "Fund test starts 29 Sept 2026 (fixed); bars 3.40, 2.41, 2.02" in text and "skipped" not in text
+    assert 'class="amber"' not in clean and "Amendments" not in text
+    assert "The same start and bars as planned." in text
     assert "fixes" not in text                                                     # no list of fixes to open
 
-    assert "bars none, 2.60, 2.05" in _text(null_bars)                             # a look before the start has no bar
+    assert "bars none, 2.60, 2.05" in _text(null_bars)                             # a skipped look has no bar
+    assert "look 1 skipped" not in _text(null_bars)                                # junk "skipped" says nothing
 
     assert out[4:10] == ["", "", "", "", "", ""]                                   # old, not started, missing: nothing
     odd = _text(out[10])
-    assert "No fix yet" in odd and "Days passed" not in odd and "Fund test would start" not in odd
+    assert "No fix yet" in odd and "Days passed" not in odd and "Fund test starts" not in odd
 
 
 @needs_node
@@ -831,10 +839,10 @@ def test_the_calibration_card_carries_the_fail_rule_lines(tmp_path, built_funds_
     text = _text(pages[0])
     assert "8 of 17 closes compared · started 1 Oct 2026" in text
     assert "Days passed: 5 of 17" in text and "Days since the last fix: 2 of 5" in text
-    assert "must be re-registered before the fund test starts" in text
+    assert "each bar is computed at its look by the same spending rule" in text
     old_text = _text(pages[1])
     assert "3 of 15 closes compared" in old_text
-    assert "Days passed" not in old_text and "No fix yet" not in old_text and "Fund test would start" not in old_text
+    assert "Days passed" not in old_text and "No fix yet" not in old_text and "Fund test starts" not in old_text
 
 
 def _css_rules(page: str) -> list[tuple[list[str], str]]:
@@ -959,7 +967,7 @@ def test_the_exploratory_funds_are_set_against_the_model_fund(tmp_path, built_fu
     source = _page_functions(built_funds_page, "fundsVisible", "sidesLine", "isExploratory", "exploratoryHtml")
     out = _run_js(tmp_path, source, "CASES.map(exploratoryHtml)", cases)
     card, text = out[0], _text(out[0])
-    assert "Exploratory: does the order or the size matter?" in text
+    assert "Exploratory: does the order, the size or the entry day matter?" in text
     assert card.count('<span class="chip idle">exploratory; cannot change the decision</span>') == 2
     assert text.index("Model, highest conviction first") < text.index("Model, sized by conviction")
     # Highest conviction first: its return against the model's, the difference, the daily mean and its t.
@@ -1093,4 +1101,68 @@ def test_the_contract_names_the_fields_of_the_25_sep_decisions():
                   "funds.list[].sides", "mean_return", "hit_rate", "too_few",
                   "report_since", "conviction_groups", "mean_net", '"0.30-0.40"', '"0.60+"', "random",
                   "integrity.four"):
+        assert field in comment, field
+
+
+# --------------------------------------------------------------------------- #
+# The owner's decisions of 26 Sep 2026 on the page: the same-day fund, the
+# price source's gaps by month, and the names the paper account held
+# --------------------------------------------------------------------------- #
+
+SAME_DAY_ROW = _fund_row("model_same_day", "Model, entered the same day", 0.010, exploratory=True, compare_to="model",
+                         vs_model={"total_return_diff": -0.002, "max_drawdown": 0.02, "model_max_drawdown": 0.012,
+                                   "mean_daily_diff": -0.0001, "t": -0.5, "days": 20},
+                         not_entered={"no_price": 3, "outside_hours": 2, "other_day": 0, "total": 5})
+
+
+@needs_node
+def test_the_same_day_fund_says_which_lines_it_could_not_enter(tmp_path, built_funds_page):
+    seven = json.loads(json.dumps(SIX_FUNDS))
+    seven["list"].append(SAME_DAY_ROW)
+    passed = _calibration("passed") | {"funds": seven}
+    odd = json.loads(json.dumps(passed))
+    odd["funds"]["list"][6]["not_entered"] = {"no_price": "x", "other_day": 1}
+    source = _page_functions(built_funds_page, "fundsVisible", "sidesLine", "isExploratory", "exploratoryHtml")
+    out = _run_js(tmp_path, source, "CASES.map(exploratoryHtml)", [passed, odd,
+                                                                    _calibration("running") | {"funds": seven}])
+    text = _text(out[0])
+    assert out[0].count('<span class="chip idle">exploratory; cannot change the decision</span>') == 3
+    same = text.split("Model, entered the same day")[1]
+    assert "Total return +1.00% vs the model's +1.20%" in same and "t -0.50 over 20 days" in same
+    assert "Lines not entered 5 3 no recorded price, 2 outside regular hours" in same
+    assert "another day" not in same and "Lines not entered" not in text.split("Model, entered the same day")[0]
+    assert "Lines not entered 1 0 no recorded price, 0 outside regular hours, 1 on another day" in _text(out[1])
+    assert out[2] == ""                                                        # hidden until calibration passes
+
+
+@needs_node
+def test_price_gaps_and_held_names_are_shown_before_calibration_passes(tmp_path, built_funds_page):
+    data = _calibration("running") | {
+        "price_gaps": {"from": "2026-09-29", "through": "2026-10-09", "tickers": 80, "limit": 0.02, "months": [
+            {"month": "2026-09", "sessions": 2, "missing": 27, "share": 27 / 160, "over": True, "by_day": {}},
+            {"month": "2026-10", "sessions": 7, "missing": 3, "share": 3 / 560, "over": False, "by_day": {}}]},
+        "held_names": {"from": "2026-09-28", "days": [
+            {"day": f"2026-10-{d:02d}", "names": 20 + d, "lines": 20 + d, "of": 80} for d in range(1, 13)]},
+    }
+    source = _page_functions(built_funds_page, "dataHtml")
+    out = _run_js(tmp_path, source, "CASES.map(dataHtml)",
+                  [data, _calibration("running"), {}, None, {"price_gaps": {"months": "x"}, "held_names": 5}])
+    html, text = out[0], _text(out[0])
+    assert "Price gaps and held names" in text and "not a fund result" in text
+    assert "over 80 watchlist tickers" in text and "Above 2% in a month, the daily health check warns" in text
+    assert "2026-09 2 27 16.88% above 2%" in text and '<tr class="over">' in html
+    assert "2026-10 7 3 0.54%" in text and html.count('<tr class="over">') == 1
+    assert "12 Oct 2026: 32 names held of 80" in text                         # newest first
+    assert text.index("12 Oct 2026") < text.index("3 Oct 2026")
+    assert "2 earlier days" in text                                           # ten shown, the rest folded
+    assert out[1:] == ["", "", "", ""]
+
+
+def test_the_contract_names_the_fields_of_the_26_sep_decisions():
+    text = (ROOT / "dashboard" / "funds.html").read_text()
+    comment = text[text.index("<!--") + 4:text.index("-->")]
+    assert "<!--" not in comment and "--!>" not in comment
+    for field in ("model_same_day", "funds.list[].not_entered", "no_price", "outside_hours", "other_day",
+                  "price_gaps", "price_gaps.months[]", "by_day", "held_names", "held_names.days[]",
+                  "fund_test.first_cycle", "fund_test.waiting_for", "skipped[]", "not_shortable_since"):
         assert field in comment, field

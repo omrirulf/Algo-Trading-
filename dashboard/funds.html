@@ -41,10 +41,14 @@
     calibration.end_estimate     ISO date calibration can end if nothing more
                                  fails, or null before it starts or once it
                                  is stopped
-    calibration.fund_test_plan   null, or {start ISO date the fund test would
-                                 start, bars[] its three t-statistic bars (null
-                                 for a look on or before the start),
-                                 registered[] the registered bars,
+    calibration.fund_test_plan   null, or {start ISO date of the fund test's
+                                 first session (fixed: 2026-09-29), first_cycle
+                                 ISO date of the cycle it acts on first,
+                                 skipped[] true|false per look (a look on or
+                                 before calibration's end is skipped: not read,
+                                 no alpha spent), bars[] the three t-statistic
+                                 bars by the spending rule (null for a skipped
+                                 look), registered[] the planned bars,
                                  registered_start ISO date, matches_registered
                                  true|false}; an amber note when false
     calibration.pass_rule.text[]      the rule: a heading line, then
@@ -79,14 +83,16 @@
     funds                        null, or {start ISO date, days[] ISO dates,
                                  list[], band}; drawn only when calibration passed
     funds.list[]                 {name model|momentum|hybrid|vt|
-                                  model_by_conviction|model_sized, label,
+                                  model_by_conviction|model_sized|
+                                  model_same_day, label,
                                   equity[] dollars per day, total_return fraction,
                                   vs_vt fraction (difference of total returns,
                                   null for vt), max_drawdown fraction (positive),
                                   trades count, win_rate fraction or null,
                                   open_positions count, cash dollars}
-    funds.list[].exploratory     true for the two exploratory funds
-                                 (model_by_conviction, model_sized): they are
+    funds.list[].exploratory     true for the three exploratory funds
+                                 (model_by_conviction, model_sized,
+                                 model_same_day): they are
                                  kept out of the chart, the table and the fund
                                  cards, and shown only against the model fund;
                                  missing in older files (then false)
@@ -98,7 +104,12 @@
                                  model_max_drawdown fraction (positive),
                                  mean_daily_diff fraction a day or null,
                                  t Newey-West t-statistic or null, days count}
-    funds.list[].sides           null for vt, else {long: Side, short: Side},
+    funds.list[].not_entered     model_same_day only: {no_price, outside_hours,
+                                 other_day, total} counts of the model's
+                                 directional lines it did not enter: no usable
+                                 recorded price, recorded outside regular New
+                                 York hours, recorded on another day
+    funds.list[].sides          null for vt, else {long: Side, short: Side},
                                  a Side {n count of closed trades, mean_return
                                  fraction or null, hit_rate fraction or null,
                                  too_few true below 20 trades: then "too few
@@ -106,7 +117,14 @@
     funds.band                   {p5[] dollars, p95[] dollars, funds count of
                                   coin-flip funds}
     fund_test.status             not_started | running
-    fund_test.start              ISO date or null
+    fund_test.start              ISO date of the first fund session (fixed,
+                                 2026-09-29), or null in older files
+    fund_test.first_cycle        ISO date of the cycle the funds act on first
+                                 (2026-09-28); missing in older files
+    fund_test.waiting_for        "calibration" while calibration has not passed
+                                 (no fund result is calculated or shown until
+                                 then), "the first session" after it, or null
+                                 while running; missing in older files
     fund_test.independent        count of independent days, or null
     fund_test.next_checkpoint    null today; the race's next is used instead
                                  (same shape as race_gate.json next)
@@ -115,14 +133,31 @@
                                  problems shown when ok is false; data_holes
                                  (a count of ticker-days with no price bar)
                                  shown as a note when above 0
-    integrity.four               covers the four funds and the two exploratory
-                                 ones (model_by_conviction, model_sized): the
-                                 key keeps its name, and each problem names
-                                 its fund
+    integrity.four               covers the four funds and the three exploratory
+                                 ones (model_by_conviction, model_sized,
+                                 model_same_day): the key keeps its name, and
+                                 each problem names its fund
     integrity.coin.order_days    optional: {median, p5, p95} days (counts, or null)
                                  on which a coin-flip fund ran out of room before
                                  the end of its signal list; shown with the fund
                                  lines, only once calibration passed
+
+  Two reports that are not fund results, shown whether or not calibration
+  has passed (the owner's decisions of 26 Sep 2026); missing in older files
+  (then the card is not drawn):
+    price_gaps                   null, or {from ISO date, through ISO date,
+                                 tickers count of watchlist tickers, limit
+                                 fraction (0.02), months[]}
+    price_gaps.months[]          {month "YYYY-MM", sessions count, missing count
+                                  of ticker-days with no price bar, share
+                                  fraction = missing / (tickers x sessions),
+                                  over true above the limit, by_day {ISO date:
+                                  count}}; a month over the limit is marked
+    held_names                   {from ISO date, days[]}
+    held_names.days[]            {day ISO date (a UTC cycle day), names count
+                                  of names the paper account held so no fund
+                                  could trade them, lines count of held lines,
+                                  of count of names journalled that day}
 
   "How often the buying order mattered" (a report only; nothing changes the
   order). An OrderSummary is:
@@ -173,7 +208,8 @@
                                  model, momentum, hybrid, random
 
   Not read here: funds.json fund_test.sessions, metrics.timing, not_shortable,
-  calibration.fund_test_plan.sessions and .exact; race_gate.json registered,
+  not_shortable_since, calibration.fund_test_plan.sessions, .exact and
+  .registered_sessions; race_gate.json registered,
   outcome, next.entry_days.
 -->
 <style>
@@ -362,6 +398,8 @@ h4{font-size:.9rem;font-weight:700;margin:14px 0 0}
 table.mini caption{text-align:left;font-weight:700;font-size:.9rem;padding:8px 0 2px;color:var(--ink)}
 table.mini th,table.mini td{padding:3px 6px}
 table.mini td.few{text-align:center;color:var(--ink-3);font-family:var(--sans)}
+/* A month of price gaps above the owner's 2%. */
+table.mini tr.over td{background:var(--warn-bg)}
 </style>
 
 <header>
@@ -388,6 +426,7 @@ table.mini td.few{text-align:center;color:var(--ink-3);font-family:var(--sans)}
 <h2>The four funds</h2>
 <div id="funds"></div>
 <section id="explore" aria-label="The exploratory funds against the model fund"></section>
+<section id="data" aria-label="Price gaps by month, and the names the paper account held"></section>
 
 <section id="order" aria-label="How often the buying order mattered"></section>
 
@@ -596,7 +635,13 @@ table.mini td.few{text-align:center;color:var(--ink-3);font-family:var(--sans)}
 
   function fundTestBanner(ft, R){
     ft = ft || {}; R = R || {};
-    if(ft.status !== "running") return `<div class="banner idle"><b>Fund test:</b> not started (it starts the first trading day after calibration passes)</div>`;
+    // The start is fixed (the owner's decision of 26 Sep 2026); what waits
+    // is the reading: no fund result exists until calibration passes.
+    if(ft.status !== "running"){
+      const from = typeof ft.start === "string" && ft.start ? ft.start : "2026-09-29";
+      const cycle = typeof ft.first_cycle === "string" && ft.first_cycle ? ft.first_cycle : "2026-09-28";
+      return `<div class="banner idle"><b>Fund test:</b> starts ${esc(day(from, true))} (the funds act on the ${esc(day(cycle, true))} cycle at the next open), and counts only after calibration passes. Until then no fund result is calculated or shown; a delayed calibration delays the reading, never the start.</div>`;
+    }
     const of = R.of || 60, td = R.trading_days || 180;
     // The fund test has no looks of its own: it is read at the race's
     // looks. So while the record carries no checkpoint of its own (today it
@@ -658,7 +703,7 @@ table.mini td.few{text-align:center;color:var(--ink-3);font-family:var(--sans)}
   // Everything the record says went wrong, gathered into one card so it
   // reaches the owner instead of sitting unread in the file: a stopped
   // calibration and why, calibration's own problems, a failed integrity
-  // check of the funds (the four and the two exploratory) or of the
+  // check of the funds (the four and the three exploratory) or of the
   // coin-flip funds, and any pass-rule condition that already reads FAIL.
   const VERDICT = /^\s*(\d+)\.\s*(.*?):\s*(PASS|FAIL|PENDING)\b\s*(?:\((.*)\))?\s*$/;
   const warnIcon = `<svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 15 14H1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8 6v3.6M8 11.4v.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>`;
@@ -680,9 +725,9 @@ table.mini td.few{text-align:center;color:var(--ink-3);font-family:var(--sans)}
     }
     (Array.isArray(c.problems) ? c.problems : []).forEach(p=>out.push({where:"Calibration", text:String(p), bad:false}));
     const integrity = data.integrity && typeof data.integrity === "object" ? data.integrity : {};
-    // "four" keeps its name in the record but checks the two exploratory
-    // funds as well, so its label names all six.
-    [["four", "The funds' integrity check (the four and the two exploratory)"], ["coin", "The coin-flip funds' integrity check"]].forEach(([k, label])=>{
+    // "four" keeps its name in the record but checks the three exploratory
+    // funds as well, so its label names all seven.
+    [["four", "The funds' integrity check (the four and the three exploratory)"], ["coin", "The coin-flip funds' integrity check"]].forEach(([k, label])=>{
       const i = integrity[k];
       if(!i || typeof i !== "object") return;
       const holes = Number(i.data_holes);
@@ -778,16 +823,15 @@ table.mini td.few{text-align:center;color:var(--ink-3);font-family:var(--sans)}
     }
     const plan = c.status === "stopped" ? null : asObj(c.fund_test_plan);
     if(plan && typeof plan.start === "string" && plan.start){
-      // A look on or before the start cannot be read by the fund test: it
-      // has no bar, and the record gives null for it.
+      // The start is fixed; a look on or before calibration's end is
+      // skipped by the fund test: it has no bar, and the record gives null.
       const bars = (v)=>{ const list = (Array.isArray(v) ? v : []).map(b=>Number.isFinite(b) ? b.toFixed(2) : "none"); return list.length ? list.join(", ") : "n/a"; };
-      html += `<p>Fund test would start ${esc(day(plan.start, true))}; bars ${esc(bars(plan.bars))}</p>`;
+      const skipped = (Array.isArray(plan.skipped) ? plan.skipped : []).map((s, k)=>s === true ? k + 1 : 0).filter(Boolean);
+      html += `<p>Fund test starts ${esc(day(plan.start, true))} (fixed); bars ${esc(bars(plan.bars))}${skipped.length ? `; look ${esc(skipped.join(" and "))} skipped (before calibration can pass)` : ""}</p>`;
       if(plan.matches_registered === false){
-        const was = [typeof plan.registered_start === "string" && plan.registered_start ? `start ${esc(day(plan.registered_start, true))}` : "",
-                     Array.isArray(plan.registered) ? `bars ${esc(bars(plan.registered))}` : ""].filter(Boolean).join("; ");
-        html += `<div class="amber" role="note"><b>This plan differs from the registered start/bars: they must be re-registered before the fund test starts.</b>${was ? ` Registered: ${was}.` : ""}</div>`;
+        html += `<div class="amber" role="note"><b>This plan differs from the planned bars${Array.isArray(plan.registered) ? ` (${esc(bars(plan.registered))})` : ""}: each bar is computed at its look by the same spending rule, from the fund sessions actually there, and logged in the Amendments table the day it is used.</b></div>`;
       } else if(plan.matches_registered === true){
-        html += `<p class="small faint">The same start and bars as registered.</p>`;
+        html += `<p class="small faint">The same start and bars as planned.</p>`;
       }
     }
     return html;
@@ -932,11 +976,12 @@ table.mini td.few{text-align:center;color:var(--ink-3);font-family:var(--sans)}
   // four. Older records carry no flag and no such row.
   const isExploratory = (x)=> !!(x && x.exploratory === true);
 
-  // The owner's two exploratory funds (25 Sep 2026): the model's own signals
-  // with one thing changed, the buying order (highest conviction first) or
-  // the size (by conviction). Each is set against the model fund only, never
-  // ranked with the four: it cannot change the decision. Shown, like every
-  // fund, only once calibration has passed.
+  // The owner's three exploratory funds (25 and 26 Sep 2026): the model's
+  // own signals with one thing changed, the buying order (highest conviction
+  // first), the size (by conviction) or the entry (the signal's own day, at
+  // the price recorded when it was made). Each is set against the model
+  // fund only, never ranked with the four: it cannot change the decision.
+  // Shown, like every fund, only once calibration has passed.
   function exploratoryHtml(data){
     if(!fundsVisible(data)) return "";
     const list = (Array.isArray(data.funds.list) ? data.funds.list : []).map(asObj).filter(Boolean);
@@ -955,6 +1000,11 @@ table.mini td.few{text-align:center;color:var(--ink-3);font-family:var(--sans)}
       // fund's drawdown is shown against the model's.
       const dd = x.name === "model_sized"
         ? `<dt>Max drawdown</dt><dd class="num">${esc(drawdown(v.max_drawdown))} <span class="faint vs">vs ${esc(whose)} ${esc(drawdown(v.model_max_drawdown))}</span></dd>` : "";
+      // Entering on the signal's own day: the lines it could not enter, and why.
+      const ne = asObj(x.not_entered);
+      const count = (k)=> ne && Number.isFinite(ne[k]) ? ne[k] : 0;
+      const notEntered = ne
+        ? `<dt>Lines not entered</dt><dd class="num">${esc(Number.isFinite(ne.total) ? ne.total : count("no_price") + count("outside_hours") + count("other_day"))} <span class="faint vs">${esc(count("no_price"))} no recorded price, ${esc(count("outside_hours"))} outside regular hours${count("other_day") ? `, ${esc(count("other_day"))} on another day` : ""}</span></dd>` : "";
       const sides = sidesLine(x.sides);
       return `<div class="xfund"><div class="head"><span>${esc(x.label || x.name)}</span><span class="chip idle">exploratory; cannot change the decision</span></div>
         <dl class="kv">
@@ -962,10 +1012,10 @@ table.mini td.few{text-align:center;color:var(--ink-3);font-family:var(--sans)}
           <dt>Difference</dt><dd class="num ${tone(v.total_return_diff)}">${esc(pts(v.total_return_diff))}</dd>
           <dt>Mean daily difference</dt><dd class="num">${esc(daily)}</dd>
           <dt>t</dt><dd class="num">${esc(t)}${over}</dd>
-          ${dd}
+          ${dd}${notEntered}
         </dl>${sides ? `<p class="sides">${sides}</p>` : ""}</div>`;
     });
-    return `<div class="card" style="margin-top:10px"><h3>Exploratory: does the order or the size matter?</h3>`
+    return `<div class="card" style="margin-top:10px"><h3>Exploratory: does the order, the size or the entry day matter?</h3>`
       + `<p class="small muted">The model fund's own signals, with one thing changed in each, set against the model fund day by day over the same days. The t is on the daily difference. Exploratory; cannot change the decision.</p>`
       + `<div class="xfunds">${items.join("")}</div></div>`;
   }
@@ -982,8 +1032,8 @@ table.mini td.few{text-align:center;color:var(--ink-3);font-family:var(--sans)}
     if(!fundsVisible(data)){
       const passed = !!(data.calibration && data.calibration.status === "passed");
       el.innerHTML = passed
-        ? `<div class="card placeholder"><strong>Waiting for the funds' first close</strong><p class="muted small">Calibration passed. The model, momentum, hybrid and VT funds start on the first trading day after it; no fund record has been written yet.</p></div>`
-        : `<div class="card placeholder"><strong>Hidden until calibration passes</strong><p class="muted small">The model, momentum, hybrid and VT funds, the two exploratory funds, and the coin-flip funds behind them, are neither shown nor compared while the simulation is still being checked against the real account.</p></div>`;
+        ? `<div class="card placeholder"><strong>Waiting for the funds' record</strong><p class="muted small">Calibration passed. The model, momentum, hybrid and VT funds run from their fixed start, 29 Sep 2026; no fund record has been written yet.</p></div>`
+        : `<div class="card placeholder"><strong>Hidden until calibration passes</strong><p class="muted small">The model, momentum, hybrid and VT funds, the three exploratory funds, and the coin-flip funds behind them, are neither calculated nor shown while the simulation is still being checked against the real account. When calibration passes, they are run from 29 Sep 2026.</p></div>`;
       return [];
     }
     const f = data.funds;
@@ -1034,6 +1084,41 @@ table.mini td.few{text-align:center;color:var(--ink-3);font-family:var(--sans)}
   // reached the end of the day's signal list, so the watchlist order decided
   // which signals got in. The real paper account is always shown; the
   // calibration copy once calibration runs; the funds only once it passed.
+  // ------------------------------------------- price gaps and held names
+  // Two reports that are not fund results (the owner's decisions of 26 Sep
+  // 2026), so they are drawn whether or not calibration has passed: how
+  // often the price source had no bar for a watchlist ticker on a trading
+  // day, per calendar month against the owner's 2%, and how many names the
+  // paper account held each cycle day, which no fund could trade that day.
+  function dataHtml(data){
+    data = asObj(data) || {};
+    const gaps = asObj(data.price_gaps), held = asObj(data.held_names);
+    const months = (gaps && Array.isArray(gaps.months) ? gaps.months : []).map(asObj).filter(m=>m && typeof m.month === "string");
+    const days = (held && Array.isArray(held.days) ? held.days : []).map(asObj).filter(d=>d && typeof d.day === "string");
+    if(!months.length && !days.length) return "";
+    const limit = gaps && isNum(gaps.limit) ? gaps.limit : 0.02;
+    const n = (v)=> isNum(v) ? String(v) : "n/a";
+    let html = `<div class="card" style="margin-top:10px"><h3>Price gaps and held names <span class="faint" style="font-weight:400">(report only; not a fund result)</span></h3>`;
+    if(months.length){
+      const rows = months.map(m=>{
+        const over = m.over === true || (isNum(m.share) && m.share > limit);
+        return `<tr${over ? ' class="over"' : ""}><td>${esc(m.month)}</td><td>${esc(n(m.sessions))}</td><td>${esc(n(m.missing))}</td><td>${esc(plain(m.share, 2))}${over ? ` <span class="chip bad">above ${esc(plain(limit, 0))}</span>` : ""}</td></tr>`;
+      }).join("");
+      html += `<h4>Missing price bars, by month</h4><p class="small muted">Ticker-days with no price bar, over ${esc(n(gaps.tickers))} watchlist tickers and every session${gaps.from ? ` from ${esc(day(gaps.from, true))}` : ""}. On such a day every fund leaves that position as it was. Above ${esc(plain(limit, 0))} in a month, the daily health check warns the owner.</p>`
+        + `<div class="scroll"><table class="mini"><thead><tr><th>Month</th><th>Sessions</th><th>Missing</th><th>Share</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    }
+    if(days.length){
+      const SHOW = 10;
+      const li = (d)=> `<li>${esc(day(d.day, true))}: <b class="num">${esc(n(d.names))}</b> ${d.names === 1 ? "name" : "names"} held${isNum(d.of) ? ` of <span class="num">${esc(d.of)}</span>` : ""}</li>`;
+      const recent = days.slice(-SHOW).reverse();
+      const older = days.slice(0, -SHOW).reverse();
+      html += `<h4>Names the paper account held, by cycle day</h4><p class="small muted">The model is not asked about a name the paper account holds, so no fund can trade it that day. The same for every fund; counted every day.</p>`
+        + `<ul class="facts">${recent.map(li).join("")}</ul>`
+        + (older.length ? `<details class="data"><summary>${esc(older.length)} earlier ${older.length === 1 ? "day" : "days"}</summary><ul class="facts">${older.map(li).join("")}</ul></details>` : "");
+    }
+    return html + `</div>`;
+  }
+
   function orderHtml(data){
     data = data && typeof data === "object" ? data : {};
     const obj = (v)=> v && typeof v === "object" && !Array.isArray(v) ? v : null;
@@ -1113,6 +1198,7 @@ table.mini td.few{text-align:center;color:var(--ink-3);font-family:var(--sans)}
     safely("race-reports", ()=>{ $("race-reports").innerHTML = raceReportsHtml(R); return []; });
     const todo = safely("calibration", ()=>renderCalibration(F)).concat(safely("funds", ()=>renderFunds(F)));
     safely("explore", ()=>{ $("explore").innerHTML = exploratoryHtml(F); return []; });
+    safely("data", ()=>{ $("data").innerHTML = dataHtml(F); return []; });
     safely("order", ()=>{ $("order").innerHTML = orderHtml(F); return []; });
     todo.forEach(([id, fn])=>safely(id, fn));
   }

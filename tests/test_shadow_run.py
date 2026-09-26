@@ -11,8 +11,8 @@ from shadow import run as shadow_run
 from shadow import schedule
 
 
-def _audit(reason: str) -> str:
-    return json.dumps({"event": "signal_processed", "result": {"status": "ERROR", "reason": reason}})
+def _audit(reason: str, ts: str = "2026-09-16 16:06:17,809") -> str:
+    return json.dumps({"event": "signal_processed", "ts": ts, "result": {"status": "ERROR", "reason": reason}})
 
 
 def test_the_paper_accounts_own_short_refusals_are_read_from_its_log():
@@ -23,7 +23,8 @@ def test_the_paper_accounts_own_short_refusals_are_read_from_its_log():
         _audit("no room under the gross exposure limit"),
         "not json",
     ]
-    assert shadow_run.not_shortable(lines) == frozenset({"LQD", "XHB", "USO"})
+    assert shadow_run.not_shortable(lines) == {"LQD": date(2026, 9, 16), "XHB": date(2026, 9, 16),
+                                               "USO": date(2026, 9, 16)}
 
 
 def test_the_brokers_own_wording_with_the_ticker_quoted_is_read():
@@ -38,7 +39,24 @@ def test_the_brokers_own_wording_with_the_ticker_quoted_is_read():
         'hard-to-borrow asset \\"USO\\""}',
         'asset "EWA" cannot be sold short',
     ]
-    assert shadow_run.not_shortable([_audit(r) for r in reasons]) == frozenset({"LQD", "TUR", "USO", "EWA"})
+    assert set(shadow_run.not_shortable([_audit(r) for r in reasons])) == {"LQD", "TUR", "USO", "EWA"}
+
+
+def test_a_refusal_is_dated_by_its_first_utc_day():
+    """The owner's decision of 26 Sep 2026: a refusal counts from the day it
+    happened. The day is the audit line's UTC day (``ts`` is UTC), the
+    calendar the funds date cycles on; a name refused twice keeps its first
+    day, whatever order the lines come in; a line with no time at all is
+    refused from the start, as every refusal was before they were dated."""
+    lines = [
+        _audit("BrokerError: asset XHB cannot be sold short", "2026-09-22 15:45:13,806"),
+        _audit("BrokerError: asset XHB cannot be sold short", "2026-09-16 19:13:07,901"),
+        _audit('asset "USO" cannot be sold short', "2026-09-23 23:59:59,000"),        # 19:59 New York
+        json.dumps({"result": {"reason": "asset TUR cannot be sold short", "timestamp": "2026-09-24T14:00:00Z"}}),
+        json.dumps({"result": {"reason": "asset EWA cannot be sold short"}}),
+    ]
+    assert shadow_run.not_shortable(lines) == {"EWA": date.min, "TUR": date(2026, 9, 24),
+                                               "USO": date(2026, 9, 23), "XHB": date(2026, 9, 16)}
 
 
 @pytest.mark.parametrize("equity, drawdown", [
@@ -61,10 +79,13 @@ def test_the_band_is_the_5th_to_95th_percentile_day_by_day():
 
 
 def test_nothing_starts_until_the_owner_sets_a_date():
-    """Calibration waits for the owner's approval of its pass rule; the funds
-    wait for calibration to pass. The code never sets either date."""
+    """Calibration waits for the owner's approval of its pass rule. The fund
+    start is the owner's fixed date (26 Sep 2026: the 28 Sep cycle, acted on
+    from the 29 Sep open); the funds still wait for calibration to pass
+    before anything about them is computed (``build``)."""
     assert schedule.CALIBRATION_START is None
-    assert schedule.FUND_START is None
+    assert schedule.FUND_FIRST_CYCLE == date(2026, 9, 28)
+    assert schedule.FUND_START == date(2026, 9, 29)
     assert schedule.CALIBRATION_DAYS == 15
     # The owner's fail rule of 25 Sep 2026: no fix yet, and five calibration
     # days after the last one. A fix is added only in a reviewed change,
@@ -81,7 +102,9 @@ def test_calibration_cannot_start_under_a_rule_the_owner_has_not_approved():
     from shadow.calibration import PASS_RULE
 
     assert (schedule.CALIBRATION_START is None) == (not PASS_RULE.approved)
-    assert schedule.FUND_START is None or schedule.CALIBRATION_START is not None
+    # The fund start no longer waits on calibration's date (the owner's
+    # decision of 26 Sep 2026); what waits is the reading, in ``build``.
+    assert schedule.FUND_START > schedule.FUND_FIRST_CYCLE
 
 
 def test_every_calibration_fix_is_dated_described_and_in_the_amendments_table():
@@ -102,9 +125,10 @@ def test_every_calibration_fix_is_dated_described_and_in_the_amendments_table():
 
 
 def test_the_fund_tests_bars_come_from_its_own_share_of_the_data():
-    """The owner's decision of 24 Sep 2026. The same calculation gives the
-    race's pinned bars for three equal looks, and the fund test's for its
-    planned 46, 106 and 166 sessions: sessions from its start to each of the
+    """The owner's decisions of 24 and 26 Sep 2026. The race keeps its
+    O'Brien-Fleming bars for three equal looks; the fund test's come from
+    an O'Brien-Fleming-type spending rule at its own shares of its planned
+    60, 120 and 180 sessions: sessions from its fixed start to each of the
     race's estimated look days."""
     from datetime import timedelta
 
@@ -120,7 +144,8 @@ def test_the_fund_tests_bars_come_from_its_own_share_of_the_data():
     looks = (date(2026, 12, 22), date(2027, 3, 22), date(2027, 6, 16))
     assert schedule.FUND_TEST_LOOK_ESTIMATES == looks
     assert tuple(sessions(schedule.FUND_TEST_PLANNED_START, look) for look in looks) == \
-        schedule.FUND_TEST_PLANNED_SESSIONS == (46, 106, 166)
-    exact = gate.obrien_fleming_bars(schedule.FUND_TEST_PLANNED_SESSIONS)
-    assert [round(b, 3) for b in exact] == [3.797, 2.501, 1.999]
-    assert tuple(round(b, 2) for b in exact) == schedule.FUND_TEST_BARS == (3.80, 2.50, 2.00)
+        schedule.FUND_TEST_PLANNED_SESSIONS == (60, 120, 180)
+    final = schedule.FUND_TEST_PLANNED_SESSIONS[-1]
+    exact = gate.spending_bars([n / final for n in schedule.FUND_TEST_PLANNED_SESSIONS])
+    assert [round(b, 3) for b in exact] == [3.395, 2.407, 2.015]
+    assert tuple(gate.rounded_bar(b) for b in exact) == schedule.FUND_TEST_BARS == (3.40, 2.41, 2.02)
