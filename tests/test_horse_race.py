@@ -1193,17 +1193,55 @@ def test_trigger_d_moves_no_look_bar_or_verdict(tmp_path, monkeypatch, capsys):
     json.dumps(with_d, allow_nan=False)
 
 
-def test_an_intraday_record_is_marked_and_a_missing_vt_close_is_said(tmp_path):
+def test_an_intraday_record_is_shown_apart_and_a_missing_vt_close_is_said(tmp_path):
+    """Since 26 Sep 2026 (d) is judged on closes only: the intraday number is
+    its own mid-day line, after the close it does not replace."""
     record = horse_race.AccountRecord(
         equity={date(2026, 9, 23): 100_000.0, date(2026, 9, 24): 100_800.0, date(2026, 9, 25): 100_926.06},
         at=datetime(2026, 9, 25, 19, 15, 32, tzinfo=timezone.utc), intraday=date(2026, 9, 25))
     vt = {date(2026, 9, 23): 100.0, date(2026, 9, 24): 100.5}
     lines = horse_race.account_lines(horse_race.account_watch(record, vt))
-    assert lines[1].startswith("    now 2026-09-25 (intraday, recorded 19:15 UTC): equity 100,926.06")
-    assert ("vs VT since the 2026-09-23 close, at the 2026-09-24 close (no final VT close for 2026-09-25 "
-            "yet): account +0.80%, VT +0.50%: +0.30 points") in lines[2]
+    assert lines[1].startswith("    now 2026-09-24 close: equity 100,800.00")
+    assert ("vs VT since the 2026-09-23 close, at the 2026-09-24 close: account +0.80%, VT +0.50%: "
+            "+0.30 points") in lines[2]
+    assert lines[3].startswith("    mid-day 2026-09-25 (recorded 19:15 UTC, not a close; never trips (d)): "
+                               "equity 100,926.06")
+    assert len(lines) == 4, "a mid-day reading above both lines warns of nothing"
     no_base = horse_race.account_lines(horse_race.account_watch(record, {date(2026, 9, 24): 100.5}))
     assert no_base[2] == "    vs VT: not judged: no final VT close for 2026-09-23, the base"
     before = horse_race.AccountRecord(equity={date(2026, 9, 22): 100_000.0}, at=STAMP)
     assert horse_race.account_lines(horse_race.account_watch(before, vt)) == [
         horse_race.trigger_d_label() + ": not judged: no account close on or after 2026-09-23"]
+
+
+def test_an_intraday_reading_below_the_line_is_a_mid_day_warning_never_a_trip(tmp_path):
+    """26 Sep 2026: (d) trips on closing equity only. A latest intraday
+    reading 9% below the peak is shown, in the text and the gate JSON, as a
+    separate warning marked mid-day; `tripped` stays false, so the daily
+    health check raises no (d) alarm for it."""
+    record = horse_race.AccountRecord(
+        equity={date(2026, 9, 23): 100_000.0, date(2026, 9, 24): 101_000.0, date(2026, 9, 25): 91_000.0},
+        at=datetime(2026, 9, 25, 15, 30, tzinfo=timezone.utc), intraday=date(2026, 9, 25))
+    watch = horse_race.account_watch(record, {date(2026, 9, 23): 100.0, date(2026, 9, 24): 100.0})
+    assert not watch.tripped
+    lines = horse_race.account_lines(watch)
+    assert lines[0].endswith(": not tripped")
+    assert lines[1].startswith("    now 2026-09-24 close: equity 101,000.00")
+    assert lines[3].startswith("    mid-day 2026-09-25 (recorded 15:30 UTC, not a close; never trips (d)): "
+                               "equity 91,000.00 | 9.90% below the peak")
+    assert lines[4].startswith("    WARNING (mid-day, does not trip (d)): mid-day 2026-09-25: equity 91,000.00")
+    data = horse_race.account_watch_json(watch)
+    json.dumps(data, allow_nan=False)
+    assert data["tripped"] is False and data["trips"] == []
+    assert data["latest"]["day"] == "2026-09-24" and data["latest"]["intraday"] is False
+    assert data["midday"]["day"] == "2026-09-25" and data["midday"]["intraday"] is True
+    warning = data["midday_warning"]
+    assert (warning["mid_day"], warning["trips_d"], warning["below_peak"], warning["behind_vt"]) == (
+        True, False, True, True)
+    from analysis import health
+
+    assert health.drawdown_tripped({"watch": {"d": data}}) is None
+    calm = horse_race.account_watch_json(horse_race.account_watch(
+        horse_race.AccountRecord(equity=dict(record.equity, **{}) | {date(2026, 9, 25): 100_500.0},
+                                 at=record.at, intraday=date(2026, 9, 25)), {}))
+    assert calm["midday"]["equity"] == 100_500.0 and calm["midday_warning"] is None

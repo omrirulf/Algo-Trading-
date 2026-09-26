@@ -92,8 +92,12 @@ def test_the_dispatch_inputs():
     inputs = _load(HEARTBEAT)[True]["workflow_dispatch"]["inputs"]
     assert inputs["mode"]["options"] == ["cycle", "protect"] and inputs["mode"]["default"] == "cycle"
     assert inputs["started_by"]["type"] == "choice"
-    assert inputs["started_by"]["options"] == ["manual", "backup"]
+    assert inputs["started_by"]["options"] == ["manual", "backup", "scheduler"]
     assert inputs["started_by"]["default"] == "manual"
+    # Which starter asked: free text, validated where the run block is built.
+    assert inputs["source"]["type"] == "string" and inputs["source"]["default"] == "manual"
+    for name in ("supabase-cron", "claude-bridge", "claude-routine", "watchdog", "manual"):
+        assert name in inputs["source"]["description"], name
     assert inputs["rerun"]["type"] == "boolean" and inputs["rerun"]["default"] is False
     assert "only for a person" in inputs["rerun"]["description"]
 
@@ -105,8 +109,11 @@ def test_the_run_name_tells_the_runs_apart():
     for piece in ("'heartbeat protect'", "heartbeat cycle ({0})", "inputs.mode == 'protect'",
                   "github.event_name == 'schedule' && 'schedule'", "inputs.started_by", "'manual'"):
         assert piece in name, piece
-    # The words the watchdog matches on.
+    # The words the watchdog matches on, at the start of the title.
     assert "protect" in name and "{0}" in name
+    # The starter that asked, after them: free text, so it must never come first.
+    assert "heartbeat cycle ({0}) via {1}" in name
+    assert "github.event_name == 'schedule' && 'github-schedule' || inputs.source || 'manual'" in name
 
 
 # --------------------------------------------------------------------------- #
@@ -183,7 +190,10 @@ def test_the_cycle_step_hands_the_journal_its_run_block():
     env = cycle["env"]
     assert env["RUN_EVENT"] == "${{ github.event_name }}"
     assert env["RUN_STARTED_BY"] == "${{ inputs.started_by }}"
+    assert env["RUN_SOURCE"] == "${{ inputs.source }}"
     assert env["RUN_ID"] == "${{ github.run_id }}"
+    # Free text reaches the script only as a variable, never pasted into it.
+    assert '--source "$RUN_SOURCE"' in run and "${{ inputs.source }}" not in run
     # Only this step: nothing else in the job is described as the cycle.
     others = [s.get("name") for s in _steps(HEARTBEAT, "cycle")
               if s.get("name") != "Run one cycle" and "HEARTBEAT_RUN" in str(s)]
@@ -533,7 +543,8 @@ def test_every_rendered_file_that_conflicts_is_taken_from_this_run(tmp_path):
         return subprocess.run(["git", *args], cwd=cwd, env=env, check=True, capture_output=True,
                               text=True).stdout
 
-    rendered = ("cycle_report.md", "score_report.md", "blend_weights.json", "book.json", "brief.txt")
+    rendered = ("cycle_report.md", "score_report.md", "blend_weights.json", "book.json", "brief.txt",
+                "starter_status.json")
     logs = ("signal_journal.log", "execution_audit.log", "fund_size.log", "account.jsonl")
     git("init", "-q", "--bare", "-b", "main", "origin.git")
     work, other = tmp_path / "work", tmp_path / "other"
@@ -714,7 +725,8 @@ def test_the_watchdog_starts_a_backup_cycle_and_never_a_rerun():
     assert step["if"] == "steps.decide.outputs.action == 'dispatch'"
     assert step["id"] == "dispatch"
     run = step["run"]
-    assert 'gh workflow run heartbeat.yml --ref "$GITHUB_REF_NAME" -f mode=cycle -f started_by=backup' in run
+    assert ('gh workflow run heartbeat.yml --ref "$GITHUB_REF_NAME" -f mode=cycle -f started_by=backup '
+            '-f source=watchdog') in run
     assert step["env"]["GH_TOKEN"] == "${{ github.token }}"
     # `rerun` is the one input that bypasses heartbeat.yml's guard. No step
     # here may pass it, in any spelling.

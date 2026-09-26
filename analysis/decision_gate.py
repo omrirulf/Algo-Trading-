@@ -590,11 +590,39 @@ class DrawdownDay:
 class DrawdownWatch:
     """Trigger (d) over every day of the period, and the days it tripped on."""
 
+    #: One row per closing equity. Only these are judged, and only these trip.
     days: tuple[DrawdownDay, ...]
     trips: tuple[Trip, ...]
     #: Why the VT part can judge no day at all, if it cannot: a base close
     #: is missing. ``None`` when it judges every day VT has a final close.
     vt_problem: Optional[str] = None
+    #: The latest reading taken during a session, when there is one newer
+    #: than every close: measured the same way, shown, never a trip.
+    midday: Optional[DrawdownDay] = None
+
+    @property
+    def midday_warning(self) -> Optional[str]:
+        """What the mid-day reading is past, in words; None when it is past neither line.
+
+        A warning, never a trip (the owner's rule of 26 Sep 2026): the
+        account can fall below a line at 11:00 and be back above it at the
+        16:00 close, and (d) is about where the day ended.
+        """
+        row = self.midday
+        if row is None:
+            return None
+        reasons = []
+        if row.too_deep:
+            reasons.append(f"equity {row.equity:,.2f} is {-row.drawdown:.2%} below its peak {row.peak:,.2f} "
+                           f"of {row.peak_day.isoformat()} (the line is {MAX_DRAWDOWN:.0%})")
+        if row.too_far_behind:
+            reasons.append(f"the account is {-row.gap * 100:.2f} points behind {INDEX_TICKER} since the "
+                           f"{DRAWDOWN_START.isoformat()} close, against {INDEX_TICKER}'s last final close "
+                           f"(the line is {MAX_BEHIND_VT * 100:.0f} points)")
+        if not reasons:
+            return None
+        return (f"mid-day {row.day.isoformat()}: " + "; ".join(reasons)
+                + ". A mid-day reading, not a close: it does not trip (d)")
 
     @property
     def latest(self) -> Optional[DrawdownDay]:
@@ -606,19 +634,32 @@ class DrawdownWatch:
         return next((d for d in reversed(self.days) if d.gap is not None), None)
 
 
-def drawdown_watch(equity: Mapping[date, float], vt_close: Mapping[date, float]) -> DrawdownWatch:
+def drawdown_watch(
+    equity: Mapping[date, float], vt_close: Mapping[date, float],
+    midday: Optional[tuple[date, float]] = None,
+) -> DrawdownWatch:
     """Trigger (d): the real paper account, more than 8% below its peak or 5 points behind VT.
 
     The owner's decision of 26 Sep 2026, replacing (b). A trip means stop and
     tell the owner; nothing here reverts, switches or trades anything.
 
-    ``equity`` is the account's closing equity per trading day, as the
-    heartbeat recorded Alpaca's daily portfolio history in
-    ``logs/account.jsonl``, plus the latest record's own equity for its day
-    when that day is newer than every close (so the latest day can be an
-    intraday number). ``vt_close`` is VT's close per day, final closes only.
-    Days before ``DRAWDOWN_START`` are ignored in both, and so is any value
-    that is not a finite number above zero.
+    ``equity`` is the account's **closing** equity per trading day: Alpaca's
+    daily portfolio history as the heartbeat recorded it in
+    ``logs/account.jsonl``, taken only from a record made after that day's
+    16:00 New York close, and a record's own equity for its day when it was
+    made after the close. ``vt_close`` is VT's close per day, final closes
+    only. Days before ``DRAWDOWN_START`` are ignored in both, and so is any
+    value that is not a finite number above zero.
+
+    ``midday`` is the latest reading taken during a session, ``(day,
+    equity)``, when it is newer than every close. (d) trips only on closing
+    equity (the owner's rule, amended 26 Sep 2026): the mid-day reading is
+    measured the same way -- against the peak of the closes before it, and
+    against the base with VT's last final close on or before its day,
+    since VT has no final close for a day still trading -- and returned
+    as ``DrawdownWatch.midday``, with ``midday_warning`` saying in words
+    when it is past either line. It is never a row of ``days``, never a
+    trip, and it moves no peak.
 
     Drawdown: the peak is the highest closing equity from ``DRAWDOWN_START``
     to the day, that day included. The day trips when equity < peak x (1 -
@@ -670,12 +711,47 @@ def drawdown_watch(equity: Mapping[date, float], vt_close: Mapping[date, float])
                            f"{INDEX_TICKER} {vt_return:+.2%}; more than {MAX_BEHIND_VT * 100:.0f} points)")
         if reasons:
             trips.append(Trip(day, day, "; ".join(reasons)))
-    return DrawdownWatch(tuple(days), tuple(trips), vt_problem)
+    return DrawdownWatch(tuple(days), tuple(trips), vt_problem,
+                         _midday_row(midday, closes, vt, base_account, base_vt, vt_problem))
 
 
-def drawdown_trips(equity: Mapping[date, float], vt_close: Mapping[date, float]) -> list[Trip]:
-    """Trigger (d)'s trips only: see ``drawdown_watch`` for the definitions."""
-    return list(drawdown_watch(equity, vt_close).trips)
+def _midday_row(
+    midday: Optional[tuple[date, float]], closes: list[tuple[date, float]], vt: Mapping[date, float],
+    base_account: Optional[float], base_vt: Optional[float], vt_problem: Optional[str],
+) -> Optional[DrawdownDay]:
+    """The mid-day reading as a ``DrawdownDay``, judged like a close but never counted as one.
+
+    None when there is no reading, it is not usable, it is before the start,
+    or it is not newer than every close (a close for that day wins).
+    """
+    if midday is None:
+        return None
+    day, value = midday
+    if not isinstance(day, date) or day < DRAWDOWN_START or not _usable(value):
+        return None
+    if closes and day <= closes[-1][0]:
+        return None
+    value = float(value)
+    earlier = [(d, v) for d, v in closes if d < day]
+    peak, peak_day = max(earlier, key=lambda pair: pair[1])[::-1] if earlier else (value, day)
+    if value > peak:
+        peak, peak_day = value, day
+    account_return = vt_return = None
+    final = [d for d in vt if d <= day]
+    if vt_problem is None and base_account and base_vt and final:
+        account_return = value / base_account - 1.0
+        vt_return = vt[max(final)] / base_vt - 1.0
+    return DrawdownDay(day, value, peak, peak_day, account_return, vt_return)
+
+
+def drawdown_trips(equity: Mapping[date, float], vt_close: Mapping[date, float],
+                   midday: Optional[tuple[date, float]] = None) -> list[Trip]:
+    """Trigger (d)'s trips only: see ``drawdown_watch`` for the definitions.
+
+    Closing equity only: ``midday`` is accepted so a caller can pass what it
+    has, and it never adds a trip.
+    """
+    return list(drawdown_watch(equity, vt_close, midday).trips)
 
 
 def known_entry_days(cycle_days: Iterable[date]) -> list[date]:

@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from dataclasses import dataclass, fields
 from datetime import datetime, timedelta, timezone
@@ -274,12 +275,19 @@ def _stamp(when: Optional[datetime]) -> str:
 #: Who started a run, in words, by the run block's ``trigger``. ``manual`` is
 #: any dispatch that did not say it was the backup -- a person, or one of the
 #: Claude Routines, which dispatch with only ``mode`` and have started every
-#: cycle since 21 Sep -- so it must not read as "by hand".
+#: cycle since 21 Sep -- so it must not read as "by hand". ``scheduler`` is
+#: an outside scheduler that is the day's main start: the Supabase starter,
+#: from 26 Sep 2026.
 _TRIGGER_WORDS = {
     "schedule": "GitHub's schedule",
+    "scheduler": "the outside scheduler",
     "backup": "the backup, because GitHub's schedule had not started it",
     "manual": "a manual dispatch (a person or a Claude Routine)",
 }
+
+#: The run block's ``source`` as the report may print it: the short safe
+#: token ``analysis/cycle_day.py`` writes. Anything else is not echoed.
+_SAFE_SOURCE = re.compile(r"[a-z0-9-]{1,40}")
 
 
 def run_line(lines: list[Line]) -> Optional[str]:
@@ -301,6 +309,11 @@ def run_line(lines: list[Line]) -> Optional[str]:
     else:
         return None
     who = _TRIGGER_WORDS.get(str(block.get("trigger")), "an unknown trigger")
+    # Which starter asked for it (supabase-cron, claude-bridge, watchdog...),
+    # from 26 Sep 2026. Blocks from before then have none, and say nothing.
+    source = block.get("source")
+    if isinstance(source, str) and source:
+        who += f" (via {source if _SAFE_SOURCE.fullmatch(source) else 'an unknown source'})"
     late = block.get("minutes_late")
     planned = ""
     try:

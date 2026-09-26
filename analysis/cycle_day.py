@@ -36,7 +36,8 @@ scheduled ones: a late GitHub cron, the watchdog's backup
 same day, and exactly one of them may trade. So the guard now also says when
 it is too late in the day to start at all (``LATEST_START_NY``), and this
 module builds the small "run block" every journal line of the cycle carries:
-what started the run, when it was meant to start, and how late it was.
+what started the run, which starter asked for it (the Supabase starter, a
+backup, a person), when it was meant to start, and how late it was.
 
 The journal cannot show the one run that matters most: the one that traded
 and lost its record. So the guard also reads GitHub's own record of today's
@@ -57,6 +58,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import re
 import sys
 from dataclasses import dataclass, replace
 from datetime import date, datetime, time, timezone
@@ -129,6 +131,37 @@ MARKET_OPEN_NY = time(9, 30)
 
 #: What ``start_decision`` can answer.
 RUN, ALREADY, TOO_LATE = "run", "already", "too_late"
+
+#: Which starter asked for the run, as the run block records it under
+#: ``source``. Since 26 Sep 2026 the owner's main starter is a pg_cron job in
+#: the Supabase project that dispatches heartbeat.yml at 14:40 UTC
+#: (``supabase/heartbeat_starter.sql``); GitHub's own cron, the Claude
+#: Routines, a temporary Claude "bridge" Routine at 14:42 and the watchdog
+#: stay as backups. Every one of them is only a request to run -- the guard
+#: above decides, the same way for all of them -- so the source is a label,
+#: never an input to any decision. It is recorded because "did the main
+#: starter start today's run, or did a backup have to?" is the question the
+#: daily brief now answers, and GitHub's run list forgets it after a few
+#: months.
+PRIMARY_SOURCE = "supabase-cron"
+#: A scheduled run has no inputs at all, so its source is named here.
+SCHEDULE_SOURCE = "github-schedule"
+#: The ``source`` input's own default, for a dispatch that does not name one.
+DEFAULT_SOURCE = "manual"
+#: What a source that is not a short safe token becomes.
+UNKNOWN_SOURCE = "unknown"
+#: The sources the owner's starters send. Documentation for a reader: any
+#: short safe token is accepted (``source_for``), so adding a starter never
+#: needs a change here first.
+KNOWN_SOURCES = (PRIMARY_SOURCE, "claude-bridge", "claude-routine", "watchdog",
+                 DEFAULT_SOURCE, SCHEDULE_SOURCE)
+#: A short safe token: lower-case letters, digits and hyphens, at most 40.
+#: The input is free text typed by whatever dispatched the run -- a person,
+#: a Routine, a database job -- and it rides on every journal line, which is
+#: committed to a public repository and read back by the brief and the race.
+#: Anything else (spaces, markup, a pasted secret, a 2 000-character string)
+#: is replaced, never echoed.
+SOURCE_PATTERN = re.compile(r"[a-z0-9-]{1,40}")
 
 
 def cycle_ran_on(entries: Iterable[JournalEntry], day: date) -> bool:
@@ -452,19 +485,47 @@ def _guard_summary(start: Start, runs_read: Optional[bool]) -> list[str]:
 
 
 def trigger_for(event: Optional[str], started_by: Optional[str]) -> str:
-    """``schedule``, ``backup`` or ``manual``, from what GitHub says started the run.
+    """``schedule``, ``scheduler``, ``backup`` or ``manual``, from what GitHub says started the run.
 
     A scheduled run has no inputs at all, so the event name is the only thing
     that can say it was the cron. Anything dispatched is manual unless it
-    says it was the backup: the watchdog always does, while a person clicking
-    "Run workflow" and a Claude Routine dispatching with only ``mode`` both
-    get the default. So ``manual`` means "dispatched", not "by a person".
+    says otherwise: the watchdog always says ``backup``, and the Supabase
+    starter says ``scheduler`` (an outside scheduler that is the day's main
+    start, not a rescue -- so it must never be counted against the
+    watchdog's cap on its own backups, which counts "(backup)" titles). A
+    person clicking "Run workflow" and a Claude Routine dispatching with only
+    ``mode`` both get the default. So ``manual`` means "dispatched", not "by
+    a person"; ``source`` in the run block says which dispatcher it was.
     """
     if (event or "").strip() == "schedule":
         return "schedule"
-    if (started_by or "").strip().lower() == "backup":
+    said = (started_by or "").strip().lower()
+    if said == "backup":
         return "backup"
+    if said == "scheduler":
+        return "scheduler"
     return "manual"
+
+
+def source_for(event: Optional[str], source: Optional[str]) -> str:
+    """The run block's ``source``: which starter asked for this run.
+
+    ``github-schedule`` for a scheduled run, whatever else is said: a cron
+    has no inputs. For a dispatch, the ``source`` input when it is a short
+    safe token (``SOURCE_PATTERN``); ``manual`` when it is empty, which is
+    the input's own default and what GitHub fills in for any dispatch that
+    leaves it out; ``unknown`` for anything else, so no arbitrary text a
+    dispatcher sent reaches the journal. Surrounding blanks are ignored;
+    nothing else is repaired -- ``Supabase-Cron`` is not a token and reads
+    ``unknown``, which is the honest answer to a starter that spells its own
+    name wrong.
+    """
+    if (event or "").strip() == "schedule":
+        return SCHEDULE_SOURCE
+    text = (source or "").strip()
+    if not text:
+        return DEFAULT_SOURCE
+    return text if SOURCE_PATTERN.fullmatch(text) else UNKNOWN_SOURCE
 
 
 def run_block(
@@ -474,6 +535,7 @@ def run_block(
     run_id: object,
     started_at: datetime,
     scheduled: time = SCHEDULED_START_UTC,
+    source: Optional[str] = None,
 ) -> dict:
     """The block every journal line of this run carries under ``"run"``.
 
@@ -483,12 +545,18 @@ def run_block(
     same 14:40 the cron was meant to keep. ``minutes_late`` is floored, so a
     run 30 minutes and 59 seconds after its time is 30 minutes late and not
     yet ``late``; it is negative for a run started early.
+
+    ``source`` is which starter asked for the run (``source_for``): the
+    Supabase starter, the Claude bridge, a Routine, the watchdog, a person,
+    or GitHub's schedule. Validated here, where the block is built, so the
+    journal only ever carries a short safe token.
     """
     started = _utc(started_at).replace(microsecond=0)
     scheduled_for = datetime.combine(started.date(), scheduled, tzinfo=timezone.utc)
     minutes_late = math.floor((started - scheduled_for).total_seconds() / 60)
     return {
         "trigger": trigger_for(event, started_by),
+        "source": source_for(event, source),
         "scheduled_for": scheduled_for.isoformat(),
         "started_at": started.isoformat(),
         "minutes_late": minutes_late,
@@ -518,7 +586,8 @@ def main(argv: Optional[list[str]] = None) -> int:
       GitHub's record of today's other heartbeat runs, as the workflow saved
       it; the one word is still all that goes to stdout, and the reason,
       written for the job summary, goes to stderr.
-    * ``--run-block``: the JSON the cycle step hands the journal
+    * ``--run-block``: the JSON the cycle step hands the journal (with
+      ``--event``, ``--started-by``, ``--source`` and ``--run-id``)
 
     A non-zero exit would be indistinguishable from the script itself
     breaking, and the caller must be able to tell "no cycle today" from "the
@@ -538,6 +607,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("--now", default=None, help="ISO datetime, default now (UTC if naive)")
     parser.add_argument("--event", default="", help="github.event_name")
     parser.add_argument("--started-by", default="", help="the started_by input, if any")
+    parser.add_argument("--source", default="", help="the source input, if any")
     parser.add_argument("--run-id", default="", help="github.run_id")
     parser.add_argument("--runs", type=Path, default=None,
                         help="with --decide: GitHub's list of today's heartbeat runs, as JSON")
@@ -553,9 +623,9 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     if args.run_block:
         block = run_block(event=args.event, started_by=args.started_by,
-                          run_id=args.run_id, started_at=_now(args.now))
+                          run_id=args.run_id, started_at=_now(args.now), source=args.source)
         print(json.dumps(block, separators=(",", ":")))
-        print(f"{block['trigger']} run, {block['minutes_late']} min after "
+        print(f"{block['trigger']} run from {block['source']}, {block['minutes_late']} min after "
               f"{block['scheduled_for']}", file=sys.stderr)
         return 0
 

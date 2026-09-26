@@ -449,8 +449,10 @@ import `store/` (checked by walking the AST), and the Supabase key has exactly
 one reader, `store/remote.py`.
 
 The remote tables run with row-level security **on and no policies**, so the
-publishable key can do nothing at all — not even read. The service-role key
-bypasses RLS and belongs in a GitHub Actions secret. The `decisions` view is
+publishable key can do nothing at all — not even read. The push uses a new-style
+secret key (`sb_secret_…`, named `github-archive`, sent on the `apikey` header
+only), which bypasses RLS and belongs in a GitHub Actions secret; the legacy
+JWT `service_role` key stops working at the end of 2026. The `decisions` view is
 `security_invoker`, without which it would read straight through that RLS.
 
 ## Score the signals

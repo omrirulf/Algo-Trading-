@@ -698,9 +698,19 @@ jobs:
           fi
           # The log paths may be read and opened, but never for writing. The
           # loader takes an iterable of lines; nothing in it needs a mode.
+          #
+          # One write is allowed outside that, and only as the exact line
+          # below: push_remote.py's record of how the push went
+          # (logs/archive_status.json, 26 Sep 2026), which the heartbeat
+          # commits so the owner hears about a paused or unconfigured
+          # archive. It is the push's own note about itself, rewritten whole,
+          # never a log this package reads as a source. Naming the line
+          # rather than the file keeps push_remote.py checked for every
+          # other write.
           hits=$(grep -rnE "(\.write_text\(|\.unlink\(\)|open\([^)]*['\"][wa])" \
                    store --include='*.py' \
-                 | grep -vE "^store/build_db\.py:" || true)
+                 | grep -vE "^store/build_db\.py:" \
+                 | grep -vE '^store/push_remote\.py:[0-9]+:        path\.write_text\(render_status\(status\), encoding="utf-8"\)$' || true)
           if [ -n "$hits" ]; then
             echo "$hits"
             echo "::error::store/ may only write through sqlite3, not the filesystem"

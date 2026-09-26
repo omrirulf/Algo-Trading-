@@ -4,7 +4,15 @@ name: heartbeat
 # watchdog had to start are told apart without opening each run. A scheduled
 # run has no inputs at all, so every `inputs.*` below is empty on one; the
 # expressions are written so that empty means "a scheduled cycle".
-run-name: ${{ inputs.mode == 'protect' && 'heartbeat protect' || format('heartbeat cycle ({0})', github.event_name == 'schedule' && 'schedule' || inputs.started_by || 'manual') }}
+#
+# Since 26 Sep the title also names the starter that asked for the run
+# ("heartbeat cycle (scheduler) via supabase-cron"), after the part the
+# watchdog reads. That order matters: `source` is free text from whoever
+# dispatched, and GitHub builds this title before any step can check it, so
+# analysis/watchdog.py matches "heartbeat protect" and "heartbeat cycle
+# (backup)" at the START of the title only -- a source that says "protect"
+# cannot make a real cycle look like a protection pass to the guard.
+run-name: ${{ inputs.mode == 'protect' && 'heartbeat protect' || format('heartbeat cycle ({0}) via {1}', github.event_name == 'schedule' && 'schedule' || inputs.started_by || 'manual', github.event_name == 'schedule' && 'github-schedule' || inputs.source || 'manual') }}
 
 # One cycle per trading day, not one per hour. Fundamentals, analyst targets
 # and insider filings change daily at most and technicals are on daily bars,
@@ -53,17 +61,33 @@ run-name: ${{ inputs.mode == 'protect' && 'heartbeat protect' || format('heartbe
 # already journalled. In practice GitHub has delivered it about three hours
 # late too, after that latest start, where the guard below stops it.
 #
-# Because the cron cannot be trusted to be on time, it is only the first of
-# three layers, and all three can fire on the same day:
+# Because the cron cannot be trusted to be on time, it is not the main
+# starter any more. Since 26 Sep (the owner's decision) the day's run is
+# started from outside GitHub, and everything else is a backup. All of these
+# can fire on the same day, and each names itself in the `source` input,
+# which the run block carries into the journal:
 #
-#   1. The two crons below.
-#   2. heartbeat-watchdog.yml. From 15:10 UTC, 30 minutes after the start is
+#   1. The Supabase starter, the MAIN one: a pg_cron job in the Supabase
+#      project "algo-trading-archive" that asks GitHub for a dispatch at
+#      14:40 UTC, Monday to Friday (supabase/heartbeat_starter.sql;
+#      started_by: scheduler, source: supabase-cron). A workflow_dispatch is
+#      created when it is asked for; it is not held in GitHub's cron
+#      backlog. The GitHub token it dispatches with lives only in Supabase
+#      Vault ("github_heartbeat_dispatch"), never in this repository.
+#   2. A temporary Claude Routine, the "bridge", at 14:42 UTC (source:
+#      claude-bridge), kept until the Supabase starter has proved itself.
+#   3. The two crons below (source: github-schedule).
+#   4. Claude Routines in the owner's account: heartbeat at 15:05 and 15:45
+#      UTC (source: claude-routine, or `manual` if a Routine does not say),
+#      and heartbeat-watchdog.yml at 15:12.
+#   5. heartbeat-watchdog.yml. From 15:10 UTC, 30 minutes after the start is
 #      due, it checks whether a cycle is journalled or on its way. If not, it
-#      starts this workflow itself (started_by: backup) and tells the owner's
-#      phone; if it is too late in the day, it only tells the phone.
-#   3. Claude Routines in the owner's account, which dispatch at fixed times.
-#      A workflow_dispatch is created when it is asked for; it is not held in
-#      GitHub's cron backlog.
+#      starts this workflow itself (started_by: backup, source: watchdog)
+#      and tells the owner's phone; if it is too late in the day, it only
+#      tells the phone.
+#
+# The daily brief says which one started the day, and warns when it was not
+# the Supabase starter.
 #
 # Every one of those is a request to run, never a cycle by itself. The
 # guarantee: on one trading day only one run reaches "Run one cycle" after the
@@ -87,9 +111,9 @@ run-name: ${{ inputs.mode == 'protect' && 'heartbeat protect' || format('heartbe
 # the journal alone and says so in the job summary.
 on:
   schedule:
-    - cron: "40 14 * * 1-5"   # the day's cycle, after the open in both seasons
+    - cron: "40 14 * * 1-5"   # the day's time, after the open in both seasons; a backup to the Supabase starter
     - cron: "35 17 * * 1-5"   # catch-up; stops at the guard if a cycle is journalled
-  workflow_dispatch:        # a manual or backup run: a cycle, or just the protection pass
+  workflow_dispatch:        # the Supabase starter, a backup or a person: a cycle, or just the protection pass
     inputs:
       mode:
         description: >-
@@ -103,11 +127,22 @@ on:
         description: >-
           Who is starting this run. manual = any dispatch that does not say
           otherwise: a person, or a Claude Routine (the default). backup = the
-          watchdog, when GitHub's schedule had not started the day's run. Only
-          a label: both are guarded the same way.
+          watchdog, when the day's run had not started. scheduler = an outside
+          scheduler that is the day's main start (the Supabase starter); not a
+          backup, so the watchdog does not count it against its own limit.
+          Only a label: all are guarded the same way.
         type: choice
         default: manual
-        options: [manual, backup]
+        options: [manual, backup, scheduler]
+      source:
+        description: >-
+          Which starter asked for this run, for the journal and the daily
+          brief: supabase-cron (the main starter), claude-bridge, claude-routine,
+          watchdog or manual. Lower-case letters, digits and hyphens, at most 40;
+          anything else is recorded as unknown. Only a label: it never changes
+          what the guard decides.
+        type: string
+        default: manual
       rerun:
         description: >-
           Run a cycle even though the guard would stop it: one is already
@@ -451,9 +486,13 @@ jobs:
           FULL_MODEL_API_KEY: ${{ secrets.FULL_MODEL_API_KEY || secrets.DEEPINFRA_API_KEY || secrets.SCREENING_API_KEY || secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY || secrets.GROQ_API_KEY }}
           # What started this run, for the run block below. Not secrets; an
           # input is empty on a scheduled run, which the script reads as
-          # "the schedule" from the event name.
+          # "the schedule" from the event name. RUN_SOURCE is free text from
+          # the dispatcher: it reaches the shell only as this variable, never
+          # pasted into the script, and the script keeps it only if it is a
+          # short safe token (analysis/cycle_day.py:source_for).
           RUN_EVENT: ${{ github.event_name }}
           RUN_STARTED_BY: ${{ inputs.started_by }}
+          RUN_SOURCE: ${{ inputs.source }}
           RUN_ID: ${{ github.run_id }}
         # Always plain --once, whatever started the run. The pre-market flag
         # gave up the market-closed gate so a 12:35 UTC start could wait on a
@@ -466,15 +505,17 @@ jobs:
         # after the open.
         #
         # HEARTBEAT_RUN is the run block every journal line of this cycle
-        # carries: schedule, backup or manual; when the day's run was due
-        # (14:40 UTC) and when this one started; how many minutes late; the
-        # run id. Built here, at the moment the cycle starts, so a rerun
+        # carries: schedule, scheduler, backup or manual; the source (which
+        # starter asked: supabase-cron, claude-bridge, watchdog,
+        # github-schedule...); when the day's run was due (14:40 UTC) and
+        # when this one started; how many minutes late; the run id. Built here, at the moment the cycle starts, so a rerun
         # (whose first attempt skips the guard) is described too, and
         # exported to this step's process only. A block that cannot be built
         # is left out -- never a reason not to trade.
         run: |
           HEARTBEAT_RUN=$(python analysis/cycle_day.py --run-block \
-            --event "$RUN_EVENT" --started-by "$RUN_STARTED_BY" --run-id "$RUN_ID") || HEARTBEAT_RUN=""
+            --event "$RUN_EVENT" --started-by "$RUN_STARTED_BY" --source "$RUN_SOURCE" \
+            --run-id "$RUN_ID") || HEARTBEAT_RUN=""
           export HEARTBEAT_RUN
           echo "run block: ${HEARTBEAT_RUN:-none}"
           python -m orchestrator.heartbeat --once
@@ -534,6 +575,43 @@ jobs:
           else
             echo "no journal lines to render; last report left in place"
           fi
+
+      - name: Read the Supabase starter's log
+        # Since 26 Sep the day's run is started by a pg_cron job in the
+        # Supabase project (supabase/heartbeat_starter.sql), which writes one
+        # row per request to public.starter_log; three minutes later a second
+        # job copies GitHub's answer onto the row -- its status code and
+        # nothing else. GitHub answers a dispatch it accepted with 204.
+        #
+        # This reads today's row, and only reads, so the brief can say what
+        # the starter's own request got back: the one thing this run cannot
+        # see for itself, since a run a backup started looks the same whether
+        # the starter was refused (a 401 is an expired token), got no answer,
+        # or never asked.
+        #
+        # Before the book snapshot, which reads the file, and committed with
+        # the journal. Through store/starter_status.py, which reads the
+        # Supabase key the one way it may be read (store/remote.py) and
+        # prints only the status code and a short checked error: never a
+        # header, never the key, and the log line below echoes only that.
+        # Missing secrets, a paused project, a missing table or any other
+        # failure write {"day", "status": "unknown", "why"}; nothing here can
+        # fail the job (continue-on-error, a short clock, and a fallback line
+        # if the script itself cannot run).
+        if: always() && steps.guard.outputs.skip != 'yes' && inputs.mode != 'protect'
+        continue-on-error: true
+        timeout-minutes: 2
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          if python store/starter_status.py > "$RUNNER_TEMP/starter_status.json"; then
+            mv "$RUNNER_TEMP/starter_status.json" logs/starter_status.json
+          else
+            printf '{"day": "%s", "status": "unknown", "why": "the starter check could not run"}\n' \
+              "$(date -u +%F)" > logs/starter_status.json
+          fi
+          echo "Supabase starter today: $(cat logs/starter_status.json)"
 
       - name: Write the book snapshot
         # One JSON file the dashboard reads: positions against their stops,
@@ -717,6 +795,12 @@ jobs:
           # account.jsonl is the same: the account as it stood at each run,
           # which nobody can read back later.
           git add -f logs/signal_journal.log logs/execution_audit.log logs/cycle_report.md logs/fund_size.log logs/blend_weights.json logs/score_report.md logs/book.json logs/brief.txt logs/account.jsonl || true
+          # starter_status.json is what the Supabase starter's own request
+          # got back today, read just before the book (26 Sep). Added on its
+          # own line, on purpose: `git add` with one path that does not exist
+          # adds none of the others, and this file is not written on a
+          # protection pass -- which would then commit no audit log at all.
+          git add -f logs/starter_status.json 2>/dev/null || true
           if git diff --cached --quiet; then
             echo "no journal changes"
             exit 0
@@ -731,8 +815,8 @@ jobs:
           # rendered files are whole rewrites, and this run's is the newer.
           sync_with_branch() {
             if ! git pull --rebase --autostash origin "${GITHUB_REF_NAME}"; then
-              git checkout --theirs -- logs/cycle_report.md logs/score_report.md logs/blend_weights.json logs/book.json logs/brief.txt 2>/dev/null || true
-              git add -f logs/cycle_report.md logs/score_report.md logs/blend_weights.json logs/book.json logs/brief.txt 2>/dev/null || true
+              git checkout --theirs -- logs/cycle_report.md logs/score_report.md logs/blend_weights.json logs/book.json logs/brief.txt logs/starter_status.json 2>/dev/null || true
+              git add -f logs/cycle_report.md logs/score_report.md logs/blend_weights.json logs/book.json logs/brief.txt logs/starter_status.json 2>/dev/null || true
               GIT_EDITOR=true git rebase --continue
             fi
           }
@@ -851,6 +935,7 @@ jobs:
         # reason it is: the lines a failed cycle wrote belong in the archive
         # too. Note this is not a guard on the secrets -- see below.
         if: always() && steps.guard.outputs.skip != 'yes' && inputs.mode != 'protect'
+        id: archive
         # Two more decisions, unchanged:
         #
         # After, because the journal must already be safe in git before this
@@ -866,7 +951,133 @@ jobs:
         # it is covered by the test suite instead of only by a green run. The
         # same reasoning puts the cycle summary in Python: see
         # orchestrator/heartbeat.py:render_summary.
+        #
+        # Since 26 Sep it also writes down how it went (--status): when it
+        # was tried, when a push last worked, and why not in a few fixed
+        # words ("not configured", "project paused or unreachable", "HTTP
+        # <code>"). The Supabase project was paused once already because
+        # every push had quietly printed "No remote archive configured" --
+        # the two secrets were never set -- and a free project nothing writes
+        # to is paused after about a week. The two steps below commit that
+        # record and tell the phone the same day a push fails; the brief
+        # warns every day it is not configured. The step itself still fails
+        # loudly on a failed push, as before.
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-        run: python store/push_remote.py
+        run: python store/push_remote.py --status logs/archive_status.json
+
+      - name: Tell the owner's phone the archive push failed
+        # The same day, not in tomorrow's brief. `always()` because the push
+        # step above fails the run when it fails, and that is exactly when
+        # this must run; the failure push further up has already had its
+        # turn by then. Only for a push that was tried and failed: "not
+        # configured" is a daily warning in the brief instead, not a page.
+        #
+        # Reads the record the push just wrote, and only its fixed words --
+        # never the remote's own text. A record not written by this run (the
+        # push crashed before it could write one) still pages, if the step
+        # failed. Posted exactly like the other phone steps: the topic goes
+        # in the JSON body, never a URL or a log, the file that carried it is
+        # removed, and a phone error never fails the job.
+        if: always() && steps.guard.outputs.skip != 'yes' && inputs.mode != 'protect'
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          PUSH_OUTCOME: ${{ steps.archive.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "${NTFY_TOPIC:-}" ]; then
+            echo "no phone configured (NTFY_TOPIC secret unset); nothing sent"
+            exit 0
+          fi
+          python - <<'EOF' > "$RUNNER_TEMP/phone.json"
+          import json, os, pathlib, re
+          from datetime import datetime, timedelta, timezone
+          try:
+              status = json.loads(pathlib.Path("logs/archive_status.json").read_text(encoding="utf-8"))
+          except (OSError, ValueError):
+              status = {}
+          status = status if isinstance(status, dict) else {}
+          try:
+              tried = datetime.fromisoformat(str(status.get("last_attempt")))
+          except ValueError:
+              tried = None
+          if tried is not None and tried.tzinfo is None:
+              tried = tried.replace(tzinfo=timezone.utc)
+          # Written by this run: the job's own ceiling is 180 minutes.
+          fresh = tried is not None and tried > datetime.now(timezone.utc) - timedelta(hours=4)
+          error = str(status.get("error") or "")
+          if not re.fullmatch(r"not configured|project paused or unreachable|HTTP [0-9]{3}|push crashed \([A-Za-z]+\)", error):
+              error = "an unrecognised error"
+          if fresh and status.get("ok") is False and error != "not configured":
+              reason = error
+          elif os.environ.get("PUSH_OUTCOME") == "failure" and not fresh:
+              reason = "the push step failed before it could say why"
+          else:
+              raise SystemExit(0)
+          advice = {
+              "project paused or unreachable": "The Supabase project may be paused; restore it "
+                                               "(Supabase dashboard, project algo-trading-archive, Restore). "
+                                               "The Supabase starter lives there too.",
+              "HTTP 401": "Supabase refused the key: check the SUPABASE_SERVICE_KEY secret.",
+          }.get(reason, "Open the run to see the push step's log.")
+          last = status.get("last_success")
+          since = (f"The last push that worked was on {last[:10]}." if isinstance(last, str) and last
+                   else "No push has worked yet.")
+          print(json.dumps({"topic": os.environ["NTFY_TOPIC"],
+                            "title": "⚠️ Archive push to Supabase failed",
+                            "message": (f"Today's push of the journal to the Supabase archive failed: {reason}. "
+                                        f"{advice} No line is lost: the journal is in git, and the next push "
+                                        f"that works sends what is missing. {since}"),
+                            "priority": 4, "tags": ["warning"], "click": os.environ["RUN_URL"]}))
+          EOF
+          if [ ! -s "$RUNNER_TEMP/phone.json" ]; then
+            rm -f "$RUNNER_TEMP/phone.json"
+            echo "the archive push did not fail today (or is only not configured); nothing sent"
+            exit 0
+          fi
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' \
+                 --data-binary @"$RUNNER_TEMP/phone.json" https://ntfy.sh/ || echo "000")
+          rm -f "$RUNNER_TEMP/phone.json"
+          case "$code" in
+            2*) echo "phone notified (HTTP $code)";;
+            *)  echo "::warning::phone not notified (HTTP $code)";;
+          esac
+
+      - name: Commit the archive push record
+        # logs/archive_status.json is written by the push, which runs after
+        # the journal's commit, so it gets a small commit of its own: the
+        # brief and the health check read it on the next run, and the date
+        # of the last push that worked must survive the runner. Same pull
+        # --rebase and three tries as "Commit the journal", but it never
+        # fails the job: a record about the archive is not worth a red run,
+        # and the phone step above has already said what matters. The file
+        # is a whole rewrite, so on a conflict this run's is kept, the newer.
+        if: always() && steps.guard.outputs.skip != 'yes' && inputs.mode != 'protect'
+        continue-on-error: true
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f logs/archive_status.json 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "no archive record changes"
+            exit 0
+          fi
+          git commit -m "Archive push record at $(date -u +'%Y-%m-%dT%H:%MZ')"
+          sync_with_branch() {
+            if ! git pull --rebase --autostash origin "${GITHUB_REF_NAME}"; then
+              git checkout --theirs -- logs/archive_status.json 2>/dev/null || true
+              git add -f logs/archive_status.json 2>/dev/null || true
+              GIT_EDITOR=true git rebase --continue
+            fi
+          }
+          for attempt in 1 2 3; do
+            if sync_with_branch && git push origin "HEAD:${GITHUB_REF_NAME}"; then
+              exit 0
+            fi
+            git rebase --abort 2>/dev/null || true
+            echo "::warning::the archive record push did not go through (try $attempt of 3)"
+            sleep 5
+          done
+          echo "::warning::the archive push record was not committed; the next run writes a new one"
+          exit 0

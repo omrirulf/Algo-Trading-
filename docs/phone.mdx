@@ -43,9 +43,12 @@ it never asks the broker anything.
 ## The brief as a push notification
 
 The heartbeat writes `logs/brief.txt` after the book snapshot: the worst
-thing in the record first, then equity, positions, what was traded, what
-closed, any position without a stop on record, the other alarms, and the
-cycle's cost. The same step then posts it to [ntfy](https://ntfy.sh), a free
+thing in the record first, then equity, positions, what was traded, who
+started the day ("Started by supabase-cron at 14:41 UTC (1 min after
+14:40)", with a warning when a backup had to), what the Supabase starter's
+own request got back and when the archive last took a push (see
+[the Supabase starter](/deployment#the-supabase-starter)), what closed, any
+position without a stop on record, the other alarms, and the cycle's cost. The same step then posts it to [ntfy](https://ntfy.sh), a free
 push service with an Android app and no account.
 
 <Steps>
@@ -71,6 +74,7 @@ What arrives, and when:
 |---|---|---|
 | The day's brief (🟢 / 🟡 / 🔴 headline) | `heartbeat`, the moment the brief is written | urgent when the headline is 🔴 |
 | *The trading cycle run failed* | `heartbeat`, when the run goes red for a reason the brief did not carry | urgent |
+| *⚠️ Archive push to Supabase failed* | `heartbeat`, the same day the push to the Supabase archive fails (not when it is only not configured: that is a daily warning in the brief) | high |
 | *A data source stopped answering* | `data sources`, when the morning probe fails | high |
 
 The topic is the only secret and it never appears in a URL or a log: the

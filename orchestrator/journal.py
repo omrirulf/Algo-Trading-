@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -39,9 +40,11 @@ def run_block() -> Optional[dict[str, Any]]:
     """What started this cycle run, as the workflow described it; else None.
 
     The heartbeat workflow sets HEARTBEAT_RUN on the cycle step to a small
-    JSON object -- the trigger (schedule, backup or manual), when the day's
-    run was scheduled and when this one started, how late that was, and the
-    GitHub run id (built by ``analysis/cycle_day.py``). It rides on every line
+    JSON object -- the trigger (schedule, scheduler, backup or manual), the
+    source (which starter asked for the run: supabase-cron, claude-bridge,
+    watchdog, github-schedule...), when the day's run was scheduled and when
+    this one started, how late that was, and the GitHub run id (built by
+    ``analysis/cycle_day.py``). It rides on every line
     so the journal alone can answer "which runs were late, and who started
     them", which GitHub's own run list forgets after a few months.
 
@@ -60,7 +63,24 @@ def run_block() -> Optional[dict[str, Any]]:
         parsed = json.loads(raw)
     except Exception:  # noqa: BLE001 - not JSON (or absurdly nested): no block
         return None
-    return parsed if isinstance(parsed, dict) else None
+    if not isinstance(parsed, dict):
+        return None
+    # ``source`` is which starter asked for the run (the Supabase starter, a
+    # Claude Routine, the watchdog...), typed by whatever dispatched it. The
+    # workflow already validates it (analysis/cycle_day.py:source_for); this
+    # is the same rule again at the last door before a public, committed
+    # file, so a block built some other way cannot put free text on every
+    # line. Only this key is judged: the rest is the workflow's own numbers.
+    if "source" in parsed and not (isinstance(parsed["source"], str)
+                                   and _SAFE_SOURCE.fullmatch(parsed["source"])):
+        parsed["source"] = "unknown"
+    return parsed
+
+
+#: A run block's ``source``: a short safe token, as
+#: ``analysis/cycle_day.py:SOURCE_PATTERN`` defines it. Repeated rather than
+#: imported: the journal must not depend on the analysis package.
+_SAFE_SOURCE = re.compile(r"[a-z0-9-]{1,40}")
 
 
 def _run_field() -> dict[str, Any]:

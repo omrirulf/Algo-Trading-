@@ -60,10 +60,16 @@ Next checkpoint: 20 independent days (= 60 trading days), estimated 2026-12-22, 
   not judged on that part). The race reads the account from
   `logs/account.jsonl` and prints the current drawdown from the peak and
   the gap to VT in points even when nothing has tripped; with no usable
-  record it says "not judged: no account record". (d) is in
-  `logs/race_gate.json` under `watch.d`, and when that says it tripped the
-  daily health check raises a warning that the brief sends to the owner's
-  phone. A trip means stop and tell the owner; nothing reverts or trades,
+  record it says "not judged: no account record". (d) trips only on
+  closing equity, after the 16:00 New York close. A latest reading taken
+  during the session is printed on its own "mid-day" line, and when it is
+  below the 8% line or more than 5 points behind (against VT's last final
+  close) the race adds a separate warning marked mid-day that does not trip
+  (d); the day is judged at its close. (d) is in `logs/race_gate.json`
+  under `watch.d` (the mid-day reading as `midday` and `midday_warning`),
+  and when that says it tripped the daily health check raises a warning
+  that the brief sends to the owner's phone; a mid-day warning raises
+  none. A trip means stop and tell the owner; nothing reverts or trades,
   and nothing that decides the race reads it. A run with more than 20% of
   its calls failed, of either kind, pages the owner's phone the same day.
 - It also prints what the model calls cost over the window, and warns if any
@@ -110,10 +116,14 @@ late-run days: 8 of 8; lines before the open: 0; after the close: 0
 - **Where the timing comes from.** From the first heartbeat cycle after the
   change that added it (28 Sep 2026 at the earliest; 25 Sep's cycle ran the
   code before it), every journal line the heartbeat's cycle step writes
-  carries a run block (`run`: what started it — `schedule`, `backup` or
-  `manual`, where `manual` is any dispatch, a person's or a Claude
-  Routine's — the scheduled start, when the cycle step started, minutes
-  late, and the GitHub run id), and a day that has one is read from it.
+  carries a run block (`run`: what started it — `schedule`, `scheduler`,
+  `backup` or `manual`, where `manual` is any dispatch, a person's or a
+  Claude Routine's, and `scheduler` the Supabase starter — the scheduled
+  start, when the cycle step started, minutes late, and the GitHub run id;
+  from 26 Sep 2026 also `source`, the starter that asked for the run), and
+  a day that has one is read from it. The row ends `via <source>` when the
+  block names one: `supabase-cron` is the main starter, anything else a
+  backup.
   Earlier days are inferred: the first line against the heartbeat's cron
   history, written down as `SCHEDULE_HISTORY` in `analysis/run_timing.py`
   (13:05 UTC on 14 Sep, 15:05 on 15–18 Sep, 12:35 from 21 Sep until the
