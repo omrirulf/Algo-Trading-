@@ -28,6 +28,7 @@ places.
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Iterable, Optional, Sequence
@@ -45,6 +46,18 @@ REQUEST_TIMEOUT_SECONDS = 30.0
 
 SIGNALS = "signals"
 EXECUTIONS = "executions"
+#: The paper account as each run read it, and the fills in those readings.
+ACCOUNT_SNAPSHOTS = "account_snapshots"
+ACCOUNT_FILLS = "account_fills"
+#: One row per model call ask; the bodies live in the Storage bucket below.
+MODEL_CALLS = "model_calls"
+#: One row per model-io object in Storage: its path, size and hash.
+MODEL_IO_FILES = "model_io_files"
+#: The daily prices the race and the funds scored with, and each night's set.
+SCORING_PRICES = "scoring_prices"
+SCORING_RUNS = "scoring_runs"
+#: The private Storage bucket that holds the model calls' full bodies.
+MODEL_IO_BUCKET = "model-io"
 
 
 def _is_legacy_jwt(key: str) -> bool:
@@ -230,20 +243,24 @@ class RemoteArchive:
 
     # -- writes ------------------------------------------------------------ #
 
-    def push(self, table: str, rows: Sequence[dict[str, Any]]) -> PushResult:
+    def push(self, table: str, rows: Sequence[dict[str, Any]], key: str = "line_hash") -> PushResult:
         """Insert rows the remote does not already have.
 
         Counts come from what the remote echoes back, not from what was sent:
         with ``resolution=ignore-duplicates`` the response carries exactly the
         rows that were actually written, so "pushed" means stored rather than
         attempted.
+
+        ``key`` is the table's primary key, which is what a re-send collides
+        on: the content hash for the two logs and the account snapshots, the
+        call id for model calls, the object path for a Storage file's row.
         """
         result = PushResult(table=table)
         for batch in _batched(rows, BATCH_SIZE):
             response = self._request(
                 "POST",
                 table,
-                params={"on_conflict": "line_hash", "select": "line_hash"},
+                params={"on_conflict": key, "select": key},
                 headers={
                     "Content-Type": "application/json",
                     # ignore-duplicates is the idempotence; representation is
@@ -258,6 +275,36 @@ class RemoteArchive:
             result.already_present += len(batch) - inserted
         return result
 
+    def upload_object(self, bucket: str, path: str, data: bytes, content_type: str) -> bool:
+        """Store ``data`` at ``bucket/path`` in Supabase Storage; False if it is already there.
+
+        Never overwrites (``x-upsert: false``): an object is written once, and
+        a re-send of the same path is answered "already exists", which is
+        the idempotence -- the caller names each object after its run, so
+        the same path is the same content. Through this class, and so
+        through ``auth_headers``, for the same reason as every other request:
+        the key has one reader and travels on the ``apikey`` header only.
+
+        Whether Storage accepts the new secret key on ``apikey`` alone is
+        what Supabase documents for the new keys (the gateway turns the key
+        into the role the service sees) but was not measured here; the first
+        push after the key is set is the measurement (docs/database.mdx).
+        """
+        if not _SAFE_OBJECT.fullmatch(bucket) or not all(
+            _SAFE_OBJECT.fullmatch(part) for part in path.split("/")
+        ):
+            raise RemoteArchiveError(f"refusing an unsafe Storage path: {bucket}/{path}")
+        try:
+            self._send(
+                "POST", f"storage/v1/object/{bucket}/{path}", label=f"storage {bucket}",
+                headers={"Content-Type": content_type, "x-upsert": "false"}, content=data,
+            )
+        except RemoteArchiveError as exc:
+            if _already_stored(exc):
+                return False
+            raise
+        return True
+
     # -- plumbing ---------------------------------------------------------- #
 
     def _request(
@@ -268,28 +315,42 @@ class RemoteArchive:
         headers: dict[str, str] | None = None,
         json: Any = None,
     ) -> httpx.Response:
-        url = f"{self._url}/rest/v1/{table}"
+        return self._send(method, f"rest/v1/{table}", label=table, params=params,
+                          headers=headers, json=json)
+
+    def _send(
+        self,
+        method: str,
+        path: str,
+        label: str,
+        params: dict[str, str] | None = None,
+        headers: dict[str, str] | None = None,
+        json: Any = None,
+        content: bytes | None = None,
+    ) -> httpx.Response:
+        url = f"{self._url}/{path}"
         # The new secret key goes on ``apikey`` only; see auth_headers.
         merged = {**auth_headers(self._key), **(headers or {})}
+        body = {"json": json} if content is None else {"content": content}
         try:
             if self._client is not None:
                 response = self._client.request(
-                    method, url, params=params, headers=merged, json=json
+                    method, url, params=params, headers=merged, **body
                 )
             else:
                 with httpx.Client(timeout=REQUEST_TIMEOUT_SECONDS) as client:
                     response = client.request(
-                        method, url, params=params, headers=merged, json=json
+                        method, url, params=params, headers=merged, **body
                     )
         except httpx.HTTPError as exc:
-            raise RemoteArchiveError(f"{method} {table} failed: {exc}") from exc
+            raise RemoteArchiveError(f"{method} {label} failed: {exc}") from exc
 
         if response.status_code >= 400:
             # The body carries PostgREST's actual complaint (a missing table, a
             # type mismatch). The status alone has sent people to the wrong
             # problem often enough to be worth the extra 300 characters.
             raise RemoteArchiveError(
-                f"{method} {table} returned HTTP {response.status_code}: "
+                f"{method} {label} returned HTTP {response.status_code}: "
                 f"{response.text[:300]}",
                 status=response.status_code,
             )
@@ -329,6 +390,25 @@ def describe_failure(exc: RemoteArchiveError) -> str:
     if not isinstance(status, int) or status in (502, 503, 504) or status >= 520:
         return UNREACHABLE
     return f"HTTP {status}"
+
+
+#: A bucket name or one segment of an object path: letters, digits, dot,
+#: dash, underscore. Nothing that could climb out of the bucket or need
+#: escaping in a URL.
+_SAFE_OBJECT = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
+
+
+def _already_stored(exc: RemoteArchiveError) -> bool:
+    """Whether Storage refused an upload because the object is already there.
+
+    Storage answers a duplicate with 409, or -- in the versions that wrap
+    their errors -- with 400 and ``"statusCode": "409"`` / ``"Duplicate"``
+    in the body. Either is the idempotence working, not a failure.
+    """
+    if exc.status == 409:
+        return True
+    text = str(exc)
+    return exc.status == 400 and ('"409"' in text or "Duplicate" in text or "already exists" in text)
 
 
 def _batched(rows: Sequence[dict[str, Any]], size: int) -> Iterable[Sequence[dict]]:
@@ -396,9 +476,16 @@ def _moment(value: str) -> Optional[datetime]:
 
 
 __all__ = [
+    "ACCOUNT_FILLS",
+    "ACCOUNT_SNAPSHOTS",
     "BATCH_SIZE",
     "EXECUTIONS",
+    "MODEL_CALLS",
+    "MODEL_IO_BUCKET",
+    "MODEL_IO_FILES",
     "NOT_CONFIGURED",
+    "SCORING_PRICES",
+    "SCORING_RUNS",
     "SIGNALS",
     "UNREACHABLE",
     "PushResult",

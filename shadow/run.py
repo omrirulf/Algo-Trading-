@@ -3,6 +3,7 @@
 
     python -m shadow.run                      # the nightly job: JSON to stdout
     python -m shadow.run --processes 4        # the coin-flip funds on 4 cores
+    python -m shadow.run --with-prices        # + prices_sha256, and the price table as a last line
 
 Prints one JSON document (the "funds" contract in ``dashboard/funds.html``).
 What it contains depends on ``shadow/schedule.py`` and nothing else:
@@ -36,6 +37,7 @@ from typing import Final, Iterable, Optional, Sequence
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from analysis import price_tape  # noqa: E402
 from analysis.baseline_compare import OhlcFetcher  # noqa: E402
 from analysis.reader import JournalEntry, read_journal  # noqa: E402
 from analysis.returns import last_final_session  # noqa: E402
@@ -366,7 +368,9 @@ def run_funds(
     }, {"four": check, "coin": coin_check}
 
 
-def build(args: argparse.Namespace, now: datetime) -> dict:
+def build(args: argparse.Namespace, now: datetime, fetchers: Optional[list] = None) -> dict:
+    """The funds document. ``fetchers``, when given, receives the price fetcher the run used,
+    so ``main`` can hand over its prices without a second fetch (``--with-prices``)."""
     from shadow import calibration as calib
 
     final_through = last_final_session(now)
@@ -375,6 +379,8 @@ def build(args: argparse.Namespace, now: datetime) -> dict:
     snapshots = calib.load_snapshots(_read_lines(args.account))
     shortable_no = not_shortable(audit_lines)
     fetcher = OhlcFetcher(final_through=final_through)
+    if fetchers is not None:
+        fetchers.append(fetcher)
     holding = calib.holding_days(audit_lines, read.entries, snapshots)
 
     calibration_start = schedule.CALIBRATION_START
@@ -425,6 +431,9 @@ def build_parser() -> argparse.ArgumentParser:
                         help="coin-flip funds for the band (default: %(default)s)")
     parser.add_argument("--processes", type=int, default=1,
                         help="cores for the coin-flip funds (default: %(default)s)")
+    parser.add_argument("--with-prices", action="store_true",
+                        help="also hand over the daily prices this run used: their SHA-256 as "
+                             "prices_sha256, and the table itself as one JSON line printed last")
     parser.add_argument("-v", "--verbose", action="store_true")
     return parser
 
@@ -433,9 +442,21 @@ def main(argv: Optional[list[str]] = None) -> int:
     args = build_parser().parse_args(argv)
     logging.basicConfig(level=logging.INFO if args.verbose else logging.ERROR,
                         format="%(levelname)s %(name)s: %(message)s")
+    now = _now()
+    used: list = []
+    out = build(args, now, used)
+    tape = None
+    if args.with_prices:
+        # What the fetcher cached once everything above had run: the bars the
+        # funds were priced with. A new last key; every other key is as it was.
+        tape = price_tape.tape([("ohlc", fetcher) for fetcher in used], consumer="funds",
+                               final_through=out.get("final_through"), generated_at=now)
+        out["prices_sha256"] = tape["prices_sha256"]
     # allow_nan=False: NaN is not JSON, and a browser that cannot parse the
     # file would show nothing at all. A NaN here is a bug to fail on.
-    print(json.dumps(build(args, _now()), separators=(",", ":"), allow_nan=False))
+    print(json.dumps(out, separators=(",", ":"), allow_nan=False))
+    if tape is not None:
+        print(price_tape.dumps(tape))
     return 0
 
 

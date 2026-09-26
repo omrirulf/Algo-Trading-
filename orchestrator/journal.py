@@ -29,7 +29,7 @@ from orchestrator.fx import FxRate
 from orchestrator.pricing import Usage
 from config import journal_files
 from config import settings as cfg
-from orchestrator import arms, llm
+from orchestrator import arms, llm, model_io
 from orchestrator.context import TickerContext
 
 log = logging.getLogger(__name__)
@@ -197,6 +197,20 @@ def _cycle_fields(live: Optional[dict[str, Any]]) -> dict[str, Any]:
     return fields
 
 
+def _calls_field(ticker: str) -> dict[str, Any]:
+    """``{"model_calls": [...]}`` for ``ticker``'s calls since its last line, else nothing.
+
+    A batched call is labelled with its custom id rather than the ticker
+    (``BRK.B`` is asked as ``BRK-B``), so both are taken.
+    """
+    try:
+        calls = model_io.take(ticker, llm.batch_custom_id(ticker))
+    except Exception:  # noqa: BLE001 - a line without its call ids, never no line
+        log.exception("could not read the model calls for %s", ticker)
+        return {}
+    return {"model_calls": calls} if calls else {}
+
+
 class MonthlyFileHandler(logging.FileHandler):
     """Append each line to its UTC month's file in the journal directory.
 
@@ -347,6 +361,13 @@ def record(
                 # rather than null outside a cycle, so a line written without
                 # them keeps exactly the keys, in exactly the order, it had.
                 **_cycle_fields(live),
+                # Every model call made for this line: its id in the capture
+                # (orchestrator/model_io.py) and the SHA-256 of the request
+                # body sent and of the response body received. The bodies
+                # are too large to commit; these make any copy of them
+                # checkable from git alone. Absent when no call was
+                # recorded, for the same reason as the fields above.
+                **_calls_field(context.ticker),
                 # What started this run and how late it was (see run_block).
                 # Last, and absent rather than null when unset, so a line
                 # written without it keeps exactly the keys, in exactly the

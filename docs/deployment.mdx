@@ -295,6 +295,22 @@ that never fails the run. A push that fails pages the phone the same day
 paused; restore it" when it did not answer), and "not configured" is a
 warning in the brief every day until the secrets are there.
 
+**What the push carries since 26 Sep 2026.** Besides the journal and the audit
+log (ladder lines included), the account snapshots and their fills, and every
+model call the run made: a row per ask, and the full request and response
+bodies to the private Storage bucket `model-io`. The run keeps those bodies
+as the 90-day artifact `model-io-<run id>-<attempt>` first ("Keep the day's
+model calls as an artifact"), so a failed upload is retried with
+`archive-push.yml` and its `model_io_run` input. The scoring prices come the
+other way round: `horse-race.yml` and `funds.yml` hold no secret and hand
+their price tables over as the artifact `scoring-prices`, and
+`scoring-prices.yml` (Supabase secrets and the phone topic only) pushes them
+after each scheduled run on `main`. Before the first push that carries any of
+this, run `supabase/2026-09-26_archive_capture.sql` once in the SQL editor,
+then the two `vacuum full` lines it names on their own; until then the new
+tables answer 404 and the push says so (the phone message names the file).
+See [Database](/database#what-else-it-keeps).
+
 ## If GitHub skips or delays the run
 
 GitHub's cron has been much worse here than "a few minutes late". In the week

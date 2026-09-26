@@ -3,6 +3,11 @@
     python analysis/horse_race.py
     python analysis/horse_race.py --horizon 5 --floor 0.5 --cost-per-side 0.0015
     python analysis/horse_race.py --per-trade
+    python analysis/horse_race.py --gate-json --with-prices   # + the prices it scored with
+
+``--with-prices`` changes no number: it adds ``prices_sha256`` to the output
+and prints the price table it hashes as one last JSON line, which the
+workflow splits off into an artifact (``analysis/price_tape.py``).
 
 Arm A is the model: whatever the journal says it said. Arm B is the coded
 thesis in ``rules/momentum.py``, recomputed here from the technicals every
@@ -102,7 +107,7 @@ from zoneinfo import ZoneInfo
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from analysis import decision_gate as gate  # noqa: E402
-from analysis import run_timing  # noqa: E402
+from analysis import price_tape, run_timing  # noqa: E402
 from analysis.call_errors import MODEL as MODEL_ERROR  # noqa: E402
 from analysis.call_errors import SETUP as SETUP_ERROR  # noqa: E402
 from analysis.baseline_compare import (  # noqa: E402
@@ -234,6 +239,10 @@ def build_parser() -> argparse.ArgumentParser:
                         help="the paper account's record, for trigger (d) only (default: %s)" % ACCOUNT_LOG)
     parser.add_argument("--gate-json", action="store_true",
                         help="print only the decision gate, as JSON (for the dashboard), and stop")
+    parser.add_argument("--with-prices", action="store_true",
+                        help="also hand over the daily prices this run scored with: their SHA-256 as "
+                             "prices_sha256 in the output, and the table itself as one JSON line "
+                             "printed last (analysis/price_tape.py)")
     parser.add_argument("-v", "--verbose", action="store_true", help="log fetch failures")
     return parser
 
@@ -1368,8 +1377,18 @@ def main(argv: list[str] | None = None) -> int:
                 basket.closes(gate.INDEX_TICKER, min(earliest, gate.DRAWDOWN_START), today).bars}
     account = account_watch(read_account(args.account or ACCOUNT_LOG), vt_close)
     if args.gate_json:
-        print(json.dumps(gate_json(view, args.horizon, now, splits=splits, timings=timings,
-                                   account=account)))
+        out = gate_json(view, args.horizon, now, splits=splits, timings=timings, account=account)
+        tape = None
+        if args.with_prices:
+            # Read from the sources after everything above has run, so it is
+            # what the gate was computed from, and added as a new last key,
+            # so every other key is what it was without the flag.
+            tape = price_tape.tape((("closes", source), ("ohlc", fetcher), ("basket", basket)),
+                                   consumer="race-gate", final_through=final_through, generated_at=now)
+            out["prices_sha256"] = tape["prices_sha256"]
+        print(json.dumps(out))
+        if tape is not None:
+            print(price_tape.dumps(tape))
         return 0
 
     # The owner's model-watch triggers, and what the calls cost. Trigger (b)
@@ -1411,6 +1430,14 @@ def main(argv: list[str] | None = None) -> int:
         spend=llm_spend(in_window), spend_whole=llm_spend(read.entries),
         warnings=window_warnings(read.entries), splits=splits, timings=timings,
     ))
+    if args.with_prices:
+        tape = price_tape.tape(
+            (("closes", source), ("ohlc", fetcher), ("basket", basket),
+             ("closes_long", long_source), ("ohlc_long", long_fetcher)),
+            consumer="race-report", final_through=final_through, generated_at=now,
+        )
+        print(f"prices_sha256: {tape['prices_sha256']}")
+        print(price_tape.dumps(tape))
     return 0
 
 

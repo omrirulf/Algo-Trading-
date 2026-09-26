@@ -24,6 +24,7 @@ from typing import Any, Optional, Protocol
 import anthropic
 import httpx
 
+from orchestrator import model_io
 from orchestrator.pricing import Usage, usage_from_response
 
 log = logging.getLogger(__name__)
@@ -303,6 +304,59 @@ def _extract_text(response: Any) -> str:
     raise LLMError(f"no text block in response (stop_reason: {stop_reason})")
 
 
+def _hostname(url: Any) -> Optional[str]:
+    """The host part of ``url``, never its path, query or credentials; None if there is none."""
+    try:
+        return httpx.URL(str(url)).host or None
+    except Exception:  # noqa: BLE001 - a label for the record, not worth a failed call
+        return None
+
+
+def _dump(response: Any) -> Optional[str]:
+    """An SDK response as JSON text, for the call record: every block, thinking included.
+
+    The Anthropic SDK hands back a parsed object rather than the bytes, so
+    this is that object re-serialised -- the same content, not the same
+    bytes. (The OpenAI-compatible path keeps the body exactly as received.)
+    """
+    try:
+        dump = getattr(response, "model_dump_json", None)
+        if callable(dump):
+            return dump()
+        return json.dumps(response, default=lambda o: getattr(o, "__dict__", repr(o)), sort_keys=True)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _usage_dict(response: Any) -> Optional[dict]:
+    """The usage block of an SDK response as plain numbers, or None."""
+    usage = getattr(response, "usage", None)
+    try:
+        dumped = usage.model_dump() if hasattr(usage, "model_dump") else dict(vars(usage))
+    except Exception:  # noqa: BLE001
+        return None
+    return {k: v for k, v in dumped.items() if isinstance(v, (int, float)) and not isinstance(v, bool)} or None
+
+
+def _error_outcome(exc: BaseException) -> str:
+    """``timeout`` / ``transport_error`` / ``http_error``, for the call record."""
+    if isinstance(exc, (anthropic.APITimeoutError, httpx.TimeoutException)):
+        return "timeout"
+    if isinstance(exc, (anthropic.APIConnectionError, httpx.TransportError)):
+        return "transport_error"
+    return "http_error"
+
+
+def _error_body(exc: BaseException) -> Optional[str]:
+    """What the server said when it refused, if it said anything. Never raises."""
+    try:
+        response = getattr(exc, "response", None)
+        text = response.text if response is not None else None
+        return text if isinstance(text, str) and text else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
 #: What the Batches API accepts as a ``custom_id``. Anything else is rejected
 #: for the whole batch with a 400 -- after the prompts were built, the news
 #: fetched and the OHLC pulled, which is the expensive end of a replay to
@@ -484,20 +538,33 @@ class AnthropicSignalProvider:
         ids = [r.custom_id for r in prompts]
         if len(set(ids)) != len(ids):
             raise LLMError("batch custom_ids must be unique")
+        requests = [{"custom_id": r.custom_id, "params": self._batch_params(r)} for r in prompts]
+        # One record per request in the batch, finished with the batch id once
+        # there is one: the prompt half of each call. Its answer is recorded
+        # when the batch is collected (``collect_batch``), under the same
+        # custom id, so the journal line carries both.
+        asks = [
+            model_io.begin("anthropic-batch", req["params"].get("model"), req["params"],
+                           label=req["custom_id"], kind="batch request", host=self._host(),
+                           custom_id=req["custom_id"], known=self._known())
+            for req in requests
+        ]
         try:
-            batch = self._client.messages.batches.create(
-                requests=[
-                    {"custom_id": r.custom_id, "params": self._batch_params(r)}
-                    for r in prompts
-                ]
-            )
+            batch = self._client.messages.batches.create(requests=requests)
         except TypeError as exc:
+            for ask in asks:
+                model_io.finish_attempt(ask, outcome="error", error=type(exc).__name__)
             raise LLMError(
                 f"No Claude credentials found: set ANTHROPIC_API_KEY, or run "
                 f"`ant auth login` ({exc})"
             ) from exc
         except anthropic.APIError as exc:
+            for ask in asks:
+                model_io.finish_attempt(ask, outcome="error", status=getattr(exc, "status_code", None),
+                                        error=type(exc).__name__)
             raise LLMError(f"batch submission failed: {exc}") from exc
+        for ask in asks:
+            model_io.finish_attempt(ask, outcome="submitted", batch_id=getattr(batch, "id", None))
         return batch.id
 
     def collect_batch(
@@ -533,20 +600,37 @@ class AnthropicSignalProvider:
         out: dict[str, Completion | LLMError] = {}
         for item in self._client.messages.batches.results(batch_id):
             kind = item.result.type
+            # The answer half of the call ``submit_batch`` recorded the prompt
+            # of. No request body here: the batch holds it, not this process.
+            ask = model_io.begin("anthropic-batch", model or ANTHROPIC_MODEL, None,
+                                 label=item.custom_id, kind="batch result", host=self._host(),
+                                 batch_id=batch_id, custom_id=item.custom_id, known=self._known())
             if kind == "succeeded":
                 message = item.result.message
-                text = _extract_text(message)
+                try:
+                    text = _extract_text(message)
+                except LLMError as exc:
+                    model_io.finish_attempt(ask, outcome="unusable", response=_dump(message),
+                                            usage=_usage_dict(message), error=str(exc)[:300])
+                    raise
                 try:
                     json.loads(text)
                 except json.JSONDecodeError as exc:
+                    model_io.finish_attempt(ask, outcome="off_schema", response=_dump(message),
+                                            usage=_usage_dict(message), error="not JSON")
                     out[item.custom_id] = LLMError(f"model returned non-JSON output: {exc}")
                     continue
+                model_io.finish_attempt(ask, outcome="answer", response=_dump(message),
+                                        usage=_usage_dict(message))
                 out[item.custom_id] = Completion(
                     text=text, usage=usage_from_response(message, model or ANTHROPIC_MODEL)
                 )
             elif kind == "errored":
+                model_io.finish_attempt(ask, outcome="error", response=_dump(item.result),
+                                        error="batch item errored")
                 out[item.custom_id] = LLMError(f"batch item errored: {item.result.error}")
             else:
+                model_io.finish_attempt(ask, outcome=str(kind))
                 out[item.custom_id] = LLMError(f"batch item {kind}")
         return out
 
@@ -593,9 +677,16 @@ class AnthropicSignalProvider:
         if reasoning:
             kwargs["thinking"] = {"type": "adaptive"}
             output_config["effort"] = effort or EFFORT
+        # The body as ``_create`` sends it: the refusal fallback is a body
+        # field while it is on (its beta name is a header, and not recorded).
+        # The SDK's own retries happen inside the one call and are not seen.
+        sent = dict(kwargs, fallbacks=FALLBACK_MODE) if self._use_fallback else kwargs
+        ask = model_io.begin("anthropic", kwargs["model"], sent, label=getattr(_CALL, "label", None),
+                             host=self._host(), known=self._known())
         try:
             response = self._create(**kwargs)
         except TypeError as exc:
+            model_io.finish_attempt(ask, outcome="error", error=type(exc).__name__)
             # Not an APIError: the SDK raises a bare TypeError, before
             # opening any connection, when it cannot resolve a credential
             # from any source at all. Still a same-cycle, no-network
@@ -605,14 +696,39 @@ class AnthropicSignalProvider:
                 f"`ant auth login` ({exc})"
             ) from exc
         except anthropic.APIError as exc:
+            model_io.finish_attempt(ask, outcome=_error_outcome(exc),
+                                    status=getattr(exc, "status_code", None),
+                                    response=_error_body(exc), error=type(exc).__name__)
             raise LLMError(f"Claude API call failed: {exc}") from exc
 
-        text = _extract_text(response)
+        try:
+            text = _extract_text(response)
+        except LLMError as exc:
+            model_io.finish_attempt(ask, outcome="unusable", status=200, response=_dump(response),
+                                    usage=_usage_dict(response), error=str(exc)[:300])
+            raise
         try:
             json.loads(text)
         except json.JSONDecodeError as exc:
+            model_io.finish_attempt(ask, outcome="off_schema", status=200, response=_dump(response),
+                                    usage=_usage_dict(response), error="not JSON")
             raise LLMError(f"model returned non-JSON output: {exc}") from exc
+        model_io.finish_attempt(ask, outcome="answer", status=200, response=_dump(response),
+                                usage=_usage_dict(response))
         return Completion(text=text, usage=usage_from_response(response, model or ANTHROPIC_MODEL))
+
+    def _host(self) -> Optional[str]:
+        """The API host this client talks to, for the call record. Never raises."""
+        return _hostname(getattr(self._client, "base_url", None)) or "api.anthropic.com"
+
+    def _known(self) -> tuple[Optional[str], ...]:
+        """The key the client holds, for the capture to keep out of its records.
+
+        Compared there, never stored. ``getattr`` because a test's fake
+        client has no key at all.
+        """
+        value = getattr(self._client, "api_key", None)
+        return (value,) if isinstance(value, str) else ()
 
 
 #: What ``reasoning=False`` becomes on a chat-completions endpoint, since that
@@ -799,6 +915,19 @@ class OpenAICompatibleProvider:
         return seconds
 
     def _post(self, body: dict) -> dict:
+        """The answer's JSON, for a caller that judges nothing about it.
+
+        ``complete_detailed`` uses ``_post_recorded`` instead, so the call
+        record can say whether the answer was usable.
+        """
+        payload, ask, raw = self._post_recorded(body)
+        model_io.finish_attempt(ask, outcome="answer", status=200, response=raw,
+                                usage=_plain_usage(payload))
+        return payload
+
+    def _post_recorded(
+        self, body: dict, first: str = "first"
+    ) -> "tuple[dict, Optional[model_io.Attempt], Optional[str]]":
         """One answer, retrying the statuses that mean 'ask me again'.
 
         As the *screening* stage a refused call was survivable: the funnel
@@ -822,7 +951,7 @@ class OpenAICompatibleProvider:
         # after two asks -- a timeout and its one retry -- read "gave up after
         # 4 attempt(s)". The count now says what was done.
         asks = 0
-        kind = "first"
+        kind = first
         # Local, never self._timeout: a provider is reused across tickers,
         # and one slow call must not quietly shorten every call after it.
         timeout = self._timeout
@@ -833,6 +962,12 @@ class OpenAICompatibleProvider:
             asks += 1
             started = datetime.now(timezone.utc)
             clock = time.monotonic()
+            # The body and nothing else: ``headers`` above, which carries
+            # the key, is never handed to the capture. The key itself is,
+            # as a value the record must not contain (orchestrator/model_io.py).
+            ask = model_io.begin("openai-compatible", body.get("model"), body,
+                                 label=getattr(_CALL, "label", None), attempt=asks, kind=kind,
+                                 host=_hostname(self._url), known=(self._api_key,))
             try:
                 if self._client is None:
                     with new_http_client(timeout) as client:
@@ -842,6 +977,10 @@ class OpenAICompatibleProvider:
             except httpx.HTTPError as exc:
                 _log_call(asks, kind, started, time.monotonic() - clock,
                           f"{type(exc).__name__} after a {timeout:.0f}s limit", None)
+                model_io.finish_attempt(
+                    ask, outcome="timeout" if isinstance(exc, httpx.TimeoutException) else "transport_error",
+                    error=f"{type(exc).__name__} after a {timeout:.0f}s limit",
+                )
                 # Retried once, and only once, since 23 Sep 2026. It was not
                 # retried at all before that, on an argument that the first
                 # production cycle disproved: the worst case was taken to be
@@ -874,13 +1013,19 @@ class OpenAICompatibleProvider:
                     payload = response.json()
                 except ValueError as exc:
                     _log_call(asks, kind, started, seconds, "HTTP 200, body not JSON", None)
+                    model_io.finish_attempt(ask, outcome="not_json", status=200, response=_body_text(response),
+                                            error="body not JSON")
                     raise LLMError(f"{self._url} returned a non-JSON body: {exc}") from exc
                 usage = payload.get("usage") if isinstance(payload, dict) else None
                 tokens = usage.get("completion_tokens") if isinstance(usage, dict) else None
                 _log_call(asks, kind, started, seconds, "HTTP 200",
                           tokens if isinstance(tokens, int) else None)
-                return payload
+                # Left open: whether this answer was usable is decided by the
+                # caller, and the record should say so.
+                return payload, ask, _body_text(response)
             _log_call(asks, kind, started, seconds, f"HTTP {response.status_code}", None)
+            model_io.finish_attempt(ask, outcome="http_error", status=response.status_code,
+                                    response=_body_text(response), error=f"HTTP {response.status_code}")
             last = f"{self._url} returned HTTP {response.status_code}: {response.text[:300]}"
             if response.status_code not in RETRY_STATUSES:
                 break              # 400, 401, 404: asking again changes nothing
@@ -996,10 +1141,13 @@ class OpenAICompatibleProvider:
         name = model or self._model
         body = self._body(system_prompt, user_prompt, json_schema, name, effort, reasoning)
         for attempt in range(self._schema_attempts):
-            payload = self._post(body)
+            kind = "first" if not attempt else "re-ask after an off-schema answer"
+            payload, ask, raw = self._post_recorded(body, kind)
             try:
-                return self._answer(payload, name)
-            except LLMError:
+                completion = self._answer(payload, name)
+            except LLMError as exc:
+                model_io.finish_attempt(ask, outcome="off_schema", status=200, response=raw,
+                                        usage=_plain_usage(payload), error=str(exc)[:300])
                 if attempt == self._schema_attempts - 1:
                     raise
                 log.warning(
@@ -1007,4 +1155,23 @@ class OpenAICompatibleProvider:
                     name,
                 )
                 body = self._insist(body)
+                continue
+            model_io.finish_attempt(ask, outcome="answer", status=200, response=raw,
+                                    usage=_plain_usage(payload))
+            return completion
         raise LLMError("unreachable")   # pragma: no cover - the loop always returns or raises
+
+
+def _body_text(response: Any) -> Optional[str]:
+    """A response body as received, for the call record. Never raises."""
+    try:
+        text = response.text
+    except Exception:  # noqa: BLE001
+        return None
+    return text if isinstance(text, str) else None
+
+
+def _plain_usage(payload: Any) -> Optional[dict]:
+    """The usage block of a chat-completions answer, as it came, or None."""
+    usage = payload.get("usage") if isinstance(payload, dict) else None
+    return usage if isinstance(usage, dict) else None

@@ -541,6 +541,19 @@ FUND_SIZE_LOG_PATH: Final[Path] = LOG_DIR / "fund_size.log"
 #: that changes every cycle would bloat the repository for nothing.
 DATABASE_PATH: Final[Path] = LOG_DIR / "trading.db"
 
+#: Every model call a heartbeat cycle makes, in full: the request body as
+#: sent and the response body as received, reasoning text included, one JSON
+#: line per ask (``orchestrator/model_io.py``). One file per run, under
+#: ``YYYY/MM/YYYY-MM-DD/``.
+#:
+#: NOT committed (gitignored): it is about ten times the journal's size, and
+#: git size is already the problem. The heartbeat keeps it as a 90-day
+#: workflow artifact and uploads it to the archive's private Storage bucket
+#: (``store/push_remote.py --model-io``); the journal line carries each
+#: call's id and the SHA-256 of both bodies, so git alone can check any
+#: copy of it.
+MODEL_IO_DIR: Final[Path] = LOG_DIR / "model_io"
+
 # --------------------------------------------------------------------------- #
 # Learned blend of the dimension scores
 # --------------------------------------------------------------------------- #

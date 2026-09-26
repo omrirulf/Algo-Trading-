@@ -276,8 +276,10 @@ def test_scheduler_mode_reads_prices_on_every_cycle(monkeypatch):
     monkeypatch.setattr(hb, "BlockingScheduler", Scheduler)
     monkeypatch.setattr(hb, "run_cycle", lambda *a, **k: calls.append(k))
     hb.main([])
-    assert calls == [{"prices": lp.for_dispatcher}]
-    assert jobs[0]["kwargs"] == {"prices": lp.for_dispatcher}
+    # Every cycle also records its model calls (orchestrator/model_io.py).
+    expected = {"prices": lp.for_dispatcher, "model_io_dir": hb.cfg.MODEL_IO_DIR}
+    assert calls == [expected]
+    assert jobs[0]["kwargs"] == expected
 
 
 def test_a_cycle_started_anywhere_else_asks_nobody_for_a_price(cycle, _journal_to_tmp):

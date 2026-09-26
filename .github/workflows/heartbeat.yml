@@ -930,6 +930,25 @@ jobs:
             *)  echo "::warning::phone not notified (HTTP $code)";;
           esac
 
+      - name: Keep the day's model calls as an artifact
+        # Every model call the cycle made, in full -- request body, response
+        # body, reasoning text (orchestrator/model_io.py, logs/model_io/).
+        # Never committed: it is about ten times the journal's size. The push
+        # below copies it to the archive's private Storage bucket; this copy
+        # is what makes a failed upload retryable, for 90 days, with
+        # archive-push.yml's model_io_run input. Before the push, so a push
+        # that fails still leaves it behind. The journal line of every call
+        # carries the SHA-256 of both bodies, so this copy is checkable from
+        # git alone. Never fails the job.
+        if: always() && steps.guard.outputs.skip != 'yes' && inputs.mode != 'protect'
+        continue-on-error: true
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: model-io-${{ github.run_id }}-${{ github.run_attempt }}
+          path: logs/model_io/
+          retention-days: 90
+          if-no-files-found: ignore
+
       - name: Push the archive to Supabase
         # Deliberately AFTER the commit above, and `always()` for the same
         # reason it is: the lines a failed cycle wrote belong in the archive
@@ -962,6 +981,16 @@ jobs:
         # record and tell the phone the same day a push fails; the brief
         # warns every day it is not configured. The step itself still fails
         # loudly on a failed push, as before.
+        #
+        # Since 26 Sep (later the same day) it also sends the account
+        # snapshots and their fills (logs/account.jsonl), the audit log's
+        # ladder lines, and every model call this run made: a row per call,
+        # and the full bodies to the private Storage bucket model-io (the
+        # push's --model-io defaults to logs/model_io). A call record that
+        # looks like it holds a credential is withheld whole and counted in
+        # the record ("withheld"). A failed Storage upload fails this step
+        # like any other failed push, so the phone hears about it the same
+        # day; the artifact above is the copy to retry from.
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
@@ -1020,6 +1049,10 @@ jobs:
                                                "(Supabase dashboard, project algo-trading-archive, Restore). "
                                                "The Supabase starter lives there too.",
               "HTTP 401": "Supabase refused the key: check the SUPABASE_SERVICE_KEY secret.",
+              "HTTP 404": "A table or the model-io bucket is missing: apply "
+                          "supabase/2026-09-26_archive_capture.sql in the SQL editor.",
+              "HTTP 403": "Supabase refused the request: if only the model-io upload failed, "
+                          "Storage did not accept the secret key (see docs/database.mdx).",
           }.get(reason, "Open the run to see the push step's log.")
           last = status.get("last_success")
           since = (f"The last push that worked was on {last[:10]}." if isinstance(last, str) and last

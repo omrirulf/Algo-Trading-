@@ -1,0 +1,119 @@
+name: scoring-prices
+
+# Copy the nightly scoring prices into the Supabase archive.
+#
+# The horse race (horse-race.yml) and the shadow funds (funds.yml) score
+# every night against daily prices fetched from yfinance, and those prices
+# are not the record's to keep: a vendor revises a bar or drops a row, and a
+# result that cannot be re-scored on the prices it was scored on cannot be
+# checked. Both runs now hand over the exact table they used, as the
+# artifact "scoring-prices" (analysis/price_tape.py), and the funds run
+# commits its SHA-256 (prices_sha256) in logs/funds.json and
+# logs/race_gate.json. This workflow is the other half: it downloads the
+# table from the run that just finished and pushes it
+# (store/push_remote.py --only prices, store/scoring_prices.py), which
+# refuses a table that does not hash to its own prices_sha256.
+#
+# Why a separate workflow: the race and the funds hold no secret at all
+# (a CI guardrail checks that for both), so neither can reach the archive.
+# This one holds the archive's key and nothing else, and it trusts nothing
+# the table says beyond its shape and its hash.
+#
+# Only for runs of those two workflows on this repository's main branch
+# that were started by their schedule or by hand -- never for a pull
+# request's run, whose artifact anyone opening a pull request could shape.
+# Nothing in the race, the funds or the pre-registration reads the archive;
+# the git record stays the official one.
+on:
+  workflow_run:
+    workflows: ["horse race", "shadow funds"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "A horse race or shadow funds run whose scoring-prices artifact to push (90 days)"
+        required: true
+
+concurrency:
+  group: scoring-prices
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read   # only to download the finished run's artifact
+
+jobs:
+  push:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.head_repository.full_name == github.repository &&
+       (github.event.workflow_run.event == 'schedule' || github.event.workflow_run.event == 'workflow_dispatch'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SOURCE_RUN: ${{ github.event.workflow_run.id || inputs.run_id }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Download the run's price tables
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: scoring-prices
+          path: ${{ runner.temp }}/scoring-prices
+          run-id: ${{ env.SOURCE_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Push them to Supabase
+        id: push
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          case "$SOURCE_RUN" in (*[!0-9]*|'') echo "run id must be a number"; exit 2;; esac
+          set -- $(find "$RUNNER_TEMP/scoring-prices" -maxdepth 1 -name '*.json' | sort)
+          if [ "$#" = "0" ]; then
+            echo "no price table in the artifact; nothing to push"
+            exit 0
+          fi
+          ARGS=""
+          for table in "$@"; do ARGS="$ARGS --prices $table"; done
+          python store/push_remote.py --only prices --run-id "$SOURCE_RUN" $ARGS
+
+      - name: Tell the owner's phone the price copy failed
+        # The same day, like the archive push's own alert: fixed words and
+        # the run's link, never the remote's text. The topic goes in the
+        # JSON body, never a URL or a log.
+        if: failure()
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "${NTFY_TOPIC:-}" ]; then
+            echo "no phone configured (NTFY_TOPIC secret unset); nothing sent"
+            exit 0
+          fi
+          python - <<'EOF' > "$RUNNER_TEMP/phone.json"
+          import json, os
+          print(json.dumps({"topic": os.environ["NTFY_TOPIC"],
+                            "title": "⚠️ Scoring prices not archived",
+                            "message": ("Tonight's scoring prices could not be copied to the Supabase archive. "
+                                        "Nothing is lost: the table is the run's artifact for 90 days, and its "
+                                        "hash is in git. Run scoring-prices.yml with that run's id to retry."),
+                            "priority": 3, "tags": ["warning"], "click": os.environ["RUN_URL"]}))
+          EOF
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' \
+                 --data-binary @"$RUNNER_TEMP/phone.json" https://ntfy.sh/ || echo "000")
+          rm -f "$RUNNER_TEMP/phone.json"
+          case "$code" in
+            2*) echo "phone notified (HTTP $code)";;
+            *)  echo "::warning::phone not notified (HTTP $code)";;
+          esac

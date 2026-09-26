@@ -10,13 +10,28 @@ name: archive-push
 # rows are keyed on a content hash and a re-send is ignored -- so running this
 # at any time, as often as you like, changes nothing that is already there.
 #
+# It also re-sends a heartbeat run's model calls (model_io_run): every
+# heartbeat keeps its capture of the day's model calls as a 90-day artifact
+# ("Keep the day's model calls as an artifact"), and when that run's own
+# upload to Storage failed, this downloads the artifact and pushes it again.
+# Idempotent too: rows are keyed on the call id, and an object already in
+# the bucket is left as it is.
+#
 # It prints only the push's own summary and the short status record
-# (last_attempt, last_success, ok, and a reason such as "HTTP 401"), never the
-# key: store/remote.py sends it on the apikey header and nowhere else.
+# (last_attempt, last_success, ok, a reason such as "HTTP 401", and how many
+# model-call records were withheld as credential-shaped), never the key:
+# store/remote.py sends it on the apikey header and nowhere else.
 #
 # Writes nothing back to the repository, and holds no other credential.
 on:
   workflow_dispatch:
+    inputs:
+      model_io_run:
+        description: "A heartbeat run id whose model-call artifact to push again (blank: none)"
+        default: ""
+      model_io_attempt:
+        description: "That run's attempt number (the artifact is model-io-<run>-<attempt>)"
+        default: "1"
 
 concurrency:
   group: archive-push
@@ -24,6 +39,7 @@ concurrency:
 
 permissions:
   contents: read
+  actions: read   # only to download a heartbeat run's model-call artifact
 
 jobs:
   push:
@@ -38,6 +54,24 @@ jobs:
           cache: pip
 
       - run: pip install -r requirements.txt
+
+      - name: Check the run to re-send
+        if: inputs.model_io_run != ''
+        env:
+          RUN: ${{ inputs.model_io_run }}
+          ATTEMPT: ${{ inputs.model_io_attempt }}
+        run: |
+          case "$RUN" in (*[!0-9]*|'') echo "model_io_run must be a run id (digits)"; exit 2;; esac
+          case "$ATTEMPT" in (*[!0-9]*|'') echo "model_io_attempt must be a number"; exit 2;; esac
+
+      - name: Download that run's model calls
+        if: inputs.model_io_run != ''
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: model-io-${{ inputs.model_io_run }}-${{ inputs.model_io_attempt }}
+          path: logs/model_io
+          run-id: ${{ inputs.model_io_run }}
+          github-token: ${{ github.token }}
 
       - name: Push the archive to Supabase
         env:

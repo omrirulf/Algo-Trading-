@@ -813,6 +813,110 @@ jobs:
           print("OK: the trading cycle cannot reach the remote push")
           PY
 
+      - name: Nothing that scores or trades can read the archive
+        # The archive in Supabase is a backup and a place to search; the git
+        # record is the official one. So nothing that decides -- the race,
+        # the funds, the pre-registration's gate, the rule arms, the trainer,
+        # the replay harness, the cycle -- may be able to read it, or its
+        # answer could depend on something that is not in git. Three halves:
+        #
+        # 1. No module in analysis/, shadow/, rules/, learn/, replay/ or
+        #    orchestrator/ imports a store/ module that talks to Supabase
+        #    (the push, the key's one reader, the starter-log read, and the
+        #    packers for model calls and scoring prices). Walked by AST, so
+        #    `from store import remote` is caught as well as
+        #    `import store.remote`.
+        # 2. No module the race or the funds import, however deep, names a
+        #    file the archive's side writes (logs/starter_status.json,
+        #    logs/archive_status.json) or the model-call capture directory.
+        #    Worked out from the imports rather than listed, so a module
+        #    added to the race later is covered without anyone remembering.
+        #    (The daily brief and the health check read the two status files
+        #    to tell the owner how the archive is doing; neither is imported
+        #    by the race or the funds.)
+        # 3. The race and funds workflows hold no secret at all -- so no
+        #    Supabase key either. They hand their price tables over as an
+        #    artifact, and scoring-prices.yml, which holds the key, pushes
+        #    them (26 Sep 2026).
+        run: |
+          python3 - <<'PY'
+          import ast, pathlib, sys
+          ARCHIVE = ("store.remote", "store.push_remote", "store.starter_status",
+                     "store.model_calls", "store.scoring_prices")
+          PACKAGES = ("analysis", "shadow", "rules", "learn", "replay", "orchestrator")
+          ENTRIES = ("analysis.horse_race", "shadow.run", "shadow.smoke")
+          # A path in code (never prose: docstrings are skipped), or the
+          # capture directory's constant.
+          ARCHIVE_FILES = ("starter_status.json", "archive_status.json", "logs/model_io")
+          ARCHIVE_NAMES = ("MODEL_IO_DIR",)
+
+          def imported(tree):
+              for node in ast.walk(tree):
+                  if isinstance(node, ast.Import):
+                      for alias in node.names:
+                          yield node.lineno, alias.name
+                  elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                      yield node.lineno, node.module
+                      for alias in node.names:
+                          yield node.lineno, f"{node.module}.{alias.name}"
+
+          def archive_module(name):
+              return any(name == m or name.startswith(m + ".") for m in ARCHIVE)
+
+          bad = []
+          for package in PACKAGES:
+              for path in sorted(pathlib.Path(package).rglob("*.py")):
+                  for lineno, name in imported(ast.parse(path.read_text())):
+                      if archive_module(name):
+                          bad.append(f"{path}:{lineno}: imports {name}")
+          if bad:
+              print("\n".join(bad))
+              sys.exit("::error::a module that scores or trades imports the archive's side of store/")
+
+          def module_path(name):
+              for candidate in (pathlib.Path(*name.split(".")).with_suffix(".py"),
+                                pathlib.Path(*name.split(".")) / "__init__.py"):
+                  if candidate.exists():
+                      return candidate
+              return None
+
+          seen, todo = {}, list(ENTRIES)
+          while todo:
+              name = todo.pop()
+              path = module_path(name)
+              if name in seen or path is None:
+                  continue
+              seen[name] = path
+              todo.extend(n for _, n in imported(ast.parse(path.read_text())))
+          for name, path in sorted(seen.items()):
+              if archive_module(name):
+                  bad.append(f"{path}: the race or the funds import {name}")
+                  continue
+              if path.as_posix() == "config/settings.py":
+                  continue   # declares the paths; declaring is not reading
+              tree = ast.parse(path.read_text())
+              prose = {id(body[0].value) for body in
+                       (getattr(n, "body", None) for n in ast.walk(tree))
+                       if isinstance(body, list) and body and isinstance(body[0], ast.Expr)
+                       and isinstance(body[0].value, ast.Constant)}
+              for node in ast.walk(tree):
+                  if isinstance(node, ast.Constant) and isinstance(node.value, str) and id(node) not in prose:
+                      if any(word in node.value for word in ARCHIVE_FILES):
+                          bad.append(f"{path}:{node.lineno}: {node.value!r}")
+                  elif isinstance(node, (ast.Attribute, ast.Name)):
+                      if (node.attr if isinstance(node, ast.Attribute) else node.id) in ARCHIVE_NAMES:
+                          bad.append(f"{path}:{node.lineno}: reads the model-call capture directory")
+          if bad:
+              print("\n".join(bad))
+              sys.exit("::error::the race or the funds can reach something the archive's side writes")
+          print(f"OK: nothing that scores or trades reads the archive ({len(seen)} modules behind the race and the funds)")
+          PY
+          if grep -nE 'secrets\.' .github/workflows/horse-race.yml .github/workflows/funds.yml .github/workflows/funds-smoke.yml; then
+            echo "::error::the race and funds workflows must hold no secret -- no Supabase key either"
+            exit 1
+          fi
+          echo "OK: the race and the funds hold no Supabase key"
+
       - name: A piped script cannot report a false green
         # `python foo.py | tee out.txt` exits with tee's status, not the
         # script's, so a script that exited 1 still shows a green step. The
