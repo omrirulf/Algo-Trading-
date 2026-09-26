@@ -54,36 +54,63 @@ from tests.test_shadow_fund import S, flat, said
 
 #: sha256 of each part of the funds document, from ``golden_parts()`` run on
 #: the code before this change (commit dc9fe11), where the list held the four
-#: and the two earlier exploratory funds -- on Python 3.11. Float arithmetic
-#: is not bit-identical across Python versions (3.12 made ``sum()`` of floats
-#: compensated, which moves the last digits of some sums), so these recorded
-#: hashes are checked on 3.11 only; on every version the same property is
-#: also shown in-process, with and without the new fund, below.
-BEFORE = {
-    "row:model": "124c8a7cbedf03bf5fbb4ab8b7d2edba7675cd538b5761ebd80e3c298e481a59",
-    "row:momentum": "d0a71e397f5f48a16e606b7a7d241bffbdb40b8c62198d210377b18f71b4cb93",
-    "row:hybrid": "8347889692892b8cfb94d762245537be9a2a331082d9535aad1965db92632352",
-    "row:vt": "e1d9476cddd6a9ccf7562331f01841a0157df1b46dde8d997ccc68a876456865",
-    "row:model_by_conviction": "65beb8e2e7440efaa9698347a4a4fe2ae336687d981badce574e6ec31ebe89d8",
-    "row:model_sized": "5097b3de53b87422dd5725b49ae0842788972595e661afb91522c01f7bc21d11",
-    "days": "225bb666697cfc15702b9c16bcd248f1ea0b74f0221fe61d38ad40dd79697760",
-    "start": "3c4c54d6835358d7e8b1691acdf90d00f5e8c6ef02039a8bb65c632773c49a4f",
-    "band": "87a0cf5599494c2bda989bd011bea2ce53bc7fded5403db4eca1043dd0d3cd5d",
+#: and the two earlier exploratory funds, in a fresh interpreter. Recorded
+#: for each Python the CI runs: 3.12 made ``sum()`` of floats compensated,
+#: which moves the last digits of two exploratory funds' sums, so the two
+#: versions' hashes differ there (and nowhere else). The golden prices are
+#: rounded (``tests/shadow_golden.py``), so the CPU a runner has cannot move
+#: them.
+_SAME_ON_BOTH = {
+    "band": "dbc748f986e1da0daac77658bfd7f5d97a93697bd4b2e4eec0e69f541e8ccff0",
     "checks:coin": "0ec3ed3ece4fd4004dd757abcbd8d5abc85fef74a4b5704e0f7e5fa738fcfaf4",
+    "days": "225bb666697cfc15702b9c16bcd248f1ea0b74f0221fe61d38ad40dd79697760",
+    "row:hybrid": "45bad8453ab1641b03be3919d672bda1163d631c89b54bd6430b6f0111912b6c",
+    "row:model": "3d8d99bfc625aafed35e1414daa7f3c7a839547525b1cc8aceee911521156b08",
+    "row:momentum": "71440e1f8dd4c05b36ac6868523b407a4f2e6db21509794805411ec3c9d4704b",
+    "row:vt": "8e4adba0b5226ca4cd2f5c04ed2e7dab38c5616b69d8b067ff9ae4d90d685370",
+    "start": "3c4c54d6835358d7e8b1691acdf90d00f5e8c6ef02039a8bb65c632773c49a4f",
+}
+BEFORE_BY_VERSION = {
+    (3, 11): {**_SAME_ON_BOTH,
+        "row:model_by_conviction": "d4460d3a191d64526e06af7cc04f1eb93ee960de744e72755eaae1e872083cd2",
+        "row:model_sized": "03fea6c97958111272f83dcc3f8af0a111d0c00579e53cdfd61e562b5e09651d",
+    },
+    (3, 12): {**_SAME_ON_BOTH,
+        "row:model_by_conviction": "a1eaf60993858f4c78d4e89d4bea01e901565f9efea260f129b85f9603e018d1",
+        "row:model_sized": "aaa975dc246a6c88557acf9ba85860d90b96b93ec5e170e9a94f50d1a4dd7c60",
+    },
 }
 
 
-@pytest.mark.skipif(sys.version_info[:2] != (3, 11),
-                    reason="the recorded hashes are from Python 3.11 (see BEFORE); "
-                           "the in-process test below covers every version")
 def test_every_other_fund_is_byte_identical_to_the_code_before_the_change():
     """Same journal (with recorded prices of every kind), same prices, same
     refusals: every row that existed before, the days, the band and the
     coin-flip funds' check hash exactly as they did on the code before the
-    change. The one new row is the same-day fund's."""
-    after = golden_parts()
-    assert {k: v for k, v in after.items() if k in BEFORE} == BEFORE
-    assert set(after) - set(BEFORE) == {"row:model_same_day"}
+    change. The one new row is the same-day fund's.
+
+    Computed in a fresh interpreter with a fixed hash seed, as the recorded
+    hashes were: nothing an earlier test left behind in this process, and no
+    set-iteration order, can move a digit."""
+    before = BEFORE_BY_VERSION.get(sys.version_info[:2])
+    if before is None:
+        pytest.skip(f"no hashes recorded for Python {sys.version_info[0]}.{sys.version_info[1]}; "
+                    "the in-process test below covers it")
+    after = _golden_in_a_fresh_process()
+    assert {k: v for k, v in after.items() if k in before} == before
+    assert set(after) - set(before) == {"row:model_same_day"}
+
+
+def _golden_in_a_fresh_process() -> dict[str, str]:
+    import os
+    import subprocess
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    code = ("import json, sys; sys.path.insert(0, '.'); "
+            "from tests.shadow_golden import golden_parts; print(json.dumps(golden_parts()))")
+    done = subprocess.run([sys.executable, "-c", code], cwd=root, capture_output=True, text=True, timeout=600,
+                          env={**os.environ, "PYTHONHASHSEED": "0"}, check=True)
+    return json.loads(done.stdout.strip().splitlines()[-1])
 
 
 def test_adding_the_same_day_fund_changes_no_other_part():

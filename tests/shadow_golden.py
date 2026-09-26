@@ -19,6 +19,7 @@ from datetime import datetime, timedelta, timezone
 import numpy as np
 
 from analysis.reader import JournalEntry
+from shadow.market import Bars
 from tests.test_shadow_fund import S, stamp
 from tests.test_shadow_variants import NAMES, Walks, said, wider
 
@@ -48,8 +49,16 @@ def live_record(rng, bars, ticker, day) -> dict | None:
 
 
 def golden_inputs():
-    """(entries, bars) for the golden run."""
-    bars = wider()
+    """(entries, bars) for the golden run.
+
+    The made-up prices are rounded to 4 decimals, as real prices are. They
+    are drawn with ``np.exp``, whose last bit depends on the CPU numpy runs
+    on (it picks a vectorised version by the instructions the chip has), so
+    unrounded they differ by a hair between two CI runners, and every hash
+    with them. The funds themselves use no such function.
+    """
+    raw = wider()
+    bars = Bars({t: raw._frames[t].round(4) for t in raw.tickers()})
     rng = np.random.RandomState(11)
     out = []
     for day in SESSIONS:
