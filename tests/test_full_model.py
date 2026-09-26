@@ -213,12 +213,16 @@ def test_asking_the_endpoint_anonymously_is_refused():
 # --- the transport retry, and what bounds it -------------------------------
 
 
-def test_a_timed_out_call_is_asked_once_more_on_a_shorter_ceiling():
+def test_a_timed_out_call_is_asked_once_more_on_the_full_ceiling():
     """Not retried at all until 23 September, on an argument the first
     production cycle disproved: the worst case was taken to be every call
     running to the 300s ceiling, which left no room to ask twice. The measured
     stage was 32 minutes, not 100, and the three tickers lost that day were
-    lost to exactly this."""
+    lost to exactly this.
+
+    The retry then got 120s, which the full model's answers almost never fit
+    (median 130-146s): 0 of 7 retries succeeded on 25 Sep. Since 26 Sep (bug
+    fix, Amendments table) the second ask gets the same 300s as the first."""
     seen: list[float] = []
     attempts = {"n": 0}
 
@@ -241,12 +245,12 @@ def test_a_timed_out_call_is_asked_once_more_on_a_shorter_ceiling():
         out = provider.complete_detailed("s", "u", SCHEMA)
 
     assert json.loads(out.text)["ticker"] == "AAPL"
-    assert seen == [llm.FULL_MODEL_TIMEOUT_SECONDS, llm.TRANSPORT_RETRY_TIMEOUT_SECONDS]
+    assert seen == [300.0, 300.0]
 
 
-def test_the_shortened_ceiling_does_not_leak_into_the_next_ticker():
+def test_the_retry_ceiling_does_not_leak_into_the_next_ticker():
     """A provider is reused across the watchlist. One slow call must not
-    quietly shorten every call after it."""
+    quietly change the ceiling of every call after it."""
     def always_timeout(request):
         raise httpx.ReadTimeout("timed out", request=request)
 
@@ -266,8 +270,91 @@ def test_the_shortened_ceiling_does_not_leak_into_the_next_ticker():
             with pytest.raises(LLMError, match="unreachable"):
                 provider.complete_detailed("s", "u", SCHEMA)
 
-    # Two tickers, each asked twice, and each starting from the full ceiling.
-    assert seen == [llm.FULL_MODEL_TIMEOUT_SECONDS, llm.TRANSPORT_RETRY_TIMEOUT_SECONDS] * 2
+    # Two tickers, each asked twice, every ask on the full ceiling.
+    assert seen == [300.0, 300.0] * 2
+
+
+def test_a_shorter_caller_ceiling_is_never_raised_by_the_retry():
+    """The screening path asks at REQUEST_TIMEOUT_SECONDS (120s). The retry
+    takes the smaller of that and its own ceiling, so fixing the full model's
+    retry cannot lengthen the screen's."""
+    def always_timeout(request):
+        raise httpx.ReadTimeout("timed out", request=request)
+
+    seen: list[float] = []
+
+    def client(timeout):
+        seen.append(timeout)
+        return httpx.Client(transport=httpx.MockTransport(always_timeout), base_url="http://local")
+
+    provider = OpenAICompatibleProvider("http://local/v1", "m", api_key="k", sleep=lambda _: None,
+                                        timeout=llm.REQUEST_TIMEOUT_SECONDS)
+    import unittest.mock
+    with unittest.mock.patch.object(llm, "new_http_client", client):
+        with pytest.raises(LLMError, match="unreachable"):
+            provider.complete_detailed("s", "u", SCHEMA)
+    assert seen == [llm.REQUEST_TIMEOUT_SECONDS] * 2
+
+
+def test_the_error_counts_the_asks_actually_made():
+    """A timeout and its one retry are two asks. The text used to say
+    "gave up after 4 attempt(s)" whatever happened."""
+    def always_timeout(request):
+        raise httpx.ReadTimeout("timed out", request=request)
+
+    provider = OpenAICompatibleProvider("http://local/v1", "m", api_key="k", sleep=lambda _: None,
+                                        timeout=llm.FULL_MODEL_TIMEOUT_SECONDS)
+    import unittest.mock
+    with unittest.mock.patch.object(
+        llm, "new_http_client",
+        lambda timeout: httpx.Client(transport=httpx.MockTransport(always_timeout), base_url="http://local"),
+    ):
+        with pytest.raises(LLMError, match=r"gave up after 2 attempt\(s\)"):
+            provider.complete_detailed("s", "u", SCHEMA)
+
+
+def test_every_ask_is_logged_with_its_ticker_try_duration_and_answer_length(caplog):
+    """The call log the owner asked for on 26 Sep: name, start, how long,
+    answer length, and first or second try."""
+    calls = {"n": 0}
+
+    def flaky(request):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise httpx.ReadTimeout("timed out", request=request)
+        body = _body()
+        body["usage"] = {"prompt_tokens": 900, "completion_tokens": 4321}
+        return httpx.Response(200, json=body)
+
+    provider = OpenAICompatibleProvider("http://local/v1", "m", api_key="k", sleep=lambda _: None,
+                                        timeout=llm.FULL_MODEL_TIMEOUT_SECONDS)
+    import logging
+    import unittest.mock
+    with unittest.mock.patch.object(
+        llm, "new_http_client",
+        lambda timeout: httpx.Client(transport=httpx.MockTransport(flaky), base_url="http://local"),
+    ), caplog.at_level(logging.INFO, logger=llm.log.name), llm.call_label("INDA"):
+        provider.complete_detailed("s", "u", SCHEMA)
+
+    lines = [r.getMessage() for r in caplog.records if r.getMessage().startswith("model call:")]
+    assert len(lines) == 2
+    assert lines[0].startswith("model call: INDA ask 1 (first) started ")
+    assert "ReadTimeout after a 300s limit" in lines[0] and lines[0].endswith("output tokens n/a")
+    assert lines[1].startswith("model call: INDA ask 2 (retry after a timeout) started ")
+    assert "HTTP 200" in lines[1] and lines[1].endswith("output tokens 4321")
+
+
+def test_the_call_label_is_per_thread_and_restored():
+    import threading
+    seen = {}
+    with llm.call_label("A"):
+        def other():
+            seen["other"] = getattr(llm._CALL, "label", None)
+        t = threading.Thread(target=other)
+        t.start(); t.join()
+        seen["inside"] = llm._CALL.label
+    assert seen == {"other": None, "inside": "A"}
+    assert getattr(llm._CALL, "label", None) is None
 
 
 def test_a_transport_failure_is_never_asked_a_third_time():
