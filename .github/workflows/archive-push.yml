@@ -89,4 +89,11 @@ jobs:
             cat "$RUNNER_TEMP/archive_status.json" >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
           fi
+          # A push that did not happen is not a green run here: this workflow
+          # exists to prove the secrets work, and "not configured" exits 0
+          # (the heartbeat treats it as a daily warning, not a failure).
+          if [ "$code" = "0" ] && ! python -c "import json,sys; sys.exit(0 if json.load(open(sys.argv[1])).get('ok') is True else 1)" "$RUNNER_TEMP/archive_status.json"; then
+            echo "::error::the archive push did not succeed (see the status above)"
+            exit 1
+          fi
           exit "$code"
