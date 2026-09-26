@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 
@@ -53,7 +54,11 @@ from tests.test_shadow_fund import S, flat, said
 
 #: sha256 of each part of the funds document, from ``golden_parts()`` run on
 #: the code before this change (commit dc9fe11), where the list held the four
-#: and the two earlier exploratory funds.
+#: and the two earlier exploratory funds -- on Python 3.11. Float arithmetic
+#: is not bit-identical across Python versions (3.12 made ``sum()`` of floats
+#: compensated, which moves the last digits of some sums), so these recorded
+#: hashes are checked on 3.11 only; on every version the same property is
+#: also shown in-process, with and without the new fund, below.
 BEFORE = {
     "row:model": "124c8a7cbedf03bf5fbb4ab8b7d2edba7675cd538b5761ebd80e3c298e481a59",
     "row:momentum": "d0a71e397f5f48a16e606b7a7d241bffbdb40b8c62198d210377b18f71b4cb93",
@@ -68,22 +73,33 @@ BEFORE = {
 }
 
 
-def test_every_other_fund_is_byte_identical_with_the_same_day_fund_added():
+@pytest.mark.skipif(sys.version_info[:2] != (3, 11),
+                    reason="the recorded hashes are from Python 3.11 (see BEFORE); "
+                           "the in-process test below covers every version")
+def test_every_other_fund_is_byte_identical_to_the_code_before_the_change():
     """Same journal (with recorded prices of every kind), same prices, same
     refusals: every row that existed before, the days, the band and the
-    coin-flip funds' check hash exactly as they did before the change. The
-    one new row is the same-day fund's."""
+    coin-flip funds' check hash exactly as they did on the code before the
+    change. The one new row is the same-day fund's."""
     after = golden_parts()
     assert {k: v for k, v in after.items() if k in BEFORE} == BEFORE
     assert set(after) - set(BEFORE) == {"row:model_same_day"}
 
 
+def test_adding_the_same_day_fund_changes_no_other_part():
+    """On any Python: the funds document with the same-day fund and without
+    it are identical in every other part."""
+    with_it, without = golden_parts(), golden_parts(without_same_day=True)
+    assert set(with_it) - set(without) == {"row:model_same_day"}
+    assert {k: v for k, v in with_it.items() if k in without} == without
+
+
 def test_dated_refusals_all_before_the_start_are_the_undated_ones():
     """The refusals as ``not_shortable`` now reads them -- dated -- change
-    nothing for a cycle after every one of them."""
+    nothing for a cycle after every one of them (compared in-process, so on
+    any Python)."""
     dated = {name: SESSIONS[0] - timedelta(days=3) for name in REFUSED}
-    after = golden_parts(dated)
-    assert {k: v for k, v in after.items() if k in BEFORE} == BEFORE
+    assert golden_parts(dated) == golden_parts()
 
 
 # --------------------------------------------------------------------------- #

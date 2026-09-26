@@ -69,13 +69,24 @@ def canonical(value) -> str:
                                      allow_nan=False).encode()).hexdigest()
 
 
-def golden_parts(refused=REFUSED) -> dict[str, str]:
-    """The hash of every part of the funds document that existed before, by name."""
+def golden_parts(refused=REFUSED, *, without_same_day: bool = False) -> dict[str, str]:
+    """The hash of every part of the funds document, by name.
+
+    ``without_same_day`` runs the same inputs with ``model_same_day`` left
+    out of the exploratory funds, so a test can show, on whatever Python it
+    runs on, that adding it changes no other part.
+    """
     from shadow import run as shadow_run
 
     entries, bars = golden_inputs()
-    funds, checks = shadow_run.run_funds(entries, SESSIONS[0], SESSIONS[-1], Walks(bars), random_funds=2,
-                                         processes=1, shortable_no=refused)
+    build = shadow_run.exploratory_funds
+    if without_same_day:
+        shadow_run.exploratory_funds = lambda *a, **k: [f for f in build(*a, **k) if f.name != "model_same_day"]
+    try:
+        funds, checks = shadow_run.run_funds(entries, SESSIONS[0], SESSIONS[-1], Walks(bars), random_funds=2,
+                                             processes=1, shortable_no=refused)
+    finally:
+        shadow_run.exploratory_funds = build
     parts = {f"row:{row['name']}": canonical(row) for row in funds["list"]}
     parts["days"] = canonical(funds["days"])
     parts["start"] = canonical(funds["start"])
