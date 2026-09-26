@@ -63,8 +63,10 @@ def test_a_look_before_calibration_has_passed_is_skipped_and_spends_nothing():
         rest = gate.spending_bars([120 / 180, 1.0])
         assert plan["exact"][1:] == [round(b, 3) for b in rest]
         assert plan["bars"][1:] == [gate.rounded_bar(b) for b in rest]
-        # Nothing spent at look 1, so look 2's bar is lower than planned.
-        assert plan["bars"][1] < schedule.FUND_TEST_BARS[1]
+        # Nothing spent at look 1, so look 2's exact bar is lower than planned
+        # (both round up to 2.41, so compare the exact values).
+        planned = gate.spending_bars([60 / 180, 120 / 180, 1.0])
+        assert rest[0] < planned[1]
         assert plan["matches_registered"] is False
     assert not skipped_look(date(2026, 12, 22), date(2026, 12, 21))
     gone = fund_test_plan(date(2027, 7, 1))
