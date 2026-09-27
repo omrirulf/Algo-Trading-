@@ -395,3 +395,58 @@ def test_the_checkpoint_table_reads_every_test_of_the_family():
     rows = {r["name"]: r for r in table["rows"]}
     assert len(rows) == 8 and rows["B, fund"]["dsr"] is not None
     assert rows["A, race arm"]["no_data"] is True and rows["C, fund"]["no_data"] is True
+
+
+# --------------------------------------------------------------------------- #
+# Section 13.7: acting differently, and "not tested"
+# --------------------------------------------------------------------------- #
+
+
+def test_b_counts_trading_days_meant_to_be_out_of_vt():
+    closes = {m: 100.0 for m in MONTHS} | {"2026-09": 110.0, "2026-10": 90.0}
+    bars = Bars({"VT": month_bars(closes), "BIL": month_bars({m: 50.0 for m in MONTHS})})
+    counts = xp.timing_counters(bars, date(2026, 11, 6))
+    # Out of VT from the 2 Nov open (after the 30 Oct decision) through 6 Nov: 5 trading days.
+    assert counts["days_out_of_vt"] == 5
+
+
+def row(t=None, passes=False, no_data=False):
+    return {"t": t, "passes_bh": passes, "no_data": no_data}
+
+
+@pytest.mark.parametrize("args, expected", [
+    ((row(3.0, True), 0.01, 50, False, True), "promising"),
+    ((row(-3.0, True), -0.01, 50, False, True), "dead"),
+    ((row(-0.5), -0.001, 50, True, True), "dead"),            # final look, mean at or below zero
+    ((row(-0.5), -0.001, 50, True, False), "not proven"),     # B: that rule does not apply
+    ((row(-3.0, True), -0.01, 50, True, False), "dead"),      # B can die through Benjamini-Hochberg
+    ((row(-0.5), -0.001, 19, True, True), "not tested"),      # acted fewer than 20 times
+    ((row(-3.0, True), -0.01, 5, True, False), "not tested"),
+    ((row(-0.5), -0.001, 5, False, True), "not proven"),      # only the final look says "not tested"
+    ((row(-0.5), -0.001, None, True, True), "dead"),          # always acts: never "not tested"
+    ((row(no_data=True), None, None, False, True), "no data"),
+])
+def test_the_outcome_of_each_test(args, expected):
+    assert shadow_run.outcome(*args) == expected
+
+
+def test_the_table_reads_how_often_each_idea_acted_differently():
+    record = {"look": 3, "counters": {xp.VETO: {"vetoed": 7}, xp.TIMING: {"days_out_of_vt": 40}},
+              "race": {"insiders": {"t": 0.5, "mean_daily_diff": 0.001, "trades": 30}},
+              "tests": {xp.TIMING: {"t": -0.4, "mean_daily_diff": -0.0002},
+                        "model_by_conviction": {"t": 0.1, "mean_daily_diff": 0.0, "acted": 3}}}
+    rows = {r["name"]: r for r in shadow_run.checkpoint_table_for(record)["rows"]}
+    assert rows["A, race arm"]["acted_differently"] == 7 and rows["A, race arm"]["outcome"] == "not tested"
+    assert rows["model_by_conviction"]["outcome"] == "not tested"
+    assert rows["B, fund"]["acted_differently"] == 40 and rows["B, fund"]["outcome"] == "not proven"
+    assert rows["insider arm"]["outcome"] == "not proven"
+    assert rows["C, fund"]["acted_differently"] is None
+
+
+def test_the_same_day_counter_counts_only_from_the_fund_start():
+    before, start = date(2026, 9, 25), date(2026, 9, 28)
+    entries = [said("MSFT", before, bias="BULLISH"), said("MSFT", start, bias="BULLISH")]
+    bars = Bars({})
+    counts = shadow_run.exploratory_counters(entries, bars, date(2026, 10, 2))
+    # Neither line has a recorded price; only the one from the 28 Sep cycle is counted.
+    assert counts["model_same_day"]["lines_without_usable_price"]["no_price"] == 1

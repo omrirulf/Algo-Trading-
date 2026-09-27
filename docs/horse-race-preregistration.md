@@ -629,13 +629,17 @@ in them: code computes everything.
   (section 5a: 20, 40 and 60 independent days; estimated 2026-12-22,
   2027-03-22, 2027-06-16).
 - **Between checkpoints, only the counters listed below are computed,
-  kept or shown** for A, B and C, and for the three exploratory funds of
-  section 11.1 (`model_by_conviction`, `model_sized`, `model_same_day`).
-  No equity, return, mean, t, hit rate or drawdown of theirs is written to
-  any file, page or log. The three exploratory funds' counter is the lines
-  `model_same_day` could not enter and why, counted from the journal without
-  running the fund; everything else about them (their order-matters counts
-  included) comes at the checkpoints.
+  kept or shown** for A, B and C, for the three exploratory funds of
+  section 11.1 (`model_by_conviction`, `model_sized`, `model_same_day`),
+  and for the insider arm (section 2). No equity, return, mean, t, hit rate
+  or drawdown of theirs is written to any file, page or log. The three
+  exploratory funds' counter is the lines `model_same_day` could not enter
+  and why, from the 2026-09-28 cycle (the fund's start; earlier lines are not
+  part of the test), counted from the journal without running the fund;
+  everything else about them (their order-matters counts included) comes at
+  the checkpoints. The insider arm's counters are the lines it took a side
+  on and its trades, at each horizon. Its results were printed nightly from
+  2026-09-22 to 2026-09-28, before this section existed; nothing is undone.
 - **At each checkpoint** their results are computed once, over every day
   from their start to that checkpoint, and written to a record that is
   kept unchanged until the next checkpoint.
@@ -789,7 +793,17 @@ in them: code computes everything.
   Benjamini-Hochberg (13.5).
 - **Dead:** at any checkpoint it trails its comparator and passes
   Benjamini-Hochberg in that direction; or at the final checkpoint its
-  mean difference is zero or below.
+  mean difference is zero or below. **Not for B:** its purpose is crash
+  protection, which 9 months may not test, so the final "zero or below"
+  rule does not apply to B; B can be dead only through Benjamini-Hochberg.
+- **Not tested:** at the final checkpoint, an idea that acted differently
+  from its comparator fewer than 20 times, whatever its numbers: it cannot
+  show anything, so it is not called dead. Acting differently is, for A,
+  a signal the veto removed; for the insider arm, a trade; for
+  `model_by_conviction`, a session on which the buying order changed what
+  was bought; for B, a trading day spent out of VT. C, `model_sized` and
+  `model_same_day` differ from their comparator on every trade, so they
+  always count as acting. Counted by code at the checkpoint.
 - **Not proven:** anything else. It stays until the final checkpoint.
 - A promising idea is only a candidate for a later registration. It
   changes nothing in this one.
@@ -832,4 +846,4 @@ in them: code computes everything.
 | 2026-09-26 | **Storage change: the journal is one file per month** (the owner's decision; not a rule change) | The journal grows by about 0.64 MB a trading day, and GitHub refuses a push carrying a file over 100 MB, which the single file `logs/signal_journal.log` would have reached in spring 2027, before the verdict; from then no cycle's journal could have been committed. The owner approved splitting it into one file per UTC month, `logs/journal/YYYY-MM.log`, before the fund test starts. The old file was moved whole to `logs/journal/2026-09.log` (every line in it was from September); a line is written exactly as before, only into its month's file; and every reader joins the months in order (`config/journal_files.py`), so every reader sees the old file byte for byte. Checked: the joined months hash to the old file (sha256 `26b6e7a2…a483d`, 6,972,754 bytes; `tests/test_journal_files.py`), and the race, its gate and the funds, calibration included, give byte-identical output before and after the split on the same prices (`.github/workflows/journal-split-check.yml`). No line, rule, window, bar or result changes. |
 | 2026-09-26 | **Fund test** (new registration) | Asked by the owner on 2026-09-24; approved by the owner on 2026-09-26. Sections 11 and 12, with the owner's decisions of 2026-09-24 (the calibration pass rule with its two-way match, the watchlist order kept and how often it matters reported, no cost in the calibration copy, the fund test's own bars), of 2026-09-25 (the calibration fail rule: re-run every day after a fix, at least 5 days after the last fix; the late-run mirroring in calibration, stopped if more than 2 calibration days need it; the exploratory funds `model_by_conviction` and `model_sized`) and of 2026-09-26 (short refusals count only from the day they happen; the monthly share of missing price days with a warning above 2%; lag 5; the 95th-percentile coin-flip condition, noted as weak for a buy-only model with the index rule as the real protection; held names as a known limitation, counted daily; bars by an O'Brien-Fleming-type spending rule, recomputed by the same rule from the actual sessions if any look moves; and the exploratory fund `model_same_day`). No exploratory fund can change the decision. Made before any fund was run: no fund result exists, and none will until calibration passes. |
 | 2026-09-26 | **Fund test start: 2026-09-28** (the owner's decision; made before any fund result existed) | The funds act on the 2026-09-28 cycle from the next open (first fund session 2026-09-29) instead of starting on the first trading day after calibration passes. Reason: it adds about 15 sessions to every look (planned 60, 120 and 180 fund sessions instead of 45, 105 and 165; bars 3.40, 2.41, 2.02 by the spending rule, rounded up). Calibration is unchanged: the fund test counts only after it passes, no fund result is calculated or shown before that, the funds are then run from 2026-09-28 with the final checked code only (after any calibration fix, with the fixed code only), and a delayed calibration delays the reading, never the start. A look before calibration has passed is skipped by the fund test, spending nothing. No fund had been run and no fund result existed. |
-| 2026-09-28 | **Exploratory tests A, B and C** (new registration; exploratory) | Asked by the owner on 2026-09-27; decided by the owner on 2026-09-27. Section 13: A, the momentum rule with a 200-day moving-average veto from final closes up to the session before the signal (race arm and fund; a 50-day version was dropped before it ran as redundant with the momentum rule's own 50-day check, decided from signal counts only, and counts in N); B, 10-month moving-average timing on VT with T-bills through BIL (fund, from the 2026-09-30 month-end); C, pullback limit entry (fund). Counters only between checkpoints, results only at the race's looks, for A, B and C **and for the three exploratory funds of section 11.1** (`model_by_conviction`, `model_sized`, `model_same_day`), which until now were to be shown nightly once calibration passed; at each look, Benjamini-Hochberg across all exploratory tests and the Deflated Sharpe Ratio with N from `docs/research/graveyard.md` (18); the research limits. None can change the decision. **Made before any result of A, B or C existed, and before any exploratory fund result existed:** none has been computed (no fund is run before calibration passes), and the rules were written by the owner on 2026-09-27, before the first line they read (the 2026-09-28 cycle). |
+| 2026-09-28 | **Exploratory tests A, B and C** (new registration; exploratory) | Asked by the owner on 2026-09-27; decided by the owner on 2026-09-27. Section 13: A, the momentum rule with a 200-day moving-average veto from final closes up to the session before the signal (race arm and fund; a 50-day version was dropped before it ran as redundant with the momentum rule's own 50-day check, decided from signal counts only, and counts in N); B, 10-month moving-average timing on VT with T-bills through BIL (fund, from the 2026-09-30 month-end); C, pullback limit entry (fund). Counters only between checkpoints, results only at the race's looks, for A, B and C **and for the three exploratory funds of section 11.1** (`model_by_conviction`, `model_sized`, `model_same_day`), which until now were to be shown nightly once calibration passed, **and for the insider arm, whose results were printed nightly from 2026-09-22 to 2026-09-28, before this section existed** (nothing is undone; from now on it shows counters only); at each look, Benjamini-Hochberg across all exploratory tests and the Deflated Sharpe Ratio with N from `docs/research/graveyard.md` (18); the outcomes of section 13.7, including **"not tested"** for an idea that acted differently from its comparator fewer than 20 times by the final checkpoint, and **B exempt from the final "zero or below" rule** (its purpose is crash protection, which 9 months may not test); the `model_same_day` counter from the 2026-09-28 cycle only; the research limits. None can change the decision. **Made before any result of A, B or C existed, and before any exploratory fund result existed:** none has been computed (no fund is run before calibration passes), and the rules were written by the owner on 2026-09-27, before the first line they read (the 2026-09-28 cycle). |

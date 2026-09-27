@@ -488,14 +488,12 @@ def test_the_exploratory_arm_is_raced_on_its_own_lines_only_and_paired(tmp_path,
     assert "took a side on 1" in out
     assert "cannot change the main decision" in out
     section = out[out.index("== EXPLORATORY"):out.index("AGREEMENT")]
-    # Both horizons are printed, each paired with the model and the rule.
-    assert "horizon 3 session(s)" in section and f"horizon {horse_race.EXPLORATORY_HORIZON} session(s)" in section
-    assert "<- too few" in section
-    rows = [l for l in section.splitlines() if l.startswith(("insiders", "model", "momentum"))]
-    assert len(rows) == 6
-    # On the one line it took a side on, the arm has one trade at horizon 3
-    # and the model (BEARISH there, above the floor) has one too: paired.
-    assert rows[0].split()[1] == "1" and rows[1].split()[1] == "1"
+    # Counters only (pre-registration 13.1): trades and days at both horizons, no return.
+    assert "Counters only" in section and "section 13.1" in section
+    assert "horizon 3 session(s): 1 trade(s) on 1 entry day(s)" in section
+    assert f"horizon {horse_race.EXPLORATORY_HORIZON} session(s):" in section
+    for word in ("mean net", "median", "hit rate", "stopped", "%"):
+        assert word not in section, word
     # The main tables carry the hybrid as a main arm, not the insider arm.
     main = out[:out.index("== EXPLORATORY")]
     assert hybrid.NAME in main and "insiders" not in main

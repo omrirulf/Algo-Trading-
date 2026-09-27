@@ -508,6 +508,19 @@ def paired(fund, other) -> dict:
             "compare_max_drawdown": max_drawdown([d.equity for d in other.days])}
 
 
+def order_changed_days(fund, model) -> int:
+    """Sessions on which ``fund`` bought something other than the model fund did (section 13.7)."""
+    def bought(f) -> dict:
+        out: dict = {}
+        for fill in f.broker.fills:
+            if fill.kind == ENTRY:
+                out.setdefault(fill.day, set()).add((fill.ticker, fill.side))
+        return out
+
+    mine, theirs = bought(fund), bought(model)
+    return sum(1 for day in set(mine) | set(theirs) if mine.get(day, set()) != theirs.get(day, set()))
+
+
 def new_funds(feed: SimFeed, bars: Bars, long_bars: Bars, final_through: date, shortable_no) -> list:
     """Tests A, B and C as funds (section 13): the veto and pullback funds on the funds' own bars and feed."""
     return [
@@ -560,6 +573,9 @@ def run_funds(
     }
     if explore:
         out["tests"] = {f.name: paired(f, model) for f in explore}
+        by_conviction = next((f for f in explore if f.name == "model_by_conviction"), None)
+        if by_conviction is not None:
+            out["tests"]["model_by_conviction"]["acted"] = order_changed_days(by_conviction, model)
     if tests:
         by_name = {f.name: f for f in four}
         out["tests"] |= {f.name: paired(f, by_name[xp.COMPARED_WITH[f.name]]) for f in tests}
@@ -620,29 +636,57 @@ def checkpoint_race(entries: Sequence[JournalEntry], long_bars: Bars, today: dat
     return xp.race_tests(lines, long_bars, how, schedule.FUND_FIRST_CYCLE, gate.DECISION_CUTOFF)
 
 
-#: Every test of the family (section 13.5), by where its numbers are in a look's record.
-FAMILY: Final[tuple[tuple[str, str, str], ...]] = (
-    ("insider arm", "race", "insiders"),
-    ("A, race arm", "race", xp.VETO),
-    ("A, fund", "tests", xp.VETO),
-    ("B, fund", "tests", xp.TIMING),
-    ("C, fund", "tests", xp.LIMIT),
-    ("model_by_conviction", "tests", "model_by_conviction"),
-    ("model_sized", "tests", "model_sized"),
-    ("model_same_day", "tests", "model_same_day"),
+#: Every test of the family (section 13.5), by where its numbers are in a
+#: look's record, and where its count of "acting differently" is (13.7):
+#: None for the ideas that differ on every trade and so always act.
+FAMILY: Final[tuple[tuple[str, str, str, Optional[tuple[str, ...]]], ...]] = (
+    ("insider arm", "race", "insiders", ("race", "insiders", "trades")),
+    ("A, race arm", "race", xp.VETO, ("counters", xp.VETO, "vetoed")),
+    ("A, fund", "tests", xp.VETO, ("counters", xp.VETO, "vetoed")),
+    ("B, fund", "tests", xp.TIMING, ("counters", xp.TIMING, "days_out_of_vt")),
+    ("C, fund", "tests", xp.LIMIT, None),
+    ("model_by_conviction", "tests", "model_by_conviction", ("tests", "model_by_conviction", "acted")),
+    ("model_sized", "tests", "model_sized", None),
+    ("model_same_day", "tests", "model_same_day", None),
 )
+#: The last planned look, the minimum of "acting differently", and B, whose
+#: purpose (crash protection) the final "zero or below" rule does not judge.
+FINAL_LOOK: Final[int] = 3
+MIN_ACTED: Final[int] = 20
+NO_ZERO_RULE: Final[frozenset[str]] = frozenset({"B, fund"})
+
+
+def outcome(row: dict, mean: Optional[float], acted: Optional[int], final: bool, zero_rule: bool) -> str:
+    """Section 13.7: promising, dead, not tested or not proven -- read by code, never by a person."""
+    if final and acted is not None and acted < MIN_ACTED:
+        return "not tested"
+    if row.get("passes_bh") and row.get("t") is not None:
+        return "promising" if row["t"] > 0 else "dead"
+    if final and zero_rule and mean is not None and mean <= 0:
+        return "dead"
+    return "no data" if row.get("no_data") else "not proven"
 
 
 def checkpoint_table_for(record: dict) -> dict:
-    """Benjamini-Hochberg across the family and the Deflated Sharpe Ratio with N from the graveyard."""
+    """Benjamini-Hochberg across the family, the Deflated Sharpe Ratio with N from the graveyard, and each outcome."""
     from analysis.multiple_tests import checkpoint_table, graveyard_n
 
     n = graveyard_n()
-    tests = []
-    for label, part, key in FAMILY:
+    final = record.get("look") == FINAL_LOOK
+    tests, extra = [], []
+    for label, part, key, where in FAMILY:
         found = (record.get(part) or {}).get(key) or {}
         tests.append({"name": label, "t": found.get("t"), "stats": found.get("stats")})
-    return {"n_trials": n, "rows": checkpoint_table(tests, n)}
+        acted = None
+        if where is not None:
+            value = (((record.get(where[0]) or {}).get(where[1])) or {}).get(where[2])
+            acted = value if isinstance(value, int) and not isinstance(value, bool) else 0
+        extra.append((found.get("mean_daily_diff"), acted, label not in NO_ZERO_RULE))
+    rows = checkpoint_table(tests, n)
+    for row, (mean, acted, zero_rule) in zip(rows, extra):
+        row["acted_differently"] = acted
+        row["outcome"] = outcome(row, mean, acted, final, zero_rule)
+    return {"n_trials": n, "final": final, "rows": rows}
 
 
 def looks_reached(race_gate: Optional[dict]) -> list[int]:

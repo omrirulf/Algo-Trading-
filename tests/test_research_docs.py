@@ -11,7 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 RESEARCH = ROOT / "docs" / "research"
-FIELDS = ("Date", "Source", "Exact rule and settings", "Data used", "Compared against",
+FIELDS = ("Date", "Source", "Exact rule and settings", "Data used", "Compared against", "Acting differently",
           "Main metric", "Read on", "Promising if", "Dead if", "Trial number")
 
 

@@ -198,7 +198,16 @@ def timing_counters(bars: Bars, through: date) -> dict:
     signals = [s for s in timing_signals(bars, through) if s["hold"] is not None]
     held = [s["hold"] for s in signals]
     switches = sum(1 for a, b in zip(held, held[1:]) if a != b)
+    # What counts as B acting differently from the VT fund (13.7): trading
+    # days, from its first session through ``through``, meant to be out of VT.
+    decided = [(date.fromisoformat(s["day"]), s["hold"]) for s in signals]
+    out_days, d = 0, (decided[0][0] + timedelta(days=1)) if decided else through
+    while decided and d <= through:
+        if is_trading_day(d) and [h for day, h in decided if day < d][-1] == TIMING_OUT:
+            out_days += 1
+        d += timedelta(days=1)
     return {"signals": len(signals), "switches": switches, "state": held[-1] if held else None,
+            "days_out_of_vt": out_days,
             "last_signal": signals[-1]["day"] if signals else None,
             "month_ends_fallen_back": sum(1 for s in timing_signals(bars, through) if s["fell_back"])}
 

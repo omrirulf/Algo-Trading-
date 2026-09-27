@@ -14,6 +14,8 @@
 
 **Read on:** At each checkpoint only: the race's looks (estimated 2026-12-22, 2027-03-22, 2027-06-16). Between them, only the counters (section 13.1). Counters: fill rate, filled and missed signals. Prediction: fill rate well below 100%, and missed signals do better than filled ones (read at checkpoints, Welch t for reading only).
 
+**Acting differently:** Always: every trade differs from the momentum fund's (entered by limit, at another price), so C always counts as acting.
+
 **Promising if:** At a checkpoint, it beats its comparator and passes Benjamini-Hochberg at 5% (section 13.5). The Deflated Sharpe Ratio is shown beside it (13.6).
 
 **Dead if:** At any checkpoint it trails its comparator and passes Benjamini-Hochberg in that direction; or at the final checkpoint its mean difference is zero or below (section 13.7).
