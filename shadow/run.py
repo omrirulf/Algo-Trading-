@@ -551,16 +551,18 @@ def run_funds(
                                     first_cycle)
     # The key keeps its name; the check covers the exploratory funds too.
     check = integrity([*four, *explore, *tests])
-    model = next(f for f in four if f.name == COMPARE_TO)
+    model = next(f for f in four if f.name == COMPARE_TO)  # the three exploratory funds' comparator
     out = {
         "start": start.isoformat(),
         "days": [d.isoformat() for d in sessions],
         "list": [summarise(f, vt) for f in four] + [summarise_exploratory(f, model, vt) for f in explore],
         "band": band(curves),
     }
+    if explore:
+        out["tests"] = {f.name: paired(f, model) for f in explore}
     if tests:
         by_name = {f.name: f for f in four}
-        out["tests"] = {f.name: paired(f, by_name[xp.COMPARED_WITH[f.name]]) for f in tests}
+        out["tests"] |= {f.name: paired(f, by_name[xp.COMPARED_WITH[f.name]]) for f in tests}
         out["tests"][xp.TIMING]["switches"] = tests[1].switches
         out["tests"][xp.LIMIT]["orders"] = {k: v for k, v in vars(tests[2].pullback).items() if k != "filled"}
     return out, {"four": check, "coin": coin_check}
@@ -604,6 +606,43 @@ def long_history(entries: Sequence[JournalEntry], final_through: date, fetcher) 
     tickers = {e.ticker for e in entries if e.timestamp is not None and e.timestamp.date() >= first}
     return Bars.fetch(tickers | {xp.TIMING_IN, xp.TIMING_OUT}, first - timedelta(days=xp.LONG_LEAD_DAYS),
                       final_through, fetcher)
+
+
+def checkpoint_race(entries: Sequence[JournalEntry], long_bars: Bars, today: date, final_through: date,
+                    fetchers: Optional[list] = None) -> dict:
+    """A's race arm, the insider arm's test and C's filled against missed, at a checkpoint (section 13)."""
+    from analysis import decision_gate as gate
+
+    lines = [e for e in entries if e.timestamp is not None and e.model_answered]
+    how = xp.race_settings(today, final_through, lines)
+    if fetchers is not None:
+        fetchers += [("race_closes", how.source), ("race_ohlc", how.fetcher)]
+    return xp.race_tests(lines, long_bars, how, schedule.FUND_FIRST_CYCLE, gate.DECISION_CUTOFF)
+
+
+#: Every test of the family (section 13.5), by where its numbers are in a look's record.
+FAMILY: Final[tuple[tuple[str, str, str], ...]] = (
+    ("insider arm", "race", "insiders"),
+    ("A, race arm", "race", xp.VETO),
+    ("A, fund", "tests", xp.VETO),
+    ("B, fund", "tests", xp.TIMING),
+    ("C, fund", "tests", xp.LIMIT),
+    ("model_by_conviction", "tests", "model_by_conviction"),
+    ("model_sized", "tests", "model_sized"),
+    ("model_same_day", "tests", "model_same_day"),
+)
+
+
+def checkpoint_table_for(record: dict) -> dict:
+    """Benjamini-Hochberg across the family and the Deflated Sharpe Ratio with N from the graveyard."""
+    from analysis.multiple_tests import checkpoint_table, graveyard_n
+
+    n = graveyard_n()
+    tests = []
+    for label, part, key in FAMILY:
+        found = (record.get(part) or {}).get(key) or {}
+        tests.append({"name": label, "t": found.get("t"), "stats": found.get("stats")})
+    return {"n_trials": n, "rows": checkpoint_table(tests, n)}
 
 
 def looks_reached(race_gate: Optional[dict]) -> list[int]:
@@ -679,7 +718,11 @@ def build(args: argparse.Namespace, now: datetime, fetchers: Optional[list] = No
     elif new_looks:
         records.append({"look": max(new_looks), "made_on": now.date().isoformat(),
                         "through": final_through.isoformat(), "counters": counters,
-                        "status": "calibration has not passed: counters only"})
+                        "status": "calibration has not passed: counters only", "tests": {}})
+    if new_looks:
+        # The race side, and the table of section 13.5-13.6 over every test with data.
+        records[-1]["race"] = checkpoint_race(read.entries, long_bars, now.date(), final_through, fetchers)
+        records[-1]["table"] = checkpoint_table_for(records[-1])
     # Not fund results: the price source's gaps and the names no fund could
     # trade, from the fund start on, whatever calibration says. After the
     # funds and calibration, so their bars are fetched as they always were.

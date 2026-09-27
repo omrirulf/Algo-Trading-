@@ -350,3 +350,48 @@ def test_n_is_the_graveyard_count_and_the_table_leaves_out_tests_with_no_data():
                                  {"name": "b", "t": None}], 18)
     assert table[0]["p_bh"] == pytest.approx(mt.p_two_sided(3.0)) and table[0]["passes_bh"] is True
     assert table[1]["no_data"] is True and table[1]["p_bh"] is None
+
+
+# --------------------------------------------------------------------------- #
+# The race side at a checkpoint
+# --------------------------------------------------------------------------- #
+
+UP = {"return_63d": 0.10, "distance_sma50": 0.03, "annualised_volatility": 0.20, "atr14": 2.0,
+      "last_close": 100.0}
+
+
+def test_the_race_side_pairs_a_with_momentum_and_splits_filled_from_missed(monkeypatch):
+    from types import SimpleNamespace as NS
+
+    d = date(2026, 10, 1)
+    at = datetime(2026, 10, 1, 15, 0, tzinfo=timezone.utc)
+    lines = [said("MSFT", d, technicals=UP, live_record={"price": 100.0}),
+             said("NVDA", d, technicals=UP, live_record={"price": 100.0})]
+    after = [x.date() for x in pd.bdate_range("2026-10-02", periods=5)]
+    msft = pd.DataFrame({"Open": 101.0, "High": 101.5, "Low": 98.5, "Close": 100.0, "Dividends": 0.0},
+                        index=pd.DatetimeIndex([pd.Timestamp(x) for x in after]))
+    nvda = msft.assign(Low=100.5)                                   # never reaches its limit of 99
+    long_bars = Bars({"MSFT": msft, "NVDA": nvda})
+    entry = after[0]
+    fake = {"momentum": [NS(ticker="MSFT", signal_at=at, net=0.01, entry_day=entry),
+                         NS(ticker="NVDA", signal_at=at, net=0.03, entry_day=entry)],
+            xp.VETO: [NS(ticker="MSFT", signal_at=at, net=0.01, entry_day=entry)],
+            "insiders": [NS(ticker="MSFT", signal_at=at, net=0.02, entry_day=entry)]}
+    monkeypatch.setattr(xp, "arm_trades", lambda name, entries, how: fake[name])
+    how = xp.RaceSettings(0.30, 3, "auto", date(2026, 10, 20), None, None, 100_000.0, 2.0, 0.05, 0.001)
+    out = xp.race_tests(lines, long_bars, how, date(2026, 9, 28), date(2026, 9, 23))
+    assert out[xp.VETO]["days"] == 1 and out[xp.VETO]["mean_daily_diff"] == pytest.approx(0.01 - 0.02)
+    assert out["insiders"]["mean_daily_diff"] == pytest.approx(0.02 - 0.01)
+    split = out["pullback_filled_vs_missed"]
+    assert split["filled"]["n"] == 1 and split["missed"]["n"] == 1
+    assert split["missed_minus_filled"] == pytest.approx(0.03 - 0.01)
+
+
+def test_the_checkpoint_table_reads_every_test_of_the_family():
+    record = {"race": {"insiders": {"t": 1.0, "stats": None}, xp.VETO: {"t": None}},
+              "tests": {xp.TIMING: {"t": 2.5, "stats": {"sr": 0.2, "t_days": 60, "skew": 0.0, "kurt": 3.0}}}}
+    table = shadow_run.checkpoint_table_for(record)
+    assert table["n_trials"] == 18
+    rows = {r["name"]: r for r in table["rows"]}
+    assert len(rows) == 8 and rows["B, fund"]["dsr"] is not None
+    assert rows["A, race arm"]["no_data"] is True and rows["C, fund"]["no_data"] is True

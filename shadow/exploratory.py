@@ -486,8 +486,144 @@ class PullbackFund(Fund):
         self.orders = left
 
 
+# --------------------------------------------------------------------------- #
+# The race side, read at a checkpoint only (13.2, 13.4, 13.5)
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True)
+class RaceSettings:
+    """The race's own arithmetic (``analysis/horse_race.py``'s defaults)."""
+
+    floor: float
+    horizon: int
+    entry_rule: str
+    today: date
+    source: object
+    fetcher: object
+    equity: float
+    stop_multiplier: float
+    max_position_pct: float
+    cost_per_side: float
+
+
+def race_settings(today: date, final_through: date, lines) -> RaceSettings:
+    """Fresh price sources, warmed over the lines as the race warms its own."""
+    from analysis import horse_race as hr
+    from analysis.baseline_compare import OhlcFetcher
+    from analysis.returns import YFinancePriceSource
+
+    source, fetcher = YFinancePriceSource(final_through=final_through), OhlcFetcher(final_through=final_through)
+    hr.prewarm(lines, source, fetcher, hr.DEFAULT_HORIZON, today)
+    return RaceSettings(cfg.MIN_CONVICTION, hr.DEFAULT_HORIZON, hr.ENTRY_AUTO, today, source, fetcher,
+                        100_000.0, cfg.ATR_STOP_MULTIPLIER, cfg.MAX_POSITION_PCT, hr.DEFAULT_COST_PER_SIDE)
+
+
+def arm_trades(name: str, entries, how: RaceSettings) -> list:
+    """An arm's scored trades on its entries, exactly as ``horse_race.race_arm`` scores them."""
+    from analysis.baseline_compare import simulate_model_trades
+    from analysis.horse_race import scored_trades
+    from analysis.scoring import score_entries
+
+    above = [e for e in entries if e.is_directional and (e.conviction or 0.0) >= how.floor]
+    scored, _ = score_entries(above, how.source, how.horizon, how.entry_rule, how.today)
+    trades, matched, _ = simulate_model_trades(
+        scored, equity=how.equity, horizon_days=how.horizon, stop_multiplier=how.stop_multiplier,
+        max_position_pct=how.max_position_pct, fetcher=how.fetcher)
+    return scored_trades(name, matched, trades, how.cost_per_side)
+
+
+def veto_entries(momentum_entries, long_bars: Bars) -> list:
+    """Momentum's entries with A's veto applied: a vetoed line becomes NEUTRAL."""
+    from dataclasses import replace
+
+    out = []
+    for e in momentum_entries:
+        if e.is_directional:
+            live = e.live or {}
+            price = None if live.get("error") is not None else _positive(live.get("price"))
+            day = e.timestamp.date()
+            kept = veto(LLMSignal(ticker=e.ticker, bias=Bias(e.bias), conviction=float(e.conviction),
+                                  rationale="momentum"), price, sma_before(long_bars, e.ticker, day))
+            if kept.bias is Bias.NEUTRAL:
+                e = replace(e, bias="NEUTRAL", conviction=0.0)
+        out.append(e)
+    return out
+
+
+def _test(diffs: Sequence[float], lag: int) -> dict:
+    from analysis.horse_race import newey_west_t
+    from analysis.multiple_tests import p_two_sided, series_stats
+
+    t = newey_west_t(list(diffs), lag)
+    return {"days": len(diffs), "mean_daily_diff": (sum(diffs) / len(diffs)) if diffs else None,
+            "t": t, "p": p_two_sided(t), "stats": series_stats(diffs)}
+
+
+def race_tests(lines, long_bars: Bars, how: RaceSettings, first: date, window_start: date) -> dict:
+    """A's race arm against momentum (13.2), the insider arm's test (13.5), and C's filled against missed (13.4)."""
+    import statistics
+
+    from analysis.horse_race import daily_net, entries_for_arm, on_grid
+
+    utc = lambda e: e.timestamp.date()  # noqa: E731 - lines carry UTC timestamps
+    from_first = [e for e in lines if utc(e) >= first]
+    momentum_entries = entries_for_arm("momentum", from_first)
+    momentum = arm_trades("momentum", momentum_entries, how)
+    vetoed = arm_trades(VETO, veto_entries(momentum_entries, long_bars), how)
+    grid = sorted(set(daily_net(momentum)) | set(daily_net(vetoed)))
+    a = [x - y for x, y in zip(on_grid(daily_net(vetoed), grid), on_grid(daily_net(momentum), grid))]
+    out = {VETO: _test(a, how.horizon) | {"trades": len(vetoed), "momentum_trades": len(momentum)}}
+
+    window = [e for e in lines if utc(e) >= window_start]
+    insider = arm_trades("insiders", entries_for_arm("insiders", window), how)
+    rule = {(t.ticker, t.signal_at): t.net for t in arm_trades("momentum", entries_for_arm("momentum", window), how)}
+    per_day: dict[date, list[float]] = {}
+    for trade in insider:
+        per_day.setdefault(trade.entry_day, []).append(trade.net - rule.get((trade.ticker, trade.signal_at), 0.0))
+    out["insiders"] = _test([statistics.fmean(v) for _, v in sorted(per_day.items())], how.horizon) | {
+        "trades": len(insider)}
+
+    net = {(t.ticker, t.signal_at): t.net for t in momentum}
+    groups: dict[str, list[float]] = {"filled": [], "missed": []}
+    for e in momentum_entries:
+        if not (e.is_directional and (e.conviction or 0.0) >= how.floor) or e.held:
+            continue
+        key = (e.ticker, e.timestamp)
+        limit, _ = limit_price(Line(e.ticker, utc(e), 1, e), Bias(e.bias))
+        if limit is None or key not in net:
+            continue
+        window_days = sessions_after(utc(e), PULLBACK_SESSIONS)
+        if window_days[-1] > how.today:
+            continue
+        hit = any(touches(Bias(e.bias), limit, bar) for bar in
+                  (long_bars.bar(e.ticker, d) for d in window_days) if bar is not None)
+        groups["filled" if hit else "missed"].append(net[key])
+    out["pullback_filled_vs_missed"] = _filled_vs_missed(groups)
+    return out
+
+
+def _filled_vs_missed(groups: dict[str, list[float]]) -> dict:
+    """Number, mean net return and hit rate of each group, and missed minus filled with a Welch t (for reading)."""
+    import statistics
+
+    out = {}
+    for name, values in groups.items():
+        out[name] = {"n": len(values), "mean_net": statistics.fmean(values) if values else None,
+                     "hit_rate": (sum(1 for v in values if v > 0) / len(values)) if values else None}
+    f, m = groups["filled"], groups["missed"]
+    welch = None
+    if len(f) >= 2 and len(m) >= 2:
+        se = math.sqrt(statistics.variance(f) / len(f) + statistics.variance(m) / len(m))
+        welch = (statistics.fmean(m) - statistics.fmean(f)) / se if se > 0 else None
+    out["missed_minus_filled"] = (statistics.fmean(m) - statistics.fmean(f)) if f and m else None
+    out["welch_t"] = welch
+    return out
+
+
 __all__ = [
-    "COMPARED_WITH", "LIMIT", "NEW_FUNDS", "PullbackFund", "TIMING", "TimingFund", "VETO", "limit_price",
+    "COMPARED_WITH", "LIMIT", "NEW_FUNDS", "PullbackFund", "RaceSettings", "TIMING", "TimingFund", "VETO",
+    "arm_trades", "limit_price", "race_settings", "race_tests",
     "pullback_counters", "sma_before", "timing_counters", "timing_signals", "touches", "veto", "veto_counters",
     "veto_signal",
 ]
