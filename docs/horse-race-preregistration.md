@@ -23,6 +23,7 @@ rule; a bug fix re-runs the race over the whole journal.
 | Planned looks | at **20, 40 and 60 independent days** (60, 120 and 180 trading days), bars **t > 3.47, 2.45, 2.00**. See section 5a. |
 | Real money | **none before the June 2027 verdict.** See section 9. |
 | Fund test | the funds act on the cycle of **2026-09-28**, first fund session **2026-09-29**; counted only after calibration passes; read at the race's looks, planned bars **t > 3.40, 2.41, 2.02**. See sections 11 and 12. |
+| Exploratory tests | A (momentum with a 200-day average veto), B (10-month average timing on VT), C (pullback limit entry), and the three exploratory funds: results only at the race's looks, with Benjamini-Hochberg and the Deflated Sharpe Ratio. They cannot change the decision. See section 13. |
 
 ## 1. The question
 
@@ -229,6 +230,8 @@ fails if any of them differs from this file.
 - **A re-scoring under a changed cost, horizon or floor.** The defaults above
   are the ones the decision reads; other settings may be printed as
   sensitivity.
+- **Tests A, B and C, and the three exploratory funds** (sections 11.1 and
+  13). Their results are read at the checkpoints only.
 - **A partial window, except a planned look.** The primary window is the
   lines journalled on or after 2026-09-23, up to the look that decides
   (section 5a) — its first 60, 120 or 180 entry days, every one of them
@@ -341,7 +344,8 @@ reads the four funds only). For each, the fund
 output and the 4 Funds page show its total return against the model fund's,
 the mean daily difference with its Newey-West t (lag 5), and, for
 `model_sized`, its maximum drawdown beside the model fund's, since bigger
-positions can mean bigger losses. In this system the "normal size" is the
+positions can mean bigger losses. These are shown only at the checkpoints
+(section 13.1, Amendment 2026-09-28); between them, only counters. In this system the "normal size" is the
 per-ticker cap (5% of equity for a company, 12% for a broad fund, and so
 on); the ATR only sets the stop. `model_sized`'s engine reads that cap times
 the conviction factor, for its own entries only: production code is not
@@ -610,6 +614,196 @@ if the snapshot is incomplete, calibration starts on the next trading day
 with a complete one). The fund test's start stays 2026-09-28 either way
 (11.3).
 
+## 13. Exploratory tests A, B and C (Amendment 2026-09-28)
+
+Three exploratory tests, asked by the owner on 2026-09-27. They are
+exploratory in the sense of section 6: **none of them can change the
+decision** (sections 5, 5a, 11.6 and 11.8 read the registered arms and the
+four funds only), and none changes any rule, look or bar. Every setting is
+fixed here, from a published source where there is one. No model takes part
+in them: code computes everything.
+
+### 13.1 Hidden until the checkpoints
+
+- A **checkpoint** is the day the race reaches one of its planned looks
+  (section 5a: 20, 40 and 60 independent days; estimated 2026-12-22,
+  2027-03-22, 2027-06-16).
+- **Between checkpoints, only the counters listed below are computed,
+  kept or shown** for A, B and C, and for the three exploratory funds of
+  section 11.1 (`model_by_conviction`, `model_sized`, `model_same_day`).
+  No equity, return, mean, t, hit rate or drawdown of theirs is written to
+  any file, page or log. The three exploratory funds' counters are the
+  ones section 11 already names that are not returns: the lines
+  `model_same_day` could not enter and why, the order-matters counts, and
+  the held names skipped.
+- **At each checkpoint** their results are computed once, over every day
+  from their start to that checkpoint, and written to a record that is
+  kept unchanged until the next checkpoint.
+- Like every fund, the A, B and C funds are computed only after
+  calibration has passed (section 12). A checkpoint before that shows
+  their counters only.
+
+### 13.2 Test A: momentum with a 200-day moving-average veto (race arm and fund)
+
+- **Source:** Brock, Lakonishok and LeBaron (1992), the moving-average
+  rule of price against its 200-day average. Nothing tuned. (A 50-day
+  version was dropped before it ran: the momentum rule already confirms
+  against the 50-day average, so it would have removed only about 1-3% of
+  signals. Decided from signal counts only, with no returns looked at; it
+  is in the graveyard and counts in N.)
+- **Rule:** take the momentum rule's signal on each line (section 2,
+  unchanged). Keep a LONG only if the live price at signal time is above
+  the 200-day simple moving average; keep a SHORT only if it is below.
+  Otherwise the line is NEUTRAL for this arm. Conviction is unchanged.
+  - *Live price at signal time:* the line's recorded last trade
+    (`live.price`, section 11.1).
+  - *200-day simple moving average:* the mean of the name's last 200 final
+    daily closes up to and including the close of the session before the
+    signal's day, so it never uses a price from after the signal. A name
+    with fewer than 200 final closes has no average, and keeps the
+    momentum signal as it is; counted.
+  - "Above" and "below" are strict: equal means NEUTRAL.
+  - A line with no recorded live price keeps the momentum signal as it is.
+    Each such line is counted.
+- **Race arm:** scored exactly like momentum (3 sessions, next open, same
+  stop, cost and floor), on lines journalled from 2026-09-28 (the first
+  cycle with a live price). **Main metric:** mean daily net return,
+  A minus momentum, over all names, on the same entry days, Newey-West t
+  (lag 3), as in section 3.
+- **Fund:** the momentum fund with A's signals; everything else
+  identical (section 11, start 2026-09-28). **Main metric:** mean daily
+  net return, A fund minus momentum fund, paired, Newey-West t (lag 5).
+- **Counter:** the share of momentum's signals (LONG or SHORT, at or above
+  the conviction floor) that the veto turns NEUTRAL, and the numbers of
+  lines with no live price and of names with no average. **If the veto
+  removes under about 10% of signals, the first checkpoint's report says
+  so**: A is then almost the momentum rule, and its result says little.
+
+### 13.3 Test B: 10-month moving-average timing on VT (fund)
+
+- **Source:** Faber (2007; updated 2013 and 2018). Nothing tuned.
+- **Rule:** on the last trading day of each month, compare VT's close with
+  the average of its last 10 month-end closes (that close and the 9
+  month-ends before it). **Above:** hold VT with all the fund's cash, like
+  the VT fund. **Not above:** hold T-bills through BIL (SPDR Bloomberg 1-3
+  Month T-Bill ETF), as Faber used T-bills. Trade at the next session's
+  open, 0.10% per side: a switch sells one and buys the other at the same
+  open (two sides). Dividends are credited for whichever fund is held, as
+  for the VT fund. No stop and no position manager, like the VT fund.
+- **Prices:** the race's daily closes, final closes only. If the price
+  source never prints VT on a month's last trading day, VT's last close
+  earlier in that month is used, and this is counted. Each leg of a trade
+  happens at the first open where that fund has a bar; in between, the
+  money is cash at 0%. Counted.
+- **Start:** the first month-end after this amendment: **2026-09-30**.
+  Until then the fund holds its $100,000 in cash; its first trade is at
+  the next open (2026-10-01), and its sample starts on that session.
+- **Compared with:** the VT fund (section 11.1). **Main metric:** mean
+  daily net return, B minus VT fund, paired over B's sessions, Newey-West t
+  (lag 5). Also shown at checkpoints: each fund's total return and maximum
+  drawdown.
+- **Counter:** the number of switches so far and the current state (in VT
+  or in BIL), with the date of the last month-end signal.
+
+### 13.4 Test C: pullback limit entry (fund)
+
+- **Source:** none published for these settings: the owner's fixed
+  choice of 2026-09-27. Nothing tuned.
+- **Rule:** the same signals as the momentum fund. Instead of buying at
+  the next open, place a limit buy at *signal price − 0.5 × ATR14*, valid
+  for the 3 sessions after the signal's day, then cancelled. A short is a
+  limit sell at *signal price + 0.5 × ATR14*.
+  - *Signal price:* the line's recorded last trade (`live.price`); if none
+    was recorded, the price the momentum rule read (`technicals.last_close`),
+    counted.
+  - *ATR14:* the line's own 14-day ATR (`technicals.atr14`), fixed when the
+    signal was made.
+- **Fill rule:** if a session opens at or past the limit, fill at the open;
+  otherwise, if the day's range reaches the limit, fill at the limit. Cost
+  0.10% per side. A session with no bar for the name (section 11.2, price
+  gaps) is one of the 3 and cannot fill.
+- **Everything else is identical to the momentum fund**, with these
+  necessary details:
+  - The engine sizes and checks the entry when the order fills, at the
+    fill price. If it refuses then (no room), the order is dropped and
+    counted. A pending order reserves nothing.
+  - A name already held gets no order (as production). A new signal on a
+    name with an order pending is ignored while that order stands; counted.
+  - Order of a session: stops gapped through fill at the open; the
+    position manager runs; limit orders the open fills (watchlist order);
+    stops touched during the session; then limit orders filled during the
+    session (watchlist order). A position filled during the session has its
+    stop checked first at the next open, as in `model_same_day`, because
+    the bar cannot say whether the low came before or after the fill.
+- **Compared with:** the momentum fund. **Main metric:** mean daily net
+  return, C fund minus momentum fund, paired, Newey-West t (lag 5).
+- **Pre-registered prediction:** the fill rate is well below 100%, and the
+  missed signals do better than the filled ones.
+- **Counters:** for every momentum signal the funds see (from the
+  2026-09-28 cycle), whether its limit would have filled within its 3
+  sessions: the fill rate, and the number of filled and missed signals.
+  Counted from prices alone, without running the fund.
+- **At checkpoints:** the forward return of filled against missed
+  signals, measured the same way for both (each signal's momentum race
+  trade: next open, 3 sessions, same stop, net of cost): number, mean net
+  return and hit rate of each group, and the difference, missed minus
+  filled, with a Welch t. Signals on the same day are not independent, so
+  that t is for reading only and is not one of the tests in 13.5. And the
+  C fund against the momentum fund (its main metric).
+
+### 13.5 At every checkpoint: Benjamini-Hochberg across all exploratory tests
+
+- **The family:** every exploratory test with a main metric at that
+  checkpoint: the insider arm (on the lines it took a side on, its net
+  return minus momentum's on the same lines, 0 where momentum did not
+  trade, averaged per entry day, Newey-West t lag 3), A's race arm, A's fund,
+  B, C, `model_by_conviction`, `model_sized` and `model_same_day` (each
+  against the fund named in section 11.1). A test with no data yet is left
+  out, and the report says so.
+- **p-value:** two-sided, from the normal distribution, for each test's
+  Newey-West t.
+- **Adjustment:** Benjamini and Hochberg (1995). With the m p-values in
+  order p(1) ≤ … ≤ p(m), the adjusted p-value of p(i) is the smallest of
+  m × p(j) / j over j ≥ i, capped at 1. A test **passes** if its adjusted
+  p-value is at most 0.05.
+
+### 13.6 At every checkpoint: the Deflated Sharpe Ratio
+
+- **Source:** Bailey and López de Prado (2014).
+- For each test in 13.5, on the same daily series as its main metric:
+  SR = mean ÷ standard deviation (per day, not annualised), T = number of
+  days, γ3 = skewness, γ4 = kurtosis (3 for a normal distribution).
+- **N** = the number of trials in `docs/research/graveyard.md` on the
+  checkpoint day (18 when this was registered).
+- SR0 = √V × ((1 − γ) × Φ⁻¹(1 − 1/N) + γ × Φ⁻¹(1 − 1/(N × e))), with
+  γ = 0.5772 (Euler's constant) and **V = 1/T**, the variance of a Sharpe
+  ratio estimated from T returns when the true one is zero (Lo 2002).
+- DSR = Φ((SR − SR0) × √(T − 1) ÷ √(1 − γ3 × SR + (γ4 − 1)/4 × SR²)).
+- Reported for every test. **Above 0.95** means the result survives the
+  number of ideas tried, at 5%. For the race arms (overlapping 3-session
+  trades) the DSR is optimistic; the Newey-West t is the careful number.
+
+### 13.7 What a result can lead to
+
+- **Promising:** at a checkpoint, the idea beats its comparator and passes
+  Benjamini-Hochberg (13.5).
+- **Dead:** at any checkpoint it trails its comparator and passes
+  Benjamini-Hochberg in that direction; or at the final checkpoint its
+  mean difference is zero or below.
+- **Not proven:** anything else. It stays until the final checkpoint.
+- A promising idea is only a candidate for a later registration. It
+  changes nothing in this one.
+
+### 13.8 Research limits
+
+- A, B and C are the starting set. **No other new exploratory test before
+  the first checkpoint (2026-12-22).**
+- **From 2027-01-01: at most 2 new ideas per quarter, registered only at
+  checkpoints.**
+- Every idea gets a card in `docs/research/cards/` and a row in
+  `docs/research/graveyard.md` before it runs, and stays in the graveyard
+  after it is dropped. The graveyard's count is N in 13.6.
+
 ## Amendments
 
 | Date | Kind | Reason |
@@ -638,3 +832,4 @@ with a complete one). The fund test's start stays 2026-09-28 either way
 | 2026-09-26 | **Storage change: the journal is one file per month** (the owner's decision; not a rule change) | The journal grows by about 0.64 MB a trading day, and GitHub refuses a push carrying a file over 100 MB, which the single file `logs/signal_journal.log` would have reached in spring 2027, before the verdict; from then no cycle's journal could have been committed. The owner approved splitting it into one file per UTC month, `logs/journal/YYYY-MM.log`, before the fund test starts. The old file was moved whole to `logs/journal/2026-09.log` (every line in it was from September); a line is written exactly as before, only into its month's file; and every reader joins the months in order (`config/journal_files.py`), so every reader sees the old file byte for byte. Checked: the joined months hash to the old file (sha256 `26b6e7a2…a483d`, 6,972,754 bytes; `tests/test_journal_files.py`), and the race, its gate and the funds, calibration included, give byte-identical output before and after the split on the same prices (`.github/workflows/journal-split-check.yml`). No line, rule, window, bar or result changes. |
 | 2026-09-26 | **Fund test** (new registration) | Asked by the owner on 2026-09-24; approved by the owner on 2026-09-26. Sections 11 and 12, with the owner's decisions of 2026-09-24 (the calibration pass rule with its two-way match, the watchlist order kept and how often it matters reported, no cost in the calibration copy, the fund test's own bars), of 2026-09-25 (the calibration fail rule: re-run every day after a fix, at least 5 days after the last fix; the late-run mirroring in calibration, stopped if more than 2 calibration days need it; the exploratory funds `model_by_conviction` and `model_sized`) and of 2026-09-26 (short refusals count only from the day they happen; the monthly share of missing price days with a warning above 2%; lag 5; the 95th-percentile coin-flip condition, noted as weak for a buy-only model with the index rule as the real protection; held names as a known limitation, counted daily; bars by an O'Brien-Fleming-type spending rule, recomputed by the same rule from the actual sessions if any look moves; and the exploratory fund `model_same_day`). No exploratory fund can change the decision. Made before any fund was run: no fund result exists, and none will until calibration passes. |
 | 2026-09-26 | **Fund test start: 2026-09-28** (the owner's decision; made before any fund result existed) | The funds act on the 2026-09-28 cycle from the next open (first fund session 2026-09-29) instead of starting on the first trading day after calibration passes. Reason: it adds about 15 sessions to every look (planned 60, 120 and 180 fund sessions instead of 45, 105 and 165; bars 3.40, 2.41, 2.02 by the spending rule, rounded up). Calibration is unchanged: the fund test counts only after it passes, no fund result is calculated or shown before that, the funds are then run from 2026-09-28 with the final checked code only (after any calibration fix, with the fixed code only), and a delayed calibration delays the reading, never the start. A look before calibration has passed is skipped by the fund test, spending nothing. No fund had been run and no fund result existed. |
+| 2026-09-28 | **Exploratory tests A, B and C** (new registration; exploratory) | Asked by the owner on 2026-09-27; decided by the owner on 2026-09-27. Section 13: A, the momentum rule with a 200-day moving-average veto from final closes up to the session before the signal (race arm and fund; a 50-day version was dropped before it ran as redundant with the momentum rule's own 50-day check, decided from signal counts only, and counts in N); B, 10-month moving-average timing on VT with T-bills through BIL (fund, from the 2026-09-30 month-end); C, pullback limit entry (fund). Counters only between checkpoints, results only at the race's looks, for A, B and C **and for the three exploratory funds of section 11.1** (`model_by_conviction`, `model_sized`, `model_same_day`), which until now were to be shown nightly once calibration passed; at each look, Benjamini-Hochberg across all exploratory tests and the Deflated Sharpe Ratio with N from `docs/research/graveyard.md` (18); the research limits. None can change the decision. **Made before any result of A, B or C existed, and before any exploratory fund result existed:** none has been computed (no fund is run before calibration passes), and the rules were written by the owner on 2026-09-27, before the first line they read (the 2026-09-28 cycle). |

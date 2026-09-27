@@ -1,4 +1,4 @@
-"""The model's answers, week by week, against its own previous four weeks.
+"""The model's answers, week by week, against their own history; its settings, day by day.
 
     python -m analysis.drift                  # the record, as JSON (logs/drift.json)
     python -m analysis.drift --text           # the latest weeks, for a person
@@ -24,20 +24,28 @@ This watches the answers themselves, every week:
 * the model, the host that served it, its settings (reasoning level,
   screening) and the prompt fingerprint (``model_setup`` on each line).
 
-The normal band (the owner's fixed rule). A number leaves its normal band
-when it is outside the mean plus or minus 2 standard deviations of the same
-number over the 4 weeks before it. The standard deviation is the sample one
-(divided by n - 1), and all 4 weeks must have the number, or there is no
-band that week. A name -- the model, the host, a setting, the prompt
-fingerprint -- leaves its band when it was not seen in any of the 4 weeks
-before. No band, and so no alert, until 4 weeks of data exist.
+The owner's rule, as changed on 27 Sep 2026 before any data existed:
+
+* **Settings** -- the model, the host, the reasoning level, screening and
+  the prompt fingerprint -- alert on any change, the same day: a value on
+  today's lines that the last cycle day before it did not have, or two
+  values on today's lines. Nothing is waited for.
+* **Numbers** -- the NEUTRAL share, the mean conviction, agreement with
+  momentum, the long share, setup and model errors, and lateness (``BANDED``)
+  -- have a band: the mean plus or minus 2 standard deviations (the sample
+  one, divided by n - 1) of the same number over **every** complete week
+  before, from the first. No band until 4 weeks have the number. An alert
+  fires only when a number is outside its band **2 weeks in a row** (each
+  week against its own band). The share at or above the floor and the share
+  of days the Supabase starter started are shown, with no band (``SHOWN``).
 
 Weeks run Monday to Sunday by the UTC date of each line, from 28 Sep 2026:
 the first week in which every cycle line carries its run block, its live
 price and its model setup. Only a complete week is judged; the current week
-is shown "so far". The alert reaches the owner's phone once: the record
-names the day to say it (``alert_on``, the first cycle day of the next
-week), and the daily health check raises a warning on that day only.
+is shown "so far". A number's alert reaches the owner's phone once: the
+record names the day to say it (``alert_on``, the first cycle day of the
+next week), and the daily health check raises a warning on that day only. A
+setting's alert is said on the day it is seen (``setting_alert_on``).
 
 Held lines (no model was asked) and lines that failed before the model was
 asked (``stage == "context"``) are left out of every number: the question
@@ -72,9 +80,11 @@ from rules import momentum  # noqa: E402
 START = date(2026, 9, 28)
 
 #: The owner's rule: the band is the mean plus or minus this many standard
-#: deviations of the same number over this many weeks before.
-BAND_WEEKS = 4
+#: deviations of every complete week before; none until this many weeks have
+#: the number; an alert after this many weeks outside it in a row.
+MIN_WEEKS = 4
 BAND_SDS = 2.0
+IN_A_ROW = 2
 
 #: The day's main starter (``analysis/cycle_day.py:PRIMARY_SOURCE``).
 PRIMARY_SOURCE = "supabase-cron"
@@ -90,19 +100,25 @@ GROUPS: tuple[tuple[str, float, float], ...] = (
 
 #: Every number judged against its band, in report order, with the words a
 #: person reads it by.
-NUMBERS: tuple[tuple[str, str], ...] = (
+BANDED: tuple[tuple[str, str], ...] = (
     ("neutral_pct", "NEUTRAL share (%)"),
     ("conviction_mean", "mean conviction (side-taking answers)"),
-    ("at_floor_pct", "side-taking answers at or above the floor (%)"),
     ("agreement_pct", "agreement with momentum (%)"),
     ("long_pct", "longs among side-taking answers (%)"),
     ("setup_error_pct", "setup errors (% of calls)"),
     ("model_error_pct", "model errors (% of calls)"),
     ("minutes_late_mean", "run start, mean minutes after schedule"),
+)
+
+#: Numbers shown every week with no band.
+SHOWN: tuple[tuple[str, str], ...] = (
+    ("at_floor_pct", "side-taking answers at or above the floor (%)"),
     ("primary_start_pct", "days started by the Supabase starter (%)"),
 )
 
-#: Every name judged against the names seen before it.
+NUMBERS: tuple[tuple[str, str], ...] = BANDED + SHOWN
+
+#: Every setting, judged day by day against the last cycle day before.
 NAMES: tuple[tuple[str, str], ...] = (
     ("model", "model"),
     ("provider", "host"),
@@ -222,12 +238,12 @@ def week_numbers(entries: Sequence[JournalEntry]) -> dict[str, Any]:
 
 
 def band(previous: Sequence[Optional[float]]) -> Optional[dict[str, float]]:
-    """The owner's band from the weeks before, or None unless all ``BAND_WEEKS`` have the number."""
-    if len(previous) < BAND_WEEKS or any(v is None for v in previous[-BAND_WEEKS:]):
+    """The owner's band from every week before that has the number; None with fewer than ``MIN_WEEKS``."""
+    known = [float(v) for v in previous if v is not None]
+    if len(known) < MIN_WEEKS:
         return None
-    last = [float(v) for v in previous[-BAND_WEEKS:]]  # type: ignore[arg-type]
-    mean = statistics.fmean(last)
-    sd = statistics.stdev(last)
+    mean = statistics.fmean(known)
+    sd = statistics.stdev(known)
     return {
         "mean": round(mean, 4),
         "sd": round(sd, 4),
@@ -245,31 +261,50 @@ def _outside(value: Optional[float], limits: Optional[dict[str, float]]) -> bool
 
 
 def judge(weeks: list[dict[str, Any]]) -> None:
-    """Add each complete week's bands and alerts, in place, from the weeks before it."""
+    """Add each complete week's bands, outside marks and alerts, in place, from the weeks before it."""
     for i, week in enumerate(weeks):
-        previous = weeks[max(0, i - BAND_WEEKS):i]
-        week["bands"], week["alerts"] = {}, []
+        previous = weeks[:i]
+        week["bands"], week["outside"], week["alerts"] = {}, {}, []
         if not week["complete"]:
             continue
-        for key, words in NUMBERS:
+        for key, words in BANDED:
             limits = band([w["values"].get(key) for w in previous])
             value = week["values"].get(key)
             week["bands"][key] = limits
-            if _outside(value, limits):
+            week["outside"][key] = _outside(value, limits)
+            run = [week] + list(reversed(previous))[:IN_A_ROW - 1]
+            if len(run) == IN_A_ROW and all(w.get("outside", {}).get(key) for w in run):
                 week["alerts"].append(
-                    f"{words}: {value:g} is outside its band {limits['low']:g} to {limits['high']:g}"
+                    f"{words}: {value:g} is outside its band {limits['low']:g} to {limits['high']:g}, "
+                    f"{IN_A_ROW} weeks in a row"
                 )
-        if len(previous) < BAND_WEEKS or not all(w["counts"]["asked"] for w in previous):
-            continue
-        for key, words in NAMES:
-            before = {name for w in previous for name in w["names"].get(key, [])}
-            new = [name for name in week["names"].get(key, []) if name not in before]
-            if before and new:
-                week["alerts"].append(f"{words}: {', '.join(new)} was not seen in the 4 weeks before")
+
+
+def setting_changes(entries: Sequence[JournalEntry], today: date) -> list[str]:
+    """Today's settings against the last cycle day before today (from ``START``); empty if none changed."""
+    by_day: dict[date, list[JournalEntry]] = {}
+    for entry in entries:
+        day = _utc_day(entry)
+        if day is not None and START <= day <= today:
+            by_day.setdefault(day, []).append(entry)
+    if today not in by_day:
+        return []
+    now = _names(by_day[today])
+    earlier = [day for day in by_day if day < today]
+    before = _names(by_day[max(earlier)]) if earlier else {}
+    out = []
+    for key, words in NAMES:
+        values, old = now.get(key) or [], before.get(key) or []
+        if len(values) > 1:
+            out.append(f"{words}: {', '.join(values)} on the same day")
+        elif values and old and values != old:
+            out.append(f"{words} changed: {', '.join(old)} -> {', '.join(values)}")
+    return out
 
 
 def build(entries: Iterable[JournalEntry], today: date) -> dict[str, Any]:
     """The whole record: every week from ``START`` to today's, judged, and the day to say it."""
+    entries = list(entries)
     by_week: dict[date, list[JournalEntry]] = {}
     first_day_this_week: Optional[date] = None
     this_monday = monday_of(today)
@@ -295,16 +330,19 @@ def build(entries: Iterable[JournalEntry], today: date) -> dict[str, Any]:
     alerts = list(last_complete["alerts"]) if last_complete else []
     # Said once: on the first cycle day of the week after the judged one.
     alert_on = first_day_this_week.isoformat() if alerts and first_day_this_week else None
+    changes = setting_changes(entries, today)
     return {
         "kind": "drift",
         "made_on": today.isoformat(),
         "start": START.isoformat(),
-        "rule": (f"a number leaves its band outside the mean +/- {BAND_SDS:g} sample standard "
-                 f"deviations of the {BAND_WEEKS} weeks before; a name, when it was not seen in "
-                 f"them; no band until {BAND_WEEKS} weeks of data exist"),
+        "rule": (f"a number alerts when it is outside the mean +/- {BAND_SDS:g} sample standard "
+                 f"deviations of every week before, {IN_A_ROW} weeks in a row (no band until "
+                 f"{MIN_WEEKS} weeks have it); a setting alerts on any change, the same day"),
         "judged_week": last_complete["week"] if last_complete else None,
         "alerts": alerts,
         "alert_on": alert_on,
+        "setting_alerts": changes,
+        "setting_alert_on": today.isoformat() if changes else None,
         "weeks": weeks,
     }
 
@@ -319,8 +357,9 @@ def render_week(week: dict[str, Any]) -> list[str]:
         value = week["values"].get(key)
         limits = (week.get("bands") or {}).get(key)
         shown = "n/a" if value is None else f"{value:g}"
+        banded = key in dict(BANDED)
         where = (f" (band {limits['low']:g} to {limits['high']:g})" if limits
-                 else " (no band yet)" if week["complete"] else "")
+                 else " (no band yet)" if week["complete"] and banded else "")
         out.append(f"- {words}: {shown}{where}")
     groups = ", ".join(f"{label} {n}" for label, n in week["conviction_groups"].items())
     out.append(f"- conviction groups: {groups}")
@@ -331,7 +370,7 @@ def render_week(week: dict[str, Any]) -> list[str]:
         names = week["names"].get(key) or ["none recorded"]
         out.append(f"- {words}: {', '.join(names)}")
     for alert in week.get("alerts") or []:
-        out.append(f"- OUTSIDE ITS BAND: {alert}")
+        out.append(f"- ALERT: {alert}")
     return out
 
 
@@ -344,7 +383,7 @@ def render(record: dict[str, Any], weeks: int = 2) -> str:
 
 
 def main(argv: Optional[list[str]] = None) -> int:
-    parser = argparse.ArgumentParser(description="The model's answers, week by week, against its last 4 weeks.")
+    parser = argparse.ArgumentParser(description="The model's answers, week by week, against their history.")
     parser.add_argument("--journal", type=Path, default=cfg.SIGNAL_JOURNAL_PATH)
     parser.add_argument("--day", default=None, help="ISO date, default today in UTC")
     parser.add_argument("--text", action="store_true", help="plain text instead of JSON")

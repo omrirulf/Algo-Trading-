@@ -36,27 +36,35 @@ Each week, from the journal alone:
 Held lines and lines that failed before the model was asked are left out:
 the question is what the model did with the calls it got.
 
-**The normal band (the owner's fixed rule).** A number leaves its band when
-it is outside the mean plus or minus 2 sample standard deviations of the
-same number over the 4 weeks before. All 4 weeks must have the number. A
-name (model, host, setting, fingerprint) leaves its band when it was not
-seen in any of the 4 weeks before. No band, and no alert, until 4 weeks of
-data exist. Weeks run Monday to Sunday (UTC) from 28 Sep 2026, so the first
-week that can alert is the week of 26 Oct 2026, said on 2 Nov 2026.
+**The rule (the owner's, changed on 27 Sep 2026 before any data existed).**
 
-An alert is a warning in the daily health check on the first cycle day of
-the following week only, so it heads that day's brief once
-(`analysis/health.py`, `drift_alert`).
+- **Settings** (the model, the host, the reasoning level, screening, the
+  prompt fingerprint): any change alerts **the same day**. Today's lines are
+  compared with the last cycle day before; two values on one day also alert.
+- **Numbers** (NEUTRAL share, mean conviction, agreement with momentum, long
+  share, setup errors, model errors, lateness): the band is the mean plus or
+  minus 2 sample standard deviations of **every** complete week before, from
+  28 Sep 2026. No band until 4 weeks have the number. An alert fires only
+  when a number is outside its band **2 weeks in a row**, each week against
+  its own band. It is said once, on the first cycle day of the following
+  week. The share at or above the floor and the share of days the Supabase
+  starter started are shown with no band (the starter already has its own
+  daily warning).
 
-<Warning>
-With only 4 weeks behind it, the band is narrow. If the numbers did not
-change at all, each one would still fall outside its band about one week in
-six, by chance, and with nine numbers most weeks would have at least one
-alert. And a number that was the same for 4 weeks (0 failed calls, say) has
-a band of zero width: any change leaves it. The rule is the owner's and is
-applied as written; the report shows every number with its band so an alert
-can be read in context.
-</Warning>
+Weeks run Monday to Sunday (UTC). The first number alert is possible for
+the week of 2 Nov 2026 (4 weeks of band, then 2 weeks outside), said on
+9 Nov 2026 at the earliest.
+
+<Note>
+Expected false alerts, if nothing really changes (simulated with normal
+weekly numbers, 37 weeks to June 2027): about 1 week in 165 for each number,
+about 1.4 alerts in all over the 7 numbers by June 2027. A number that has
+been exactly the same every week (0 setup errors, say) has a band of zero
+width, so any change for 2 weeks in a row alerts. The price of the 2-week
+rule: a real lasting change of 2 standard deviations is caught within 4
+weeks only about a third of the time, because the first week outside widens
+the band; a change of 3 standard deviations about 70% of the time.
+</Note>
 
 ### The prompt fingerprint
 

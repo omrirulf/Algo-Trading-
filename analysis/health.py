@@ -40,9 +40,10 @@ are read like the nightly records; the starter's own request result
 
 One rule, from 27 Sep 2026, reads the weekly drift record
 (``logs/drift.json``, written by ``analysis/drift.py``): on the first cycle
-day of a week, a warning when a number about the model's answers last week
-left its normal band (the owner's rule: the mean plus or minus 2 standard
-deviations of the 4 weeks before; none until 4 weeks of data exist).
+day of a week, a warning when a number about the model's answers stayed
+outside its normal band 2 weeks in a row (the mean plus or minus 2 standard
+deviations of every week before; none until 4 weeks have it); and on any
+day, a warning when the model, its host, a setting or the prompt changed.
 """
 
 from __future__ import annotations
@@ -412,16 +413,15 @@ def calibration_stopped(funds: Optional[dict]) -> Optional[Alarm]:
 
 
 def drift_alert(drift: Optional[dict], day: date) -> Optional[Alarm]:
-    """27 Sep 2026: last week, a number left its normal band (the owner's weekly drift report).
+    """27 Sep 2026: a weekly number stayed outside its normal band (the owner's drift report).
 
-    The owner's rule: a weekly number about the model's answers leaves its
-    normal band when it is outside the mean plus or minus 2 standard
-    deviations of the 4 weeks before; a name (model, host, setting, prompt
-    fingerprint) leaves it when it was not seen in them; no alert until 4
-    weeks of data exist (``analysis/drift.py``). Said once, on the day the
-    record names (``alert_on``: the first cycle day of the following week),
-    so a week that drifted is one notification, not five. A warning: it
-    changes nothing by itself; the owner decides what it means.
+    The owner's rule: a weekly number about the model's answers alerts when
+    it is outside the mean plus or minus 2 standard deviations of every week
+    before, 2 weeks in a row; no band until 4 weeks have it
+    (``analysis/drift.py``). Said once, on the day the record names
+    (``alert_on``: the first cycle day of the following week), so a week
+    that drifted is one notification, not five. A warning: it changes
+    nothing by itself; the owner decides what it means.
     """
     if not isinstance(drift, dict) or drift.get("alert_on") != day.isoformat():
         return None
@@ -431,9 +431,29 @@ def drift_alert(drift: Optional[dict], day: date) -> Optional[Alarm]:
     week = drift.get("judged_week")
     week = week if isinstance(week, str) and re.fullmatch(r"\d{4}-W\d{2}", week) else "last week"
     listed = "; ".join(a[:160] for a in alerts[:6]) + (" …" if len(alerts) > 6 else "")
-    return Alarm(WARNING, f"Drift: {len(alerts)} value(s) left their normal band in {week}",
-                 f"{listed}. Band: the mean plus or minus 2 standard deviations of the 4 weeks "
+    return Alarm(WARNING, f"Drift: {len(alerts)} value(s) outside their normal band 2 weeks running, to {week}",
+                 f"{listed}. Band: the mean plus or minus 2 standard deviations of every week "
                  f"before (analysis/drift.py). Nothing changes by itself; the owner decides.")
+
+
+def setting_changed(drift: Optional[dict], day: date) -> Optional[Alarm]:
+    """27 Sep 2026: the model, its host, a setting or the prompt changed today.
+
+    The owner's rule: any change of the model, the host it is asked at, the
+    reasoning level, screening or the prompt fingerprint alerts the same day
+    (``analysis/drift.py``, ``setting_changes``: today's lines against the
+    last cycle day before). A warning: a change of contestant is the owner's
+    to judge; nothing reverts by itself.
+    """
+    if not isinstance(drift, dict) or drift.get("setting_alert_on") != day.isoformat():
+        return None
+    changes = [c for c in drift.get("setting_alerts") or [] if isinstance(c, str) and c]
+    if not changes:
+        return None
+    return Alarm(WARNING, f"Model setup changed today: {changes[0][:120]}",
+                 "; ".join(c[:160] for c in changes[:5]) + ". Seen on today's journal lines against "
+                 "the last cycle day before (analysis/drift.py). The race counts only lines made "
+                 "as the pre-registration names; the owner decides.")
 
 
 def _fraction(value: object) -> Optional[float]:
@@ -748,6 +768,7 @@ def check(journal: Path, audit: Path, day: date, funds: Optional[Path] = None,
         duplicate_cycle(today),
         # The model's answers against its own last four weeks: said on the
         # first cycle day of the week after the one that drifted, only.
+        setting_changed(_read_record(drift_path), day),
         drift_alert(_read_record(drift_path), day),
         # The machinery that starts the day and keeps its record, after
         # everything about the day's trading: the brief names the first

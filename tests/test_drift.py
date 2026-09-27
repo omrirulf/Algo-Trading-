@@ -82,74 +82,97 @@ def test_one_week_of_numbers_is_counted_from_the_calls_the_model_got():
     assert week["names"]["provider"] == ["api.deepinfra.com"]
 
 
-def test_the_band_is_the_mean_plus_or_minus_two_sample_standard_deviations():
-    limits = drift.band([10.0, 12.0, 14.0, 16.0])
-    sd = statistics.stdev([10.0, 12.0, 14.0, 16.0])
-    assert limits["mean"] == 13.0 and limits["sd"] == pytest.approx(sd, abs=1e-4)
-    assert limits["low"] == pytest.approx(13 - 2 * sd, abs=1e-4)
-    assert limits["high"] == pytest.approx(13 + 2 * sd, abs=1e-4)
+def test_the_band_is_every_week_before_with_two_sample_standard_deviations():
+    values = [10.0, 12.0, 14.0, 16.0, 30.0]
+    limits = drift.band(values)
+    sd = statistics.stdev(values)
+    assert limits["mean"] == pytest.approx(statistics.fmean(values), abs=1e-4)
+    assert limits["sd"] == pytest.approx(sd, abs=1e-4)
+    assert limits["low"] == pytest.approx(statistics.fmean(values) - 2 * sd, abs=1e-4)
     assert drift.band([10.0, 12.0, 14.0]) is None               # fewer than 4 weeks: no band
-    assert drift.band([10.0, None, 14.0, 16.0]) is None          # a week without the number: no band
+    assert drift.band([10.0, None, 14.0, 16.0]) is None          # only 3 weeks have the number
+    assert drift.band([10.0, None, 14.0, 16.0, 11.0]) is not None
 
 
-def test_no_alert_until_four_weeks_of_data_exist_then_a_drifting_week_alerts():
+def drifting(weeks_out):
+    """Four ordinary weeks, then weeks at the given NEUTRAL counts (of 10 answers), then an ordinary one."""
     lines = []
-    # Four ordinary weeks with a little movement, then a week where the model
-    # suddenly says NEUTRAL to everything.
     for monday, neutral in zip(MONDAYS[:4], (8, 9, 8, 9)):
-        lines += week_of_lines(monday, neutral=neutral, longs=2)
-    lines += week_of_lines(MONDAYS[4], neutral=20, longs=0)
-    # Judged on the first cycle day of the week after.
-    lines += week_of_lines(MONDAYS[5], neutral=8, longs=2)
-    record = build(lines, MONDAYS[5])
+        lines += week_of_lines(monday, neutral=neutral, longs=10 - neutral)
+    for k, neutral in enumerate(weeks_out):
+        lines += week_of_lines(MONDAYS[4 + k], neutral=neutral, longs=10 - neutral)
+    today = MONDAYS[4 + len(weeks_out)]
+    lines += week_of_lines(today, neutral=8, longs=2)
+    return build(lines, today), today
+
+
+def test_one_week_outside_its_band_does_not_alert():
+    record, _ = drifting([5])
+    week = record["weeks"][4]
+    assert week["outside"]["neutral_pct"] is True
+    assert week["alerts"] == [] and record["alerts"] == [] and record["alert_on"] is None
+
+
+def test_two_weeks_in_a_row_outside_alert_on_the_first_day_of_the_next_week():
+    record, today = drifting([5, 0])
     weeks = record["weeks"]
-    assert all(not w["alerts"] for w in weeks[:4])               # no band, no alert, in weeks 1 to 4
-    assert weeks[4]["bands"]["neutral_pct"] is not None
-    assert any(a.startswith("NEUTRAL share (%): 100") for a in weeks[4]["alerts"])
-    assert record["judged_week"] == weeks[4]["week"]
-    assert record["alert_on"] == MONDAYS[5].isoformat()
-    assert weeks[5]["complete"] is False and weeks[5]["alerts"] == []
+    assert all(not w["alerts"] for w in weeks[:5])
+    assert any(a.startswith("NEUTRAL share (%): 0 is outside its band") and a.endswith("2 weeks in a row")
+               for a in weeks[5]["alerts"])
+    assert record["judged_week"] == weeks[5]["week"] and record["alert_on"] == today.isoformat()
+    alarm = health.drift_alert(record, today)
+    assert alarm.severity == health.WARNING and "2 weeks running" in alarm.title
+    assert health.drift_alert(record, today + timedelta(days=1)) is None
 
 
-def test_the_alert_is_said_once_on_the_first_cycle_day_of_the_next_week():
+def test_no_band_and_no_alert_in_the_first_four_weeks():
     lines = []
-    for monday, neutral in zip(MONDAYS[:4], (8, 9, 8, 9)):
-        lines += week_of_lines(monday, neutral=neutral, longs=2)
-    lines += week_of_lines(MONDAYS[4], neutral=20, longs=0)
-    lines += week_of_lines(MONDAYS[5], neutral=8, longs=2)
-    tuesday = MONDAYS[5] + timedelta(days=1)
-    lines += [line(tuesday, "T1", "NEUTRAL", technicals=UP)]
-    monday_record = build(lines, MONDAYS[5])
-    tuesday_record = build(lines, tuesday)
-    assert monday_record["alert_on"] == MONDAYS[5].isoformat()
-    # Tuesday's record still names Monday: the health check says it on Monday only.
-    assert tuesday_record["alert_on"] == MONDAYS[5].isoformat()
-    assert health.drift_alert(monday_record, MONDAYS[5]) is not None
-    assert health.drift_alert(tuesday_record, tuesday) is None
-    alarm = health.drift_alert(monday_record, MONDAYS[5])
-    assert alarm.severity == health.WARNING
-    assert alarm.title.startswith("Drift: ") and monday_record["judged_week"] in alarm.title
+    for monday, neutral in zip(MONDAYS[:4], (1, 9, 0, 10)):
+        lines += week_of_lines(monday, neutral=neutral, longs=10 - neutral)
+    record = build(lines, MONDAYS[4])
+    assert all(w["bands"].get("neutral_pct") is None for w in record["weeks"][:4])
+    assert record["alerts"] == []
 
 
-def test_a_new_prompt_or_host_leaves_its_band_as_a_name():
-    lines = []
-    for monday in MONDAYS[:4]:
-        lines += week_of_lines(monday, neutral=8, longs=2)
+def test_the_floor_share_and_the_starter_share_are_shown_with_no_band():
+    record, _ = drifting([5, 0])
+    week = record["weeks"][5]
+    assert "at_floor_pct" not in week["bands"] and "primary_start_pct" not in week["bands"]
+    assert "at_floor_pct" in week["values"] and "primary_start_pct" in week["values"]
+
+
+def test_a_changed_setting_alerts_the_same_day():
+    first, second = MONDAYS[0], MONDAYS[0] + timedelta(days=1)
     changed = dict(SETUP, prompt="ffffffffffff", provider="api.other.example")
-    lines += week_of_lines(MONDAYS[4], neutral=8, longs=2, setup=changed)
-    lines += week_of_lines(MONDAYS[5], neutral=8, longs=2)
-    week = build(lines, MONDAYS[5])["weeks"][4]
-    assert "prompt fingerprint: ffffffffffff was not seen in the 4 weeks before" in week["alerts"]
-    assert "host: api.other.example was not seen in the 4 weeks before" in week["alerts"]
+    lines = week_of_lines(first, neutral=8, longs=2) + week_of_lines(second, neutral=8, longs=2, setup=changed)
+    record = build(lines, second)
+    assert "prompt fingerprint changed: abcdef012345 -> ffffffffffff" in record["setting_alerts"]
+    assert "host changed: api.deepinfra.com -> api.other.example" in record["setting_alerts"]
+    assert record["setting_alert_on"] == second.isoformat()
+    alarm = health.setting_changed(record, second)
+    assert alarm.severity == health.WARNING and alarm.title.startswith("Model setup changed today")
+    # The day after, with the new setting kept, nothing is said.
+    third = second + timedelta(days=1)
+    record = build(lines + week_of_lines(third, neutral=8, longs=2, setup=changed), third)
+    assert record["setting_alerts"] == [] and health.setting_changed(record, third) is None
 
 
-def test_a_steady_week_raises_nothing_and_the_health_check_stays_quiet():
+def test_two_settings_on_one_day_alert_and_the_first_day_never_does():
+    other = dict(SETUP, model="another/model")
+    lines = week_of_lines(MONDAYS[0], neutral=4, longs=1) + week_of_lines(MONDAYS[0], neutral=4, longs=1, setup=other)
+    record = build(lines, MONDAYS[0])
+    assert any(a.endswith("on the same day") and a.startswith("model:") for a in record["setting_alerts"])
+    record = build(week_of_lines(MONDAYS[0], neutral=8, longs=2), MONDAYS[0])
+    assert record["setting_alerts"] == []
+
+
+def test_a_steady_record_raises_nothing():
     lines = []
-    for monday in MONDAYS[:6]:
+    for monday in MONDAYS[:7]:
         lines += week_of_lines(monday, neutral=8, longs=2)
-    record = build(lines, MONDAYS[5])
-    assert record["alerts"] == [] and record["alert_on"] is None
-    assert health.drift_alert(record, MONDAYS[5]) is None
+    record = build(lines, MONDAYS[6])
+    assert record["alerts"] == [] and record["alert_on"] is None and record["setting_alerts"] == []
+    assert health.drift_alert(record, MONDAYS[6]) is None and health.setting_changed(record, MONDAYS[6]) is None
 
 
 def test_weeks_before_the_start_are_not_read():
@@ -179,6 +202,7 @@ def test_the_health_check_reads_the_record_beside_the_journal(tmp_path):
         "alert_on": day.isoformat(), "judged_week": "2026-W44",
         "alerts": ["NEUTRAL share (%): 99 is outside its band 85 to 93"]}))
     alarms = health.check(journal, audit, day, token_expires=None)
-    assert any(a.title.startswith("Drift: 1 value(s) left their normal band in 2026-W44") for a in alarms)
+    assert any(a.title.startswith("Drift: 1 value(s) outside their normal band 2 weeks running, to 2026-W44")
+               for a in alarms)
     alarms = health.check(journal, audit, day + timedelta(days=1), token_expires=None)
     assert not any(a.title.startswith("Drift:") for a in alarms)
