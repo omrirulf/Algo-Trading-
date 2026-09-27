@@ -677,6 +677,38 @@ jobs:
           fi
           echo "OK: the shadow funds cannot trade"
 
+      - name: The history screen cannot trade and asks no model
+        # history/ replays the rules that run live on past prices, before a
+        # new rule may take a live slot (the owner's process of 27 Sep 2026,
+        # docs/research/backlog.md). It drives the production engine through
+        # shadow/'s simulated books and never builds one of its own; it writes
+        # only the output directory it is given, never the live journal or
+        # logs/. It must not reach a broker, read a credential or the
+        # environment, or ask a model: a model has read about the past, so a
+        # history screen is only for rules that need none. Its workflow runs
+        # by hand only and holds no secret.
+        run: |
+          hits=$(grep -rnE '(AlpacaPaperBroker|TradingClient|^[[:space:]]*(from|import)[[:space:]]+(alpaca|anthropic|openai)|get_settings|os\.environ|getenv|alpaca_api_key|alpaca_secret_key|post_signal|DirectDispatcher|build_dispatcher|ExecutionEngine\(|PositionManager\(|orchestrator\.llm|orchestrator\.heartbeat|from orchestrator import [^#]*\bllm\b|rules\.hybrid|model_signal|SIGNAL_JOURNAL_PATH|LOG_DIR)' \
+                   history --include='*.py' || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::history/ must not reach a broker, read a credential, ask a model or write the live logs"
+            exit 1
+          fi
+          if grep -nE 'secrets\.' .github/workflows/history-screen.yml; then
+            echo "::error::the history screen's workflow must hold no secret"
+            exit 1
+          fi
+          python3 - <<'PY'
+          import sys, yaml
+          wf = yaml.safe_load(open(".github/workflows/history-screen.yml"))
+          triggers = set(wf.get(True) or wf.get("on") or {})
+          if triggers != {"workflow_dispatch"}:
+              sys.exit(f"::error::the history screen runs by hand only, not on {sorted(triggers)}")
+          print("OK: the history screen runs by hand only")
+          PY
+          echo "OK: the history screen cannot trade and asks no model"
+
       - name: The heartbeat watchdog holds the phone topic and nothing else
         # heartbeat-watchdog.yml can start heartbeat.yml, which trades. That
         # is exactly why it must not hold a broker or model key itself: it

@@ -1,0 +1,109 @@
+name: history screen
+
+# A history screen (docs/research/backlog.md, "History first, live second"):
+# rules replayed on 2000 to now with the code that runs them live --
+# production's technicals on final closes up to the previous session, the
+# race's own scoring, the production fund engine. This one screens the rules
+# already running (the locked momentum rule and tests A, B and C of
+# pre-registration section 13). It changes nothing in the locked test, and
+# nothing live reads what it writes.
+#
+# By hand only. Yahoo is reached from here; the development sandbox cannot.
+# The price table and the history journal (one file per month, as
+# logs/journal/) are kept as a 90-day artifact, and their SHA-256s are in the
+# report; results.json and report.md are committed to
+# docs/research/history/<name>/ on the branch the run was started from.
+#
+# No secret of any kind: yfinance is unauthenticated, and the screen reads no
+# key and asks no model (CI: "The history screen cannot trade and asks no
+# model").
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: "The report's folder under docs/research/history/ (letters, digits, - and _)"
+        default: "2026-09-rules-running-live"
+      seeds:
+        description: "Coin flips per line for the race's band (the race's own number: 1000)"
+        default: "1000"
+
+permissions:
+  contents: write   # only to commit docs/research/history/<name>/
+
+concurrency:
+  group: history-screen-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  screen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    env:
+      SCREEN_NAME: ${{ inputs.name }}
+      SCREEN_SEEDS: ${{ inputs.seeds }}
+      OUT: ${{ runner.temp }}/screen
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Check the inputs
+        run: |
+          [[ "$SCREEN_NAME" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "::error::name: letters, digits, - and _ only"; exit 1; }
+          [[ "$SCREEN_SEEDS" =~ ^[0-9]+$ ]] || { echo "::error::seeds: a whole number"; exit 1; }
+
+      - name: Fetch the prices
+        run: python -m history.screen fetch --out "$OUT"
+
+      - name: Run the screen
+        run: |
+          python -m history.screen run --out "$OUT" --seeds "$SCREEN_SEEDS" \
+            --run-id "$GITHUB_RUN_ID" --commit "$GITHUB_SHA"
+
+      - name: Keep the prices, the journal and the results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: history-screen-${{ inputs.name }}
+          retention-days: 90
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/screen/prices.csv.gz
+            ${{ runner.temp }}/screen/prices.meta.json
+            ${{ runner.temp }}/screen/journal/
+            ${{ runner.temp }}/screen/results.json
+            ${{ runner.temp }}/screen/report.md
+
+      - name: Commit the report
+        run: |
+          dest="docs/research/history/$SCREEN_NAME"
+          mkdir -p "$dest"
+          cp "$OUT/report.md" "$OUT/results.json" "$dest/"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/research/history/
+          if git diff --cached --quiet; then
+            echo "nothing new to commit"
+            exit 0
+          fi
+          git commit -m "History screen: $SCREEN_NAME (run $GITHUB_RUN_ID)"
+          for wait in 2 4 8 16; do
+            git pull --rebase origin "$GITHUB_REF_NAME" && git push origin "HEAD:$GITHUB_REF_NAME" && exit 0
+            sleep "$wait"
+          done
+          echo "::error::could not push the report"
+          exit 1
+
+      - name: Publish to the run summary
+        if: always()
+        run: |
+          {
+            echo "## History screen: $SCREEN_NAME"
+            echo
+            cat "$OUT/report.md" 2>/dev/null || echo "(no report)"
+          } >> "$GITHUB_STEP_SUMMARY"

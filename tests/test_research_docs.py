@@ -26,12 +26,35 @@ def test_the_graveyard_is_numbered_one_by_one_and_states_its_count():
     assert [int(r[0]) for r in rows] == list(range(1, len(rows) + 1))
     text = (RESEARCH / "graveyard.md").read_text()
     assert f"**N = {len(rows)}**" in text
-    assert len(rows) == 18
+    # 18 ideas when section 13 was registered, then the 13 history screens of 2026-09-27.
+    assert len(rows) == 31
 
 
-def test_the_pre_registration_names_the_same_n():
+def test_the_checkpoints_read_n_from_every_numbered_row_history_screens_included():
+    from analysis.multiple_tests import graveyard_n
+
+    assert graveyard_n() == len(trials())
+    history = [r for r in trials() if r[2].startswith("history screen")]
+    assert [int(r[0]) for r in history] == list(range(19, 32))
+
+
+def test_the_pre_registration_still_names_the_n_it_was_registered_with():
+    """Section 13.6 reads N from the graveyard on the checkpoint day; 18 is the count on the day it was
+    registered, and stays as written while the graveyard grows."""
     text = (ROOT / "docs" / "horse-race-preregistration.md").read_text()
-    assert f"checkpoint day ({len(trials())} when this was registered)" in text
+    assert "checkpoint day (18 when this was registered)" in text
+
+
+def test_the_card_template_asks_for_the_history_screen_and_the_backlog_says_history_first():
+    template = (RESEARCH / "cards" / "_template.md").read_text()
+    assert "**History screen:**" in template and "not possible (uses the AI)" in template
+    backlog = (RESEARCH / "backlog.md").read_text()
+    assert "## History first, live second" in backlog
+    for words in ("after its source was published", "0.10% per side", "using the real code",
+                  "skips the history screen", "do not use live slots", "counts in N"):
+        assert words in backlog, words
+    waiting = backlog.split("## Waiting", 1)[1].split("##", 1)[0]
+    assert "otation" not in waiting and "urn-of-the-month" not in waiting
 
 
 def test_the_dropped_fifty_day_version_is_kept_and_counted():

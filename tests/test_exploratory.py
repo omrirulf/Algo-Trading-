@@ -344,7 +344,8 @@ def test_p_values_and_the_deflated_sharpe_ratio():
 
 
 def test_n_is_the_graveyard_count_and_the_table_leaves_out_tests_with_no_data():
-    assert mt.graveyard_n() == 18
+    # 18 ideas at registration, and the 13 history screens logged on 2026-09-27: they count in N too.
+    assert mt.graveyard_n() == 31
     table = mt.checkpoint_table([{"name": "a", "t": 3.0, "stats": {"sr": 0.3, "t_days": 100, "skew": 0.0,
                                                                      "kurt": 3.0}},
                                  {"name": "b", "t": None}], 18)
@@ -391,7 +392,7 @@ def test_the_checkpoint_table_reads_every_test_of_the_family():
     record = {"race": {"insiders": {"t": 1.0, "stats": None}, xp.VETO: {"t": None}},
               "tests": {xp.TIMING: {"t": 2.5, "stats": {"sr": 0.2, "t_days": 60, "skew": 0.0, "kurt": 3.0}}}}
     table = shadow_run.checkpoint_table_for(record)
-    assert table["n_trials"] == 18
+    assert table["n_trials"] == mt.graveyard_n() == 31
     rows = {r["name"]: r for r in table["rows"]}
     assert len(rows) == 8 and rows["B, fund"]["dsr"] is not None
     assert rows["A, race arm"]["no_data"] is True and rows["C, fund"]["no_data"] is True
