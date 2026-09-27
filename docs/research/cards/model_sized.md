@@ -14,10 +14,10 @@
 
 **Read on:** At each checkpoint only: the race's looks (estimated 2026-12-22, 2027-03-22, 2027-06-16). Between them, only the counters (section 13.1).
 
-**Acting differently:** Always: every trade's size differs from the model fund's, so it always counts as acting.
+**Acting differently:** A trade whose size factor is not 1.0, that is, conviction outside 0.50-0.60 (counted at the checkpoint). A trade at 0.50-0.60 is the model fund's own size.
 
 **Promising if:** At a checkpoint, it beats its comparator and passes Benjamini-Hochberg at 5% (section 13.5). The Deflated Sharpe Ratio is shown beside it (13.6).
 
-**Dead if:** At any checkpoint it trails its comparator and passes Benjamini-Hochberg in that direction; or at the final checkpoint its mean difference is zero or below (section 13.7).
+**Dead if:** At any checkpoint it trails its comparator and passes Benjamini-Hochberg in that direction; or at the final checkpoint its mean difference is zero or below (section 13.7). At the final checkpoint, fewer than 20 times acting differently is "not tested", whatever the numbers (section 13.7).
 
 **Trial number:** 10

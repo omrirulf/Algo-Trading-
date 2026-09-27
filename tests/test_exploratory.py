@@ -440,7 +440,8 @@ def test_the_table_reads_how_often_each_idea_acted_differently():
     assert rows["model_by_conviction"]["outcome"] == "not tested"
     assert rows["B, fund"]["acted_differently"] == 40 and rows["B, fund"]["outcome"] == "not proven"
     assert rows["insider arm"]["outcome"] == "not proven"
-    assert rows["C, fund"]["acted_differently"] is None
+    assert rows["C, fund"]["acted_differently"] == 0 and rows["C, fund"]["outcome"] == "not tested"
+    assert rows["model_same_day"]["acted_differently"] is None                  # always acts
 
 
 def test_the_same_day_counter_counts_only_from_the_fund_start():
@@ -450,3 +451,50 @@ def test_the_same_day_counter_counts_only_from_the_fund_start():
     counts = shadow_run.exploratory_counters(entries, bars, date(2026, 10, 2))
     # Neither line has a recorded price; only the one from the 28 Sep cycle is counted.
     assert counts["model_same_day"]["lines_without_usable_price"]["no_price"] == 1
+
+
+def test_c_acts_differently_when_it_misses_or_fills_at_another_price():
+    from types import SimpleNamespace as NS
+
+    from shadow.broker import Fill
+
+    d = date(2026, 10, 1)
+    next_day = xp.sessions_after(d, 1)[0]
+    stats = xp.PullbackStats(missed=1, ignored_pending=1, skipped_held=1,
+                             filled=[("MSFT", d, next_day, 99.0), ("NVDA", d, next_day, 50.0),
+                                     ("JPM", d, next_day, 30.0)])
+    momentum = NS(broker=NS(fills=[Fill(next_day, "MSFT", "entry", "buy", 10, 99.0, 1.0),
+                                   Fill(next_day, "NVDA", "entry", "buy", 10, 51.0, 1.0)]))
+    # 3 not filled; MSFT at the momentum fund's own price; NVDA at another; JPM the momentum fund never bought.
+    assert xp.pullback_acted(NS(pullback=stats), momentum) == 3 + 2
+
+
+def test_model_sized_acts_differently_only_where_its_factor_is_not_one():
+    from types import SimpleNamespace as NS
+
+    from shadow.order_matters import Event
+
+    d = date(2026, 10, 1)
+    events = [Event(d, "A", c, status, "") for c, status in
+              ((0.35, "ACCEPTED"), (0.45, "ACCEPTED"), (0.55, "ACCEPTED"), (0.59, "ACCEPTED"),
+               (0.65, "ACCEPTED"), (0.35, "REJECTED"), (0.2, "ACCEPTED"))]
+    assert shadow_run.sized_trades_scaled(NS(order_events=events)) == 3
+
+
+def test_a_checkpoint_run_of_every_fund_carries_each_test_and_its_count():
+    from tests.test_shadow_variants import Walks, journal_with_every_band, wider
+
+    bars = wider()
+    sessions = S[:30]
+    entries = [e if i % 3 else said(e.ticker, e.timestamp.date(), bias=e.bias or "NEUTRAL",
+                                    conviction=e.conviction or 0.5, technicals=UP,
+                                    live_record={"price": 100.0})
+               for i, e in enumerate(journal_with_every_band(sessions))]
+    funds, checks = shadow_run.run_funds(entries, sessions[0], sessions[-1], Walks(bars), random_funds=1,
+                                         processes=1, shortable_no=frozenset(), long_bars=bars)
+    tests = funds["tests"]
+    assert set(tests) >= {"model_by_conviction", "model_sized", "model_same_day", xp.VETO, xp.TIMING, xp.LIMIT}
+    for name in ("model_by_conviction", "model_sized", xp.LIMIT):
+        assert isinstance(tests[name]["acted"], int)
+    assert tests[xp.LIMIT]["orders"]["placed"] > 0
+    json.dumps(funds, allow_nan=False)

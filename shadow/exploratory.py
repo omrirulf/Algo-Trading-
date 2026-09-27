@@ -59,6 +59,26 @@ PULLBACK_SESSIONS: Final[int] = 3
 LONG_LEAD_DAYS: Final[int] = 330
 
 
+def pullback_acted(fund: "PullbackFund", momentum) -> int:
+    """C acting differently from the momentum fund (13.7): each momentum signal C considered and
+    did not fill, or filled at a price other than the one the momentum fund paid for it.
+
+    The momentum fund's price for a signal is its entry in that name at the first session after
+    the signal's day; a fill the momentum fund has no such entry for differs too.
+    """
+    from shadow.broker import ENTRY
+
+    paid = {(f.ticker, f.day): f.price for f in momentum.broker.fills if f.kind == ENTRY}
+    stats = fund.pullback
+    unfilled = stats.missed + stats.no_room + stats.ignored_pending + stats.no_limit + stats.skipped_held
+    differs = 0
+    for ticker, signal_day, _, price in stats.filled:
+        theirs = paid.get((ticker, sessions_after(signal_day, 1)[0]))
+        if theirs is None or not math.isclose(theirs, price, rel_tol=1e-9, abs_tol=1e-9):
+            differs += 1
+    return unfilled + differs
+
+
 def _positive(value: object) -> Optional[float]:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
@@ -380,6 +400,9 @@ class PullbackStats:
     ignored_pending: int = 0
     no_limit: int = 0
     technicals_price: int = 0
+    #: Signals C considered but could not order because its own book held the name.
+    skipped_held: int = 0
+    #: Every fill: (ticker, the signal's day, the fill's day, the fill price).
     filled: list = field(default_factory=list)
 
 
@@ -439,7 +462,10 @@ class PullbackFund(Fund):
         standing = {o.line.ticker for o in self.orders}
         for line in cycle:
             signal = self.signal_for(line)
-            if not _counted(signal) or line.ticker in self.broker.positions:
+            if not _counted(signal):
+                continue
+            if line.ticker in self.broker.positions:
+                self.pullback.skipped_held += 1
                 continue
             if line.ticker in standing:
                 self.pullback.ignored_pending += 1
@@ -476,7 +502,7 @@ class PullbackFund(Fund):
                     self.pullback.filled_open += 1
                 else:
                     self.pullback.filled_range += 1
-                self.pullback.filled.append((order.line.ticker, order.line.day.isoformat()))
+                self.pullback.filled.append((order.line.ticker, order.line.day, day, fill[0]))
             else:
                 self.tally.rejected += 1
                 self.pullback.no_room += 1

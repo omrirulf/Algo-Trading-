@@ -521,6 +521,17 @@ def order_changed_days(fund, model) -> int:
     return sum(1 for day in set(mine) | set(theirs) if mine.get(day, set()) != theirs.get(day, set()))
 
 
+def sized_trades_scaled(fund) -> int:
+    """``model_sized`` acting differently (section 13.7): its accepted entries whose size factor is not 1.0.
+
+    Conviction 0.50-0.60 has factor 1.0 -- the model fund's own size -- so those trades do not differ.
+    """
+    from shadow.fund import conviction_factor
+
+    return sum(1 for e in fund.order_events or [] if e.status == "ACCEPTED" and e.conviction is not None
+               and conviction_factor(e.conviction) not in (None, 1.0))
+
+
 def new_funds(feed: SimFeed, bars: Bars, long_bars: Bars, final_through: date, shortable_no) -> list:
     """Tests A, B and C as funds (section 13): the veto and pullback funds on the funds' own bars and feed."""
     return [
@@ -576,11 +587,15 @@ def run_funds(
         by_conviction = next((f for f in explore if f.name == "model_by_conviction"), None)
         if by_conviction is not None:
             out["tests"]["model_by_conviction"]["acted"] = order_changed_days(by_conviction, model)
+        sized = next((f for f in explore if f.name == "model_sized"), None)
+        if sized is not None:
+            out["tests"]["model_sized"]["acted"] = sized_trades_scaled(sized)
     if tests:
         by_name = {f.name: f for f in four}
         out["tests"] |= {f.name: paired(f, by_name[xp.COMPARED_WITH[f.name]]) for f in tests}
         out["tests"][xp.TIMING]["switches"] = tests[1].switches
         out["tests"][xp.LIMIT]["orders"] = {k: v for k, v in vars(tests[2].pullback).items() if k != "filled"}
+        out["tests"][xp.LIMIT]["acted"] = xp.pullback_acted(tests[2], by_name["momentum"])
     return out, {"four": check, "coin": coin_check}
 
 
@@ -644,9 +659,9 @@ FAMILY: Final[tuple[tuple[str, str, str, Optional[tuple[str, ...]]], ...]] = (
     ("A, race arm", "race", xp.VETO, ("counters", xp.VETO, "vetoed")),
     ("A, fund", "tests", xp.VETO, ("counters", xp.VETO, "vetoed")),
     ("B, fund", "tests", xp.TIMING, ("counters", xp.TIMING, "days_out_of_vt")),
-    ("C, fund", "tests", xp.LIMIT, None),
+    ("C, fund", "tests", xp.LIMIT, ("tests", xp.LIMIT, "acted")),
     ("model_by_conviction", "tests", "model_by_conviction", ("tests", "model_by_conviction", "acted")),
-    ("model_sized", "tests", "model_sized", None),
+    ("model_sized", "tests", "model_sized", ("tests", "model_sized", "acted")),
     ("model_same_day", "tests", "model_same_day", None),
 )
 #: The last planned look, the minimum of "acting differently", and B, whose
