@@ -159,7 +159,7 @@ def test_the_funds_page_is_labelled_simulated_and_linked_from_the_desk():
     assert "independent days (= " in text and "NO DECISION YET" in text and "Next checkpoint: " in text
     assert "bar t &gt; " in text
     # The owner's decision of 26 Sep 2026: a fixed start, read only after calibration passes.
-    assert "and counts only after calibration passes. Until then no fund result is calculated or shown" in text
+    assert "and counts only after calibration passes." in text
     assert "Hidden until calibration passes" in text
     assert "not in force yet" in text
 
@@ -258,8 +258,8 @@ NODE = shutil.which("node")
 needs_node = pytest.mark.skipif(NODE is None, reason="node is not installed")
 
 #: The helpers the page's pure functions call, in the order they are defined.
-HELPERS = ("isNum", "esc", "money", "kMoney", "signed", "plain", "pts", "tone", "bar2", "asObj", "day", "israel",
-           "HUE", "SHORT", "DASH", "key", "bandKey", "plotHost", "tiles", "VERDICT", "warnIcon")
+HELPERS = ("isNum", "esc", "DOCS", "DOC_ICON", "doc", "money", "kMoney", "signed", "plain", "pts", "tone", "bar2",
+           "asObj", "day", "israel", "HUE", "SHORT", "DASH", "key", "bandKey", "plotHost", "tiles", "VERDICT", "warnIcon")
 
 #: The proposed rule's lines as shadow/calibration.py writes them: a heading,
 #: then conditions that already carry their numbers.
@@ -429,8 +429,8 @@ def test_calibration_shows_the_verdicts_and_the_reason_no_day_is_recorded(tmp_pa
 
     shown = pages[0]
     assert "No calibration day recorded yet" in shown and "no real close after 2026-10-01 yet" in shown
-    assert "the first one lands after the first close" not in shown
-    assert "the first one lands after the first close" in pages[1]                    # no problem: the usual line
+    assert '<div class="card muted small">No calibration day recorded yet.</div>' not in shown
+    assert '<div class="card muted small">No calibration day recorded yet.</div>' in pages[1]   # no problem: the usual card
     for page in (pages[0], pages[2]):
         assert "Where each condition stands" in page
         assert '<span class="chip bad">FAIL</span><span>1. every close within 1.00% <span class="faint">(worst 1.42% on 2026-10-03)</span>' in page
@@ -470,7 +470,7 @@ def test_the_fund_test_is_read_at_the_races_next_look(tmp_path, built_funds_page
     assert "No checkpoint left to reach" not in out[2] and "decision gate writes its record" in out[2]
     assert "No checkpoint left to reach" in out[3]                                     # the race has no look left
     # Not running: the fixed start, and the reading waits for calibration.
-    assert "starts 29 Sept 2026 (the funds act on the 28 Sept 2026 cycle at the next open)" in out[4]
+    assert "starts 29 Sept 2026 (on the 28 Sept 2026 cycle)" in out[4]
     assert "counts only after calibration passes" in out[4]
 
 
@@ -681,7 +681,7 @@ def test_the_order_report_gives_the_real_account_its_days_and_escapes_every_stri
     assert card.count("<mark>") == 1                           # only where outranks is non-empty
     assert "<b>X</b>" not in card and "<i>Y</i>" not in card and "&lt;i&gt;Y&lt;/i&gt;" in card
     assert 'RSP <span class="num">—</span>' in card and 'KRE <span class="num">0.32</span>' in card   # null conviction
-    assert "Report only: the buying order (watchlist order) is not changed." in card
+    assert "Report only; the order is not changed." in card
     # Not started: no calibration copy line, no fund line.
     assert "Calibration copy" not in card and " fund:" not in card and "Coin-flip" not in card
 
@@ -801,19 +801,18 @@ def test_calibration_says_the_days_passed_the_last_fix_and_the_days_since_it(tmp
         assert "Last fix: 12 Oct 2026 (stops re-placed &lt;b&gt;after&lt;/b&gt; a partial fill)" in text
         assert "<b>after" not in html                                              # the fix's text is escaped
         assert "Days since the last fix: 2 of 5" in text
-        assert "Calibration ends at day 15 or 5 days after the last fix, whichever is later." in text
         assert "If nothing more fails, it ends 23 Oct 2026." in text
         assert "All 2 fixes" in text
         assert "Fund test starts 29 Sept 2026 (fixed); bars none, 2.40, 2.01; look 1 skipped" in text
         # The plan moved: an amber note, with the planned bars and the rule that replaces them.
         assert 'class="amber"' in html
-        assert "differs from the planned bars (3.40, 2.41, 2.02): each bar is computed at its look" in text
-        assert "logged in the Amendments table the day it is used" in text
+        assert "Differs from the planned bars (3.40, 2.41, 2.02): computed at each look by the spending rule" in text
+        assert "logged in the Amendments table" in text
 
     text = _text(clean)
     assert "Days passed: 4 of 15" in text and "No fix yet" in text
     assert "Days since the last fix" not in text and " of 5" not in text          # "X of 5" only with a fix
-    assert "Calibration ends at day 15 or 5 days after the last fix, whichever is later." in text
+    assert "If nothing more fails, it ends 16 Oct 2026." in text
     assert "Fund test starts 29 Sept 2026 (fixed); bars 3.40, 2.41, 2.02" in text and "skipped" not in text
     assert 'class="amber"' not in clean and "Amendments" not in text
     assert "The same start and bars as planned." in text
@@ -839,7 +838,7 @@ def test_the_calibration_card_carries_the_fail_rule_lines(tmp_path, built_funds_
     text = _text(pages[0])
     assert "8 of 17 closes compared · started 1 Oct 2026" in text
     assert "Days passed: 5 of 17" in text and "Days since the last fix: 2 of 5" in text
-    assert "each bar is computed at its look by the same spending rule" in text
+    assert "computed at each look by the spending rule" in text
     old_text = _text(pages[1])
     assert "3 of 15 closes compared" in old_text
     assert "Days passed" not in old_text and "No fix yet" not in old_text and "Fund test starts" not in old_text
@@ -1058,8 +1057,8 @@ def test_the_race_reports_show_too_few_until_twenty_trades(tmp_path, built_funds
     out = _run_js(tmp_path, source, "CASES.map(raceReportsHtml)", cases)
     card, text = out[0], _text(out[0])
     assert "Race: by conviction, and longs vs shorts (exploratory, report only)" in text
-    assert re.search(r"The decision race's trades since 23 Sept? 2026, after costs\.", text)   # "Sep" or "Sept"
-    assert 'A group or side reads "too few" until it has 20 trades.' in text
+    assert re.search(r"Trades since 23 Sept? 2026, after costs", text)             # "Sep" or "Sept"
+    assert '"too few" below 20 trades' in text
     assert text.index("Does higher conviction mean better trades?") < text.index("Longs vs shorts")
     conviction, sides = card.split("<h4>Longs vs shorts</h4>")
     # A table per arm, in the race's order; the coin flip only in longs vs shorts.
@@ -1149,7 +1148,7 @@ def test_price_gaps_and_held_names_are_shown_before_calibration_passes(tmp_path,
                   [data, _calibration("running"), {}, None, {"price_gaps": {"months": "x"}, "held_names": 5}])
     html, text = out[0], _text(out[0])
     assert "Price gaps and held names" in text and "not a fund result" in text
-    assert "over 80 watchlist tickers" in text and "Above 2% in a month, the daily health check warns" in text
+    assert "Over 80 watchlist tickers" in text and "limit 2% a month" in text
     assert "2026-09 2 27 16.88% above 2%" in text and '<tr class="over">' in html
     assert "2026-10 7 3 0.54%" in text and html.count('<tr class="over">') == 1
     assert "12 Oct 2026: 32 names held of 80" in text                         # newest first
@@ -1166,3 +1165,45 @@ def test_the_contract_names_the_fields_of_the_26_sep_decisions():
                   "price_gaps", "price_gaps.months[]", "by_day", "held_names", "held_names.days[]",
                   "fund_test.first_cycle", "fund_test.waiting_for", "skipped[]", "not_shortable_since"):
         assert field in comment, field
+
+
+# --------------------------------------------------------------------------- #
+# The words live in the docs; the pages link to them
+# --------------------------------------------------------------------------- #
+
+def _docs_anchors() -> dict[str, set[str]]:
+    """Each docs page (its path under docs/, no extension) and the anchors of its headings, the way Mintlify slugs them."""
+    def slug(heading: str) -> str:
+        heading = heading.lower().replace("'", "").replace("’", "")
+        return re.sub(r"-+", "-", re.sub(r"[^a-z0-9]+", "-", heading)).strip("-")
+    pages = {}
+    for path in (ROOT / "docs").rglob("*.mdx"):
+        prose = re.sub(r"```.*?```", "", path.read_text(), flags=re.S)         # a "#" inside a code block is a comment
+        pages[str(path.relative_to(ROOT / "docs")).removesuffix(".mdx")] = {
+            slug(m.group(1)) for m in re.finditer(r"^#{1,4} (.+?)\s*$", prose, re.M)}
+    return pages
+
+
+def test_every_docs_link_on_both_pages_reaches_a_page_and_a_heading():
+    # The pages explain nothing themselves: each part links to the docs page
+    # that does. A renamed heading would leave a link pointing at the top of
+    # the page, so every anchor is checked against the docs' headings.
+    pages = _docs_anchors()
+    assert _docs_anchors()["shadow-funds"] >= {"calibration-first", "late-runs"}   # the slug rule, on known headings
+    for name in ("template.html", "funds.html"):
+        page = (ROOT / "dashboard" / name).read_text()
+        assert 'const DOCS = "https://algotrade.mintlify.site/";' in page
+        links = set(re.findall(r'href="https://algotrade\.mintlify\.site/([^"]*)"', page)) | set(re.findall(r'doc\("([^"]+)"', page))
+        assert len(links) >= 6, name
+        for link in links:
+            target, _, anchor = link.partition("#")
+            assert target == "" or target in pages, (name, link)
+            assert not anchor or anchor in pages[target], (name, link)
+        # Opened in the browser, beside the app, never inside it.
+        assert 'target="_blank" rel="noopener"' in page
+        # The explanations that moved to the docs are gone from the page.
+        for gone in ("Every position has a stop, every ticker was judged once", "if every stop fires at once",
+                     "Every fund on this page is a simulation", "The two lines should lie on top of each other",
+                     "the daily health check warns the owner",
+                     "so the copy did not do what the real account could not"):
+            assert gone not in page, (name, gone)
