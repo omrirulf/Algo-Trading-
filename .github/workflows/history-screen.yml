@@ -41,7 +41,6 @@ jobs:
     env:
       SCREEN_NAME: ${{ inputs.name }}
       SCREEN_SEEDS: ${{ inputs.seeds }}
-      OUT: ${{ runner.temp }}/screen
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
@@ -58,11 +57,11 @@ jobs:
           [[ "$SCREEN_SEEDS" =~ ^[0-9]+$ ]] || { echo "::error::seeds: a whole number"; exit 1; }
 
       - name: Fetch the prices
-        run: python -m history.screen fetch --out "$OUT"
+        run: python -m history.screen fetch --out "$RUNNER_TEMP/screen"
 
       - name: Run the screen
         run: |
-          python -m history.screen run --out "$OUT" --seeds "$SCREEN_SEEDS" \
+          python -m history.screen run --out "$RUNNER_TEMP/screen" --seeds "$SCREEN_SEEDS" \
             --run-id "$GITHUB_RUN_ID" --commit "$GITHUB_SHA"
 
       - name: Keep the prices, the journal and the results
@@ -83,7 +82,7 @@ jobs:
         run: |
           dest="docs/research/history/$SCREEN_NAME"
           mkdir -p "$dest"
-          cp "$OUT/report.md" "$OUT/results.json" "$dest/"
+          cp "$RUNNER_TEMP/screen/report.md" "$RUNNER_TEMP/screen/results.json" "$dest/"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add docs/research/history/
@@ -105,5 +104,5 @@ jobs:
           {
             echo "## History screen: $SCREEN_NAME"
             echo
-            cat "$OUT/report.md" 2>/dev/null || echo "(no report)"
+            cat "$RUNNER_TEMP/screen/report.md" 2>/dev/null || echo "(no report)"
           } >> "$GITHUB_STEP_SUMMARY"
