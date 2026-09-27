@@ -60,23 +60,26 @@ LONG_LEAD_DAYS: Final[int] = 330
 
 
 def pullback_acted(fund: "PullbackFund", momentum) -> int:
-    """C acting differently from the momentum fund (13.7): each momentum signal C considered and
-    did not fill, or filled at a price other than the one the momentum fund paid for it.
+    """C acting differently from the momentum fund (13.7): each momentum signal on which the two
+    funds did differently. One bought it and the other did not, or both bought it at different
+    prices. A signal both funds skipped (held in both, no room in either) is no difference.
 
-    The momentum fund's price for a signal is its entry in that name at the first session after
-    the signal's day; a fill the momentum fund has no such entry for differs too.
+    The momentum fund bought a signal when it has an entry in that name at the first session
+    after the signal's day; C bought it when one of its limit orders for it filled.
     """
     from shadow.broker import ENTRY
 
     paid = {(f.ticker, f.day): f.price for f in momentum.broker.fills if f.kind == ENTRY}
-    stats = fund.pullback
-    unfilled = stats.missed + stats.no_room + stats.ignored_pending + stats.no_limit + stats.skipped_held
+    mine = {(ticker, signal_day): price for ticker, signal_day, _, price in fund.pullback.filled}
     differs = 0
-    for ticker, signal_day, _, price in stats.filled:
+    for ticker, signal_day in fund.pullback.considered:
+        ours = mine.get((ticker, signal_day))
         theirs = paid.get((ticker, sessions_after(signal_day, 1)[0]))
-        if theirs is None or not math.isclose(theirs, price, rel_tol=1e-9, abs_tol=1e-9):
+        if ours is None and theirs is None:
+            continue
+        if ours is None or theirs is None or not math.isclose(ours, theirs, rel_tol=1e-9, abs_tol=1e-9):
             differs += 1
-    return unfilled + differs
+    return differs
 
 
 def _positive(value: object) -> Optional[float]:
@@ -402,6 +405,8 @@ class PullbackStats:
     technicals_price: int = 0
     #: Signals C considered but could not order because its own book held the name.
     skipped_held: int = 0
+    #: Every momentum signal C considered: (ticker, the signal's day).
+    considered: list = field(default_factory=list)
     #: Every fill: (ticker, the signal's day, the fill's day, the fill price).
     filled: list = field(default_factory=list)
 
@@ -464,6 +469,7 @@ class PullbackFund(Fund):
             signal = self.signal_for(line)
             if not _counted(signal):
                 continue
+            self.pullback.considered.append((line.ticker, line.day))
             if line.ticker in self.broker.positions:
                 self.pullback.skipped_held += 1
                 continue

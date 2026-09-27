@@ -453,20 +453,24 @@ def test_the_same_day_counter_counts_only_from_the_fund_start():
     assert counts["model_same_day"]["lines_without_usable_price"]["no_price"] == 1
 
 
-def test_c_acts_differently_when_it_misses_or_fills_at_another_price():
+def test_c_acts_differently_only_where_its_outcome_differs_from_the_momentum_funds():
     from types import SimpleNamespace as NS
 
     from shadow.broker import Fill
 
     d = date(2026, 10, 1)
     next_day = xp.sessions_after(d, 1)[0]
-    stats = xp.PullbackStats(missed=1, ignored_pending=1, skipped_held=1,
-                             filled=[("MSFT", d, next_day, 99.0), ("NVDA", d, next_day, 50.0),
+    later = xp.sessions_after(d, 2)[1]
+    considered = [("MSFT", d), ("NVDA", d), ("JPM", d), ("AAPL", d), ("KO", d), ("XOM", d), ("PG", d)]
+    stats = xp.PullbackStats(missed=2, skipped_held=2, considered=considered,
+                             filled=[("MSFT", d, next_day, 99.0), ("NVDA", d, later, 50.0),
                                      ("JPM", d, next_day, 30.0)])
     momentum = NS(broker=NS(fills=[Fill(next_day, "MSFT", "entry", "buy", 10, 99.0, 1.0),
-                                   Fill(next_day, "NVDA", "entry", "buy", 10, 51.0, 1.0)]))
-    # 3 not filled; MSFT at the momentum fund's own price; NVDA at another; JPM the momentum fund never bought.
-    assert xp.pullback_acted(NS(pullback=stats), momentum) == 3 + 2
+                                   Fill(next_day, "NVDA", "entry", "buy", 10, 51.0, 1.0),
+                                   Fill(next_day, "AAPL", "entry", "buy", 10, 200.0, 1.0)]))
+    # Same: MSFT (both bought at 99); KO, XOM, PG (neither bought: held or missed in both).
+    # Different: NVDA (both bought, other prices); JPM (only C bought); AAPL (only momentum bought).
+    assert xp.pullback_acted(NS(pullback=stats), momentum) == 3
 
 
 def test_model_sized_acts_differently_only_where_its_factor_is_not_one():

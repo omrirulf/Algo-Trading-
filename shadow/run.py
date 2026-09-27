@@ -594,7 +594,8 @@ def run_funds(
         by_name = {f.name: f for f in four}
         out["tests"] |= {f.name: paired(f, by_name[xp.COMPARED_WITH[f.name]]) for f in tests}
         out["tests"][xp.TIMING]["switches"] = tests[1].switches
-        out["tests"][xp.LIMIT]["orders"] = {k: v for k, v in vars(tests[2].pullback).items() if k != "filled"}
+        out["tests"][xp.LIMIT]["orders"] = {k: v for k, v in vars(tests[2].pullback).items()
+                                            if k not in ("filled", "considered")}
         out["tests"][xp.LIMIT]["acted"] = xp.pullback_acted(tests[2], by_name["momentum"])
     return out, {"four": check, "coin": coin_check}
 
