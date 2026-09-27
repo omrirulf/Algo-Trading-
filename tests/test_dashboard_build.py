@@ -1207,3 +1207,61 @@ def test_every_docs_link_on_both_pages_reaches_a_page_and_a_heading():
                      "the daily health check warns the owner",
                      "so the copy did not do what the real account could not"):
             assert gone not in page, (name, gone)
+
+
+def test_every_link_that_leaves_the_app_says_so():
+    # A link that opens a new tab carries the outward arrow after its label
+    # and a note for screen readers, in the markup and in the doc() helper
+    # the renderers use; every one of them is rel="noopener".
+    arrow = 'M4 12 12 4M6 4h6v6'
+    note = '<span class="sr-only">(opens in a new tab)</span>'
+    for name in ("template.html", "funds.html"):
+        page = (ROOT / "dashboard" / name).read_text()
+        markup = page.split("<script>")[0]
+        anchors = re.findall(r'<a [^>]*target="_blank"[^>]*>.*?</a>', markup)
+        assert len(anchors) >= 3, name                                        # the nav's Docs link and the footer
+        for a in anchors:
+            assert 'rel="noopener"' in a and arrow in a and a.endswith(note + "</a>"), (name, a)
+            assert a.index(arrow) > a.index(">"), (name, a)                     # the arrow trails the label
+        helper = re.search(r"const doc = .*", page).group(0)
+        assert "${label}${DOC_ICON}" + note + "</a>`;" in helper, name
+        assert arrow in re.search(r"const DOC_ICON = .*", page).group(0), name
+        assert ".sr-only{position:absolute;width:1px;height:1px;" in page, name
+        # Big enough to tap, and a focus ring on every control a keyboard reaches.
+        assert "a.doc{" in page and "min-height:28px" in page.split("a.doc{", 1)[1].split("}", 1)[0], name
+        assert "summary:focus-visible" in page and "a:focus-visible" in page, name
+        assert "min-height:40px" in page.split("button{", 1)[1].split("}", 1)[0], name
+
+
+def _tokens(css: str) -> dict[str, str]:
+    return dict(re.findall(r"--([a-z0-9-]+):(#[0-9a-f]{6})", css))
+
+
+def _contrast(a: str, b: str) -> float:
+    def lum(h):
+        r, g, b_ = (int(h[i:i + 2], 16) / 255 for i in (1, 3, 5))
+        f = lambda c: c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+        return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b_)
+    la, lb = lum(a), lum(b)
+    return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
+
+
+@pytest.mark.parametrize("name", ["template.html", "funds.html"])
+def test_the_theme_tokens_clear_the_contrast_floors(name):
+    # WCAG AA: 4.5:1 for the small text the muted and status inks are used
+    # for, on every surface they sit on; 3:1 for a chart line on its card.
+    # Both themes, since dark mode is its own set of tokens, not a flip.
+    page = (ROOT / "dashboard" / name).read_text()
+    css = re.search(r"<style>(.*?)</style>", page, re.S).group(1)
+    light = _tokens(css.split("@media", 1)[0])
+    dark = _tokens(css.split('[data-theme="dark"]', 1)[1].split("}", 1)[0])
+    for theme in (light, dark):
+        for ink, on in (("ink-3", "bg"), ("ink-3", "surface"), ("ink-3", "surface-2"), ("ink-2", "bg"), ("ink-2", "surface"),
+                        ("accent", "surface"), ("accent", "bg"), ("good", "good-bg"), ("warn", "warn-bg"), ("bad", "bad-bg"),
+                        ("good", "surface"), ("bad", "surface"), ("accent-ink", "accent")):
+            assert _contrast(theme[ink], theme[on]) >= 4.5, (name, ink, on, theme[ink], theme[on])
+        assert _contrast(theme["ink-3"], theme["bg"]) < _contrast(theme["ink-2"], theme["bg"])   # muted stays lighter
+        assert _contrast(theme["bar-fill"], theme["bar"]) >= 3.0
+        if "s-model" in theme:
+            for series in ("s-model", "s-momentum", "s-hybrid"):
+                assert _contrast(theme[series], theme["surface"]) >= 3.0, (name, series)
