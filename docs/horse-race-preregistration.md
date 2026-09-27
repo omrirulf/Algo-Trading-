@@ -632,10 +632,10 @@ in them: code computes everything.
   kept or shown** for A, B and C, and for the three exploratory funds of
   section 11.1 (`model_by_conviction`, `model_sized`, `model_same_day`).
   No equity, return, mean, t, hit rate or drawdown of theirs is written to
-  any file, page or log. The three exploratory funds' counters are the
-  ones section 11 already names that are not returns: the lines
-  `model_same_day` could not enter and why, the order-matters counts, and
-  the held names skipped.
+  any file, page or log. The three exploratory funds' counter is the lines
+  `model_same_day` could not enter and why, counted from the journal without
+  running the fund; everything else about them (their order-matters counts
+  included) comes at the checkpoints.
 - **At each checkpoint** their results are computed once, over every day
   from their start to that checkpoint, and written to a record that is
   kept unchanged until the next checkpoint.

@@ -85,7 +85,11 @@ jobs:
         run: |
           set -o pipefail
           case "$RANDOM_FUNDS" in (*[!0-9]*|'') echo "random must be a number"; exit 2;; esac
-          python -m shadow.run --processes "$(nproc)" --random "$RANDOM_FUNDS" --with-prices > "$RUNNER_TEMP/funds.out"
+          # The race's fresh gate says which looks are reached; the committed
+          # funds.json carries each look's exploratory record unchanged
+          # (pre-registration section 13.1).
+          python -m shadow.run --processes "$(nproc)" --random "$RANDOM_FUNDS" --with-prices \
+            --race-gate "$RUNNER_TEMP/race_gate.json" --previous logs/funds.json > "$RUNNER_TEMP/funds.out"
           mkdir -p "$RUNNER_TEMP/scoring-prices"
           head -n 1 "$RUNNER_TEMP/funds.out" > "$RUNNER_TEMP/funds.json"
           tail -n 1 "$RUNNER_TEMP/funds.out" > "$RUNNER_TEMP/scoring-prices/funds.json"

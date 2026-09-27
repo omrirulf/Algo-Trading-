@@ -159,6 +159,10 @@ CONVICTION_FIRST: Final[str] = "conviction"
 #: recorded when its signal was made (the exploratory ``model_same_day``).
 NEXT_OPEN: Final[str] = "next_open"
 SAME_DAY: Final[str] = "same_day"
+#: The exploratory pullback fund (C, pre-registration 13.4): limit orders
+#: placed for the next session, filled at a price the bars decide
+#: (``shadow.exploratory.PullbackFund``, which is the only fund using it).
+PULLBACK: Final[str] = "pullback"
 
 #: Why the same-day fund did not enter a directional line.
 NO_PRICE: Final[str] = "no recorded price"
@@ -420,8 +424,8 @@ class Fund:
     ) -> None:
         if priority not in (WATCHLIST_FIRST, CONVICTION_FIRST):
             raise ValueError(f"priority must be {WATCHLIST_FIRST!r} or {CONVICTION_FIRST!r}, got {priority!r}")
-        if entry not in (NEXT_OPEN, SAME_DAY):
-            raise ValueError(f"entry must be {NEXT_OPEN!r} or {SAME_DAY!r}, got {entry!r}")
+        if entry not in (NEXT_OPEN, SAME_DAY, PULLBACK):
+            raise ValueError(f"entry must be {NEXT_OPEN!r}, {SAME_DAY!r} or {PULLBACK!r}, got {entry!r}")
         if entry == SAME_DAY and priority != WATCHLIST_FIRST:
             raise ValueError("a same-day fund dispatches in watchlist order")
         self.name = name
@@ -441,7 +445,7 @@ class Fund:
         self.refused_on = refusal_days(not_shortable)
         #: The same-day fund's prices: the feed's, but the recorded price for
         #: the line being entered. Every other fund reads the feed itself.
-        self.quotes: Optional[RecordedQuote] = RecordedQuote(feed) if entry == SAME_DAY else None
+        self.quotes: Optional[RecordedQuote] = RecordedQuote(feed) if entry in (SAME_DAY, PULLBACK) else None
         feed = self.quotes if self.quotes is not None else feed
         self.broker = SimBroker(name=name, cash=cash, quote=feed.get_latest_price,
                                 cost_per_side=cost_per_side, not_shortable=frozenset(self.refused_on))
@@ -768,7 +772,7 @@ def run(
 
 __all__ = [
     "CONVICTION_FIRST", "CONVICTION_SIZES", "Day", "Decision", "Fund", "IndexFund", "Line", "NEXT_OPEN",
-    "NOT_ENTERED_REASONS", "NO_PRICE", "OTHER_DAY", "OUTSIDE_HOURS", "RecordedQuote", "Refusals", "SAME_DAY",
+    "NOT_ENTERED_REASONS", "NO_PRICE", "OTHER_DAY", "OUTSIDE_HOURS", "PULLBACK", "RecordedQuote", "Refusals", "SAME_DAY",
     "STARTING_CASH", "Tally", "WATCHLIST_FIRST", "by_conviction", "coin_signal", "conviction_factor",
     "cycle_days", "dispatch_order", "lines_by_day", "model_signal", "recorded_fill", "refusal_days",
     "refused_by", "rule_signal", "run",

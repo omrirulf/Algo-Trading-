@@ -168,7 +168,9 @@ def test_the_funds_are_byte_for_byte_the_same_apart_from_the_new_field(vendor, t
     record = json.loads(plain)
     assert record["funds"] and sum(f["trades"] for f in record["funds"]["list"]) > 0   # the funds traded
     assert price_tape.digest(tape["rows"]) == tape["prices_sha256"] and tape["consumer"] == "funds"
-    assert set(tape["coverage"]) == {"ohlc"} and "VT" in tape["coverage"]["ohlc"]["tickers"]
+    # The funds' own bars, and the longer history tests A and B read (pre-registration 13.2, 13.3).
+    assert set(tape["coverage"]) == {"ohlc", "ohlc_long"} and "VT" in tape["coverage"]["ohlc"]["tickers"]
+    assert {"VT", "BIL"} <= set(tape["coverage"]["ohlc_long"]["tickers"])
 
 
 def test_a_source_the_tape_cannot_read_adds_nothing_and_breaks_nothing():
