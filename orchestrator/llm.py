@@ -141,6 +141,23 @@ def configured_effort() -> Optional[str]:
     effort = MODEL_EFFORT if MODEL_BASE_URL else EFFORT
     return (effort or "").strip().lower() or None
 
+
+def configured_model() -> str:
+    """The full model's name, as configured here: MODEL, or Anthropic's when no base URL is set."""
+    return MODEL if MODEL_BASE_URL else ANTHROPIC_MODEL
+
+
+def configured_provider() -> Optional[str]:
+    """The host the full model is asked at, as configured here; never a key or a path.
+
+    Recorded on every cycle's journal lines with ``configured_model`` (the
+    owner's weekly drift report, 27 Sep 2026): the model's name alone does
+    not say who serves it, and a change of host is a change of contestant
+    that no line would otherwise show.
+    """
+    return _hostname(MODEL_BASE_URL) if MODEL_BASE_URL else "api.anthropic.com"
+
+
 #: The same, for the full model on the OpenAI-compatible path. Separate
 #: because 120 is not a timeout for a reasoning model at high effort, it is a
 #: coin toss: gpt-oss-120b measured ~128s a call, and a 120s deadline lost 286

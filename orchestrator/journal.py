@@ -111,6 +111,9 @@ class _Cycle:
     reader: Any = None
     #: ``{"market_closed": bool}`` once the position-management pass returned.
     management: Optional[dict[str, bool]] = None
+    #: Who answers and with which prompt: ``{"model", "provider", "prompt"}``
+    #: (``heartbeat.model_setup``), as configured when the cycle opened.
+    setup: Optional[dict[str, Any]] = None
 
 
 #: The open cycle, or None. Only ``cycle()`` opens one, so a line written by
@@ -119,16 +122,20 @@ _open: Optional[_Cycle] = None
 
 
 @contextmanager
-def cycle(prices_for: Optional[Callable[[Any], Any]] = None) -> Iterator[None]:
+def cycle(prices_for: Optional[Callable[[Any], Any]] = None,
+          setup: Optional[dict[str, Any]] = None) -> Iterator[None]:
     """Mark the lines written inside as one cycle's.
 
     ``prices_for`` builds the reader that prices each line (``None`` reads no
-    price, and the lines carry none). Closed in ``finally`` so a cycle that
-    raised cannot leave its facts on the next cycle's lines -- in scheduler
-    mode one process runs many.
+    price, and the lines carry none). ``setup`` is who answers and with which
+    prompt (``heartbeat.model_setup``), written on every line as
+    ``model_setup``; ``None`` writes nothing. Closed in ``finally`` so a cycle
+    that raised cannot leave its facts on the next cycle's lines -- in
+    scheduler mode one process runs many.
     """
     global _open
-    _open = _Cycle(prices_for=prices_for)
+    _open = _Cycle(prices_for=prices_for,
+                   setup=dict(setup) if isinstance(setup, dict) else None)
     try:
         yield
     finally:
@@ -187,13 +194,15 @@ def read_live(ticker: str) -> Optional[dict[str, Any]]:
 
 
 def _cycle_fields(live: Optional[dict[str, Any]]) -> dict[str, Any]:
-    """``live`` and ``management``, each only when there is one to write."""
+    """``live``, ``management`` and ``model_setup``, each only when there is one to write."""
     fields: dict[str, Any] = {}
     if live is not None:
         fields["live"] = live
     facts = _open
     if facts is not None and facts.management is not None:
         fields["management"] = dict(facts.management)
+    if facts is not None and facts.setup is not None:
+        fields["model_setup"] = dict(facts.setup)
     return fields
 
 
@@ -355,9 +364,12 @@ def record(
                 "stage": stage,
                 # The price of the name when this line's signal was made, and
                 # whether the cycle's position-management pass found the
-                # market shut (the owner's request of 25 Sep 2026). For later
+                # market shut (the owner's request of 25 Sep 2026), and who
+                # answered with which prompt -- model, host and a fingerprint
+                # of the prompt's fixed texts (``model_setup``, for the
+                # owner's weekly drift report of 27 Sep 2026). For later
                 # study only: the race and the funds still enter at the next
-                # open, and nothing in the cycle reads either back. Absent
+                # open, and nothing in the cycle reads any of them back. Absent
                 # rather than null outside a cycle, so a line written without
                 # them keeps exactly the keys, in exactly the order, it had.
                 **_cycle_fields(live),

@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import json
 import argparse
+import hashlib
 import logging
 import os
 import sys
@@ -50,11 +51,12 @@ from pydantic import ValidationError  # noqa: E402
 
 from analysis.reader import SCORE_FIELDS, SCORE_SOURCES  # noqa: E402
 from app.schemas import MAX_KEY_FACTORS, Bias, LLMSignal  # noqa: E402
+from config import journal_files  # noqa: E402
 from config import settings as cfg  # noqa: E402
 from config.instruments import is_fund  # noqa: E402
 from orchestrator.fx import FxRate, fetch_rate as fetch_fx_rate  # noqa: E402
 from config.settings import get_settings  # noqa: E402
-from orchestrator import blend, context, flows, journal, live_price, model_io  # noqa: E402
+from orchestrator import blend, context, flows, journal, live_price, llm, model_io  # noqa: E402
 from orchestrator.context import TickerContext  # noqa: E402
 from orchestrator.llm import (  # noqa: E402
     FULL_MODEL_TIMEOUT_SECONDS,
@@ -870,9 +872,58 @@ def write_step_summary(report: CycleReport) -> bool:
 # --------------------------------------------------------------------------- #
 
 
+#: The fixed words after every ticker's context in the user prompt.
+USER_PROMPT_TAIL = "\n\nRespond with the JSON signal for {ticker}."
+
+
 def build_user_prompt(ticker_context: TickerContext) -> str:
     prompt = ticker_context.as_prompt()
-    return f"{prompt}\n\nRespond with the JSON signal for {ticker_context.ticker}."
+    return prompt + USER_PROMPT_TAIL.format(ticker=ticker_context.ticker)
+
+
+def prompt_fingerprint() -> str:
+    """12 hex characters that change whenever a fixed text the full model is sent changes.
+
+    The SHA-256 of every fixed piece of the prompt: the company prompt, the
+    fund prompt's head, each section's guidance and tail, the user prompt's
+    closing words, the answer schema, and the two sentences the client adds
+    on its own (no reasoning, and the re-ask after an off-schema answer).
+    Not the context itself, which is new every day, and not the code that
+    renders it. Recorded on every cycle line (``model_setup``) so the
+    owner's weekly drift report can say when the prompt changed, from the
+    journal alone (27 Sep 2026).
+    """
+    parts = {
+        "company": SYSTEM_PROMPT,
+        "fund_head": ETF_PROMPT_HEAD,
+        "fund_sections": [list(pair) for pair in ETF_SECTION_GUIDANCE],
+        "fund_tail": ETF_PROMPT_TAIL,
+        "user_tail": USER_PROMPT_TAIL,
+        "schema": SIGNAL_JSON_SCHEMA,
+        "no_reasoning": llm.NO_REASONING_INSTRUCTION,
+        "off_schema": llm.OFF_SCHEMA_INSTRUCTION,
+    }
+    blob = json.dumps(parts, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:12]
+
+
+def model_setup() -> dict[str, Any] | None:
+    """Who answers and with which prompt, as configured: model, host, prompt fingerprint.
+
+    Never a key: the host is the configured base URL's host only
+    (``llm.configured_provider``). Nothing that decides a trade reads it,
+    and it never raises: a label the cycle's lines carry is not worth a
+    cycle, so anything that goes wrong here leaves the lines without it.
+    """
+    try:
+        return {
+            "model": llm.configured_model(),
+            "provider": llm.configured_provider(),
+            "prompt": prompt_fingerprint(),
+        }
+    except Exception:  # noqa: BLE001 - see the docstring
+        log.exception("could not describe the model setup; lines will carry none")
+        return None
 
 
 #: Which sections of the prompt can feed each score, per instrument kind.
@@ -1701,7 +1752,7 @@ def run_cycle(
     # The capture is opened the same way, and named after the run the
     # workflow described (journal.run_block).
     run_id = str((journal.run_block() or {}).get("run_id") or "") or None
-    with journal.cycle(prices), model_io.capture(model_io_dir, run_id):
+    with journal.cycle(prices, setup=model_setup()), model_io.capture(model_io_dir, run_id):
         if cfg.USE_BATCH_API:
             return run_batched_cycle(dispatcher, premarket=premarket)
         return _run_live_cycle(dispatcher, premarket)
@@ -1786,6 +1837,35 @@ def _run_live_cycle(dispatcher: Dispatcher | None, premarket: bool) -> CycleRepo
     return report
 
 
+def weekly_digest(digest_dir: Path, today: date | None = None) -> dict[str, Any]:
+    """The owner's weekly risk digest for the held names (``orchestrator/digest.py``), as a record.
+
+    The one place the digest meets a key: the full model's provider is built
+    here, as for a cycle, and handed in. Nothing else of a cycle is built --
+    no dispatcher, no broker, no journal line -- and the digest's answer goes
+    to stdout only. What this week's earlier digests cost is counted against
+    the cap, so a rerun cannot spend it twice.
+    """
+    from orchestrator import digest
+
+    today = today or datetime.now(ZoneInfo("UTC")).date()
+    try:
+        account = (cfg.LOG_DIR / "account.jsonl").read_text(encoding="utf-8").splitlines()
+    except OSError:
+        account = []
+    spent = digest.spent_in_week(digest_dir, digest.week_of(today))
+    try:
+        provider = full_model_provider()
+    except LLMError as exc:
+        return {"kind": "risk-digest", "week": digest.week_of(today), "made_on": today.isoformat(),
+                "status": f"not asked: {str(exc)[:200]}", "flags": [], "earnings": [], "held": {},
+                "cost_usd": 0.0}
+    path = cfg.SIGNAL_JOURNAL_PATH
+    lines = journal_files.iter_lines(path) if journal_files.exists(path) else iter(())
+    return digest.run(provider, model=llm.configured_model(), today=today, account_lines=account,
+                      journal_lines=lines, spent_this_week=spent)
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Run the trading heartbeat.")
     parser.add_argument(
@@ -1816,9 +1896,29 @@ def main(argv: list[str] | None = None) -> None:
             "No signals, no model, no new trades. Works after the close."
         ),
     )
+    parser.add_argument(
+        "--weekly-digest",
+        action="store_true",
+        help=(
+            "Ask the full model to flag this week's headlines for the held "
+            "names, print the digest as JSON and exit (orchestrator/digest.py). "
+            "No cycle, no dispatcher, no order: it reads the account record "
+            "and the journal, and is capped at digest.WEEKLY_CAP_USD a week."
+        ),
+    )
+    parser.add_argument(
+        "--digest-dir",
+        type=Path,
+        default=cfg.LOG_DIR / "digest",
+        help="where this week's earlier digests are, to count what they cost against the cap",
+    )
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
+    if args.weekly_digest:
+        print(json.dumps(weekly_digest(args.digest_dir), sort_keys=True))
+        return
 
     if args.protect_only:
         outcome = protect_positions()

@@ -1,0 +1,116 @@
+---
+title: "Weekly and monthly reports"
+description: "The model's drift against its own last four weeks, the risk digest for the held names, and the monthly concentration report"
+---
+
+Three reports watch the experiment without touching it (the owner's request
+of 27 Sep 2026). None of them trades, changes a rule or feeds anything that
+decides: they are for reading, and one of them can ask the owner to look.
+
+| Report | When | Made by | Record |
+| --- | --- | --- | --- |
+| Drift | every run; judged weekly | `analysis/drift.py`, in the heartbeat | `logs/drift.json` |
+| Risk digest | the week's first cycle day | `orchestrator/digest.py`, in the heartbeat | `logs/digest/<week>.json` |
+| Concentration | the first night after a month ends | `analysis/concentration.py`, in the funds workflow | `logs/concentration.json` |
+
+The week's first cycle day also writes `logs/weekly/<week>.md`, the three
+joined (`analysis/weekly.py`), and sends it to the phone as its own
+notification after the daily brief, with a link to that file.
+
+## Drift
+
+Each week, from the journal alone:
+
+- the share of the model's answers that are NEUTRAL;
+- the conviction of the answers that take a side: the mean, the share at or
+  above the floor, and the count in each conviction group;
+- agreement with the momentum rule, on the lines where both take a side;
+- the long/short mix;
+- failed calls by type (setup errors and model errors, as
+  `analysis/call_errors.py` splits them), as shares of the calls asked;
+- when each day's run started (minutes after 14:40 UTC) and which starter
+  started it;
+- the model, the host that served it, the reasoning level, screening, and
+  the prompt fingerprint.
+
+Held lines and lines that failed before the model was asked are left out:
+the question is what the model did with the calls it got.
+
+**The normal band (the owner's fixed rule).** A number leaves its band when
+it is outside the mean plus or minus 2 sample standard deviations of the
+same number over the 4 weeks before. All 4 weeks must have the number. A
+name (model, host, setting, fingerprint) leaves its band when it was not
+seen in any of the 4 weeks before. No band, and no alert, until 4 weeks of
+data exist. Weeks run Monday to Sunday (UTC) from 28 Sep 2026, so the first
+week that can alert is the week of 26 Oct 2026, said on 2 Nov 2026.
+
+An alert is a warning in the daily health check on the first cycle day of
+the following week only, so it heads that day's brief once
+(`analysis/health.py`, `drift_alert`).
+
+<Warning>
+With only 4 weeks behind it, the band is narrow. If the numbers did not
+change at all, each one would still fall outside its band about one week in
+six, by chance, and with nine numbers most weeks would have at least one
+alert. And a number that was the same for 4 weeks (0 failed calls, say) has
+a band of zero width: any change leaves it. The rule is the owner's and is
+applied as written; the report shows every number with its band so an alert
+can be read in context.
+</Warning>
+
+### The prompt fingerprint
+
+Every cycle line carries `model_setup`: the model, the host it was asked at
+(never a key or a path) and 12 hex characters of the SHA-256 of every fixed
+text the model is sent -- the company prompt, the fund prompt's parts, the
+user prompt's closing words, the answer schema, and the two sentences the
+client adds on its own (`orchestrator.heartbeat.prompt_fingerprint`). It
+changes when any of those texts changes. It does not cover the day's context
+or the code that renders it.
+
+## Risk digest
+
+Once a week, for the names the paper account holds (its last snapshot):
+
+- **earnings dates** in the next 14 days, listed by code from the date the
+  cycle already reads (yfinance's calendar), for companies;
+- **fund closures or changes, index changes, earnings news and major news**,
+  flagged by the model from the headlines the cycle already fetched for each
+  held name that week (`context.sources` in the journal; no new search).
+
+The model answers with a headline's id, a kind and a one-sentence note, and
+nothing else. Code keeps a flag only if it names a headline the model was
+given, copies the link, title and source from that headline, strips anything
+like a link from the note, and counts what it dropped. Headlines are
+untrusted text; the prompt tells the model to read them as data.
+
+**Cost cap: $1 a week.** Before the call, the worst case (every character a
+token, a full answer, asked twice for an off-schema retry) is priced; if it
+would take the week's spend past $1, or the model has no price, no call is
+made and the digest says so. A full week of headlines prices at about $0.02
+in the worst case; a real digest costs well under a cent. The measured cost
+is in the record.
+
+The heartbeat runs it with `python -m orchestrator.heartbeat --weekly-digest`,
+which builds the full model's provider and nothing else of a cycle: no
+dispatcher, no broker, no journal line. CI keeps `orchestrator/digest.py`
+away from `app/`, orders and files, and lets only the heartbeat import it.
+
+## Concentration (monthly, descriptive only)
+
+For each month's last trading day:
+
+- **the book's beta to VT**: each position's ordinary least-squares beta to
+  VT over the year of daily final closes before it, times its signed market
+  value, summed and divided by equity (longs and shorts also shown apart);
+- **each exposure group against its cap** (25%; Duration 30%), counted as
+  the risk engine counts them;
+- **breadth**: the share of the watchlist whose close is above the average
+  of its last 50 closes;
+- **VT's realized volatility**: the standard deviation of its daily returns
+  in the month, times the square root of 252.
+
+The book is the paper account's last snapshot of the month
+(`logs/account.jsonl`). Prices are the raw daily closes the race uses. The
+funds workflow makes each month once and commits it; the next weekly report
+shows it.

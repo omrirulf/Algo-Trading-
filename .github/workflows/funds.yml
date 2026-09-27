@@ -34,7 +34,7 @@ on:
         default: "1000"
 
 permissions:
-  contents: write   # only to commit logs/funds.json and logs/race_gate.json and publish the desk
+  contents: write   # only to commit logs/funds.json, logs/race_gate.json and logs/concentration.json, and publish the desk
 
 concurrency:
   group: shadow-funds
@@ -93,6 +93,25 @@ jobs:
           python -c "import json,sys; json.load(open(sys.argv[1]))" "$RUNNER_TEMP/funds.json"
           python -c "import json,sys; t=json.load(open(sys.argv[1])); assert t['kind']=='scoring-prices'" "$RUNNER_TEMP/scoring-prices/funds.json"
 
+      - name: The monthly concentration report
+        # The owner's monthly report (27 Sep 2026), descriptive only: the
+        # book's beta to VT, each exposure group against its cap, breadth
+        # (the watchlist's share above its 50-day average) and VT's realized
+        # volatility, for the last trading day of the month before
+        # (analysis/concentration.py). Made once: on a night the committed
+        # file already holds that month, the program prints it back and
+        # fetches nothing. It reads the account record and daily closes and
+        # needs no key. A night that cannot make it leaves the file as it was
+        # and does not stop the funds' commit.
+        continue-on-error: true
+        run: |
+          if python -m analysis.concentration --previous --history logs/concentration.json > "$RUNNER_TEMP/concentration.json" \
+             && python -c "import json,sys; d=json.load(open(sys.argv[1])); assert d['kind']=='concentration'" "$RUNNER_TEMP/concentration.json"; then
+            cp "$RUNNER_TEMP/concentration.json" logs/concentration.json
+          else
+            echo "::warning::the concentration report was not made; the committed file is left as it was"
+          fi
+
       - name: Hand the scoring prices over
         # Read by scoring-prices.yml once this run has finished. 90 days, so
         # a copy that failed can be retried by hand. No secret is involved.
@@ -110,6 +129,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -f logs/race_gate.json logs/funds.json
+          # The monthly concentration report (27 Sep 2026), on its own line:
+          # it exists only once the first month has been made.
+          git add -f logs/concentration.json 2>/dev/null || true
           if git diff --cached --quiet; then
             echo "no changes"
             exit 0
@@ -120,6 +142,9 @@ jobs:
           if ! git pull --rebase --autostash origin "${GITHUB_REF_NAME}"; then
             git checkout --theirs -- logs/race_gate.json logs/funds.json 2>/dev/null || true
             git add -f logs/race_gate.json logs/funds.json
+            # On its own: one missing path makes git refuse the whole list.
+            git checkout --theirs -- logs/concentration.json 2>/dev/null || true
+            git add -f logs/concentration.json 2>/dev/null || true
             GIT_EDITOR=true git rebase --continue
           fi
           git push origin "HEAD:${GITHUB_REF_NAME}"

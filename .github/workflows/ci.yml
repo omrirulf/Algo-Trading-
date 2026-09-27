@@ -580,6 +580,35 @@ jobs:
           fi
           echo "OK: the price reader only reads a price, for the journal"
 
+      - name: The risk digest only reads and flags
+        # orchestrator/digest.py asks the full model, once a week, to flag
+        # the held names' headlines (the owner's request of 27 Sep 2026: the
+        # model only reads and flags; it never trades, changes a rule or
+        # calculates a number). It is handed the provider, so the credential
+        # check above already keeps it from reading a key. This keeps it from
+        # anything else: no import from app/ (the broker and the engine live
+        # there), no order or dispatcher call, no file written. And only the
+        # heartbeat may import it -- from its --weekly-digest mode, which
+        # returns before a dispatcher is built -- so no module that trades,
+        # scores or decides can read what the model flagged.
+        run: |
+          f=orchestrator/digest.py
+          hits=$(grep -nE '(^(from|import) app\b|submit_[a-z_]*\(|post_signal|ExecutionEngine|build_dispatcher|PositionManager|\.write_text\(|\.write_bytes\(|open\([^)]*["'"'"'][wax])' "$f" || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::orchestrator/digest.py may read and flag only: no app import, no order, no file"
+            exit 1
+          fi
+          importers=$(grep -rlE '(from orchestrator import [^#]*\bdigest\b|orchestrator\.digest|import digest)' \
+                        app orchestrator config analysis store backtest replay learn rules shadow --include='*.py' \
+                      | grep -vE '^orchestrator/(heartbeat|digest)\.py$' || true)
+          if [ -n "$importers" ]; then
+            echo "$importers"
+            echo "::error::only orchestrator/heartbeat.py may import orchestrator/digest.py"
+            exit 1
+          fi
+          echo "OK: the digest only reads and flags"
+
       - name: The scorer is read-only
         # analysis/ grades past decisions. It must never be able to make one:
         # no order path, and no writing to the journal it is reading.
