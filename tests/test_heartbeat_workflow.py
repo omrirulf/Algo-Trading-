@@ -544,7 +544,7 @@ def test_every_rendered_file_that_conflicts_is_taken_from_this_run(tmp_path):
                               text=True).stdout
 
     rendered = ("cycle_report.md", "score_report.md", "blend_weights.json", "book.json", "brief.txt",
-                "starter_status.json")
+                "starter_status.json", "drift.json")
     logs = ("journal/2026-09.log", "execution_audit.log", "fund_size.log", "account.jsonl")
     git("init", "-q", "--bare", "-b", "main", "origin.git")
     work, other = tmp_path / "work", tmp_path / "other"

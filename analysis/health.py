@@ -37,6 +37,13 @@ up and working (``logs/archive_status.json``, written by
 has left (``config.settings.GITHUB_DISPATCH_TOKEN_EXPIRES``). The first two
 are read like the nightly records; the starter's own request result
 (``logs/starter_status.json``) only adds detail to the first.
+
+One rule, from 27 Sep 2026, reads the weekly drift record
+(``logs/drift.json``, written by ``analysis/drift.py``): on the first cycle
+day of a week, a warning when a number about the model's answers stayed
+outside its normal band 2 weeks in a row (the mean plus or minus 2 standard
+deviations of every week before; none until 4 weeks have it); and on any
+day, a warning when the model, its host, a setting or the prompt changed.
 """
 
 from __future__ import annotations
@@ -101,6 +108,10 @@ STARTER_FILE = "starter_status.json"
 #: --status``). Written after the push, which is the heartbeat's last step,
 #: so what this run reads is the previous run's push.
 ARCHIVE_FILE = "archive_status.json"
+
+#: The weekly drift record (``analysis/drift.py``), written beside the
+#: journal by the heartbeat before the book snapshot (27 Sep 2026).
+DRIFT_FILE = "drift.json"
 
 #: The one file the journal was before 26 Sep 2026, beside the monthly
 #: directory (``config.settings.LEGACY_SIGNAL_JOURNAL_PATH``; a test pins
@@ -401,6 +412,50 @@ def calibration_stopped(funds: Optional[dict]) -> Optional[Alarm]:
                  f"{funds.get('final_through') or 'an unknown date'}.")
 
 
+def drift_alert(drift: Optional[dict], day: date) -> Optional[Alarm]:
+    """27 Sep 2026: a weekly number stayed outside its normal band (the owner's drift report).
+
+    The owner's rule: a weekly number about the model's answers alerts when
+    it is outside the mean plus or minus 2 standard deviations of every week
+    before, 2 weeks in a row; no band until 4 weeks have it
+    (``analysis/drift.py``). Said once, on the day the record names
+    (``alert_on``: the first cycle day of the following week), so a week
+    that drifted is one notification, not five. A warning: it changes
+    nothing by itself; the owner decides what it means.
+    """
+    if not isinstance(drift, dict) or drift.get("alert_on") != day.isoformat():
+        return None
+    alerts = [a for a in drift.get("alerts") or [] if isinstance(a, str) and a]
+    if not alerts:
+        return None
+    week = drift.get("judged_week")
+    week = week if isinstance(week, str) and re.fullmatch(r"\d{4}-W\d{2}", week) else "last week"
+    listed = "; ".join(a[:160] for a in alerts[:6]) + (" …" if len(alerts) > 6 else "")
+    return Alarm(WARNING, f"Drift: {len(alerts)} value(s) outside their normal band 2 weeks running, to {week}",
+                 f"{listed}. Band: the mean plus or minus 2 standard deviations of every week "
+                 f"before (analysis/drift.py). Nothing changes by itself; the owner decides.")
+
+
+def setting_changed(drift: Optional[dict], day: date) -> Optional[Alarm]:
+    """27 Sep 2026: the model, its host, a setting or the prompt changed today.
+
+    The owner's rule: any change of the model, the host it is asked at, the
+    reasoning level, screening or the prompt fingerprint alerts the same day
+    (``analysis/drift.py``, ``setting_changes``: today's lines against the
+    last cycle day before). A warning: a change of contestant is the owner's
+    to judge; nothing reverts by itself.
+    """
+    if not isinstance(drift, dict) or drift.get("setting_alert_on") != day.isoformat():
+        return None
+    changes = [c for c in drift.get("setting_alerts") or [] if isinstance(c, str) and c]
+    if not changes:
+        return None
+    return Alarm(WARNING, f"Model setup changed today: {changes[0][:120]}",
+                 "; ".join(c[:160] for c in changes[:5]) + ". Seen on today's journal lines against "
+                 "the last cycle day before (analysis/drift.py). The race counts only lines made "
+                 "as the pre-registration names; the owner decides.")
+
+
 def _fraction(value: object) -> Optional[float]:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
@@ -672,7 +727,8 @@ _FROM_SETTINGS = object()
 
 def check(journal: Path, audit: Path, day: date, funds: Optional[Path] = None,
           race: Optional[Path] = None, *, starter: Optional[Path] = None,
-          archive: Optional[Path] = None, token_expires: object = _FROM_SETTINGS) -> list[Alarm]:
+          archive: Optional[Path] = None, drift: Optional[Path] = None,
+          token_expires: object = _FROM_SETTINGS) -> list[Alarm]:
     """Every alarm the day's record raises, critical first.
 
     ``funds`` is the shadow funds' record; by default the ``funds.json``
@@ -680,7 +736,8 @@ def check(journal: Path, audit: Path, day: date, funds: Optional[Path] = None,
     by default the ``race_gate.json`` beside it (``RACE_GATE_FILE``).
     ``starter`` and ``archive`` are the Supabase starter's and the archive
     push's records, by default beside the journal too (``STARTER_FILE``,
-    ``ARCHIVE_FILE``). ``token_expires`` is the starter's token's expiry,
+    ``ARCHIVE_FILE``). ``drift`` is the weekly drift record, by default the
+    ``drift.json`` beside it (``DRIFT_FILE``). ``token_expires`` is the starter's token's expiry,
     by default ``config.settings.GITHUB_DISPATCH_TOKEN_EXPIRES``.
     """
     today = journal_lines_on(_read_lines(journal), day)
@@ -689,6 +746,7 @@ def check(journal: Path, audit: Path, day: date, funds: Optional[Path] = None,
     race_path = Path(race) if race is not None else Path(journal).parent / RACE_GATE_FILE
     starter_path = Path(starter) if starter is not None else Path(journal).parent / STARTER_FILE
     archive_path = Path(archive) if archive is not None else Path(journal).parent / ARCHIVE_FILE
+    drift_path = Path(drift) if drift is not None else Path(journal).parent / DRIFT_FILE
     if token_expires is _FROM_SETTINGS:
         from config.settings import GITHUB_DISPATCH_TOKEN_EXPIRES as token_expires
     found = [
@@ -708,6 +766,10 @@ def check(journal: Path, audit: Path, day: date, funds: Optional[Path] = None,
         cftc_gaps(today),
         news_gaps(today),
         duplicate_cycle(today),
+        # The model's answers against its own last four weeks: said on the
+        # first cycle day of the week after the one that drifted, only.
+        setting_changed(_read_record(drift_path), day),
+        drift_alert(_read_record(drift_path), day),
         # The machinery that starts the day and keeps its record, after
         # everything about the day's trading: the brief names the first
         # warning, and a day that traded badly is the bigger news. The

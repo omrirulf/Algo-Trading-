@@ -144,6 +144,9 @@ class JournalEntry:
     #: The engine's reason, as journalled in the line's ``outcome``. Read it
     #: through ``outcome_reason``.
     outcome_reason_record: Any = None
+    #: The line's ``model_setup`` record as journalled. Read it through
+    #: ``model_setup``.
+    model_setup_record: Any = None
 
     @property
     def run(self) -> Optional[dict[str, Any]]:
@@ -197,6 +200,19 @@ class JournalEntry:
         engine, or the reason is missing, empty or not text.
         """
         return _text(self.outcome_reason_record)
+
+    @property
+    def model_setup(self) -> Optional[dict[str, Any]]:
+        """Who answered this line and with which prompt, or None.
+
+        Keys as written by the cycle (``orchestrator.heartbeat.model_setup``):
+        ``model``, ``provider`` (the host the model was asked at) and
+        ``prompt`` (12 hex characters that change when a fixed text of the
+        prompt changes). None on lines written before the record existed (it
+        arrived after 27 Sep 2026), outside a heartbeat cycle, and on
+        anything that is not an object. Check each value before trusting it.
+        """
+        return self.model_setup_record if isinstance(self.model_setup_record, dict) else None
 
     @property
     def model_answered(self) -> bool:
@@ -404,6 +420,9 @@ def entry_from(payload: Any) -> Optional[JournalEntry]:
             dict(payload["management"]) if isinstance(payload.get("management"), dict) else None
         ),
         outcome_reason_record=outcome.get("reason"),
+        model_setup_record=(
+            dict(payload["model_setup"]) if isinstance(payload.get("model_setup"), dict) else None
+        ),
     )
 
 

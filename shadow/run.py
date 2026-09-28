@@ -26,6 +26,15 @@ calibration verdict is "passed", no fund is run: nothing about a fund's
 book, equity or trades is calculated, and ``funds`` and ``integrity`` are
 null (``build``). A delayed calibration delays the reading, never the start.
 
+**Exploratory results only at checkpoints** (pre-registration section 13.1,
+2026-09-28): the three exploratory funds and tests A, B and C (``shadow.
+exploratory``) are run only on the night the race first reaches a planned
+look (``--race-gate``), and only once calibration has passed. Their results
+go into a record for that look, carried unchanged from the previous
+document (``--previous``) every night after; between looks the document
+carries only their counters, which are counted from the journal and the
+prices without running a fund.
+
 Two reports that are not fund results are in every document from the fund
 start on, whatever calibration says: ``price_gaps`` (the price source's
 missing ticker-days per calendar month over the watchlist) and
@@ -78,13 +87,15 @@ from shadow.fund import (  # noqa: E402
 )
 from shadow.market import Bars, SimFeed, calendar  # noqa: E402
 from shadow.order_matters import fund_summary, real_summary  # noqa: E402
+from shadow import exploratory as xp  # noqa: E402
 
 log = logging.getLogger("shadow.run")
 
 INDEX_TICKER = "VT"
 LABELS = {"model": "Model", "momentum": "Momentum", "hybrid": "Hybrid", "vt": "VT (world index, held)",
           "model_by_conviction": "Model, highest conviction first", "model_sized": "Model, sized by conviction",
-          "model_same_day": "Model, entered the same day"}
+          "model_same_day": "Model, entered the same day", xp.VETO: "Momentum, 200-day average veto (A)",
+          xp.TIMING: "VT or T-bills by the 10-month average (B)", xp.LIMIT: "Momentum, pullback limit entry (C)"}
 
 #: The owner's exploratory funds (decisions 3 and 4 of 25 Sep 2026, and
 #: ``model_same_day`` of 26 Sep 2026), in the order they are listed, after
@@ -327,7 +338,7 @@ def integrity(funds: Sequence) -> dict:
     """
     problems: list[str] = []
     for fund in funds:
-        if isinstance(fund, IndexFund):
+        if not hasattr(fund, "broker"):
             continue
         problems += [f"{fund.name}: {u}" for u in fund.tally.unexpected]
         problems += [f"{fund.name}: manager: {e}" for e in fund.tally.manager_errors]
@@ -339,7 +350,7 @@ def integrity(funds: Sequence) -> dict:
         for ticker, pos in fund.broker.positions.items():
             if covered.get(ticker, 0) != abs(pos.qty):
                 problems.append(f"{fund.name}: {ticker} stops cover {covered.get(ticker, 0)} of {abs(pos.qty)}")
-    holes = [f"{fund.name}: {h}" for fund in funds if not isinstance(fund, IndexFund) for h in fund.tally.data_holes]
+    holes = [f"{fund.name}: {h}" for fund in funds if hasattr(fund, "broker") for h in fund.tally.data_holes]
     return {"ok": not problems, "problems": problems[:50], "data_holes": len(holes), "data_hole_examples": holes[:10]}
 
 
@@ -470,9 +481,70 @@ def _read_lines(path: Path) -> list[str]:
         return []
 
 
+def paired(fund, other) -> dict:
+    """``fund`` against ``other`` day by day, on the sessions both have: the test of section 13.
+
+    The daily net returns are paired by date (a fund that starts later, like
+    B, is paired from its own first session), then judged as the fund test's
+    are: mean difference, Newey-West t (lag 5), two-sided p, and the stats
+    the Deflated Sharpe Ratio reads (``analysis.multiple_tests``).
+    """
+    from analysis.horse_race import newey_west_t
+    from analysis.multiple_tests import p_two_sided, series_stats
+
+    def by_day(f) -> dict:
+        equity = [STARTING_CASH] + [round(d.equity, 2) for d in f.days]
+        return {d.day: today / before - 1.0 for d, before, today in zip(f.days, equity, equity[1:])}
+
+    mine, theirs = by_day(fund), by_day(other)
+    days = sorted(set(mine) & set(theirs))
+    diffs = [mine[d] - theirs[d] for d in days]
+    t = newey_west_t(diffs, VS_MODEL_LAG)
+    return {"compare_to": other.name, "days": len(diffs), "from": days[0].isoformat() if days else None,
+            "mean_daily_diff": statistics.fmean(diffs) if diffs else None, "t": t, "p": p_two_sided(t),
+            "stats": series_stats(diffs),
+            "total_return": total_return(fund), "compare_total_return": total_return(other),
+            "max_drawdown": max_drawdown([d.equity for d in fund.days]),
+            "compare_max_drawdown": max_drawdown([d.equity for d in other.days])}
+
+
+def order_changed_days(fund, model) -> int:
+    """Sessions on which ``fund`` bought something other than the model fund did (section 13.7)."""
+    def bought(f) -> dict:
+        out: dict = {}
+        for fill in f.broker.fills:
+            if fill.kind == ENTRY:
+                out.setdefault(fill.day, set()).add((fill.ticker, fill.side))
+        return out
+
+    mine, theirs = bought(fund), bought(model)
+    return sum(1 for day in set(mine) | set(theirs) if mine.get(day, set()) != theirs.get(day, set()))
+
+
+def sized_trades_scaled(fund) -> int:
+    """``model_sized`` acting differently (section 13.7): its accepted entries whose size factor is not 1.0.
+
+    Conviction 0.50-0.60 has factor 1.0 -- the model fund's own size -- so those trades do not differ.
+    """
+    from shadow.fund import conviction_factor
+
+    return sum(1 for e in fund.order_events or [] if e.status == "ACCEPTED" and e.conviction is not None
+               and conviction_factor(e.conviction) not in (None, 1.0))
+
+
+def new_funds(feed: SimFeed, bars: Bars, long_bars: Bars, final_through: date, shortable_no) -> list:
+    """Tests A, B and C as funds (section 13): the veto and pullback funds on the funds' own bars and feed."""
+    return [
+        Fund(xp.VETO, xp.veto_signal(long_bars), feed, bars, not_shortable=shortable_no),
+        xp.TimingFund(xp.TIMING, long_bars, final_through),
+        xp.PullbackFund(xp.LIMIT, feed, bars, not_shortable=shortable_no),
+    ]
+
+
 def run_funds(
     entries: Sequence[JournalEntry], start: date, final_through: date, fetcher, *,
     random_funds: int, processes: int, shortable_no, first_cycle: Optional[date] = None,
+    exploratory: bool = True, long_bars: Optional[Bars] = None,
 ) -> tuple[dict, dict]:
     """Every fund from ``start`` through ``final_through``. Called only once calibration has passed (``build``).
 
@@ -494,26 +566,163 @@ def run_funds(
         Fund("hybrid", rule_signal("hybrid"), feed, bars, not_shortable=shortable_no),
         IndexFund("vt", INDEX_TICKER, bars),
     ]
-    explore = exploratory_funds(feed, bars, shortable_no)
-    # One run for all seven: the same sessions, cycles and feed clock.
-    run([*four, *explore], sessions, cycles, ran, feed, first_cycle)
+    explore = exploratory_funds(feed, bars, shortable_no) if exploratory else []
+    tests = new_funds(feed, bars, long_bars, final_through, shortable_no) if exploratory and long_bars else []
+    # One run for all of them: the same sessions, cycles and feed clock.
+    run([*four, *explore, *tests], sessions, cycles, ran, feed, first_cycle)
     vt = four[-1].days[-1].equity / STARTING_CASH - 1.0 if four[-1].days else None
     curves, coin_check = coin_funds(random_funds, processes, bars, sessions, cycles, ran, shortable_no,
                                     first_cycle)
     # The key keeps its name; the check covers the exploratory funds too.
-    check = integrity([*four, *explore])
-    model = next(f for f in four if f.name == COMPARE_TO)
-    return {
+    check = integrity([*four, *explore, *tests])
+    model = next(f for f in four if f.name == COMPARE_TO)  # the three exploratory funds' comparator
+    out = {
         "start": start.isoformat(),
         "days": [d.isoformat() for d in sessions],
         "list": [summarise(f, vt) for f in four] + [summarise_exploratory(f, model, vt) for f in explore],
         "band": band(curves),
-    }, {"four": check, "coin": coin_check}
+    }
+    if explore:
+        out["tests"] = {f.name: paired(f, model) for f in explore}
+        by_conviction = next((f for f in explore if f.name == "model_by_conviction"), None)
+        if by_conviction is not None:
+            out["tests"]["model_by_conviction"]["acted"] = order_changed_days(by_conviction, model)
+        sized = next((f for f in explore if f.name == "model_sized"), None)
+        if sized is not None:
+            out["tests"]["model_sized"]["acted"] = sized_trades_scaled(sized)
+    if tests:
+        by_name = {f.name: f for f in four}
+        out["tests"] |= {f.name: paired(f, by_name[xp.COMPARED_WITH[f.name]]) for f in tests}
+        out["tests"][xp.TIMING]["switches"] = tests[1].switches
+        out["tests"][xp.LIMIT]["orders"] = {k: v for k, v in vars(tests[2].pullback).items()
+                                            if k not in ("filled", "considered")}
+        out["tests"][xp.LIMIT]["acted"] = xp.pullback_acted(tests[2], by_name["momentum"])
+    return out, {"four": check, "coin": coin_check}
+
+
+def exploratory_counters(entries: Sequence[JournalEntry], long_bars: Bars, final_through: date) -> dict:
+    """Everything shown about the exploratory tests between checkpoints (section 13.1): counters, no result.
+
+    Counted from the journal and the prices alone; no fund is built. For
+    ``model_same_day``, the directional lines from the first cycle it could
+    not have entered, by reason (the check ``shadow.fund.recorded_fill``
+    makes); nothing else of the three exploratory funds is shown between
+    checkpoints.
+    """
+    from shadow.fund import recorded_fill
+
+    first = schedule.FUND_FIRST_CYCLE
+    cycles = lines_by_day(entries)
+    unusable: dict[str, int] = {key: 0 for key in NOT_ENTERED_KEYS.values()}
+    for day, lines in cycles.items():
+        if day < first:
+            continue
+        for line in lines:
+            signal = model_signal(line)
+            if signal is None or signal.bias.value == "NEUTRAL":
+                continue
+            _, why = recorded_fill(line.entry, "buy" if signal.bias.value == "BULLISH" else "sell", day)
+            if why is not None:
+                unusable[NOT_ENTERED_KEYS[why]] += 1
+    return {
+        xp.VETO: xp.veto_counters(cycles, long_bars, first),
+        xp.TIMING: xp.timing_counters(long_bars, final_through),
+        xp.LIMIT: xp.pullback_counters(cycles, long_bars, first, final_through),
+        "model_same_day": {"lines_without_usable_price": unusable},
+    }
+
+
+def long_history(entries: Sequence[JournalEntry], final_through: date, fetcher) -> Bars:
+    """Closes far enough back for A's 200-day average and B's 10 month-ends, from their own fetcher."""
+    first = schedule.FUND_FIRST_CYCLE
+    tickers = {e.ticker for e in entries if e.timestamp is not None and e.timestamp.date() >= first}
+    return Bars.fetch(tickers | {xp.TIMING_IN, xp.TIMING_OUT}, first - timedelta(days=xp.LONG_LEAD_DAYS),
+                      final_through, fetcher)
+
+
+def checkpoint_race(entries: Sequence[JournalEntry], long_bars: Bars, today: date, final_through: date,
+                    fetchers: Optional[list] = None) -> dict:
+    """A's race arm, the insider arm's test and C's filled against missed, at a checkpoint (section 13)."""
+    from analysis import decision_gate as gate
+
+    lines = [e for e in entries if e.timestamp is not None and e.model_answered]
+    how = xp.race_settings(today, final_through, lines)
+    if fetchers is not None:
+        fetchers += [("race_closes", how.source), ("race_ohlc", how.fetcher)]
+    return xp.race_tests(lines, long_bars, how, schedule.FUND_FIRST_CYCLE, gate.DECISION_CUTOFF)
+
+
+#: Every test of the family (section 13.5), by where its numbers are in a
+#: look's record, and where its count of "acting differently" is (13.7):
+#: None for the ideas that differ on every trade and so always act.
+FAMILY: Final[tuple[tuple[str, str, str, Optional[tuple[str, ...]]], ...]] = (
+    ("insider arm", "race", "insiders", ("race", "insiders", "trades")),
+    ("A, race arm", "race", xp.VETO, ("counters", xp.VETO, "vetoed")),
+    ("A, fund", "tests", xp.VETO, ("counters", xp.VETO, "vetoed")),
+    ("B, fund", "tests", xp.TIMING, ("counters", xp.TIMING, "days_out_of_vt")),
+    ("C, fund", "tests", xp.LIMIT, ("tests", xp.LIMIT, "acted")),
+    ("model_by_conviction", "tests", "model_by_conviction", ("tests", "model_by_conviction", "acted")),
+    ("model_sized", "tests", "model_sized", ("tests", "model_sized", "acted")),
+    ("model_same_day", "tests", "model_same_day", None),
+)
+#: The last planned look, the minimum of "acting differently", and B, whose
+#: purpose (crash protection) the final "zero or below" rule does not judge.
+FINAL_LOOK: Final[int] = 3
+MIN_ACTED: Final[int] = 20
+NO_ZERO_RULE: Final[frozenset[str]] = frozenset({"B, fund"})
+
+
+def outcome(row: dict, mean: Optional[float], acted: Optional[int], final: bool, zero_rule: bool) -> str:
+    """Section 13.7: promising, dead, not tested or not proven -- read by code, never by a person."""
+    if final and acted is not None and acted < MIN_ACTED:
+        return "not tested"
+    if row.get("passes_bh") and row.get("t") is not None:
+        return "promising" if row["t"] > 0 else "dead"
+    if final and zero_rule and mean is not None and mean <= 0:
+        return "dead"
+    return "no data" if row.get("no_data") else "not proven"
+
+
+def checkpoint_table_for(record: dict) -> dict:
+    """Benjamini-Hochberg across the family, the Deflated Sharpe Ratio with N from the graveyard, and each outcome."""
+    from analysis.multiple_tests import checkpoint_table, graveyard_n
+
+    n = graveyard_n()
+    final = record.get("look") == FINAL_LOOK
+    tests, extra = [], []
+    for label, part, key, where in FAMILY:
+        found = (record.get(part) or {}).get(key) or {}
+        tests.append({"name": label, "t": found.get("t"), "stats": found.get("stats")})
+        acted = None
+        if where is not None:
+            value = (((record.get(where[0]) or {}).get(where[1])) or {}).get(where[2])
+            acted = value if isinstance(value, int) and not isinstance(value, bool) else 0
+        extra.append((found.get("mean_daily_diff"), acted, label not in NO_ZERO_RULE))
+    rows = checkpoint_table(tests, n)
+    for row, (mean, acted, zero_rule) in zip(rows, extra):
+        row["acted_differently"] = acted
+        row["outcome"] = outcome(row, mean, acted, final, zero_rule)
+    return {"n_trials": n, "final": final, "rows": rows}
+
+
+def looks_reached(race_gate: Optional[dict]) -> list[int]:
+    """The race's planned looks reached so far, numbered from 1 (``logs/race_gate.json``)."""
+    looks = race_gate.get("looks") if isinstance(race_gate, dict) else None
+    return [i + 1 for i, look in enumerate(looks or []) if isinstance(look, dict) and look.get("reached") is True]
+
+
+def _read_json(path: Optional[Path]) -> Optional[dict]:
+    try:
+        value = json.loads(Path(path).read_text(encoding="utf-8")) if path else None
+    except (OSError, ValueError):
+        return None
+    return value if isinstance(value, dict) else None
 
 
 def build(args: argparse.Namespace, now: datetime, fetchers: Optional[list] = None) -> dict:
-    """The funds document. ``fetchers``, when given, receives the price fetcher the run used,
-    so ``main`` can hand over its prices without a second fetch (``--with-prices``)."""
+    """The funds document. ``fetchers``, when given, receives the price fetchers the run used, as
+    ``(name, fetcher)``, so ``main`` can hand over its prices without a second fetch (``--with-prices``):
+    the funds' own (``ohlc``) and the longer history tests A and B read (``ohlc_long``)."""
     from shadow import calibration as calib
 
     final_through = last_final_session(now)
@@ -523,7 +732,7 @@ def build(args: argparse.Namespace, now: datetime, fetchers: Optional[list] = No
     shortable_no = not_shortable(audit_lines)
     fetcher = OhlcFetcher(final_through=final_through)
     if fetchers is not None:
-        fetchers.append(fetcher)
+        fetchers.append(("ohlc", fetcher))
     holding = calib.holding_days(audit_lines, read.entries, snapshots)
 
     calibration_start = schedule.CALIBRATION_START
@@ -543,10 +752,37 @@ def build(args: argparse.Namespace, now: datetime, fetchers: Optional[list] = No
     funds, checks = None, None
     fund_start = schedule.FUND_START
     passed = calibration.get("status") == "passed"
+    # Section 13.1: the exploratory funds and tests A, B and C only on the
+    # night the race first reaches a look, and only after calibration passed;
+    # a look's record is kept as it was made, night after night.
+    previous = (_read_json(getattr(args, "previous", None)) or {}).get("exploratory") or {}
+    records = [r for r in previous.get("checkpoints") or [] if isinstance(r, dict)]
+    recorded = {r.get("look") for r in records}
+    new_looks = [k for k in looks_reached(_read_json(getattr(args, "race_gate", None))) if k not in recorded]
+    long_fetcher = OhlcFetcher(final_through=final_through)
+    if fetchers is not None:
+        fetchers.append(("ohlc_long", long_fetcher))
+    long_bars = long_history(read.entries, final_through, long_fetcher)
+    counters = exploratory_counters(read.entries, long_bars, final_through)
     if fund_start is not None and passed and fund_start <= final_through:
         funds, checks = run_funds(read.entries, fund_start, final_through, fetcher,
                                   random_funds=args.random, processes=args.processes,
-                                  shortable_no=shortable_no, first_cycle=schedule.FUND_FIRST_CYCLE)
+                                  shortable_no=shortable_no, first_cycle=schedule.FUND_FIRST_CYCLE,
+                                  exploratory=bool(new_looks), long_bars=long_bars)
+        if new_looks:
+            rows = [r for r in funds["list"] if r.get("exploratory")]
+            records.append({"look": max(new_looks), "made_on": now.date().isoformat(),
+                            "through": final_through.isoformat(), "counters": counters,
+                            "funds": {r["name"]: r for r in rows}, "tests": funds.pop("tests", {})})
+            funds["list"] = [r for r in funds["list"] if not r.get("exploratory")]
+    elif new_looks:
+        records.append({"look": max(new_looks), "made_on": now.date().isoformat(),
+                        "through": final_through.isoformat(), "counters": counters,
+                        "status": "calibration has not passed: counters only", "tests": {}})
+    if new_looks:
+        # The race side, and the table of section 13.5-13.6 over every test with data.
+        records[-1]["race"] = checkpoint_race(read.entries, long_bars, now.date(), final_through, fetchers)
+        records[-1]["table"] = checkpoint_table_for(records[-1])
     # Not fund results: the price source's gaps and the names no fund could
     # trade, from the fund start on, whatever calibration says. After the
     # funds and calibration, so their bars are fetched as they always were.
@@ -576,6 +812,8 @@ def build(args: argparse.Namespace, now: datetime, fetchers: Optional[list] = No
                                 if isinstance(shortable_no, dict) else None),
         "price_gaps": gaps,
         "held_names": held,
+        # Section 13: counters between checkpoints, results only in a look's record.
+        "exploratory": {"counters": counters, "checkpoints": records},
         # The real paper account's own record, always: it is the account,
         # not a fund result. The calibration fund's is in "calibration" and
         # each fund's in its own row, shown when those are.
@@ -595,6 +833,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--with-prices", action="store_true",
                         help="also hand over the daily prices this run used: their SHA-256 as "
                              "prices_sha256, and the table itself as one JSON line printed last")
+    parser.add_argument("--race-gate", type=Path, default=Path(cfg.AUDIT_LOG_PATH).parent / "race_gate.json",
+                        help="the race's gate record, for the looks reached (section 13.1)")
+    parser.add_argument("--previous", type=Path, default=Path(cfg.AUDIT_LOG_PATH).parent / "funds.json",
+                        help="the last funds document, whose checkpoint records are carried unchanged")
     parser.add_argument("-v", "--verbose", action="store_true")
     return parser
 
@@ -610,7 +852,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     if args.with_prices:
         # What the fetcher cached once everything above had run: the bars the
         # funds were priced with. A new last key; every other key is as it was.
-        tape = price_tape.tape([("ohlc", fetcher) for fetcher in used], consumer="funds",
+        tape = price_tape.tape(used, consumer="funds",
                                final_through=out.get("final_through"), generated_at=now)
         out["prices_sha256"] = tape["prices_sha256"]
     # allow_nan=False: NaN is not JSON, and a browser that cannot parse the

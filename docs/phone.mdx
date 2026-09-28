@@ -78,10 +78,13 @@ What arrives, and when:
 | *The trading cycle run failed* | `heartbeat`, when the run goes red for a reason the brief did not carry | urgent |
 | *⚠️ Archive push to Supabase failed* | `heartbeat`, the same day the push to the Supabase archive fails (not when it is only not configured: that is a daily warning in the brief) | high |
 | *A data source stopped answering* | `data sources`, when the morning probe fails | high |
+| *Weekly report* (drift, risk digest, concentration when new) | `heartbeat`, on the week's first cycle day, after the journal is committed; see [Weekly and monthly reports](/weekly-report) | normal |
 
 The topic is the only secret and it never appears in a URL or a log: the
 message is posted as JSON to ntfy's root, and the temporary file that carried
 it is removed. A push step never fails the run; the run's verdict is the
 cycle's.
 
-Tapping a notification opens the desk.
+Tapping a notification opens the desk; tapping the weekly report opens its full
+text in the repository (`logs/weekly/<week>.md`). A drift alert also heads that
+day's brief, as a warning.

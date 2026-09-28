@@ -2044,27 +2044,20 @@ def _render_group(report: GroupReport, horizon: int, seeds: int, title: Optional
 def _render_exploratory(per_horizon: Sequence[ExploratoryResult]) -> list[str]:
     if not per_horizon:
         return []
+    # Counters only (pre-registration section 13.1, 28 Sep 2026): an
+    # exploratory arm's results are read at the checkpoints, in the funds
+    # document's record for each look, never nightly. Its results were
+    # printed here nightly from 22 to 28 Sep 2026, before section 13 existed.
     first = per_horizon[0]
     out = [
         "",
         f"== EXPLORATORY: {first.name} (secondary; cannot change the main decision) ==",
-        f"offered {first.offered} lines, took a side on {first.directional}. Scored on those lines",
-        "only, paired against the model and the momentum rule on the same lines.",
-        f"'too few' until {EXPLORATORY_MIN_TRADES} trades on {EXPLORATORY_MIN_DAYS} distinct entry days.",
+        f"offered {first.offered} lines, took a side on {first.directional}.",
+        "Counters only: its results are read at the checkpoints (pre-registration section 13.1).",
     ]
     for result in per_horizon:
-        flag = "" if result.enough else f"  <- too few ({len(result.own.trades)} trades, {result.entry_days} days)"
-        out += [
-            "",
-            f"horizon {result.horizon} session(s){flag}",
-            f"{'arm':<10}{'n':>5}{'mean net':>10}{'median':>9}{'hit rate':>10}{'stopped':>9}",
-        ]
-        for row in result.rows:
-            out.append(
-                f"{row.name:<10}{len(row.trades):>5}{_pct(mean_net(row.trades), 2):>10}"
-                f"{_pct(median_net(row.trades), 2):>9}{_pct(hit_rate(row.trades)):>10}"
-                f"{_pct(stop_rate(row.trades)):>9}"
-            )
+        out.append(f"horizon {result.horizon} session(s): {len(result.own.trades)} trade(s) on "
+                   f"{result.entry_days} entry day(s)")
     return out
 
 

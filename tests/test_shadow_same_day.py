@@ -562,10 +562,11 @@ def test_the_fund_test_sections_name_the_numbers_the_code_runs():
     text = " ".join(body.split())
     # The sections, in order, after section 10 and before the Amendments table.
     heads = [line for line in body.splitlines() if line.startswith("## ")]
-    assert heads[-3:] == ["## 10. Model watch (Amendment 2026-09-24; operational, not a decision rule)",
+    assert heads[-4:] == ["## 10. Model watch (Amendment 2026-09-24; operational, not a decision rule)",
                           "## 11. The fund test (Amendment 2026-09-24)",
-                          "## 12. Calibration (before the fund test counts)"]
-    assert "draft" not in heads[-2] and "Amendments rows this section would add" not in raw
+                          "## 12. Calibration (before the fund test counts)",
+                          "## 13. Exploratory tests A, B and C (Amendment 2026-09-28)"]
+    assert "draft" not in heads[-3] and "Amendments rows this section would add" not in raw
     # The start, the gate, the looks and the bars.
     assert (schedule.FUND_FIRST_CYCLE, schedule.FUND_START) == (date(2026, 9, 28), date(2026, 9, 29))
     assert "The funds act on the cycle journalled on **Monday 2026-09-28**" in text
@@ -590,5 +591,5 @@ def test_the_fund_test_sections_name_the_numbers_the_code_runs():
     start = [r for r in rows if "| **Fund test start: 2026-09-28**" in r]
     assert len(fund_test) == len(start) == 1
     assert fund_test[0][2:12] == start[0][2:12] >= "2026-09-26"
-    assert rows.index(fund_test[0]) + 1 == rows.index(start[0]) == len(rows) - 1
+    assert rows.index(fund_test[0]) + 1 == rows.index(start[0])
     assert [r[2:12] for r in rows] == sorted(r[2:12] for r in rows)

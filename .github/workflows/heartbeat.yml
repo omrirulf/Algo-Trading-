@@ -576,6 +576,28 @@ jobs:
             echo "no journal lines to render; last report left in place"
           fi
 
+      - name: Measure the model's drift, week by week
+        # The owner's weekly drift report (27 Sep 2026): the model's answers,
+        # week by week -- NEUTRAL share, conviction, agreement with momentum,
+        # longs and shorts, failed calls by type, run starts and starters,
+        # and who answered with which prompt -- each number against the mean
+        # plus or minus 2 standard deviations of the 4 weeks before
+        # (analysis/drift.py). Read from the journal alone, so it needs no
+        # key and no network. Before the book snapshot (and the starter's log,
+        # which the snapshot must directly follow), because the health
+        # check inside it reads this record and, on the first cycle day of a
+        # week after one that drifted, puts the alert in the brief. Never
+        # fails the job: a record that cannot be written leaves the last one.
+        if: always() && steps.guard.outputs.skip != 'yes' && inputs.mode != 'protect'
+        continue-on-error: true
+        run: |
+          if python -m analysis.drift > "$RUNNER_TEMP/drift.json" \
+             && python -c "import json,sys; json.load(open(sys.argv[1]))" "$RUNNER_TEMP/drift.json"; then
+            mv "$RUNNER_TEMP/drift.json" logs/drift.json
+          else
+            echo "drift record not written; previous one left in place"
+          fi
+
       - name: Read the Supabase starter's log
         # Since 26 Sep the day's run is started by a pg_cron job in the
         # Supabase project (supabase/heartbeat_starter.sql), which writes one
@@ -673,6 +695,48 @@ jobs:
             2*) echo "phone notified (HTTP $code)";;
             *)  echo "::warning::phone not notified (HTTP $code)";;
           esac
+
+      - name: Make the weekly report
+        # The owner's weekly report (27 Sep 2026), once a week: on the first
+        # day of the week whose cycle gets this far, and not again that week
+        # (the report's own file is the marker). Three parts, for reading
+        # only: last week's drift numbers against their bands (the record
+        # written above); the risk digest for the held names -- flags with
+        # links, the week's one model call, capped at $1 a week by
+        # orchestrator/digest.py and made by the heartbeat's --weekly-digest
+        # mode, which builds no dispatcher and places no order; and the
+        # monthly concentration report when it is new (made by the funds
+        # workflow). Committed with the journal below; the phone is told
+        # after that commit, so the notification's link works.
+        #
+        # The model key is here and the phone topic is not: the push is its
+        # own step. Same key chain as the cycle's, for the same reason (the
+        # tests keep the two equal). Never fails the job.
+        if: always() && steps.guard.outputs.skip != 'yes' && inputs.mode != 'protect'
+        id: weekly
+        continue-on-error: true
+        timeout-minutes: 10
+        env:
+          FULL_MODEL_API_KEY: ${{ secrets.FULL_MODEL_API_KEY || secrets.DEEPINFRA_API_KEY || secrets.SCREENING_API_KEY || secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY || secrets.GROQ_API_KEY }}
+          REPORTS_URL: https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/logs/weekly
+        run: |
+          week=$(date -u +%G-W%V)
+          if [ -f "logs/weekly/$week.md" ]; then
+            echo "the weekly report for $week was already made"
+            exit 0
+          fi
+          mkdir -p logs/digest logs/weekly
+          if python -m orchestrator.heartbeat --weekly-digest > "$RUNNER_TEMP/digest.json" \
+             && python -c "import json,sys; json.load(open(sys.argv[1]))" "$RUNNER_TEMP/digest.json"; then
+            mv "$RUNNER_TEMP/digest.json" "logs/digest/$week.json"
+          else
+            echo "::warning::the risk digest could not be made this week"
+          fi
+          python -m analysis.weekly --week "$week" --markdown > "$RUNNER_TEMP/weekly.md"
+          python -m analysis.weekly --week "$week" --phone --url "$REPORTS_URL/$week.md" > "$RUNNER_TEMP/weekly_phone.txt"
+          mv "$RUNNER_TEMP/weekly.md" "logs/weekly/$week.md"
+          echo "made=yes" >> "$GITHUB_OUTPUT"
+          cat "$RUNNER_TEMP/weekly_phone.txt"
 
       - name: Refit the blend weights
         # After the cycle, never before it: a cycle applies the weights the
@@ -801,6 +865,11 @@ jobs:
           # adds none of the others, and this file is not written on a
           # protection pass -- which would then commit no audit log at all.
           git add -f logs/starter_status.json 2>/dev/null || true
+          # The weekly drift record, and the week's report and digest once a
+          # week (27 Sep 2026); each on its own line for the same reason.
+          git add -f logs/drift.json 2>/dev/null || true
+          git add -f logs/weekly 2>/dev/null || true
+          git add -f logs/digest 2>/dev/null || true
           if git diff --cached --quiet; then
             echo "no journal changes"
             exit 0
@@ -817,6 +886,9 @@ jobs:
             if ! git pull --rebase --autostash origin "${GITHUB_REF_NAME}"; then
               git checkout --theirs -- logs/cycle_report.md logs/score_report.md logs/blend_weights.json logs/book.json logs/brief.txt logs/starter_status.json 2>/dev/null || true
               git add -f logs/cycle_report.md logs/score_report.md logs/blend_weights.json logs/book.json logs/brief.txt logs/starter_status.json 2>/dev/null || true
+              # On its own: one missing path makes git refuse the whole list.
+              git checkout --theirs -- logs/drift.json 2>/dev/null || true
+              git add -f logs/drift.json 2>/dev/null || true
               GIT_EDITOR=true git rebase --continue
             fi
           }
@@ -854,6 +926,39 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: bash dashboard/publish.sh || echo "::warning::desk not published; the page still reads the live snapshot"
+
+      - name: Push the weekly report to the owner's phone
+        # Its own notification, once the journal (and with it the report) is
+        # committed and the desk published, once a week: only when "Make the
+        # weekly report" made this week's report in this run. Same rules as the brief's push:
+        # the topic in the body, never in a URL or a log; unset, nothing is
+        # sent; never fails the job.
+        if: always() && steps.guard.outputs.skip != 'yes' && steps.weekly.outputs.made == 'yes'
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: |
+          if [ -z "${NTFY_TOPIC:-}" ]; then
+            echo "no phone configured (NTFY_TOPIC secret unset); nothing sent"
+            exit 0
+          fi
+          python - <<'EOF' > "$RUNNER_TEMP/phone.json"
+          import json, os, pathlib
+          text = pathlib.Path(os.environ["RUNNER_TEMP"], "weekly_phone.txt").read_text(encoding="utf-8").strip()
+          first, _, rest = text.partition("\n")
+          url = rest.rsplit("Full report: ", 1)[-1].strip() if "Full report: " in rest else ""
+          message = {"topic": os.environ["NTFY_TOPIC"], "title": first, "message": rest or first,
+                     "priority": 3, "tags": ["calendar"]}
+          if url.startswith("https://github.com/"):
+              message["click"] = url
+          print(json.dumps(message))
+          EOF
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' \
+                 --data-binary @"$RUNNER_TEMP/phone.json" https://ntfy.sh/ || echo "000")
+          rm -f "$RUNNER_TEMP/phone.json"
+          case "$code" in
+            2*) echo "phone notified (HTTP $code)";;
+            *)  echo "::warning::phone not notified (HTTP $code)";;
+          esac
 
       - name: Sound the alarm on anything the record says went quietly wrong
         # The 17 Sep lesson: eleven positions spent a day with no stop, a

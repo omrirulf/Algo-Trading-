@@ -209,6 +209,30 @@ Production and the calibration copy keep watchlist order and the normal
 size. Each fund's closed trades are also split into longs and shorts (the
 number, the mean net return and the hit rate; "too few" under 20).
 
+## Exploratory tests A, B and C, and results only at checkpoints
+
+Pre-registration section 13 (2026-09-28), in `shadow/exploratory.py`:
+
+| Fund | Rule | Compared with |
+| --- | --- | --- |
+| `momentum_200` (A) | the momentum signal, kept only when the line's live price is on its side of the 200-day average of final closes before the signal's day | the momentum fund (and, in the race, the momentum arm) |
+| `vt_timing` (B) | VT when its month-end close is above the average of its last 10 month-end closes, else BIL; switched at the next open, 0.10% a side, from the 2026-09-30 month-end | the VT fund |
+| `momentum_pullback` (C) | the momentum signals, entered by a limit at the signal price minus (short: plus) half the line's ATR14, standing 3 sessions | the momentum fund |
+
+**Between checkpoints, only counters** (`funds.json` → `exploratory.counters`):
+the share of momentum's signals A's veto removes, B's switches and state,
+C's fill rate, and the lines `model_same_day` could not enter. They are
+counted from the journal and the prices, without running a fund.
+
+**At a checkpoint** (the night the race first reaches a look, and only once
+calibration has passed), the three exploratory funds and A, B and C are run
+from the fund start. Their results, the race side (A's race arm, the insider
+arm's test, C's filled against missed signals) and the table of
+Benjamini-Hochberg adjusted p-values and Deflated Sharpe Ratios (N from
+`docs/research/graveyard.md`) go into one record per look
+(`exploratory.checkpoints`), carried unchanged every night after. None of it
+can change the decision.
+
 ## How often the buying order matters (report only)
 
 Each cycle the engine works through the day's signals one at a time, in
