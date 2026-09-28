@@ -4,7 +4,8 @@
   fund from the real paper account. ``None`` until the owner sets it, in a
   reviewed change to this file, and only after the owner has approved the
   pass rule in ``shadow.calibration.PASS_RULE``; until then calibration has
-  not started, whatever the code could compute.
+  not started, whatever the code could compute. Set on 28 Sep 2026, the
+  day of the first complete account snapshot, with the rule approved.
 * ``FUND_START`` -- the first fund session: the day the four funds (the
   exploratory funds and the thousand coin-flip funds too) start with
   $100,000 each. Fixed by the owner's decision of 26 Sep 2026: the funds act
@@ -29,7 +30,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Final, Optional
 
-CALIBRATION_START: Optional[date] = None
+CALIBRATION_START: Optional[date] = date(2026, 9, 28)
 CALIBRATION_DAYS: Final[int] = 15
 
 #: Every fix made after a calibration fail, oldest first: (the day the fix
