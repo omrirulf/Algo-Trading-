@@ -142,7 +142,11 @@ day costs each arm. It has not been built.
 From the first cycle after 26 Sep 2026, a line whose ticker the model was
 asked about carries one more key, `model_calls`: one entry per HTTP ask made
 for it — a retry after a 429 or a timeout, and the re-ask after an
-off-schema answer, are entries of their own.
+off-schema answer or (from 29 Sep 2026) after an answer with a value
+outside the schema, such as a negative conviction, are entries of their
+own. That first answer's record is marked `invalid_values`. There is one
+re-ask in all, whichever the problem; if the second answer is bad too, the
+line is rejected as before.
 
 ```json
 "model_calls": [

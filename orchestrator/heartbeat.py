@@ -562,8 +562,10 @@ def call_llm(system_prompt: str, user_prompt: str, json_schema: dict) -> Complet
     """
     provider = full_model_provider()
     effort = full_model_effort()
+    # ``check``: an answer whose values break the signal's limits is asked
+    # once more, like an off-schema one (the owner's decision of 28 Sep 2026).
     return provider.complete_detailed(
-        system_prompt, user_prompt, json_schema, model=MODEL, effort=effort,
+        system_prompt, user_prompt, json_schema, model=MODEL, effort=effort, check=parse_signal,
     )
 
 
@@ -886,8 +888,9 @@ def prompt_fingerprint() -> str:
 
     The SHA-256 of every fixed piece of the prompt: the company prompt, the
     fund prompt's head, each section's guidance and tail, the user prompt's
-    closing words, the answer schema, and the two sentences the client adds
-    on its own (no reasoning, and the re-ask after an off-schema answer).
+    closing words, the answer schema, and the three sentences the client adds
+    on its own (no reasoning, and the re-asks after an off-schema answer and
+    after one with values outside the schema).
     Not the context itself, which is new every day, and not the code that
     renders it. Recorded on every cycle line (``model_setup``) so the
     owner's weekly drift report can say when the prompt changed, from the
@@ -902,6 +905,7 @@ def prompt_fingerprint() -> str:
         "schema": SIGNAL_JSON_SCHEMA,
         "no_reasoning": llm.NO_REASONING_INSTRUCTION,
         "off_schema": llm.OFF_SCHEMA_INSTRUCTION,
+        "invalid_values": llm.INVALID_VALUES_INSTRUCTION,
     }
     blob = json.dumps(parts, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:12]
