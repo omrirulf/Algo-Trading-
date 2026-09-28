@@ -701,23 +701,23 @@ jobs:
         # day of the week whose cycle gets this far, and not again that week
         # (the report's own file is the marker). Three parts, for reading
         # only: last week's drift numbers against their bands (the record
-        # written above); the risk digest for the held names -- flags with
-        # links, the week's one model call, capped at $1 a week by
-        # orchestrator/digest.py and made by the heartbeat's --weekly-digest
-        # mode, which builds no dispatcher and places no order; and the
-        # monthly concentration report when it is new (made by the funds
-        # workflow). Committed with the journal below; the phone is told
-        # after that commit, so the notification's link works.
+        # written above); the risk digest for the held names -- earnings
+        # dates and headlines naming a fund closing, a delisting, a ticker
+        # change, a split or a merger, found by code with no model call
+        # (orchestrator/digest.py, made smaller by the owner on 28 Sep 2026)
+        # and made by the heartbeat's --weekly-digest mode, which builds no
+        # dispatcher and places no order; and the monthly concentration
+        # report when it is new (made by the funds workflow). Committed with
+        # the journal below; the phone is told after that commit, so the
+        # notification's link works.
         #
-        # The model key is here and the phone topic is not: the push is its
-        # own step. Same key chain as the cycle's, for the same reason (the
-        # tests keep the two equal). Never fails the job.
+        # No key here, and no phone topic: the push is its own step. Never
+        # fails the job.
         if: always() && steps.guard.outputs.skip != 'yes' && inputs.mode != 'protect'
         id: weekly
         continue-on-error: true
         timeout-minutes: 10
         env:
-          FULL_MODEL_API_KEY: ${{ secrets.FULL_MODEL_API_KEY || secrets.DEEPINFRA_API_KEY || secrets.SCREENING_API_KEY || secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY || secrets.GROQ_API_KEY }}
           REPORTS_URL: https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/logs/weekly
         run: |
           week=$(date -u +%G-W%V)
