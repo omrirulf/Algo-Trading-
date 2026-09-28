@@ -55,6 +55,11 @@ algo-trading-system/
 │   ├── metrics.py             # rank correlations, buckets, drift (pure)
 │   ├── report.py              # text report; owns the "too few to conclude" threshold
 │   └── score_journal.py       # CLI: python analysis/score_journal.py
+├── history/                   # history screens: rules replayed on 2000-now with the real code
+│   ├── screen.py              # CLI: python -m history.screen fetch|run --out DIR
+│   ├── journal.py             # a journal from prices only (production technicals, previous close)
+│   ├── race.py                # the race's own scoring, year by year, with the coin flip and always long
+│   └── funds.py               # the production engine's funds, the VT fund and B
 ├── store/                     # queryable index over the logs; writes only its own db
 │   ├── schema.py              # the DDL, in one place
 │   ├── database.py            # connect_rw / connect_ro (the read-only boundary)
@@ -378,6 +383,13 @@ python backtest/verify_tickers.py
 # What a cycle actually costs, and whether a cheaper model would behave the same.
 python replay/compare_models.py --dry-run
 python replay/compare_models.py --limit 20
+
+# A rule on 2000-now, with the real code, before it may take a live slot
+# (docs/research/backlog.md, "History first, live second"). Needs Yahoo, so it
+# runs by hand as the "history screen" workflow; the report lands in
+# docs/research/history/.
+python -m history.screen fetch --out /tmp/screen
+python -m history.screen run --out /tmp/screen
 ```
 
 [Replay](docs/replay.mdx) is honest because the context was captured live;

@@ -677,6 +677,59 @@ jobs:
           fi
           echo "OK: the shadow funds cannot trade"
 
+      - name: The history screen cannot trade and asks no model
+        # history/ replays the rules that run live on past prices, before a
+        # new rule may take a live slot (the owner's process of 27 Sep 2026,
+        # docs/research/backlog.md). It drives the production engine through
+        # shadow/'s simulated books and never builds one of its own; it writes
+        # only the output directory it is given, never the live journal or
+        # logs/. It must not reach a broker, read a credential or the
+        # environment, or ask a model: a model has read about the past, so a
+        # history screen is only for rules that need none. Imports are read
+        # by AST, so a multi-line import is caught too. The deeper protection
+        # is the workflow: it runs by hand only and holds no secret, so no key
+        # a model or a broker would need exists where the screen runs
+        # (tests/test_history_screen.py also runs a whole screen with the
+        # network cut). Lifted and tested by tests/test_history_screen.py.
+        run: |
+          python3 - <<'PY'
+          import ast, pathlib, re, sys
+          import yaml
+          FORBIDDEN_MODULES = ("orchestrator.llm", "orchestrator.heartbeat", "orchestrator.live_price",
+                               "orchestrator.news", "orchestrator.digest", "orchestrator.dispatch",
+                               "orchestrator.context", "replay", "store", "app.broker_client",
+                               "anthropic", "openai", "alpaca")
+          FORBIDDEN_TEXT = re.compile(
+              r"(os\.environ|getenv|get_settings|alpaca_api_key|alpaca_secret_key|post_signal|"
+              r"ExecutionEngine\(|PositionManager\(|model_signal|rule_signal\(\s*[\"']hybrid|"
+              r"cfg\.[A-Z_]*(PATH|DIR)\b|SIGNAL_JOURNAL_PATH|LOG_DIR|[\"']logs/)")
+          bad = []
+          for path in sorted(pathlib.Path("history").rglob("*.py")):
+              text = path.read_text()
+              for node in ast.walk(ast.parse(text)):
+                  names = []
+                  if isinstance(node, ast.Import):
+                      names = [alias.name for alias in node.names]
+                  elif isinstance(node, ast.ImportFrom) and node.module:
+                      names = [node.module] + [f"{node.module}.{alias.name}" for alias in node.names]
+                  for name in names:
+                      if any(name == m or name.startswith(m + ".") for m in FORBIDDEN_MODULES):
+                          bad.append(f"{path}:{node.lineno}: imports {name}")
+              for lineno, line in enumerate(text.splitlines(), 1):
+                  if FORBIDDEN_TEXT.search(line):
+                      bad.append(f"{path}:{lineno}: {line.strip()}")
+          workflow = pathlib.Path(".github/workflows/history-screen.yml").read_text()
+          if "secrets." in workflow:
+              bad.append("history-screen.yml: holds a secret")
+          triggers = set(yaml.safe_load(workflow).get(True) or {})
+          if triggers != {"workflow_dispatch"}:
+              bad.append(f"history-screen.yml: runs on {sorted(triggers)}, not by hand only")
+          if bad:
+              print("\n".join(bad))
+              sys.exit("::error::history/ must not reach a broker, read a credential, ask a model or write the live logs")
+          print("OK: the history screen cannot trade and asks no model")
+          PY
+
       - name: The heartbeat watchdog holds the phone topic and nothing else
         # heartbeat-watchdog.yml can start heartbeat.yml, which trades. That
         # is exactly why it must not hold a broker or model key itself: it
