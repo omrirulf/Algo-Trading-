@@ -79,5 +79,5 @@ Not to be proposed again without a new reason, written down here first.
 | Month | What changed |
 | --- | --- |
 | 2026-09 | Started, with A, B and C registered (section 13) and the graveyard at N = 18. |
-| 2026-09 | 27 Sep: the history-first process added. Every history test so far logged in the graveyard (N = 34). Rotation (sectors, countries) and turn-of-the-month dropped: both failed their history screen. They were never in the Waiting table, so they are recorded under "Dropped after a history screen". |
-| 2026-09 | 28 Sep: the owner's decisions. The momentum quick test counts as three rows (held 3, 21 and 63 sessions), so N = 34; the quick tests of momentum, A and C stay counted; the survival rule above is approved; the owner's note on when the quick tests of A, B and C were run is under pre-registration section 13. |
+| 2026-09 | 27 Sep: the history-first process added. Every history test so far logged in the graveyard (N = 33 by the end of the day's edits). Rotation (sectors, countries) and turn-of-the-month dropped: both failed their history screen. They were never in the Waiting table, so they are recorded under "Dropped after a history screen". |
+| 2026-09 | 28 Sep: the owner's decisions. The momentum quick test counts as three rows (held 3, 21 and 63 sessions), so N goes from 33 to 34; the quick tests of momentum, A and C stay counted; the survival rule above is approved; the owner's note on when the quick tests of A, B and C were run is under pre-registration section 13. |

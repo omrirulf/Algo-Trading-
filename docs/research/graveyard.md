@@ -48,10 +48,12 @@ test had three settings, held 3, 21 and 63 sessions, so it is three rows
 (the owner's decision of 2026-09-28).
 
 Rows 22 to 25 tested ideas that became A, B and C (pre-registration section
-13, registered 2026-09-28). The owner ran them on 2026-09-27, after A, B and
-C's settings were fixed and before section 13 was committed; no setting was
-changed after seeing them, and no live result of A, B or C existed (the
-owner's note under section 13, added 2026-09-28).
+13, registered 2026-09-28). That registration says it was made before any
+result of A, B or C existed, meaning their live results, computed by this
+repository's code. The owner ran these quick tests on 2026-09-27, after A, B
+and C's settings were fixed and before section 13 was committed; no setting
+was changed after seeing them (the owner's note under section 13, added
+2026-09-28).
 
 Rows 30 to 34 are the first screen with the real code (`history/`), of the
 rules already running live. It changes nothing in the locked test.
@@ -72,7 +74,7 @@ rules already running live. It changes nothing in the locked test.
 | 30 | Momentum (the locked rule), race and fund, 80 names | history screen (real code) | no edge at 3 sessions; fund behind VT | 2026-09-28 | Race: no clear difference from a coin flip (minus a coin flip -0.002% a day, t -0.07; from 2010 t -0.51); behind always long on the same lines from 2010 (t -2.3). Fund: -3.5% a year 2000-2026, behind the VT fund from 2010 (t -3.0); positions held about 11 days, costs 4.8% a year. | [report](history/2026-09-rules-running-live/report.md) |
 | 31 | A: momentum with the 200-day veto, race and fund, 80 names | history screen (real code) | almost momentum; a small plus | 2026-09-28 | Vetoed 5.7% of momentum's signals (under 10%: A is almost momentum). A minus momentum: race +0.007% a day (t +1.7; from 2010 t +3.0, one slice of many); fund +0.004% a day (t +1.6). Behind the VT fund like momentum. | [report](history/2026-09-rules-running-live/report.md) |
 | 32 | B: 10-month timing on VT (the registered rule) | history screen (real code) | behind VT; no crash in its data | 2026-09-28 | Holds from 2009-04 (VT's prices start 2008-06): 6.5% a year against 11.3% for the VT fund, worst fall 27.6% against 29.1%; B minus VT fund -0.019% a day (t -2.0). From 2010: 3.5% a year less. | [report](history/2026-09-rules-running-live/report.md) |
-| 33 | B's rule on SPY (the same code; a check of row 24) | history screen (real code) | smaller crash, lower return | 2026-09-28 | From 2007-06: 7.8% a year against 9.0% for the SPY fund, worst fall 25.3% against 49.6%; from 2010: 4.1% a year less (t -1.9). Same code as B; a check of row 23, not the registered rule. | [report](history/2026-09-rules-running-live/report.md) |
+| 33 | B's rule on SPY (the same code; a check of row 24) | history screen (real code) | smaller crash, lower return | 2026-09-28 | From 2007-06: 7.8% a year against 9.0% for the SPY fund, worst fall 25.3% against 49.6%; from 2010: 4.1% a year less (t -1.9). Same code as B; a check of row 24, not the registered rule. | [report](history/2026-09-rules-running-live/report.md) |
 | 34 | C: pullback limit entry, fund, 80 names | history screen (real code) | no clear difference from momentum | 2026-09-28 | Fill rate 61.2%; missed signals +0.88% against filled -0.93% per race trade (built in: a fill means the price fell first). C fund minus momentum fund +0.003% a day (t +0.7); most limits that were reached could not be bought, because the book was full. | [report](history/2026-09-rules-running-live/report.md) |
 
 ## Not counted, and why
