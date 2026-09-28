@@ -78,12 +78,16 @@ def test_the_band_is_the_5th_to_95th_percentile_day_by_day():
     assert shadow_run.band([]) == {"p5": [], "p95": [], "funds": 0}
 
 
-def test_nothing_starts_until_the_owner_sets_a_date():
-    """Calibration waits for the owner's approval of its pass rule. The fund
-    start is the owner's fixed date (26 Sep 2026: the 28 Sep cycle, acted on
-    from the 29 Sep open); the funds still wait for calibration to pass
-    before anything about them is computed (``build``)."""
-    assert schedule.CALIBRATION_START is None
+def test_calibration_started_on_the_owners_day_under_the_approved_rule():
+    """Calibration waited for the owner's approval of its pass rule and the
+    first complete account snapshot; both came on 28 Sep 2026, so the rule
+    is in force and the start is that day's close. The fund start is the
+    owner's fixed date (26 Sep 2026: the 28 Sep cycle, acted on from the
+    29 Sep open); the funds still wait for calibration to pass before
+    anything about them is computed (``build``)."""
+    from shadow.calibration import PASS_RULE
+
+    assert schedule.CALIBRATION_START == date(2026, 9, 28) and PASS_RULE.approved
     assert schedule.FUND_FIRST_CYCLE == date(2026, 9, 28)
     assert schedule.FUND_START == date(2026, 9, 29)
     assert schedule.CALIBRATION_DAYS == 15

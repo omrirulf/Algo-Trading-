@@ -567,7 +567,7 @@ def test_calibration_report_fetches_what_it_needs_and_returns_the_json_part():
     assert [p["day"] for p in out["series"]] == ["2026-10-02", "2026-10-05", "2026-10-06"]
     assert {d["ticker"] for d in out["differences"]} == {"XOM", "LQD"}
     assert out["metrics"]["matched_share"] == 0.5 and out["metrics"]["unexplained"] == 0
-    assert out["pass_rule"]["approved"] is False and out["pass_rule"]["verdicts"]
+    assert out["pass_rule"]["approved"] is True and out["pass_rule"]["verdicts"]   # in force since 2026-09-28
     json.dumps(out)                                     # plain JSON, nothing else
 
 
@@ -722,9 +722,11 @@ def day(n: int) -> date:
     return calibration_days(n)[-1]
 
 
-#: The rule as it reads once in force: what the verdicts are tested
-#: against. The flag flips with the start date (see the pinning tests).
+#: The rule as it reads in force: what the verdicts are tested against.
+#: The flag flipped with the start date on 2026-09-28 (see the pinning
+#: tests); ``UNAPPROVED`` keeps the guard for a rule not in force tested.
 APPROVED = dataclasses.replace(PASS_RULE, approved=True)
+UNAPPROVED = dataclasses.replace(PASS_RULE, approved=False)
 
 
 def test_a_clean_complete_calibration_passes_every_condition():
@@ -739,11 +741,11 @@ def test_an_unapproved_rule_cannot_pass_however_good_the_numbers():
     result, however clean, may read "passed" -- and "passed" is what shows
     the funds."""
     result = crafted()
-    passed, lines = calib.evaluate_pass_rule(result)
+    passed, lines = calib.evaluate_pass_rule(result, UNAPPROVED)
     assert not passed
     assert "not in force" in lines[0] and "cannot pass" in lines[1]
     assert [line.split(":")[1].split()[0] for line in lines[2:]] == ["PASS"] * 6
-    assert calib.calibration_status(result, (True, lines)) == "failed", "even a forged verdict"
+    assert calib.calibration_status(result, (True, lines), UNAPPROVED) == "failed", "even a forged verdict"
     assert calib.calibration_status(result, (True, lines), APPROVED) == "passed"
 
 
@@ -902,7 +904,7 @@ def test_a_fail_reads_failed_at_once_and_a_merged_fix_runs_on_five_days_after_it
     # Day 9: a close outside 1%. Failed at once, not at day 15.
     broken = crafted(closes=9, worst=0.03)
     assert calib.calibration_status(broken, calib.evaluate_pass_rule(broken, APPROVED), APPROVED) == "failed"
-    assert calib.calibration_status(broken, calib.evaluate_pass_rule(broken)) == "failed"
+    assert calib.calibration_status(broken, calib.evaluate_pass_rule(broken, UNAPPROVED), UNAPPROVED) == "failed"
 
     # The cause is fixed and merged on day 9; the nightly re-run of the same
     # days from the same seed passes them. Running: five days after the fix.
@@ -912,7 +914,7 @@ def test_a_fail_reads_failed_at_once_and_a_merged_fix_runs_on_five_days_after_it
         assert calib.calibration_status(rerun, evaluation, APPROVED) == status, closes
     # 9 + 5 is 14, so day 15 is the end; passed only under the rule in force.
     done = crafted(closes=15, fixes=fix_on(9))
-    assert calib.calibration_status(done, calib.evaluate_pass_rule(done)) == "failed"
+    assert calib.calibration_status(done, calib.evaluate_pass_rule(done, UNAPPROVED), UNAPPROVED) == "failed"
 
     # A fix after day 12 moves the end to day 17.
     late = crafted(closes=15, fixes=fix_on(12))
@@ -924,7 +926,7 @@ def test_a_fail_reads_failed_at_once_and_a_merged_fix_runs_on_five_days_after_it
     end = crafted(closes=17, fixes=fix_on(12))
     passed, lines = calib.evaluate_pass_rule(end, APPROVED)
     assert passed and calib.calibration_status(end, (passed, lines), APPROVED) == "passed"
-    assert calib.calibration_status(end, calib.evaluate_pass_rule(end)) == "failed"   # the unapproved rule
+    assert calib.calibration_status(end, calib.evaluate_pass_rule(end, UNAPPROVED), UNAPPROVED) == "failed"
 
     # A re-run that fails on an earlier day is a new fail, fix or no fix.
     again = crafted(closes=15, worst=0.03, fixes=fix_on(12))
@@ -1233,7 +1235,7 @@ def test_calibration_json_before_the_start_is_not_started():
     assert out["series"] == [] and out["differences"] == []
     assert all(v is None for v in out["metrics"].values())
     assert out["holding_days"] == holding
-    assert out["pass_rule"] == {"text": list(PASS_RULE.text), "approved": False, "verdicts": []}
+    assert out["pass_rule"] == {"text": list(PASS_RULE.text), "approved": True, "verdicts": []}
     # The fail rule's keys say nothing before the start, whatever result is passed.
     assert (out["days_passed"], out["fixes"], out["last_fix"], out["days_since_fix"], out["days_after_fix_needed"],
             out["end_estimate"], out["fund_test_plan"]) == (0, [], None, None, 5, None, None)
