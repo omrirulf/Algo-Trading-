@@ -1624,7 +1624,7 @@ PASS_RULE = PassRule(
         "each is counted and shown. If more than 2 calibration days need this, calibration stops and the "
         "owner is told.",
     ),
-    approved=False,
+    approved=True,
     closes=DAYS_NEEDED,
     # (1) The sim enters a session late: the account buys during the day it
     # decides, the sim at the next open. On one day's entries -- a few
