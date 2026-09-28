@@ -17,15 +17,25 @@ name: history screen
 # No secret of any kind: yfinance is unauthenticated, and the screen reads no
 # key and asks no model (CI: "The history screen cannot trade and asks no
 # model").
+#
+# A screen gets its row in docs/research/graveyard.md before it runs (the
+# row links to its folder here), so a run whose folder no graveyard row
+# names is refused. A folder that already holds a report is replaced only
+# when `replace` is ticked: a re-run after a bug fix is the same trial; a
+# changed setting is a new row and a new folder.
 on:
   workflow_dispatch:
     inputs:
       name:
-        description: "The report's folder under docs/research/history/ (letters, digits, - and _)"
-        default: "2026-09-rules-running-live"
+        description: "The screen's folder under docs/research/history/ (letters, digits, - and _); its graveyard row must link to it"
+        required: true
       seeds:
         description: "Coin flips per line for the race's band (the race's own number: 1000)"
         default: "1000"
+      replace:
+        description: "Replace a report already in that folder (a re-run of the same screen after a bug fix)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write   # only to commit docs/research/history/<name>/
@@ -41,6 +51,7 @@ jobs:
     env:
       SCREEN_NAME: ${{ inputs.name }}
       SCREEN_SEEDS: ${{ inputs.seeds }}
+      SCREEN_REPLACE: ${{ inputs.replace }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
@@ -54,7 +65,13 @@ jobs:
       - name: Check the inputs
         run: |
           [[ "$SCREEN_NAME" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "::error::name: letters, digits, - and _ only"; exit 1; }
-          [[ "$SCREEN_SEEDS" =~ ^[0-9]+$ ]] || { echo "::error::seeds: a whole number"; exit 1; }
+          [[ "$SCREEN_SEEDS" =~ ^[1-9][0-9]*$ ]] || { echo "::error::seeds: a whole number, at least 1"; exit 1; }
+          grep -q "history/$SCREEN_NAME/" docs/research/graveyard.md \
+            || { echo "::error::no graveyard row links to history/$SCREEN_NAME/: a screen gets its row before it runs"; exit 1; }
+          if [ -e "docs/research/history/$SCREEN_NAME/report.md" ] && [ "$SCREEN_REPLACE" != "true" ]; then
+            echo "::error::docs/research/history/$SCREEN_NAME/ already holds a report; tick 'replace' to re-run the same screen"
+            exit 1
+          fi
 
       - name: Fetch the prices
         run: python -m history.screen fetch --out "$RUNNER_TEMP/screen"

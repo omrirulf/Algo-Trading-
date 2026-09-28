@@ -301,7 +301,15 @@ def test_the_funds_run_clean_through_the_production_engine_and_nothing_stays_pat
 # --------------------------------------------------------------------------- #
 
 
-def test_a_screen_writes_its_results_and_a_report_that_says_what_history_cannot_give(tmp_path, table):
+def test_a_screen_writes_its_results_and_a_report_with_the_network_cut(tmp_path, table, monkeypatch):
+    """The whole screen, forked workers too, with every outbound connection refused: no model, no broker, no feed."""
+    import socket
+
+    def refuse(*args, **kwargs):
+        raise AssertionError("the history screen tried to reach the network")
+
+    monkeypatch.setattr(socket.socket, "connect", refuse)
+    monkeypatch.setattr(socket.socket, "connect_ex", refuse)
     prices.save(table, tmp_path / "prices.csv.gz")
     assert screen.main(["run", "--out", str(tmp_path), "--processes", "2", "--seeds", "8",
                         "--first", "2001-01-02"]) == 0
@@ -309,32 +317,101 @@ def test_a_screen_writes_its_results_and_a_report_that_says_what_history_cannot_
     assert results["meta"]["seeds"] == 8 and results["meta"]["journal_lines"] > 0
     arm = results["race"]["arms"]["momentum"]["periods"]["all years"]
     assert arm["trades"] > 0 and arm["coin_flip_band"]["mean/day"]["seeds"] == 8
+    assert "always long, same lines" in arm["coin_flip_band"]["mean/day"]["others"]
+    assert arm["longs"]["vs_same_side_every_line_same_days"]["days"] > 0
+    fund = results["funds"]["funds"]["momentum"]["periods"]["all years"]["trades"]
+    assert fund["mean_days_held"] > 0 and fund["costs_per_year"] > 0
+    assert results["funds"]["funds"]["momentum_pullback"]["order_matters"] is None
     text = (tmp_path / "report.md").read_text()
     assert text == report.render(results)
     for words in ("previous session's final close stands in", "Survivorship", "Nothing here changes the locked test",
-                  "anything that uses the AI", "may mean little more than", "Read with care"):
+                  "anything that uses the AI", "may mean little more than", "Read with care",
+                  "How to read the coin-flip band", "adjusted for splits", "one calendar year at a time",
+                  "keep them as cash", "A is then almost the momentum rule"):
         assert words in text, words
+
+
+def test_a_screen_without_vt_bil_or_spy_stops_before_it_runs_anything(tmp_path, table):
+    frames = {t: f for t, f in table.frames.items() if t != "BIL"}
+    prices.save(prices.PriceTable(frames, table.final_through, "test", ("BIL",)), tmp_path / "prices.csv.gz")
+    with pytest.raises(SystemExit, match="no prices for BIL"):
+        screen.main(["run", "--out", str(tmp_path), "--processes", "1"])
+    assert not (tmp_path / "journal").exists()
+    with pytest.raises(SystemExit):
+        screen.main(["run", "--out", str(tmp_path), "--seeds", "0"])
+
+
+def test_the_verdict_is_read_from_the_paired_t_and_says_which_way():
+    assert report.verdict({"mean": -0.00002, "t": -0.07}) == "no clear difference from a coin flip"
+    assert report.verdict({"mean": 0.001, "t": 2.5}) == "better than a coin flip"
+    assert report.verdict({"mean": -0.001, "t": -2.5}) == "worse than a coin flip"
+    assert report.verdict({"mean": None, "t": None}).startswith("not known")
+    period = {"coin_flip_band": {"mean/day": {"low": -0.00224, "high": -0.00201}},
+              "vs_coin_flip_expected": {"mean": -0.00002, "t": -0.07}}
+    assert report.band_ratio(period) == pytest.approx(abs(-0.00002 / -0.07) / ((0.00023) / 3.29))
 
 
 # --------------------------------------------------------------------------- #
 # The workflow and the fence
 # --------------------------------------------------------------------------- #
 
+GUARD = "The history screen cannot trade and asks no model"
 
-def test_the_workflow_runs_by_hand_only_holds_no_secret_and_commits_only_the_report():
+
+def _guard_python() -> str:
+    steps = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())["jobs"]["guardrails"]["steps"]
+    run = next(step["run"] for step in steps if step.get("name") == GUARD)
+    import textwrap
+
+    return textwrap.dedent(run.split("python3 - <<'PY'\n", 1)[1].split("\nPY", 1)[0])
+
+
+def _guard(tree: Path):
+    import subprocess
+    import sys
+
+    return subprocess.run([sys.executable, "-c", _guard_python()], cwd=tree, capture_output=True, text=True,
+                          timeout=120)
+
+
+def test_the_workflow_runs_by_hand_only_holds_no_secret_and_needs_its_graveyard_row():
     path = ROOT / ".github" / "workflows" / "history-screen.yml"
     text = path.read_text()
     wf = yaml.safe_load(text)
     assert set(wf[True]) == {"workflow_dispatch"}            # "on:" reads as True in YAML
+    inputs = wf[True]["workflow_dispatch"]["inputs"]
+    assert inputs["name"].get("required") is True and "default" not in inputs["name"]
+    assert inputs["replace"]["default"] is False
     assert "secrets." not in text
     assert wf["permissions"] == {"contents": "write"}
     assert "git add docs/research/history/" in text and "git add -A" not in text
+    assert 'grep -q "history/$SCREEN_NAME/" docs/research/graveyard.md' in text
+    assert "^[1-9][0-9]*$" in text
 
 
-def test_the_history_package_cannot_trade_or_ask_a_model():
-    forbidden = re.compile(r"(AlpacaPaperBroker|TradingClient|^\s*(from|import)\s+(alpaca|anthropic|openai)|"
-                           r"get_settings|os\.environ|getenv|alpaca_api_key|alpaca_secret_key|post_signal|"
-                           r"build_dispatcher|DirectDispatcher|orchestrator\.llm|from orchestrator import [^\n]*\bllm\b|"
-                           r"orchestrator\.heartbeat|rules\.hybrid|model_signal)", re.MULTILINE)
-    for path in sorted((ROOT / "history").glob("*.py")):
-        assert not forbidden.search(path.read_text()), path.name
+def test_the_guard_passes_the_repository_and_fails_every_way_out(tmp_path):
+    import shutil
+
+    assert _guard(ROOT).returncode == 0, _guard(ROOT).stdout
+    breaches = {
+        "multi-line model import": "from orchestrator import (\n    llm,\n)\n",
+        "the replay harness": "from replay.runner import main\n",
+        "a key from the environment": "import os\nKEY = os.environ.get('K')\n",
+        "the live audit log": "from config import settings as cfg\nPATH = cfg.AUDIT_LOG_PATH\n",
+        "a live log path": "PATH = 'logs/journal'\n",
+        "an engine of its own": "engine = ExecutionEngine(broker, feed)\n",
+        "the model's answers": "from shadow.fund import model_signal\n",
+        "the hybrid arm": "signal = rule_signal('hybrid')\n",
+    }
+    for label, code in breaches.items():
+        tree = tmp_path / label.replace(" ", "_")
+        shutil.copytree(ROOT / "history", tree / "history")
+        shutil.copytree(ROOT / ".github", tree / ".github")
+        (tree / "history" / "breach.py").write_text(code)
+        assert _guard(tree).returncode != 0, label
+    tree = tmp_path / "secret"
+    shutil.copytree(ROOT / "history", tree / "history")
+    shutil.copytree(ROOT / ".github", tree / ".github")
+    wf = tree / ".github" / "workflows" / "history-screen.yml"
+    wf.write_text(wf.read_text().replace("SCREEN_SEEDS: ${{ inputs.seeds }}", "KEY: ${{ secrets.X }}"))
+    assert _guard(tree).returncode != 0

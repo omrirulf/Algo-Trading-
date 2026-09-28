@@ -267,13 +267,21 @@ def coin_flips(keys: Sequence[Key], seeds: int, processes: int = 1, chunk: int =
 
 
 def coin_band(trades: Sequence[hr.ScoredTrade], sides: Mapping[Key, Side], flips: np.ndarray,
-              row_of: Mapping[Key, int], grid: Sequence[date]) -> dict[str, dict]:
+              row_of: Mapping[Key, int], grid: Sequence[date],
+              others: Optional[Mapping[str, Optional[float]]] = None) -> dict[str, dict]:
     """``hr.bands_for``'s three bands, from flips drawn once: the coin flip on the arm's own lines.
 
     For each seed, the draw is the flip's side of every one of the arm's lines
     that has both sides (``hr.flip_trades``); its mean net return, hit rate
     and mean per day over ``grid`` go into the sample, and the arm's own
     value is placed in it with the race's ``percentile`` and ``percentile_of``.
+    ``others`` are further mean-per-day values placed in the same band (the
+    report's "always long on the same lines": where simply buying would sit).
+
+    The flips are independent line by line, as the race's are. A rule's calls
+    are not: it goes long on most names on the same days, and those names
+    move together. So the band is narrower than the rule's own uncertainty,
+    and the paired t (``vs_coin_flip_expected``) is the careful number.
     """
     seeds = flips.shape[1]
     usable = [t.key for t in trades if t.key in sides]
@@ -305,6 +313,9 @@ def coin_band(trades: Sequence[hr.ScoredTrade], sides: Mapping[Key, Side], flips
         out[name] = {"low": hr.percentile(sample, hr.BAND[0]), "high": hr.percentile(sample, hr.BAND[1]),
                      "median": hr.percentile(sample, 50.0), "value": value,
                      "percentile": hr.percentile_of(value, sample), "seeds": len(sample)}
+        if name == "mean/day":
+            out[name]["others"] = {label: {"value": v, "percentile": hr.percentile_of(v, sample)}
+                                   for label, v in (others or {}).items()}
     return out
 
 
@@ -357,21 +368,25 @@ def _paired(mine: dict[date, float], theirs: dict[date, float], grid: Sequence[d
 
 
 def _side_stats(trades: Sequence[hr.ScoredTrade], sides: Mapping[Key, Side],
-                every_long: Optional[dict[date, float]] = None) -> dict:
-    """One side's trades: the race's own split (number, mean net, hit rate), and its paired reads.
+                every_same_side: dict[date, float]) -> dict:
+    """One side's trades: the race's own split (number, mean net, hit rate), and whether it picked well.
 
-    Both sides against what a coin flip earns on the same lines; the longs
-    also against owning every name on the same entry days (``every_long``),
-    the owner's "its buys trailed holding all the ETFs".
+    The selection test: the side's trades against taking the same side on
+    every line on the same entry days (``every_same_side``) -- for the longs,
+    the owner's "its buys trailed holding all the ETFs". Against the coin
+    flip a one-sided slice says little: for a long, net minus the coin flip's
+    average is half the long-minus-short spread, i.e. how much the lines rose,
+    whoever picked them. It is kept in the results, not read in the report.
     """
     stats = hr.split_stats("", trades).as_json()
     stats.pop("too_few", None)
     edge = _daily([(t.entry_day, t.net - (sides[t.key].buy_net + sides[t.key].sell_net) / 2.0)
                    for t in trades if t.key in sides])
     stats["vs_coin_flip_expected"] = test_of([edge[d] for d in sorted(edge)], hr.DEFAULT_HORIZON)
-    if every_long is not None:
-        days = sorted({t.entry_day for t in trades})
-        stats["vs_always_long_every_line_same_days"] = _paired(hr.daily_net(trades), every_long, days)
+    days = sorted({t.entry_day for t in trades})
+    stats["vs_same_side_every_line_same_days"] = _paired(hr.daily_net(trades), every_same_side, days)
+    stats["same_side_every_line_mean_net"] = (
+        statistics.fmean([every_same_side[d] for d in days if d in every_same_side]) if days else None)
     return stats
 
 
@@ -383,8 +398,10 @@ def arm_period(trades_all: Sequence[hr.ScoredTrade], pooled: Pooled, period: Per
     every = [(key, s) for key, s in sides.items() if period.contains(s.entry_day)]
     grid = sorted({s.entry_day for _, s in every})
     every_long = _daily([(s.entry_day, s.buy_net) for _, s in every])
+    every_short = _daily([(s.entry_day, s.sell_net) for _, s in every])
     mine = hr.daily_net(trades)
     own_days = sorted(mine)
+    same_long = _daily([(t.entry_day, sides[t.key].buy_net) for t in trades if t.key in sides])
     out = {
         "trades": len(trades),
         "days_traded": len(own_days),
@@ -395,16 +412,21 @@ def arm_period(trades_all: Sequence[hr.ScoredTrade], pooled: Pooled, period: Per
         "stop_rate": hr.stop_rate(trades),
         "mean_per_day": statistics.fmean(hr.on_grid(mine, grid)) if grid else None,
         "longs": _side_stats([t for t in trades if t.trade.side == "buy"], sides, every_long),
-        "shorts": _side_stats([t for t in trades if t.trade.side == "sell"], sides),
+        "shorts": _side_stats([t for t in trades if t.trade.side == "sell"], sides, every_short),
+        # Split-adjusted prices: a name that later split many times (NVDA) trades far under $1 in the
+        # early years, where the engine's stops, rounded to the cent, are coarse. Counted, not excluded.
+        "entry_under_1_dollar": _under_a_dollar(trades),
     }
     edge = _daily([(t.entry_day, t.net - (sides[t.key].buy_net + sides[t.key].sell_net) / 2.0)
                    for t in trades if t.key in sides])
     out["vs_coin_flip_expected"] = test_of([edge[d] for d in own_days if d in edge], hr.DEFAULT_HORIZON)
+    same_long_per_day = statistics.fmean(hr.on_grid(same_long, grid)) if grid else None
     if flips is not None:
-        out["coin_flip_band"] = coin_band(trades, sides, flips, row_of, grid)
-    same_long = _daily([(t.entry_day, sides[t.key].buy_net) for t in trades if t.key in sides])
+        out["coin_flip_band"] = coin_band(trades, sides, flips, row_of, grid,
+                                          {"always long, same lines": same_long_per_day})
     out["always_long_same_lines"] = {
         "mean_net": statistics.fmean([sides[t.key].buy_net for t in trades if t.key in sides]) if trades else None,
+        "mean_per_day": same_long_per_day,
         "paired": _paired(mine, same_long, own_days),
     }
     out["always_long_every_line"] = {
@@ -415,6 +437,15 @@ def arm_period(trades_all: Sequence[hr.ScoredTrade], pooled: Pooled, period: Per
         "paired": _paired(mine, every_long, grid),
     }
     return out
+
+
+def _under_a_dollar(trades: Sequence[hr.ScoredTrade]) -> dict:
+    """Trades entered under $1 (split-adjusted), in all and by name."""
+    by_name: dict[str, int] = {}
+    for t in trades:
+        if t.trade.entry_price < 1.0:
+            by_name[t.ticker] = by_name.get(t.ticker, 0) + 1
+    return {"trades": sum(by_name.values()), "by_name": dict(sorted(by_name.items()))}
 
 
 def veto_vs_momentum(pooled: Pooled, period: Period) -> dict:

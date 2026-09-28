@@ -17,22 +17,27 @@ screen it survived (below).
      says so);
    - with the registered cost, 0.10% per side;
    - **using the real code**: the code that would run it live, through the
-     history screen (`history/`, run by hand with the workflow
-     `.github/workflows/history-screen.yml`; reports in `history/`).
+     history screen (the `history/` package, run by hand with the workflow
+     `.github/workflows/history-screen.yml`; its reports go to
+     `docs/research/history/`).
 2. **Only an idea that survives its screen can be proposed for a live
    slot.** What "survives" means is written on the card before the screen
-   runs. When the card says nothing else: it beats its comparator on its main
-   metric, after costs, over the years after its source, with a Newey-West t
-   above 2.
+   runs (its "Survives its history screen if" field). When the card says
+   nothing else: it beats its comparator on its main metric, after costs,
+   over the years after its source, with a Newey-West t above 2.
 3. **An idea that uses the AI skips the history screen** (it is not
    possible: the AI has read about the past, so the past cannot test it) and
    goes straight to the live queue. Its card says "History screen: not
    possible (uses the AI)".
 4. **History screens do not use live slots**, but every screen gets its row
-   in `graveyard.md` before it runs and **counts in N**, whatever it shows
-   (pre-registration, section 13.6).
+   in `graveyard.md` before it runs (the row links to the screen's folder in
+   `docs/research/history/`, and the workflow refuses a screen no row names)
+   and **counts in N**, whatever it shows (pre-registration, section 13.6).
 
 ## The limits (pre-registration, section 13.8; unchanged)
+
+Section 13.8 says "new ideas"; the owner's reading of 2026-09-27 is that these
+are **live** ideas, and a history screen is not one.
 
 - A, B and C are the starting set. **No other new exploratory test before
   the first checkpoint (2026-12-22).**
@@ -64,13 +69,13 @@ Not to be proposed again without a new reason, written down here first.
 
 | Dropped | Idea | Why | Graveyard |
 | --- | --- | --- | --- |
-| 2026-09-27 | Rotation among sectors | Failed its history screen (the owner's quick test). | trial 24 |
-| 2026-09-27 | Rotation among countries | Failed its history screen (the owner's quick test). | trial 25 |
-| 2026-09-27 | Turn-of-the-month | Failed its history screen (the owner's quick test). | trial 26 |
+| 2026-09-27 | Rotation among sectors | Failed its history screen (the owner's quick test). | trial 25 |
+| 2026-09-27 | Rotation among countries | Failed its history screen (the owner's quick test). | trial 26 |
+| 2026-09-27 | Turn-of-the-month | Failed its history screen (the owner's quick test). | trial 27 |
 
 ## Monthly updates
 
 | Month | What changed |
 | --- | --- |
 | 2026-09 | Started, with A, B and C registered (section 13) and the graveyard at N = 18. |
-| 2026-09 | 27 Sep: the history-first process added. Every history test so far logged in the graveyard (N = 31). Rotation (sectors, countries) and turn-of-the-month dropped: both failed their history screen. They were never in the Waiting table, so they are recorded under "Dropped after a history screen". |
+| 2026-09 | 27 Sep: the history-first process added. Every history test so far logged in the graveyard (N = 33). Rotation (sectors, countries) and turn-of-the-month dropped: both failed their history screen. They were never in the Waiting table, so they are recorded under "Dropped after a history screen". |

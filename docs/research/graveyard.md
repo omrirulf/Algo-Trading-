@@ -9,7 +9,7 @@ checkpoint (pre-registration, section 13.6; `analysis/multiple_tests.py`
 counts them). A new idea gets its row (and its card in `cards/`) before it
 runs, and a history screen gets its row before it runs.
 
-**N = 31** (2026-09-27: 18 ideas and 13 history screens).
+**N = 33** (2026-09-28: 18 ideas and 15 history screens).
 
 | Trial | Idea | Kind | Status | Dates | Why it is here / what happened | Card |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -38,27 +38,41 @@ Every test of an idea on past prices so far (the owner's process of
 2026-09-27, `backlog.md`, "History first, live second"). They count in N like
 every other trial. One row for each rule and set of names tested; a screen
 re-run because its code had a bug is the same row, and a screen run with any
-setting changed is a new row. Rows 19 to 27 are the owner's quick tests: the
-owner's own code, not the registered code, on 38 ETFs from 2000 to 2026,
-with a 2 x ATR stop assumed. Rows 28 to 31 are the first screen with the real
-code (`history/`), of the rules already running live; it changes nothing in
-the locked test.
+setting changed is a new row.
+
+Rows 19 to 28 are the owner's quick tests: the owner's own code, not the
+registered code, run outside this repository before 2026-09-27. Their exact
+dates and settings are not recorded here. Rows 19 to 22 used 38 ETFs from
+2000 to 2026 with a 2 x ATR stop assumed; rows 23, 24 and 28 used SPY or VT.
+If row 20's 1, 2 and 3 months were separate settings, each is a row of its
+own, and N grows by two.
+
+Rows 21 to 24 tested ideas that became A, B and C (pre-registration section
+13, registered 2026-09-28). That registration says it was made before any
+result of A, B or C existed, meaning their live results. Whether these quick
+tests on history came before or after the owner fixed A, B and C's settings
+on 2026-09-27 is not recorded here.
+
+Rows 29 to 33 are the first screen with the real code (`history/`), of the
+rules already running live. It changes nothing in the locked test.
 
 | Trial | Idea | Kind | Status | Dates | Why it is here / what happened | Card |
 | --- | --- | --- | --- | --- | --- | --- |
-| 19 | Momentum (the 63-day rule), 3-session trades, on 38 ETFs | history screen (the owner's quick test) | no edge on history | by 2026-09-27 | No better than a coin flip. | |
-| 20 | Momentum held 1 to 3 months, on 38 ETFs | history screen (the owner's quick test) | no edge since 2010 | by 2026-09-27 | Worked in 2000-2009. Since 2010 its buys trailed holding all the ETFs, and its shorts lost about 3.7% per 3-month short. | |
-| 21 | A: momentum with a 200-day average veto, on 38 ETFs | history screen (the owner's quick test) | no clear difference | by 2026-09-27 | The veto removed only about 4% of signals, with no clear difference. | |
-| 22 | C: pullback limit entry, on 38 ETFs | history screen (the owner's quick test) | prediction as expected | by 2026-09-27 | Filled 63% of signals; missed signals did better than filled ones (+1.0% against -1.0%). Partly built in: a fill means the price fell first. | |
-| 23 | The 10-month average on SPY and on VT (B's rule) | history screen (the owner's quick test) | smaller crashes, lower return | by 2026-09-27 | Smaller crashes, but 3-4% a year less return since 2007. | |
-| 24 | Rotation among sectors | history screen (the owner's quick test) | failed; dropped | by 2026-09-27 | Failed its history screen. Dropped from the backlog. | |
-| 25 | Rotation among countries | history screen (the owner's quick test) | failed; dropped | by 2026-09-27 | Failed its history screen. Dropped from the backlog. | |
-| 26 | Turn-of-the-month | history screen (the owner's quick test) | failed; dropped | by 2026-09-27 | Failed its history screen. Dropped from the backlog. | |
-| 27 | Volatility targeting on SPY | history screen (the owner's quick test) | tested, not taken further | by 2026-09-27 | Tested on history by the owner; its result is not written down in this repository. | |
-| 28 | Momentum (the locked rule), race and fund | history screen (real code) | RESULT_28 | 2026-09-27 | DETAIL_28 | [report](history/2026-09-rules-running-live/report.md) |
-| 29 | A: momentum with the 200-day veto, race and fund | history screen (real code) | RESULT_29 | 2026-09-27 | DETAIL_29 | [report](history/2026-09-rules-running-live/report.md) |
-| 30 | B: 10-month timing on VT (and the same code on SPY, as a check of row 23) | history screen (real code) | RESULT_30 | 2026-09-27 | DETAIL_30 | [report](history/2026-09-rules-running-live/report.md) |
-| 31 | C: pullback limit entry, fund | history screen (real code) | RESULT_31 | 2026-09-27 | DETAIL_31 | [report](history/2026-09-rules-running-live/report.md) |
+| 19 | Momentum (the 63-day rule), 3-session trades, on 38 ETFs | history screen (the owner's quick test) | no edge on history | before 2026-09-27 | No better than a coin flip. | |
+| 20 | Momentum held 1 to 3 months, on 38 ETFs | history screen (the owner's quick test) | no edge since 2010 | before 2026-09-27 | Worked in 2000-2009. Since 2010 its buys trailed holding all the ETFs, and its shorts lost about 3.7% per 3-month short. | |
+| 21 | A: momentum with a 200-day average veto, on 38 ETFs | history screen (the owner's quick test) | no clear difference | before 2026-09-27 | The veto removed only about 4% of signals, with no clear difference. | |
+| 22 | C: pullback limit entry, on 38 ETFs | history screen (the owner's quick test) | prediction as expected | before 2026-09-27 | Filled 63% of signals; missed signals did better than filled ones (+1.0% against -1.0%). Partly built in: a fill means the price fell first. | |
+| 23 | The 10-month average on SPY (B's rule) | history screen (the owner's quick test) | smaller crashes, lower return | before 2026-09-27 | Smaller crashes, but 3-4% a year less return since 2007 (with row 24). | |
+| 24 | The 10-month average on VT (B's rule) | history screen (the owner's quick test) | smaller crashes, lower return | before 2026-09-27 | Smaller crashes, but 3-4% a year less return since 2007 (with row 23). | |
+| 25 | Rotation among sectors | history screen (the owner's quick test) | failed | before 2026-09-27 | Failed its history screen. Recorded as dropped in `backlog.md` (it was never in the Waiting table). | |
+| 26 | Rotation among countries | history screen (the owner's quick test) | failed | before 2026-09-27 | Failed its history screen. Recorded as dropped in `backlog.md` (it was never in the Waiting table). | |
+| 27 | Turn-of-the-month | history screen (the owner's quick test) | failed | before 2026-09-27 | Failed its history screen. Recorded as dropped in `backlog.md` (it was never in the Waiting table). | |
+| 28 | Volatility targeting on SPY | history screen (the owner's quick test) | tested, not taken further | before 2026-09-27 | Tested on history by the owner; its result is not written down in this repository. | |
+| 29 | Momentum (the locked rule), race and fund, 80 names | history screen (real code) | RESULT_29 | 2026-09-28 | DETAIL_29 | [report](history/2026-09-rules-running-live/report.md) |
+| 30 | A: momentum with the 200-day veto, race and fund, 80 names | history screen (real code) | RESULT_30 | 2026-09-28 | DETAIL_30 | [report](history/2026-09-rules-running-live/report.md) |
+| 31 | B: 10-month timing on VT (the registered rule) | history screen (real code) | RESULT_31 | 2026-09-28 | DETAIL_31 | [report](history/2026-09-rules-running-live/report.md) |
+| 32 | B's rule on SPY (the same code; a check of row 23) | history screen (real code) | RESULT_32 | 2026-09-28 | DETAIL_32 | [report](history/2026-09-rules-running-live/report.md) |
+| 33 | C: pullback limit entry, fund, 80 names | history screen (real code) | RESULT_33 | 2026-09-28 | DETAIL_33 | [report](history/2026-09-rules-running-live/report.md) |
 
 ## Not counted, and why
 

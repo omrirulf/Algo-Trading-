@@ -39,6 +39,7 @@ from datetime import date
 from pathlib import Path
 from typing import Iterator, Mapping, Optional, Sequence
 
+import numpy as np
 import pandas as pd
 
 from history import journal
@@ -125,13 +126,28 @@ def paired(fund, other, period: Period, since: Optional[date] = None) -> dict:
 
 
 def trades_of(fund, period: Period) -> dict:
-    """Entries made, and the closed trades opened in ``period``: longs and shorts (``shadow.run.sides``)."""
+    """Entries made, and the closed trades opened in ``period``: longs and shorts (``shadow.run.sides``).
+
+    Also, for reading the fund's result: how long a position was held (weekdays from its entry to its
+    last share), what the 0.10%-a-side cost took from the book per year (each fill's cost over that
+    day's equity, summed, per 252 sessions), and how many entries were under $1 (split-adjusted prices,
+    where the engine's cent-rounded stops are coarse).
+    """
     closed = [c for c in fund.broker.closed if period.contains(c.opened)]
+    equity = {d.day: d.equity for d in fund.days}
+    fills = [f for f in fund.broker.fills if period.contains(f.day)]
+    sessions = sum(1 for d in fund.days if period.contains(d.day))
+    held = [int(np.busday_count(c.opened, c.closed)) for c in closed]
+    cost_share = sum(f.cost / equity[f.day] for f in fills if equity.get(f.day))
     return {
-        "entries": sum(1 for f in fund.broker.fills if f.kind == ENTRY and period.contains(f.day)),
+        "entries": sum(1 for f in fills if f.kind == ENTRY),
         "closed": len(closed),
         "win_rate": (sum(1 for c in closed if c.pnl > 0) / len(closed)) if closed else None,
         "sides": sides(closed),
+        "mean_days_held": statistics.fmean(held) if held else None,
+        "median_days_held": statistics.median(held) if held else None,
+        "costs_per_year": cost_share * 252.0 / sessions if sessions else None,
+        "entries_under_1_dollar": sum(1 for f in fills if f.kind == ENTRY and f.price < 1.0),
     }
 
 
@@ -205,7 +221,8 @@ def summarise(by_name: Mapping[str, object], b_spy, counters: dict, first_cycle:
             if name != "momentum":
                 row["vs_momentum"] = paired(fund, by_name["momentum"], period)
             rows[period.name] = row
-        out["funds"][name] = {"periods": rows, "order_matters": _order_counts(fund)}
+        # C enters by limit order outside the fund's own dispatch, so the order report has nothing of it.
+        out["funds"][name] = {"periods": rows, "order_matters": _order_counts(fund) if name != xp.LIMIT else None}
     b = by_name[xp.TIMING]
     b_first = b.days[0].day if b.days else None
     out["funds"][xp.TIMING] = {"periods": {

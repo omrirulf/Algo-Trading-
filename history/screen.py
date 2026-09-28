@@ -86,6 +86,11 @@ def run(args: argparse.Namespace) -> int:
     out: Path = args.out
     started = time.monotonic()
     table, prices_sha = prices.load(args.prices or out / "prices.csv.gz")
+    # The calendar, the VT fund and B cannot be done without these; say so now, not after an hour.
+    absent = [t for t in (prices.CALENDAR_TICKER, prices.INDEX_TICKER, prices.BILLS_TICKER)
+              if t not in table.frames or table.frames[t].empty]
+    if absent:
+        raise SystemExit(f"history screen: no prices for {', '.join(absent)}; nothing was run")
     sessions = sessions_of(table)
     final_through = table.final_through
     log.info("prices through %s, %d sessions, sha256 %s", final_through, len(sessions), prices_sha)
@@ -115,7 +120,7 @@ def run(args: argparse.Namespace) -> int:
     pooled = race.pool_years(years_done)
     del years_done
     keys = sorted({t.key for name in race.ARMS for t in pooled.arms[name]})
-    flips = race.coin_flips(keys, args.seeds, processes=args.processes) if args.seeds else None
+    flips = race.coin_flips(keys, args.seeds, processes=args.processes)
     row_of = {key: i for i, key in enumerate(keys)}
     log.info("coin flips: %d lines x %d seeds (%.0fs)", len(keys), args.seeds, time.monotonic() - started)
     race_results = race.summarise(pooled, flips, row_of)
@@ -126,6 +131,8 @@ def run(args: argparse.Namespace) -> int:
             "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "final_through": final_through.isoformat(),
             "first_line_day": first.isoformat(),
+            "last_session": sessions[-1].isoformat(),
+            "watchlist_names": len(DEFAULT_WATCHLIST),
             "prices_sha256": prices_sha,
             "prices_fetched_at": table.fetched_at,
             "journal_sha256": journal_sha,
@@ -164,6 +171,13 @@ def fetch(args: argparse.Namespace) -> int:
     return 0
 
 
+def _positive(text: str) -> int:
+    value = int(text)
+    if value < 1:
+        raise argparse.ArgumentTypeError("at least 1: a screen always draws the coin flip's band")
+    return value
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="history.screen", description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -174,7 +188,7 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--out", type=Path, required=True)
     r.add_argument("--prices", type=Path, default=None, help="the table (default: OUT/prices.csv.gz)")
     r.add_argument("--processes", type=int, default=os.cpu_count() or 2)
-    r.add_argument("--seeds", type=int, default=hr.DEFAULT_SEEDS,
+    r.add_argument("--seeds", type=_positive, default=hr.DEFAULT_SEEDS,
                    help="coin flips per line for the band (default: the race's %(default)s)")
     r.add_argument("--first", type=date.fromisoformat, default=journal.FIRST_LINE_DAY)
     r.add_argument("--reuse-journal", action="store_true", help="read OUT/journal instead of building it")
