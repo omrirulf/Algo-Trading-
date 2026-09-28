@@ -1,10 +1,12 @@
 {
  "meta": {
-  "generated_at": "2026-09-27T22:14:08+00:00",
+  "generated_at": "2026-09-28T07:03:35+00:00",
   "final_through": "2026-09-27",
   "first_line_day": "2000-01-03",
+  "last_session": "2026-09-25",
+  "watchlist_names": 80,
   "prices_sha256": "3f52d3623084e55084520c22bc6b30f0d54cba91a830d9e7950b408a5c42d7c7",
-  "prices_fetched_at": "2026-09-27T21:18:56+00:00",
+  "prices_fetched_at": "2026-09-28T05:37:09+00:00",
   "journal_sha256": "6362a1227890e3e24826fb4bc17f86c1a17f6ffeea0989f6941b435e52e2abd8",
   "journal_lines": 461925,
   "seeds": 1000,
@@ -12,10 +14,10 @@
   "cost_per_side": 0.001,
   "missing_tickers": [],
   "run": {
-   "run_id": "36351241413",
-   "commit": "178fef8f9faa373c51fe0268a4ad4774a577295a"
+   "run_id": "36382668730",
+   "commit": "dd70af0d9421db0cb1297faf5277671b465faf61"
   },
-  "seconds": 3274
+  "seconds": 5151
  },
  "data": {
   "coverage": [
@@ -595,12 +597,13 @@
         "t": 2.4195010102540335,
         "p": 0.015541817560224658
        },
-       "vs_always_long_every_line_same_days": {
+       "vs_same_side_every_line_same_days": {
         "days": 6634,
         "mean": 4.810962338806051e-05,
         "t": 0.20281721829250318,
         "p": 0.8392778993764518
-       }
+       },
+       "same_side_every_line_mean_net": -0.0014694644680898344
       },
       "shorts": {
        "n": 76201,
@@ -611,6 +614,20 @@
         "mean": -0.0005428338606215037,
         "t": -1.4919430585722855,
         "p": 0.13571407339214625
+       },
+       "vs_same_side_every_line_same_days": {
+        "days": 6451,
+        "mean": 0.000170587656267405,
+        "t": 0.7298871601704339,
+        "p": 0.4654591613322392
+       },
+       "same_side_every_line_mean_net": -0.002817515032645766
+      },
+      "entry_under_1_dollar": {
+       "trades": 2396,
+       "by_name": {
+        "HDB": 168,
+        "NVDA": 2228
        }
       },
       "vs_coin_flip_expected": {
@@ -642,11 +659,18 @@
         "median": -0.002123069445864025,
         "value": -0.0021420182199743515,
         "percentile": 41.4,
-        "seeds": 1000
+        "seeds": 1000,
+        "others": {
+         "always long, same lines": {
+          "value": -0.0014514236963384893,
+          "percentile": 100.0
+         }
+        }
        }
       },
       "always_long_same_lines": {
        "mean_net": -0.0013891674974946557,
+       "mean_per_day": -0.0014514236963384893,
        "paired": {
         "days": 6720,
         "mean": -0.0006905945236358621,
@@ -686,12 +710,13 @@
         "t": 1.338373060763337,
         "p": 0.1807748560738882
        },
-       "vs_always_long_every_line_same_days": {
+       "vs_same_side_every_line_same_days": {
         "days": 2431,
         "mean": 0.00048171000305108623,
         "t": 0.9251181312474221,
         "p": 0.35490446273422727
-       }
+       },
+       "same_side_every_line_mean_net": -0.0018148592630061215
       },
       "shorts": {
        "n": 22273,
@@ -702,6 +727,20 @@
         "mean": -0.0005402934440743322,
         "t": -0.7038561855332589,
         "p": 0.4815223395664985
+       },
+       "vs_same_side_every_line_same_days": {
+        "days": 2268,
+        "mean": -1.1815319538479394e-05,
+        "t": -0.024678493874307334,
+        "p": 0.9803114092581413
+       },
+       "same_side_every_line_mean_net": -0.0028298395468433993
+      },
+      "entry_under_1_dollar": {
+       "trades": 1640,
+       "by_name": {
+        "HDB": 168,
+        "NVDA": 1472
        }
       },
       "vs_coin_flip_expected": {
@@ -733,11 +772,18 @@
         "median": -0.002259987872010436,
         "value": -0.002089117636173217,
         "percentile": 84.3,
-        "seeds": 1000
+        "seeds": 1000,
+        "others": {
+         "always long, same lines": {
+          "value": -0.0018966474879913446,
+          "percentile": 98.5
+         }
+        }
        }
       },
       "always_long_same_lines": {
        "mean_net": -0.0018224542447508045,
+       "mean_per_day": -0.0018966474879913446,
        "paired": {
         "days": 2514,
         "mean": -0.00019247014818187243,
@@ -777,12 +823,13 @@
         "t": 2.213565394391101,
         "p": 0.026858690066675184
        },
-       "vs_always_long_every_line_same_days": {
+       "vs_same_side_every_line_same_days": {
         "days": 4203,
         "mean": -0.00020268326810868363,
         "t": -0.9127778262537429,
         "p": 0.3613594025503901
-       }
+       },
+       "same_side_every_line_mean_net": -0.001269689367818244
       },
       "shorts": {
        "n": 53928,
@@ -793,6 +840,19 @@
         "mean": -0.0005442112607479643,
         "t": -1.4460233560547033,
         "p": 0.1481706509969607
+       },
+       "vs_same_side_every_line_same_days": {
+        "days": 4183,
+        "mean": 0.00026948556425873796,
+        "t": 1.0778691773740705,
+        "p": 0.28109214233406665
+       },
+       "same_side_every_line_mean_net": -0.002810832747634952
+      },
+      "entry_under_1_dollar": {
+       "trades": 756,
+       "by_name": {
+        "NVDA": 756
        }
       },
       "vs_coin_flip_expected": {
@@ -824,11 +884,18 @@
         "median": -0.0020462297877261292,
         "value": -0.0021736378271251006,
         "percentile": 2.9,
-        "seeds": 1000
+        "seeds": 1000,
+        "others": {
+         "always long, same lines": {
+          "value": -0.0011853056240096072,
+          "percentile": 100.0
+         }
+        }
        }
       },
       "always_long_same_lines": {
        "mean_net": -0.0012170592580949748,
+       "mean_per_day": -0.0011853056240096072,
        "paired": {
         "days": 4206,
         "mean": -0.0009883322031154936,
@@ -868,12 +935,13 @@
         "t": 2.2744875150677633,
         "p": 0.0229366909173776
        },
-       "vs_always_long_every_line_same_days": {
+       "vs_same_side_every_line_same_days": {
         "days": 3449,
         "mean": -0.0001571016542591165,
         "t": -0.7062408736124065,
         "p": 0.4800383558899872
-       }
+       },
+       "same_side_every_line_mean_net": -0.0012318754794208798
       },
       "shorts": {
        "n": 45569,
@@ -884,6 +952,19 @@
         "mean": -0.0006183643714340207,
         "t": -1.5627716007594923,
         "p": 0.1181063262347879
+       },
+       "vs_same_side_every_line_same_days": {
+        "days": 3434,
+        "mean": 0.0002301788712939474,
+        "t": 0.896780768827828,
+        "p": 0.36983591179336406
+       },
+       "same_side_every_line_mean_net": -0.0028461538272692424
+      },
+      "entry_under_1_dollar": {
+       "trades": 358,
+       "by_name": {
+        "NVDA": 358
        }
       },
       "vs_coin_flip_expected": {
@@ -915,11 +996,18 @@
         "median": -0.002046122212407302,
         "value": -0.0020352818854022523,
         "percentile": 55.8,
-        "seeds": 1000
+        "seeds": 1000,
+        "others": {
+         "always long, same lines": {
+          "value": -0.0011821706922160707,
+          "percentile": 100.0
+         }
+        }
        }
       },
       "always_long_same_lines": {
        "mean_net": -0.0012886351531897111,
+       "mean_per_day": -0.0011821706922160707,
        "paired": {
         "days": 3452,
         "mean": -0.0008531111931861817,
@@ -972,12 +1060,13 @@
         "t": 2.4657238896358704,
         "p": 0.013673669147696854
        },
-       "vs_always_long_every_line_same_days": {
+       "vs_same_side_every_line_same_days": {
         "days": 6623,
         "mean": 7.031224208584429e-05,
         "t": 0.28809167809150027,
         "p": 0.7732765626314735
-       }
+       },
+       "same_side_every_line_mean_net": -0.001483647199040403
       },
       "shorts": {
        "n": 71099,
@@ -988,6 +1077,20 @@
         "mean": -0.0005070520729879183,
         "t": -1.363708610259697,
         "p": 0.17265929306200478
+       },
+       "vs_same_side_every_line_same_days": {
+        "days": 6410,
+        "mean": 0.00019854273243478354,
+        "t": 0.8207961350611246,
+        "p": 0.4117624004551479
+       },
+       "same_side_every_line_mean_net": -0.002811598273437473
+      },
+      "entry_under_1_dollar": {
+       "trades": 2232,
+       "by_name": {
+        "HDB": 168,
+        "NVDA": 2064
        }
       },
       "vs_coin_flip_expected": {
@@ -1019,11 +1122,18 @@
         "median": -0.002137084291891375,
         "value": -0.002076439718852506,
         "percentile": 80.0,
-        "seeds": 1000
+        "seeds": 1000,
+        "others": {
+         "always long, same lines": {
+          "value": -0.001438935700178445,
+          "percentile": 100.0
+         }
+        }
        }
       },
       "always_long_same_lines": {
        "mean_net": -0.0013842290775543907,
+       "mean_per_day": -0.001438935700178445,
        "paired": {
         "days": 6720,
         "mean": -0.0006375040186740612,
@@ -1063,12 +1173,13 @@
         "t": 1.1861009283944435,
         "p": 0.23558244395693784
        },
-       "vs_always_long_every_line_same_days": {
+       "vs_same_side_every_line_same_days": {
         "days": 2421,
         "mean": 0.0004181043048972047,
         "t": 0.7779267510568352,
         "p": 0.4366121967350878
-       }
+       },
+       "same_side_every_line_mean_net": -0.001853651915586376
       },
       "shorts": {
        "n": 21105,
@@ -1079,6 +1190,20 @@
         "mean": -0.0005141543907510138,
         "t": -0.6553628858852968,
         "p": 0.5122341411055233
+       },
+       "vs_same_side_every_line_same_days": {
+        "days": 2239,
+        "mean": 1.730044086677776e-05,
+        "t": 0.03497497758353502,
+        "p": 0.9720996936581718
+       },
+       "same_side_every_line_mean_net": -0.00282821628745122
+      },
+      "entry_under_1_dollar": {
+       "trades": 1545,
+       "by_name": {
+        "HDB": 168,
+        "NVDA": 1377
        }
       },
       "vs_coin_flip_expected": {
@@ -1110,11 +1235,18 @@
         "median": -0.002276719280851376,
         "value": -0.0020755821873258027,
         "percentile": 88.9,
-        "seeds": 1000
+        "seeds": 1000,
+        "others": {
+         "always long, same lines": {
+          "value": -0.0019226044667932027,
+          "percentile": 97.8
+         }
+        }
        }
       },
       "always_long_same_lines": {
        "mean_net": -0.0018969727682774482,
+       "mean_per_day": -0.0019226044667932027,
        "paired": {
         "days": 2514,
         "mean": -0.00015297772053259984,
@@ -1154,12 +1286,13 @@
         "t": 2.4561890319728197,
         "p": 0.014041927243595431
        },
-       "vs_always_long_every_line_same_days": {
+       "vs_same_side_every_line_same_days": {
         "days": 4202,
         "mean": -0.00013006961990042498,
         "t": -0.5705072109390746,
         "p": 0.5683337327090232
-       }
+       },
+       "same_side_every_line_mean_net": -0.0012704674230390222
       },
       "shorts": {
        "n": 49994,
@@ -1170,6 +1303,19 @@
         "mean": -0.000503239536552634,
         "t": -1.3030223885970929,
         "p": 0.19256711817445415
+       },
+       "vs_same_side_every_line_same_days": {
+        "days": 4171,
+        "mean": 0.0002958339074097931,
+        "t": 1.137498301631717,
+        "p": 0.2553300341771645
+       },
+       "same_side_every_line_mean_net": -0.002802677694828799
+      },
+      "entry_under_1_dollar": {
+       "trades": 687,
+       "by_name": {
+        "NVDA": 687
        }
       },
       "vs_coin_flip_expected": {
@@ -1201,11 +1347,18 @@
         "median": -0.0020543721392205184,
         "value": -0.0020769522804925757,
         "percentile": 37.8,
-        "seeds": 1000
+        "seeds": 1000,
+        "others": {
+         "always long, same lines": {
+          "value": -0.0011498383917453727,
+          "percentile": 100.0
+         }
+        }
        }
       },
       "always_long_same_lines": {
        "mean_net": -0.0011789044492736946,
+       "mean_per_day": -0.0011498383917453727,
        "paired": {
         "days": 4206,
         "mean": -0.000927113888747203,
@@ -1425,7 +1578,11 @@
          "hit_rate": 0.34536245647356756,
          "too_few": false
         }
-       }
+       },
+       "mean_days_held": 10.800681329189576,
+       "median_days_held": 8.0,
+       "costs_per_year": 0.047587170544159195,
+       "entries_under_1_dollar": 269
       },
       "vs_vt": {
        "days": 4591,
@@ -1512,7 +1669,11 @@
          "hit_rate": 0.3651685393258427,
          "too_few": false
         }
-       }
+       },
+       "mean_days_held": 10.939004225610876,
+       "median_days_held": 9,
+       "costs_per_year": 0.04490306079794449,
+       "entries_under_1_dollar": 178
       },
       "vs_vt": {
        "days": 383,
@@ -1599,7 +1760,11 @@
          "hit_rate": 0.335246293639407,
          "too_few": false
         }
-       }
+       },
+       "mean_days_held": 10.733988838692532,
+       "median_days_held": 8,
+       "costs_per_year": 0.0491907475170641,
+       "entries_under_1_dollar": 91
       },
       "vs_vt": {
        "days": 4208,
@@ -1686,7 +1851,11 @@
          "hit_rate": 0.332761087267525,
          "too_few": false
         }
-       }
+       },
+       "mean_days_held": 10.628992889737875,
+       "median_days_held": 8,
+       "costs_per_year": 0.04946507579965866,
+       "entries_under_1_dollar": 46
       },
       "vs_vt": {
        "days": 3454,
@@ -1790,7 +1959,11 @@
          "hit_rate": 0.34343770819453695,
          "too_few": false
         }
-       }
+       },
+       "mean_days_held": 10.794009103210726,
+       "median_days_held": 8.0,
+       "costs_per_year": 0.046956597321793817,
+       "entries_under_1_dollar": 246
       },
       "vs_vt": {
        "days": 4591,
@@ -1905,7 +2078,11 @@
          "hit_rate": 0.36839481555333997,
          "too_few": false
         }
-       }
+       },
+       "mean_days_held": 11.00116076610563,
+       "median_days_held": 9,
+       "costs_per_year": 0.043744464550744405,
+       "entries_under_1_dollar": 164
       },
       "vs_vt": {
        "days": 383,
@@ -2020,7 +2197,11 @@
          "hit_rate": 0.33091545772886444,
          "too_few": false
         }
-       }
+       },
+       "mean_days_held": 10.697447921363514,
+       "median_days_held": 8,
+       "costs_per_year": 0.04887563291742552,
+       "entries_under_1_dollar": 82
       },
       "vs_vt": {
        "days": 4208,
@@ -2152,7 +2333,11 @@
          "hit_rate": 0.351029601029601,
          "too_few": false
         }
-       }
+       },
+       "mean_days_held": 10.794693240485053,
+       "median_days_held": 8.0,
+       "costs_per_year": 0.04825298182068426,
+       "entries_under_1_dollar": 228
       },
       "vs_vt": {
        "days": 4591,
@@ -2267,7 +2452,11 @@
          "hit_rate": 0.36623376623376624,
          "too_few": false
         }
-       }
+       },
+       "mean_days_held": 11.182321534506624,
+       "median_days_held": 9,
+       "costs_per_year": 0.04381145354271851,
+       "entries_under_1_dollar": 148
       },
       "vs_vt": {
        "days": 383,
@@ -2382,7 +2571,11 @@
          "hit_rate": 0.3442088091353997,
          "too_few": false
         }
-       }
+       },
+       "mean_days_held": 10.625721920524093,
+       "median_days_held": 8,
+       "costs_per_year": 0.05090649942781493,
+       "entries_under_1_dollar": 80
       },
       "vs_vt": {
        "days": 4208,
@@ -2470,13 +2663,7 @@
       }
      }
     },
-    "order_matters": {
-     "cycle_days": 0,
-     "days": 0,
-     "skipped": 0,
-     "outranked_days": 0,
-     "by_kind": {}
-    },
+    "order_matters": null,
     "orders": {
      "placed": 61238,
      "filled_open": 9647,
