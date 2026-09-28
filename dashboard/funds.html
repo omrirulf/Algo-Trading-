@@ -2,7 +2,9 @@
 <html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#8a5a1e">
+<meta name="theme-color" content="#8a5a1e" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#15171c" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
 <meta name="description" content="The four-fund experiment: simulated funds that run the real execution engine and position manager against a simulated broker. Simulated, not real money.">
 <title>Algo Trading 4 Funds</title>
 <link rel="manifest" href="manifest.webmanifest">
@@ -219,18 +221,18 @@
    surfaces, VT in the secondary ink so the index reads as the yardstick
    rather than a fourth contender, and a band fill one step off the card. */
 :root{
-  --bg:#f5f4f0;--surface:#ffffff;--surface-2:#eeece6;--line:#d9d6cd;--ink:#1d1f24;--ink-2:#5b5f6b;--ink-3:#8a8e99;
+  --bg:#f5f4f0;--surface:#ffffff;--surface-2:#eeece6;--line:#d9d6cd;--ink:#1d1f24;--ink-2:#5b5f6b;--ink-3:#676b77;
   --accent:#8a5a1e;--accent-ink:#ffffff;
-  --good:#2f7d4f;--good-bg:#e3f1e8;--warn:#a26a00;--warn-bg:#f7edd3;--bad:#b3352b;--bad-bg:#f8e2df;
+  --good:#276f45;--good-bg:#e3f1e8;--warn:#8f5d00;--warn-bg:#f7edd3;--bad:#b3352b;--bad-bg:#f8e2df;
   --bar:#cfcbc0;--bar-fill:#8a5a1e;
   --sans:"Source Sans 3",system-ui,-apple-system,"Segoe UI",sans-serif;
   --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
-  --s-model:#2a78d6;--s-momentum:#eb6834;--s-hybrid:#1baf7a;--s-vt:var(--ink-2);--s-real:#b9b6ad;
+  --s-model:#2a78d6;--s-momentum:#eb6834;--s-hybrid:#15996c;--s-vt:var(--ink-2);--s-real:#b9b6ad;
   --band:#e9e6dd;--grid:#ecebe6;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --bg:#15171c;--surface:#1d2027;--surface-2:#252932;--line:#343945;--ink:#ecebe6;--ink-2:#aab0bd;--ink-3:#7d8390;
+    --bg:#15171c;--surface:#1d2027;--surface-2:#252932;--line:#343945;--ink:#ecebe6;--ink-2:#aab0bd;--ink-3:#8b919e;
     --accent:#d9a45b;--accent-ink:#15171c;
     --good:#6fc48f;--good-bg:#1e3327;--warn:#e0b25a;--warn-bg:#3a2f15;--bad:#f08a7e;--bad-bg:#3d211e;
     --bar:#343945;--bar-fill:#d9a45b;
@@ -239,7 +241,7 @@
   }
 }
 :root[data-theme="dark"]{
-  --bg:#15171c;--surface:#1d2027;--surface-2:#252932;--line:#343945;--ink:#ecebe6;--ink-2:#aab0bd;--ink-3:#7d8390;
+  --bg:#15171c;--surface:#1d2027;--surface-2:#252932;--line:#343945;--ink:#ecebe6;--ink-2:#aab0bd;--ink-3:#8b919e;
   --accent:#d9a45b;--accent-ink:#15171c;
   --good:#6fc48f;--good-bg:#1e3327;--warn:#e0b25a;--warn-bg:#3a2f15;--bad:#f08a7e;--bad-bg:#3d211e;
   --bar:#343945;--bar-fill:#d9a45b;
@@ -258,14 +260,24 @@ p{margin:6px 0 0}
 header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 16px;padding-block:6px 14px;border-bottom:1px solid var(--line)}
 #fresh{font-size:.9rem}
 .nav{font-size:.88rem;margin-bottom:2px}
-.nav a{display:inline-block;padding-block:4px;color:var(--accent);font-weight:600}
+.nav a{display:inline-block;padding-block:8px;color:var(--accent);font-weight:600}
 .nav a[aria-current="page"]{color:var(--ink);font-weight:700;text-decoration:none}
 .title{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
 /* The label the owner asked to be unmissable: a boxed badge beside the
    title, in the caution colours, on every state of the page. */
 .sim{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--warn);background:var(--warn-bg);color:var(--ink);border-radius:8px;padding:2px 10px;font-weight:700;font-size:.95rem}
 .sim svg{flex:none;color:var(--warn)}
-.intro{font-size:.9rem;color:var(--ink-2);margin-top:10px}
+/* A link to the docs page that explains a part: a small pill with the
+   arrow every link that leaves the app carries, and a hidden note for
+   screen readers. Tall enough to tap (WCAG 2.5.8: 24px), with room
+   between pills. */
+a.doc{display:inline-flex;align-items:center;gap:5px;min-height:28px;font-size:.8rem;font-weight:600;color:var(--accent);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:3px 11px;text-decoration:none;white-space:nowrap;vertical-align:middle}
+a.doc:hover{border-color:var(--accent)}
+a.doc svg,.nav a.ext svg{flex:none;margin-left:1px}
+.nav a.ext{display:inline-flex;align-items:center;gap:3px}
+.docs{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+header + .docs{margin-top:12px}
 .banner{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:8px;padding:10px 12px;margin-top:10px;font-size:.95rem;overflow-wrap:anywhere}
 .banner.idle{border-left-color:var(--ink-3)}
 .banner.decided{border-left-color:var(--good)}
@@ -330,7 +342,7 @@ header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-be
 .tip .r b{font-family:var(--mono);font-weight:600;font-variant-numeric:tabular-nums}
 .tip .r span{color:var(--ink-2)}
 details.data{margin-top:8px;font-size:.88rem}
-details.data summary{cursor:pointer;color:var(--ink-2);font-weight:600;padding-block:4px}
+details.data summary{cursor:pointer;color:var(--ink-2);font-weight:600;padding-block:6px}
 .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
 table{border-collapse:collapse;width:100%;font-size:.84rem}
 th,td{padding:4px 8px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
@@ -354,7 +366,7 @@ td{font-family:var(--mono);font-variant-numeric:tabular-nums}
 .fund .big + .faint{font-size:.82rem}
 .up{color:var(--good)}.down{color:var(--bad)}
 footer{margin-top:36px;padding-top:12px;border-top:1px solid var(--line);font-size:.84rem;color:var(--ink-3);display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
-button{font:inherit;font-size:.88rem;font-weight:600;color:var(--accent-ink);background:var(--accent);border:0;border-radius:8px;padding:6px 12px;cursor:pointer}
+button{font:inherit;font-size:.88rem;font-weight:600;color:var(--accent-ink);background:var(--accent);border:0;border-radius:8px;padding:8px 16px;min-height:40px;cursor:pointer}
 button:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 button[disabled]{opacity:.55;cursor:default}
 #note{font-size:.84rem;color:var(--ink-3)}
@@ -404,7 +416,7 @@ table.mini tr.over td{background:var(--warn-bg)}
 
 <header>
   <div>
-    <nav class="nav" aria-label="Pages"><a href="index.html">Desk</a> <span class="faint">|</span> <a href="funds.html" aria-current="page">4 Funds</a></nav>
+    <nav class="nav" aria-label="Pages"><a href="index.html">Desk</a> <span class="faint">|</span> <a href="funds.html" aria-current="page">4 Funds</a> <span class="faint">|</span> <a class="ext" href="https://algotrade.mintlify.site/shadow-funds" target="_blank" rel="noopener">Docs<svg width="10" height="10" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 12 12 4M6 4h6v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="sr-only">(opens in a new tab)</span></a></nav>
     <div class="title">
       <h1>4 Funds</h1>
       <span class="sim" role="note"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 15 14H1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8 6v3.6M8 11.4v.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Simulated, not real money</span>
@@ -414,7 +426,7 @@ table.mini tr.over td{background:var(--warn-bg)}
   </div>
 </header>
 
-<p class="intro">Every fund on this page is a simulation: the real execution engine and position manager, trading a simulated broker over daily bars. None of them places an order anywhere. The one real account shown, during calibration, is the paper account, which is not real money either.</p>
+<div class="docs" aria-label="Docs"><a class="doc" href="https://algotrade.mintlify.site/shadow-funds#what-is-real-and-what-is-simulated" target="_blank" rel="noopener">What is simulated<svg width="10" height="10" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 12 12 4M6 4h6v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="sr-only">(opens in a new tab)</span></a> <a class="doc" href="https://algotrade.mintlify.site/shadow-funds#calibration-first" target="_blank" rel="noopener">Calibration<svg width="10" height="10" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 12 12 4M6 4h6v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="sr-only">(opens in a new tab)</span></a> <a class="doc" href="https://algotrade.mintlify.site/shadow-funds#the-fund-tests-start-and-the-gate" target="_blank" rel="noopener">The fund test<svg width="10" height="10" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 12 12 4M6 4h6v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="sr-only">(opens in a new tab)</span></a> <a class="doc" href="https://algotrade.mintlify.site/horse-race" target="_blank" rel="noopener">The race<svg width="10" height="10" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 12 12 4M6 4h6v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="sr-only">(opens in a new tab)</span></a></div>
 
 <section id="banners" aria-label="Where the tests stand"></section>
 <section id="problems" aria-label="Problems in the record"></section>
@@ -431,7 +443,7 @@ table.mini tr.over td{background:var(--warn-bg)}
 <section id="order" aria-label="How often the buying order mattered"></section>
 
 <footer>
-  <span id="note">Rebuilt each night from the simulation's record and the decision gate. Nothing on this page is a live quote or a live position.</span>
+  <span id="note" class="docs"><a class="doc" href="https://algotrade.mintlify.site/shadow-funds#where-to-read-it" target="_blank" rel="noopener">Where this is read from<svg width="10" height="10" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 12 12 4M6 4h6v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="sr-only">(opens in a new tab)</span></a> <a class="doc" href="https://algotrade.mintlify.site/shadow-funds" target="_blank" rel="noopener">The four funds, explained<svg width="10" height="10" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 12 12 4M6 4h6v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="sr-only">(opens in a new tab)</span></a></span>
   <button id="refresh" type="button">Refresh</button>
 </footer>
 
@@ -444,6 +456,10 @@ table.mini tr.over td{background:var(--warn-bg)}
   const $ = (id)=>document.getElementById(id);
   const isNum = (v)=> typeof v === "number" && isFinite(v);
   const esc = (s)=> String(s??"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  // The docs explain; the page shows. Each part links to its page.
+  const DOCS = "https://algotrade.mintlify.site/";
+  const DOC_ICON = `<svg width="10" height="10" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 12 12 4M6 4h6v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const doc = (path, label)=> `<a class="doc" href="${DOCS}${path}" target="_blank" rel="noopener">${label}${DOC_ICON}<span class="sr-only">(opens in a new tab)</span></a>`;
   const money = (v)=> !isNum(v) ? "n/a" : (v<0?"−":"") + "$" + Math.abs(v).toLocaleString("en-US",{maximumFractionDigits:0});
   const kMoney = (v)=> !isNum(v) ? "n/a" : Math.abs(v) < 1000 ? money(v) : (v<0?"−":"") + "$" + (Math.abs(v)/1000).toLocaleString("en-US",{maximumFractionDigits:2}) + "k";
   // Every return and share in both files is a fraction: 0.012 is 1.2%.
@@ -623,10 +639,10 @@ table.mini tr.over td{background:var(--warn-bg)}
   }
 
   function raceBanner(R, from){
-    if(!isNum(R.independent)) return `<div class="banner idle"><b>Race:</b> no decision-gate record yet. The nightly run writes it to logs/race_gate.json.</div>`;
+    if(!isNum(R.independent)) return `<div class="banner idle"><b>Race:</b> no decision-gate record yet. ${doc("horse-race#the-decision-gate-comes-first", "The gate")}</div>`;
     const of = R.of || 60, td = R.trading_days || 180;
     const looks = Array.isArray(R.looks) && R.looks.length ? `<details class="data"><summary>All ${R.looks.length} checkpoints</summary><ul class="looks">${R.looks.map(l=>`<li><span class="num">${esc(l.independent)}</span> independent days · bar t &gt; <span class="num">${bar2(l.bar)}</span> · ${l.reached ? (l.outcome ? "decided: " + esc(l.outcome) : "reached, no decision") : "not reached yet"}${l.reason ? ` <span class="faint">${esc(l.reason)}</span>` : ""}</li>`).join("")}</ul></details>` : "";
-    const written = `<div class="sub">Decision gate written ${esc(israel(R.generated_at))}${from ? " · " + esc(from) : ""}</div>`;
+    const written = `<div class="sub">Decision gate written ${esc(israel(R.generated_at))}${from ? " · " + esc(from) : ""} ${doc("horse-race#the-decision-gate-comes-first", "The gate")}</div>`;
     if(R.decided){
       return `<div class="banner decided"><b>Race:</b> ${esc(R.status_line)}${R.outcome_text ? `<div><b>${esc(R.outcome_text)}</b></div>` : ""}${written}${looks}</div>`;
     }
@@ -640,7 +656,7 @@ table.mini tr.over td{background:var(--warn-bg)}
     if(ft.status !== "running"){
       const from = typeof ft.start === "string" && ft.start ? ft.start : "2026-09-29";
       const cycle = typeof ft.first_cycle === "string" && ft.first_cycle ? ft.first_cycle : "2026-09-28";
-      return `<div class="banner idle"><b>Fund test:</b> starts ${esc(day(from, true))} (the funds act on the ${esc(day(cycle, true))} cycle at the next open), and counts only after calibration passes. Until then no fund result is calculated or shown; a delayed calibration delays the reading, never the start.</div>`;
+      return `<div class="banner idle"><b>Fund test:</b> starts ${esc(day(from, true))} (on the ${esc(day(cycle, true))} cycle), and counts only after calibration passes. ${doc("shadow-funds#the-fund-tests-start-and-the-gate", "The start and the gate")}</div>`;
     }
     const of = R.of || 60, td = R.trading_days || 180;
     // The fund test has no looks of its own: it is read at the race's
@@ -649,10 +665,10 @@ table.mini tr.over td{background:var(--warn-bg)}
     // and "none left" is said only when the race has none left either.
     let next;
     if(ft.next_checkpoint) next = nextText(ft.next_checkpoint);
-    else if(R.next) next = `${nextText(R.next)} <span class="faint">(the race's next look; the fund test is read at the race's looks)</span>`;
-    else if(!isNum(R.independent)) next = "Next checkpoint: the race's next look, not known until the decision gate writes its record.";
+    else if(R.next) next = `${nextText(R.next)} <span class="faint">(the race's next look)</span>`;
+    else if(!isNum(R.independent)) next = "Next checkpoint: not known until the decision gate writes its record.";
     else next = nextText(null);
-    return `<div class="banner"><b>Fund test:</b> ${esc(isNum(ft.independent) ? ft.independent : 0)} of ${esc(of)} independent days (= ${esc(td)} trading days), <b>NO DECISION YET</b>. ${next}${ft.start ? `<div class="sub">Started ${esc(day(ft.start, true))}</div>` : ""}</div>`;
+    return `<div class="banner"><b>Fund test:</b> ${esc(isNum(ft.independent) ? ft.independent : 0)} of ${esc(of)} independent days (= ${esc(td)} trading days), <b>NO DECISION YET</b>. ${next}<div class="sub">${ft.start ? `Started ${esc(day(ft.start, true))} ` : ""}${doc("shadow-funds#the-fund-tests-start-and-the-gate", "The fund test")}</div></div>`;
   }
 
   // ------------------------------------------------------------ race reports
@@ -693,7 +709,7 @@ table.mini tr.over td{background:var(--warn-bg)}
     if(!byConviction.length && !bySide.length) return "";
     const since = typeof R.report_since === "string" && R.report_since ? ` since ${esc(day(R.report_since, true))}` : "";
     return `<div class="card" style="margin-top:10px"><h3>Race: by conviction, and longs vs shorts <span class="faint" style="font-weight:400">(exploratory, report only)</span></h3>`
-      + `<p class="small muted">The decision race's trades${since}, after costs. A group or side reads "too few" until it has 20 trades. Nothing here moves a look, a bar or the verdict.</p>`
+      + `<p class="small muted">Trades${since}, after costs · "too few" below 20 trades · ${doc("horse-race#exploratory-reports-conviction-groups-longs-and-shorts", "About these reports")}</p>`
       + (byConviction.length ? `<h4>Does higher conviction mean better trades?</h4><div class="minis">${byConviction.join("")}</div>` : "")
       + (bySide.length ? `<h4>Longs vs shorts</h4><div class="minis">${bySide.join("")}</div>` : "")
       + `</div>`;
@@ -814,10 +830,10 @@ table.mini tr.over td{background:var(--warn-bg)}
     let html = `<ul class="facts">${facts.map(f=>`<li>${f}</li>`).join("")}</ul>`;
     // A stopped calibration has no end date, and the fund test's start is
     // not worked out from it, so the record gives neither and none is shown.
-    const end = c.status !== "stopped" && typeof c.end_estimate === "string" && c.end_estimate ? ` If nothing more fails, it ends ${esc(day(c.end_estimate, true))}.` : "";
+    const end = c.status !== "stopped" && typeof c.end_estimate === "string" && c.end_estimate ? `If nothing more fails, it ends ${esc(day(c.end_estimate, true))}. ` : "";
     html += c.status === "stopped"
-      ? `<p class="small muted">Calibration is stopped, so it has no end date, and the fund test's start is not worked out from it.</p>`
-      : `<p class="small muted">Calibration ends at day 15 or ${esc(after)} days after the last fix, whichever is later.${end}</p>`;
+      ? `<p class="small muted">Calibration is stopped, so it has no end date. ${doc("shadow-funds#calibration-first", "The fail rule")}</p>`
+      : `<p class="small muted">${end}${doc("shadow-funds#calibration-first", "The fail rule")}</p>`;
     if(fixes.length > 1){
       html += `<details class="data"><summary>All ${esc(fixes.length)} fixes</summary><ul class="facts">${fixes.map(f=>`<li>${esc(day(f.day, true))}${f.what != null && f.what !== "" ? `: ${esc(f.what)}` : ""}</li>`).join("")}</ul></details>`;
     }
@@ -827,9 +843,9 @@ table.mini tr.over td{background:var(--warn-bg)}
       // skipped by the fund test: it has no bar, and the record gives null.
       const bars = (v)=>{ const list = (Array.isArray(v) ? v : []).map(b=>Number.isFinite(b) ? b.toFixed(2) : "none"); return list.length ? list.join(", ") : "n/a"; };
       const skipped = (Array.isArray(plan.skipped) ? plan.skipped : []).map((s, k)=>s === true ? k + 1 : 0).filter(Boolean);
-      html += `<p>Fund test starts ${esc(day(plan.start, true))} (fixed); bars ${esc(bars(plan.bars))}${skipped.length ? `; look ${esc(skipped.join(" and "))} skipped (before calibration can pass)` : ""}</p>`;
+      html += `<p>Fund test starts ${esc(day(plan.start, true))} (fixed); bars ${esc(bars(plan.bars))}${skipped.length ? `; look ${esc(skipped.join(" and "))} skipped` : ""}</p>`;
       if(plan.matches_registered === false){
-        html += `<div class="amber" role="note"><b>This plan differs from the planned bars${Array.isArray(plan.registered) ? ` (${esc(bars(plan.registered))})` : ""}: each bar is computed at its look by the same spending rule, from the fund sessions actually there, and logged in the Amendments table the day it is used.</b></div>`;
+        html += `<div class="amber" role="note"><b>Differs from the planned bars${Array.isArray(plan.registered) ? ` (${esc(bars(plan.registered))})` : ""}: computed at each look by the spending rule, logged in the Amendments table.</b> ${doc("shadow-funds#the-fund-tests-start-and-the-gate", "Why the bars moved")}</div>`;
       } else if(plan.matches_registered === true){
         html += `<p class="small faint">The same start and bars as planned.</p>`;
       }
@@ -853,14 +869,14 @@ table.mini tr.over td{background:var(--warn-bg)}
       const days = count ?? new Set(items.map(m=>m.day)).size;
       const over = days > limit;
       const rows = items.map(m=>`<li>${esc(day(m.day, true))}: ${m.what === "ladder pass" ? "ladder pass (the whole book)" : `entry ${esc(m.ticker ?? "n/a")}`}${m.at ? ` <span class="faint">at ${esc(israel(m.at))}</span>` : ""}${m.reason ? ` <span class="faint">(${esc(m.reason)})</span>` : ""}</li>`).join("");
-      return `<div class="${over ? "alert bad" : "amber"}" role="note"><b>Late runs:</b> ${n(entries, "entry", "entries")} and ${n(passes, "ladder pass", "ladder passes")} mirrored on ${n(days, "day", "days")} (limit ${esc(limit)}). The real account's run met a closed market, so the copy did not do what the real account could not.`
+      return `<div class="${over ? "alert bad" : "amber"}" role="note"><b>Late runs:</b> ${n(entries, "entry", "entries")} and ${n(passes, "ladder pass", "ladder passes")} mirrored on ${n(days, "day", "days")} (limit ${esc(limit)}). ${doc("shadow-funds#late-runs", "Late runs")}`
         + (rows ? `<details class="data"><summary>What was mirrored</summary><ul class="facts">${rows}</ul></details>` : "") + `</div>`;
     }
 
     const el = $("calibration");
     const c = data.calibration;
     if(!c || typeof c !== "object"){
-      el.innerHTML = `<div class="card muted">No calibration record yet. The nightly run writes logs/funds.json; until the first one lands there is nothing to show.</div>`;
+      el.innerHTML = `<div class="card muted">No calibration record yet. ${doc("shadow-funds#calibration-first", "Calibration")}</div>`;
       return [];
     }
     const status = c.status || "not_started";
@@ -869,20 +885,18 @@ table.mini tr.over td{background:var(--warn-bg)}
     const todo = [];
     let html = "";
     if(status === "not_started"){
-      html += `<div class="card"><div class="st"><span class="chip ${chip[0]}">${esc(chip[1])}</span></div><p>Calibration has not started. It is waiting for the owner to approve the pass rule below. Once it is approved and a start day is set, the calibration fund runs beside the real paper account for ${esc(need)} trading days, and only those two are shown here.</p></div>`;
+      html += `<div class="card"><div class="st"><span class="chip ${chip[0]}">${esc(chip[1])}</span><span>waiting for the pass rule below to be approved · <span class="num">${esc(need)}</span> trading days once it starts</span></div><div class="docs">${doc("shadow-funds#calibration-first", "Calibration")} ${doc("shadow-funds#what-is-real-and-what-is-simulated", "What is simulated")}</div></div>`;
     } else {
       const say = {
-        running: "The calibration fund starts from the real paper account's book and runs the same journal lines through the real engine and manager. The two lines should lie on top of each other; every trade where they differ is listed below with its reason.",
-        passed: "Calibration passed under the approved rule.",
-        failed: "Calibration failed under the approved rule, so the four funds stay hidden.",
-        stopped: "Calibration is stopped: too many days needed late-run mirroring. It gives neither a pass nor a fail until the owner decides, and the four funds stay hidden.",
+        failed: "Failed under the approved rule: the four funds stay hidden.",
+        stopped: "Stopped: neither a pass nor a fail until the owner decides; the four funds stay hidden.",
       }[status] || "";
       const why = status === "stopped" && typeof c.stop_reason === "string" && c.stop_reason
         ? `<p class="small"><b>Why:</b> ${esc(c.stop_reason)}</p>` : "";
       // "Closes compared" rather than "Day": after a fail the days passed
       // (the fail rule's count, below) stop short of the days compared, and
       // two different numbers both called days would read as a contradiction.
-      html += `<div class="card"><div class="st"><span class="chip ${chip[0]}">${esc(chip[1])}</span><span><b class="num">${esc(done)}</b> of <span class="num">${esc(need)}</span> closes compared${c.start ? ` · started ${esc(day(c.start, true))}` : ""}</span></div><div class="bar" role="img" aria-label="${esc(done)} of ${esc(need)} calibration closes compared"><i style="width:${Math.max(0, Math.min(100, need ? done / need * 100 : 0))}%"></i></div>${calibrationFixHtml(c)}${say ? `<p class="small muted">${say}</p>` : ""}${why}${lateRunsHtml(c)}</div>`;
+      html += `<div class="card"><div class="st"><span class="chip ${chip[0]}">${esc(chip[1])}</span><span><b class="num">${esc(done)}</b> of <span class="num">${esc(need)}</span> closes compared${c.start ? ` · started ${esc(day(c.start, true))}` : ""}</span></div><div class="bar" role="img" aria-label="${esc(done)} of ${esc(need)} calibration closes compared"><i style="width:${Math.max(0, Math.min(100, need ? done / need * 100 : 0))}%"></i></div>${calibrationFixHtml(c)}${say ? `<p class="small muted">${say}</p>` : ""}${why}${lateRunsHtml(c)}<div class="docs">${doc("shadow-funds#calibration-first", "Calibration")} ${doc("shadow-funds#what-is-real-and-what-is-simulated", "What is simulated")}</div></div>`;
       const series = Array.isArray(c.series) ? c.series : [];
       const problems = (Array.isArray(c.problems) ? c.problems : []).map(p=>String(p ?? ""));
       if(series.length){
@@ -890,7 +904,7 @@ table.mini tr.over td{background:var(--warn-bg)}
         const last = series[series.length - 1];
         const m = c.metrics || {};
         const aria = `Calibration fund against the real paper account, ${day(days[0], true)} to ${day(days[days.length-1], true)}. On the last day the simulation was ${money(last.sim)} and the real account ${money(last.real)}; the largest daily gap was ${plain(m.max_abs_gap_pct, 2)}.`;
-        html += `<div class="chart"><h3>The calibration fund against the real account</h3><div class="cap">Equity at each close. Where the real account has no record for a day, its line breaks.</div>
+        html += `<div class="chart"><h3>The calibration fund against the real account</h3><div class="cap">Equity at each close.</div>
           <ul class="legend"><li>${key("var(--s-real)", false, 5)}Real paper account</li><li>${key("var(--s-model)")}Calibration fund (simulated)</li></ul>
           ${plotHost("Calibration chart")}
           <details class="data"><summary>The numbers by day</summary><div class="scroll"><table><thead><tr><th>Day</th><th>Simulated</th><th>Real</th><th>Gap</th></tr></thead><tbody>${series.map(r=>`<tr><td>${esc(day(r.day, true))}</td><td>${esc(money(r.sim))}</td><td>${esc(money(r.real))}</td><td>${esc(signed(r.diff_pct, 2))}</td></tr>`).join("")}</tbody></table></div></details></div>`;
@@ -910,7 +924,7 @@ table.mini tr.over td{background:var(--warn-bg)}
         // first day would have been, not only in the card above.
         html += `<div class="alert"><h3>${warnIcon}No calibration day recorded yet</h3><p class="small">The record gives ${problems.length === 1 ? "this reason" : "these reasons"}:</p><ul>${problems.map(p=>`<li>${esc(p)}</li>`).join("")}</ul></div>`;
       } else {
-        html += `<div class="card muted small">No calibration day recorded yet; the first one lands after the first close.</div>`;
+        html += `<div class="card muted small">No calibration day recorded yet.</div>`;
       }
       const m = c.metrics || {};
       html += tiles([
@@ -930,7 +944,7 @@ table.mini tr.over td{background:var(--warn-bg)}
     html += `<div class="card" style="margin-top:12px"><h3>Pass rule ${rule.approved ? `<span class="chip good">approved</span>` : `<span class="chip run">not in force yet</span>`}</h3>${lines.length ? ruleHtml(lines) : `<p class="muted small">No pass rule written yet.</p>`}${verdictsHtml(verdicts)}</div>`;
     const h = c.holding_days || {};
     const dd = (v)=> isNum(v) ? (Number.isInteger(v) ? String(v) : v.toFixed(1)) : "n/a";
-    html += `<h3 style="margin-top:16px">How long the real account holds a position, in trading days</h3>` + tiles([
+    html += `<h3 style="margin-top:16px">The real account's holding period, in trading days</h3>` + tiles([
       ["Median, closed", isNum(h.median) ? dd(h.median) + " days" : "n/a", `over ${esc(isNum(h.closed) ? h.closed : 0)} closed position${h.closed === 1 ? "" : "s"}`],
       ["Range, closed", isNum(h.min) && isNum(h.max) ? `${dd(h.min)}–${dd(h.max)} days` : "n/a", "shortest to longest"],
       ["Median, still open", isNum(h.open_median) ? dd(h.open_median) + " days" : "n/a", "days held so far"],
@@ -1016,7 +1030,7 @@ table.mini tr.over td{background:var(--warn-bg)}
         </dl>${sides ? `<p class="sides">${sides}</p>` : ""}</div>`;
     });
     return `<div class="card" style="margin-top:10px"><h3>Exploratory: does the order, the size or the entry day matter?</h3>`
-      + `<p class="small muted">The model fund's own signals, with one thing changed in each, set against the model fund day by day over the same days. The t is on the daily difference. Exploratory; cannot change the decision.</p>`
+      + `<p class="small muted">The model's signals with one thing changed, against the model fund day by day · ${doc("shadow-funds#three-exploratory-funds", "The three funds")}</p>`
       + `<div class="xfunds">${items.join("")}</div></div>`;
   }
 
@@ -1032,8 +1046,8 @@ table.mini tr.over td{background:var(--warn-bg)}
     if(!fundsVisible(data)){
       const passed = !!(data.calibration && data.calibration.status === "passed");
       el.innerHTML = passed
-        ? `<div class="card placeholder"><strong>Waiting for the funds' record</strong><p class="muted small">Calibration passed. The model, momentum, hybrid and VT funds run from their fixed start, 29 Sep 2026; no fund record has been written yet.</p></div>`
-        : `<div class="card placeholder"><strong>Hidden until calibration passes</strong><p class="muted small">The model, momentum, hybrid and VT funds, the three exploratory funds, and the coin-flip funds behind them, are neither calculated nor shown while the simulation is still being checked against the real account. When calibration passes, they are run from 29 Sep 2026.</p></div>`;
+        ? `<div class="card placeholder"><strong>Waiting for the funds' record</strong><p class="muted small">Calibration passed · the funds run from 29 Sep 2026 · ${doc("shadow-funds#the-funds", "The funds")}</p></div>`
+        : `<div class="card placeholder"><strong>Hidden until calibration passes</strong><p class="muted small">Run from 29 Sep 2026 once it does · ${doc("shadow-funds#calibration-first", "Why hidden")}</p></div>`;
       return [];
     }
     const f = data.funds;
@@ -1051,7 +1065,7 @@ table.mini tr.over td{background:var(--warn-bg)}
     const aria = `Equity of the four simulated funds from ${day(f.start || days[0], true)} to ${day(days[days.length-1], true)}. Total return: ${summary}.` + (b && lastBand >= 0 ? ` Shaded band: ${nf} coin-flip funds between the 5th and 95th percentile, ${money(b.p5[lastBand])} to ${money(b.p95[lastBand])} on the last day.` : "");
     const head = ["Day"].concat(list.map(x=>SHORT[x.name] || x.label || x.name)).concat(b ? ["Band 5th", "Band 95th"] : []);
     const table = days.map((d, i)=>`<tr><td>${esc(day(d, true))}</td>${list.map(x=>`<td>${esc(money((x.equity || [])[i]))}</td>`).join("")}${b ? `<td>${esc(money(b.p5[i]))}</td><td>${esc(money(b.p95[i]))}</td>` : ""}</tr>`).join("");
-    let html = `<div class="chart"><h3>Equity since ${esc(day(f.start || days[0], true))}</h3><div class="cap">Each fund's equity at every close. ${b ? `The shaded band is where the middle 90% of ${esc(nf)} coin-flip funds stood that day: the same journal lines, with a seeded coin flip in place of the signal.` : ""}</div>
+    let html = `<div class="chart"><h3>Equity since ${esc(day(f.start || days[0], true))}</h3><div class="cap">Equity at every close${b ? ` · band: the middle 90% of ${esc(nf)} coin-flip funds` : ""} ${doc("horse-race#the-coin-flip-a-thousand-times", "The coin flip")}</div>
       <ul class="legend">${legend}</ul>
       ${plotHost("Chart of the four funds")}
       <details class="data"><summary>The numbers by day</summary><div class="scroll"><table><thead><tr>${head.map(t=>`<th>${esc(t)}</th>`).join("")}</tr></thead><tbody>${table}</tbody></table></div></details></div>`;
@@ -1067,6 +1081,7 @@ table.mini tr.over td{background:var(--warn-bg)}
         <dt>Cash</dt><dd class="num">${esc(money(x.cash))}</dd>
         ${orderCell(x)}
       </dl>${sidesCell(x)}</article>`).join("")}</div>`;
+    html += `<div class="docs">${doc("shadow-funds#the-funds", "The four funds")} ${doc("horse-race#what-the-numbers-mean", "What the numbers mean")}</div>`;
     el.innerHTML = html;
     // VT is drawn first and the model last, so the fund the race is about
     // sits on top where the lines cross.
@@ -1104,7 +1119,7 @@ table.mini tr.over td{background:var(--warn-bg)}
         const over = m.over === true || (isNum(m.share) && m.share > limit);
         return `<tr${over ? ' class="over"' : ""}><td>${esc(m.month)}</td><td>${esc(n(m.sessions))}</td><td>${esc(n(m.missing))}</td><td>${esc(plain(m.share, 2))}${over ? ` <span class="chip bad">above ${esc(plain(limit, 0))}</span>` : ""}</td></tr>`;
       }).join("");
-      html += `<h4>Missing price bars, by month</h4><p class="small muted">Ticker-days with no price bar, over ${esc(n(gaps.tickers))} watchlist tickers and every session${gaps.from ? ` from ${esc(day(gaps.from, true))}` : ""}. On such a day every fund leaves that position as it was. Above ${esc(plain(limit, 0))} in a month, the daily health check warns the owner.</p>`
+      html += `<h4>Missing price bars, by month</h4><p class="small muted">Over ${esc(n(gaps.tickers))} watchlist tickers${gaps.from ? ` from ${esc(day(gaps.from, true))}` : ""} · limit ${esc(plain(limit, 0))} a month · ${doc("shadow-funds#the-day", "Price gaps")}</p>`
         + `<div class="scroll"><table class="mini"><thead><tr><th>Month</th><th>Sessions</th><th>Missing</th><th>Share</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     }
     if(days.length){
@@ -1112,7 +1127,7 @@ table.mini tr.over td{background:var(--warn-bg)}
       const li = (d)=> `<li>${esc(day(d.day, true))}: <b class="num">${esc(n(d.names))}</b> ${d.names === 1 ? "name" : "names"} held${isNum(d.of) ? ` of <span class="num">${esc(d.of)}</span>` : ""}</li>`;
       const recent = days.slice(-SHOW).reverse();
       const older = days.slice(0, -SHOW).reverse();
-      html += `<h4>Names the paper account held, by cycle day</h4><p class="small muted">The model is not asked about a name the paper account holds, so no fund can trade it that day. The same for every fund; counted every day.</p>`
+      html += `<h4>Names the paper account held, by cycle day</h4><p class="small muted">Names no fund could trade that day · ${doc("shadow-funds#the-day", "Held names")}</p>`
         + `<ul class="facts">${recent.map(li).join("")}</ul>`
         + (older.length ? `<details class="data"><summary>${esc(older.length)} earlier ${older.length === 1 ? "day" : "days"}</summary><ul class="facts">${older.map(li).join("")}</ul></details>` : "");
     }
@@ -1181,7 +1196,7 @@ table.mini tr.over td{background:var(--warn-bg)}
       + (kinds ? `<div class="kinds" aria-label="Skipped signals by what ran out">${kinds}</div>` : "")
       + (days.length ? `<details class="data"><summary>${days.length === 1 ? "The one day" : "The " + esc(days.length) + " days, most recent first"}</summary><ul class="odays">${days.join("")}</ul></details>` : "")
       + (lines.length ? `<ul class="lines">${lines.map(l=>`<li>${l}</li>`).join("")}</ul>` : "")
-      + `<p class="small muted">Report only: the buying order (watchlist order) is not changed.</p></div>`;
+      + `<p class="small muted">Report only; the order is not changed. ${doc("shadow-funds#how-often-the-buying-order-matters-report-only", "About this report")}</p></div>`;
   }
 
   // ------------------------------------------------------------------ render
@@ -1192,7 +1207,7 @@ table.mini tr.over td{background:var(--warn-bg)}
     charts = [];
     $("fresh").textContent = F.final_through
       ? `Record through ${day(F.final_through, true)} · written ${israel(F.generated_at)}${source.funds ? " · " + source.funds : ""}`
-      : "No funds record yet: the nightly run has not written one.";
+      : "No funds record yet.";
     safely("banners", ()=>{ $("banners").innerHTML = raceBanner(R, source.race) + fundTestBanner(F.fund_test, R); return []; });
     safely("problems", ()=>{ $("problems").innerHTML = problemsHtml(F); return []; });
     safely("race-reports", ()=>{ $("race-reports").innerHTML = raceReportsHtml(R); return []; });
@@ -1261,9 +1276,9 @@ table.mini tr.over td{background:var(--warn-bg)}
       const changed = results.some(r=>r.status === "fulfilled" && r.value);
       if(changed) render();
       const failed = results.map((r, i)=> r.status === "rejected" ? FILES[KINDS[i]].what + ": " + (r.reason && r.reason.message || "unknown") : null).filter(Boolean);
-      if(!failed.length) live("on. " + (changed ? "Read from GitHub" : "GitHub has the same records; checked") + " at " + clock() + " Israel time; checks again every 5 minutes.");
-      else if(navigator.onLine === false) live("offline; showing the last copies on this phone.");
-      else live((failed.length < KINDS.length ? "partly on. " : "") + failed.join("; ") + ". Showing the last copy of each; checked at " + clock() + " Israel time.");
+      if(!failed.length) live("on · " + (changed ? "read from GitHub " : "same records on GitHub · checked ") + clock() + " Israel time · next check in 5 min");
+      else if(navigator.onLine === false) live("offline · showing the copies on this phone");
+      else live((failed.length < KINDS.length ? "partly on · " : "") + failed.join("; ") + " · showing the last copy of each · checked " + clock() + " Israel time");
     } finally { refresh.disabled = false; }
   }
   pull("reading the records from GitHub");

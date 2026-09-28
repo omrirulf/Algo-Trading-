@@ -2,7 +2,9 @@
 <html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#8a5a1e">
+<meta name="theme-color" content="#8a5a1e" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#15171c" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
 <meta name="description" content="The paper-trading book: positions against their stops, the risk caps, today's cycle and the alarms. Rebuilt from the record after each cycle.">
 <title>Algo Trading Desk</title>
 <link rel="manifest" href="manifest.webmanifest">
@@ -11,23 +13,23 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
 :root{
-  --bg:#f5f4f0;--surface:#ffffff;--surface-2:#eeece6;--line:#d9d6cd;--ink:#1d1f24;--ink-2:#5b5f6b;--ink-3:#8a8e99;
+  --bg:#f5f4f0;--surface:#ffffff;--surface-2:#eeece6;--line:#d9d6cd;--ink:#1d1f24;--ink-2:#5b5f6b;--ink-3:#676b77;
   --accent:#8a5a1e;--accent-ink:#ffffff;
-  --good:#2f7d4f;--good-bg:#e3f1e8;--warn:#a26a00;--warn-bg:#f7edd3;--bad:#b3352b;--bad-bg:#f8e2df;
+  --good:#276f45;--good-bg:#e3f1e8;--warn:#8f5d00;--warn-bg:#f7edd3;--bad:#b3352b;--bad-bg:#f8e2df;
   --bar:#cfcbc0;--bar-fill:#8a5a1e;
   --sans:"Source Sans 3",system-ui,-apple-system,"Segoe UI",sans-serif;
   --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --bg:#15171c;--surface:#1d2027;--surface-2:#252932;--line:#343945;--ink:#ecebe6;--ink-2:#aab0bd;--ink-3:#7d8390;
+    --bg:#15171c;--surface:#1d2027;--surface-2:#252932;--line:#343945;--ink:#ecebe6;--ink-2:#aab0bd;--ink-3:#8b919e;
     --accent:#d9a45b;--accent-ink:#15171c;
     --good:#6fc48f;--good-bg:#1e3327;--warn:#e0b25a;--warn-bg:#3a2f15;--bad:#f08a7e;--bad-bg:#3d211e;
     --bar:#343945;--bar-fill:#d9a45b;
   }
 }
 :root[data-theme="dark"]{
-  --bg:#15171c;--surface:#1d2027;--surface-2:#252932;--line:#343945;--ink:#ecebe6;--ink-2:#aab0bd;--ink-3:#7d8390;
+  --bg:#15171c;--surface:#1d2027;--surface-2:#252932;--line:#343945;--ink:#ecebe6;--ink-2:#aab0bd;--ink-3:#8b919e;
   --accent:#d9a45b;--accent-ink:#15171c;
   --good:#6fc48f;--good-bg:#1e3327;--warn:#e0b25a;--warn-bg:#3a2f15;--bad:#f08a7e;--bad-bg:#3d211e;
   --bar:#343945;--bar-fill:#d9a45b;
@@ -41,12 +43,27 @@ h2{font-size:1.02rem;font-weight:700;text-transform:uppercase;letter-spacing:.06
 .muted{color:var(--ink-2)}.faint{color:var(--ink-3)}
 header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 16px;padding-block:6px 14px;border-bottom:1px solid var(--line)}
 #fresh{font-size:.9rem}
+.nav{font-size:.88rem;margin-bottom:2px}
+.nav a{display:inline-block;padding-block:8px;color:var(--accent);font-weight:600}
+.nav a[aria-current="page"]{color:var(--ink);font-weight:700;text-decoration:none}
 .stripe{display:flex;gap:10px;align-items:flex-start;border-radius:8px;padding:10px 12px;margin-top:14px;font-size:.95rem}
 .stripe.critical{background:var(--bad-bg);color:var(--bad)}
 .stripe.warning{background:var(--warn-bg);color:var(--warn)}
 .stripe.clean{background:var(--good-bg);color:var(--good)}
 .stripe strong{font-weight:700}
 .stripe .detail{color:inherit;opacity:.85;font-size:.88rem}
+.stripe details{font-size:.86rem;margin-top:2px}
+.stripe summary{cursor:pointer;font-weight:600;opacity:.85;padding-block:4px}
+/* A link to the docs page that explains a part: a small pill with the
+   arrow every link that leaves the app carries, and a hidden note for
+   screen readers. Tall enough to tap (WCAG 2.5.8: 24px), with room
+   between pills. */
+a.doc{display:inline-flex;align-items:center;gap:5px;min-height:28px;font-size:.8rem;font-weight:600;color:var(--accent);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:3px 11px;text-decoration:none;white-space:nowrap;vertical-align:middle}
+a.doc:hover{border-color:var(--accent)}
+a.doc svg,.nav a.ext svg{flex:none;margin-left:1px}
+.nav a.ext{display:inline-flex;align-items:center;gap:3px}
+.docs{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .stripe > div{min-width:0;overflow-wrap:anywhere}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:14px}
 .tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
@@ -85,8 +102,8 @@ header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-be
 .calls .why{width:100%;color:var(--ink-2);font-size:.86rem}
 .closed{font-size:.92rem;color:var(--ink-2)}
 footer{margin-top:36px;padding-top:12px;border-top:1px solid var(--line);font-size:.84rem;color:var(--ink-3);display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
-button{font:inherit;font-size:.88rem;font-weight:600;color:var(--accent-ink);background:var(--accent);border:0;border-radius:8px;padding:6px 12px;cursor:pointer}
-button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button{font:inherit;font-size:.88rem;font-weight:600;color:var(--accent-ink);background:var(--accent);border:0;border-radius:8px;padding:8px 16px;min-height:40px;cursor:pointer}
+button:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 button[disabled]{opacity:.55;cursor:default}
 #note{font-size:.84rem;color:var(--ink-3)}
 @media (max-width:560px){
@@ -99,7 +116,7 @@ button[disabled]{opacity:.55;cursor:default}
 
 <header>
   <div>
-    <nav aria-label="Pages" style="font-size:.88rem;margin-bottom:2px"><a href="index.html" aria-current="page" style="display:inline-block;padding-block:4px;color:var(--ink);font-weight:700;text-decoration:none">Desk</a> <span class="faint">|</span> <a href="funds.html" style="display:inline-block;padding-block:4px;color:var(--accent);font-weight:600">4 Funds</a></nav>
+    <nav class="nav" aria-label="Pages"><a href="index.html" aria-current="page">Desk</a> <span class="faint">|</span> <a href="funds.html">4 Funds</a> <span class="faint">|</span> <a class="ext" href="https://algotrade.mintlify.site/" target="_blank" rel="noopener">Docs<svg width="10" height="10" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 12 12 4M6 4h6v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="sr-only">(opens in a new tab)</span></a></nav>
     <h1>Algo Trading Desk</h1>
     <div id="fresh" class="muted">Loading the record…</div>
     <div id="live" class="faint" style="font-size:.84rem">Live updates: starting…</div>
@@ -127,7 +144,7 @@ button[disabled]{opacity:.55;cursor:default}
 <div class="closed" id="closed"></div>
 
 <footer>
-  <span id="note">Rebuilt from the journal and the audit log after each cycle. Marks are what the position manager saw on its last pass, not live quotes.</span>
+  <span id="note" class="docs"><a class="doc" href="https://algotrade.mintlify.site/phone#the-desk-as-an-app" target="_blank" rel="noopener">About this page<svg width="10" height="10" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 12 12 4M6 4h6v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="sr-only">(opens in a new tab)</span></a> <a class="doc" href="https://algotrade.mintlify.site/position-management#where-the-state-lives" target="_blank" rel="noopener">Where the numbers come from<svg width="10" height="10" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 12 12 4M6 4h6v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="sr-only">(opens in a new tab)</span></a> <a class="doc" href="https://algotrade.mintlify.site/cycle-report" target="_blank" rel="noopener">The daily report<svg width="10" height="10" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 12 12 4M6 4h6v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="sr-only">(opens in a new tab)</span></a></span>
   <button id="refresh" type="button">Refresh</button>
 </footer>
 
@@ -143,6 +160,10 @@ button[disabled]{opacity:.55;cursor:default}
   const israel = (iso)=>{ if(!iso) return "n/a"; const d=new Date(iso.endsWith("Z")||iso.includes("+")?iso:iso+"Z"); if(isNaN(d)) return iso; return d.toLocaleString("en-GB",{timeZone:"Asia/Jerusalem",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}) + " Israel time"; };
   const esc = (s)=> String(s??"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
   const heat = (share)=> share==null ? "" : share>=90 ? "hot" : share>=70 ? "warm" : "";
+  // The docs explain; the page shows. Each part links to its page.
+  const DOCS = "https://algotrade.mintlify.site/";
+  const DOC_ICON = `<svg width="10" height="10" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 12 12 4M6 4h6v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const doc = (path, label)=> `<a class="doc" href="${DOCS}${path}" target="_blank" rel="noopener">${label}${DOC_ICON}<span class="sr-only">(opens in a new tab)</span></a>`;
 
   function render(book, source){
     const e = book.exposure || {};
@@ -154,29 +175,29 @@ button[disabled]{opacity:.55;cursor:default}
     const alarms = book.alarms || [];
     const critical = alarms.filter(a=>a.severity==="critical").length;
     if(!alarms.length){
-      $("alarms").innerHTML = `<div class="stripe clean"><strong>Clean.</strong><span class="detail">Every position has a stop, every ticker was judged once, every mapped source answered.</span></div>`;
+      $("alarms").innerHTML = `<div class="stripe clean"><span>🟢</span><div><strong>Clean</strong> ${doc("naked-position-runbook#how-its-caught-automatically-now", "What is checked")}</div></div>`;
     } else {
-      $("alarms").innerHTML = alarms.map(a=>`<div class="stripe ${esc(a.severity)}"><span>${a.severity==="critical"?"🔴":"🟡"}</span><div><strong>${esc(a.title)}.</strong> <span class="detail">${esc(a.detail)}</span></div></div>`).join("");
+      $("alarms").innerHTML = alarms.map(a=>`<div class="stripe ${esc(a.severity)}"><span>${a.severity==="critical"?"🔴":"🟡"}</span><div><strong>${esc(a.title)}</strong> ${doc(a.severity==="critical" ? "naked-position-runbook#how-to-fix-it-by-hand" : "naked-position-runbook#how-its-caught-automatically-now", a.severity==="critical" ? "What to do" : "About this alarm")}${a.detail ? `<details><summary>Details</summary><span class="detail">${esc(a.detail)}</span></details>` : ""}</div></div>`).join("");
     }
 
     // tiles
     const tiles = [
-      ["Equity", book.equity ? money(book.equity) : "not yet recorded", book.equity_at ? "as of " + israel(book.equity_at) : "recorded from tomorrow's cycle on"],
-      ["Gross exposure", money(e.gross), e.caps && e.caps[0] && e.caps[0].share!=null ? pct(e.caps[0].share) + " of the whole-account cap" : `${e.positions} of ${e.max_positions} slots`],
-      ["At risk to the stops", money(e.at_risk), "if every stop fires at once"],
-      ["Unrealised", money2(e.unrealised), "positions with a mark only"],
+      ["Equity", book.equity ? money(book.equity) : "not yet", book.equity_at ? israel(book.equity_at) : ""],
+      ["Gross exposure", money(e.gross), e.caps && e.caps[0] && e.caps[0].share!=null ? pct(e.caps[0].share) + " of cap" : `${e.positions} of ${e.max_positions} slots`],
+      ["At risk to the stops", money(e.at_risk), ""],
+      ["Unrealised", money2(e.unrealised), ""],
     ];
-    $("tiles").innerHTML = tiles.map(([l,v,s])=>`<div class="tile"><div class="label">${l}</div><div class="value num${/^[^$−+\d]/.test(v)?" text":""}">${v}</div><div class="sub">${s}</div></div>`).join("");
+    $("tiles").innerHTML = tiles.map(([l,v,s])=>`<div class="tile"><div class="label">${l}</div><div class="value num${/^[^$−+\d]/.test(v)?" text":""}">${v}</div>${s ? `<div class="sub">${s}</div>` : ""}</div>`).join("");
 
     // positions
     const ps = book.positions || [];
-    $("positions").innerHTML = ps.length ? ps.map(p=>{
+    $("positions").innerHTML = (ps.length ? ps.map(p=>{
       const long = p.side==="buy";
       const ref = p.mark ?? p.entry_price;
       const dist = p.stop_distance_pct;
       const ladder = (book.ladder||[]);
-      const nextRung = ladder[p.rungs_taken] ? `next rung at +${ladder[p.rungs_taken].take_at_r}R` : "ladder complete";
-      const ahead = p.gain_r!=null ? `${p.gain_r>=0?"+":""}${p.gain_r.toFixed(2)}R` : "no mark yet";
+      const nextRung = ladder[p.rungs_taken] ? `next +${ladder[p.rungs_taken].take_at_r}R` : "ladder done";
+      const ahead = p.gain_r!=null ? `${p.gain_r>=0?"+":""}${p.gain_r.toFixed(2)}R` : "no mark";
       return `<div class="pos">
         <div class="name">${esc(p.ticker)}<small>${esc(p.name)} · ${esc(p.sleeve)}</small>
           <span class="chip ${long?"long":"short"}">${long?"long":"short"}</span>
@@ -185,14 +206,14 @@ button[disabled]{opacity:.55;cursor:default}
         </div>
         <div class="pnl num" style="color:${p.unrealised==null?"var(--ink-3)":p.unrealised>=0?"var(--good)":"var(--bad)"}">${p.unrealised==null?"no mark":money2(p.unrealised)}</div>
         <div class="row"><span>${p.quantity} sh · <b class="num">${money(p.market_value)}</b></span><span>entry <b class="num">${px(p.entry_price)}</b></span><span>mark <b class="num">${px(p.mark)}</b></span><span>stop <b class="num">${px(p.stop)}</b></span><span>risk <b class="num">${money(p.risk_to_stop)}</b></span><span>${ahead} · ${nextRung}</span></div>
-        <div class="stopbar"><div class="bar"><i style="width:${Math.max(4,Math.min(100, dist==null?0:100-Math.min(dist,10)*10))}%"></i></div><div class="cap"><span>stop ${dist==null?"n/a":dist.toFixed(1)+"% away"}</span><span>opened ${esc((p.opened||"").slice(0,10))} · last pass: ${esc(p.last_action||"none")} on ${esc(p.last_seen||"")}</span></div></div>
+        <div class="stopbar"><div class="bar"><i style="width:${Math.max(4,Math.min(100, dist==null?0:100-Math.min(dist,10)*10))}%"></i></div><div class="cap"><span>stop ${dist==null?"n/a":dist.toFixed(1)+"% away"}</span><span>opened ${esc((p.opened||"").slice(0,10))}${p.last_seen ? ` · ${esc(p.last_action||"seen")} ${esc(p.last_seen)}` : ""}</span></div></div>
       </div>`;
-    }).join("") : `<div class="muted">No open positions on record.</div>`;
+    }).join("") : `<div class="muted">No open positions on record.</div>`) + `<div class="docs">${doc("position-management#the-ladder", "The ladder")} ${doc("position-management#the-stop-trails-the-price", "The stop")}</div>`;
 
     // caps
-    const capRow = (c)=>`<div class="cap-row"><div class="lbl">${esc(c.label)} <span class="faint">cap ${Math.round(c.cap_pct*100)}%</span></div><div class="bar"><i class="${heat(c.share)}" style="width:${c.share==null?0:Math.min(100,c.share)}%"></i></div><div class="amt num">${money(c.used)}${c.cap!=null?` of ${money(c.cap)} · ${pct(c.share)}`:" · cap needs equity"}</div></div>`;
+    const capRow = (c)=>`<div class="cap-row"><div class="lbl">${esc(c.label)} <span class="faint">cap ${Math.round(c.cap_pct*100)}%</span></div><div class="bar"><i class="${heat(c.share)}" style="width:${c.share==null?0:Math.min(100,c.share)}%"></i></div><div class="amt num">${money(c.used)}${c.cap!=null?` of ${money(c.cap)} · ${pct(c.share)}`:" · no equity yet"}</div></div>`;
     $("caps").innerHTML = (e.caps||[]).map(capRow).join("");
-    $("groups").innerHTML = (e.groups||[]).map(capRow).join("") || `<div class="muted">Nothing held.</div>`;
+    $("groups").innerHTML = ((e.groups||[]).map(capRow).join("") || `<div class="muted">Nothing held.</div>`) + `<div class="docs">${doc("guardrails#the-gross-exposure-cap", "The caps")} ${doc("guardrails#four-position-caps-and-the-boundary-between-them", "The groups")}</div>`;
 
     // cycle
     const c = book.cycle || {};
@@ -207,12 +228,13 @@ button[disabled]{opacity:.55;cursor:default}
     const steps = [["On the watchlist", total], ["Already held", c.held||0], ["Screened out", c.screened_out||0], ["Judged in full", c.judged||0], ["Directional calls", (c.directional||[]).length], ["Trades placed", (c.accepted||[]).length]];
     if((c.failed||[]).length) steps.push(["Failed", c.failed.length]);
     $("funnel").innerHTML = steps.map(([l,n])=>`<div class="step"><span>${l}</span><div class="bar"><i class="${l==="Failed"?"hot":""}" style="width:${total?Math.max(1,n/total*100):0}%"></i></div><span class="n num">${n}</span></div>`).join("")
-      + `<div class="muted" style="font-size:.88rem;margin-top:4px">${c.day||""} · ran ${israel(c.started)} → ${c.finished?new Date(c.finished).toLocaleTimeString("en-GB",{timeZone:"Asia/Jerusalem",hour:"2-digit",minute:"2-digit"}):"n/a"} · model cost $${(c.cost_usd??0).toFixed(2)}${(c.failed||[]).length?` · failed: ${c.failed.join(", ")}`:""}${c.lines>c.tickers?` · ${c.lines-c.tickers} duplicate lines (a second cycle ran)`:""}</div>`;
+      + `<div class="muted" style="font-size:.88rem;margin-top:4px">${c.day||""} · ${israel(c.started)} → ${c.finished?new Date(c.finished).toLocaleTimeString("en-GB",{timeZone:"Asia/Jerusalem",hour:"2-digit",minute:"2-digit"}):"n/a"} · cost $${(c.cost_usd??0).toFixed(2)}${(c.failed||[]).length?` · failed: ${esc(c.failed.join(", "))}`:""}${c.lines>c.tickers?` · ${c.lines-c.tickers} duplicate lines`:""}</div>`
+      + `<div class="docs">${doc("decision-path", "The decision path")} ${doc("deployment#the-job-summary", "The run's summary")}</div>`;
     $("calls").innerHTML = (c.directional||[]).map(d=>`<li><b>${esc(d.ticker)}</b><span class="muted">${esc(d.name)}</span><span class="chip ${d.bias==="BULLISH"?"long":"short"}">${esc(d.bias)}</span><span class="num">conviction ${d.conviction!=null?d.conviction.toFixed(2):"n/a"}</span><span class="${d.status==="ACCEPTED"?"":"muted"}"><b>${d.status==="ACCEPTED"?"traded":"not traded"}</b></span><span class="why">${esc(d.reason||"")}</span></li>`).join("") || `<li class="muted">No directional call today.</li>`;
 
     // closed
     const cl = book.closed || [];
-    $("closed").innerHTML = cl.length ? cl.map(p=>`<div><b>${esc(p.ticker)}</b> ${esc(p.name)} · ${p.side==="buy"?"long":"short"} ${p.quantity} sh from ${px(p.entry_price)} · last seen ${esc(p.last_seen)} · ${esc(p.closed_reason)}</div>`).join("") : `<div class="muted">Nothing closed on record. A position the manager stops seeing appears here with the last day it was seen.</div>`;
+    $("closed").innerHTML = cl.length ? cl.map(p=>`<div><b>${esc(p.ticker)}</b> ${esc(p.name)} · ${p.side==="buy"?"long":"short"} ${p.quantity} sh from ${px(p.entry_price)} · last seen ${esc(p.last_seen)} · ${esc(p.closed_reason)}</div>`).join("") : `<div class="muted">Nothing closed on record.</div>`;
   }
 
   // The page opens on the newest copy it has -- the one saved on this phone,
@@ -244,10 +266,10 @@ button[disabled]{opacity:.55;cursor:default}
       const book = await r.json();
       if(!book || !book.day) throw new Error("not a snapshot");
       try { localStorage.setItem(SAVED, JSON.stringify(book)); } catch(_) {}
-      if(newer(book, shown)){ shown = null; show(book, "read from GitHub at " + clock()); live("on. Read from GitHub at " + clock() + " Israel time; checks again every 5 minutes."); }
-      else { live("on. GitHub has the same record (" + book.day + "); checked at " + clock() + " Israel time."); }
+      if(newer(book, shown)){ shown = null; show(book, "read from GitHub at " + clock()); live("on · read from GitHub " + clock() + " Israel time · next check in 5 min"); }
+      else { live("on · same record on GitHub (" + book.day + ") · checked " + clock() + " Israel time"); }
     } catch(e){
-      live((navigator.onLine === false ? "offline" : "GitHub did not answer (" + (e && e.message || "unknown") + ")") + "; showing the last copy from " + (shown && shown.day || "never") + ".");
+      live((navigator.onLine === false ? "offline" : "GitHub did not answer (" + (e && e.message || "unknown") + ")") + " · showing the copy from " + (shown && shown.day || "never"));
     } finally { refresh.disabled = false; }
   }
   pull("reading the record from GitHub");
