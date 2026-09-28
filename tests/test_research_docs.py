@@ -26,8 +26,8 @@ def test_the_graveyard_is_numbered_one_by_one_and_states_its_count():
     assert [int(r[0]) for r in rows] == list(range(1, len(rows) + 1))
     text = (RESEARCH / "graveyard.md").read_text()
     assert f"**N = {len(rows)}**" in text
-    # 18 ideas when section 13 was registered, then the 15 history screens of 2026-09-27 and 28.
-    assert len(rows) == 33
+    # 18 ideas when section 13 was registered, then the 16 history screens of 2026-09-27 and 28.
+    assert len(rows) == 34
 
 
 def test_the_checkpoints_read_n_from_every_numbered_row_history_screens_included():
@@ -35,7 +35,7 @@ def test_the_checkpoints_read_n_from_every_numbered_row_history_screens_included
 
     assert graveyard_n() == len(trials())
     history = [r for r in trials() if r[2].startswith("history screen")]
-    assert [int(r[0]) for r in history] == list(range(19, 34))
+    assert [int(r[0]) for r in history] == list(range(19, 35))
 
 
 def test_no_row_is_left_with_a_placeholder_and_every_real_code_screen_links_its_report():

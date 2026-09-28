@@ -9,7 +9,7 @@ checkpoint (pre-registration, section 13.6; `analysis/multiple_tests.py`
 counts them). A new idea gets its row (and its card in `cards/`) before it
 runs, and a history screen gets its row before it runs.
 
-**N = 33** (2026-09-28: 18 ideas and 15 history screens).
+**N = 34** (2026-09-28: 18 ideas and 16 history screens).
 
 | Trial | Idea | Kind | Status | Dates | Why it is here / what happened | Card |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -40,39 +40,40 @@ every other trial. One row for each rule and set of names tested; a screen
 re-run because its code had a bug is the same row, and a screen run with any
 setting changed is a new row.
 
-Rows 19 to 28 are the owner's quick tests: the owner's own code, not the
-registered code, run outside this repository before 2026-09-27. Their exact
-dates and settings are not recorded here. Rows 19 to 22 used 38 ETFs from
-2000 to 2026 with a 2 x ATR stop assumed; rows 23, 24 and 28 used SPY or VT.
-If row 20's 1, 2 and 3 months were separate settings, each is a row of its
-own, and N grows by two.
+Rows 19 to 29 are the owner's quick tests: the owner's own code, not the
+registered code, run outside this repository by 2026-09-27. Their exact
+settings are not recorded here. Rows 19 to 23 used 38 ETFs from 2000 to 2026
+with a 2 x ATR stop assumed; rows 24, 25 and 29 used SPY or VT. The momentum
+test had three settings, held 3, 21 and 63 sessions, so it is three rows
+(the owner's decision of 2026-09-28).
 
-Rows 21 to 24 tested ideas that became A, B and C (pre-registration section
-13, registered 2026-09-28). That registration says it was made before any
-result of A, B or C existed, meaning their live results. Whether these quick
-tests on history came before or after the owner fixed A, B and C's settings
-on 2026-09-27 is not recorded here.
+Rows 22 to 25 tested ideas that became A, B and C (pre-registration section
+13, registered 2026-09-28). The owner ran them on 2026-09-27, after A, B and
+C's settings were fixed and before section 13 was committed; no setting was
+changed after seeing them, and no live result of A, B or C existed (the
+owner's note under section 13, added 2026-09-28).
 
-Rows 29 to 33 are the first screen with the real code (`history/`), of the
+Rows 30 to 34 are the first screen with the real code (`history/`), of the
 rules already running live. It changes nothing in the locked test.
 
 | Trial | Idea | Kind | Status | Dates | Why it is here / what happened | Card |
 | --- | --- | --- | --- | --- | --- | --- |
-| 19 | Momentum (the 63-day rule), 3-session trades, on 38 ETFs | history screen (the owner's quick test) | no edge on history | before 2026-09-27 | No better than a coin flip. | |
-| 20 | Momentum held 1 to 3 months, on 38 ETFs | history screen (the owner's quick test) | no edge since 2010 | before 2026-09-27 | Worked in 2000-2009. Since 2010 its buys trailed holding all the ETFs, and its shorts lost about 3.7% per 3-month short. | |
-| 21 | A: momentum with a 200-day average veto, on 38 ETFs | history screen (the owner's quick test) | no clear difference | before 2026-09-27 | The veto removed only about 4% of signals, with no clear difference. | |
-| 22 | C: pullback limit entry, on 38 ETFs | history screen (the owner's quick test) | prediction as expected | before 2026-09-27 | Filled 63% of signals; missed signals did better than filled ones (+1.0% against -1.0%). Partly built in: a fill means the price fell first. | |
-| 23 | The 10-month average on SPY (B's rule) | history screen (the owner's quick test) | smaller crashes, lower return | before 2026-09-27 | Smaller crashes, but 3-4% a year less return since 2007 (with row 24). | |
-| 24 | The 10-month average on VT (B's rule) | history screen (the owner's quick test) | smaller crashes, lower return | before 2026-09-27 | Smaller crashes, but 3-4% a year less return since 2007 (with row 23). | |
-| 25 | Rotation among sectors | history screen (the owner's quick test) | failed | before 2026-09-27 | Failed its history screen. Recorded as dropped in `backlog.md` (it was never in the Waiting table). | |
-| 26 | Rotation among countries | history screen (the owner's quick test) | failed | before 2026-09-27 | Failed its history screen. Recorded as dropped in `backlog.md` (it was never in the Waiting table). | |
-| 27 | Turn-of-the-month | history screen (the owner's quick test) | failed | before 2026-09-27 | Failed its history screen. Recorded as dropped in `backlog.md` (it was never in the Waiting table). | |
-| 28 | Volatility targeting on SPY | history screen (the owner's quick test) | tested, not taken further | before 2026-09-27 | Tested on history by the owner; its result is not written down in this repository. | |
-| 29 | Momentum (the locked rule), race and fund, 80 names | history screen (real code) | no edge at 3 sessions; fund behind VT | 2026-09-28 | Race: no clear difference from a coin flip (minus a coin flip -0.002% a day, t -0.07; from 2010 t -0.51); behind always long on the same lines from 2010 (t -2.3). Fund: -3.5% a year 2000-2026, behind the VT fund from 2010 (t -3.0); positions held about 11 days, costs 4.8% a year. | [report](history/2026-09-rules-running-live/report.md) |
-| 30 | A: momentum with the 200-day veto, race and fund, 80 names | history screen (real code) | almost momentum; a small plus | 2026-09-28 | Vetoed 5.7% of momentum's signals (under 10%: A is almost momentum). A minus momentum: race +0.007% a day (t +1.7; from 2010 t +3.0, one slice of many); fund +0.004% a day (t +1.6). Behind the VT fund like momentum. | [report](history/2026-09-rules-running-live/report.md) |
-| 31 | B: 10-month timing on VT (the registered rule) | history screen (real code) | behind VT; no crash in its data | 2026-09-28 | Holds from 2009-04 (VT's prices start 2008-06): 6.5% a year against 11.3% for the VT fund, worst fall 27.6% against 29.1%; B minus VT fund -0.019% a day (t -2.0). From 2010: 3.5% a year less. | [report](history/2026-09-rules-running-live/report.md) |
-| 32 | B's rule on SPY (the same code; a check of row 23) | history screen (real code) | smaller crash, lower return | 2026-09-28 | From 2007-06: 7.8% a year against 9.0% for the SPY fund, worst fall 25.3% against 49.6%; from 2010: 4.1% a year less (t -1.9). Same code as B; a check of row 23, not the registered rule. | [report](history/2026-09-rules-running-live/report.md) |
-| 33 | C: pullback limit entry, fund, 80 names | history screen (real code) | no clear difference from momentum | 2026-09-28 | Fill rate 61.2%; missed signals +0.88% against filled -0.93% per race trade (built in: a fill means the price fell first). C fund minus momentum fund +0.003% a day (t +0.7); most limits that were reached could not be bought, because the book was full. | [report](history/2026-09-rules-running-live/report.md) |
+| 19 | Momentum (the 63-day rule) held 3 sessions, on 38 ETFs | history screen (the owner's quick test) | no edge on history | by 2026-09-27 | No better than a coin flip. |  |
+| 20 | Momentum (the 63-day rule) held 21 sessions (1 month), on 38 ETFs | history screen (the owner's quick test) | no edge since 2010 | by 2026-09-27 | Worked in 2000-2009. Since 2010 its buys trailed holding all the ETFs. |  |
+| 21 | Momentum (the 63-day rule) held 63 sessions (3 months), on 38 ETFs | history screen (the owner's quick test) | no edge since 2010 | by 2026-09-27 | Worked in 2000-2009. Since 2010 its buys trailed holding all the ETFs, and its shorts lost about 3.7% per 3-month short. |  |
+| 22 | A: momentum with a 200-day average veto, on 38 ETFs | history screen (the owner's quick test) | no clear difference | 2026-09-27 | The veto removed only about 4% of signals, with no clear difference. |  |
+| 23 | C: pullback limit entry, on 38 ETFs | history screen (the owner's quick test) | prediction as expected | 2026-09-27 | Filled 63% of signals; missed signals did better than filled ones (+1.0% against -1.0%). Partly built in: a fill means the price fell first. |  |
+| 24 | The 10-month average on SPY (B's rule) | history screen (the owner's quick test) | smaller crashes, lower return | 2026-09-27 | Smaller crashes, but 3-4% a year less return since 2007 (with row 25). |  |
+| 25 | The 10-month average on VT (B's rule) | history screen (the owner's quick test) | smaller crashes, lower return | 2026-09-27 | Smaller crashes, but 3-4% a year less return since 2007 (with row 24). |  |
+| 26 | Rotation among sectors | history screen (the owner's quick test) | failed | by 2026-09-27 | Failed its history screen. Recorded as dropped in `backlog.md` (it was never in the Waiting table). |  |
+| 27 | Rotation among countries | history screen (the owner's quick test) | failed | by 2026-09-27 | Failed its history screen. Recorded as dropped in `backlog.md` (it was never in the Waiting table). |  |
+| 28 | Turn-of-the-month | history screen (the owner's quick test) | failed | by 2026-09-27 | Failed its history screen. Recorded as dropped in `backlog.md` (it was never in the Waiting table). |  |
+| 29 | Volatility targeting on SPY | history screen (the owner's quick test) | tested, not taken further | by 2026-09-27 | Tested on history by the owner; its result is not written down in this repository. |  |
+| 30 | Momentum (the locked rule), race and fund, 80 names | history screen (real code) | no edge at 3 sessions; fund behind VT | 2026-09-28 | Race: no clear difference from a coin flip (minus a coin flip -0.002% a day, t -0.07; from 2010 t -0.51); behind always long on the same lines from 2010 (t -2.3). Fund: -3.5% a year 2000-2026, behind the VT fund from 2010 (t -3.0); positions held about 11 days, costs 4.8% a year. | [report](history/2026-09-rules-running-live/report.md) |
+| 31 | A: momentum with the 200-day veto, race and fund, 80 names | history screen (real code) | almost momentum; a small plus | 2026-09-28 | Vetoed 5.7% of momentum's signals (under 10%: A is almost momentum). A minus momentum: race +0.007% a day (t +1.7; from 2010 t +3.0, one slice of many); fund +0.004% a day (t +1.6). Behind the VT fund like momentum. | [report](history/2026-09-rules-running-live/report.md) |
+| 32 | B: 10-month timing on VT (the registered rule) | history screen (real code) | behind VT; no crash in its data | 2026-09-28 | Holds from 2009-04 (VT's prices start 2008-06): 6.5% a year against 11.3% for the VT fund, worst fall 27.6% against 29.1%; B minus VT fund -0.019% a day (t -2.0). From 2010: 3.5% a year less. | [report](history/2026-09-rules-running-live/report.md) |
+| 33 | B's rule on SPY (the same code; a check of row 24) | history screen (real code) | smaller crash, lower return | 2026-09-28 | From 2007-06: 7.8% a year against 9.0% for the SPY fund, worst fall 25.3% against 49.6%; from 2010: 4.1% a year less (t -1.9). Same code as B; a check of row 23, not the registered rule. | [report](history/2026-09-rules-running-live/report.md) |
+| 34 | C: pullback limit entry, fund, 80 names | history screen (real code) | no clear difference from momentum | 2026-09-28 | Fill rate 61.2%; missed signals +0.88% against filled -0.93% per race trade (built in: a fill means the price fell first). C fund minus momentum fund +0.003% a day (t +0.7); most limits that were reached could not be bought, because the book was full. | [report](history/2026-09-rules-running-live/report.md) |
 
 ## Not counted, and why
 

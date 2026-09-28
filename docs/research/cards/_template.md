@@ -16,7 +16,7 @@ Copy this file for a new idea. Every field is filled before the idea runs live, 
 
 **Main metric:** …
 
-**Survives its history screen if:** written before the screen runs; the comparator, the metric, the years (after the source) and the bar. Default, when nothing else is written: it beats its comparator on its main metric, after costs, over the years after its source, with a Newey-West t above 2. For an idea that uses the AI: 'no history screen (uses the AI)'.
+**Survives its history screen if:** written before the screen runs; the comparator, the metric, the years (after the source) and the bar. Default, when nothing else is written: it beats its comparator on its main metric, after costs, over the years after its source, with a Newey-West t above 2 (approved by the owner, 2026-09-28). For an idea that uses the AI: 'no history screen (uses the AI)'.
 
 **History screen:** the result of the idea's registered history screen, with the link to its report in `docs/research/history/` and its graveyard row; or 'not possible (uses the AI)'. An idea that needs no AI is proposed for a live slot only after it survives its screen (`backlog.md`, "History first, live second"). Cards written before 2026-09-27 have neither of these two fields, because nothing is changed after a card is written.
 

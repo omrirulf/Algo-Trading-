@@ -24,7 +24,8 @@ screen it survived (below).
    slot.** What "survives" means is written on the card before the screen
    runs (its "Survives its history screen if" field). When the card says
    nothing else: it beats its comparator on its main metric, after costs,
-   over the years after its source, with a Newey-West t above 2.
+   over the years after its source, with a Newey-West t above 2 (approved by
+   the owner, 2026-09-28).
 3. **An idea that uses the AI skips the history screen** (it is not
    possible: the AI has read about the past, so the past cannot test it) and
    goes straight to the live queue. Its card says "History screen: not
@@ -69,13 +70,14 @@ Not to be proposed again without a new reason, written down here first.
 
 | Dropped | Idea | Why | Graveyard |
 | --- | --- | --- | --- |
-| 2026-09-27 | Rotation among sectors | Failed its history screen (the owner's quick test). | trial 25 |
-| 2026-09-27 | Rotation among countries | Failed its history screen (the owner's quick test). | trial 26 |
-| 2026-09-27 | Turn-of-the-month | Failed its history screen (the owner's quick test). | trial 27 |
+| 2026-09-27 | Rotation among sectors | Failed its history screen (the owner's quick test). | trial 26 |
+| 2026-09-27 | Rotation among countries | Failed its history screen (the owner's quick test). | trial 27 |
+| 2026-09-27 | Turn-of-the-month | Failed its history screen (the owner's quick test). | trial 28 |
 
 ## Monthly updates
 
 | Month | What changed |
 | --- | --- |
 | 2026-09 | Started, with A, B and C registered (section 13) and the graveyard at N = 18. |
-| 2026-09 | 27 Sep: the history-first process added. Every history test so far logged in the graveyard (N = 33). Rotation (sectors, countries) and turn-of-the-month dropped: both failed their history screen. They were never in the Waiting table, so they are recorded under "Dropped after a history screen". |
+| 2026-09 | 27 Sep: the history-first process added. Every history test so far logged in the graveyard (N = 34). Rotation (sectors, countries) and turn-of-the-month dropped: both failed their history screen. They were never in the Waiting table, so they are recorded under "Dropped after a history screen". |
+| 2026-09 | 28 Sep: the owner's decisions. The momentum quick test counts as three rows (held 3, 21 and 63 sessions), so N = 34; the quick tests of momentum, A and C stay counted; the survival rule above is approved; the owner's note on when the quick tests of A, B and C were run is under pre-registration section 13. |
