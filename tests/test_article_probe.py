@@ -108,7 +108,54 @@ class FakeHttp:
 
     def get(self, url, headers):
         self.gets.append((url, headers))
+        if url == news.BRIGHTDATA_REQUEST_URL.replace("request", "datasets/list"):
+            return FakeResponse(200, payload=[])   # an empty scraper library
         return self.polls.pop(0)
+
+
+class RoutedHttp(FakeHttp):
+    """Answers Bright Data's API by URL, longest prefix first; the Unlocker as FakeHttp does.
+
+    Each route's answers are handed out in order, and the last one repeats.
+    """
+
+    def __init__(self, routes, pages=None):
+        super().__init__(pages=pages or {})
+        self.routes = {key: list(answers) for key, answers in routes.items()}
+
+    def _answer(self, method, url):
+        for (verb, prefix), answers in sorted(self.routes.items(), key=lambda kv: -len(kv[0][1])):
+            if verb == method and url.startswith(prefix):
+                return answers.pop(0) if len(answers) > 1 else answers[0]
+        raise AssertionError(f"unexpected {method} {url}")
+
+    def post(self, url, body, headers):
+        if url == news.BRIGHTDATA_REQUEST_URL:
+            return super().post(url, body, headers)
+        self.posts.append((url, body, headers))
+        return self._answer("POST", url)
+
+    def get(self, url, headers):
+        self.gets.append((url, headers))
+        return self._answer("GET", url)
+
+
+API = ap.BRIGHTDATA_API
+CREATE = API + "dca/collector"
+AUTOMATE = API + "dca/collectors/c_1/automate_template"
+PROGRESS = AUTOMATE + "/progress"
+
+
+def build_routes(create=None, automate=None, progress=None, **extra):
+    routes = {
+        ("POST", CREATE): create or [FakeResponse(200, payload={"id": "c_1", "name": "article-probe yahoo"})],
+        ("POST", AUTOMATE): automate or [FakeResponse(200, payload={})],
+        ("GET", PROGRESS): progress or [FakeResponse(200, payload={"status": "running", "step": "writing"}),
+                                        FakeResponse(200, payload={"status": "done",
+                                                                   "completed_steps": ["plan", "code", "test"]})],
+    }
+    routes.update(extra.get("more") or {})
+    return routes
 
 
 def plain_text(page: str, url: str) -> tuple[str, str, str]:
@@ -446,6 +493,99 @@ def test_the_same_story_from_both_sources_reads_as_the_same_text():
     assert ap.contained("too short", NOVO_TEXT) is None
 
 
+@pytest.mark.parametrize("status, payload, text, pending", [
+    (202, {"status": "running"}, "", True),
+    (500, None, "oops", True),
+    (404, None, "not yet", True),
+    (200, None, "", True),
+    (200, None, "null", True),
+    (200, {"pending": True}, "", True),
+    (200, {"status": "building"}, "", True),
+    (200, {"status": "done"}, "", False),
+    (200, {"url": YAHOO_1, "body": "text"}, "", False),
+])
+def test_not_ready_yet_is_read_the_way_bright_data_s_cli_reads_it(status, payload, text, pending):
+    assert ap._pending(status, payload, text) is pending
+
+
+# --------------------------------------------------------------------------- #
+# Building the scraper through Scraper Studio's API
+# --------------------------------------------------------------------------- #
+
+
+def test_scraper_studio_s_ai_builds_the_scraper_with_the_cli_s_own_calls():
+    http = RoutedHttp(build_routes())
+    build = ap.build_scraper(http, "tok", "finance.yahoo.com", [YAHOO_1, YAHOO_2], **fast())
+    assert build.status == "done" and build.collector_id == "c_1" and not build.error
+    assert build.steps == ["plan", "code", "test"]
+    assert build.trigger == API + "dca/trigger?collector=c_1"
+    (create_url, create_body, headers), (automate_url, automate_body, _) = http.posts
+    assert create_url == CREATE and create_body["deliver"] == ap.SCRAPER_DELIVERY and create_body["name"]
+    assert headers["Authorization"] == "Bearer tok"
+    assert automate_url == AUTOMATE
+    assert automate_body == {"description": ap.SCRAPER_DESCRIPTION, "urls": [YAHOO_1, YAHOO_2]}
+    assert [url for url, _ in http.gets] == [PROGRESS, PROGRESS]
+    assert all(url.startswith(API) for url, *_ in http.posts + http.gets)
+
+
+def test_the_ai_s_parallel_build_cap_is_waited_out_not_fatal():
+    waits: list = []
+    ticks = iter(range(0, 10_000, 5))
+    http = RoutedHttp(build_routes(automate=[FakeResponse(429, text="cannot run more than 3 jobs in parallel"),
+                                             FakeResponse(200, payload={})]))
+    build = ap.build_scraper(http, "tok", "finance.yahoo.com", [YAHOO_1],
+                             sleep=waits.append, clock=lambda: next(ticks))
+    assert build.status == "done"
+    assert waits[0] == ap.SCRAPER_BUILD_RETRY_BASE_SECONDS
+    assert any("HTTP 429" in line for line in build.log)
+
+
+@pytest.mark.parametrize("status, message", [
+    ("failed", "ended with status 'failed'"),
+    ("pending_answer", "waiting for an answer in Scraper Studio's web UI"),
+])
+def test_a_build_that_fails_or_waits_for_a_person_says_so_and_runs_nothing(status, message):
+    http = RoutedHttp(build_routes(progress=[FakeResponse(200, payload={"status": status})]))
+    build = ap.build_scraper(http, "tok", "finance.yahoo.com", [YAHOO_1], **fast())
+    assert message in build.error and build.trigger == ""
+
+
+def test_a_build_that_never_finishes_stops_at_its_deadline():
+    http = RoutedHttp(build_routes(progress=[FakeResponse(200, payload={"status": "running", "step": "testing"})]))
+    build = ap.build_scraper(http, "tok", "finance.yahoo.com", [YAHOO_1], **fast(deadline=60))
+    assert "not done after 60s" in build.error and "running at step testing" in build.error
+    assert build.trigger == ""
+
+
+def test_a_refused_create_leaves_no_collector_behind_to_run():
+    http = RoutedHttp(build_routes(create=[FakeResponse(401, text="invalid token")]))
+    build = ap.build_scraper(http, "tok", "finance.yahoo.com", [YAHOO_1], **fast())
+    assert "creating the collector failed: HTTP 401 invalid token" in build.error
+    assert not build.collector_id and build.trigger == "" and len(http.posts) == 1
+
+
+@pytest.mark.parametrize("site, brand", [
+    ("finance.yahoo.com", "yahoo"), ("uk.finance.yahoo.com", "yahoo"),
+    ("www.stocktwits.com", "stocktwits"), ("localhost", "localhost"),
+])
+def test_a_site_s_brand_is_the_name_a_library_scraper_would_carry(site, brand):
+    assert ap.brand_of(site) == brand
+
+
+def test_the_library_is_searched_for_scrapers_named_for_the_site():
+    library = [{"id": "gd_lmrpz3vxmz972ghd7", "name": "Yahoo Finance business information"},
+               {"id": "gd_lyptx9h74wtlvpnfu", "name": "Reuters news"}]
+    http = RoutedHttp({("GET", API + "datasets/list"): [FakeResponse(200, payload=library)]})
+    found, seen, error = ap.library_matches(http, "tok", "finance.yahoo.com")
+    assert found == [library[0]] and seen == 2 and not error
+
+
+def test_a_library_that_cannot_be_listed_is_reported_not_fatal():
+    http = RoutedHttp({("GET", API + "datasets/list"): [FakeResponse(404, text="not found")]})
+    found, seen, error = ap.library_matches(http, "tok", "finance.yahoo.com")
+    assert found == [] and seen == 0 and "HTTP 404" in error
+
+
 # --------------------------------------------------------------------------- #
 # The prompts
 # --------------------------------------------------------------------------- #
@@ -487,6 +627,23 @@ def test_the_named_only_prompt_gives_text_to_the_stories_about_the_company_and_n
     assert list(every) == ["headlines", "unlocker"]
 
 
+def test_the_scraper_fills_the_pages_the_unlocker_could_not_read():
+    entry = entries(journal_line())[0]
+
+    def lede(text):
+        return ap.Lede(text=text, words=len(text.split()), boilerplate_words=0, article_words=9)
+
+    pages = [ap.Page(index=0, source="Yahoo", url=YAHOO_1, kind=ap.ARTICLE, error="HTTP 502"),
+             ap.Page(index=1, source="Stocktwits", url=STOCKTWITS, kind=ap.ARTICLE, lede=lede("valero words"))]
+    scraped = [ap.Scraped(index=0, url=YAHOO_1, lede=lede("yahoo words from the scraper"))]
+    variants = ap.build_variants(entry.context, pages, scraped)
+    # No result was read by both, so there is no like-for-like pair -- only the fill.
+    assert list(variants) == ["headlines", "unlocker", "unlocker+scraper"]
+    combined = variants["unlocker+scraper"].as_prompt()
+    assert "valero words" in combined and "yahoo words from the scraper" in combined
+    assert "yahoo words" not in variants["unlocker"].as_prompt()
+
+
 def test_an_html_error_page_becomes_one_readable_line():
     gateway = "<html>\n<head><title>502 Bad Gateway</title></head>\n<body><center>nginx</center></body></html>"
     assert ap.brief(gateway) == "502 Bad Gateway nginx"
@@ -506,7 +663,8 @@ def test_the_two_site_prompts_differ_only_in_where_the_words_came_from():
     scraped = [ap.Scraped(index=0, url=YAHOO_1, lede=lede("scraper words zero")),
                ap.Scraped(index=2, url=YAHOO_2, lede=lede("only the scraper read this"))]
     variants = ap.build_variants(entry.context, pages, scraped)
-    assert list(variants) == ["headlines", "unlocker", "unlocker-site", "scraper-site"]
+    # The scraper also read page 2, which the Unlocker could not: that is the fill.
+    assert list(variants) == ["headlines", "unlocker", "unlocker+scraper", "unlocker-site", "scraper-site"]
     site_u = variants["unlocker-site"].as_prompt()
     site_s = variants["scraper-site"].as_prompt()
     # Only the result both sources read is in either; the Stocktwits page is not a site page.
@@ -631,6 +789,70 @@ def test_a_run_without_a_scraper_says_so():
     assert "not asked: no scraper trigger URL" in ap.render(probe)
 
 
+YAHOO_RECORDS = [
+    {"url": YAHOO_1, "title": "Novo buyback", "body": NOVO_TEXT},
+    {"url": YAHOO_2, "body": "Novo Nordisk faces a patent cliff.\nIts pipeline is thin."},
+]
+
+
+def test_a_run_that_builds_its_scraper_runs_it_on_the_same_pages():
+    http = RoutedHttp(build_routes(more={
+        ("GET", API + "datasets/list"): [FakeResponse(200, payload=[])],
+        ("POST", API + "dca/trigger?collector=c_1"): [FakeResponse(200, payload={"collection_id": "j_1"})],
+        ("GET", API + "dca/dataset?id=j_1"): [FakeResponse(200, payload={"status": "building"}),
+                                              FakeResponse(200, payload=YAHOO_RECORDS)],
+    }), pages=UNLOCKER_PAGES)
+    probe = ap.run(
+        entries(journal_line())[0], site="finance.yahoo.com", words=300, repeats=1, http=http,
+        token="tok", zone="z", extract=plain_text, complete=fake_complete(), build=True,
+        fetch_workers=1, model_workers=1, scraper_kwargs=fast(), build_kwargs=fast(),
+    )
+    assert probe.build.trigger == API + "dca/trigger?collector=c_1"
+    assert probe.scraper.trigger == probe.build.trigger and not probe.scraper.error
+    assert [s.index for s in probe.scraped] == [0, 2]
+    assert all(s.in_unlocker == 1.0 for s in probe.scraped)
+    assert "scraper-site" in probe.variants
+    # The scraper was asked for the site's two article links, and only those.
+    trigger_body = next(body for url, body, _ in http.posts if url.startswith(API + "dca/trigger"))
+    assert trigger_body == [{"url": YAHOO_1}, {"url": YAHOO_2}]
+    report = ap.render(probe)
+    assert "built by Scraper Studio's AI: c_1" in report
+    assert "reuse it: scraper_trigger=" + API + "dca/trigger?collector=c_1" in report
+    assert "library: none of 0 ready-made scrapers is named for 'yahoo'" in report
+    record = json.loads(json.dumps(ap.as_json(probe)))
+    assert record["build"]["collector_id"] == "c_1" and record["library"]["scrapers_seen"] == 0
+
+
+def test_a_scraper_that_exists_is_reused_never_rebuilt():
+    trigger = API + "dca/trigger?collector=c_9"
+    http = RoutedHttp({
+        ("GET", API + "datasets/list"): [FakeResponse(200, payload=[])],
+        ("POST", trigger): [FakeResponse(200, payload=YAHOO_RECORDS)],
+    }, pages=UNLOCKER_PAGES)
+    probe = ap.run(
+        entries(journal_line())[0], site="finance.yahoo.com", words=300, repeats=1, http=http,
+        token="tok", zone="z", extract=plain_text, build=True, scraper_trigger=trigger,
+        fetch_workers=1, scraper_kwargs=fast(),
+    )
+    assert probe.build is None
+    assert not any(url == CREATE for url, *_ in http.posts)
+    assert len(probe.scraped) == 2 and not probe.scraper.error
+
+
+def test_a_failed_build_is_reported_and_the_rest_of_the_probe_still_runs():
+    http = RoutedHttp(build_routes(create=[FakeResponse(403, text="forbidden")], more={
+        ("GET", API + "datasets/list"): [FakeResponse(200, payload=[])],
+    }), pages=UNLOCKER_PAGES)
+    probe = ap.run(
+        entries(journal_line())[0], site="finance.yahoo.com", words=300, repeats=1, http=http,
+        token="tok", zone="z", extract=plain_text, complete=fake_complete(), build=True,
+        fetch_workers=1, model_workers=1, build_kwargs=fast(),
+    )
+    assert probe.scraper is None and "HTTP 403" in probe.build.error
+    assert "unlocker" in probe.variants and probe.calls
+    assert "build error: creating the collector failed: HTTP 403 forbidden" in ap.render(probe)
+
+
 # --------------------------------------------------------------------------- #
 # The command line
 # --------------------------------------------------------------------------- #
@@ -707,6 +929,18 @@ def test_inputs_reach_the_script_as_variables_never_as_shell_text():
     assert '--scraper-trigger "$SCRAPER_TRIGGER"' in run
 
 
+def test_a_scraper_is_built_only_when_someone_asks_for_one():
+    """A build leaves a collector in the Bright Data account that no API can
+    delete, so it never happens on a pull-request run or by default."""
+    wf = _workflow()
+    triggers = wf.get("on") or wf[True]
+    build = triggers["workflow_dispatch"]["inputs"]["build_scraper"]
+    assert build["type"] == "boolean" and build["default"] is False
+    step = _probe_step()
+    assert step["env"]["BUILD_SCRAPER"] == "${{ inputs.build_scraper }}"
+    assert '[ "$BUILD_SCRAPER" = "true" ] && args+=(--build-scraper)' in step["run"]
+
+
 def test_the_extractor_is_installed_for_the_probe_and_nowhere_else():
     runs = " ".join(s.get("run", "") for s in _workflow()["jobs"]["probe"]["steps"])
     assert "trafilatura==" in runs
@@ -724,11 +958,13 @@ def test_the_probe_can_outlast_every_wait_it_may_meet():
     """Derived from the constants, so raising one without the clock fails here."""
     pages = news.MAX_HEADLINES
     fetching = math.ceil(pages / ap.FETCH_WORKERS) * 2 * ap.UNLOCKER_TIMEOUT_SECONDS
+    # The build's retries sleep inside its own deadline; its last request can run past it.
+    building = ap.SCRAPER_BUILD_DEADLINE_SECONDS + 2 * ap.UNLOCKER_TIMEOUT_SECONDS
     scraping = ap.UNLOCKER_TIMEOUT_SECONDS + ap.SCRAPER_DEADLINE_SECONDS + ap.UNLOCKER_TIMEOUT_SECONDS
     calls = len(ap.VARIANTS) * ap.DEFAULT_REPEATS
     asking = math.ceil(calls / ap.MODEL_WORKERS) * (
         llm.FULL_MODEL_TIMEOUT_SECONDS + llm.TRANSPORT_RETRY_TIMEOUT_SECONDS)
-    minutes = (fetching + scraping + asking) / 60
+    minutes = (fetching + building + scraping + asking) / 60
     assert _workflow()["jobs"]["probe"]["timeout-minutes"] >= minutes + 5, f"needs ~{minutes:.0f} min"
 
 
