@@ -108,7 +108,54 @@ class FakeHttp:
 
     def get(self, url, headers):
         self.gets.append((url, headers))
+        if url == news.BRIGHTDATA_REQUEST_URL.replace("request", "datasets/list"):
+            return FakeResponse(200, payload=[])   # an empty scraper library
         return self.polls.pop(0)
+
+
+class RoutedHttp(FakeHttp):
+    """Answers Bright Data's API by URL, longest prefix first; the Unlocker as FakeHttp does.
+
+    Each route's answers are handed out in order, and the last one repeats.
+    """
+
+    def __init__(self, routes, pages=None):
+        super().__init__(pages=pages or {})
+        self.routes = {key: list(answers) for key, answers in routes.items()}
+
+    def _answer(self, method, url):
+        for (verb, prefix), answers in sorted(self.routes.items(), key=lambda kv: -len(kv[0][1])):
+            if verb == method and url.startswith(prefix):
+                return answers.pop(0) if len(answers) > 1 else answers[0]
+        raise AssertionError(f"unexpected {method} {url}")
+
+    def post(self, url, body, headers):
+        if url == news.BRIGHTDATA_REQUEST_URL:
+            return super().post(url, body, headers)
+        self.posts.append((url, body, headers))
+        return self._answer("POST", url)
+
+    def get(self, url, headers):
+        self.gets.append((url, headers))
+        return self._answer("GET", url)
+
+
+API = ap.BRIGHTDATA_API
+CREATE = API + "dca/collector"
+AUTOMATE = API + "dca/collectors/c_1/automate_template"
+PROGRESS = AUTOMATE + "/progress"
+
+
+def build_routes(create=None, automate=None, progress=None, **extra):
+    routes = {
+        ("POST", CREATE): create or [FakeResponse(200, payload={"id": "c_1", "name": "article-probe yahoo"})],
+        ("POST", AUTOMATE): automate or [FakeResponse(200, payload={})],
+        ("GET", PROGRESS): progress or [FakeResponse(200, payload={"status": "running", "step": "writing"}),
+                                        FakeResponse(200, payload={"status": "done",
+                                                                   "completed_steps": ["plan", "code", "test"]})],
+    }
+    routes.update(extra.get("more") or {})
+    return routes
 
 
 def plain_text(page: str, url: str) -> tuple[str, str, str]:
@@ -384,6 +431,62 @@ def test_a_realtime_collector_answers_with_one_record():
     assert run.records == [record]
 
 
+REALTIME = API + "dca/trigger_immediate?collector=c_1"
+
+
+def test_the_realtime_trigger_gets_one_page_per_request_as_the_cli_sends_it():
+    one, two = {"url": YAHOO_1, "body": NOVO_TEXT}, {"url": YAHOO_2, "body": "Novo faces a cliff."}
+    http = RoutedHttp({
+        ("POST", REALTIME): [FakeResponse(200, payload={"response_id": "z_1"}),
+                             FakeResponse(200, payload={"response_id": "z_2"})],
+        ("GET", API + "dca/get_result?response_id=z_1"): [FakeResponse(200, payload=[one])],
+        ("GET", API + "dca/get_result?response_id=z_2"): [FakeResponse(202, text=""),
+                                                          FakeResponse(200, payload=two)],
+    })
+    run = ap.run_scraper(http, "tok", REALTIME, [YAHOO_1, YAHOO_2], **fast())
+    assert [body for _, body, _ in http.posts] == [{"url": YAHOO_1}, {"url": YAHOO_2}]
+    assert run.records == [one, two] and not run.error
+    assert not any("/dca/log/" in url for url, _ in http.gets)
+
+
+def test_one_realtime_page_failing_does_not_lose_the_others():
+    two = {"url": YAHOO_2, "body": "Novo faces a cliff."}
+    http = RoutedHttp({
+        ("POST", REALTIME): [FakeResponse(500, text="worker crashed"),
+                             FakeResponse(200, payload={"response_id": "z_2"})],
+        ("GET", API + "dca/get_result?response_id=z_2"): [FakeResponse(200, payload=[two])],
+    })
+    run = ap.run_scraper(http, "tok", REALTIME, [YAHOO_1, YAHOO_2], **fast())
+    assert run.records == [two]
+    assert run.error == f"{YAHOO_1}: trigger refused: HTTP 500 worker crashed"
+
+
+def test_a_batch_job_that_brings_back_nothing_has_its_log_read():
+    """The Yahoo scraper built from a Yahoo page returned no record for it, and
+    no error either: the job log says whether the pages failed or were read."""
+    trigger = API + "dca/trigger?collector=c_1"
+    http = RoutedHttp({
+        ("POST", trigger): [FakeResponse(200, payload={"collection_id": "j_1"})],
+        ("GET", API + "dca/dataset?id=j_1"): [FakeResponse(200, payload={"status": "building"}),
+                                              FakeResponse(200, payload=[])],
+        ("GET", API + "dca/log/j_1"): [FakeResponse(200, payload={
+            "Id": "j_1", "Status": "done", "Inputs": 2, "Lines": 0, "Fails": 2, "Success_rate": 0})],
+    })
+    run = ap.run_scraper(http, "tok", trigger, [YAHOO_1, YAHOO_2], **fast())
+    assert run.records == [] and not run.error
+    assert run.log[-1] == "job log: done, 2 input(s), 0 record(s), 2 failed, success rate 0"
+
+
+def test_a_batch_job_with_articles_needs_no_log():
+    trigger = API + "dca/trigger?collector=c_1"
+    http = RoutedHttp({
+        ("POST", trigger): [FakeResponse(200, payload={"collection_id": "j_1"})],
+        ("GET", API + "dca/dataset?id=j_1"): [FakeResponse(200, payload=[{"url": YAHOO_1, "body": NOVO_TEXT}])],
+    })
+    run = ap.run_scraper(http, "tok", trigger, [YAHOO_1], **fast())
+    assert len(run.records) == 1 and [url for url, _ in http.gets] == [API + "dca/dataset?id=j_1"]
+
+
 def test_newline_delimited_records_are_read_too():
     lines = "\n".join(json.dumps({"url": u, "body": "text"}) for u in (YAHOO_1, YAHOO_2))
     http = FakeHttp(trigger=FakeResponse(200, text=lines))
@@ -446,6 +549,182 @@ def test_the_same_story_from_both_sources_reads_as_the_same_text():
     assert ap.contained("too short", NOVO_TEXT) is None
 
 
+@pytest.mark.parametrize("status, payload, text, pending", [
+    (202, {"status": "running"}, "", True),
+    (500, None, "oops", True),
+    (404, None, "not yet", True),
+    (200, None, "", True),
+    (200, None, "null", True),
+    (200, {"pending": True}, "", True),
+    (200, {"status": "building"}, "", True),
+    (200, {"status": "done"}, "", False),
+    (200, {"url": YAHOO_1, "body": "text"}, "", False),
+])
+def test_not_ready_yet_is_read_the_way_bright_data_s_cli_reads_it(status, payload, text, pending):
+    assert ap._pending(status, payload, text) is pending
+
+
+# --------------------------------------------------------------------------- #
+# Building the scraper through Scraper Studio's API
+# --------------------------------------------------------------------------- #
+
+
+def test_scraper_studio_s_ai_builds_the_scraper_with_the_cli_s_own_calls():
+    http = RoutedHttp(build_routes())
+    build = ap.build_scraper(http, "tok", "finance.yahoo.com", [YAHOO_1, YAHOO_2], **fast())
+    assert build.status == "done" and build.collector_id == "c_1" and not build.error
+    assert build.steps == ["plan", "code", "test"]
+    assert build.trigger == API + "dca/trigger?collector=c_1"
+    (create_url, create_body, headers), (automate_url, automate_body, _) = http.posts
+    assert create_url == CREATE and create_body["deliver"] == ap.SCRAPER_DELIVERY and create_body["name"]
+    assert headers["Authorization"] == "Bearer tok"
+    assert automate_url == AUTOMATE
+    assert automate_body == {"description": ap.SCRAPER_DESCRIPTION, "urls": [YAHOO_1, YAHOO_2]}
+    assert [url for url, _ in http.gets] == [PROGRESS, PROGRESS]
+    assert all(url.startswith(API) for url, *_ in http.posts + http.gets)
+
+
+def test_the_ai_s_parallel_build_cap_is_waited_out_not_fatal():
+    waits: list = []
+    ticks = iter(range(0, 10_000, 5))
+    http = RoutedHttp(build_routes(automate=[FakeResponse(429, text="cannot run more than 3 jobs in parallel"),
+                                             FakeResponse(200, payload={})]))
+    build = ap.build_scraper(http, "tok", "finance.yahoo.com", [YAHOO_1],
+                             sleep=waits.append, clock=lambda: next(ticks))
+    assert build.status == "done"
+    assert waits[0] == ap.SCRAPER_BUILD_RETRY_BASE_SECONDS
+    assert any("HTTP 429" in line for line in build.log)
+
+
+@pytest.mark.parametrize("status, message", [
+    ("failed", "ended with status 'failed'"),
+    ("pending_answer", "waiting for an answer in Scraper Studio's web UI"),
+])
+def test_a_build_that_fails_or_waits_for_a_person_says_so_and_runs_nothing(status, message):
+    http = RoutedHttp(build_routes(progress=[FakeResponse(200, payload={"status": status})]))
+    build = ap.build_scraper(http, "tok", "finance.yahoo.com", [YAHOO_1], **fast())
+    assert message in build.error and build.trigger == ""
+
+
+def test_a_build_that_never_finishes_stops_at_its_deadline():
+    http = RoutedHttp(build_routes(progress=[FakeResponse(200, payload={"status": "running", "step": "testing"})]))
+    build = ap.build_scraper(http, "tok", "finance.yahoo.com", [YAHOO_1], **fast(deadline=60))
+    assert "not done after 60s" in build.error and "running at step testing" in build.error
+    assert build.trigger == ""
+
+
+def test_a_refused_create_leaves_no_collector_behind_to_run():
+    http = RoutedHttp(build_routes(create=[FakeResponse(401, text="invalid token")]))
+    build = ap.build_scraper(http, "tok", "finance.yahoo.com", [YAHOO_1], **fast())
+    assert "creating the collector failed: HTTP 401 invalid token" in build.error
+    assert not build.collector_id and build.trigger == "" and len(http.posts) == 1
+
+
+def test_a_server_error_that_repeats_itself_is_an_answer_not_a_hiccup():
+    """The first real build was told "Invalid ide automation" five times over
+    seven minutes; the second time it is said, the build stops and says so."""
+    waits: list = []
+    ticks = iter(range(0, 10_000, 5))
+    refused = FakeResponse(500, text="Invalid ide automation", headers={"x-brd-error": "automation refused"})
+    http = RoutedHttp(build_routes(automate=[refused]))
+    build = ap.build_scraper(http, "tok", "finance.yahoo.com", [YAHOO_1],
+                             sleep=waits.append, clock=lambda: next(ticks))
+    assert sum(1 for url, *_ in http.posts if url == AUTOMATE) == 2
+    assert waits == [ap.SCRAPER_BUILD_RETRY_BASE_SECONDS]
+    assert build.error == "starting the AI build failed: HTTP 500 Invalid ide automation [automation refused]"
+    assert build.trigger == "" and not http.gets
+
+
+def test_a_server_error_that_changes_is_still_waited_out():
+    waits: list = []
+    ticks = iter(range(0, 10_000, 5))
+    http = RoutedHttp(build_routes(automate=[FakeResponse(502, text="Bad Gateway"),
+                                             FakeResponse(503, text="Service Unavailable"),
+                                             FakeResponse(200, payload={})]))
+    build = ap.build_scraper(http, "tok", "finance.yahoo.com", [YAHOO_1],
+                             sleep=waits.append, clock=lambda: next(ticks))
+    assert build.status == "done" and len(waits) >= 2
+
+
+def test_a_failed_build_says_where_and_why_when_the_api_does():
+    http = RoutedHttp(build_routes(progress=[FakeResponse(200, payload={
+        "status": "failed", "step": "preview_picker", "error": "page did not load"})]))
+    build = ap.build_scraper(http, "tok", "finance.yahoo.com", [YAHOO_1], **fast())
+    assert build.error == "the AI build ended with status 'failed' at step preview_picker: page did not load"
+
+
+COLLECTOR_7 = API + "dca/collectors/c_7/automate_template"
+
+
+def test_a_collector_left_behind_is_built_on_not_joined_by_another():
+    http = RoutedHttp({
+        ("GET", COLLECTOR_7 + "/progress"): [FakeResponse(404, text="no automation job"),
+                                             FakeResponse(200, payload={"status": "running"}),
+                                             FakeResponse(200, payload={"status": "done", "completed_steps": ["a"]})],
+        ("POST", COLLECTOR_7): [FakeResponse(200, payload={})],
+    })
+    build = ap.build_scraper(http, "tok", "finance.yahoo.com", [YAHOO_1], collector="c_7", **fast())
+    assert not any(url == CREATE for url, *_ in http.posts)
+    assert http.posts[0][:2] == (COLLECTOR_7, {"description": ap.SCRAPER_DESCRIPTION, "urls": [YAHOO_1]})
+    assert build.status == "done" and build.trigger == API + "dca/trigger?collector=c_7"
+    assert build.log[0] == "collector c_7 reused; its last build: HTTP 404 no automation job"
+
+
+def test_a_collector_already_built_is_used_as_it_is():
+    http = RoutedHttp({("GET", COLLECTOR_7 + "/progress"): [
+        FakeResponse(200, payload={"status": "done", "completed_steps": ["a", "b"]})]})
+    build = ap.build_scraper(http, "tok", "finance.yahoo.com", [YAHOO_1], collector="c_7", **fast())
+    assert not http.posts and build.steps == ["a", "b"]
+    assert build.trigger == API + "dca/trigger?collector=c_7"
+
+
+def test_only_a_collector_id_is_ever_put_in_a_url():
+    http = RoutedHttp({})
+    build = ap.build_scraper(http, "tok", "finance.yahoo.com", [YAHOO_1], collector="c_7/../../x", **fast())
+    assert "is not a collector id" in build.error and not http.posts and not http.gets
+
+
+def test_the_ai_builds_from_a_page_the_unlocker_could_read():
+    read = ap.Page(index=2, source="Yahoo", url=YAHOO_2, kind=ap.ARTICLE,
+                   lede=ap.Lede("words", 1, 0, 1))
+    refused = ap.Page(index=0, source="Yahoo", url=YAHOO_1, kind=ap.ARTICLE, error="HTTP 502")
+    assert ap.examples([refused, read], [0, 2]) == [YAHOO_2]
+    assert ap.examples([refused], [0]) == [YAHOO_1]
+    assert ap.examples([refused, read], [0]) == [YAHOO_1]
+
+
+def test_bright_data_s_own_words_for_a_failure_are_kept():
+    response = FakeResponse(502, text="<html>502 Bad Gateway</html>",
+                            headers={"x-luminati-error": "Target site blocked", "x-brd-err-code": "target_40001"})
+    assert ap.brd_reason(response) == "Target site blocked; target_40001"
+    assert ap.brd_reason(FakeResponse(502, text="Bad Gateway")) == ""
+    http = FakeHttp()
+    http.post = lambda url, body, headers: response
+    assert ap._unlock(http, "tok", "z", YAHOO_1)[2] == "HTTP 502 Target site blocked; target_40001"
+
+
+@pytest.mark.parametrize("site, brand", [
+    ("finance.yahoo.com", "yahoo"), ("uk.finance.yahoo.com", "yahoo"),
+    ("www.stocktwits.com", "stocktwits"), ("localhost", "localhost"),
+])
+def test_a_site_s_brand_is_the_name_a_library_scraper_would_carry(site, brand):
+    assert ap.brand_of(site) == brand
+
+
+def test_the_library_is_searched_for_scrapers_named_for_the_site():
+    library = [{"id": "gd_lmrpz3vxmz972ghd7", "name": "Yahoo Finance business information"},
+               {"id": "gd_lyptx9h74wtlvpnfu", "name": "Reuters news"}]
+    http = RoutedHttp({("GET", API + "datasets/list"): [FakeResponse(200, payload=library)]})
+    found, seen, error = ap.library_matches(http, "tok", "finance.yahoo.com")
+    assert found == [library[0]] and seen == 2 and not error
+
+
+def test_a_library_that_cannot_be_listed_is_reported_not_fatal():
+    http = RoutedHttp({("GET", API + "datasets/list"): [FakeResponse(404, text="not found")]})
+    found, seen, error = ap.library_matches(http, "tok", "finance.yahoo.com")
+    assert found == [] and seen == 0 and "HTTP 404" in error
+
+
 # --------------------------------------------------------------------------- #
 # The prompts
 # --------------------------------------------------------------------------- #
@@ -487,6 +766,23 @@ def test_the_named_only_prompt_gives_text_to_the_stories_about_the_company_and_n
     assert list(every) == ["headlines", "unlocker"]
 
 
+def test_the_scraper_fills_the_pages_the_unlocker_could_not_read():
+    entry = entries(journal_line())[0]
+
+    def lede(text):
+        return ap.Lede(text=text, words=len(text.split()), boilerplate_words=0, article_words=9)
+
+    pages = [ap.Page(index=0, source="Yahoo", url=YAHOO_1, kind=ap.ARTICLE, error="HTTP 502"),
+             ap.Page(index=1, source="Stocktwits", url=STOCKTWITS, kind=ap.ARTICLE, lede=lede("valero words"))]
+    scraped = [ap.Scraped(index=0, url=YAHOO_1, lede=lede("yahoo words from the scraper"))]
+    variants = ap.build_variants(entry.context, pages, scraped)
+    # No result was read by both, so there is no like-for-like pair -- only the fill.
+    assert list(variants) == ["headlines", "unlocker", "unlocker+scraper"]
+    combined = variants["unlocker+scraper"].as_prompt()
+    assert "valero words" in combined and "yahoo words from the scraper" in combined
+    assert "yahoo words" not in variants["unlocker"].as_prompt()
+
+
 def test_an_html_error_page_becomes_one_readable_line():
     gateway = "<html>\n<head><title>502 Bad Gateway</title></head>\n<body><center>nginx</center></body></html>"
     assert ap.brief(gateway) == "502 Bad Gateway nginx"
@@ -506,7 +802,8 @@ def test_the_two_site_prompts_differ_only_in_where_the_words_came_from():
     scraped = [ap.Scraped(index=0, url=YAHOO_1, lede=lede("scraper words zero")),
                ap.Scraped(index=2, url=YAHOO_2, lede=lede("only the scraper read this"))]
     variants = ap.build_variants(entry.context, pages, scraped)
-    assert list(variants) == ["headlines", "unlocker", "unlocker-site", "scraper-site"]
+    # The scraper also read page 2, which the Unlocker could not: that is the fill.
+    assert list(variants) == ["headlines", "unlocker", "unlocker+scraper", "unlocker-site", "scraper-site"]
     site_u = variants["unlocker-site"].as_prompt()
     site_s = variants["scraper-site"].as_prompt()
     # Only the result both sources read is in either; the Stocktwits page is not a site page.
@@ -631,6 +928,73 @@ def test_a_run_without_a_scraper_says_so():
     assert "not asked: no scraper trigger URL" in ap.render(probe)
 
 
+YAHOO_RECORDS = [
+    {"url": YAHOO_1, "title": "Novo buyback", "body": NOVO_TEXT},
+    {"url": YAHOO_2, "body": "Novo Nordisk faces a patent cliff.\nIts pipeline is thin."},
+]
+
+
+def test_a_run_that_builds_its_scraper_runs_it_on_the_same_pages():
+    http = RoutedHttp(build_routes(more={
+        ("GET", API + "datasets/list"): [FakeResponse(200, payload=[])],
+        ("POST", API + "dca/trigger?collector=c_1"): [FakeResponse(200, payload={"collection_id": "j_1"})],
+        ("GET", API + "dca/dataset?id=j_1"): [FakeResponse(200, payload={"status": "building"}),
+                                              FakeResponse(200, payload=YAHOO_RECORDS)],
+    }), pages=UNLOCKER_PAGES)
+    probe = ap.run(
+        entries(journal_line())[0], site="finance.yahoo.com", words=300, repeats=1, http=http,
+        token="tok", zone="z", extract=plain_text, complete=fake_complete(), build=True,
+        fetch_workers=1, model_workers=1, scraper_kwargs=fast(), build_kwargs=fast(),
+    )
+    assert probe.build.trigger == API + "dca/trigger?collector=c_1"
+    assert probe.scraper.trigger == probe.build.trigger and not probe.scraper.error
+    assert [s.index for s in probe.scraped] == [0, 2]
+    assert all(s.in_unlocker == 1.0 for s in probe.scraped)
+    assert "scraper-site" in probe.variants
+    # The AI built it from one of the site's pages, as the CLI does; the
+    # scraper was then asked for both of the site's article links, and only those.
+    automate_body = next(body for url, body, _ in http.posts if url == AUTOMATE)
+    assert automate_body["urls"] == [YAHOO_1]
+    trigger_body = next(body for url, body, _ in http.posts if url.startswith(API + "dca/trigger"))
+    assert trigger_body == [{"url": YAHOO_1}, {"url": YAHOO_2}]
+    report = ap.render(probe)
+    assert "built by Scraper Studio's AI: c_1" in report
+    assert "reuse it: scraper_trigger=" + API + "dca/trigger?collector=c_1" in report
+    assert "library: none of 0 ready-made scrapers is named for 'yahoo'" in report
+    record = json.loads(json.dumps(ap.as_json(probe)))
+    assert record["build"]["collector_id"] == "c_1" and record["library"]["scrapers_seen"] == 0
+
+
+def test_a_scraper_that_exists_is_reused_never_rebuilt():
+    trigger = API + "dca/trigger?collector=c_9"
+    http = RoutedHttp({
+        ("GET", API + "datasets/list"): [FakeResponse(200, payload=[])],
+        ("POST", trigger): [FakeResponse(200, payload=YAHOO_RECORDS)],
+    }, pages=UNLOCKER_PAGES)
+    probe = ap.run(
+        entries(journal_line())[0], site="finance.yahoo.com", words=300, repeats=1, http=http,
+        token="tok", zone="z", extract=plain_text, build=True, scraper_trigger=trigger,
+        fetch_workers=1, scraper_kwargs=fast(),
+    )
+    assert probe.build is None
+    assert not any(url == CREATE for url, *_ in http.posts)
+    assert len(probe.scraped) == 2 and not probe.scraper.error
+
+
+def test_a_failed_build_is_reported_and_the_rest_of_the_probe_still_runs():
+    http = RoutedHttp(build_routes(create=[FakeResponse(403, text="forbidden")], more={
+        ("GET", API + "datasets/list"): [FakeResponse(200, payload=[])],
+    }), pages=UNLOCKER_PAGES)
+    probe = ap.run(
+        entries(journal_line())[0], site="finance.yahoo.com", words=300, repeats=1, http=http,
+        token="tok", zone="z", extract=plain_text, complete=fake_complete(), build=True,
+        fetch_workers=1, model_workers=1, build_kwargs=fast(),
+    )
+    assert probe.scraper is None and "HTTP 403" in probe.build.error
+    assert "unlocker" in probe.variants and probe.calls
+    assert "build error: creating the collector failed: HTTP 403 forbidden" in ap.render(probe)
+
+
 # --------------------------------------------------------------------------- #
 # The command line
 # --------------------------------------------------------------------------- #
@@ -658,6 +1022,25 @@ def test_no_line_that_fits_is_a_clear_failure(tmp_path, capsys):
     journal.write_text(journal_line("IWM") + "\n")
     assert ap.main(["--journal", str(journal), "--dry-run"]) == 1
     assert "no single-stock line fits" in capsys.readouterr().out
+
+
+def test_naming_a_collector_is_asking_for_a_build_on_it(tmp_path, monkeypatch):
+    journal = tmp_path / "journal.log"
+    journal.write_text(journal_line() + "\n")
+    monkeypatch.setattr(news, "resolve_token", lambda *a: "tok")
+    monkeypatch.setattr(news, "resolve_zone", lambda *a: "z")
+    seen: dict = {}
+
+    def fake_run(entry, **kwargs):
+        seen.update(kwargs)
+        return ap.Probe(entry=entry, site=kwargs["site"], words=kwargs["words"], repeats=kwargs["repeats"])
+
+    monkeypatch.setattr(ap, "run", fake_run)
+    ap.main(["--journal", str(journal), "--no-model", "--collector", " c_7 "])
+    assert seen["build"] is True and seen["collector"] == "c_7"
+    seen.clear()
+    ap.main(["--journal", str(journal), "--no-model"])
+    assert seen["build"] is False and seen["collector"] == ""
 
 
 # --------------------------------------------------------------------------- #
@@ -707,6 +1090,21 @@ def test_inputs_reach_the_script_as_variables_never_as_shell_text():
     assert '--scraper-trigger "$SCRAPER_TRIGGER"' in run
 
 
+def test_a_scraper_is_built_only_when_someone_asks_for_one():
+    """A build leaves a collector in the Bright Data account that no documented
+    API deletes, so it never happens on a pull-request run or by default."""
+    wf = _workflow()
+    triggers = wf.get("on") or wf[True]
+    inputs = triggers["workflow_dispatch"]["inputs"]
+    assert inputs["build_scraper"]["type"] == "boolean" and inputs["build_scraper"]["default"] is False
+    assert inputs["scraper_collector"]["default"] == ""
+    step = _probe_step()
+    assert step["env"]["BUILD_SCRAPER"] == "${{ inputs.build_scraper }}"
+    assert step["env"]["SCRAPER_COLLECTOR"] == "${{ inputs.scraper_collector }}"
+    assert '[ "$BUILD_SCRAPER" = "true" ] && args+=(--build-scraper)' in step["run"]
+    assert '[ -n "$SCRAPER_COLLECTOR" ] && args+=(--collector "$SCRAPER_COLLECTOR")' in step["run"]
+
+
 def test_the_extractor_is_installed_for_the_probe_and_nowhere_else():
     runs = " ".join(s.get("run", "") for s in _workflow()["jobs"]["probe"]["steps"])
     assert "trafilatura==" in runs
@@ -724,11 +1122,14 @@ def test_the_probe_can_outlast_every_wait_it_may_meet():
     """Derived from the constants, so raising one without the clock fails here."""
     pages = news.MAX_HEADLINES
     fetching = math.ceil(pages / ap.FETCH_WORKERS) * 2 * ap.UNLOCKER_TIMEOUT_SECONDS
-    scraping = ap.UNLOCKER_TIMEOUT_SECONDS + ap.SCRAPER_DEADLINE_SECONDS + ap.UNLOCKER_TIMEOUT_SECONDS
+    # The build's retries sleep inside its own deadline; its last request can run past it.
+    building = ap.SCRAPER_BUILD_DEADLINE_SECONDS + 2 * ap.UNLOCKER_TIMEOUT_SECONDS
+    # Trigger, deadline, the poll that ran past it, and the job log read when nothing came back.
+    scraping = ap.SCRAPER_DEADLINE_SECONDS + 3 * ap.UNLOCKER_TIMEOUT_SECONDS
     calls = len(ap.VARIANTS) * ap.DEFAULT_REPEATS
     asking = math.ceil(calls / ap.MODEL_WORKERS) * (
         llm.FULL_MODEL_TIMEOUT_SECONDS + llm.TRANSPORT_RETRY_TIMEOUT_SECONDS)
-    minutes = (fetching + scraping + asking) / 60
+    minutes = (fetching + building + scraping + asking) / 60
     assert _workflow()["jobs"]["probe"]["timeout-minutes"] >= minutes + 5, f"needs ~{minutes:.0f} min"
 
 

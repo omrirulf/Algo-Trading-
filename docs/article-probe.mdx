@@ -12,7 +12,9 @@ rather than the page around it, and what the model then says and spends.
 python replay/article_probe.py --dry-run                     # which line, which pages; no network
 python replay/article_probe.py --no-model                    # fetch and measure only
 python replay/article_probe.py --ticker NVO --day 2026-09-28
-python replay/article_probe.py --scraper-trigger 'https://api.brightdata.com/...'
+python replay/article_probe.py --build-scraper               # Scraper Studio's AI builds the site's scraper
+python replay/article_probe.py --collector c_...              # build on (or use) a collector that exists
+python replay/article_probe.py --scraper-trigger 'https://api.brightdata.com/dca/trigger?collector=c_...'
 ```
 
 It runs by hand (**Actions → article probe**) and, like the
@@ -25,30 +27,63 @@ holds no broker key.
 | Source | How | Covers |
 | --- | --- | --- |
 | Web Unlocker | the zone the news fetch already uses, then one generic extractor (trafilatura) cuts the story out of the page | every site, one code path |
-| Scraper Studio | the scraper's API trigger URL, from the Bright Data dashboard | the one site it was built for |
+| Scraper Studio | a scraper its AI builds through the API (`--build-scraper`, or `--collector` to build on one that exists), or an existing one by its trigger URL | the one site it was built for |
 
 Both are cut to the same number of words (`--words`, default 300) before the
 model sees them, so a difference between the two is a difference in *which*
 words, not in how many. Quote pages, symbol pages, filings and videos are
 skipped without a request; Google's `/goto` redirect stubs are followed once.
 
-## Adding the Scraper Studio side
+## The Scraper Studio side
 
-1. In Scraper Studio, build a scraper for the site the probe picks a line for
-   (`finance.yahoo.com` by default). If the site is already in Bright Data's
-   scraper library, Scraper Studio says so.
-2. Have it return, per article URL: `url`, `title`, `published_at` and
-   `body`, the article text only. Any field name works, since the probe takes
-   `body` if there is one and the longest text otherwise, but `body` avoids
-   the guess.
-3. Copy the API trigger URL the dashboard shows (the URL, **not** the token)
-   into the workflow's `scraper_trigger` input, or into the repository
-   variable `BRIGHTDATA_SCRAPER_TRIGGER`. The probe sends the Bright Data token
-   only to `https://api.brightdata.com/`, and refuses any other trigger URL.
+Nobody has to open the dashboard. Dispatch the workflow with `build_scraper`
+on, and the probe has Scraper Studio's AI build a scraper for the site from one
+of the line's own article links, with the same three API calls Bright Data's
+CLI makes for `bdata scraper create`:
 
-Both of Bright Data's job APIs are understood: a `snapshot_id` is collected
-from the datasets API, a `collection_id` or `response_id` from the collector
-API, and a list is taken as the records themselves.
+1. `POST /dca/collector` creates an empty collector;
+2. `POST /dca/collectors/{id}/automate_template` asks the AI to build it from
+   one example page and a description of the fields wanted (`url`, `title`,
+   `published_at`, `author`, and `body`, the article's own text), waiting out
+   the AI's parallel-build cap (HTTP 429) the way the CLI does;
+3. `GET /dca/collectors/{id}/automate_template/progress` until it is done,
+   within 15 minutes.
+
+The example page is one the Unlocker could read, when one could: a page that
+loads is one the AI can learn from. A server error is retried like the CLI
+retries it, until it says the same thing twice: then it is an answer, not a
+hiccup. Every refusal is reported with Bright Data's own error headers.
+
+`scraper_collector` (`--collector c_…`) builds on a collector that already
+exists instead of creating another. One that a failed build left behind is
+finished rather than joined by a second stub; one that is already built is
+used as it is.
+
+It then runs the new scraper on the same pages, and the report prints its
+trigger URL, `https://api.brightdata.com/dca/trigger?collector=c_…`, so a
+later run can reuse it through the `scraper_trigger` input or the repository
+variable `BRIGHTDATA_SCRAPER_TRIGGER` instead of building another. A trigger
+URL, when given, always wins over a build.
+
+<Warning>
+  A build leaves the collector in the account's Scraper Studio, even when the
+  build fails. Bright Data documents no API to delete one, so it is only built
+  when asked for by name, never on a pull-request run; delete it in the
+  dashboard when done, or build on it with `scraper_collector`.
+</Warning>
+
+Bright Data's library of ready-made scrapers is looked up too, and any named
+for the site are listed. A name match is a lead, not an answer: the one
+Bright Data's CLI knows for Yahoo returns company data, not articles.
+
+The probe sends the Bright Data token only to `https://api.brightdata.com/`,
+and refuses any other trigger URL. Both of Bright Data's job APIs are
+understood: a `snapshot_id` is collected from the datasets API, a
+`collection_id` or `response_id` from the collector API, and a list is taken
+as the records themselves. The realtime trigger (`/dca/trigger_immediate`)
+gets one page per request, as the CLI sends it. When a batch job brings back
+no article text, its job log (`GET /dca/log/{id}`) is read, so the report
+says whether the pages failed or were read and yielded nothing.
 
 ## What the model is asked
 
@@ -61,6 +96,7 @@ asked `--repeats` times (default 2):
 | `headlines` | exactly as recorded |
 | `unlocker` | every result that yielded an article gets its opening words under its headline |
 | `unlocker-named` | the same, but only for the stories that name the company (asked when some do not) |
+| `unlocker+scraper` | the Unlocker's text, plus the scraper's for the pages the Unlocker could not read (asked when the scraper filled one) |
 | `unlocker-site` | only the site's results, text from the Unlocker |
 | `scraper-site` | the same results, text from the scraper |
 
@@ -86,7 +122,7 @@ the scraper's records and every answer.
 ## What it costs
 
 About a dozen Unlocker requests, the scraper's records if one is given, and
-four to ten model calls at the production price (a fifth of a cent each).
+four to twelve model calls at the production price (a fifth of a cent each).
 
 ## What it cannot decide
 
