@@ -57,10 +57,11 @@ jobs:
     runs-on: ubuntu-latest
     # Worst case, every wait at its limit: ten pages at 90s each, four at a
     # time and doubled for Google redirects (~9 min), the scraper's 10-minute
-    # deadline, and up to ten model calls four at a time at 300s plus one
-    # retry each (~30 min). tests/test_article_probe.py derives this from the
-    # constants, so raising one without the other fails there.
-    timeout-minutes: 60
+    # deadline, and up to ten model calls four at a time at 480s plus one
+    # retry each (~48 min; the full model's read timeout since 30 Sep 2026).
+    # tests/test_article_probe.py derives this from the constants, so raising
+    # one without the other fails there.
+    timeout-minutes: 80
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0

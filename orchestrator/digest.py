@@ -39,14 +39,15 @@ The headlines go to the model ``BATCH_ITEMS`` at a time, every batch at
 once. The first digest (2026-W40, 29 Sep 2026) sent the whole week in one
 call -- 274 headlines, about 19,500 tokens -- and gpt-oss-120b, writing
 about 43 tokens a second on DeepInfra that day, had not answered when the
-ask and its one retry each ran out the 300-second read timeout
-(``llm.FULL_MODEL_TIMEOUT_SECONDS``). The report said only "LLMError". A
-batch of forty is about 3,300 tokens: the size of the per-ticker prompts the
-same model answers every cycle (a median of 2,666 input tokens on 29 Sep, in
-about two minutes at a higher effort than this one). Asked together, the
-batches take about as long as the slowest of them, so the digest's worst
-case is still one call's. A batch that fails is named in the status with the
-error it raised, and the other batches' flags are kept.
+ask and its one retry each ran out that day's 300-second read timeout
+(``llm.FULL_MODEL_TIMEOUT_SECONDS``, 480 since 30 Sep). The report said
+only "LLMError". A batch of forty is about 3,300 tokens: the size of the
+per-ticker prompts the same model answers every cycle (a median of 2,666
+input tokens on 29 Sep, in about two minutes at a higher effort than this
+one). Asked together, the batches take about as long as the slowest of
+them, so the digest's worst case is still one call's. A batch that fails is
+named in the status with the error it raised, and the other batches' flags
+are kept.
 
 Cost
 ----
