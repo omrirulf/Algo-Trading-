@@ -118,6 +118,27 @@ uses "What analysts and big funds say".
   thing being checked would no longer be in the document.
 </Warning>
 
+### When the rationale is only a label
+
+Since the full model moved to `openai/gpt-oss-120b` on 23 Sep 2026, about
+one answer in five has only its side as the rationale: `NEUTRAL`, `Buy`,
+`SELL`. The prompt says in detail what the key factors and the scores must
+hold, but never what the rationale should say. The Claude models wrote a
+paragraph anyway; this model writes a short sentence, and sometimes one word.
+In every other way these answers look like the rest: as many key factors,
+and the same spread of confidence and scores.
+
+A rationale of one or two words is not quoted as if it were a reason. The
+report says *"no explanation. It wrote only “BUY”"*, the key factors below it
+stay as they are, and the header counts them: *"Answers with no explanation:
+10 of 57"*, so a rise shows from one day to the next.
+
+The cure is one sentence in the prompt saying what the rationale should hold.
+A prompt change is a new registration of the `model` arm, which restarts the
+race's count, so it waits for December and goes in with the article-text
+decision at the first checkpoint: one restart, not two (the owner's decision
+of 29 Sep 2026).
+
 Renaming a report section cannot touch the prompt — the prompt builds its own
 headings in `orchestrator/context.py`, and the byte-identity test pins that.
 The timestamp leads with Israel time and keeps UTC beside it, because the

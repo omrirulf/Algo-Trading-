@@ -320,6 +320,39 @@ def test_the_models_own_words_are_quoted_not_rewritten():
     assert "> A rich multiple tempers an otherwise clean catalyst." in text
 
 
+@pytest.mark.parametrize("label", ["BUY", "Neutral", "neutral.", "SELL now"])
+def test_a_label_is_not_quoted_as_if_it_were_a_reason(label):
+    """Since the switch to gpt-oss-120b about one answer in five has only its
+    side as the rationale. Quoting "BUY" under "the model's own words" reads
+    as an explanation; the report says there is none, and points at the
+    reasons the model did give."""
+    line = _line()
+    line.raw["signal"]["rationale"] = label
+    text = "\n".join(cr.render_ticker(line))
+    assert f"no explanation. It wrote only \u201c{label}\u201d" in text
+    assert f"> {label}" not in text
+    assert "**Main reasons it gave:**" in text and "- Guidance raised 8%" in text
+
+
+def test_a_short_reason_is_still_a_reason():
+    line = _line()
+    line.raw["signal"]["rationale"] = "Guidance raise confirmed."
+    text = "\n".join(cr.render_ticker(line))
+    assert "> Guidance raise confirmed." in text and "no explanation" not in text
+
+
+def test_the_header_counts_the_answers_with_no_explanation():
+    quiet = _line("MSFT")
+    quiet.raw["signal"]["rationale"] = "NEUTRAL"
+    text = cr.render([_line("AAPL"), quiet, _line("TSLA", signal=None, outcome=None, error="timed out")])
+    assert "**Answers with no explanation:** 1 of 2" in text
+
+
+def test_no_answers_means_no_count():
+    text = cr.render([_line("TSLA", signal=None, outcome=None, error="timed out")])
+    assert "Answers with no explanation" not in text
+
+
 def test_the_stamp_leads_with_israel_time():
     """The person reading this is in Israel; UTC stays beside it, not instead of it."""
     text = cr.render([_line("LLY", when="2026-09-15T14:07:00+00:00")])

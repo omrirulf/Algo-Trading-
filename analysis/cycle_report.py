@@ -117,6 +117,16 @@ SLEEVE_HEADINGS: dict[InstrumentKind, str] = {
     InstrumentKind.COMMODITY_FUND: "Commodities",
 }
 
+#: A rationale this short is a label ("NEUTRAL", "Buy"), not an explanation.
+#: Since the full model moved to gpt-oss-120b on 2026-09-23, about one answer
+#: in five says only that: the prompt spells out the key factors and the
+#: scores but never what the rationale should hold, and the Claude models
+#: filled it anyway. The prompt gets that sentence in December, with the
+#: article-text decision, so the race restarts once rather than twice (the
+#: owner's decision of 2026-09-29). Until then the report says so plainly and
+#: counts them, instead of quoting a label as if it were a reason.
+LABEL_ONLY_MAX_WORDS = 2
+
 #: What a side means, in words. Kept out of the headings, which stay short,
 #: and stated once in the opening block instead.
 BIAS_MEANINGS = (
@@ -475,6 +485,12 @@ def heading(line: Line) -> str:
     return f"### {line.name} ({line.ticker}) · {line.sleeve_name} — {bias}, {sure}"
 
 
+def label_only(rationale: Any) -> bool:
+    """Is this rationale only a label, like "NEUTRAL" or "Buy", rather than a reason?"""
+    words = str(rationale or "").split()
+    return 0 < len(words) <= LABEL_ONLY_MAX_WORDS
+
+
 def render_ticker(line: Line) -> list[str]:
     """One ticker: what it concluded, then every input it concluded it from."""
     signal = line.signal or {}
@@ -502,8 +518,12 @@ def render_ticker(line: Line) -> list[str]:
             "",
         ]
 
-    if signal.get("rationale"):
-        out += ["**In the model's own words:**", "", f"> {signal['rationale']}", ""]
+    rationale = str(signal.get("rationale") or "").strip()
+    if label_only(rationale):
+        out += [f"**In the model's own words:** no explanation. It wrote only “{rationale}”, "
+                "so the main reasons below are all it gave.", ""]
+    elif rationale:
+        out += ["**In the model's own words:**", "", f"> {rationale}", ""]
 
     factors = signal.get("key_factors") or []
     if factors:
@@ -733,6 +753,12 @@ def render(lines: list[Line], position_actions: Optional[list[dict]] = None) -> 
         f"{len(failed)} with a problem",
         "",
     ]
+    answered = [l for l in lines if (l.signal or {}).get("rationale")]
+    if answered:
+        bare = sum(1 for l in answered if label_only(l.signal["rationale"]))
+        out += [f"**Answers with no explanation:** {bare} of {len(answered)} (the model wrote only a "
+                "label, like “NEUTRAL”, where its reason should be). Their main reasons are "
+                "still shown.", ""]
     started = run_line(lines)
     if started:
         out += [started, ""]
