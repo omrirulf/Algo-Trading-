@@ -522,3 +522,18 @@ def test_the_objects_are_xz_that_any_computer_opens_and_the_same_lines_make_the_
     assert first.data == second.data and first.sha256 == second.sha256
     assert json.loads(_lzma.decompress(first.data).decode())["call_id"] == "c1"
     assert first.file_row("7")["compressed_bytes"] == len(first.data)
+
+
+def test_an_answer_with_a_value_outside_the_schema_is_re_asked_and_both_are_kept(cycle, _journal_to_tmp, tmp_path):
+    """The owner's decision of 28 Sep 2026: XBI's conviction of -0.35 now gets
+    the one re-ask. The bad answer stays in the record, marked as such."""
+    bad = json.dumps({"ticker": "NVDA", "bias": "BEARISH", "conviction": -0.35, "rationale": "r"})
+    cycle.script["NVDA"] = [answer("NVDA", content=bad), answer("NVDA")]
+    _, lines = run(_journal_to_tmp, tmp_path / "io")
+    captured = {r["call_id"]: r for r in records(tmp_path / "io")}
+    nvda = next(line for line in lines if line["ticker"] == "NVDA")
+    calls = [captured[c["call_id"]] for c in nvda["model_calls"]]
+    assert [c["outcome"] for c in calls] == ["invalid_values", "answer"]
+    assert calls[1]["kind"] == "re-ask after invalid values"
+    assert "conviction" in calls[0]["error"]
+    assert nvda["signal"]["conviction"] == 0.3 and not nvda.get("error")

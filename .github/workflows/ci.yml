@@ -581,16 +581,15 @@ jobs:
           echo "OK: the price reader only reads a price, for the journal"
 
       - name: The risk digest only reads and flags
-        # orchestrator/digest.py asks the full model, once a week, to flag
-        # the held names' headlines (the owner's request of 27 Sep 2026: the
-        # model only reads and flags; it never trades, changes a rule or
-        # calculates a number). It is handed the provider, so the credential
-        # check above already keeps it from reading a key. This keeps it from
-        # anything else: no import from app/ (the broker and the engine live
-        # there), no order or dispatcher call, no file written. And only the
-        # heartbeat may import it -- from its --weekly-digest mode, which
-        # returns before a dispatcher is built -- so no module that trades,
-        # scores or decides can read what the model flagged.
+        # orchestrator/digest.py lists, once a week, the held names' earnings
+        # dates and the headlines that name a fund closing, a delisting, a
+        # ticker change, a split or a merger (the owner's request of 27 Sep
+        # 2026, made smaller on 28 Sep: code only, no model call). This keeps
+        # it from anything else: no import from app/ (the broker and the
+        # engine live there), no order or dispatcher call, no file written.
+        # And only the heartbeat may import it -- from its --weekly-digest
+        # mode, which returns before a dispatcher is built -- so no module
+        # that trades, scores or decides can read what it flagged.
         run: |
           f=orchestrator/digest.py
           hits=$(grep -nE '(^(from|import) app\b|submit_[a-z_]*\(|post_signal|ExecutionEngine|build_dispatcher|PositionManager|\.write_text\(|\.write_bytes\(|open\([^)]*["'"'"'][wax])' "$f" || true)

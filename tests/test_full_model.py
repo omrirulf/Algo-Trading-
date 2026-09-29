@@ -172,6 +172,81 @@ def test_the_re_ask_does_not_mutate_the_caller_s_prompt():
     assert server.sent[0]["messages"][0]["content"] == "system prompt"
 
 
+# --- an answer whose values break the schema (the owner's decision, 28 Sep) --
+
+BAD_VALUE = dict(ANSWER, conviction=-0.35)
+
+
+def test_a_value_outside_the_schema_is_asked_again_with_the_problem_stated():
+    """XBI on 28 Sep 2026: conviction -0.35 parsed, broke the limit, and the
+    name was lost with no second ask. Now it gets the one re-ask, naming the
+    field, and the model's own second answer is what the cycle uses."""
+    server = _Server(httpx.Response(200, json=_body(BAD_VALUE)), httpx.Response(200, json=_body()))
+    out = _provider(server).complete_detailed("s", "u", SCHEMA, check=hb.parse_signal)
+    assert json.loads(out.text)["conviction"] == 0.2
+    first, second = server.sent
+    assert llm.INVALID_VALUES_INSTRUCTION not in first["messages"][0]["content"]
+    assert llm.INVALID_VALUES_INSTRUCTION in second["messages"][0]["content"]
+    assert "conviction: Input should be greater than or equal to 0" in second["messages"][0]["content"]
+    assert first["messages"][1] == second["messages"][1]
+
+
+def test_a_second_bad_value_is_returned_for_the_cycle_to_reject_as_before():
+    """The code never mends a value: after the one re-ask the answer goes back
+    as it came, and ``parse_signal`` rejects it where it always did."""
+    server = _Server(httpx.Response(200, json=_body(BAD_VALUE)), httpx.Response(200, json=_body(BAD_VALUE)))
+    out = _provider(server).complete_detailed("s", "u", SCHEMA, check=hb.parse_signal)
+    assert json.loads(out.text)["conviction"] == -0.35
+    assert len(server.sent) == llm.SCHEMA_ATTEMPTS
+    with pytest.raises(ValueError):
+        hb.parse_signal(out.text)
+
+
+def test_the_two_kinds_of_bad_answer_share_the_one_re_ask():
+    server = _Server(
+        httpx.Response(200, json={"choices": [{"message": {"content": "prose"}}]}),
+        httpx.Response(200, json=_body(BAD_VALUE)),
+    )
+    out = _provider(server).complete_detailed("s", "u", SCHEMA, check=hb.parse_signal)
+    assert json.loads(out.text)["conviction"] == -0.35 and len(server.sent) == 2
+
+
+def test_a_good_answer_is_asked_once_and_no_check_changes_nothing():
+    server = _Server(httpx.Response(200, json=_body()))
+    assert json.loads(_provider(server).complete_detailed("s", "u", SCHEMA, check=hb.parse_signal).text) == ANSWER
+    server = _Server(httpx.Response(200, json=_body(BAD_VALUE)))
+    assert json.loads(_provider(server).complete_detailed("s", "u", SCHEMA).text)["conviction"] == -0.35
+    assert len(server.sent) == 1
+
+
+def test_a_check_that_breaks_for_another_reason_costs_nothing():
+    def broken(text):
+        raise RuntimeError("not a value problem")
+
+    server = _Server(httpx.Response(200, json=_body()))
+    assert json.loads(_provider(server).complete_detailed("s", "u", SCHEMA, check=broken).text) == ANSWER
+    assert len(server.sent) == 1
+
+
+def test_the_cycle_asks_the_full_model_with_the_signal_check(monkeypatch):
+    seen = {}
+
+    class Fake:
+        def complete_detailed(self, *a, **kw):
+            seen.update(kw)
+            return "x"
+
+    monkeypatch.setattr(hb, "full_model_provider", lambda: Fake())
+    hb.call_llm("s", "u", hb.SIGNAL_JSON_SCHEMA)
+    assert seen["check"] is hb.parse_signal
+
+
+def test_the_new_complaint_is_part_of_the_prompt_fingerprint(monkeypatch):
+    before = hb.prompt_fingerprint()
+    monkeypatch.setattr(llm, "INVALID_VALUES_INSTRUCTION", llm.INVALID_VALUES_INSTRUCTION + " ")
+    assert hb.prompt_fingerprint() != before
+
+
 # --- how the cycle asks ----------------------------------------------------
 
 

@@ -19,7 +19,7 @@ import threading
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Optional, Protocol
+from typing import Any, Callable, Optional, Protocol
 
 import anthropic
 import httpx
@@ -464,6 +464,7 @@ class SignalProvider(Protocol):
         model: Optional[str] = None,
         effort: Optional[str] = None,
         reasoning: bool = True,
+        check: Optional[Callable[[str], Any]] = None,
     ) -> "Completion": ...
 
 
@@ -669,6 +670,7 @@ class AnthropicSignalProvider:
         model: Optional[str] = None,
         effort: Optional[str] = None,
         reasoning: bool = True,
+        check: Optional[Callable[[str], Any]] = None,
     ) -> Completion:
         """The model's JSON plus what the call actually cost.
 
@@ -680,6 +682,9 @@ class AnthropicSignalProvider:
         ``reasoning=False`` omits adaptive thinking and the effort setting.
         That is the request shape Haiku 4.5 accepts, and it is what makes the
         screening stage cheap: the same prompt, answered without deliberation.
+
+        ``check`` is accepted for the protocol and not used: this path has no
+        re-ask of either kind, and its caller judges the answer as before.
         """
         output_config: dict[str, Any] = {
             "format": {"type": "json_schema", "schema": build_output_schema(json_schema)},
@@ -840,6 +845,15 @@ OFF_SCHEMA_INSTRUCTION = (
     "\n\nYour previous answer could not be parsed. Reply with the JSON object "
     "required by the schema and nothing else: no prose before it, no code "
     "fence around it, no commentary after it."
+)
+
+#: The re-ask after an answer that parsed but broke the schema's limits (the
+#: owner's decision of 28 Sep 2026: XBI answered conviction -0.35 and was
+#: lost with no second ask). The problem found is appended after it.
+INVALID_VALUES_INSTRUCTION = (
+    "\n\nYour previous answer had a value outside what the schema allows. Reply "
+    "with the JSON object required by the schema, every value inside its allowed "
+    "range, and nothing else. The problem was: "
 )
 
 NO_REASONING_INSTRUCTION = (
@@ -1098,10 +1112,10 @@ class OpenAICompatibleProvider:
         return body
 
     @staticmethod
-    def _insist(body: dict) -> dict:
-        """The same question, with the schema complaint said out loud."""
+    def _insist(body: dict, complaint: str = OFF_SCHEMA_INSTRUCTION) -> dict:
+        """The same question, with the complaint said out loud."""
         retold = json.loads(json.dumps(body))
-        retold["messages"][0]["content"] += OFF_SCHEMA_INSTRUCTION
+        retold["messages"][0]["content"] += complaint
         return retold
 
     def _answer(self, payload: dict, name: str) -> "Completion":
@@ -1139,6 +1153,7 @@ class OpenAICompatibleProvider:
         model: Optional[str] = None,
         effort: Optional[str] = None,
         reasoning: bool = True,
+        check: Optional[Callable[[str], Any]] = None,
     ) -> "Completion":
         """One signal, re-asking once if the answer came back off-schema.
 
@@ -1154,29 +1169,78 @@ class OpenAICompatibleProvider:
         So a bad parse is re-asked with the complaint stated, and only a
         second bad parse raises. The re-ask is a second billed call, which is
         the point: it is cheaper than the trade it would otherwise skip.
+
+        ``check`` (the owner's decision of 28 Sep 2026) is the caller's own
+        test of an answer that parsed: it raises ``ValueError`` (a pydantic
+        ``ValidationError`` is one) when a value breaks the schema's limits,
+        such as XBI's conviction of -0.35 that day. Such an answer gets the
+        same one re-ask, with the problem stated. The two kinds share the one
+        re-ask. The last answer is returned even when it fails the check, so
+        the caller rejects and journals it exactly as before; the code never
+        mends a value itself. Every attempt stays in the call record, the bad
+        one marked ``invalid_values``.
         """
         name = model or self._model
         body = self._body(system_prompt, user_prompt, json_schema, name, effort, reasoning)
+        kind = "first"
         for attempt in range(self._schema_attempts):
-            kind = "first" if not attempt else "re-ask after an off-schema answer"
+            last = attempt == self._schema_attempts - 1
             payload, ask, raw = self._post_recorded(body, kind)
             try:
                 completion = self._answer(payload, name)
             except LLMError as exc:
                 model_io.finish_attempt(ask, outcome="off_schema", status=200, response=raw,
                                         usage=_plain_usage(payload), error=str(exc)[:300])
-                if attempt == self._schema_attempts - 1:
+                if last:
                     raise
                 log.warning(
                     "%s answered off-schema; asking once more with the complaint stated",
                     name,
                 )
                 body = self._insist(body)
+                kind = "re-ask after an off-schema answer"
                 continue
-            model_io.finish_attempt(ask, outcome="answer", status=200, response=raw,
-                                    usage=_plain_usage(payload))
+            problem = _check_problem(check, completion.text) if check is not None else None
+            if problem is not None and not last:
+                model_io.finish_attempt(ask, outcome="invalid_values", status=200, response=raw,
+                                        usage=_plain_usage(payload), error=problem[:300])
+                log.warning(
+                    "%s answered with a value outside the schema (%s); asking once more "
+                    "with the problem stated", name, problem,
+                )
+                body = self._insist(body, INVALID_VALUES_INSTRUCTION + problem)
+                kind = "re-ask after invalid values"
+                continue
+            model_io.finish_attempt(ask, outcome="invalid_values" if problem else "answer", status=200,
+                                    response=raw, usage=_plain_usage(payload),
+                                    **({"error": problem[:300]} if problem else {}))
             return completion
         raise LLMError("unreachable")   # pragma: no cover - the loop always returns or raises
+
+
+def _check_problem(check: Callable[[str], Any], text: str) -> Optional[str]:
+    """What ``check`` found wrong with an answer, in one short line; None if nothing.
+
+    A pydantic error is summarised by field and message only, so the re-ask
+    names the problem (``conviction: Input should be greater than or equal
+    to 0``) without echoing the answer back at length.
+    """
+    try:
+        check(text)
+    except ValueError as exc:
+        errors = getattr(exc, "errors", None)
+        if callable(errors):
+            try:
+                parts = [f"{'.'.join(str(x) for x in e.get('loc', ())) or 'answer'}: {e.get('msg', '')}"
+                         for e in errors()[:3]]
+            except Exception:  # noqa: BLE001 - a summary must never cost the answer
+                parts = []
+            if parts:
+                return "; ".join(parts)
+        return (str(exc).splitlines() or [type(exc).__name__])[0][:200]
+    except Exception:  # noqa: BLE001 - not a value problem: the caller judges the answer as before
+        return None
+    return None
 
 
 def _body_text(response: Any) -> Optional[str]:

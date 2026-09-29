@@ -403,7 +403,7 @@ def test_heartbeat_call_llm_asks_the_endpoint_with_the_configured_key(monkeypatc
             seen.update(base_url=base_url, model=model, key=api_key, timeout=timeout)
 
         def complete_detailed(self, system_prompt, user_prompt, json_schema,
-                              model=None, effort=None, reasoning=True):
+                              model=None, effort=None, reasoning=True, check=None):
             seen.update(prompts=(system_prompt, user_prompt), asked=model, effort=effort)
             return json.dumps(VALID_SIGNAL)
 
@@ -433,7 +433,7 @@ def test_heartbeat_call_llm_falls_back_to_anthropic_when_no_base_url(monkeypatch
             seen["key"] = api_key
 
         def complete_detailed(self, system_prompt, user_prompt, json_schema,
-                              model=None, effort=None, reasoning=True):
+                              model=None, effort=None, reasoning=True, check=None):
             seen.update(prompts=(system_prompt, user_prompt), effort=effort)
             return json.dumps(VALID_SIGNAL)
 
