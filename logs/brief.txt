@@ -1,8 +1,8 @@
 🟡 2 warnings: 1 of 80 ticker(s) produced no signal
-Equity $101,440 · 22 positions · $87,362 gross · $2,458 at risk · unrealised +$1,491
-2 directional calls, none traded
+Equity $101,718 · 22 positions · $87,035 gross · $2,410 at risk · unrealised +$1,658
+3 directional calls, none traded
 Started by supabase-cron at 14:40 UTC (0 min after 14:40)
-Supabase: starter HTTP 204 at 14:40 UTC · archive: no push recorded
+Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-09-28
 Closed: GOOGL, XBI
-Also: 2 of 80 ticker(s) were judged without news
-Cycle 80 tickers, $0.14 · 2026-09-28
+Also: 5 of 80 ticker(s) were judged without news
+Cycle 80 tickers, $0.14 · 2026-09-29
