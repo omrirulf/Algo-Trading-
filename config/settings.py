@@ -410,9 +410,11 @@ SCREEN_MAX_CONCURRENCY: Final[int] = 8
 #: It also sets the cycle's worst case, which is the binding constraint. The
 #: full-model stage takes ceil(watchlist / this) rounds, each bounded by
 #: FULL_MODEL_TIMEOUT_SECONDS: eighty names four at a time is twenty rounds of
-#: at most five minutes, which fits heartbeat.yml's clock alongside the ~42
-#: minutes the cycle already spends gathering context. Raising it to relieve
-#: the throttle would not -- the throttle is not where the time goes.
+#: at most eight minutes and a retry since 30 Sep 2026 (five before), more
+#: than heartbeat.yml's clock holds alongside the ~42 minutes of gathering
+#: context, which is why FULL_MODEL_STAGE_BUDGET_SECONDS below bounds the
+#: stage. Raising it to relieve the throttle would not -- the throttle is not
+#: where the time goes.
 FULL_MODEL_MAX_CONCURRENCY: Final[int] = 4
 
 #: How long the full-model stage may spend in total before it stops asking.

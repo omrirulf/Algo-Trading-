@@ -297,7 +297,8 @@ def test_a_timed_out_call_is_asked_once_more_on_the_full_ceiling():
 
     The retry then got 120s, which the full model's answers almost never fit
     (median 130-146s): 0 of 7 retries succeeded on 25 Sep. Since 26 Sep (bug
-    fix, Amendments table) the second ask gets the same 300s as the first."""
+    fix, Amendments table) the second ask gets the same ceiling as the first:
+    300s then, 480s since 30 Sep (bug fix, Amendments table)."""
     seen: list[float] = []
     attempts = {"n": 0}
 
@@ -320,7 +321,7 @@ def test_a_timed_out_call_is_asked_once_more_on_the_full_ceiling():
         out = provider.complete_detailed("s", "u", SCHEMA)
 
     assert json.loads(out.text)["ticker"] == "AAPL"
-    assert seen == [300.0, 300.0]
+    assert seen == [480.0, 480.0]
 
 
 def test_the_retry_ceiling_does_not_leak_into_the_next_ticker():
@@ -346,7 +347,53 @@ def test_the_retry_ceiling_does_not_leak_into_the_next_ticker():
                 provider.complete_detailed("s", "u", SCHEMA)
 
     # Two tickers, each asked twice, every ask on the full ceiling.
-    assert seen == [300.0, 300.0] * 2
+    assert seen == [480.0, 480.0] * 2
+
+
+def test_an_answer_run_to_the_token_cap_reaches_the_re_ask_on_a_slow_day():
+    """29 Sep 2026 (bug fix, Amendments table): about one first ask in
+    fifteen reasons until MAX_TOKENS and gives no answer. At 300s that ended
+    in time only above 53 tokens a second: on 28 Sep (~57) four did, and the
+    off-schema re-ask rescued all four; on 29 Sep (~41) the same kind of ask
+    timed out instead, the retry asked the same question again, and EWU was
+    lost to two.
+
+    This endpoint writes at 41 tokens a second and runs the first ask to the
+    cap; an ask whose cap takes longer than its ceiling times out."""
+    rate = 41.0
+    asked: list[str] = []
+    seen: list[float] = []
+
+    def endpoint_for(timeout):
+        def endpoint(request):
+            system = json.loads(request.content)["messages"][0]["content"]
+            asked.append("re-ask" if llm.OFF_SCHEMA_INSTRUCTION in system else "first")
+            if asked[-1] == "re-ask":
+                return httpx.Response(200, json=_body())
+            if llm.MAX_TOKENS / rate > timeout:
+                raise httpx.ReadTimeout("The read operation timed out", request=request)
+            return httpx.Response(200, json={
+                "choices": [{"message": {"content": ""}, "finish_reason": "length"}],
+                "usage": {"prompt_tokens": 3000, "completion_tokens": llm.MAX_TOKENS}})
+        return endpoint
+
+    def client(timeout):
+        seen.append(timeout)
+        return httpx.Client(transport=httpx.MockTransport(endpoint_for(timeout)), base_url="http://local")
+
+    provider = OpenAICompatibleProvider(
+        "http://local/v1", "openai/gpt-oss-120b", api_key="k", sleep=lambda _: None,
+        timeout=llm.FULL_MODEL_TIMEOUT_SECONDS,
+    )
+    import unittest.mock
+    with unittest.mock.patch.object(llm, "new_http_client", client):
+        out = provider.complete_detailed("s", "u", SCHEMA)
+
+    assert json.loads(out.text)["ticker"] == "AAPL"
+    assert asked == ["first", "re-ask"] and seen == [480.0, 480.0]
+    # The cap needs more than the old 300s at 41 tokens a second, and fits the
+    # ceiling down to 35 -- below that day's median, above its slow spells.
+    assert 300 < llm.MAX_TOKENS / rate and llm.MAX_TOKENS / 35.0 <= llm.FULL_MODEL_TIMEOUT_SECONDS
 
 
 def test_a_shorter_caller_ceiling_is_never_raised_by_the_retry():
@@ -414,7 +461,7 @@ def test_every_ask_is_logged_with_its_ticker_try_duration_and_answer_length(capl
     lines = [r.getMessage() for r in caplog.records if r.getMessage().startswith("model call:")]
     assert len(lines) == 2
     assert lines[0].startswith("model call: INDA ask 1 (first) started ")
-    assert "ReadTimeout after a 300s limit" in lines[0] and lines[0].endswith("output tokens n/a")
+    assert "ReadTimeout after a 480s limit" in lines[0] and lines[0].endswith("output tokens n/a")
     assert lines[1].startswith("model call: INDA ask 2 (retry after a timeout) started ")
     assert "HTTP 200" in lines[1] and lines[1].endswith("output tokens 4321")
 
