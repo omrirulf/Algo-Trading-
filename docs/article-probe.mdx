@@ -1,0 +1,97 @@
+---
+title: "The Article Probe"
+description: "One recorded context, with the articles behind its search results fetched and handed to the model: what full text would add, before anything is built"
+---
+
+The news block is a headline and Google's ~150-character snippet per result.
+The probe asks, on **one** example, what changes when the model also gets the
+start of each article: how many words that adds, how much of it is the story
+rather than the page around it, and what the model then says and spends.
+
+```bash
+python replay/article_probe.py --dry-run                     # which line, which pages; no network
+python replay/article_probe.py --no-model                    # fetch and measure only
+python replay/article_probe.py --ticker NVO --day 2026-09-28
+python replay/article_probe.py --scraper-trigger 'https://api.brightdata.com/...'
+```
+
+It runs by hand (**Actions → article probe**) and, like the
+`baseline-compare` workflow, on its own pull request when it changes, because
+a manual workflow does not exist until it reaches `main`. It never trades and
+holds no broker key.
+
+## Where the text comes from
+
+| Source | How | Covers |
+| --- | --- | --- |
+| Web Unlocker | the zone the news fetch already uses, then one generic extractor (trafilatura) cuts the story out of the page | every site, one code path |
+| Scraper Studio | the scraper's API trigger URL, from the Bright Data dashboard | the one site it was built for |
+
+Both are cut to the same number of words (`--words`, default 300) before the
+model sees them, so a difference between the two is a difference in *which*
+words, not in how many. Quote pages, symbol pages, filings and videos are
+skipped without a request; Google's `/goto` redirect stubs are followed once.
+
+## Adding the Scraper Studio side
+
+1. In Scraper Studio, build a scraper for the site the probe picks a line for
+   (`finance.yahoo.com` by default). If the site is already in Bright Data's
+   scraper library, Scraper Studio says so.
+2. Have it return, per article URL: `url`, `title`, `published_at` and
+   `body`, the article text only. Any field name works, since the probe takes
+   `body` if there is one and the longest text otherwise, but `body` avoids
+   the guess.
+3. Copy the API trigger URL the dashboard shows (the URL, **not** the token)
+   into the workflow's `scraper_trigger` input, or into the repository
+   variable `BRIGHTDATA_SCRAPER_TRIGGER`. The probe sends the Bright Data token
+   only to `https://api.brightdata.com/`, and refuses any other trigger URL.
+
+Both of Bright Data's job APIs are understood: a `snapshot_id` is collected
+from the datasets API, a `collection_id` or `response_id` from the collector
+API, and a list is taken as the records themselves.
+
+## What the model is asked
+
+The production call, unchanged (`heartbeat.call_llm`: same system prompt,
+model, effort and schema), on the same context rendered several ways, each
+asked `--repeats` times (default 2):
+
+| Prompt | The NEWS block |
+| --- | --- |
+| `headlines` | exactly as recorded |
+| `unlocker` | every result that yielded an article gets its opening words under its headline |
+| `unlocker-site` | only the site's results, text from the Unlocker |
+| `scraper-site` | the same results, text from the scraper |
+
+The last two include only results *both* sources read, so they differ in
+nothing but where the words came from.
+
+## What it reports
+
+- **What the Unlocker got**, per result: page size, article length, words
+  sent, the share of those words that look like page furniture (sign-up
+  boxes, "story continues", disclosures), whether the story names the company
+  at all, and why a result has no text (skipped, refused, paywall or teaser?).
+- **Scraper Studio**, per site result: the same measures, plus how much of
+  each source's text the other also has. Near 100% both ways means both read
+  the same story.
+- **What the model read and said**, per prompt: prompt words, input and
+  output tokens, cost per call, and every answer; then each prompt's first
+  rationale.
+
+The run's artifact keeps everything: each article's text, each prompt as sent,
+the scraper's records and every answer.
+
+## What it costs
+
+About a dozen Unlocker requests, the scraper's records if one is given, and
+four or eight model calls at the production price (a fifth of a cent each).
+
+## What it cannot decide
+
+One context and a handful of calls show what the model reads and what it
+costs. They cannot show that it trades better: that takes many contexts
+scored against prices, which is what saving the text at signal time and
+testing it at a checkpoint would be for. The pages are also fetched when the
+probe runs, not when the line was written, so a story edited since then is
+read as it is now.
