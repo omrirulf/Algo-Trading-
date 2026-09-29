@@ -1841,13 +1841,15 @@ def _run_live_cycle(dispatcher: Dispatcher | None, premarket: bool) -> CycleRepo
     return report
 
 
-def weekly_digest(today: date | None = None) -> dict[str, Any]:
+def weekly_digest(digest_dir: Path, today: date | None = None) -> dict[str, Any]:
     """The owner's weekly risk digest for the held names (``orchestrator/digest.py``), as a record.
 
-    Code only since the owner's decision of 28 Sep 2026: earnings dates and
-    operational events found by fixed words in the week's headlines. No key,
-    no model, no dispatcher, no broker, no journal line; the record goes to
-    stdout only.
+    The one place the digest meets a key: the full model's provider is built
+    here, as for a cycle, and handed in. Nothing else of a cycle is built --
+    no dispatcher, no broker, no journal line -- and the digest's answer goes
+    to stdout only. What this week's earlier digests cost is counted against
+    the cap, so a rerun cannot spend it twice. (Code only from 28 Sep 2026;
+    the model reading is back since 29 Sep, at the owner's request.)
     """
     from orchestrator import digest
 
@@ -1856,9 +1858,17 @@ def weekly_digest(today: date | None = None) -> dict[str, Any]:
         account = (cfg.LOG_DIR / "account.jsonl").read_text(encoding="utf-8").splitlines()
     except OSError:
         account = []
+    spent = digest.spent_in_week(digest_dir, digest.week_of(today))
+    try:
+        provider = full_model_provider()
+    except LLMError as exc:
+        return {"kind": "risk-digest", "week": digest.week_of(today), "made_on": today.isoformat(),
+                "status": f"not asked: {str(exc)[:200]}", "flags": [], "earnings": [], "held": {},
+                "cost_usd": 0.0}
     path = cfg.SIGNAL_JOURNAL_PATH
     lines = journal_files.iter_lines(path) if journal_files.exists(path) else iter(())
-    return digest.run(today=today, account_lines=account, journal_lines=lines)
+    return digest.run(provider, model=llm.configured_model(), today=today, account_lines=account,
+                      journal_lines=lines, spent_this_week=spent)
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -1895,18 +1905,25 @@ def main(argv: list[str] | None = None) -> None:
         "--weekly-digest",
         action="store_true",
         help=(
-            "List the held names' earnings dates and the week's headlines that "
-            "name a fund closing, a delisting, a ticker change, a split or a "
-            "merger, print the digest as JSON and exit (orchestrator/digest.py). "
-            "Code only: no model, no cycle, no dispatcher, no order."
+            "Ask the full model to flag this week's headlines for the held "
+            "names, in batches, print the digest as JSON and exit "
+            "(orchestrator/digest.py). No cycle, no dispatcher, no order: it "
+            "reads the account record and the journal, and is capped at "
+            "digest.WEEKLY_CAP_USD a week."
         ),
+    )
+    parser.add_argument(
+        "--digest-dir",
+        type=Path,
+        default=cfg.LOG_DIR / "digest",
+        help="where this week's earlier digests are, to count what they cost against the cap",
     )
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
     if args.weekly_digest:
-        print(json.dumps(weekly_digest(), sort_keys=True))
+        print(json.dumps(weekly_digest(args.digest_dir), sort_keys=True))
         return
 
     if args.protect_only:

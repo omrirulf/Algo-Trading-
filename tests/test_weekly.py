@@ -14,6 +14,7 @@ from pathlib import Path
 import yaml
 
 from analysis import weekly
+from orchestrator import llm
 from tests.test_phone import _is_a_safe_push
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -95,11 +96,23 @@ def test_the_concentration_report_is_shown_the_week_after_it_is_made_only(tmp_pa
     assert "Concentration, 2026-10" in text and "descriptive only" in text
 
 
+def test_the_markdown_says_which_month_the_concentration_report_is_for(tmp_path):
+    """2026-W40 showed 2026-08's report under a heading with no month, and "book:
+    no account snapshot recorded that month" read as if this month's were missing."""
+    month = {"month": "2026-10", "as_of": "2026-10-30", "made_on": "2026-11-02",
+             "book": None, "breadth": {"above": 30, "of": 80, "pct": 37.5, "no_data": []},
+             "vt_volatility": {"annualised_pct": 12.0, "sessions": 22}}
+    conc = {"kind": "concentration", "latest": "2026-10", "months": {"2026-10": month}}
+    md = weekly.markdown(WEEK, logs(tmp_path, drift_record(), digest_record(), conc))
+    assert "## Concentration for 2026-10 (as of 2026-10-30; monthly, descriptive only)" in md
+    assert "- book: not measured: no account snapshot was recorded on or before 2026-10-30" in md
+
+
 def test_the_markdown_lists_every_flag_with_its_source_and_link(tmp_path):
     md = weekly.markdown(WEEK, logs(tmp_path, drift_record(), digest_record(flags=3)))
     for k in range(3):
         assert f"[Title {k}](https://news.example.com/{k}/" in md
-    assert "found by code (no model call)" in md
+    assert "Cost: $0.0040 (cap $1.00 a week)" in md
 
 
 # --------------------------------------------------------------------------- #
@@ -125,18 +138,29 @@ def test_the_drift_record_is_written_before_the_book_reads_it():
         assert f"git add -f {path} 2>/dev/null || true" in commit
 
 
-def test_the_weekly_report_holds_no_key():
+def test_the_weekly_report_holds_the_model_key_and_nothing_else():
     steps = _steps("heartbeat.yml", "cycle")
     names = list(steps)
     step = steps["Make the weekly report"]
     assert names.index("Make the weekly report") > names.index("Push the day to the owner's phone")
     assert step["id"] == "weekly" and step["continue-on-error"] is True
     assert "steps.guard.outputs.skip != 'yes'" in step["if"] and "inputs.mode != 'protect'" in step["if"]
-    assert set(step["env"]) == {"REPORTS_URL"}                     # the digest is code only (28 Sep 2026)
+    assert set(step["env"]) == {"FULL_MODEL_API_KEY", "REPORTS_URL"}   # the model reading is back (29 Sep 2026)
+    assert step["env"]["FULL_MODEL_API_KEY"] == steps["Run one cycle"]["env"]["FULL_MODEL_API_KEY"]
     run = step["run"]
     assert "python -m orchestrator.heartbeat --weekly-digest" in run
     assert 'if [ -f "logs/weekly/$week.md" ]' in run                              # once a week
     assert "--once" not in run and "NTFY" not in run
+
+
+def test_the_weekly_step_outlasts_a_digest_call_and_its_retry():
+    """2026-W40 (29 Sep 2026): the digest's call and its one retry each ran to
+    the 300-second read timeout, which was all ten of the step's minutes, and
+    the step was stopped as the report was being written. The digest's
+    batches are asked at once, so its worst case is still one call's."""
+    step = _steps("heartbeat.yml", "cycle")["Make the weekly report"]
+    two_asks = llm.TRANSPORT_ATTEMPTS * llm.FULL_MODEL_TIMEOUT_SECONDS
+    assert step["timeout-minutes"] * 60 >= two_asks + 3 * 60
 
 
 def test_the_weekly_report_reaches_the_phone_as_a_safe_push_after_the_commit():

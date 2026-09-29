@@ -155,8 +155,8 @@ def markdown(week: str, logs: Path = LOGS) -> str:
         out.append("Not made this week.")
     else:
         out.append(f"Status: {dig.get('status')}. Headlines read: {dig.get('headlines_read', 0)}. "
-                   "Earnings dates, and headlines naming a fund closing, a delisting, a ticker "
-                   "or name change, a split or a merger, found by code (no model call).")
+                   f"Cost: ${dig.get('cost_usd') or 0:.4f} (cap ${dig.get('cap_usd', 1):.2f} a week). "
+                   f"Flags dropped for naming no headline given: {dig.get('dropped', 0)}.")
         out.append("")
         for e in dig.get("earnings") or []:
             out.append(f"- **{e['ticker']}** earnings on {e['date']} (in {e['days_away']} days): {e['link']}")
@@ -166,7 +166,10 @@ def markdown(week: str, logs: Path = LOGS) -> str:
         if not dig.get("earnings") and not dig.get("flags"):
             out.append("Nothing flagged.")
     if conc:
-        out += ["", "## Concentration (monthly, descriptive only)", ""]
+        # The month in the heading: the section is last month's, which the
+        # render's own first line says and the lines below it do not.
+        out += ["", f"## Concentration for {conc.get('month')} (as of {conc.get('as_of')}; "
+                    "monthly, descriptive only)", ""]
         out += concentration.render(conc).rstrip("\n").split("\n")[1:]
         rows = ((conc.get("book") or {}).get("beta_to_vt") or {}).get("by_position") or []
         if rows:

@@ -162,7 +162,19 @@ def configured_provider() -> Optional[str]:
 #: because 120 is not a timeout for a reasoning model at high effort, it is a
 #: coin toss: gpt-oss-120b measured ~128s a call, and a 120s deadline lost 286
 #: of 300 calls on 22 September -- every one of them billed.
-FULL_MODEL_TIMEOUT_SECONDS = 300.0
+#:
+#: 480 rather than 300 since 30 Sep 2026 (bug fix, the owner's decision of
+#: 29 Sep, logged in the pre-registration's Amendments table). About one first
+#: ask in fifteen reasons until MAX_TOKENS and never gives its answer. At 300s
+#: such an answer ended in time only when the model wrote faster than 53
+#: tokens a second: on 28 Sep (about 57) four did, and the off-schema re-ask
+#: rescued all four; on 29 Sep (about 41) none reached the limit, three first
+#: asks timed out instead, and the retry after a timeout asks the same question
+#: again -- EWU was lost to two. At 480s an answer at the limit ends in time
+#: down to 33 tokens a second, and so reaches the re-ask that states the
+#: complaint. Only how long we wait changes; the second ask gets the same
+#: (TRANSPORT_RETRY_TIMEOUT_SECONDS).
+FULL_MODEL_TIMEOUT_SECONDS = 480.0
 
 #: JSON Schema keywords kept when deriving the generation-time schema. Value
 #: constraints (pattern, minLength, minimum, ...) are deliberately dropped:

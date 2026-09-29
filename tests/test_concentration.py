@@ -105,6 +105,24 @@ def test_the_book_is_the_last_snapshot_of_the_month():
     assert conc.book_at(lines, date(2026, 9, 1)) is None
 
 
+def test_a_month_before_the_account_record_began_says_so():
+    """2026-08's report (made 29 Sep 2026) had no book because the account has
+    been recorded only since 25 Sep; it said "no account snapshot recorded
+    that month", which read like a recorder that had failed."""
+    none = lambda t, a, b: []                                          # noqa: E731
+    lines = [snapshot("2026-09-25T16:21:20Z", [{"ticker": "MSFT", "qty": 1, "market_value": 500.0}])]
+    record = conc.report("2026-08", lines, none, watchlist=())
+    assert record["book"] is None
+    assert ("- book: not measured: the paper account has been recorded only since 2026-09-25 "
+            "(logs/account.jsonl), after this month's last trading day, 2026-08-31") in conc.render(record)
+    empty = conc.render(conc.report("2026-08", [], none, watchlist=()))
+    assert "- book: not measured: no account snapshot has been recorded yet (logs/account.jsonl)" in empty
+    # A record made before the reason was kept (2026-08's) names the day looked for.
+    old = {k: v for k, v in record.items() if k != "book_missing"}
+    assert "- book: not measured: no account snapshot was recorded on or before 2026-08-31" in conc.render(old)
+    assert conc.report("2026-09", lines, none, watchlist=())["book"] is not None
+
+
 def test_the_report_signs_shorts_and_counts_groups_against_their_caps():
     end = date(2026, 9, 30)
     days = sessions(end, 300)
