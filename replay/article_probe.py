@@ -595,6 +595,26 @@ def _is_record(payload: Any) -> bool:
     return isinstance(payload, dict) and bool(record_url(payload)) and bool(record_text(payload)[1])
 
 
+def _job_summary(payload: Any) -> str:
+    """A collector job's log (``GET /dca/log/{id}``) on one line: how many pages went
+    in, how many records came out, how many failed. Keys come in either casing."""
+    if not isinstance(payload, dict):
+        return "no log"
+
+    def get(key: str) -> Any:
+        return payload.get(key, payload.get(key.capitalize()))
+
+    parts = [str(get("status") or "?")]
+    parts += [f"{get(key)} {label}" for key, label in (("inputs", "input(s)"), ("lines", "record(s)"),
+                                                          ("fails", "failed")) if get(key) is not None]
+    if get("success_rate") is not None:
+        parts.append(f"success rate {get('success_rate')}")
+    errors = get("errors") or get("error")
+    if errors:
+        parts.append(f"errors: {brief(json.dumps(errors, default=str), 160)}")
+    return ", ".join(parts)
+
+
 def run_scraper(
     http: Http, token: str, trigger: str, urls: list[str], *,
     deadline: float = SCRAPER_DEADLINE_SECONDS, poll: float = SCRAPER_POLL_SECONDS,
@@ -608,6 +628,12 @@ def run_scraper(
     from the datasets API, a ``collection_id`` or ``response_id`` from the
     older collector API, and a list is the records themselves. Anything else
     is reported verbatim rather than guessed at.
+
+    The realtime trigger (``/dca/trigger_immediate``) takes one page per
+    request, as Bright Data's CLI sends it; the batch trigger takes them all
+    at once. A batch job that brings back no article text has its job log
+    read, so the report says whether the pages failed or were read and
+    yielded nothing.
     """
     run = ScraperRun(trigger=trigger)
     if not trigger.startswith(BRIGHTDATA_API):
@@ -615,55 +641,71 @@ def run_scraper(
                      f"the scraper trigger must be a {BRIGHTDATA_API} URL")
         return run
     started = clock()
+    realtime = urlsplit(trigger).path.rstrip("/").endswith("/dca/trigger_immediate")
+    bodies: list[Any] = [{"url": u} for u in urls] if realtime else [[{"url": u} for u in urls]]
     try:
-        response = http.post(trigger, [{"url": u} for u in urls], _auth(token))
-        run.requests += 1
-        payload = _payload(response)
-        run.log.append(f"trigger: HTTP {response.status_code}")
-        if int(response.status_code) >= 400:
-            run.error = f"trigger refused: HTTP {response.status_code} {brief(response.text)}"
-            return run
-        if isinstance(payload, list):
-            run.records = payload
-            return run
-        if not isinstance(payload, dict):
-            run.error = f"trigger answered with something that is not JSON: {(response.text or '')[:200]!r}"
-            return run
-        target = _poll_url(payload)
-        if target is None:
-            if _is_record(payload):
-                run.records = [payload]
-            else:
-                run.error = f"unrecognised trigger response: {json.dumps(payload)[:300]}"
-            return run
-        run.log.append(f"collecting from {target.replace(BRIGHTDATA_API, '/')}")
-        last = ""
-        while True:
-            if clock() - started > deadline:
-                run.error = (f"the scraper's results were not ready after {deadline:.0f}s"
-                             + (f" (last answer: {last})" if last else ""))
-                return run
-            sleep(poll)
-            response = http.get(target, _auth(token))
-            run.requests += 1
-            payload = _payload(response)
-            status = int(response.status_code)
-            if status == 200 and isinstance(payload, list):
-                run.records = payload
-                return run
-            if status == 200 and _is_record(payload):
-                run.records = [payload]
-                return run
-            if _pending(status, payload, response.text or ""):
-                last = f"HTTP {status} {brief(response.text, 120)}".strip()
-                continue
-            run.error = f"collecting failed: HTTP {status} {brief(response.text)}"
-            return run
+        for body in bodies:
+            records, error, job = _one_job(http, token, trigger, body, run, started,
+                                           deadline=deadline, poll=poll, sleep=sleep, clock=clock)
+            run.records += records
+            if error:
+                run.error = f"{body['url']}: {error}" if realtime else error
+                if not realtime or clock() - started > deadline:
+                    return run
+            if job and not any(record_text(r)[1] for r in records if isinstance(r, dict)):
+                response = http.get(f"{BRIGHTDATA_API}dca/log/{job}", _auth(token))
+                run.requests += 1
+                run.log.append(f"job log: {_job_summary(_payload(response))}"
+                               if int(response.status_code) < 300
+                               else f"job log: HTTP {response.status_code} {brief(response.text, 120)}")
+        return run
     except httpx.HTTPError as exc:
         run.error = f"{type(exc).__name__}: {exc}"[:200]
         return run
     finally:
         run.seconds = clock() - started
+
+
+def _one_job(
+    http: Http, token: str, trigger: str, body: Any, run: ScraperRun, started: float, *,
+    deadline: float, poll: float, sleep: Callable[[float], None], clock: Callable[[], float],
+) -> tuple[list, str, str]:
+    """``(records, error, collection id)`` for one trigger request and its results."""
+    response = http.post(trigger, body, _auth(token))
+    run.requests += 1
+    payload = _payload(response)
+    run.log.append(f"trigger: HTTP {response.status_code}")
+    if int(response.status_code) >= 400:
+        return [], f"trigger refused: HTTP {response.status_code} {brief(response.text)}", ""
+    if isinstance(payload, list):
+        return payload, "", ""
+    if not isinstance(payload, dict):
+        return [], f"trigger answered with something that is not JSON: {(response.text or '')[:200]!r}", ""
+    target = _poll_url(payload)
+    if target is None:
+        if _is_record(payload):
+            return [payload], "", ""
+        return [], f"unrecognised trigger response: {json.dumps(payload)[:300]}", ""
+    job = str(payload.get("collection_id") or "") if not payload.get("snapshot_id") else ""
+    run.log.append(f"collecting from {target.replace(BRIGHTDATA_API, '/')}")
+    last = ""
+    while True:
+        if clock() - started > deadline:
+            return [], (f"the scraper's results were not ready after {deadline:.0f}s"
+                        + (f" (last answer: {last})" if last else "")), job
+        sleep(poll)
+        response = http.get(target, _auth(token))
+        run.requests += 1
+        payload = _payload(response)
+        status = int(response.status_code)
+        if status == 200 and isinstance(payload, list):
+            return payload, "", job
+        if status == 200 and _is_record(payload):
+            return [payload], "", job
+        if _pending(status, payload, response.text or ""):
+            last = f"HTTP {status} {brief(response.text, 120)}".strip()
+            continue
+        return [], f"collecting failed: HTTP {status} {brief(response.text)}", job
 
 
 # --------------------------------------------------------------------------- #

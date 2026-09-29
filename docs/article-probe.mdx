@@ -80,7 +80,10 @@ The probe sends the Bright Data token only to `https://api.brightdata.com/`,
 and refuses any other trigger URL. Both of Bright Data's job APIs are
 understood: a `snapshot_id` is collected from the datasets API, a
 `collection_id` or `response_id` from the collector API, and a list is taken
-as the records themselves.
+as the records themselves. The realtime trigger (`/dca/trigger_immediate`)
+gets one page per request, as the CLI sends it. When a batch job brings back
+no article text, its job log (`GET /dca/log/{id}`) is read, so the report
+says whether the pages failed or were read and yielded nothing.
 
 ## What the model is asked
 

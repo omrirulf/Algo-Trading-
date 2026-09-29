@@ -431,6 +431,62 @@ def test_a_realtime_collector_answers_with_one_record():
     assert run.records == [record]
 
 
+REALTIME = API + "dca/trigger_immediate?collector=c_1"
+
+
+def test_the_realtime_trigger_gets_one_page_per_request_as_the_cli_sends_it():
+    one, two = {"url": YAHOO_1, "body": NOVO_TEXT}, {"url": YAHOO_2, "body": "Novo faces a cliff."}
+    http = RoutedHttp({
+        ("POST", REALTIME): [FakeResponse(200, payload={"response_id": "z_1"}),
+                             FakeResponse(200, payload={"response_id": "z_2"})],
+        ("GET", API + "dca/get_result?response_id=z_1"): [FakeResponse(200, payload=[one])],
+        ("GET", API + "dca/get_result?response_id=z_2"): [FakeResponse(202, text=""),
+                                                          FakeResponse(200, payload=two)],
+    })
+    run = ap.run_scraper(http, "tok", REALTIME, [YAHOO_1, YAHOO_2], **fast())
+    assert [body for _, body, _ in http.posts] == [{"url": YAHOO_1}, {"url": YAHOO_2}]
+    assert run.records == [one, two] and not run.error
+    assert not any("/dca/log/" in url for url, _ in http.gets)
+
+
+def test_one_realtime_page_failing_does_not_lose_the_others():
+    two = {"url": YAHOO_2, "body": "Novo faces a cliff."}
+    http = RoutedHttp({
+        ("POST", REALTIME): [FakeResponse(500, text="worker crashed"),
+                             FakeResponse(200, payload={"response_id": "z_2"})],
+        ("GET", API + "dca/get_result?response_id=z_2"): [FakeResponse(200, payload=[two])],
+    })
+    run = ap.run_scraper(http, "tok", REALTIME, [YAHOO_1, YAHOO_2], **fast())
+    assert run.records == [two]
+    assert run.error == f"{YAHOO_1}: trigger refused: HTTP 500 worker crashed"
+
+
+def test_a_batch_job_that_brings_back_nothing_has_its_log_read():
+    """The Yahoo scraper built from a Yahoo page returned no record for it, and
+    no error either: the job log says whether the pages failed or were read."""
+    trigger = API + "dca/trigger?collector=c_1"
+    http = RoutedHttp({
+        ("POST", trigger): [FakeResponse(200, payload={"collection_id": "j_1"})],
+        ("GET", API + "dca/dataset?id=j_1"): [FakeResponse(200, payload={"status": "building"}),
+                                              FakeResponse(200, payload=[])],
+        ("GET", API + "dca/log/j_1"): [FakeResponse(200, payload={
+            "Id": "j_1", "Status": "done", "Inputs": 2, "Lines": 0, "Fails": 2, "Success_rate": 0})],
+    })
+    run = ap.run_scraper(http, "tok", trigger, [YAHOO_1, YAHOO_2], **fast())
+    assert run.records == [] and not run.error
+    assert run.log[-1] == "job log: done, 2 input(s), 0 record(s), 2 failed, success rate 0"
+
+
+def test_a_batch_job_with_articles_needs_no_log():
+    trigger = API + "dca/trigger?collector=c_1"
+    http = RoutedHttp({
+        ("POST", trigger): [FakeResponse(200, payload={"collection_id": "j_1"})],
+        ("GET", API + "dca/dataset?id=j_1"): [FakeResponse(200, payload=[{"url": YAHOO_1, "body": NOVO_TEXT}])],
+    })
+    run = ap.run_scraper(http, "tok", trigger, [YAHOO_1], **fast())
+    assert len(run.records) == 1 and [url for url, _ in http.gets] == [API + "dca/dataset?id=j_1"]
+
+
 def test_newline_delimited_records_are_read_too():
     lines = "\n".join(json.dumps({"url": u, "body": "text"}) for u in (YAHOO_1, YAHOO_2))
     http = FakeHttp(trigger=FakeResponse(200, text=lines))
@@ -1068,7 +1124,8 @@ def test_the_probe_can_outlast_every_wait_it_may_meet():
     fetching = math.ceil(pages / ap.FETCH_WORKERS) * 2 * ap.UNLOCKER_TIMEOUT_SECONDS
     # The build's retries sleep inside its own deadline; its last request can run past it.
     building = ap.SCRAPER_BUILD_DEADLINE_SECONDS + 2 * ap.UNLOCKER_TIMEOUT_SECONDS
-    scraping = ap.UNLOCKER_TIMEOUT_SECONDS + ap.SCRAPER_DEADLINE_SECONDS + ap.UNLOCKER_TIMEOUT_SECONDS
+    # Trigger, deadline, the poll that ran past it, and the job log read when nothing came back.
+    scraping = ap.SCRAPER_DEADLINE_SECONDS + 3 * ap.UNLOCKER_TIMEOUT_SECONDS
     calls = len(ap.VARIANTS) * ap.DEFAULT_REPEATS
     asking = math.ceil(calls / ap.MODEL_WORKERS) * (
         llm.FULL_MODEL_TIMEOUT_SECONDS + llm.TRANSPORT_RETRY_TIMEOUT_SECONDS)
