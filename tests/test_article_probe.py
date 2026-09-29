@@ -103,7 +103,7 @@ class FakeHttp:
         self.posts.append((url, body, headers))
         if url == news.BRIGHTDATA_REQUEST_URL:
             status, page = self.pages.get(body["url"], (404, "gone"))
-            return FakeResponse(status, page, headers={} if status == 200 else {"x-brd-err-msg": "target said 404"})
+            return FakeResponse(status, page, headers={"x-brd-err-msg": "target said 404"} if status == 404 else {})
         return self.trigger
 
     def get(self, url, headers):
@@ -470,6 +470,30 @@ def test_article_text_lands_under_its_own_headline_and_nowhere_else():
     assert after.index(added[0]) == after.index("- " + entry.context.headlines[2]) + 1
 
 
+def test_the_named_only_prompt_gives_text_to_the_stories_about_the_company_and_no_others():
+    entry = entries(journal_line())[0]
+
+    def page(index, text, mentions):
+        return ap.Page(index=index, source="s", url="u", kind=ap.ARTICLE, mentions=mentions,
+                       lede=ap.Lede(text=text, words=len(text.split()), boilerplate_words=0, article_words=9))
+
+    variants = ap.build_variants(entry.context, [page(0, "novo buyback words", True),
+                                                 page(1, "valero record words", False)], [])
+    assert list(variants) == ["headlines", "unlocker", "unlocker-named"]
+    named = variants["unlocker-named"].as_prompt()
+    assert "novo buyback words" in named and "valero record words" not in named
+    # When every story names the company the prompt would repeat `unlocker`, so it is not asked.
+    every = ap.build_variants(entry.context, [page(0, "novo buyback words", True)], [])
+    assert list(every) == ["headlines", "unlocker"]
+
+
+def test_an_html_error_page_becomes_one_readable_line():
+    gateway = "<html>\n<head><title>502 Bad Gateway</title></head>\n<body><center>nginx</center></body></html>"
+    assert ap.brief(gateway) == "502 Bad Gateway nginx"
+    page = ap.fetch_page(FakeHttp(pages={YAHOO_1: (502, gateway)}), "tok", "z", 0, "Yahoo Finance", YAHOO_1)
+    assert page.error == "HTTP 502 502 Bad Gateway nginx"
+
+
 def test_the_two_site_prompts_differ_only_in_where_the_words_came_from():
     entry = entries(journal_line())[0]
 
@@ -572,16 +596,17 @@ def test_a_run_reads_every_story_and_skips_what_is_not_one():
     assert by_index[0].mentions is True
     # Four stories, one of them through Google: five Unlocker requests, no scraper.
     assert sum(p.requests for p in probe.pages) == 5
-    assert list(probe.variants) == ["headlines", "unlocker"]
-    assert len(probe.calls) == 4
+    # The Valero story never names Novo, so the named-only prompt is asked too.
+    assert list(probe.variants) == ["headlines", "unlocker", "unlocker-named"]
+    assert len(probe.calls) == 6
 
 
 def test_a_run_with_a_scraper_compares_the_two_on_the_same_pages():
     probe, http = full_run(scraper_trigger=ap.BRIGHTDATA_API + "datasets/v3/scrape?dataset_id=gd_1")
     assert [s.index for s in probe.scraped] == [0, 2]
     assert all(s.in_unlocker == 1.0 and s.unlocker_in == 1.0 for s in probe.scraped)
-    assert list(probe.variants) == ["headlines", "unlocker", "unlocker-site", "scraper-site"]
-    assert len(probe.calls) == 8
+    assert list(probe.variants) == ["headlines", "unlocker", "unlocker-named", "unlocker-site", "scraper-site"]
+    assert len(probe.calls) == 10
     trigger_posts = [p for p in http.posts if p[0] != news.BRIGHTDATA_REQUEST_URL]
     assert trigger_posts[0][1] == [{"url": YAHOO_1}, {"url": YAHOO_2}]
 
@@ -596,7 +621,7 @@ def test_the_report_and_the_record_say_what_happened():
     assert "via Google to benzinga.com" in report
     assert "1 of them never name the company" in report
     record = json.loads(json.dumps(ap.as_json(probe)))
-    assert record["ticker"] == "NVO" and len(record["calls"]) == 8
+    assert record["ticker"] == "NVO" and len(record["calls"]) == 10
     assert "  Article: " in record["prompts"]["unlocker"]
     assert "  Article: " not in record["prompts"]["headlines"]
 

@@ -12,8 +12,8 @@ name: article probe
 # cost and answers.
 #
 # It costs a little: about a dozen Unlocker requests, the scraper's records
-# if one is given, and eight model calls at the production price (a fifth of
-# a cent each). It never trades and holds no broker key.
+# if one is given, and up to ten model calls at the production price (a
+# fifth of a cent each). It never trades and holds no broker key.
 on:
   workflow_dispatch:
     inputs:
@@ -57,8 +57,8 @@ jobs:
     runs-on: ubuntu-latest
     # Worst case, every wait at its limit: ten pages at 90s each, four at a
     # time and doubled for Google redirects (~9 min), the scraper's 10-minute
-    # deadline, and eight model calls four at a time at 300s plus one retry
-    # each (~20 min). tests/test_article_probe.py derives this from the
+    # deadline, and up to ten model calls four at a time at 300s plus one
+    # retry each (~30 min). tests/test_article_probe.py derives this from the
     # constants, so raising one without the other fails there.
     timeout-minutes: 60
     steps:

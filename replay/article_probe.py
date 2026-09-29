@@ -36,6 +36,9 @@ several ways, each asked ``--repeats`` times:
 * ``headlines``: the prompt exactly as recorded;
 * ``unlocker``: every result that yielded an article gets its opening words,
   indented under its own headline;
+* ``unlocker-named``: the same, but only the stories that name the company --
+  asked when some do not, because a result about another company is noise
+  that no parser removes;
 * ``unlocker-site`` / ``scraper-site``: only the chosen site's results get
   them, from each source in turn, and only the results both sources read --
   so the pair differs in nothing but where the words came from.
@@ -154,7 +157,7 @@ META_FIELDS = frozenset({
 #: Status values that mean "not ready yet" on either of Bright Data's job APIs.
 PENDING = frozenset({"running", "building", "collecting", "starting", "pending", "queued", "in_progress"})
 
-VARIANTS = ("headlines", "unlocker", "unlocker-site", "scraper-site")
+VARIANTS = ("headlines", "unlocker", "unlocker-named", "unlocker-site", "scraper-site")
 
 
 # --------------------------------------------------------------------------- #
@@ -323,6 +326,15 @@ def redirect_target(page: str) -> Optional[str]:
     return None
 
 
+def brief(body: str, limit: int = 200) -> str:
+    """An error body on one line: tags stripped, whitespace folded.
+
+    A gateway's error page is HTML, and its newlines broke the report's table
+    on the first real run.
+    """
+    return " ".join(re.sub(r"<[^>]+>", " ", body or "").split())[:limit]
+
+
 def _unlock(http: Http, token: str, zone: str, url: str) -> tuple[int, str, str]:
     """``(status, body, error)`` for one page through the Unlocker."""
     response = http.post(news.BRIGHTDATA_REQUEST_URL, {"zone": zone, "url": url, "format": "raw"},
@@ -331,7 +343,7 @@ def _unlock(http: Http, token: str, zone: str, url: str) -> tuple[int, str, str]
     body = response.text or ""
     if status != 200:
         headers = getattr(response, "headers", None) or {}
-        reason = headers.get("x-brd-err-msg") or headers.get("x-brd-error") or body[:200]
+        reason = headers.get("x-brd-err-msg") or headers.get("x-brd-error") or brief(body)
         return status, "", f"HTTP {status} {reason}".strip()
     return status, body, ""
 
@@ -575,7 +587,7 @@ def run_scraper(
         payload = _payload(response)
         run.log.append(f"trigger: HTTP {response.status_code}")
         if int(response.status_code) >= 400:
-            run.error = f"trigger refused: HTTP {response.status_code} {(response.text or '')[:200]}"
+            run.error = f"trigger refused: HTTP {response.status_code} {brief(response.text)}"
             return run
         if isinstance(payload, list):
             run.records = payload
@@ -608,7 +620,7 @@ def run_scraper(
             if status == 200 and _is_record(payload):
                 run.records = [payload]
                 return run
-            run.error = f"collecting failed: HTTP {status} {(response.text or '')[:200]}"
+            run.error = f"collecting failed: HTTP {status} {brief(response.text)}"
             return run
     except httpx.HTTPError as exc:
         run.error = f"{type(exc).__name__}: {exc}"[:200]
@@ -740,11 +752,21 @@ def with_ledes(context: TickerContext, ledes: dict[int, str]) -> TickerContext:
 
 
 def build_variants(context: TickerContext, pages: list[Page], scraped: list[Scraped]) -> dict[str, TickerContext]:
-    """Each prompt the model will be asked, in report order."""
+    """Each prompt the model will be asked, in report order.
+
+    ``unlocker-named`` gives text only to the stories that name the company.
+    The first real run found the noise was not page furniture but whole
+    articles about other companies -- four of eight on a Novo Nordisk line --
+    so this is the prompt that asks whether leaving those out is cheaper and
+    reads differently. Only asked when it would differ from ``unlocker``.
+    """
     unlocker = {p.index: p.lede.text for p in pages if p.lede}
     variants = {"headlines": context}
     if unlocker:
         variants["unlocker"] = with_ledes(context, unlocker)
+    named = {p.index: p.lede.text for p in pages if p.lede and p.mentions}
+    if named and named != unlocker:
+        variants["unlocker-named"] = with_ledes(context, named)
     both = {s.index: s.lede.text for s in scraped if s.lede and s.index in unlocker}
     if both:
         variants["unlocker-site"] = with_ledes(context, {i: unlocker[i] for i in both})
