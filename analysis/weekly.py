@@ -155,8 +155,8 @@ def markdown(week: str, logs: Path = LOGS) -> str:
         out.append("Not made this week.")
     else:
         out.append(f"Status: {dig.get('status')}. Headlines read: {dig.get('headlines_read', 0)}. "
-                   "Earnings dates, and headlines naming a fund closing, a delisting, a ticker "
-                   "or name change, a split or a merger, found by code (no model call).")
+                   f"Cost: ${dig.get('cost_usd') or 0:.4f} (cap ${dig.get('cap_usd', 1):.2f} a week). "
+                   f"Flags dropped for naming no headline given: {dig.get('dropped', 0)}.")
         out.append("")
         for e in dig.get("earnings") or []:
             out.append(f"- **{e['ticker']}** earnings on {e['date']} (in {e['days_away']} days): {e['link']}")
