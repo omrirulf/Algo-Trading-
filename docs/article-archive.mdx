@@ -1,0 +1,96 @@
+---
+title: "Article archive"
+description: "After each cycle, the articles behind the companies' news, saved privately for the December test and never shown to the model"
+---
+
+The model reads each news result as a headline and Google's ~150-character
+snippet. The [article probe](/article-probe) showed on one example what the
+start of each article would add. One example cannot show that it trades
+better, so the owner decided on 29 Sep 2026: **do not give the model article
+text yet, but save it from now on**. At the first checkpoint (about
+22 Dec 2026) a test can then compare, over many days, the model's answers
+with and without the text, scored against prices.
+
+```bash
+python -m store.articles                 # the latest cycle not archived yet
+python -m store.articles --cycle 36584368928
+python -m store.articles --no-upload     # fetch and count only; store nothing
+python -m store.articles --dry-run       # which links; no network
+```
+
+You do not have to run it. The **article archive** workflow runs it after
+every heartbeat run on `main`.
+
+## What it saves
+
+For the latest cycle:
+
+1. every **company** the cycle asked about. Funds are left out: the probe found
+   their news mostly about something else;
+2. each news result whose **headline or snippet names the company**. A story
+   about another company is noise, and there is no need to pay to fetch it;
+3. the page behind it, fetched through the Web Unlocker zone the news fetch
+   already uses (a Google redirect is followed once). One generic extractor
+   (trafilatura) cuts the story out of the page, the same way the probe
+   does (`orchestrator/article_text.py`);
+4. the first **1,000 words** of each story, paragraph by paragraph. The probe
+   gives the model 300; keeping more lets the test try other lengths without
+   fetching again.
+
+A cycle has had 72 to 106 such links, from 13 to 16 companies: about 100 Web
+Unlocker requests a day. Four pages are fetched at a time, and no new page
+is started after 25 minutes.
+
+## Where it goes: private, never the repository
+
+<Warning>
+  The repository is public, and the articles are other people's work. Their
+  text goes **only** to the archive's private Storage bucket, as one
+  xz-compressed file per cycle:
+  `model-io/articles/YYYY/MM/YYYY-MM-DD/<run>.jsonl.xz`, next to the model
+  calls' full bodies ([Database](/database)). It is never put in a commit, a
+  workflow artifact or a log line. The tests check the workflow for all three.
+</Warning>
+
+The repository gets one line per cycle in `logs/article_archive.jsonl`. It
+holds counts only: companies, links, articles with text, words kept, why the
+others have none (`"HTTP 502": 8`, for example), and the object's path, size
+and SHA-256. No text, no headline and no link. A copy of the object can be
+checked against that hash without trusting where it came from.
+
+One line per article in the object:
+
+| Field | What |
+| --- | --- |
+| `cycle`, `ticker`, `ts_utc`, `index` | which cycle, company, journal line and result |
+| `source`, `headline`, `url` | the result, as the model saw it |
+| `final_url`, `fetched_at`, `status`, `error`, `seconds` | how the fetch went |
+| `title`, `date` | what the extractor read off the page |
+| `article_words`, `kept_words`, `paragraphs` | the story: its length, and its first 1,000 words |
+| `paywall_suspected`, `names_the_company` | the probe's crude checks |
+
+## What it does not do
+
+- **It does not change the model's answers.** Nothing in the cycle reads the
+  archive, and the prompt is unchanged, so the race is untouched.
+- **It is not part of the cycle.** It runs in its own workflow after the
+  heartbeat run ends, so it cannot slow a cycle down or make one fail. The
+  cycle already takes up to an hour and a half.
+- **It holds no broker key and no model key.** It only fetches pages and
+  stores them.
+
+## Things to know
+
+- **The pages are fetched an hour or two after the cycle read the
+  headlines.** Each line says when (`fetched_at`). A story edited in between
+  is saved as it was when fetched.
+- **Some sites cannot be read.** Yahoo Finance answered HTTP 502 to every
+  article the probe tried on 29 Sep. Those results are counted by the reason they have no
+  text. Scraper Studio was tested for them and left out until the December
+  checkpoint (see [Article probe](/article-probe)).
+- **Each cycle is archived once.** A cycle with a stored object in the index
+  is skipped. The file is never overwritten, so a run that repeats one
+  stores nothing new. You can archive a named cycle again by hand with the
+  workflow's `cycle` input.
+- **A pull-request run stores nothing.** It fetches and counts the latest
+  cycle with `--no-upload`, and commits nothing.
