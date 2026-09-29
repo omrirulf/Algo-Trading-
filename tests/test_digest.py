@@ -7,12 +7,16 @@ never trades, changes a rule or calculates a number; under $1 a week.
 from __future__ import annotations
 
 import json
+import logging
+import re
+import threading
 from datetime import date
 
+import httpx
 import pytest
 
-from orchestrator import digest, heartbeat
-from orchestrator.llm import Completion, LLMError
+from orchestrator import digest, heartbeat, llm
+from orchestrator.llm import Completion, LLMError, OpenAICompatibleProvider
 from orchestrator.pricing import Usage
 
 TODAY = date(2026, 10, 5)
@@ -132,10 +136,23 @@ def test_the_weekly_cap_is_kept_before_the_call():
 
 
 def test_the_worst_case_of_a_full_week_is_far_under_the_cap():
-    items = [{"id": f"H{k}", "ticker": "NVDA", "seen": "2026-10-05", "title": "x" * 200,
-              "snippet": "y" * 300, "source": "z" * 60, "link": "https://a.example"} for k in range(digest.MAX_ITEMS)]
-    user = digest.user_prompt({"NVDA": "long"}, items)
-    assert digest.worst_case_usd(MODEL, digest.SYSTEM_PROMPT, user) < 0.25 * digest.WEEKLY_CAP_USD
+    def week(sizes):
+        items = []
+        for k, size in enumerate(sizes):
+            items += [{"id": f"H{len(items) + n + 1}", "ticker": f"N{k:03d}", "seen": "2026-10-05",
+                       "title": "x" * 200, "snippet": "y" * 300, "source": "z" * 60,
+                       "link": "https://a.example"} for n in range(size)]
+        items = items[:digest.MAX_ITEMS]
+        return {i["ticker"]: "long" for i in items}, items
+
+    # Every name at its limit; the shape that makes the most calls (each batch
+    # closes at 26, when the next name's 15 would not fit); one name with all.
+    for sizes in ([digest.PER_NAME] * 20, [11, 15] + [15, 11] * 12, [digest.MAX_ITEMS]):
+        held, items = week(sizes)
+        asks = digest.batches(held, items)
+        assert len(asks) <= 12
+        worst = sum(digest.worst_case_usd(MODEL, digest.SYSTEM_PROMPT, user) for _, user in asks)
+        assert worst < 0.25 * digest.WEEKLY_CAP_USD
 
 
 def test_nothing_to_read_asks_nobody_and_a_failed_call_says_so():
@@ -146,7 +163,7 @@ def test_nothing_to_read_asks_nobody_and_a_failed_call_says_so():
     broken = Fake(raises=LLMError("HTTP 500"))
     record = digest.run(broken, model=MODEL, today=TODAY, account_lines=[account(("NVDA", 1))],
                         journal_lines=[jline("NVDA", sources=[src(1)])])
-    assert record["status"] == "failed: LLMError" and record["flags"] == []
+    assert record["status"] == "failed: LLMError: HTTP 500" and record["flags"] == []
 
 
 def test_what_this_week_already_cost_is_read_from_its_files(tmp_path):
@@ -175,3 +192,122 @@ def test_the_heartbeat_mode_builds_a_provider_and_nothing_that_trades(tmp_path, 
     monkeypatch.setattr(heartbeat, "full_model_provider", no_key)
     record = heartbeat.weekly_digest(tmp_path, today=TODAY)
     assert record["status"].startswith("not asked:") and record["cost_usd"] == 0.0
+
+
+# --------------------------------------------------------------------------- #
+# 2026-W40: the week that did not fit in one answer
+# --------------------------------------------------------------------------- #
+
+#: The held names of the first digest (29 Sep 2026) and how many headlines each had: 274 in all.
+W40 = {"ASML": 15, "CAT": 15, "EMB": 1, "EWT": 5, "GLD": 15, "HDB": 15, "IEF": 8, "JPM": 15,
+       "KRE": 4, "LLY": 15, "MSFT": 15, "NVDA": 15, "NVO": 15, "PG": 15, "RSP": 15, "RY": 15,
+       "TEVA": 15, "TIP": 15, "TLT": 15, "UUP": 1, "XLY": 15, "XOM": 15}
+
+TIMED_OUT = ("https://api.deepinfra.com/v1/openai/chat/completions unreachable: "
+             "The read operation timed out (gave up after 2 attempt(s))")
+
+
+def w40_week():
+    """The account and journal lines of a week shaped like 2026-W40's."""
+    lines = [jline(t, sources=[src(f"{t}-{k}") for k in range(n)]) for t, n in W40.items()]
+    return [account(*((t, 1) for t in W40))], lines
+
+
+def ids_in(user):
+    return re.findall(r"^(H\d+) \|", user, re.MULTILINE)
+
+
+def test_a_week_too_big_for_one_answer_is_read_in_batches_each_answered_in_time():
+    """29 Sep 2026: the whole week, 274 headlines, went to gpt-oss-120b in one
+    call; the ask and its one retry each ran out the 300-second read timeout,
+    and the report said only "failed: LLMError".
+
+    This endpoint fails the same way -- a request with more headlines than a
+    batch never answers in time -- and is asked through the real provider,
+    retry included."""
+    lock = threading.Lock()
+    sizes: list[int] = []
+
+    def endpoint(request):
+        ids = ids_in(json.loads(request.content)["messages"][1]["content"])
+        with lock:
+            sizes.append(len(ids))
+        if len(ids) > digest.BATCH_ITEMS:
+            raise httpx.ReadTimeout("The read operation timed out", request=request)
+        flags = [{"id": ids[0], "kind": "major_news", "note": "Something happened."}]
+        return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps({"flags": flags})}}],
+                                         "usage": {"prompt_tokens": 3_300, "completion_tokens": 2_000}})
+
+    provider = OpenAICompatibleProvider(
+        "http://local/v1", MODEL, api_key="k", sleep=lambda _: None, timeout=llm.FULL_MODEL_TIMEOUT_SECONDS,
+        client=httpx.Client(transport=httpx.MockTransport(endpoint), base_url="http://local"))
+    accounts, journal = w40_week()
+    held = digest.held_names(accounts)
+    items = digest.gather(journal, held, TODAY)["items"]
+    assert len(items) == 274
+
+    # What 29 Sep did: the week in one call, asked twice, and the error that said why.
+    with pytest.raises(LLMError, match=re.escape("The read operation timed out (gave up after 2 attempt(s))")):
+        provider.complete_detailed(digest.SYSTEM_PROMPT, digest.user_prompt(held, items), digest.SCHEMA)
+    assert sizes == [274, 274]
+
+    sizes.clear()
+    record = digest.run(provider, model=MODEL, today=TODAY, account_lines=accounts, journal_lines=journal)
+    assert record["status"] == "ok"
+    assert sum(sizes) == 274 and max(sizes) <= digest.BATCH_ITEMS and record["batches"] == len(sizes) > 1
+    assert len(record["flags"]) == len(sizes) and "errors" not in record
+    assert record["cost_usd"] == pytest.approx(len(sizes) * (3_300 * 0.05 + 2_000 * 0.45) / 1e6)
+    assert record["worst_case_usd"] < 0.25 * digest.WEEKLY_CAP_USD
+
+
+def test_every_headline_is_asked_once_and_a_name_s_headlines_together():
+    accounts, journal = w40_week()
+    held = digest.held_names(accounts)
+    items = digest.gather(journal, held, TODAY)["items"]
+    asks = digest.batches(held, items)
+    assert [i for _, user in asks for i in ids_in(user)] == [i["id"] for i in items]
+    calls: dict[str, set[int]] = {}
+    for n, (part, user) in enumerate(asks):
+        assert len(part) <= digest.BATCH_ITEMS and ids_in(user) == [i["id"] for i in part]
+        names = list(dict.fromkeys(i["ticker"] for i in part))
+        listed = user.split("\n", 1)[0]
+        assert all(f"{t} (" in listed for t in names)
+        assert not any(f"{t} (" in listed for t in held if t not in names)
+        for t in names:
+            calls.setdefault(t, set()).add(n)
+    assert all(len(where) == 1 for where in calls.values())
+
+
+def test_a_batch_that_fails_says_why_and_the_others_still_count(caplog):
+    class JpmTimesOut(Fake):
+        def complete_detailed(self, system, user, schema, effort=None):
+            self.asked.append(user)
+            if "| JPM |" in user:
+                raise LLMError(TIMED_OUT)
+            flags = [{"id": ids_in(user)[0], "kind": "major_news", "note": "Something happened."}]
+            return Completion(json.dumps({"flags": flags}), self.usage)
+
+    accounts, journal = w40_week()
+    fake = JpmTimesOut()
+    with caplog.at_level(logging.WARNING, logger="orchestrator.digest"):
+        record = digest.run(fake, model=MODEL, today=TODAY, account_lines=accounts, journal_lines=journal)
+    n = record["batches"]
+    [error] = record["errors"]
+    assert len(fake.asked) == n > 1 and "JPM" in error["names"]
+    assert error["error"] == f"LLMError: {TIMED_OUT}"
+    assert record["status"].startswith(f"partial: {n - 1} of {n} batches answered ({274 - error['headlines']} of 274")
+    assert f"batch {error['batch']} of {n} ({', '.join(error['names'])}) failed: LLMError: {TIMED_OUT}" in record["status"]
+    assert len(record["flags"]) == n - 1 and not {f["ticker"] for f in record["flags"]} & set(error["names"])
+    assert record["cost_usd"] == pytest.approx((n - 1) * (20_000 * 0.05 + 1_500 * 0.45) / 1e6)
+    assert TIMED_OUT in caplog.text
+
+
+def test_every_batch_failing_says_why():
+    accounts, journal = w40_week()
+    record = digest.run(Fake(raises=LLMError(TIMED_OUT)), model=MODEL, today=TODAY,
+                        account_lines=accounts, journal_lines=journal)
+    n = record["batches"]
+    assert record["status"].startswith(f"failed: all {n} batches; batch 1 of {n} (ASML")
+    assert record["status"].endswith(f"LLMError: {TIMED_OUT}")
+    assert len(record["errors"]) == n and record["flags"] == [] and record["cost_usd"] == 0.0
+    assert "tokens" not in record

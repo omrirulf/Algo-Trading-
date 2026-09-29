@@ -92,12 +92,25 @@ given, copies the link, title and source from that headline, strips anything
 like a link from the note, and counts what it dropped. Headlines are
 untrusted text; the prompt tells the model to read them as data.
 
-**Cost cap: $1 a week.** Before the call, the worst case (every character a
-token, a full answer, asked twice for an off-schema retry) is priced; if it
-would take the week's spend past $1, or the model has no price, no call is
-made and the digest says so. A full week of headlines prices at about $0.02
-in the worst case; a real digest costs well under a cent. The measured cost
-is in the record.
+**Batches.** The headlines go to the model at most 40 to a call, a name's
+headlines always in the same call, and every call at once. The first digest
+(2026-W40, 29 Sep 2026) sent the whole week in one call: 274 headlines, about
+19,500 tokens. gpt-oss-120b, writing about 43 tokens a second that day, had
+not answered when the call and its one retry each ran out the 300-second
+timeout, and the report said only `failed: LLMError`. A batch of 40 is about
+the size of the prompt the same model answers for each ticker every cycle.
+A batch that fails is named in the status with the error it raised (for
+example `LLMError: ... The read operation timed out (gave up after 2
+attempt(s))`), the heartbeat's log says the same, and the other batches'
+flags are kept.
+
+**Cost cap: $1 a week.** Before the calls, the worst case (every character a
+token, a full answer for every batch, each asked twice for an off-schema
+retry) is priced; if it would take the week's spend past $1, or the model
+has no price, no call is made and the digest says so. At gpt-oss-120b's
+price, W40's 274 headlines make 9 batches and price at $0.14 in the worst
+case, and no full week (at most 12 batches) can price above $0.25; a real
+digest costs a cent or two. The measured cost is in the record.
 
 The heartbeat runs it with `python -m orchestrator.heartbeat --weekly-digest`,
 which builds the full model's provider and nothing else of a cycle: no

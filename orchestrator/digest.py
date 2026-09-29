@@ -13,8 +13,9 @@ Who does what
   journal line), listed by code when it falls in the next ``EARNINGS_DAYS``
   days. The headlines are the ones the cycle already fetched for each held
   name this week and wrote in the journal (``context.sources``): no new
-  search is made, so the digest costs one model call and nothing else.
-* **The model reads and flags.** It is shown the headlines and asked which
+  search is made, so the digest costs its model calls and nothing else.
+* **The model reads and flags.** It is shown the headlines, at most
+  ``BATCH_ITEMS`` to a call, and asked which
   report a fund closure or change, an index change, an earnings date or
   warning, or major news. It answers with the headline's id, a kind and a
   one-sentence note -- never a link, a price, a number of its own or a view
@@ -30,13 +31,29 @@ text: it reaches the model inside a data block the prompt says to read as
 data, and the answer is held to a schema whose only free text is a short
 note, which is cut to ``NOTE_CHARS`` and stripped of anything like a link.
 
+Batches
+-------
+The headlines go to the model ``BATCH_ITEMS`` at a time, every batch at
+once. The first digest (2026-W40, 29 Sep 2026) sent the whole week in one
+call -- 274 headlines, about 19,500 tokens -- and gpt-oss-120b, writing
+about 43 tokens a second on DeepInfra that day, had not answered when the
+ask and its one retry each ran out the 300-second read timeout
+(``llm.FULL_MODEL_TIMEOUT_SECONDS``). The report said only "LLMError". A
+batch of forty is about 3,300 tokens: the size of the per-ticker prompts the
+same model answers every cycle (a median of 2,666 input tokens on 29 Sep, in
+about two minutes at a higher effort than this one). Asked together, the
+batches take about as long as the slowest of them, so the digest's worst
+case is still one call's. A batch that fails is named in the status with the
+error it raised, and the other batches' flags are kept.
+
 Cost
 ----
 Capped at ``WEEKLY_CAP_USD`` a week (the owner's cap: under $1). Before the
-call, the worst case -- every input token and a full answer, asked twice
-for an off-schema retry -- is priced from ``orchestrator.pricing``; if it
-would take the week's spend past the cap, or the model has no price, the
-call is not made and the digest says so. The measured cost is recorded.
+calls, the worst case -- every input token and a full answer for every
+batch, each asked twice for an off-schema retry -- is priced from
+``orchestrator.pricing``; if it would take the week's spend past the cap, or
+the model has no price, no call is made and the digest says so. The
+measured cost is recorded.
 
 No key is read here: the caller hands in the provider
 (``heartbeat.full_model_provider``).
@@ -45,7 +62,9 @@ No key is read here: the caller hands in the provider
 from __future__ import annotations
 
 import json
+import logging
 import re
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any, Iterable, Optional, Sequence
@@ -53,6 +72,8 @@ from typing import Any, Iterable, Optional, Sequence
 from config.instruments import is_fund
 from orchestrator import llm
 from orchestrator.pricing import Usage, cost_usd, price_for
+
+log = logging.getLogger(__name__)
 
 #: The owner's cap, in dollars a week.
 WEEKLY_CAP_USD = 1.00
@@ -63,6 +84,11 @@ NEWS_DAYS = 7
 #: At most this many headlines per held name (the newest), and in all.
 PER_NAME = 15
 MAX_ITEMS = 300
+#: At most this many headlines in one model call (see "Batches" above). More
+#: than ``PER_NAME``, so a name's headlines always go in the same call.
+BATCH_ITEMS = 40
+#: A failed call's error is kept to one line of this many characters.
+ERROR_CHARS = 300
 #: At most this many flags are kept, and a note is cut to this many characters.
 MAX_FLAGS = 25
 NOTE_CHARS = 240
@@ -232,8 +258,29 @@ def user_prompt(held: dict[str, str], items: Sequence[dict[str, Any]]) -> str:
             "Return the flags as JSON.")
 
 
+def batches(held: dict[str, str], items: Sequence[dict[str, Any]]) -> list[tuple[list[dict[str, Any]], str]]:
+    """The headlines cut into calls of at most ``BATCH_ITEMS``, in order, each with its prompt.
+
+    A name's headlines are never split between two calls, so the model sees
+    every headline about a name together and can flag an event once; each
+    call's prompt lists only the held names its headlines are under. The ids
+    stay those ``gather`` gave, so ``check`` reads every call's answer alike.
+    """
+    parts: list[list[dict[str, Any]]] = []
+    for ticker in dict.fromkeys(i["ticker"] for i in items):
+        mine = [i for i in items if i["ticker"] == ticker]
+        for start in range(0, len(mine), BATCH_ITEMS):
+            chunk = mine[start:start + BATCH_ITEMS]
+            if parts and len(parts[-1]) + len(chunk) <= BATCH_ITEMS:
+                parts[-1] += chunk
+            else:
+                parts.append(list(chunk))
+    return [(part, user_prompt({t: held[t] for t in dict.fromkeys(i["ticker"] for i in part) if t in held}, part))
+            for part in parts]
+
+
 def worst_case_usd(model: str, system: str, user: str) -> Optional[float]:
-    """The most one digest can cost: every character a token, a full answer, asked twice."""
+    """The most one call can cost: every character a token, a full answer, asked twice."""
     price = price_for(model)
     if price is None:
         return None
@@ -269,9 +316,32 @@ def check(answer: str, items: Sequence[dict[str, Any]], held: dict[str, str]) ->
     return kept[:MAX_FLAGS], dropped
 
 
+def _reason(exc: BaseException) -> str:
+    """What a failed call raised, on one line: its class and its message, not the class alone."""
+    text = f"{type(exc).__name__}: {exc}" if str(exc) else type(exc).__name__
+    return " ".join(text.split())[:ERROR_CHARS]
+
+
+def _status(asks: Sequence[tuple[list[dict[str, Any]], str]], errors: Sequence[dict[str, Any]]) -> str:
+    """``ok``; or how many batches failed, which one first, and the error it raised."""
+    if not errors:
+        return "ok"
+    first = errors[0]
+    where = f"batch {first['batch']} of {len(asks)} ({', '.join(first['names'])})"
+    if len(errors) == len(asks):
+        if len(asks) == 1:
+            return f"failed: {first['error']}"
+        return f"failed: all {len(asks)} batches; {where}: {first['error']}"
+    failed = {e["batch"] for e in errors}
+    read = sum(len(part) for number, (part, _) in enumerate(asks, start=1) if number not in failed)
+    return (f"partial: {len(asks) - len(errors)} of {len(asks)} batches answered "
+            f"({read} of {sum(len(part) for part, _ in asks)} headlines); {where} failed: {first['error']}"
+            + (f" (and {len(errors) - 1} more)" if len(errors) > 1 else ""))
+
+
 def run(provider: Any, *, model: str, today: date, account_lines: Iterable[str],
         journal_lines: Iterable[str], spent_this_week: float = 0.0) -> dict[str, Any]:
-    """One week's digest, as a record. Makes at most one model call, and none past the cap."""
+    """One week's digest, as a record. One model call per batch, all at once, and none past the cap."""
     held = held_names(account_lines)
     facts = gather(journal_lines, held, today)
     record: dict[str, Any] = {
@@ -286,8 +356,10 @@ def run(provider: Any, *, model: str, today: date, account_lines: Iterable[str],
     if not facts["items"]:
         record["status"] = "no headlines this week"
         return record
-    user = user_prompt(held, facts["items"])
-    worst = worst_case_usd(model, SYSTEM_PROMPT, user)
+    asks = batches(held, facts["items"])
+    worsts = [worst_case_usd(model, SYSTEM_PROMPT, user) for _, user in asks]
+    worst = None if None in worsts else sum(worsts)
+    record["batches"] = len(asks)
     record["worst_case_usd"] = None if worst is None else round(worst, 4)
     if worst is None:
         record["status"] = f"not asked: no price for {model}, so the cap cannot be kept"
@@ -295,17 +367,46 @@ def run(provider: Any, *, model: str, today: date, account_lines: Iterable[str],
     if spent_this_week + worst > WEEKLY_CAP_USD:
         record["status"] = f"not asked: up to ${worst:.2f} would pass the ${WEEKLY_CAP_USD:.2f} weekly cap"
         return record
-    try:
-        completion = provider.complete_detailed(SYSTEM_PROMPT, user, SCHEMA, effort=EFFORT)
-    except Exception as exc:  # noqa: BLE001 - a digest that failed says so; it never breaks a run
-        record["status"] = f"failed: {type(exc).__name__}"
-        return record
-    usage: Usage = completion.usage
-    spent = cost_usd(usage)
+
+    def ask(number: int) -> Any:
+        with llm.call_label(f"digest {number}/{len(asks)}"):
+            try:
+                return provider.complete_detailed(SYSTEM_PROMPT, asks[number - 1][1], SCHEMA, effort=EFFORT)
+            except Exception as exc:  # noqa: BLE001 - a batch that failed says why; it never breaks a run
+                return exc
+
+    # Every batch at once, so the digest's worst case stays one call's (its
+    # ask and one retry). At most twelve for a full week: a batch is closed
+    # only when the next name's headlines (at most PER_NAME) would not fit.
+    with ThreadPoolExecutor(max_workers=len(asks)) as pool:
+        answers = list(pool.map(ask, range(1, len(asks) + 1)))
+
+    spent: Optional[float] = 0.0
+    tokens = {"input": 0, "output": 0}
+    errors: list[dict[str, Any]] = []
+    for number, ((part, _), answer) in enumerate(zip(asks, answers), start=1):
+        names = list(dict.fromkeys(i["ticker"] for i in part))
+        if isinstance(answer, BaseException):
+            errors.append({"batch": number, "names": names, "headlines": len(part), "error": _reason(answer)})
+            log.warning("risk digest: batch %d of %d (%s) failed: %s",
+                        number, len(asks), ", ".join(names), errors[-1]["error"])
+            continue
+        usage: Usage = answer.usage
+        cost = cost_usd(usage)
+        spent = None if spent is None or cost is None else spent + cost
+        tokens["input"] += usage.input_tokens
+        tokens["output"] += usage.output_tokens
+        kept, dropped = check(answer.text, part, held)
+        record["flags"] += kept
+        record["dropped"] += dropped
+    record["dropped"] += max(0, len(record["flags"]) - MAX_FLAGS)
+    record["flags"] = record["flags"][:MAX_FLAGS]
     record["cost_usd"] = round(spent, 6) if spent is not None else None
-    record["tokens"] = {"input": usage.input_tokens, "output": usage.output_tokens}
-    record["flags"], record["dropped"] = check(completion.text, facts["items"], held)
-    record["status"] = "ok"
+    if len(errors) < len(asks):
+        record["tokens"] = tokens
+    if errors:
+        record["errors"] = errors
+    record["status"] = _status(asks, errors)
     return record
 
 

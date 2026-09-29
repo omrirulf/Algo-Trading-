@@ -14,6 +14,7 @@ from pathlib import Path
 import yaml
 
 from analysis import weekly
+from orchestrator import llm
 from tests.test_phone import _is_a_safe_push
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -138,6 +139,16 @@ def test_the_weekly_report_holds_the_model_key_and_nothing_else():
     assert "python -m orchestrator.heartbeat --weekly-digest" in run
     assert 'if [ -f "logs/weekly/$week.md" ]' in run                              # once a week
     assert "--once" not in run and "NTFY" not in run
+
+
+def test_the_weekly_step_outlasts_a_digest_call_and_its_retry():
+    """2026-W40 (29 Sep 2026): the digest's call and its one retry each ran to
+    the 300-second read timeout, which was all ten of the step's minutes, and
+    the step was stopped as the report was being written. The digest's
+    batches are asked at once, so its worst case is still one call's."""
+    step = _steps("heartbeat.yml", "cycle")["Make the weekly report"]
+    two_asks = llm.TRANSPORT_ATTEMPTS * llm.FULL_MODEL_TIMEOUT_SECONDS
+    assert step["timeout-minutes"] * 60 >= two_asks + 3 * 60
 
 
 def test_the_weekly_report_reaches_the_phone_as_a_safe_push_after_the_commit():
