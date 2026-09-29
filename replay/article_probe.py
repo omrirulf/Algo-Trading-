@@ -5,6 +5,7 @@
     python replay/article_probe.py --no-model
     python replay/article_probe.py --ticker NVO --day 2026-09-28
     python replay/article_probe.py --build-scraper
+    python replay/article_probe.py --collector c_...        # build on (or use) a collector that exists
     python replay/article_probe.py --scraper-trigger 'https://api.brightdata.com/dca/trigger?collector=c_...'
 
 The news block is a headline and Google's ~150-character snippet per result.
@@ -21,10 +22,11 @@ Two sources, side by side when both are asked for:
   generic article extractor (trafilatura) cutting the story out of the page.
   Every site goes through the same path.
 * **A Scraper Studio scraper** for one site (``--site``). ``--build-scraper``
-  has Scraper Studio's AI build one on the spot, from this line's article
-  links, through the same API calls Bright Data's own CLI makes -- no
+  has Scraper Studio's AI build one on the spot, from one of this line's
+  article links, through the same API calls Bright Data's own CLI makes -- no
   dashboard, nothing to copy by hand -- and the report prints its trigger URL
-  so a later run can reuse it with ``--scraper-trigger``. Its records are
+  so a later run can reuse it with ``--scraper-trigger``. ``--collector``
+  builds on a collector that exists instead of creating another. Its records are
   read whatever the fields were named: ``body`` if there is one, else the
   longest text. Bright Data's library of ready-made scrapers is looked up
   too, and any named for the site are listed.
@@ -344,6 +346,18 @@ def brief(body: str, limit: int = 200) -> str:
     return " ".join(re.sub(r"<[^>]+>", " ", body or "").split())[:limit]
 
 
+#: Where Bright Data says why a request failed, when it does: the news fetch
+#: reads the first two, Bright Data's CLI the second and third.
+BRD_ERROR_HEADERS = ("x-brd-err-msg", "x-brd-error", "x-luminati-error", "x-brd-err-code")
+
+
+def brd_reason(response: Any) -> str:
+    """Bright Data's own words for a failure, from its headers; empty when it gave none."""
+    headers = getattr(response, "headers", None) or {}
+    said = [str(headers.get(name)) for name in BRD_ERROR_HEADERS if headers.get(name)]
+    return "; ".join(dict.fromkeys(said))
+
+
 def _unlock(http: Http, token: str, zone: str, url: str) -> tuple[int, str, str]:
     """``(status, body, error)`` for one page through the Unlocker."""
     response = http.post(news.BRIGHTDATA_REQUEST_URL, {"zone": zone, "url": url, "format": "raw"},
@@ -351,8 +365,7 @@ def _unlock(http: Http, token: str, zone: str, url: str) -> tuple[int, str, str]
     status = int(response.status_code)
     body = response.text or ""
     if status != 200:
-        headers = getattr(response, "headers", None) or {}
-        reason = headers.get("x-brd-err-msg") or headers.get("x-brd-error") or brief(body)
+        reason = brd_reason(response) or brief(body)
         return status, "", f"HTTP {status} {reason}".strip()
     return status, body, ""
 
@@ -677,6 +690,11 @@ SCRAPER_BUILD_RETRIES = 4
 SCRAPER_BUILD_RETRY_BASE_SECONDS = 30.0
 SCRAPER_BUILD_RETRY_MAX_SECONDS = 240.0
 TRANSIENT_STATUSES = frozenset({429, 500, 502, 503, 504})
+#: Example pages the AI builds from. The API takes a list, but Bright Data's
+#: CLI always sends one, and the first build -- sent two -- was refused.
+SCRAPER_BUILD_EXAMPLES = 1
+#: A collector id, as the collector API hands one out.
+COLLECTOR_ID = re.compile(r"c_[a-z0-9]+")
 
 #: Where the built scraper's own results would be pushed. The collector API
 #: wants a delivery target at creation; this is the CLI's default, and the
@@ -712,7 +730,7 @@ class ScraperBuild:
 
 def build_scraper(
     http: Http, token: str, site: str, urls: list[str], description: str = SCRAPER_DESCRIPTION, *,
-    name: str = "", deadline: float = SCRAPER_BUILD_DEADLINE_SECONDS,
+    name: str = "", collector: str = "", deadline: float = SCRAPER_BUILD_DEADLINE_SECONDS,
     poll: float = SCRAPER_BUILD_POLL_SECONDS, sleep: Callable[[float], None] = time.sleep,
     clock: Callable[[], float] = time.monotonic,
 ) -> ScraperBuild:
@@ -725,45 +743,90 @@ def build_scraper(
     URL for anyone to copy: the finished scraper's trigger is its id.
 
     The collector stays in the account's Scraper Studio, where it can be
-    inspected, reused by id, or deleted by hand -- Bright Data has no API to
-    delete one, as the CLI notes. So this runs only when asked for.
+    inspected, reused by id, or deleted by hand -- Bright Data documents no
+    API to delete one, as the CLI notes. So this runs only when asked for,
+    and ``collector`` builds on one that exists instead of creating another:
+    one a failed build left behind is finished rather than joined by a
+    second, and one already built is used as it is.
     """
     build = ScraperBuild(site=site, name=name or f"article-probe {site} {time.strftime('%Y-%m-%d %H:%M', time.gmtime())}")
     started = clock()
     headers = _auth(token)
 
+    def said(response: Any) -> str:
+        """A refused call as the log and the report show it, Bright Data's headers included."""
+        reason = brd_reason(response)
+        return f"HTTP {response.status_code} {brief(response.text)}{f' [{reason}]' if reason else ''}".strip()
+
     def post_retrying(url: str, body: Any) -> Any:
-        """POST, waiting out the AI's parallel-build cap and brief server errors."""
+        """POST, waiting out the AI's parallel-build cap and brief server errors.
+
+        A server error that says the same thing twice is an answer, not a
+        hiccup: the first build spent seven minutes being told the same thing
+        five times.
+        """
+        last = ""
         for attempt in range(SCRAPER_BUILD_RETRIES + 1):
             response = http.post(url, body, headers)
             build.requests += 1
             status = int(response.status_code)
             if status not in TRANSIENT_STATUSES or attempt == SCRAPER_BUILD_RETRIES:
                 return response
+            this = said(response)
+            if status != 429 and this == last:
+                return response
+            last = this
             wait = min(SCRAPER_BUILD_RETRY_BASE_SECONDS * 2 ** attempt, SCRAPER_BUILD_RETRY_MAX_SECONDS)
             if clock() - started + wait > deadline:
                 return response
-            build.log.append(f"HTTP {status} from {url.replace(BRIGHTDATA_API, '/')}; waiting {wait:.0f}s")
+            build.log.append(f"{this} from {url.replace(BRIGHTDATA_API, '/')}; waiting {wait:.0f}s")
             sleep(wait)
         return response  # pragma: no cover - the loop always returns
 
     try:
-        response = post_retrying(f"{BRIGHTDATA_API}dca/collector",
-                                 {"name": build.name, "deliver": SCRAPER_DELIVERY})
-        payload = _payload(response)
-        if int(response.status_code) >= 300 or not isinstance(payload, dict) or not payload.get("id"):
-            build.error = f"creating the collector failed: HTTP {response.status_code} {brief(response.text)}"
-            return build
-        build.collector_id = str(payload["id"])
-        build.name = str(payload.get("name") or build.name)
-        build.log.append(f"collector {build.collector_id} created")
+        if collector:
+            if not COLLECTOR_ID.fullmatch(collector):
+                build.error = f"{collector!r} is not a collector id (c_ and letters or digits)"
+                return build
+            build.collector_id, build.name = collector, name
+            base = f"{BRIGHTDATA_API}dca/collectors/{collector}/automate_template"
+            response = http.get(f"{base}/progress", headers)
+            build.requests += 1
+            payload = _payload(response)
+            before = ""
+            if int(response.status_code) < 300 and isinstance(payload, dict):
+                before = str(payload.get("status") or "").lower()
+                build.steps = list(payload.get("completed_steps") or [])
+                found = f"{before or 'no status'} at step {payload.get('step') or '?'}"
+            else:
+                found = said(response)
+            build.log.append(f"collector {collector} reused; its last build: {found}")
+            if before == "done":
+                build.status = "done"
+                build.log.append("already built, so used as it is")
+                return build
+            if before == "pending_answer":
+                build.status = before
+                build.error = ("the AI build is waiting for an answer in Scraper Studio's web UI "
+                               f"(https://brightdata.com/cp/scrapers/{collector})")
+                return build
+        else:
+            response = post_retrying(f"{BRIGHTDATA_API}dca/collector",
+                                     {"name": build.name, "deliver": SCRAPER_DELIVERY})
+            payload = _payload(response)
+            if int(response.status_code) >= 300 or not isinstance(payload, dict) or not payload.get("id"):
+                build.error = f"creating the collector failed: {said(response)}"
+                return build
+            build.collector_id = str(payload["id"])
+            build.name = str(payload.get("name") or build.name)
+            build.log.append(f"collector {build.collector_id} created")
+            base = f"{BRIGHTDATA_API}dca/collectors/{build.collector_id}/automate_template"
 
-        base = f"{BRIGHTDATA_API}dca/collectors/{build.collector_id}/automate_template"
         response = post_retrying(base, {"description": description, "urls": list(urls)})
         if int(response.status_code) >= 300:
-            build.error = f"starting the AI build failed: HTTP {response.status_code} {brief(response.text)}"
+            build.error = f"starting the AI build failed: {said(response)}"
             return build
-        build.log.append("AI build started")
+        build.log.append(f"AI build started from {len(urls)} example page(s): " + ", ".join(urls))
 
         last = ""
         while True:
@@ -776,7 +839,7 @@ def build_scraper(
             build.requests += 1
             payload = _payload(response)
             if not isinstance(payload, dict) or int(response.status_code) >= 300:
-                last = f"HTTP {response.status_code} {brief(response.text, 120)}".strip()
+                last = said(response)[:160]
                 continue
             build.status = str(payload.get("status") or "").lower()
             build.steps = list(payload.get("completed_steps") or build.steps)
@@ -785,7 +848,9 @@ def build_scraper(
                 build.log.append(f"AI build done after {len(build.steps)} step(s)")
                 return build
             if build.status in ("failed", "error", "cancelled"):
-                build.error = f"the AI build ended with status {build.status!r}"
+                detail = payload.get("error") or payload.get("message") or payload.get("reason")
+                build.error = (f"the AI build ended with status {build.status!r} at step "
+                               f"{payload.get('step') or '?'}" + (f": {brief(str(detail))}" if detail else ""))
                 return build
             if build.status == "pending_answer":
                 build.error = ("the AI build is waiting for an answer in Scraper Studio's web UI "
@@ -1160,6 +1225,7 @@ def render(probe: Probe) -> str:
             head += f" ({build.name})"
         out.append(f"{head}, {build.status or 'not started'}, {len(build.steps)} step(s), "
                    f"{build.requests} request(s), {build.seconds:.0f}s")
+        out += [f"  {line}" for line in build.log]
         if build.error:
             out.append(f"build error: {build.error}")
         if build.trigger:
@@ -1285,6 +1351,14 @@ def as_json(probe: Probe) -> dict:
 # --------------------------------------------------------------------------- #
 
 
+def examples(pages: list[Page], indexes: list[int], count: int = SCRAPER_BUILD_EXAMPLES) -> list[str]:
+    """The site's pages the AI builds from: ones the Unlocker read first, since a page
+    that loads is one the AI can learn from, then the rest in their order."""
+    site_pages = [p for p in pages if p.index in indexes]
+    ordered = [p for p in site_pages if p.lede] + [p for p in site_pages if not p.lede]
+    return [p.url for p in ordered][:max(1, count)]
+
+
 def run(
     entry: ReplayEntry, *, site: str, words: int, repeats: int, http: Http, token: str, zone: str,
     extract: Extractor = trafilatura_extract, complete: Optional[Complete] = None,
@@ -1292,12 +1366,15 @@ def run(
     fetch_workers: int = FETCH_WORKERS, model_workers: int = MODEL_WORKERS,
     scraper_kwargs: Optional[dict] = None, build: bool = False,
     scraper_description: str = SCRAPER_DESCRIPTION, build_kwargs: Optional[dict] = None,
+    collector: str = "",
 ) -> Probe:
     """Fetch, read, optionally build and run a scraper, optionally ask. Never raises for a bad page or call.
 
-    ``build`` has Scraper Studio's AI build a scraper for the site from its
-    article links on this line, then runs it on the same links. A trigger URL,
-    when one is given, wins: a scraper that exists is reused, never rebuilt.
+    ``build`` has Scraper Studio's AI build a scraper for the site from one of
+    its article links on this line -- ``collector``, when given, is built on
+    rather than a new one created -- then runs it on all of them. A trigger
+    URL, when one is given, wins: a scraper that exists is reused, never
+    rebuilt.
     """
     probe = Probe(entry=entry, site=site, words=words, repeats=repeats, model=model, effort=effort)
     probe.pages = [read_page(p, entry.ticker, words, extract)
@@ -1307,7 +1384,8 @@ def run(
     if (build or scraper_trigger) and urls:
         probe.library = library_matches(http, token, site)
     if build and not scraper_trigger and urls:
-        probe.build = build_scraper(http, token, site, urls, scraper_description, **(build_kwargs or {}))
+        probe.build = build_scraper(http, token, site, examples(probe.pages, indexes), scraper_description,
+                                    collector=collector, **(build_kwargs or {}))
         scraper_trigger = probe.build.trigger
     if scraper_trigger:
         probe.scraper = run_scraper(http, token, scraper_trigger, urls, **(scraper_kwargs or {}))
@@ -1351,6 +1429,10 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser.add_argument("--build-scraper", action="store_true",
                         help="have Scraper Studio's AI build a scraper for --site from this line's "
                              "article links, then run it; ignored when --scraper-trigger is given")
+    parser.add_argument("--collector", default="",
+                        help="build on this existing collector (c_...) instead of creating one -- a "
+                             "failed build's leftover is finished, a built one used as it is; implies "
+                             "--build-scraper")
     parser.add_argument("--scraper-description", default=SCRAPER_DESCRIPTION,
                         help="what the built scraper should return, for Scraper Studio's AI")
     parser.add_argument("--concurrency", type=int, default=MODEL_WORKERS, help="model calls in flight at once")
@@ -1396,8 +1478,9 @@ def main(argv: Optional[list[str]] = None) -> int:
         entry, site=args.site, words=args.words, repeats=max(1, args.repeats), http=Http(),
         token=token, zone=zone, complete=complete, scraper_trigger=args.scraper_trigger.strip(),
         model=llm.configured_model(), effort=llm.configured_effort(),
-        model_workers=max(1, args.concurrency), build=args.build_scraper,
+        model_workers=max(1, args.concurrency), build=args.build_scraper or bool(args.collector.strip()),
         scraper_description=args.scraper_description.strip() or SCRAPER_DESCRIPTION,
+        collector=args.collector.strip(),
     )
     say(render(probe))
     if args.as_json:

@@ -13,6 +13,7 @@ python replay/article_probe.py --dry-run                     # which line, which
 python replay/article_probe.py --no-model                    # fetch and measure only
 python replay/article_probe.py --ticker NVO --day 2026-09-28
 python replay/article_probe.py --build-scraper               # Scraper Studio's AI builds the site's scraper
+python replay/article_probe.py --collector c_...              # build on (or use) a collector that exists
 python replay/article_probe.py --scraper-trigger 'https://api.brightdata.com/dca/trigger?collector=c_...'
 ```
 
@@ -26,7 +27,7 @@ holds no broker key.
 | Source | How | Covers |
 | --- | --- | --- |
 | Web Unlocker | the zone the news fetch already uses, then one generic extractor (trafilatura) cuts the story out of the page | every site, one code path |
-| Scraper Studio | a scraper its AI builds through the API (`--build-scraper`), or an existing one by its trigger URL | the one site it was built for |
+| Scraper Studio | a scraper its AI builds through the API (`--build-scraper`, or `--collector` to build on one that exists), or an existing one by its trigger URL | the one site it was built for |
 
 Both are cut to the same number of words (`--words`, default 300) before the
 model sees them, so a difference between the two is a difference in *which*
@@ -36,17 +37,27 @@ skipped without a request; Google's `/goto` redirect stubs are followed once.
 ## The Scraper Studio side
 
 Nobody has to open the dashboard. Dispatch the workflow with `build_scraper`
-on, and the probe has Scraper Studio's AI build a scraper for the site from the
-line's own article links, with the same three API calls Bright Data's CLI makes
-for `bdata scraper create`:
+on, and the probe has Scraper Studio's AI build a scraper for the site from one
+of the line's own article links, with the same three API calls Bright Data's
+CLI makes for `bdata scraper create`:
 
 1. `POST /dca/collector` creates an empty collector;
 2. `POST /dca/collectors/{id}/automate_template` asks the AI to build it from
-   the example URLs and a description of the fields wanted (`url`, `title`,
+   one example page and a description of the fields wanted (`url`, `title`,
    `published_at`, `author`, and `body`, the article's own text), waiting out
    the AI's parallel-build cap (HTTP 429) the way the CLI does;
 3. `GET /dca/collectors/{id}/automate_template/progress` until it is done,
    within 15 minutes.
+
+The example page is one the Unlocker could read, when one could: a page that
+loads is one the AI can learn from. A server error is retried like the CLI
+retries it, until it says the same thing twice: then it is an answer, not a
+hiccup. Every refusal is reported with Bright Data's own error headers.
+
+`scraper_collector` (`--collector c_…`) builds on a collector that already
+exists instead of creating another. One that a failed build left behind is
+finished rather than joined by a second stub; one that is already built is
+used as it is.
 
 It then runs the new scraper on the same pages, and the report prints its
 trigger URL, `https://api.brightdata.com/dca/trigger?collector=c_…`, so a
@@ -55,9 +66,10 @@ variable `BRIGHTDATA_SCRAPER_TRIGGER` instead of building another. A trigger
 URL, when given, always wins over a build.
 
 <Warning>
-  A build leaves the collector in the account's Scraper Studio. Bright Data has
-  no API to delete one, so it is only built when asked for by name, never on a
-  pull-request run; delete it in the dashboard when done.
+  A build leaves the collector in the account's Scraper Studio, even when the
+  build fails. Bright Data documents no API to delete one, so it is only built
+  when asked for by name, never on a pull-request run; delete it in the
+  dashboard when done, or build on it with `scraper_collector`.
 </Warning>
 
 Bright Data's library of ready-made scrapers is looked up too, and any named

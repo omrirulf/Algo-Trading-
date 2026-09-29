@@ -564,6 +564,89 @@ def test_a_refused_create_leaves_no_collector_behind_to_run():
     assert not build.collector_id and build.trigger == "" and len(http.posts) == 1
 
 
+def test_a_server_error_that_repeats_itself_is_an_answer_not_a_hiccup():
+    """The first real build was told "Invalid ide automation" five times over
+    seven minutes; the second time it is said, the build stops and says so."""
+    waits: list = []
+    ticks = iter(range(0, 10_000, 5))
+    refused = FakeResponse(500, text="Invalid ide automation", headers={"x-brd-error": "automation refused"})
+    http = RoutedHttp(build_routes(automate=[refused]))
+    build = ap.build_scraper(http, "tok", "finance.yahoo.com", [YAHOO_1],
+                             sleep=waits.append, clock=lambda: next(ticks))
+    assert sum(1 for url, *_ in http.posts if url == AUTOMATE) == 2
+    assert waits == [ap.SCRAPER_BUILD_RETRY_BASE_SECONDS]
+    assert build.error == "starting the AI build failed: HTTP 500 Invalid ide automation [automation refused]"
+    assert build.trigger == "" and not http.gets
+
+
+def test_a_server_error_that_changes_is_still_waited_out():
+    waits: list = []
+    ticks = iter(range(0, 10_000, 5))
+    http = RoutedHttp(build_routes(automate=[FakeResponse(502, text="Bad Gateway"),
+                                             FakeResponse(503, text="Service Unavailable"),
+                                             FakeResponse(200, payload={})]))
+    build = ap.build_scraper(http, "tok", "finance.yahoo.com", [YAHOO_1],
+                             sleep=waits.append, clock=lambda: next(ticks))
+    assert build.status == "done" and len(waits) >= 2
+
+
+def test_a_failed_build_says_where_and_why_when_the_api_does():
+    http = RoutedHttp(build_routes(progress=[FakeResponse(200, payload={
+        "status": "failed", "step": "preview_picker", "error": "page did not load"})]))
+    build = ap.build_scraper(http, "tok", "finance.yahoo.com", [YAHOO_1], **fast())
+    assert build.error == "the AI build ended with status 'failed' at step preview_picker: page did not load"
+
+
+COLLECTOR_7 = API + "dca/collectors/c_7/automate_template"
+
+
+def test_a_collector_left_behind_is_built_on_not_joined_by_another():
+    http = RoutedHttp({
+        ("GET", COLLECTOR_7 + "/progress"): [FakeResponse(404, text="no automation job"),
+                                             FakeResponse(200, payload={"status": "running"}),
+                                             FakeResponse(200, payload={"status": "done", "completed_steps": ["a"]})],
+        ("POST", COLLECTOR_7): [FakeResponse(200, payload={})],
+    })
+    build = ap.build_scraper(http, "tok", "finance.yahoo.com", [YAHOO_1], collector="c_7", **fast())
+    assert not any(url == CREATE for url, *_ in http.posts)
+    assert http.posts[0][:2] == (COLLECTOR_7, {"description": ap.SCRAPER_DESCRIPTION, "urls": [YAHOO_1]})
+    assert build.status == "done" and build.trigger == API + "dca/trigger?collector=c_7"
+    assert build.log[0] == "collector c_7 reused; its last build: HTTP 404 no automation job"
+
+
+def test_a_collector_already_built_is_used_as_it_is():
+    http = RoutedHttp({("GET", COLLECTOR_7 + "/progress"): [
+        FakeResponse(200, payload={"status": "done", "completed_steps": ["a", "b"]})]})
+    build = ap.build_scraper(http, "tok", "finance.yahoo.com", [YAHOO_1], collector="c_7", **fast())
+    assert not http.posts and build.steps == ["a", "b"]
+    assert build.trigger == API + "dca/trigger?collector=c_7"
+
+
+def test_only_a_collector_id_is_ever_put_in_a_url():
+    http = RoutedHttp({})
+    build = ap.build_scraper(http, "tok", "finance.yahoo.com", [YAHOO_1], collector="c_7/../../x", **fast())
+    assert "is not a collector id" in build.error and not http.posts and not http.gets
+
+
+def test_the_ai_builds_from_a_page_the_unlocker_could_read():
+    read = ap.Page(index=2, source="Yahoo", url=YAHOO_2, kind=ap.ARTICLE,
+                   lede=ap.Lede("words", 1, 0, 1))
+    refused = ap.Page(index=0, source="Yahoo", url=YAHOO_1, kind=ap.ARTICLE, error="HTTP 502")
+    assert ap.examples([refused, read], [0, 2]) == [YAHOO_2]
+    assert ap.examples([refused], [0]) == [YAHOO_1]
+    assert ap.examples([refused, read], [0]) == [YAHOO_1]
+
+
+def test_bright_data_s_own_words_for_a_failure_are_kept():
+    response = FakeResponse(502, text="<html>502 Bad Gateway</html>",
+                            headers={"x-luminati-error": "Target site blocked", "x-brd-err-code": "target_40001"})
+    assert ap.brd_reason(response) == "Target site blocked; target_40001"
+    assert ap.brd_reason(FakeResponse(502, text="Bad Gateway")) == ""
+    http = FakeHttp()
+    http.post = lambda url, body, headers: response
+    assert ap._unlock(http, "tok", "z", YAHOO_1)[2] == "HTTP 502 Target site blocked; target_40001"
+
+
 @pytest.mark.parametrize("site, brand", [
     ("finance.yahoo.com", "yahoo"), ("uk.finance.yahoo.com", "yahoo"),
     ("www.stocktwits.com", "stocktwits"), ("localhost", "localhost"),
@@ -812,7 +895,10 @@ def test_a_run_that_builds_its_scraper_runs_it_on_the_same_pages():
     assert [s.index for s in probe.scraped] == [0, 2]
     assert all(s.in_unlocker == 1.0 for s in probe.scraped)
     assert "scraper-site" in probe.variants
-    # The scraper was asked for the site's two article links, and only those.
+    # The AI built it from one of the site's pages, as the CLI does; the
+    # scraper was then asked for both of the site's article links, and only those.
+    automate_body = next(body for url, body, _ in http.posts if url == AUTOMATE)
+    assert automate_body["urls"] == [YAHOO_1]
     trigger_body = next(body for url, body, _ in http.posts if url.startswith(API + "dca/trigger"))
     assert trigger_body == [{"url": YAHOO_1}, {"url": YAHOO_2}]
     report = ap.render(probe)
@@ -882,6 +968,25 @@ def test_no_line_that_fits_is_a_clear_failure(tmp_path, capsys):
     assert "no single-stock line fits" in capsys.readouterr().out
 
 
+def test_naming_a_collector_is_asking_for_a_build_on_it(tmp_path, monkeypatch):
+    journal = tmp_path / "journal.log"
+    journal.write_text(journal_line() + "\n")
+    monkeypatch.setattr(news, "resolve_token", lambda *a: "tok")
+    monkeypatch.setattr(news, "resolve_zone", lambda *a: "z")
+    seen: dict = {}
+
+    def fake_run(entry, **kwargs):
+        seen.update(kwargs)
+        return ap.Probe(entry=entry, site=kwargs["site"], words=kwargs["words"], repeats=kwargs["repeats"])
+
+    monkeypatch.setattr(ap, "run", fake_run)
+    ap.main(["--journal", str(journal), "--no-model", "--collector", " c_7 "])
+    assert seen["build"] is True and seen["collector"] == "c_7"
+    seen.clear()
+    ap.main(["--journal", str(journal), "--no-model"])
+    assert seen["build"] is False and seen["collector"] == ""
+
+
 # --------------------------------------------------------------------------- #
 # The workflow
 # --------------------------------------------------------------------------- #
@@ -930,15 +1035,18 @@ def test_inputs_reach_the_script_as_variables_never_as_shell_text():
 
 
 def test_a_scraper_is_built_only_when_someone_asks_for_one():
-    """A build leaves a collector in the Bright Data account that no API can
-    delete, so it never happens on a pull-request run or by default."""
+    """A build leaves a collector in the Bright Data account that no documented
+    API deletes, so it never happens on a pull-request run or by default."""
     wf = _workflow()
     triggers = wf.get("on") or wf[True]
-    build = triggers["workflow_dispatch"]["inputs"]["build_scraper"]
-    assert build["type"] == "boolean" and build["default"] is False
+    inputs = triggers["workflow_dispatch"]["inputs"]
+    assert inputs["build_scraper"]["type"] == "boolean" and inputs["build_scraper"]["default"] is False
+    assert inputs["scraper_collector"]["default"] == ""
     step = _probe_step()
     assert step["env"]["BUILD_SCRAPER"] == "${{ inputs.build_scraper }}"
+    assert step["env"]["SCRAPER_COLLECTOR"] == "${{ inputs.scraper_collector }}"
     assert '[ "$BUILD_SCRAPER" = "true" ] && args+=(--build-scraper)' in step["run"]
+    assert '[ -n "$SCRAPER_COLLECTOR" ] && args+=(--collector "$SCRAPER_COLLECTOR")' in step["run"]
 
 
 def test_the_extractor_is_installed_for_the_probe_and_nowhere_else():

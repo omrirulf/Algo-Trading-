@@ -40,6 +40,9 @@ on:
         description: "Have Scraper Studio's AI build a scraper for the site first (leaves a collector in the account); ignored when a trigger is given"
         type: boolean
         default: false
+      scraper_collector:
+        description: "Build on this existing collector (c_...) instead of creating one: a failed build's leftover is finished, a built one used as it is"
+        default: ""
       ask_model:
         description: "Ask the model (off: fetch and measure only)"
         type: boolean
@@ -100,6 +103,7 @@ jobs:
           # Blank on a pull_request run, which never builds a scraper: a build
           # leaves a collector in the account, so it is asked for by name.
           BUILD_SCRAPER: ${{ inputs.build_scraper }}
+          SCRAPER_COLLECTOR: ${{ inputs.scraper_collector }}
         run: |
           args=(--json)
           [ -n "$SITE" ] && args+=(--site "$SITE")
@@ -109,6 +113,7 @@ jobs:
           [ -n "$REPEATS" ] && args+=(--repeats "$REPEATS")
           [ -n "$SCRAPER_TRIGGER" ] && args+=(--scraper-trigger "$SCRAPER_TRIGGER")
           [ "$BUILD_SCRAPER" = "true" ] && args+=(--build-scraper)
+          [ -n "$SCRAPER_COLLECTOR" ] && args+=(--collector "$SCRAPER_COLLECTOR")
           # Blank on a pull_request run, which asks the model like a dispatch does.
           [ "$ASK_MODEL" = "false" ] && args+=(--no-model)
           status=0
