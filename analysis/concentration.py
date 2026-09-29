@@ -108,6 +108,29 @@ def book_at(lines: Iterable[str], through: date) -> Optional[dict[str, Any]]:
     return best
 
 
+def no_book_reason(lines: Iterable[str], through: date) -> str:
+    """Why ``book_at`` found no snapshot on or before ``through``, in plain words.
+
+    The account has been recorded only since 25 Sep 2026 (``logs/account.jsonl``,
+    written after every heartbeat run from then on), so every month before
+    September 2026 has no book to measure: an expected gap, not a recorder
+    that failed. Saying when the record starts tells the two apart.
+    """
+    first: Optional[str] = None
+    for raw in lines:
+        try:
+            snapshot = json.loads(raw)
+        except ValueError:
+            continue
+        if isinstance(snapshot, dict) and isinstance(snapshot.get("at"), str) \
+                and isinstance(snapshot.get("positions"), list):
+            first = snapshot["at"] if first is None else min(first, snapshot["at"])
+    if first is None:
+        return "no account snapshot has been recorded yet (logs/account.jsonl)"
+    return (f"the paper account has been recorded only since {first[:10]} (logs/account.jsonl), "
+            f"after this month's last trading day, {through.isoformat()}")
+
+
 def daily_returns(bars: Sequence[tuple[date, float]]) -> dict[date, float]:
     """Each session's close over the previous close in ``bars``, minus one, by the later date."""
     out: dict[date, float] = {}
@@ -165,6 +188,7 @@ def report(month: str, account_lines: Iterable[str], closes: Closes,
     """The month's concentration record. ``closes(ticker, start, end)`` gives final daily closes."""
     as_of = last_trading_day(month)
     start = as_of - timedelta(days=LOOKBACK_DAYS)
+    account_lines = list(account_lines)
     snapshot = book_at(account_lines, as_of)
     index = list(closes(INDEX, start, as_of))
     record: dict[str, Any] = {"month": month, "as_of": as_of.isoformat(), "index": INDEX}
@@ -186,6 +210,7 @@ def report(month: str, account_lines: Iterable[str], closes: Closes,
 
     if snapshot is None:
         record["book"] = None
+        record["book_missing"] = no_book_reason(account_lines, as_of)
         return record
     account = snapshot.get("account") if isinstance(snapshot.get("account"), dict) else {}
     equity = account.get("equity") if isinstance(account.get("equity"), (int, float)) else None
@@ -242,7 +267,9 @@ def render(record: dict[str, Any]) -> str:
     out = [f"Concentration, {record['month']} (as of {record['as_of']}), descriptive only:"]
     book = record.get("book")
     if book is None:
-        out.append("- book: no account snapshot recorded that month")
+        # A record made before ``book_missing`` existed (2026-08's) says only the date.
+        why = record.get("book_missing") or f"no account snapshot was recorded on or before {record['as_of']}"
+        out.append(f"- book: not measured: {why}")
     else:
         b = book["beta_to_vt"]
         out.append(f"- beta to VT: {b['net']} net (longs {b['long_side']}, shorts {b['short_side']}), "

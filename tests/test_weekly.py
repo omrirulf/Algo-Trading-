@@ -95,6 +95,18 @@ def test_the_concentration_report_is_shown_the_week_after_it_is_made_only(tmp_pa
     assert "Concentration, 2026-10" in text and "descriptive only" in text
 
 
+def test_the_markdown_says_which_month_the_concentration_report_is_for(tmp_path):
+    """2026-W40 showed 2026-08's report under a heading with no month, and "book:
+    no account snapshot recorded that month" read as if this month's were missing."""
+    month = {"month": "2026-10", "as_of": "2026-10-30", "made_on": "2026-11-02",
+             "book": None, "breadth": {"above": 30, "of": 80, "pct": 37.5, "no_data": []},
+             "vt_volatility": {"annualised_pct": 12.0, "sessions": 22}}
+    conc = {"kind": "concentration", "latest": "2026-10", "months": {"2026-10": month}}
+    md = weekly.markdown(WEEK, logs(tmp_path, drift_record(), digest_record(), conc))
+    assert "## Concentration for 2026-10 (as of 2026-10-30; monthly, descriptive only)" in md
+    assert "- book: not measured: no account snapshot was recorded on or before 2026-10-30" in md
+
+
 def test_the_markdown_lists_every_flag_with_its_source_and_link(tmp_path):
     md = weekly.markdown(WEEK, logs(tmp_path, drift_record(), digest_record(flags=3)))
     for k in range(3):
