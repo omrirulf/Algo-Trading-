@@ -134,4 +134,10 @@ For each month's last trading day:
 The book is the paper account's last snapshot of the month
 (`logs/account.jsonl`). Prices are the raw daily closes the race uses. The
 funds workflow makes each month once and commits it; the next weekly report
-shows it.
+shows it, under a heading that names the month.
+
+The account has been recorded only since 25 Sep 2026, so no month before
+September 2026 has a book: August's report says `book: not measured` and
+names the day it looked for. September's, made on the first night of
+October, is the first with one. A month whose book is missing says why:
+nothing recorded yet, or recorded only since a later day.

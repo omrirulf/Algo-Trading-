@@ -166,7 +166,10 @@ def markdown(week: str, logs: Path = LOGS) -> str:
         if not dig.get("earnings") and not dig.get("flags"):
             out.append("Nothing flagged.")
     if conc:
-        out += ["", "## Concentration (monthly, descriptive only)", ""]
+        # The month in the heading: the section is last month's, which the
+        # render's own first line says and the lines below it do not.
+        out += ["", f"## Concentration for {conc.get('month')} (as of {conc.get('as_of')}; "
+                    "monthly, descriptive only)", ""]
         out += concentration.render(conc).rstrip("\n").split("\n")[1:]
         rows = ((conc.get("book") or {}).get("beta_to_vt") or {}).get("by_position") or []
         if rows:
