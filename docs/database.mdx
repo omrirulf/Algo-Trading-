@@ -266,6 +266,7 @@ secret, key or token is ever in what it stores.
 | `model_calls` | HTTP ask to a model — retries, timeouts, refusals, off-schema answers included | the heartbeat's push |
 | `model_io_files` | Storage object: its path, size, SHA-256, calls, withheld | the heartbeat's push |
 | Storage `model-io/YYYY/MM/YYYY-MM-DD/<run>-<HHMMSS>.jsonl.xz` | heartbeat run: every call's full request and response body | the heartbeat's push |
+| Storage `model-io/articles/YYYY/MM/YYYY-MM-DD/<run>.jsonl.xz` | cycle: the text of the articles behind its companies' news, never shown to the model ([Article archive](/article-archive)) | `article-archive.yml` |
 | `scoring_prices` | distinct daily bar the race or the funds scored with | `scoring-prices.yml` |
 | `scoring_runs` | race or funds run: its `prices_sha256` and what it covered | `scoring-prices.yml` |
 
@@ -385,6 +386,7 @@ code that pushes (one real gpt-oss day rebuilt as the capture records it):
 | `scoring_runs` (3 a night) | 4.5 KB | ~3 MB |
 | **Database** | | **~200 MB of 500 MB** |
 | Storage `model-io` (~70 asks a day) | about 7 KB a call, xz | **~125 MB of 1 GB** |
+| Storage `model-io/articles/` (~100 articles a cycle) | 85 KB a cycle, xz (29 Sep: 98 articles, 82 with text) | **~22 MB more** |
 
 The objects are **xz** (the owner's choice of 26 Sep 2026: stronger than gzip,
 in a format any computer opens: `xz -d` / `unxz` on Linux and macOS, the

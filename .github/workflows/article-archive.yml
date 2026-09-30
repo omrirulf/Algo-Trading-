@@ -1,0 +1,122 @@
+name: article archive
+
+# After each heartbeat run, the articles behind the latest cycle's news
+# results -- for companies only, and only the results whose headline or
+# snippet names the company -- fetched through the Web Unlocker zone the news
+# fetch uses and saved to the archive's private Storage bucket, under
+# articles/. The model never sees them; they are for the checkpoint's test of
+# whether it would have done better with them (the owner's decision of
+# 29 Sep 2026). See docs/article-archive.mdx and store/articles.py.
+#
+# The repository is public and the articles are other people's work, so
+# their text never comes here: not in a commit, not in an artifact, not in
+# this log. What is committed is one line of counts per cycle, in
+# logs/article_archive.jsonl.
+on:
+  workflow_run:
+    workflows: [heartbeat]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      cycle:
+        description: "Archive this cycle (its heartbeat run id); blank: the latest not archived yet"
+        default: ""
+  # A manual workflow does not exist until this file is on main, so -- like
+  # article-probe.yml -- it also runs on its own pull request, and only when
+  # it changes. A pull-request run fetches and counts, stores nothing and
+  # commits nothing.
+  pull_request:
+    paths:
+      - store/articles.py
+      - orchestrator/article_text.py
+      - .github/workflows/article-archive.yml
+
+permissions:
+  contents: write
+
+# One at a time, so two runs never archive the same cycle or race to append
+# the same index line.
+concurrency:
+  group: article-archive
+  cancel-in-progress: false
+
+jobs:
+  archive:
+    # A pull request from a fork gets no secrets, so there is nothing to fetch with.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    # The fetch stops starting pages after 25 minutes (TIME_BUDGET_SECONDS),
+    # and the pages in flight then end within 90 seconds each, doubled for a
+    # Google redirect; plus the install and the push. tests/test_store_articles.py
+    # derives this from the constants.
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+          cache: pip
+      # trafilatura is the article extractor, and only the probe and this use
+      # it, so it is installed here rather than added to requirements.txt.
+      - run: pip install -r requirements.txt trafilatura==2.0.0
+
+      - name: Save the articles behind the latest cycle's news
+        # The Bright Data token and zone the news fetch uses, and the
+        # archive's key, which store/remote.py alone reads. No broker key and
+        # no model key: this cannot trade and asks no model.
+        #
+        # Only the counts reach stdout; the script prints no article text.
+        env:
+          BRIGHTDATA_API_TOKEN: ${{ secrets.BRIGHTDATA_API_TOKEN }}
+          BRIGHTDATA_SERP_ZONE: ${{ vars.BRIGHTDATA_SERP_ZONE }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          CYCLE: ${{ inputs.cycle }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          args=()
+          [ -n "$CYCLE" ] && args+=(--cycle "$CYCLE")
+          [ "$EVENT" = "pull_request" ] && args+=(--no-upload)
+          status=0
+          python -m store.articles "${args[@]}" > "$RUNNER_TEMP/line.json" || status=$?
+          if [ -s "$RUNNER_TEMP/line.json" ]; then
+            cat "$RUNNER_TEMP/line.json"
+            {
+              echo '## Article archive'
+              echo
+              echo '```json'
+              cat "$RUNNER_TEMP/line.json"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            if [ "$EVENT" != "pull_request" ]; then
+              cat "$RUNNER_TEMP/line.json" >> logs/article_archive.jsonl
+            fi
+          fi
+          exit $status
+
+      - name: Commit the index line
+        # The counts, never the text. Same pull --rebase and three tries as
+        # the heartbeat's own commits; a line that does not go through is
+        # written again by the next run, which finds its cycle not archived
+        # and stores nothing new (the object is never overwritten).
+        if: always() && github.event_name != 'pull_request'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add logs/article_archive.jsonl 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "no new index line"
+            exit 0
+          fi
+          git commit -m "Article archive: index line at $(date -u +'%Y-%m-%dT%H:%MZ')"
+          for attempt in 1 2 3; do
+            if git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}"; then
+              exit 0
+            fi
+            git rebase --abort 2>/dev/null || true
+            echo "::warning::the index line did not go through (try $attempt of 3)"
+            sleep 5
+          done
+          echo "::error::the article archive's index line was not committed"
+          exit 1
