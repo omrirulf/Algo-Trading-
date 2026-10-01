@@ -1,8 +1,6 @@
-🟡 2 warnings: 1 of 80 ticker(s) were judged without news
-Equity $101,830 · 22 positions · $87,052 gross · $2,348 at risk · unrealised +$1,714
-2 directional calls, none traded
+🟡 1 warning: 2 of 80 ticker(s) were judged without news
+Equity $101,761 · 19 positions · $74,614 gross · $2,017 at risk · unrealised +$1,846
+5 directional calls, none traded
 Started by supabase-cron at 14:40 UTC (0 min after 14:40)
-Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-09-29
-Closed: GOOGL, XBI
-Also: Model setup changed today: prompt fingerprint changed: dc976939791d -> 6c59e07de87e
-Cycle 80 tickers, $0.14 · 2026-09-30
+Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-09-30
+Cycle 80 tickers, $0.15 · 2026-10-01
