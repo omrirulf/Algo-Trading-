@@ -24,7 +24,7 @@ import html as html_lib
 import re
 import time
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional
+from typing import Any, Callable, NamedTuple, Optional
 from urllib.parse import urlsplit
 
 import httpx
@@ -134,6 +134,9 @@ class Page:
     requests: int = 0
     seconds: float = 0.0
     error: str = ""
+    #: Which form of the request API the page came through: ``raw``, or
+    #: ``json`` when the raw form met Bright Data's gateway failing.
+    form: str = ""
     html: str = field(default="", repr=False)
     text: str = ""
     title: str = ""
@@ -207,16 +210,69 @@ def brd_reason(response: Any) -> str:
     return "; ".join(dict.fromkeys(said))
 
 
-def _unlock(http: Http, token: str, zone: str, url: str) -> tuple[int, str, str]:
-    """``(status, body, error)`` for one page through the Unlocker."""
+class Answer(NamedTuple):
+    """What one page fetch came back with."""
+
+    status: int
+    body: str
+    error: str
+    #: Requests it took: one, or two when the raw form failed and the json form was tried.
+    requests: int = 1
+    #: Which form of the request API answered: ``raw`` or ``json``.
+    form: str = "raw"
+
+
+#: Bright Data's own gateway failing looks like this: a bare "502 Bad Gateway"
+#: page of a hundred-odd bytes with none of its error headers. A page's own
+#: error answer is larger, and the Unlocker's own refusals carry a reason.
+GATEWAY_PAGE_MAX_BYTES = 1024
+
+
+def _unlock(http: Http, token: str, zone: str, url: str) -> Answer:
+    """One page through the Unlocker: the raw form, then the json form when the gateway failed.
+
+    The raw form is what the news fetch sends, and the page's own status
+    comes back as the API's. On 1 Oct 2026 it answered 502 for every Yahoo
+    Finance story under the newer ``/markets/.../articles/`` addresses -- a
+    bare nginx "502 Bad Gateway" from Bright Data's own gateway, none of its
+    error headers -- while the json form fetched the same page with status
+    200, as did a direct fetch (``replay/unlocker_check.py``). So a 5xx that
+    carries no reason and no page is asked once more in the json form, which
+    reports the page's own status apart from the API's. A refusal with a
+    reason, a 4xx, or a page's own error answer is taken as it is.
+    """
     response = http.post(news.BRIGHTDATA_REQUEST_URL, {"zone": zone, "url": url, "format": "raw"},
                          _auth(token))
     status = int(response.status_code)
     body = response.text or ""
+    if status == 200:
+        return Answer(status, body, "")
+    reason = brd_reason(response)
+    refusal = f"HTTP {status} {reason or brief(body)}".strip()
+    if status < 500 or reason or len(body.encode("utf-8")) > GATEWAY_PAGE_MAX_BYTES:
+        return Answer(status, "", refusal)
+    return _unlock_json(http, token, zone, url, refusal)
+
+
+def _unlock_json(http: Http, token: str, zone: str, url: str, refusal: str) -> Answer:
+    """The same page in the json form: the API's status outside, the page's own inside."""
+    response = http.post(news.BRIGHTDATA_REQUEST_URL, {"zone": zone, "url": url, "format": "json"},
+                         _auth(token))
+    status = int(response.status_code)
     if status != 200:
-        reason = brd_reason(response) or brief(body)
-        return status, "", f"HTTP {status} {reason}".strip()
-    return status, body, ""
+        reason = brd_reason(response) or brief(response.text or "")
+        return Answer(status, "", f"{refusal} (raw); then HTTP {status} {reason} (json)".strip(), 2, "json")
+    try:
+        payload = response.json()
+    except ValueError:
+        payload = None
+    if not isinstance(payload, dict) or not isinstance(payload.get("body"), str):
+        return Answer(status, "", f"{refusal} (raw); then no page body (json)", 2, "json")
+    page_status = int(payload.get("status_code") or 200)
+    if page_status != 200:
+        return Answer(page_status, "", f"{refusal} (raw); then the page answered HTTP {page_status} (json)",
+                      2, "json")
+    return Answer(200, payload["body"], "", 2, "json")
 
 
 def fetch_page(http: Http, token: str, zone: str, index: int, source: str, url: str) -> Page:
@@ -226,15 +282,18 @@ def fetch_page(http: Http, token: str, zone: str, index: int, source: str, url: 
         return page
     started = time.monotonic()
     try:
-        page.status, page.html, page.error = _unlock(http, token, zone, url)
-        page.requests = 1
+        answer = _unlock(http, token, zone, url)
+        page.status, page.html, page.error = answer.status, answer.body, answer.error
+        page.requests, page.form = answer.requests, answer.form
         page.final_url = url
         if page.kind == GOOGLE_REDIRECT and page.html:
             target = redirect_target(page.html)
             if target:
                 page.final_url = target
-                page.status, page.html, page.error = _unlock(http, token, zone, target)
-                page.requests = 2
+                answer = _unlock(http, token, zone, target)
+                page.status, page.html, page.error = answer.status, answer.body, answer.error
+                page.requests += answer.requests
+                page.form = answer.form
             elif _looks_like_google(page.html):
                 page.error = "Google's redirect page, and no destination could be read off it"
                 page.html = ""

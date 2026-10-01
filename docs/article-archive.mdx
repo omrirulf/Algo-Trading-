@@ -43,8 +43,9 @@ is started after 25 minutes.
 
 The first real run, on the 29 Sep cycle, took under two minutes: 98 links
 from 16 companies, 82 with article text (43,635 words kept), 15 refused with
-HTTP 502 (Yahoo Finance) and 1 page with no article on it. The file was
-85 KB, which is about 22 MB a year.
+HTTP 502 (Yahoo Finance; read since 1 Oct through the Unlocker's `json`
+form, below) and 1 page with no article on it. The file was 85 KB, which is
+about 22 MB a year.
 
 ## Where it goes: private, never the repository
 
@@ -89,10 +90,19 @@ One line per article in the object:
 - **The pages are fetched an hour or two after the cycle read the
   headlines.** Each line says when (`fetched_at`). A story edited in between
   is saved as it was when fetched.
-- **Some sites cannot be read.** Yahoo Finance answered HTTP 502 to every
-  article the probe tried on 29 Sep. Those results are counted by the reason they have no
-  text. Scraper Studio was tested for them and left out until the December
-  checkpoint (see [Article probe](/article-probe)).
+- **Yahoo Finance, and the two forms of the Unlocker's API.** Every Yahoo
+  Finance story the probe and the archive tried on 29 Sep was refused with
+  HTTP 502. The owner could open them all, and asked for a double check.
+  `replay/unlocker_check.py` (the **unlocker check** workflow) asks for one
+  page every way Bright Data's own tools ask, plus a direct fetch from the
+  runner as a control. The answer, on 1 Oct: the page is fine (the direct
+  fetch and the Unlocker's `json` form both got it), but the Unlocker's `raw`
+  form, which the news fetch and the archive send, answers Yahoo's newer
+  `/…/articles/` addresses with a bare "502 Bad Gateway" from Bright Data's
+  own gateway. So a 5xx with no reason and no page is asked once more in the
+  `json` form; the index counts those (`read_in_json_form`), and each line
+  says which form read it (`form`). Scraper Studio runs on the same
+  unlocking layer, which is the likely reason it read so little of Yahoo.
 - **Each cycle is archived once.** A cycle with a stored object in the index
   is skipped. The file is never overwritten, so a run that repeats one
   stores nothing new. You can archive a named cycle again by hand with the

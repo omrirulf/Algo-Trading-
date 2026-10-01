@@ -92,8 +92,10 @@ class FakeResponse:
 class FakeHttp:
     """The Unlocker serves ``pages``; the scraper's trigger and polls answer in order."""
 
-    def __init__(self, pages=None, trigger=None, polls=()):
+    def __init__(self, pages=None, trigger=None, polls=(), json_pages=None):
         self.pages = pages or {}
+        #: What the json form of the request API answers: url -> (the page's own status, its body).
+        self.json_pages = json_pages or {}
         self.trigger = trigger
         self.polls = list(polls)
         self.posts: list = []
@@ -102,8 +104,12 @@ class FakeHttp:
     def post(self, url, body, headers):
         self.posts.append((url, body, headers))
         if url == news.BRIGHTDATA_REQUEST_URL:
-            status, page = self.pages.get(body["url"], (404, "gone"))
-            return FakeResponse(status, page, headers={"x-brd-err-msg": "target said 404"} if status == 404 else {})
+            if body.get("format") == "json" and body["url"] in self.json_pages:
+                status, page = self.json_pages[body["url"]]
+                return FakeResponse(200, payload={"status_code": status, "headers": {}, "body": page})
+            status, page, *rest = self.pages.get(body["url"], (404, "gone"))
+            headers = rest[0] if rest else ({"x-brd-err-msg": "target said 404"} if status == 404 else {})
+            return FakeResponse(status, page, headers=headers)
         return self.trigger
 
     def get(self, url, headers):
@@ -693,6 +699,43 @@ def test_the_ai_builds_from_a_page_the_unlocker_could_read():
     assert ap.examples([refused, read], [0]) == [YAHOO_1]
 
 
+GATEWAY_502 = ("<html><head><title>502 Bad Gateway</title></head>"
+               "<body><center><h1>502 Bad Gateway</h1></center></body></html>")
+
+
+def test_bright_data_s_gateway_failing_in_the_raw_form_is_asked_again_in_the_json_form():
+    """1 Oct 2026: the raw form answered a bare 502 from Bright Data's own gateway
+    for every Yahoo Finance story under /markets/.../articles/, while the json
+    form read the same page and so did a direct fetch (replay/unlocker_check.py)."""
+    http = FakeHttp(pages={YAHOO_1: (502, GATEWAY_502)}, json_pages={YAHOO_1: (200, NOVO_TEXT)})
+    page = ap.fetch_page(http, "tok", "z", 0, "Yahoo Finance", YAHOO_1)
+    assert page.status == 200 and page.html == NOVO_TEXT and not page.error
+    assert page.requests == 2 and page.form == "json"
+    assert [body["format"] for _, body, _ in http.posts] == ["raw", "json"]
+    assert all(url == news.BRIGHTDATA_REQUEST_URL for url, *_ in http.posts)
+
+
+def test_the_json_form_reports_the_page_s_own_refusal():
+    http = FakeHttp(pages={YAHOO_1: (502, GATEWAY_502)}, json_pages={YAHOO_1: (403, "<html>Access denied</html>")})
+    page = ap.fetch_page(http, "tok", "z", 0, "Yahoo Finance", YAHOO_1)
+    assert page.status == 403 and not page.html and page.requests == 2
+    assert page.error == "HTTP 502 502 Bad Gateway 502 Bad Gateway (raw); then the page answered HTTP 403 (json)"
+
+
+def test_a_refusal_with_a_reason_or_a_page_of_its_own_is_not_asked_again():
+    with_reason = FakeHttp(pages={YAHOO_1: (502, GATEWAY_502, {"x-brd-err-code": "target_40001"})},
+                           json_pages={YAHOO_1: (200, NOVO_TEXT)})
+    page = ap.fetch_page(with_reason, "tok", "z", 0, "Yahoo Finance", YAHOO_1)
+    assert page.error == "HTTP 502 target_40001" and page.requests == 1 and page.form == "raw"
+    a_pages_own = FakeHttp(pages={YAHOO_1: (503, "<html>" + "down " * 400 + "</html>")},
+                           json_pages={YAHOO_1: (200, NOVO_TEXT)})
+    page = ap.fetch_page(a_pages_own, "tok", "z", 0, "Yahoo Finance", YAHOO_1)
+    assert page.status == 503 and page.requests == 1 and len(a_pages_own.posts) == 1
+    not_found = FakeHttp(json_pages={YAHOO_1: (200, NOVO_TEXT)})
+    page = ap.fetch_page(not_found, "tok", "z", 0, "Yahoo Finance", YAHOO_1)
+    assert page.status == 404 and page.requests == 1
+
+
 def test_bright_data_s_own_words_for_a_failure_are_kept():
     response = FakeResponse(502, text="<html>502 Bad Gateway</html>",
                             headers={"x-luminati-error": "Target site blocked", "x-brd-err-code": "target_40001"})
@@ -787,7 +830,9 @@ def test_an_html_error_page_becomes_one_readable_line():
     gateway = "<html>\n<head><title>502 Bad Gateway</title></head>\n<body><center>nginx</center></body></html>"
     assert ap.brief(gateway) == "502 Bad Gateway nginx"
     page = ap.fetch_page(FakeHttp(pages={YAHOO_1: (502, gateway)}), "tok", "z", 0, "Yahoo Finance", YAHOO_1)
-    assert page.error == "HTTP 502 502 Bad Gateway nginx"
+    # A bare gateway page is asked again in the json form; both answers are on the one line.
+    assert page.error == "HTTP 502 502 Bad Gateway nginx (raw); then HTTP 502 502 Bad Gateway nginx (json)"
+    assert page.requests == 2
 
 
 def test_the_two_site_prompts_differ_only_in_where_the_words_came_from():
@@ -1079,7 +1124,7 @@ def test_the_probe_costs_money_so_it_runs_by_hand_or_on_its_own_pull_request_onl
     triggers = wf.get("on") or wf[True]
     assert set(triggers) == {"workflow_dispatch", "pull_request"}
     assert sorted(triggers["pull_request"]["paths"]) == [
-        ".github/workflows/article-probe.yml", "replay/article_probe.py"]
+        ".github/workflows/article-probe.yml", "orchestrator/article_text.py", "replay/article_probe.py"]
     # A fork's pull request gets no secrets; the job must skip rather than fail there.
     assert "github.repository" in wf["jobs"]["probe"]["if"]
 

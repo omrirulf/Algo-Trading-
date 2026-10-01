@@ -53,6 +53,7 @@ on:
   pull_request:
     paths:
       - replay/article_probe.py
+      - orchestrator/article_text.py
       - .github/workflows/article-probe.yml
 
 permissions:
