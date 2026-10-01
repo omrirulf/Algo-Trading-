@@ -175,6 +175,15 @@ def test_a_cycle_already_archived_is_not_fetched_again(tmp_path):
     assert "already archived" in said[-1]
 
 
+def test_a_fetch_only_run_reads_an_archived_cycle_again(tmp_path):
+    """It stores nothing, and it is the pull-request run's one real test of the fetch."""
+    (tmp_path / "article_archive.jsonl").write_text(
+        json.dumps({"cycle": "222", "ok": True, "object": "model-io/articles/x.jsonl.xz"}) + "\n")
+    archive = FakeArchive()
+    (line_, code), http, _ = archive_run(tmp_path, archive=archive, no_upload=True)
+    assert code == 0 and line_["cycle"] == "222" and http.posts and not archive.uploads
+
+
 def test_a_failed_archive_is_not_counted_as_done(tmp_path):
     (tmp_path / "article_archive.jsonl").write_text(json.dumps({"cycle": "222", "ok": False}) + "\n")
     (line_, code), http, _ = archive_run(tmp_path)

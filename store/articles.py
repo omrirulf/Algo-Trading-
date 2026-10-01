@@ -303,7 +303,9 @@ def run(
     lines = by_cycle[cycle]
     day = min(str(l.get("ts_utc") or "") for l in lines)[:10]
     index_lines = args.index.read_text(encoding="utf-8").splitlines() if args.index.exists() else []
-    if not wanted and cycle in archived(index_lines):
+    # A fetch-only run (--no-upload) stores nothing, so it reads the cycle
+    # again: it is the pull-request run's one real test of the fetch.
+    if not wanted and not args.no_upload and cycle in archived(index_lines):
         say(f"cycle {cycle} ({day}) is already archived; nothing to do")
         return None, 0
 
