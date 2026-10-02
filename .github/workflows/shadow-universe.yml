@@ -14,6 +14,9 @@ name: shadow universe
 # (python -m orchestrator.universe --check): the flag SHADOW_UNIVERSE_ENABLED,
 # the start date, and the NYSE calendar. Until all three say yes every later
 # step is skipped, so the job asks nothing, writes nothing and costs nothing.
+# On a day it runs, two more conditions: before 23:15 UTC (so no line is
+# dated the next day), and today's production cycle already journalled (so
+# the two never ask the model provider at the same time).
 #
 # Cost cap: $1 a UTC day for the model. The scorer stops asking at the cap and
 # exits 3; the job then tells the owner's phone, in fixed words.
@@ -22,9 +25,19 @@ name: shadow universe
 # (backtest/verify_tickers.py's check), with no model and no key -- the check
 # the list needs before it is frozen on 2026-12-22.
 on:
+  # The main start: as soon as a production run ends. That run is started on
+  # time by the Supabase starter (heartbeat.yml), while GitHub delivers this
+  # repository's own crons hours late. A run that ended without a cycle
+  # journalled (a protection pass, a failure) finds nothing to do at the
+  # check; the next production run to end starts it again.
+  workflow_run:
+    workflows: ["heartbeat"]
+    types: [completed]
   schedule:
-    # Weekdays at 18:30 UTC: after the production cycle (14:40 UTC, catch-up
-    # 17:35), so the two never ask the model provider at the same time.
+    # A backup, weekdays at 18:30 UTC. It does only what the main start left
+    # undone (names already answered today are not asked again), and the
+    # scorer starts no new name from 23:15 UTC (NO_NEW_NAME_AFTER_UTC), so a
+    # late backup scores fewer names and never dates a line the next day.
     - cron: "30 18 * * 1-5"
   workflow_dispatch:
     inputs:

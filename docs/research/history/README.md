@@ -34,3 +34,4 @@ Nothing a screen shows changes the locked test, its rules or its decisions.
 | Screen | Date | What | Summary | Report |
 | --- | --- | --- | --- | --- |
 | `2026-09-rules-running-live` | 2026-09-28 | The rules already running live: momentum, A, B on VT, B's rule on SPY, C (graveyard rows 30-34) | [summary](2026-09-rules-running-live/summary.md) | [report](2026-09-rules-running-live/report.md) |
+| `2026-10-stress-periods` | 2026-10-02 | Stress periods 2000-2002, 2008, 2020, 2022: momentum, A, B, C, VT, SPY; the regime split's cut-offs (graveyard rows 37-40) | - | [report](2026-10-stress-periods/report.md) |

@@ -44,9 +44,10 @@ def test_the_registered_settings():
     assert (regimes.TREND_CLOSES, regimes.VOL_RETURNS, regimes.SESSIONS_PER_YEAR) == (200, 21, 252)
     assert (regimes.RACE_LAG, regimes.FUND_LAG) == (3, 5)
     assert regimes.TERCILES == (1 / 3, 2 / 3)
-    # None until the integrator writes the registered numbers in; then two finite numbers, low below high.
+    # Fixed on 2026-10-02 from the stress kind's run 37013435615 (section 13.10).
     cutoffs = regimes.VOL_CUTOFFS
-    assert cutoffs is None or (len(cutoffs) == 2 and math.isfinite(cutoffs[0]) and cutoffs[0] < cutoffs[1])
+    assert cutoffs == (0.11302353418809083, 0.16965241927688823)
+    assert all(math.isfinite(c) for c in cutoffs) and cutoffs[0] < cutoffs[1]
 
 
 # --------------------------------------------------------------------------- #

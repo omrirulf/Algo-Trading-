@@ -27,6 +27,15 @@ of large foreign companies that trade in New York. Rules:
   Warner Bros. Discovery, Norfolk Southern, Honeywell, Kraft Heinz, Keurig Dr
   Pepper, Corteva, FedEx, Devon and Coterra), because a name that stops
   trading, or drops in price on a spin-off day, breaks a price-only return.
+  After a review the same day, Johnson & Johnson (DePuy Synthes), Medtronic
+  (MiniMed) and S&P Global (Mobility) were replaced by Edwards Lifesciences,
+  IDEXX and MetLife for the same reason: each has a separation announced that
+  may fall inside the scoring window.
+* The news search asks for ``"<ticker> stock"`` (``orchestrator/news.py``,
+  unchanged), so no ticker whose letters are the usual name of something
+  bigger in market news. Dow Inc. ("DOW stock" finds the Dow Jones index) and
+  ASE Technology ("ASX stock" finds the Australian exchange) were replaced by
+  Martin Marietta and UMC.
 * The ADR block holds large foreign companies bought in dollars on a US
   exchange. Most trade as ADRs; a few list their own shares directly (Check
   Point, Wix, monday.com, ICL, Nu, UBS). For this list they are the same
@@ -44,8 +53,9 @@ before registration, never after.
 Frozen at registration. The list is published in the pre-registration card
 on ``REGISTRATION`` (2026-12-22, the race's first checkpoint, where the IC
 test is registered) and does not change afterwards: no name added, removed or
-replaced, whatever it does. A name that is later bought out or delisted
-simply stops producing lines.
+replaced, whatever it does. A name that is later bought out or delisted is
+still asked every day (one call, about a quarter of a cent), but its lines
+have no price to be measured against, so the IC report leaves them out.
 
 Off until ``START``. ``SHADOW_UNIVERSE_ENABLED`` keeps the scorer off, the
 same pattern as the screening flag; a test fails if the flag is on before the
@@ -125,8 +135,8 @@ BLOCKS: Final[dict[str, tuple[str, ...]]] = {
         "KMI", "MPC", "OKE", "OXY", "PSX", "SLB", "VLO", "WMB",
     ),
     "Materials": (
-        "ALB", "APD", "CRH", "DD", "DOW", "ECL", "FCX",
-        "LIN", "NEM", "NTR", "NUE", "PPG", "SHW", "VMC",
+        "ALB", "APD", "CRH", "DD", "ECL", "FCX", "LIN",
+        "MLM", "NEM", "NTR", "NUE", "PPG", "SHW", "VMC",
     ),
     "Industrials": (
         "ADP", "BA", "CMI", "CSX", "DE", "EMR", "ETN", "GD", "GE", "ITW", "JCI",
@@ -141,12 +151,12 @@ BLOCKS: Final[dict[str, tuple[str, ...]]] = {
         "MDLZ", "MNST", "MO", "PEP", "PM", "SYY", "TGT", "WMT",
     ),
     "Health care": (
-        "ABBV", "ABT", "AMGN", "BMY", "BSX", "CI", "CVS", "DHR", "ELV", "GILD", "HCA",
-        "ISRG", "JNJ", "MDT", "MRK", "PFE", "REGN", "SYK", "TMO", "UNH", "VRTX", "ZTS",
+        "ABBV", "ABT", "AMGN", "BMY", "BSX", "CI", "CVS", "DHR", "ELV", "EW", "GILD",
+        "HCA", "IDXX", "ISRG", "MRK", "PFE", "REGN", "SYK", "TMO", "UNH", "VRTX", "ZTS",
     ),
     "Financials": (
         "AIG", "AXP", "BAC", "BK", "BLK", "BX", "C", "CB", "CME", "COF", "GS", "ICE",
-        "MA", "MCO", "MS", "PGR", "PNC", "PYPL", "SCHW", "SPGI", "TRV", "USB", "V", "WFC",
+        "MA", "MCO", "MET", "MS", "PGR", "PNC", "PYPL", "SCHW", "TRV", "USB", "V", "WFC",
     ),
     "Information technology": (
         "AAPL", "ACN", "ADBE", "ADI", "AMAT", "AMD", "ANET", "AVGO", "CDNS", "CRM", "CSCO", "IBM",
@@ -171,7 +181,7 @@ BLOCKS: Final[dict[str, tuple[str, ...]]] = {
     ADR_PREFIX + "India": ("IBN", "INFY", "MMYT", "RDY", "WIT"),
     ADR_PREFIX + "Latin America": ("ABEV", "AMX", "BAP", "FMX", "ITUB", "NU", "PBR", "SQM", "VALE"),
     ADR_PREFIX + "Israel": ("CHKP", "ICL", "MNDY", "NICE", "WIX"),
-    ADR_PREFIX + "Korea and Taiwan": ("ASX", "KB", "PKX", "SHG", "TSM"),
+    ADR_PREFIX + "Korea and Taiwan": ("KB", "PKX", "SHG", "TSM", "UMC"),
     ADR_PREFIX + "Australia": ("BHP",),
 }
 

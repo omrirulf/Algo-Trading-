@@ -88,7 +88,8 @@ def test_the_flag_is_the_one_the_pre_registration_registers():
 
 
 def test_the_registered_settings():
-    assert su.SHADOW_UNIVERSE_ENABLED is False
+    # The flag itself is pinned against the pre-registration's date above, so
+    # switching it on as registered does not fail here.
     assert su.START == date(2027, 1, 1)
     assert su.REGISTRATION == date(2026, 12, 22)
     assert su.REGISTRATION < su.START
@@ -201,13 +202,44 @@ def test_the_scorer_does_nothing_when_off_early_or_closed(monkeypatch, nothing_m
     assert universe.check(now) == {"date": now.date().isoformat(), "run": False, "reason": run.reason}
 
 
-def test_the_check_says_yes_on_a_trading_day_after_the_start(monkeypatch):
+def _production_journal(monkeypatch, tmp_path, *stamps: datetime) -> Path:
+    """A production journal holding one line at each of ``stamps``."""
+    directory = tmp_path / "journal"
+    for stamp in stamps:
+        path = month_file(directory, stamp)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps({"ts_utc": stamp.isoformat(), "ticker": "XLE", "signal": None,
+                                     "error": "x"}) + "\n")
+    monkeypatch.setattr(cfg, "SIGNAL_JOURNAL_PATH", directory)
+    return directory
+
+
+def test_the_check_says_yes_on_a_trading_day_after_the_start_once_production_ran(monkeypatch, tmp_path):
     monkeypatch.setattr(su, "SHADOW_UNIVERSE_ENABLED", True)
     assert is_trading_day(A_DAY_ON.date())
+    _production_journal(monkeypatch, tmp_path, A_DAY_ON.replace(hour=15, minute=2))
     assert universe.check(A_DAY_ON) == {"date": "2027-01-05", "run": True, "reason": None}
 
 
+def test_the_universe_waits_for_the_days_production_cycle(monkeypatch, tmp_path, nothing_may_happen):
+    """So the two never ask the model provider at the same time, and no
+    catch-up cycle starts once the universe runs (heartbeat.yml's guard)."""
+    monkeypatch.setattr(su, "SHADOW_UNIVERSE_ENABLED", True)
+    monkeypatch.setattr(universe, "utc_now", lambda: A_DAY_ON)
+    yesterday = A_DAY_ON - timedelta(days=1)
+    _production_journal(monkeypatch, tmp_path, yesterday)   # yesterday's cycle is not today's
+    answer = universe.check(A_DAY_ON)
+    assert answer["run"] is False and "no production cycle is journalled for 2027-01-05" in answer["reason"]
+    run = universe.score_universe(("AAPL",), journal_dir=nothing_may_happen)
+    assert run.ran is False and run.reason == answer["reason"] and run.exit_code == universe.EXIT_OK
+    assert not nothing_may_happen.exists()
+    monkeypatch.setattr(cfg, "SIGNAL_JOURNAL_PATH", tmp_path / "no-journal-at-all")
+    assert universe.production_ran(A_DAY_ON.date()) is False
+
+
 def test_the_cli_check_and_an_off_run_ask_nothing_and_exit_0(monkeypatch, capsys, nothing_may_happen):
+    monkeypatch.setattr(su, "SHADOW_UNIVERSE_ENABLED", False)
     monkeypatch.setattr(universe, "utc_now", lambda: A_DAY_ON)
     assert universe.main(["--check"]) == 0
     answer = json.loads(capsys.readouterr().out)
@@ -367,6 +399,7 @@ def wired(monkeypatch, tmp_path):
     and the model, and production's order path and journal booby-trapped."""
     monkeypatch.setattr(su, "SHADOW_UNIVERSE_ENABLED", True)
     monkeypatch.setattr(universe, "utc_now", lambda: A_DAY_ON)
+    monkeypatch.setattr(universe, "production_ran", lambda day: True)
     monkeypatch.setattr(cfg, "BLEND_WEIGHTS_PATH", tmp_path / "no-weights.json")
     gathered: list[str] = []
     failing_context: set[str] = set()
@@ -524,6 +557,58 @@ def test_the_time_budget_stops_new_names(wired):
     assert wired.gathered == []
 
 
+class TickingClock:
+    """``utc_now`` that moves one minute on at every reading."""
+
+    def __init__(self, start: datetime, then: datetime | None = None) -> None:
+        self.now = start
+        self.then = then
+
+    def __call__(self) -> datetime:
+        current = self.now
+        self.now = self.then if self.then is not None else self.now + timedelta(minutes=1)
+        return current
+
+
+#: A Monday in the universe's first week, so the next UTC day is a trading day too.
+A_MONDAY = date(2027, 1, 4)
+
+
+def test_no_name_is_started_after_the_cut_off_so_no_line_is_dated_the_next_day(wired, monkeypatch):
+    assert universe.NO_NEW_NAME_AFTER_UTC.isoformat() == "23:15:00"
+    # The run starts at 23:12; each name reads the clock to start and to write.
+    clock = TickingClock(datetime(2027, 1, 4, 23, 12, tzinfo=timezone.utc))
+    monkeypatch.setattr(universe, "utc_now", clock)
+    run = universe.score_universe(("AAPL", "KO", "SAP", "NKE"), journal_dir=wired.dir, workers=1)
+    assert run.day == A_MONDAY and run.ran is True
+    assert (run.asked, run.answered, run.not_asked) == (1, 1, 3)
+    assert wired.gathered == ["AAPL"]
+    lines = _lines(month_file(wired.dir, datetime(2027, 1, 4, tzinfo=timezone.utc)))
+    assert [line["ticker"] for line in lines] == ["AAPL"]
+    assert all(datetime.fromisoformat(line["ts_utc"]).date() == A_MONDAY for line in lines)
+
+
+def test_a_run_that_reaches_the_next_utc_day_starts_no_new_name(wired, monkeypatch):
+    # Started at 22:00 on Monday; by the time the first name is due it is Tuesday.
+    clock = TickingClock(datetime(2027, 1, 4, 22, 0, tzinfo=timezone.utc),
+                         then=datetime(2027, 1, 5, 0, 1, tzinfo=timezone.utc))
+    monkeypatch.setattr(universe, "utc_now", clock)
+    run = universe.score_universe(("AAPL", "KO"), journal_dir=wired.dir, workers=1)
+    assert run.day == A_MONDAY
+    assert (run.asked, run.not_asked) == (0, 2)
+    assert wired.gathered == [] and not wired.dir.exists()
+
+
+def test_a_run_started_after_the_cut_off_does_nothing_and_says_why(wired, monkeypatch, nothing_may_happen):
+    late = datetime(2027, 1, 5, 23, 20, tzinfo=timezone.utc)
+    monkeypatch.setattr(universe, "utc_now", lambda: late)
+    run = universe.score_universe(("AAPL",), journal_dir=nothing_may_happen)
+    assert run.ran is False and "too late in the UTC day" in run.reason
+    assert run.exit_code == universe.EXIT_OK and not nothing_may_happen.exists()
+    assert universe.check(late) == {"date": "2027-01-05", "run": False, "reason": run.reason}
+    assert universe.check(late.replace(hour=23, minute=14))["run"] is True
+
+
 # --------------------------------------------------------------------------- #
 # The cost cap
 # --------------------------------------------------------------------------- #
@@ -595,6 +680,19 @@ def test_an_unpriced_answer_is_charged_at_the_estimate():
     assert universe.charged_usd({"model": "unknown"}) == universe.ESTIMATED_COST_PER_NAME_USD
     assert universe.charged_usd({"cost_usd": True}) == universe.ESTIMATED_COST_PER_NAME_USD
     assert universe.charged_usd(None) == 0.0
+    # A call that failed with no usage is still billed for what it generated.
+    assert universe.charged_usd(None, asked=True) == universe.ESTIMATED_COST_PER_NAME_USD
+
+
+def test_a_call_that_failed_counts_against_the_cap_today_and_on_a_re_run(wired):
+    wired.failing_context.add("KO")
+    wired.model.behaviour["SAP"] = LLMError("the request timed out after 480 seconds")
+    run = universe.score_universe(("AAPL", "KO", "SAP"), journal_dir=wired.dir)
+    # AAPL is priced; SAP failed with no usage, so it is charged the estimate;
+    # KO never reached the model, so it costs nothing.
+    expected = CHEAP.cost_usd + universe.ESTIMATED_COST_PER_NAME_USD
+    assert run.cost_usd == pytest.approx(expected)
+    assert universe.day_lines(wired.dir, A_DAY_ON.date()).spent_usd == pytest.approx(expected)
 
 
 def test_the_days_lines_read_only_today(tmp_path):
@@ -611,7 +709,8 @@ def test_the_days_lines_read_only_today(tmp_path):
     ]
     path.write_text("\n".join(json.dumps(r) for r in rows) + "\n[1, 2]\n", encoding="utf-8")
     seen = universe.day_lines(directory, day)
-    assert seen.spent_usd == pytest.approx(0.01)
+    # KO's failed call carries no usage: it is charged the estimate.
+    assert seen.spent_usd == pytest.approx(0.01 + universe.ESTIMATED_COST_PER_NAME_USD)
     assert seen.answered == frozenset({"AAPL"})
     assert universe.day_lines(tmp_path / "missing", day) == universe.DayLines()
 
@@ -674,10 +773,12 @@ def test_the_scoring_step_gets_exactly_the_cycle_s_model_news_and_source_keys():
         assert spellings[0] in score
 
 
-def test_the_workflow_runs_on_weekdays_and_by_hand():
+def test_the_workflow_runs_after_each_production_run_on_weekdays_and_by_hand():
     wf = _workflow()
     triggers = wf.get("on") or wf[True]
-    assert set(triggers) == {"schedule", "workflow_dispatch"}
+    assert set(triggers) == {"workflow_run", "schedule", "workflow_dispatch"}
+    heartbeat_wf = yaml.safe_load((ROOT / ".github/workflows/heartbeat.yml").read_text(encoding="utf-8"))
+    assert triggers["workflow_run"] == {"workflows": [heartbeat_wf["name"]], "types": ["completed"]}
     (cron,) = [entry["cron"] for entry in triggers["schedule"]]
     assert cron.split()[-1] == "1-5"
     assert wf["permissions"] == {"contents": "write"}

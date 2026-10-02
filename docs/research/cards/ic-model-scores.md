@@ -4,13 +4,13 @@
 
 **Source:** The information coefficient, the cross-sectional rank correlation of a forecast with the next return (Grinold and Kahn, *Active Portfolio Management*, 2000). The owner's choice of scores, horizons and comparator (2026-10-02).
 
-**Exact rule and settings:** For every journal line the model answered (a signal, no error, not held), journalled on or after 2026-09-28 (UTC): six scores, the blended score (`blend.composite`) and the five dimension scores (`news_score`, `technical_score`, `fundamental_score`, `analyst_score`, `insider_score`; a missing score leaves that line out for that score). The comparator: the momentum score, +conviction for a BULLISH momentum signal, −conviction for BEARISH, 0 for NEUTRAL (`arms.momentum` on the line). The forward return of a line journalled on UTC day D at horizon h: the open of the first session after D (the race's entry rule) to the close of the h-th session counting that one, price only; h = 1 and h = 3. Each entry day, for each score and horizon: the Spearman rank correlation (ties at their average rank) over the names with both values, if there are at least 10 of them and the score and the return are not the same for every one of them (else the day is skipped for that score, and counted; a news score of 0 on every line is common). A name with two lines on one entry day keeps its last. Then: the mean daily IC; a Newey-West t with lag equal to the horizon (1 and 3); the number of days; the effective number of independent names, measured from the correlations of the names' daily close-to-close returns over the window as the participation ratio (sum of eigenvalues)² ÷ sum of eigenvalues² (names with fewer than 20 returns left out); and the smallest IC that could be detected at t = 2.4: 2.4 × the Newey-West standard error of the mean IC (measured), and 2.4 ÷ √((n_eff − 1) × days ÷ h) (from n_eff). Code: `analysis/ic.py`. Two universes, one rule: the production names (`logs/journal/`) and the shadow stock universe (`logs/shadow_universe/`, from 2027-01-01; the list below).
+**Exact rule and settings:** For every journal line the model answered (a signal about this ticker, not held; a line with an error written after the answer, such as an unreachable engine, still counts, as in the race), journalled on or after 2026-09-28 (UTC): six scores, the blended score (`blend.composite`) and the five dimension scores (`news_score`, `technical_score`, `fundamental_score`, `analyst_score`, `insider_score`; a missing score leaves that line out for that score). The comparator: the momentum score, +conviction for a BULLISH momentum signal, −conviction for BEARISH, 0 for NEUTRAL (`arms.momentum` on the line). The forward return of a line journalled on UTC day D at horizon h: the open of the first session after D (the race's entry rule) to the close of the h-th session counting that one, price only; h = 1 and h = 3. Each entry day, for each score and horizon: the Spearman rank correlation (ties at their average rank) over the names with both values, if there are at least 10 of them and the score and the return are not the same for every one of them (else the day is skipped for that score, and counted; a news score of 0 on every line is common). A name with two lines on one entry day keeps its last. Then: the mean daily IC; a Newey-West t with lag equal to the horizon (1 and 3); the number of days; the effective number of independent names, measured from the correlations of the names' daily close-to-close returns over the window after each day's average return across the names is taken out (a rank IC ignores a move every name shares): names with returns on fewer than 90% of the window's dates or fewer than 20 returns are left out, the dates every kept name has are used (at least 20 of them, else no n_eff and the reason is given), and n_eff = N² ÷ max(ΣC² − N(N−1)/(T−1), N) for N names, T dates and correlation matrix C (the noise-corrected participation ratio; the uncorrected N² ÷ ΣC² is shown beside it); and the smallest IC that could be detected at t = 2.4: 2.4 × the Newey-West standard error of the mean IC (measured), and 2.4 ÷ √((n_eff − 1) × days ÷ h) (from n_eff). Code: `analysis/ic.py`. Two universes, one rule: the production names (`logs/journal/`) and the shadow stock universe (`logs/shadow_universe/`, from 2027-01-01; the list below).
 
 **Data used:** The journal's answered lines (scores, `arms.momentum`, the UTC time of the line), and final daily bars (open and close) from the race's price source.
 
 **Compared against:** Zero (no ranking skill), and, for reading, the momentum score's IC on the same lines and days, with the daily difference (blended IC minus momentum IC) and its Newey-West t.
 
-**Main metric:** Proposed, for the owner to confirm at registration: in each universe, the mean daily IC of the blended score at 3 sessions, Newey-West t (lag 3). That is the test in the Benjamini-Hochberg family (section 13.5), one per universe, and it gets its Deflated Sharpe Ratio on the daily IC series (section 13.6). Every other score and horizon is reported for reading.
+**Main metric:** Proposed: in each universe, the blended score's IC at 3 sessions (its mean daily IC, Newey-West t, lag 3). The owner confirms or changes it in a dated Amendments row before the funds run of the night the race reaches the first look, before any IC value exists; if nothing is logged by then, this proposal stands. That is the test in the Benjamini-Hochberg family (section 13.5), one per universe, and it gets its Deflated Sharpe Ratio on the daily IC series (section 13.6). Every other score and horizon is reported for reading.
 
 **Survives its history screen if:** No history screen (uses the AI).
 
@@ -24,7 +24,7 @@
 
 **Dead if:** At any checkpoint the main test's mean IC is below zero and passes Benjamini-Hochberg in that direction; or at the final checkpoint its mean IC is zero or below (section 13.7).
 
-**Trial number:** 35 (the production names); the shadow stock universe is trial 36, the same rule. The owner's proposal: two trials in N, one idea against the quarterly limit (section 13.8); confirmed or changed at registration.
+**Trial number:** 35 (the production names); the shadow stock universe is trial 36, the same rule. The owner's proposal: two trials in N, one idea against the quarterly limit (section 13.8), counted in the first quarter of 2027; confirmed or changed by the owner, like the main metric, before any IC value exists.
 
 ## What is stored on every line (the owner asked)
 
@@ -39,12 +39,12 @@ Shadow stock universe: 251 names, chosen on 2026-10-02, frozen on 2026-12-22.
 | Sector | Names | Tickers |
 |---|---:|---|
 | Energy | 16 | BKR, CNQ, COP, CVX, ENB, EOG, FANG, HAL, KMI, MPC, OKE, OXY, PSX, SLB, VLO, WMB |
-| Materials | 14 | ALB, APD, CRH, DD, DOW, ECL, FCX, LIN, NEM, NTR, NUE, PPG, SHW, VMC |
+| Materials | 14 | ALB, APD, CRH, DD, ECL, FCX, LIN, MLM, NEM, NTR, NUE, PPG, SHW, VMC |
 | Industrials | 22 | ADP, BA, CMI, CSX, DE, EMR, ETN, GD, GE, ITW, JCI, LHX, LMT, MMM, NOC, PH, RSG, RTX, TT, UNP, UPS, WM |
 | Consumer discretionary | 19 | ABNB, AMZN, AZO, BKNG, CMG, F, GM, HD, HLT, LOW, MAR, MCD, NKE, ORLY, ROST, SBUX, TJX, TSLA, YUM |
 | Consumer staples | 16 | ADM, CL, COST, GIS, HSY, KMB, KO, KR, MDLZ, MNST, MO, PEP, PM, SYY, TGT, WMT |
-| Health care | 22 | ABBV, ABT, AMGN, BMY, BSX, CI, CVS, DHR, ELV, GILD, HCA, ISRG, JNJ, MDT, MRK, PFE, REGN, SYK, TMO, UNH, VRTX, ZTS |
-| Financials | 24 | AIG, AXP, BAC, BK, BLK, BX, C, CB, CME, COF, GS, ICE, MA, MCO, MS, PGR, PNC, PYPL, SCHW, SPGI, TRV, USB, V, WFC |
+| Health care | 22 | ABBV, ABT, AMGN, BMY, BSX, CI, CVS, DHR, ELV, EW, GILD, HCA, IDXX, ISRG, MRK, PFE, REGN, SYK, TMO, UNH, VRTX, ZTS |
+| Financials | 24 | AIG, AXP, BAC, BK, BLK, BX, C, CB, CME, COF, GS, ICE, MA, MCO, MET, MS, PGR, PNC, PYPL, SCHW, TRV, USB, V, WFC |
 | Information technology | 23 | AAPL, ACN, ADBE, ADI, AMAT, AMD, ANET, AVGO, CDNS, CRM, CSCO, IBM, INTC, INTU, KLAC, LRCX, MU, NOW, ORCL, PANW, QCOM, SNPS, TXN |
 | Communication services | 13 | CHTR, CMCSA, DIS, FOXA, LYV, META, NFLX, OMC, SPOT, T, TMUS, TTWO, VZ |
 | Utilities | 12 | AEP, CEG, D, DUK, ED, EXC, NEE, PEG, SO, SRE, VST, XEL |
@@ -55,6 +55,6 @@ Shadow stock universe: 251 names, chosen on 2026-10-02, frozen on 2026-12-22.
 | ADR: India | 5 | IBN, INFY, MMYT, RDY, WIT |
 | ADR: Latin America | 9 | ABEV, AMX, BAP, FMX, ITUB, NU, PBR, SQM, VALE |
 | ADR: Israel | 5 | CHKP, ICL, MNDY, NICE, WIX |
-| ADR: Korea and Taiwan | 5 | ASX, KB, PKX, SHG, TSM |
+| ADR: Korea and Taiwan | 5 | KB, PKX, SHG, TSM, UMC |
 | ADR: Australia | 1 | BHP |
 | **Total** | **251** | |

@@ -570,7 +570,9 @@ def _stress_method(results: dict) -> list[str]:
         "- **Words:** *total return* is over the fund's own sessions in the period; *worst fall* is the maximum "
         "drawdown, the deepest fall from the running high within the period (the start counts as a high); "
         "*minus VT* is the fund's total return minus VT's over the same sessions (when VT starts later in the "
-        "period, over VT's sessions only), and *minus SPY* the same against SPY; *invested* is the book's gross "
+        "period, over VT's sessions only: VT is then measured from its cash before its purchase at that "
+        "session's open, so its 0.10% cost is inside, and the other fund from its close the session before, so "
+        "one overnight move is inside), and *minus SPY* the same against SPY; *invested* is the book's gross "
         "exposure as a share of equity.",
         "",
     ]

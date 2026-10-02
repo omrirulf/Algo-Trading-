@@ -35,10 +35,11 @@ close.
 rule over a window that ends before it: ``tercile_cutoffs``, the 1/3 and
 2/3 quantiles of VT's daily 21-day volatility from its first 21 returns to
 2026-09-30. The sandbox this was written in cannot reach a price source, so
-the history screen's stress kind computes them from the prices it fetches
-(``history.stress``, ``results.json`` key ``regime_cutoffs``) and the numbers
-are then written into ``VOL_CUTOFFS`` and pre-registration section 13.10.
-Until then, the volatility split says "cut-offs not fixed yet".
+the history screen's stress kind computed them from the prices it fetched
+(``history.stress``, ``results.json`` key ``regime_cutoffs``, run
+37013435615), and the numbers were written into ``VOL_CUTOFFS`` and
+pre-registration section 13.10 on 2026-10-02. (Were ``VOL_CUTOFFS`` ever
+None, the volatility split would say "cut-offs not fixed yet".)
 
 One difference to keep in mind. For the cut-offs, each session's volatility
 is dated by its **own** close (the 21 returns ending at that close): they

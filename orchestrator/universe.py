@@ -42,11 +42,17 @@ ends with ``cap_reached`` (exit code 3, so the workflow can alert the
 owner's phone). Calls run four at a time, so the check-and-reserve is done
 under a lock, and calls already in flight may finish slightly above the cap:
 the summary reports the real total. An answer with no known price is charged
-at the estimate, so a missing price row cannot hide spending from the cap.
+at the estimate, and so is a call that failed with no usage (it is billed for
+what it generated), so neither can hide spending from the cap.
 
 Off until 2027-01-01. Nothing happens unless ``SHADOW_UNIVERSE_ENABLED`` is
 on, today (UTC) is on or after ``START``, and today is a trading day
-(``config.market_calendar``). ``--check`` says which of the three stops it.
+(``config.market_calendar``). Two more conditions keep a run in its place on
+the day: it is before ``NO_NEW_NAME_AFTER_UTC`` (23:15 UTC, so no line is
+dated the next day), and the production journal already holds today's cycle
+(so the universe never asks the model provider at the same time as
+production, and no catch-up cycle starts once it runs). ``--check`` says
+which one stops it.
 """
 
 from __future__ import annotations
@@ -60,12 +66,14 @@ import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime, time as clock_time, timezone
 from pathlib import Path
 from typing import Any, Final, Mapping, Optional, Sequence
 
 from pydantic import ValidationError
 
+from analysis.cycle_day import cycle_ran_on
+from analysis.reader import read_journal
 from app.schemas import LLMSignal
 from config import journal_files
 from config import settings as cfg
@@ -96,6 +104,17 @@ WORKERS: Final[int] = cfg.FULL_MODEL_MAX_CONCURRENCY
 #: inside the workflow's clock with its lines committed. 251 names, four at a
 #: time, at about two and a half minutes a name, take about 160 minutes.
 RUN_BUDGET_SECONDS: Final[float] = 240 * 60
+
+#: No new name is started at or after this UTC time, and a run that starts
+#: after it asks nothing. Each line is dated by the UTC time it is written,
+#: and the IC report enters a line at the open after that date, so a name
+#: asked after midnight would be dated the next day: missing from its own
+#: day's cross-section, and counted as the next day's answer. GitHub's crons
+#: in this repository arrive hours late (``heartbeat.yml``), so a run can
+#: reach midnight. 23:15 leaves room for the slowest name (a context gather
+#: plus two full-length model attempts, about 37 minutes) to finish before
+#: midnight.
+NO_NEW_NAME_AFTER_UTC: Final[clock_time] = clock_time(23, 15)
 
 #: What one name is expected to cost: the day's estimate shared over the
 #: list. Held in reserve for each call in flight, and charged for an answer
@@ -149,11 +168,48 @@ def why_not(day: date) -> Optional[str]:
     return None
 
 
+def too_late(now: datetime) -> Optional[str]:
+    """The reason no new name may be started at ``now``, or None while it still may."""
+    moment = _utc(now)
+    if moment.time() >= NO_NEW_NAME_AFTER_UTC:
+        return (f"{moment.strftime('%H:%M')} UTC is too late in the UTC day: no new name is started "
+                f"from {NO_NEW_NAME_AFTER_UTC.strftime('%H:%M')} UTC, so no line is dated the next day")
+    return None
+
+
+def production_ran(day: date) -> bool:
+    """Whether the production journal (``cfg.SIGNAL_JOURNAL_PATH``) has a cycle on ``day``.
+
+    The same evidence the production guard reads (``analysis.cycle_day``):
+    once a cycle is journalled, no catch-up cycle starts that day, so the
+    universe, which waits for it, never asks the model provider at the same
+    time as production. An unreadable journal counts as no cycle.
+    """
+    try:
+        return cycle_ran_on(read_journal(cfg.SIGNAL_JOURNAL_PATH).entries, day)
+    except (OSError, ValueError):
+        return False
+
+
+def waiting_for_production(day: date) -> Optional[str]:
+    """The reason to wait for production on ``day``, or None once its cycle is journalled."""
+    if production_ran(day):
+        return None
+    return (f"no production cycle is journalled for {day.isoformat()} yet: the universe waits for it, "
+            "so the two never ask the model provider at the same time")
+
+
+def _reason(moment: datetime) -> Optional[str]:
+    """Every reason not to start at ``moment``, in order; None when it may."""
+    day = moment.date()
+    return why_not(day) or too_late(moment) or waiting_for_production(day)
+
+
 def check(now: Optional[datetime] = None) -> dict[str, Any]:
     """``{"date", "run", "reason"}`` for today (UTC). Asks nothing, writes nothing."""
-    day = _utc(now or utc_now()).date()
-    reason = why_not(day)
-    return {"date": day.isoformat(), "run": reason is None, "reason": reason}
+    moment = _utc(now or utc_now())
+    reason = _reason(moment)
+    return {"date": moment.date().isoformat(), "run": reason is None, "reason": reason}
 
 
 def _utc(moment: datetime) -> datetime:
@@ -165,15 +221,18 @@ def _utc(moment: datetime) -> datetime:
 # --------------------------------------------------------------------------- #
 
 
-def charged_usd(usage: Any, per_name_usd: float = ESTIMATED_COST_PER_NAME_USD) -> float:
+def charged_usd(usage: Any, per_name_usd: float = ESTIMATED_COST_PER_NAME_USD, *,
+                asked: bool = False) -> float:
     """What one line's call counts against the cap, from its ``usage`` record.
 
     The measured ``cost_usd`` when there is one; the estimate when the call
     was recorded but could not be priced (so a missing price row cannot
-    blind the cap); nothing when no usage was recorded at all.
+    blind the cap). With no usage at all: the estimate when the model was
+    ``asked`` (a call that timed out or failed is still billed for what it
+    generated, ``orchestrator/llm.py``), nothing when it was not.
     """
     if not isinstance(usage, Mapping):
-        return 0.0
+        return per_name_usd if asked else 0.0
     cost = usage.get("cost_usd")
     if isinstance(cost, (int, float)) and not isinstance(cost, bool) and cost >= 0:
         return float(cost)
@@ -200,6 +259,11 @@ def _line_day(payload: Mapping[str, Any]) -> Optional[date]:
         return None
 
 
+def _was_asked(payload: Mapping[str, Any]) -> bool:
+    """Whether a line's name reached the model: every line but a context-stage failure."""
+    return payload.get("stage") != CONTEXT_FAILED
+
+
 def day_lines(directory: Path | str, day: date) -> DayLines:
     """Read today's lines from the month's file in ``directory``. Never raises on a bad line."""
     path = journal_files.month_file(directory, datetime(day.year, day.month, day.day, tzinfo=timezone.utc))
@@ -214,7 +278,7 @@ def day_lines(directory: Path | str, day: date) -> DayLines:
             continue
         if not isinstance(payload, dict) or _line_day(payload) != day:
             continue
-        spent += charged_usd(payload.get("usage"))
+        spent += charged_usd(payload.get("usage"), asked=_was_asked(payload))
         ticker = payload.get("ticker")
         if isinstance(ticker, str) and payload.get("signal") is not None and payload.get("error") is None:
             answered.add(ticker)
@@ -368,6 +432,8 @@ class _Shared:
     setup: Optional[dict[str, Any]]
     effort: Optional[str]
     deadline: float
+    #: The run's UTC day: no name is started once the clock has left it.
+    day: date
 
 
 def _write(shared: _Shared, context: TickerContext, *, signal: Optional[LLMSignal] = None,
@@ -413,6 +479,9 @@ def _judge(ticker: str, context: TickerContext, answer: "Completion | BaseExcept
 def _score(ticker: str, shared: _Shared) -> str:
     if time.monotonic() >= shared.deadline:
         return NOT_ASKED
+    now = _utc(utc_now())
+    if now.date() != shared.day or too_late(now) is not None:
+        return NOT_ASKED
     if not shared.guard.has_room():
         return NOT_ASKED
 
@@ -437,7 +506,7 @@ def _score(ticker: str, shared: _Shared) -> str:
     except Exception as exc:  # noqa: BLE001 - _ask hands back only the model's own failures
         answer = exc
     usage = answer.usage if isinstance(answer, Completion) else None
-    shared.guard.settle(charged_usd(usage.as_dict() if usage is not None else None))
+    shared.guard.settle(charged_usd(usage.as_dict() if usage is not None else None, asked=True))
     return _judge(ticker, context, answer, shared)
 
 
@@ -524,8 +593,9 @@ def score_universe(
     answered today, and asks the rest, ``workers`` (default ``WORKERS``) at a
     time, until the list, the cap or the time budget runs out.
     """
-    day = _utc(utc_now()).date()
-    reason = why_not(day)
+    started = _utc(utc_now())
+    day = started.date()
+    reason = _reason(started)
     if reason is not None:
         log.info("shadow universe not scored: %s", reason)
         return UniverseRun(day=day, ran=False, reason=reason)
@@ -562,6 +632,7 @@ def score_universe(
         setup=heartbeat.model_setup(),
         effort=llm.configured_effort(),
         deadline=time.monotonic() + budget_seconds,
+        day=day,
     )
     log.info("shadow universe: %d name(s) due, %d already answered today, %d at a time, "
              "$%.4f spent so far today of a $%.2f cap",
@@ -629,6 +700,7 @@ __all__ = [
     "LineWriter",
     "MODEL_FAILED",
     "NOT_ASKED",
+    "NO_NEW_NAME_AFTER_UTC",
     "RUN_BUDGET_SECONDS",
     "UNIVERSE",
     "UNRECORDED",
@@ -640,8 +712,11 @@ __all__ = [
     "day_lines",
     "journal_line",
     "main",
+    "production_ran",
     "score_universe",
+    "too_late",
     "utc_now",
+    "waiting_for_production",
     "why_not",
 ]
 

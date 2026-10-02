@@ -127,3 +127,18 @@ def test_the_regime_cut_offs_are_the_numbers_the_registered_rule_gave():
     text = " ".join((ROOT / "docs" / "horse-race-preregistration.md").read_text().split())
     assert "low up to **11.30%** a year" in text and "up to **16.97%**" in text
     assert "0.11302353418809083 and 0.16965241927688823" in text
+
+
+def test_the_ic_card_states_the_settings_the_code_registers():
+    """The card is what is registered on 2026-12-22; its numbers must be the code's (``analysis.ic``)."""
+    from analysis import ic
+
+    card = " ".join((RESEARCH / "cards" / "ic-model-scores.md").read_text().split())
+    assert ic.IC_START.isoformat() in card and ic.IC_REGISTRATION.isoformat() in card
+    assert (ic.MIN_NAMES, ic.N_EFF_MIN_RETURNS, ic.N_EFF_MIN_DATES, ic.MDE_T) == (10, 20, 20, 2.4)
+    assert ic.N_EFF_MIN_COVERAGE == 0.9 and ic.NW_LAG == {1: 1, 3: 3} and ic.HORIZONS == (1, 3)
+    for phrase in ("at least 10 of them", "fewer than 20 returns", "fewer than 90% of the window's dates",
+                   "at least 20 of them", "t = 2.4", "lag equal to the horizon (1 and 3)", "h = 1 and h = 3",
+                   "the blended score's IC at 3 sessions"):
+        assert phrase in card, phrase
+    assert (ic.MAIN_SCORE, ic.MAIN_HORIZON) == ("blend", 3)
