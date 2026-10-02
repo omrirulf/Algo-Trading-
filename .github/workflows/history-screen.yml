@@ -36,6 +36,13 @@ on:
         description: "Replace a report already in that folder (a re-run of the same screen after a bug fix)"
         type: boolean
         default: false
+      kind:
+        description: "full: the rules running live, race and funds, 2000 to now; stress: the funds in 2000-2002, 2008, 2020 and 2022 (the owner's item 6 of 2 Oct 2026)"
+        type: choice
+        options:
+          - full
+          - stress
+        default: full
 
 permissions:
   contents: write   # only to commit docs/research/history/<name>/
@@ -52,6 +59,7 @@ jobs:
       SCREEN_NAME: ${{ inputs.name }}
       SCREEN_SEEDS: ${{ inputs.seeds }}
       SCREEN_REPLACE: ${{ inputs.replace }}
+      SCREEN_KIND: ${{ inputs.kind }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
@@ -74,11 +82,11 @@ jobs:
           fi
 
       - name: Fetch the prices
-        run: python -m history.screen fetch --out "$RUNNER_TEMP/screen"
+        run: python -m history.screen fetch --out "$RUNNER_TEMP/screen" --kind "$SCREEN_KIND"
 
       - name: Run the screen
         run: |
-          python -m history.screen run --out "$RUNNER_TEMP/screen" --seeds "$SCREEN_SEEDS" \
+          python -m history.screen run --out "$RUNNER_TEMP/screen" --kind "$SCREEN_KIND" --seeds "$SCREEN_SEEDS" \
             --run-id "$GITHUB_RUN_ID" --commit "$GITHUB_SHA"
 
       - name: Keep the prices, the journal and the results

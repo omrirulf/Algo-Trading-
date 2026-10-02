@@ -231,12 +231,12 @@ FORBIDDEN_NAMES = {
     "screen_signal", "run_cycle", "run_batched_cycle", "manage_positions",
     "protect_positions", "open_tickers", "is_market_open", "ExecutionEngine",
     "PositionManager", "AlpacaPaperBroker", "TradingClient", "submit_order",
-    "submit_bracket_order", "journal", "record", "read_live", "note_cycle", "live_price",
+    "submit_bracket_order", "record", "read_live", "note_cycle", "live_price",
     "flows",
 }
 
 FORBIDDEN_MODULES = (
-    "orchestrator.journal", "orchestrator.live_price", "orchestrator.dispatch",
+    "orchestrator.live_price", "orchestrator.dispatch",
     "orchestrator.digest", "orchestrator.flows", "app.broker_client", "app.execution_engine",
     "app.position_manager", "app.main", "alpaca", "store", "anthropic", "openai",
 )
@@ -270,6 +270,15 @@ def test_the_scorer_never_names_the_engine_the_broker_or_the_production_journal(
     assert not bad, bad
 
 
+def test_the_only_journal_function_the_scorer_uses_makes_the_blend_and_arms_records():
+    """The journal computes the blend's and the arms' records (the CI guardrails allow only it, besides their own
+    modules); ``journal.record``, which writes the production journal, is never named."""
+    tree = _tree()
+    used = {n.attr for n in ast.walk(tree)
+            if isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name) and n.value.id == "journal"}
+    assert used == {"universe_records"}
+
+
 def test_the_scorer_calls_the_production_functions():
     """Same model, settings and prompt: the steps are heartbeat's own, not copies."""
     tree = _tree()
@@ -279,8 +288,10 @@ def test_the_scorer_calls_the_production_functions():
                  "parse_signal", "scores_without_a_source", "PreparedTicker", "model_setup",
                  "full_model_provider"):
         assert ("heartbeat", name) in attributes, name
-    assert ("blend", "blend_signal") in attributes and ("blend", "load_weights") in attributes
-    assert ("arms", "arms_record") in attributes
+    assert ("blend", "load_weights") in attributes
+    # The blend's and the arms' records are made by the journal, the one module besides theirs the CI
+    # guardrails let compute and write them down.
+    assert ("journal", "universe_records") in attributes
     assert ("journal_files", "month_file") in attributes
 
 
@@ -425,6 +436,21 @@ def test_writes_the_documented_line_for_every_name(wired):
         entry = entry_from(line)
         assert entry.model_answered and not entry.model_failed
         assert entry.sections == {"analysts", "insiders"}
+
+
+def test_the_ic_report_reads_the_line_with_every_score(wired):
+    """The reader the line is written for, when it is there (analysis/ic.py)."""
+    ic = pytest.importorskip("analysis.ic")
+    if not hasattr(ic, "line_from"):
+        pytest.skip("analysis.ic has no line_from")
+    universe.score_universe(("AAPL",), journal_dir=wired.dir)
+    (line,) = _lines(wired.month)
+    read = ic.line_from(line)
+    assert read is not None and read.ticker == "AAPL" and read.day == A_DAY_ON.date()
+    assert read.scores["blend"] == line["blend"]["composite"]
+    for name in ("news", "technical", "fundamental", "analyst", "insider"):
+        assert read.scores[name] == line["signal"][f"{name}_score"], name
+    assert read.scores["momentum"] is not None
 
 
 def test_the_arms_are_the_ones_the_production_journal_would_write(wired):

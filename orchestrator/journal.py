@@ -389,3 +389,28 @@ def record(
         )
     except Exception:  # noqa: BLE001 - journalling must not break the cycle
         log.exception("failed to journal %s", context.ticker)
+
+
+def universe_records(context: TickerContext, signal: Optional[LLMSignal], weights: Any,
+                     when: datetime) -> dict[str, Any]:
+    """The learned blend's and the rule arms' records for a line of the shadow stock universe.
+
+    Pre-registration section 13.9 (2 Oct 2026): the universe's lines carry
+    exactly what a production line carries, so the IC report reads both
+    universes alike. They are computed here, beside ``record``'s own, so the
+    blend's and the arms' output is still made only by the modules that
+    compute it and the journal that writes it down (the CI steps "The learned
+    blend runs in shadow" and "The rule arms ... run in shadow"). Nothing
+    reads them back: the universe trades nothing. A blend that fails is
+    written down as a failure, never the loss of the line.
+    """
+    from orchestrator import blend
+
+    made: Optional[dict[str, Any]] = None
+    if signal is not None:
+        try:
+            made = blend.blend_signal(signal, weights)
+        except Exception as exc:  # noqa: BLE001 - see the docstring
+            log.exception("%s: blend failed", context.ticker)
+            made = {"mode": cfg.BLEND_MODE, "error": f"{type(exc).__name__}: {exc}"}
+    return {"blend": made, "arms": arms.arms_record(context, when.date(), signal)}

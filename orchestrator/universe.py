@@ -14,17 +14,17 @@ the production functions in ``orchestrator.heartbeat`` and nothing else:
 earnings, the keyed sources), ``system_prompt_for`` and ``build_user_prompt``
 (the same texts, so the same prompt fingerprint), ``call_llm`` through the
 same ``_ask`` and ``call_label`` wrapper the cycle uses, ``parse_signal`` and
-``scores_without_a_source``, the learned blend (``blend.blend_signal`` with
-the weights read once per run, like the cycle), and the rule arms
-(``arms.arms_record``, exactly as ``orchestrator/journal.py`` computes them
-for a production line). The model's key reaches the call only through
+``scores_without_a_source``; the learned blend (the weights read once per
+run, like the cycle) and the rule arms are computed by
+``orchestrator/journal.py`` (``journal.universe_records``), exactly as it
+computes them for a production line. The model's key reaches the call only through
 heartbeat's own functions; this module reads no key itself.
 
 What it never does. No signal goes to the engine: there is no dispatcher
 here, no broker, no order, and no line in the production journal
 (``journal.record`` is never called). The screen is not used: every name gets
-the full model, once. The live price reader is not imported. The blend and
-the arms records are computed and written down here and read by nothing.
+the full model, once. The live price reader is not imported. The blend's and
+the arms' records are written down here and read by nothing.
 ``tests/test_shadow_universe.py`` checks all of this by reading this file.
 
 Its own journal. One JSON line per name per day in
@@ -71,7 +71,7 @@ from config import journal_files
 from config import settings as cfg
 from config import shadow_universe as su
 from config.market_calendar import is_trading_day
-from orchestrator import arms, blend, heartbeat, llm
+from orchestrator import blend, heartbeat, journal, llm
 from orchestrator.context import TickerContext
 from orchestrator.llm import Completion, LLMError
 from orchestrator.pricing import Usage
@@ -87,7 +87,9 @@ EVENT: Final[str] = "shadow_universe_scored"
 #: Names scored at the same time. Production's full-model setting
 #: (``FULL_MODEL_MAX_CONCURRENCY``, four, measured against the provider's
 #: rate limit), so the universe asks the provider no harder than the cycle
-#: does. Each worker gathers one name's context and asks its one call.
+#: does. Each worker gathers one name's context and asks its one call. The
+#: shared context provider's caches are plain dictionaries: two workers
+#: filling the same entry at once only fetch it twice, which is harmless.
 WORKERS: Final[int] = cfg.FULL_MODEL_MAX_CONCURRENCY
 
 #: No new name is started after this many seconds, so a slow day still ends
@@ -299,7 +301,7 @@ def journal_line(
     now: datetime,
     *,
     signal: Optional[LLMSignal] = None,
-    blend_record: Optional[dict[str, Any]] = None,
+    weights: Any = None,
     usage: Optional[Usage] = None,
     error: Optional[str] = None,
     stage: Optional[str] = None,
@@ -309,18 +311,19 @@ def journal_line(
     """One line of the shadow universe's journal (the format the IC report reads).
 
     ``signal``, ``blend`` and ``arms`` are exactly what a production line
-    carries; the arms are computed here, from the same context and day, as
-    ``journal.record`` computes them. ``stage`` is ``"context"`` when the
+    carries; the journal computes the last two (``journal.universe_records``)
+    from the same context, day and blend weights, as ``journal.record`` does. ``stage`` is ``"context"`` when the
     name failed before the model was asked, as on a production line.
     """
     now = _utc(now)
+    shadow = journal.universe_records(context, signal, weights, now)
     return {
         "ts_utc": now.isoformat(),
         "ticker": context.ticker,
         "universe": UNIVERSE,
         "signal": signal.model_dump(mode="json") if signal is not None else None,
-        "blend": blend_record,
-        "arms": arms.arms_record(context, now.date(), signal),
+        "blend": shadow["blend"],
+        "arms": shadow["arms"],
         "context": compact_context(context),
         "usage": usage.as_dict() if usage is not None else None,
         "error": error,
@@ -368,12 +371,11 @@ class _Shared:
 
 
 def _write(shared: _Shared, context: TickerContext, *, signal: Optional[LLMSignal] = None,
-           blend_record: Optional[dict[str, Any]] = None, usage: Optional[Usage] = None,
-           error: Optional[str] = None, stage: Optional[str] = None) -> str:
+           usage: Optional[Usage] = None, error: Optional[str] = None, stage: Optional[str] = None) -> str:
     """Write the name's line and say what became of the name."""
     now = utc_now()
     try:
-        line = journal_line(context, now, signal=signal, blend_record=blend_record, usage=usage,
+        line = journal_line(context, now, signal=signal, weights=shared.weights, usage=usage,
                             error=error, stage=stage, setup=shared.setup, effort=shared.effort)
         shared.writer.write(line, now)
     except Exception:  # noqa: BLE001 - one name's line must not end the run
@@ -402,17 +404,10 @@ def _judge(ticker: str, context: TickerContext, answer: "Completion | BaseExcept
         log.exception("%s: failed to produce a signal", ticker)
         return _write(shared, context, usage=usage, error=f"unexpected {type(exc).__name__}: {exc}")
 
-    try:
-        blend_record = blend.blend_signal(signal, shared.weights)
-    except Exception as exc:  # noqa: BLE001 - a blend failure is written down, never the loss of the line
-        log.exception("%s: blend failed", ticker)
-        blend_record = {"mode": cfg.BLEND_MODE, "error": f"{type(exc).__name__}: {exc}"}
-
     if signal.ticker != ticker:
         log.error("%s: the model answered for %s instead", ticker, signal.ticker)
-        return _write(shared, context, signal=signal, blend_record=blend_record, usage=usage,
-                      error=f"answered for {signal.ticker}")
-    return _write(shared, context, signal=signal, blend_record=blend_record, usage=usage)
+        return _write(shared, context, signal=signal, usage=usage, error=f"answered for {signal.ticker}")
+    return _write(shared, context, signal=signal, usage=usage)
 
 
 def _score(ticker: str, shared: _Shared) -> str:
