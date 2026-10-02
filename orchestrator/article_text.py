@@ -236,9 +236,13 @@ def _unlock(http: Http, token: str, zone: str, url: str) -> Answer:
     nine Yahoo Finance ``/.../articles/`` stories in that day's cycle -- a
     bare nginx "502 Bad Gateway" from Bright Data's own gateway, none of its
     error headers -- while the json form fetched the same page with status
-    200, as did a direct fetch (``replay/unlocker_check.py``). So a 5xx that
-    carries no reason and no page is asked once more in the json form, which
-    reports the page's own status apart from the API's. A refusal with a
+    200, as did a direct fetch (``replay/unlocker_check.py``). Yahoo's
+    responses carry a 29-35 KB header block; the raw form relays it to the
+    caller and the json form carries it inside the body, and the raw
+    failures fit a limit near 32 KB at the gateway (measured on 2 Oct, not
+    confirmed by Bright Data). So a 5xx that carries no reason and no page
+    is asked once more in the json form, which reports the page's own
+    status apart from the API's. A refusal with a
     reason, a 4xx, or a page's own error answer is taken as it is.
     """
     response = http.post(news.BRIGHTDATA_REQUEST_URL, {"zone": zone, "url": url, "format": "raw"},
