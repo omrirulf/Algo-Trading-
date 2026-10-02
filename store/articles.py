@@ -215,7 +215,7 @@ def record(cycle: str, link: Link, page: Page, fetched_at: str) -> dict[str, Any
     return {
         "cycle": cycle, "ticker": link.ticker, "ts_utc": link.ts_utc, "index": link.index,
         "source": link.source, "headline": link.headline, "url": link.url,
-        "final_url": page.final_url, "fetched_at": fetched_at, "status": page.status,
+        "final_url": page.final_url, "fetched_at": fetched_at, "status": page.status, "form": page.form,
         "error": page.error, "page_bytes": page.page_bytes, "seconds": round(page.seconds, 1),
         "title": page.title, "date": page.date,
         "article_words": len(page.text.split()) if page.text else 0,
@@ -261,6 +261,7 @@ def summary(cycle: str, day: str, lines: list[dict], links: list[Link], records:
         "with_text": len(with_text),
         "words_kept": sum(r["kept_words"] for r in records),
         "names_the_company": sum(1 for r in with_text if r["names_the_company"]),
+        "read_in_json_form": sum(1 for r in with_text if r.get("form") == "json"),
         "paywall_suspected": sum(1 for r in with_text if r["paywall_suspected"]),
         "no_text": dict(Counter(k for k in (failure_kind(r) for r in records) if k).most_common()),
         **extra,
@@ -302,7 +303,9 @@ def run(
     lines = by_cycle[cycle]
     day = min(str(l.get("ts_utc") or "") for l in lines)[:10]
     index_lines = args.index.read_text(encoding="utf-8").splitlines() if args.index.exists() else []
-    if not wanted and cycle in archived(index_lines):
+    # A fetch-only run (--no-upload) stores nothing, so it reads the cycle
+    # again: it is the pull-request run's one real test of the fetch.
+    if not wanted and not args.no_upload and cycle in archived(index_lines):
         say(f"cycle {cycle} ({day}) is already archived; nothing to do")
         return None, 0
 

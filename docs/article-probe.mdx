@@ -34,6 +34,14 @@ model sees them, so a difference between the two is a difference in *which*
 words, not in how many. Quote pages, symbol pages, filings and videos are
 skipped without a request; Google's `/goto` redirect stubs are followed once.
 
+A page is asked for in the Unlocker's `raw` form, as the news fetch asks,
+and once more in its `json` form when the raw form answers a bare 5xx from
+Bright Data's own gateway: that is what every Yahoo Finance story under
+`/…/articles/` that was tried got on 29 Sep and 1 Oct, while the json form read the ones it was tried on
+(`replay/unlocker_check.py`, the **unlocker check** workflow, asks for one
+URL every way Bright Data's tools ask and shows every header). The report
+says when a page was read that way.
+
 ## The Scraper Studio side
 
 Nobody has to open the dashboard. Dispatch the workflow with `build_scraper`
