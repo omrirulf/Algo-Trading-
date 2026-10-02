@@ -8,7 +8,7 @@ representative rate on the trade date. So, for every weekday from the start
 to the end, both included, the rate (shekels per dollar) comes from:
 
 1. the Bank of Israel's representative rate (series RER_USD_ILS), from its
-   public SDMX service (``BOI_URL``), when the Bank published one that day;
+   public SDMX service (``BOI_URLS``), when the Bank published one that day;
 2. else, only for a day the Bank did not publish, the European Central
    Bank's reference rates for that same day, crossed through the euro:
    USD/ILS = (shekels per euro) / (dollars per euro) (``ECB_URL``);
@@ -19,13 +19,27 @@ Every day from 2 or 3 is counted and listed (``RateTable.counts``,
 carried with no Bank of Israel rate before it stops the run: a rate is
 never made up.
 
-Both services answer in CSV, and the date and value columns are found by
-their names. An answer that is not CSV, that has lost one of those columns,
-or that holds a value which cannot be a USD/ILS rate stops the run with a
-clear error. So a change in either service fails the nightly step loudly
-(and the funds then say there is no shekel view tonight) instead of giving
-wrong numbers. The rates themselves are kept exactly as the services gave
-them.
+The Bank of Israel's service has more than one address for the same
+series, and an old one may stop working. So ``fetch_boi`` asks each address
+in ``BOI_URLS`` in turn and uses the first answer that holds rates. An
+address that answers 404, cannot be reached, or gives a body that does not
+read as rates is passed over for the next one; when none gives rates, the
+error names every address tried and why. The Bank may answer in CSV or in
+SDMX-XML, and ``parse_boi`` reads both; the European Central Bank answers in
+CSV. In CSV the date and value columns are found by their names; in XML
+every ``Obs`` element is read, in any namespace, in both SDMX forms
+(structure-specific and generic). Every request carries a normal web
+browser's User-Agent, because the Bank's server refuses other agents (a web
+search on 2 Oct 2026 said so; the addresses after the first come from the
+same search and have not yet been checked against the live service).
+
+An answer that is neither CSV nor XML, that has lost its date or value,
+that holds no observation, or that holds a value which cannot be a USD/ILS
+rate gives a clear error, never a number. An XML answer that declares a
+DOCTYPE or an ENTITY is refused before it is read, so no entity can expand.
+So a change in either service fails the nightly step loudly (and the funds
+then say there is no shekel view tonight) instead of giving wrong numbers.
+The rates themselves are kept exactly as the services gave them.
 
 The table travels like the price table (``analysis/price_tape.py``):
 ``tape`` builds it in exactly that shape, consumer ``fx-rates``. Its SHA-256
@@ -55,6 +69,7 @@ from bisect import bisect_left
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Callable, Final, Iterator, Optional
+from xml.etree import ElementTree
 
 import httpx
 
@@ -62,10 +77,21 @@ from analysis import price_tape
 from config import israel_tax
 
 #: The Bank of Israel's public SDMX service: the representative USD/ILS rate,
-#: one row per day the Bank published, as CSV.
+#: one row per day the Bank published, as CSV. The first address tried.
 BOI_URL: Final[str] = (
     "https://edge.boi.gov.il/FusionEdgeServer/sdmx/v2/data/dataflow/BOI.STATISTICS/EXR/1.0/"
     "RER_USD_ILS?startperiod={start}&endperiod={end}&format=csv"
+)
+#: Every address of the same series, tried in this order until one answers
+#: HTTP 200 with rates: the older v2 path above (it may now answer 404), the
+#: SDMX REST path as CSV, and the same REST path in its default form,
+#: SDMX-XML. The REST path comes from a web search on 2 Oct 2026.
+BOI_URLS: Final[tuple[str, ...]] = (
+    BOI_URL,
+    "https://edge.boi.gov.il/FusionEdgeServer/ws/public/sdmxapi/rest/data/BOI.STATISTICS,EXR,1.0/"
+    "RER_USD_ILS?startPeriod={start}&endPeriod={end}&format=csv",
+    "https://edge.boi.gov.il/FusionEdgeServer/ws/public/sdmxapi/rest/data/BOI.STATISTICS,EXR,1.0/"
+    "RER_USD_ILS?startPeriod={start}&endPeriod={end}",
 )
 #: The European Central Bank's reference rates, shekels and dollars per euro,
 #: as CSV. Read only for days the Bank of Israel did not publish.
@@ -110,10 +136,27 @@ VALUE_COLUMNS: Final[tuple[str, ...]] = ("OBS_VALUE", "VALUE")
 #: Value cells that mean "no rate that day" rather than a changed format.
 _NO_VALUE: Final[frozenset[str]] = frozenset({"", "nan", "na"})
 _DAY_TEXT = re.compile(r"(\d{4}-\d{2}-\d{2})(?:[T ].*)?")
-_HEADERS: Final[dict[str, str]] = {"User-Agent": "Algo-Trading research (public rate table)",
-                                   "Accept": "text/csv, */*"}
+#: In an SDMX-XML answer, in any namespace: the element that is one
+#: observation; the date and value as its attributes (structure-specific
+#: form); and, failing those, the children whose ``value`` holds them
+#: (generic form).
+_XML_OBS: Final[str] = "Obs"
+_XML_DATE: Final[tuple[str, str]] = ("TIME_PERIOD", "ObsDimension")
+_XML_VALUE: Final[tuple[str, str]] = ("OBS_VALUE", "ObsValue")
+#: A DOCTYPE or ENTITY declaration: the only way an XML body can define
+#: entities, so one is refused before the body is parsed.
+_XML_DECLARATION = re.compile(r"<!\s*(?:DOCTYPE|ENTITY)", re.IGNORECASE)
+#: Sent with every request. The Bank of Israel's server refuses a request
+#: whose User-Agent is not a web browser's, so this is a normal browser's
+#: string. Accept asks for CSV first, then XML; ``parse_boi`` reads either.
+_HEADERS: Final[dict[str, str]] = {
+    "User-Agent": ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
+                   "Chrome/126.0 Safari/537.36"),
+    "Accept": "text/csv, application/xml;q=0.9, */*;q=0.8",
+}
 
-#: A fetch: ``url -> body``, or None when the service says it holds no data (HTTP 404).
+#: A fetch: ``url -> body``, or None when the service says it holds no data
+#: (HTTP 404). Raises ``RateError`` when it cannot fetch.
 Getter = Callable[[str], Optional[str]]
 #: A source of rates: ``(start, end) -> {day: shekels per dollar}``.
 Fetcher = Callable[[date, date], dict[date, float]]
@@ -303,25 +346,96 @@ def _observations(header: list[str], rows: list[list[str]], who: str,
         if any(cell.strip() for cell in row[len(header):]):
             raise RateError(f"{who}: a row has more cells than the header ({','.join(row)[:120]!r})")
         day = _day(row[when], who)
-        text = row[value].strip()
-        if text.lower() in _NO_VALUE:
-            yield row, day, None
+        yield row, day, _number(row[value], day, who)
+
+
+def _number(text: Optional[str], day: date, who: str) -> Optional[float]:
+    """A value as a positive number; None when it means no rate that day (absent, empty, NaN or NA)."""
+    text = (text or "").strip()
+    if text.lower() in _NO_VALUE:
+        return None
+    try:
+        number = float(text)
+    except ValueError:
+        raise RateError(f"{who}: {day}'s value {text!r} is not a number") from None
+    if not math.isfinite(number) or number <= 0:
+        raise RateError(f"{who}: {day}'s value {text!r} is not a positive number")
+    return number
+
+
+def _local(name: str) -> str:
+    """A tag or attribute name without its namespace."""
+    return name.rsplit("}", 1)[-1]
+
+
+def _xml_field(obs: ElementTree.Element, names: tuple[str, str]) -> Optional[str]:
+    """An observation's date or value: its attribute ``names[0]``, else the ``value`` of its child ``names[1]``."""
+    attribute, child_tag = names
+    for key, text in obs.attrib.items():
+        if _local(key) == attribute:
+            return text
+    for child in obs:
+        if isinstance(child.tag, str) and _local(child.tag) == child_tag:
+            return next((text for key, text in child.attrib.items() if _local(key) == "value"), None)
+    return None
+
+
+def _xml(body: str, who: str) -> list[tuple[date, Optional[float]]]:
+    """Each ``Obs`` of an SDMX-XML answer, with its date and its value (None: no rate that day).
+
+    Read in any namespace, in the structure-specific form
+    (``<Obs TIME_PERIOD="..." OBS_VALUE="..."/>``) and the generic one
+    (``<Obs><ObsDimension value="..."/><ObsValue value="..."/></Obs>``).
+    Raises when the body declares a DOCTYPE or an ENTITY (refused before
+    parsing), is not well-formed XML, holds no ``Obs``, or has an ``Obs``
+    without a date.
+    """
+    if _XML_DECLARATION.search(body):
+        raise RateError(f"{who}: the answer declares a DOCTYPE or an ENTITY, so it is refused unread "
+                        f"(it begins {body[:60]!r})")
+    try:
+        root = ElementTree.fromstring(body)
+    except ElementTree.ParseError as exc:
+        raise RateError(f"{who}: the answer is not CSV and not well-formed XML ({exc}; "
+                        f"it begins {body[:60]!r})") from None
+    found = []
+    for obs in root.iter():
+        if not isinstance(obs.tag, str) or _local(obs.tag) != _XML_OBS:
             continue
-        try:
-            number = float(text)
-        except ValueError:
-            raise RateError(f"{who}: {day}'s value {text!r} is not a number") from None
-        if not math.isfinite(number) or number <= 0:
-            raise RateError(f"{who}: {day}'s value {text!r} is not a positive number")
-        yield row, day, number
+        when = _xml_field(obs, _XML_DATE)
+        if when is None:
+            raise RateError(f"{who}: an Obs has no {' or '.join(_XML_DATE)} "
+                            f"({ElementTree.tostring(obs, encoding='unicode')[:120]!r}); has the format changed?")
+        day = _day(when, who)
+        found.append((day, _number(_xml_field(obs, _XML_VALUE), day, who)))
+    if not found:
+        raise RateError(f"{who}: the answer is not CSV, and as XML it holds no observation (no Obs element; "
+                        f"it begins {body[:60]!r}); has the format changed?")
+    return found
 
 
 def parse_boi(text: str) -> dict[date, float]:
-    """The Bank of Israel's CSV answer as {day: shekels per dollar}. Raises ``RateError`` on a changed format."""
+    """The Bank of Israel's answer, CSV or SDMX-XML, as {day: shekels per dollar}.
+
+    XML is told by its first character, ``<`` (after a byte-order mark and
+    white space); anything else is read as CSV. Both are held to the same
+    checks, each raising ``RateError``: an answer with no observation, a
+    value that is not a positive number or cannot be a USD/ILS rate, and two
+    different values for one day. An observation without a value is a day
+    the Bank did not publish: the day is left out.
+    """
     who = "the Bank of Israel"
-    header, rows = _csv(text, who)
+    body = text.strip().lstrip("\ufeff").strip() if isinstance(text, str) else text
+    if isinstance(body, str) and body.startswith("<"):
+        observations = _xml(body, who)
+    else:
+        header, rows = _csv(text, who)
+        if not rows:
+            raise RateError(f"{who}: the answer holds no observation (a header and no row); "
+                            "has the format changed?")
+        observations = [(day, number) for _, day, number in _observations(header, rows, who)]
     out: dict[date, float] = {}
-    for _, day, number in _observations(header, rows, who):
+    for day, number in observations:
         if number is not None:
             _put(out, day, _check_rate(number, day, who), who)
     return out
@@ -388,12 +502,33 @@ def http_get(url: str, *, client: Optional[httpx.Client] = None, attempts: int =
 
 
 def fetch_boi(start: date, end: date, get: Optional[Getter] = None) -> dict[date, float]:
-    """The Bank of Israel's published rates from ``start`` to ``end``. Raises ``RateError``."""
-    body = (get or http_get)(BOI_URL.format(start=start.isoformat(), end=end.isoformat()))
-    if body is None:
-        raise RateError(f"the Bank of Israel holds no rates from {start} to {end} (HTTP 404); "
-                        "has its address or series changed?")
-    return parse_boi(body)
+    """The Bank of Israel's published rates from ``start`` to ``end``, from the first address that gives them.
+
+    Asks each of ``BOI_URLS`` in order. An address that answers 404, that
+    cannot be fetched (``RateError`` from ``get``), whose body does not read
+    as rates, or whose observations hold no rate is passed over for the
+    next. Raises ``RateError`` naming every address tried and why when none
+    gives rates.
+    """
+    fetch = get or http_get
+    problems = []
+    for template in BOI_URLS:
+        url = template.format(start=start.isoformat(), end=end.isoformat())
+        try:
+            body = fetch(url)
+            if body is None:
+                problems.append(f"{url}: HTTP 404 (no data there)")
+                continue
+            rates = parse_boi(body)
+        except RateError as exc:
+            problems.append(f"{url}: {exc}")
+            continue
+        if rates:
+            return rates
+        problems.append(f"{url}: the answer holds no rate")
+    raise RateError(f"the Bank of Israel gave no rates from {start} to {end} at any of its {len(BOI_URLS)} "
+                    "addresses; has its address or series changed? Tried: "
+                    + "; ".join(f"({number}) {problem}" for number, problem in enumerate(problems, 1)))
 
 
 def fetch_ecb(start: date, end: date, get: Optional[Getter] = None) -> dict[date, float]:
@@ -565,8 +700,8 @@ if __name__ == "__main__":
 
 
 __all__ = [
-    "ATTEMPTS", "BOI", "BOI_URL", "CARRIED", "CONSUMER", "DATE_COLUMNS", "DayRate", "ECB", "ECB_URL", "KIND",
-    "LOOKBACK_DAYS", "PAUSE_SECONDS", "PLAUSIBLE_RANGE", "RateError", "RateTable", "SOURCE", "SOURCES", "TICKERS",
-    "TIMEOUT_SECONDS", "VALUE_COLUMNS", "build", "fetch_boi", "fetch_ecb", "http_get", "load_tape", "main",
-    "parse_boi", "parse_ecb", "summary", "tape", "weekdays",
+    "ATTEMPTS", "BOI", "BOI_URL", "BOI_URLS", "CARRIED", "CONSUMER", "DATE_COLUMNS", "DayRate", "ECB", "ECB_URL",
+    "KIND", "LOOKBACK_DAYS", "PAUSE_SECONDS", "PLAUSIBLE_RANGE", "RateError", "RateTable", "SOURCE", "SOURCES",
+    "TICKERS", "TIMEOUT_SECONDS", "VALUE_COLUMNS", "build", "fetch_boi", "fetch_ecb", "http_get", "load_tape",
+    "main", "parse_boi", "parse_ecb", "summary", "tape", "weekdays",
 ]
