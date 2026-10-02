@@ -1265,3 +1265,47 @@ def test_the_theme_tokens_clear_the_contrast_floors(name):
         if "s-model" in theme:
             for series in ("s-model", "s-momentum", "s-hybrid"):
                 assert _contrast(theme[series], theme["surface"]) >= 3.0, (name, series)
+
+
+# --------------------------------------------------------------------------- #
+# After Israeli tax and in shekels (pre-registration sections 5c and 11.9)
+# --------------------------------------------------------------------------- #
+
+def _tax_view(equity, after, ils, ils_after, from_fx, paid, if_sold):
+    return {"from": "2026-09-10", "through": "2026-10-02", "days": 17,
+            "usd": {"start": 100000, "equity": equity, "after_tax": after, "return": equity / 1e5 - 1,
+                    "after_tax_return": after / 1e5 - 1},
+            "ils": {"start": 304000, "equity": ils, "after_tax": ils_after, "return": ils / 304000 - 1,
+                    "after_tax_return": ils_after / 304000 - 1, "from_usd_ils": from_fx, "after_tax_from_usd_ils": from_fx},
+            "tax_ils": {"paid_so_far": paid, "if_sold_today": if_sold},
+            "usd_ils": {"start": 3.04, "end": 3.08, "change": 0.013}, "unpriced": []}
+
+
+@needs_node
+def test_the_after_tax_view_shows_the_paper_account_now_and_the_funds_once_calibration_passed(tmp_path, built_funds_page):
+    paper = _tax_view(101761.67, 101500.0, 313426.0, 312620.0, 0.0131, 120.0, 925.0)
+    running = _calibration("running") | {"after_tax": {
+        "fx": {"available": True, "first": "2026-09-10", "counts": {"boi": 16, "ecb": 1, "carried": 0}},
+        "paper": paper, "paper_lots": {"checked": True, "mismatches": ["XBI"]}, "funds": None,
+        "looks": [{"look": 1, "made_on": "2026-12-22", "status": "unavailable", "reason": "calibration had not passed"}],
+        "breakeven": {"years": 20, "growth": 0.06, "dividend_yield": 0.02, "extra_per_year": 0.00816}}}
+    passed = _calibration("passed") | {"after_tax": running["after_tax"] | {
+        "funds": {n: _tax_view(100500, 100400, 309500, 309200, 0.01, 0, 100) for n in ("model", "momentum", "hybrid", "vt")},
+        "looks": [{"look": 1, "made_on": "2026-12-23", "status": "ready",
+                   "tests": {"model": {"t": 1.234}, "momentum": {"t": -0.5}, "hybrid": {"t": 3.6}}}]}}
+    no_rates = {"after_tax": {"fx": {"available": False, "reason": "no rate table was given"}}}
+    source = _page_functions(built_funds_page, "afterTaxHtml")
+    out = _run_js(tmp_path, source, "CASES.map(afterTaxHtml)", [running, passed, no_rates, {}, None, {"after_tax": 5}])
+    text = _text(out[0])
+    assert "After Israeli tax and in shekels" in text and "Paper account (real)" in text
+    assert "$101,762 +1.76%" in text and "$101,500 +1.50%" in text and "₪313,426" in text
+    assert "+1.31 pts" in text and "₪120" in text and "₪925" in text
+    assert "once calibration has passed" in text and "Model fund" not in text
+    assert "differ from its positions for XBI" in text
+    assert "Look 1 (made 22 Dec 2026): not available: calibration had not passed" in text
+    assert "1 day from another source" in text and "0.82 points a year" in text and "not a gate" in text
+    both = _text(out[1])
+    assert all(f"{n} fund" in both for n in ("Model", "Momentum", "Hybrid", "VT")) and "once calibration" not in both
+    assert "Model t 1.23 · Momentum t -0.50 · Hybrid t 3.60" in both
+    assert "No rate table tonight (no rate table was given)" in _text(out[2])
+    assert out[3:] == ["", "", ""]

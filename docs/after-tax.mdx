@@ -1,0 +1,78 @@
+---
+title: "After tax and in shekels"
+description: "The after-tax gate, the Israeli tax rules it applies, and the after-tax and shekel views of the paper account and the funds"
+---
+
+The owner lives in Israel and pays Israeli tax. An arm that beats VT before tax can still lose to it after tax,
+because an actively traded fund pays tax on its gains every year, while VT held pays once, at the end. Since
+2 Oct 2026 the experiment checks that, and shows every result after tax and in shekels too.
+
+## The after-tax gate
+
+Pre-registration section 5c. The arm that would win must also beat the VT fund **after Israeli tax**, on an
+"if sold today" basis, at the same bar and with the same Newey-West test as the fund test (lag 5).
+
+- **After-tax equity** = the fund's equity at the close, minus the tax due if every position were sold at that
+  close. A year's tax is never below 0.
+- **After-tax daily return** = after-tax equity today ÷ after-tax equity yesterday − 1.
+- **The test** = the arm's fund minus the VT fund, day by day, from the first fund session (29 Sep 2026) to the
+  close of the look's last trades.
+
+The funds run makes the test once, on the night the race first reaches a look, and keeps it. The race reads it
+back the next night. It can only stop an arm from winning; it never decides anything by itself.
+
+## The tax rules
+
+Every number is in `config/israel_tax.py`; the arithmetic is in `analysis/israel_tax.py`, with the owner's ten
+cases as tests (`tests/test_israel_tax.py`).
+
+| Rule | What the code does |
+| --- | --- |
+| Gains in shekels | cost and proceeds in shekels at the day's rate; the tax is on the smaller of the shekel gain and the dollar gain at the sale-day rate; a loss made only by the exchange rate is not deductible |
+| Rate | 25% on real gains and on dividends |
+| Surtax | 3% + 2% above 721,560 ILS, as parameters; off |
+| Lots | FIFO, per account; a reinvested dividend is a new lot |
+| Dividends | 25% Israeli tax, with a credit for the 25% US tax withheld (W-8BEN); the extra is usually 0 |
+| Losses | first against the same year's gains; the rest against the year's dividends (switch on, until the accountant answers), then carried forward against future gains only, with no expiry |
+| Exchange rate | the Bank of Israel's representative rate on the trade date |
+
+The open questions are in `docs/research/cpa-questions.md`. The answers will change settings only through a
+dated amendment.
+
+## The shekel view
+
+The same results in shekels, at the Bank of Israel's representative rate for each day (`analysis/boi_rates.py`).
+For a day the Bank did not publish, the European Central Bank's reference rates crossed through the euro are
+used, and if neither has the day, the Bank's last earlier rate; every such day is counted and listed.
+
+The view shows how much of each shekel result came from the dollar's move against the shekel: the shekel
+return minus the dollar return. If the dollar fell 3% against the shekel, a fund that made 2% in dollars lost
+about 1% in shekels, and the view says the dollar's move took about 3 points.
+
+The rate table is kept like the price table: its SHA-256 (`rates_sha256`) is committed in `logs/fx_rates.json`
+and `logs/funds.json`, and the table itself goes to the archive.
+
+## Where to read it
+
+- **The 4 Funds page**, "After tax and in shekels": the paper account every night; the four funds once
+  calibration has passed.
+- **`logs/after_tax.md`**: the same, as a short report.
+- **`logs/funds.json`**, key `after_tax`: everything, with each look's after-tax test under `after_tax.looks`.
+- **The exploratory funds** after tax: only in the checkpoint records, at the race's looks.
+
+Before and after tax are side by side, with two tax numbers: **tax paid so far** (on everything sold or received
+so far, as if the year ended today) and **if sold today** (that, plus every open position sold at the close).
+
+## For information: the break-even
+
+`python -m analysis.tax_breakeven --table`: how much more a year, before tax, an actively traded fund must earn to
+tie with VT held for 20 years. At 6% growth and a 2% dividend yield it is about 0.82 points a year. It is not a
+gate.
+
+## What is not modeled
+
+- Alpaca's paper record has no dividends, so none are taxed for the paper account.
+- The funds pay no tax during the year; the after-tax equity takes the tax off as if it were paid when due, so it
+  does not shrink the money the fund trades with.
+- "If sold today" sells at the close with no selling cost.
+- Business-income treatment of frequent trading is not modeled (accountant's question 4).

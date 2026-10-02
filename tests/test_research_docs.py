@@ -26,8 +26,9 @@ def test_the_graveyard_is_numbered_one_by_one_and_states_its_count():
     assert [int(r[0]) for r in rows] == list(range(1, len(rows) + 1))
     text = (RESEARCH / "graveyard.md").read_text()
     assert f"**N = {len(rows)}**" in text
-    # 18 ideas when section 13 was registered, then the 16 history screens of 2026-09-27 and 28.
-    assert len(rows) == 34
+    # 18 ideas when section 13 was registered, then the 16 history screens of 2026-09-27 and 28, then on
+    # 2026-10-02 the IC report's two universes, the four stress-period screens and the regime split.
+    assert len(rows) == 41
 
 
 def test_the_checkpoints_read_n_from_every_numbered_row_history_screens_included():
@@ -35,7 +36,7 @@ def test_the_checkpoints_read_n_from_every_numbered_row_history_screens_included
 
     assert graveyard_n() == len(trials())
     history = [r for r in trials() if r[2].startswith("history screen")]
-    assert [int(r[0]) for r in history] == list(range(19, 35))
+    assert [int(r[0]) for r in history] == list(range(19, 35)) + list(range(37, 41))
 
 
 def test_no_row_is_left_with_a_placeholder_and_every_real_code_screen_links_its_report():
@@ -83,3 +84,31 @@ def test_every_linked_card_exists_and_has_every_field():
     names = {p.name for p in (RESEARCH / "cards").glob("*.md")} - {"_template.md"}
     linked = {re.search(r"\(cards/([^)]+)\)", r[6]).group(1) for r in trials() if "(cards/" in r[6]}
     assert names == linked
+
+
+def test_the_owners_items_of_2_oct_have_their_rows_before_they_run():
+    """The IC report's two universes (one card), the four stress-period screens (one folder, which the history
+    workflow refuses to run without) and the regime split."""
+    rows = {int(r[0]): r for r in trials()}
+    assert "production names" in rows[35][1] and "(cards/ic-model-scores.md)" in rows[35][6]
+    assert "shadow stock universe" in rows[36][1] and "cards/ic-model-scores.md" in rows[36][5]
+    for trial in (37, 38, 39, 40):
+        assert rows[trial][2].startswith("history screen (real code") and "Stress periods" in rows[trial][1]
+    assert "history/2026-10-stress-periods/" in (RESEARCH / "graveyard.md").read_text()
+    assert "market state" in rows[41][1] and rows[41][2] == "exploratory report"
+
+
+def test_the_accountant_questions_are_listed_with_the_two_new_ones():
+    text = (RESEARCH / "cpa-questions.md").read_text()
+    numbered = re.findall(r"^(\d+)\. \*\*", text, re.M)
+    assert numbered == [str(n) for n in range(1, 11)]
+    assert "ILS-hedged fund" in text and "kupat gemel lehashkaa" in text and "Arbitrage Committee" in text
+    assert "OFFSET_LOSSES_VS_DIVIDENDS" in text and "T5" in text
+
+
+def test_the_ic_card_carries_the_shadow_universe_exactly_as_the_code_lists_it():
+    """Published in the card on the registration date and never changed after (pre-registration 13.9)."""
+    from config import shadow_universe
+
+    card = (RESEARCH / "cards" / "ic-model-scores.md").read_text()
+    assert shadow_universe.markdown_table() in card

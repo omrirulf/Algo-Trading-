@@ -1,0 +1,224 @@
+name: shadow universe
+
+# The shadow stock universe (the owner's instruction of 2 Oct 2026, item 5).
+#
+# About 250 US-listed stocks and ADRs that production never trades
+# (config/shadow_universe.py) are scored once a trading day by the same model,
+# with the same settings and the same prompt as production, one call per name
+# (orchestrator/universe.py). The lines go to logs/shadow_universe/, one file
+# per UTC month, for the IC report. Nothing is traded: this job holds no
+# broker key and no webhook secret, and the scorer has no dispatcher, no
+# engine and no broker (tests/test_shadow_universe.py reads it to check).
+#
+# Off until 2027-01-01. The "Would it run today?" step asks the scorer
+# (python -m orchestrator.universe --check): the flag SHADOW_UNIVERSE_ENABLED,
+# the start date, and the NYSE calendar. Until all three say yes every later
+# step is skipped, so the job asks nothing, writes nothing and costs nothing.
+#
+# Cost cap: $1 a UTC day for the model. The scorer stops asking at the cap and
+# exits 3; the job then tells the owner's phone, in fixed words.
+#
+# A by-hand run with `verify` only checks that every name resolves on Yahoo
+# (backtest/verify_tickers.py's check), with no model and no key -- the check
+# the list needs before it is frozen on 2026-12-22.
+on:
+  schedule:
+    # Weekdays at 18:30 UTC: after the production cycle (14:40 UTC, catch-up
+    # 17:35), so the two never ask the model provider at the same time.
+    - cron: "30 18 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Score only the first N names (blank: all of them)"
+        default: ""
+      verify:
+        description: "Only check that every name resolves on Yahoo (no model, no key, nothing committed)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write   # only to commit logs/shadow_universe/
+
+# One run at a time, so two runs never ask the same name on the same day or
+# race to append to the same month's file.
+concurrency:
+  group: shadow-universe
+  cancel-in-progress: false
+
+jobs:
+  score:
+    if: ${{ !inputs.verify }}
+    runs-on: ubuntu-latest
+    # Sized for 251 names asked four at a time (production's full-model
+    # setting) with the 480-second model timeout. The scorer starts no new
+    # name after RUN_BUDGET_SECONDS (240 minutes); a name started just before
+    # that may need a 480-second ask and its 480-second retry, twice when the
+    # answer has to be asked again (32 minutes), plus its context, the setup
+    # and the commit. tests/test_shadow_universe.py keeps this number and
+    # those constants in step. Expected: about 160 minutes.
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        # The branch as it is now, so a second run on the same day sees the
+        # lines the first one committed and does not ask those names again.
+        with:
+          ref: ${{ github.ref }}
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Would it run today?
+        id: check
+        # Asks nothing and needs no key. Every later step runs only on "yes".
+        run: |
+          answer=$(python -m orchestrator.universe --check)
+          echo "$answer"
+          run=$(python -c 'import json,sys; print("yes" if json.loads(sys.argv[1])["run"] else "no")' "$answer")
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+          if [ "$run" != "yes" ]; then
+            echo "Not today: $(python -c 'import json,sys; print(json.loads(sys.argv[1])["reason"])' "$answer")"
+          fi
+
+      - name: Score the universe
+        id: score
+        if: steps.check.outputs.run == 'yes'
+        # Exactly the model, news and data-source keys the production cycle
+        # step gets (heartbeat.yml, "Run one cycle"), and nothing else: no
+        # Alpaca key, no webhook secret, no execution mode. Insiders and
+        # analysts come from yfinance and need no key.
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          BRIGHTDATA_API_TOKEN: ${{ secrets.BRIGHTDATA_API_TOKEN }}
+          BRIGHTDATA_SERP_ZONE: ${{ vars.BRIGHTDATA_SERP_ZONE }}
+          EIA_API_KEY: ${{ secrets.EIA_API_KEY }}
+          USDA_NASS_KEY: ${{ secrets.USDA_NASS_KEY }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          FULL_MODEL_API_KEY: ${{ secrets.FULL_MODEL_API_KEY || secrets.DEEPINFRA_API_KEY || secrets.SCREENING_API_KEY || secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY || secrets.GROQ_API_KEY }}
+          LIMIT: ${{ inputs.limit }}
+        # Exit 3 is the cost cap: not a failure of the job, so the lines
+        # already written are committed below and the phone is told. Any
+        # other non-zero code fails the step.
+        run: |
+          ARGS=""
+          if [ -n "$LIMIT" ]; then
+            case "$LIMIT" in (*[!0-9]*) echo "limit must be a number"; exit 2;; esac
+            ARGS="--limit $LIMIT"
+          fi
+          set +e
+          python -m orchestrator.universe $ARGS > "$RUNNER_TEMP/summary.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/summary.json"
+          {
+            echo '## Shadow universe'
+            echo
+            echo '```json'
+            cat "$RUNNER_TEMP/summary.json"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$status" = "3" ]; then
+            echo "cap=yes" >> "$GITHUB_OUTPUT"
+            echo "::warning::the daily cost cap stopped the run; the names not asked have no score today"
+            exit 0
+          fi
+          exit "$status"
+
+      - name: Commit the lines
+        # Also after a failed run: every line already written is kept. Only
+        # this workflow writes logs/shadow_universe/, so a pull --rebase that
+        # meets another workflow's commit has nothing to merge by hand.
+        if: always() && steps.check.outputs.run == 'yes'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f logs/shadow_universe/ 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "no new lines"
+            exit 0
+          fi
+          git commit -m "Shadow universe: scores at $(date -u +'%Y-%m-%dT%H:%MZ')"
+          for attempt in 1 2 3; do
+            if git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}"; then
+              exit 0
+            fi
+            git rebase --abort 2>/dev/null || true
+            echo "::warning::the lines did not go through (try $attempt of 3)"
+            sleep 5
+          done
+          echo "::error::the shadow universe's lines were not committed"
+          exit 1
+
+      - name: Tell the owner's phone the cost cap stopped the run
+        # Like scoring-prices.yml's alert: fixed words and the run's link,
+        # no number but the cap itself. The topic goes in the JSON body,
+        # never a URL or a log.
+        if: always() && steps.score.outputs.cap == 'yes'
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "${NTFY_TOPIC:-}" ]; then
+            echo "no phone configured (NTFY_TOPIC secret unset); nothing sent"
+            exit 0
+          fi
+          python - <<'EOF' > "$RUNNER_TEMP/phone.json"
+          import json, os
+          print(json.dumps({"topic": os.environ["NTFY_TOPIC"],
+                            "title": "⚠️ Shadow universe stopped at its cost cap",
+                            "message": ("Today's shadow universe run reached its $1 daily cost cap and stopped "
+                                        "asking the model. Nothing is traded. The names not asked today have no "
+                                        "score for today, and tomorrow starts again from zero."),
+                            "priority": 3, "tags": ["warning"], "click": os.environ["RUN_URL"]}))
+          EOF
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' \
+                 --data-binary @"$RUNNER_TEMP/phone.json" https://ntfy.sh/ || echo "000")
+          rm -f "$RUNNER_TEMP/phone.json"
+          case "$code" in
+            2*) echo "phone notified (HTTP $code)";;
+            *)  echo "::warning::phone not notified (HTTP $code)";;
+          esac
+
+  verify:
+    # By hand only. Reads prices from Yahoo, asks no model, holds no key and
+    # commits nothing.
+    if: ${{ inputs.verify }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Does every name resolve?
+        run: |
+          python - <<'EOF'
+          import sys
+          from backtest.verify_tickers import check
+          from config.shadow_universe import SECTORS, TICKERS
+          results = [check(ticker) for ticker in TICKERS]
+          broken = [r for r in results if not r.resolved]
+          for r in results:
+              print(f"{r.ticker:<6} {'ok' if r.resolved else 'NO':<3} {SECTORS[r.ticker]:<28} {r.note}")
+          print(f"{len(results) - len(broken)} of {len(results)} names resolve")
+          if broken:
+              print("Does not resolve: " + ", ".join(r.ticker for r in broken))
+              sys.exit(1)
+          EOF

@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 
 from analysis import decision_gate as gate
-from analysis.decision_gate import LookInputs, WatchDay
+from analysis.decision_gate import AfterTax, LookInputs, WatchDay
 
 
 # --- the bars are the O'Brien-Fleming ones, and they hold the error rate ----------
@@ -93,11 +93,16 @@ def test_trading_days_skip_weekends_and_holidays():
 # --- one look ----------------------------------------------------------------------------
 
 
-def inputs(mm=0.0, mh=0.0, hm=0.0, mean=0.001, band=0.0005, **vs):
+def inputs(mm=0.0, mh=0.0, hm=0.0, mean=0.001, band=0.0005, after_tax="same", drawdown=None, **vs):
+    """One look's numbers. The after-tax test (section 5c) defaults to the same t's as the index test, so
+    every case below that is not about it reads as before; ``after_tax`` overrides it (None: not made yet)."""
     t_vs = {"model": 0.0, "momentum": 0.0, "hybrid": 0.0}
     t_vs.update(vs)
+    if after_tax == "same":
+        after_tax = AfterTax(gate.AFTER_TAX_READY, dict(t_vs))
     return LookInputs(entry_days=60, t_model_momentum=mm, t_model_hybrid=mh, t_hybrid_momentum=hm,
-                      model_mean=mean, model_band_high=band, t_vs_index=t_vs)
+                      model_mean=mean, model_band_high=band, t_vs_index=t_vs, after_tax=after_tax,
+                      vt_max_drawdown=drawdown)
 
 
 def test_the_model_is_kept_only_if_it_also_beats_the_index():
@@ -173,6 +178,73 @@ def test_the_header_line_is_the_owners_words_until_a_decision():
         "independent days since 2026-09-23: 60 of 60 (= 180 trading days) — FINAL: "
         + gate.OUTCOME_TEXT[gate.NO_ARM].upper()
     )
+
+
+# --- the after-tax gate and the downturn label (Amendment 2026-10-02) ---------------------
+
+
+def after(**t):
+    return AfterTax(gate.AFTER_TAX_READY, t)
+
+
+def test_the_winner_must_also_beat_the_vt_fund_after_israeli_tax():
+    """Section 5c: the arm that would win must also beat the VT fund after tax, at the same bar."""
+    kept = gate.decide(inputs(mm=3.0, mh=2.5, model=2.1, after_tax=after(model=2.2)), 2.0, final=True)
+    assert kept[:2] == ("model", "model") and "after Israeli tax at t > 2.00 (t = 2.20)" in kept[2]
+    candidate, outcome, reason = gate.decide(inputs(mm=3.0, mh=2.5, model=2.1, after_tax=after(model=1.5)),
+                                             2.0, final=True)
+    assert (candidate, outcome) == ("model", gate.NO_ARM)
+    assert "did not beat the VT fund after Israeli tax" in reason and "no arm trades" in reason
+    # The replacement is held to it too.
+    assert gate.decide(inputs(momentum=2.5, after_tax=after(momentum=1.0)), 2.0, final=True)[1] == gate.NO_ARM
+
+
+def test_the_after_tax_gate_only_stops_an_arm_and_never_decides_by_itself():
+    # Early look: pre-tax beats VT at the bar, after tax it does not -> nothing is decided.
+    candidate, outcome, reason = gate.decide(
+        inputs(mm=3.6, mh=3.6, model=3.6, after_tax=after(model=-9.0)), 3.47, final=False)
+    assert (candidate, outcome) == ("model", None) and "decides nothing" in reason
+    # Trailing VT before tax is still the early "no arm trades", whatever the after-tax record says.
+    assert gate.decide(inputs(mm=3.6, mh=3.6, model=-3.6, after_tax=None), 3.47, final=False)[1] == gate.NO_ARM
+    # A failed arm before tax never reaches the after-tax test.
+    assert gate.decide(inputs(mm=3.0, mh=2.5, model=1.9, after_tax=None), 2.0, final=True)[1] == gate.NO_ARM
+
+
+def test_a_look_waits_for_its_after_tax_record_and_cannot_pass_without_funds():
+    waiting = gate.decide(inputs(mm=3.0, mh=2.5, model=2.1, after_tax=None), 2.0, final=True)
+    assert waiting[:2] == ("model", None) and "waits for it" in waiting[2]
+    none = AfterTax(gate.AFTER_TAX_UNAVAILABLE, {}, "calibration had not passed")
+    final = gate.decide(inputs(mm=3.0, mh=2.5, model=2.1, after_tax=none), 2.0, final=True)
+    assert final[:2] == ("model", gate.NO_ARM) and "calibration had not passed" in final[2]
+    early = gate.decide(inputs(mm=3.6, mh=3.6, model=3.6, after_tax=none), 3.47, final=False)
+    assert early[:2] == ("model", None)
+
+
+def test_the_after_tax_test_is_the_fund_tests_own_lag():
+    assert gate.AFTER_TAX_LAG == 5
+
+
+def test_a_verdict_is_labelled_when_vt_never_fell_ten_percent():
+    """Section 5d: a label and a policy, never a change to the outcome."""
+    calm = gate.decide(inputs(mm=3.0, mh=2.5, model=2.1, drawdown=0.061), 2.0, final=True)
+    assert calm[1] == "model" and "NOT TESTED IN A DOWNTURN" in calm[2] and "starts small" in calm[2]
+    rough = gate.decide(inputs(mm=3.0, mh=2.5, model=2.1, drawdown=0.124), 2.0, final=True)
+    assert rough[1] == "model" and "tested in a downturn" in rough[2] and "NOT TESTED" not in rough[2]
+    assert "could not be measured" in gate.decide(inputs(momentum=1.0), 2.0, final=True)[2]
+    # No decision, no label.
+    assert "downturn" not in gate.decide(inputs(mm=3.0, mh=3.0, model=5.0, drawdown=0.01), 3.47, final=False)[2]
+    assert gate.DOWNTURN_DRAWDOWN == 0.10 and gate.tested_in_a_downturn(0.10) is True
+    looks = gate.evaluate({20: inputs(), 40: inputs(), 60: inputs(momentum=1.0, drawdown=0.05)})
+    assert gate.status_line(60, looks).endswith("FINAL: " + gate.OUTCOME_TEXT[gate.NO_ARM].upper()
+                                                + " — NOT TESTED IN A DOWNTURN")
+
+
+def test_vt_s_largest_fall_is_measured_inside_the_window_only():
+    closes = [(date(2026, 9, 21), 200.0), (date(2026, 9, 23), 100.0), (date(2026, 9, 24), 110.0),
+              (date(2026, 9, 25), 99.0), (date(2026, 9, 28), 120.0), (date(2026, 9, 29), 102.0)]
+    assert gate.vt_max_drawdown(closes, date(2026, 9, 23), date(2026, 9, 29)) == pytest.approx(0.15)
+    assert gate.vt_max_drawdown(closes, date(2026, 9, 23), date(2026, 9, 25)) == pytest.approx(0.1)
+    assert gate.vt_max_drawdown(closes, date(2027, 1, 1), date(2027, 2, 1)) is None
 
 
 # --- the index's own window ----------------------------------------------------------------

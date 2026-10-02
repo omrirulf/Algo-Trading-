@@ -984,7 +984,9 @@ def test_the_reports_move_no_look_bar_or_verdict():
         _arm(control.NAME, []),
     ]
     index = {d: 0.0 for d in days}
-    before = horse_race.look_inputs(results, {}, days, index, 60, 3, 10)
+    raw = horse_race.look_inputs(results, {}, days, index, 60, 3, 10)
+    # Momentum's fund also clears the after-tax test (section 5c), recorded by the funds run.
+    before = replace(raw, after_tax=decision_gate.AfterTax(decision_gate.AFTER_TAX_READY, {momentum.NAME: 9.0}))
     looks = tuple(decision_gate.evaluate({20: before}))
     assert looks[0].outcome == momentum.NAME, "the crafted race decides at the first look"
     view = horse_race.GateView(registered=True, mismatches=(), window_lines=60, window_cycle_days=60,
@@ -995,7 +997,7 @@ def test_the_reports_move_no_look_bar_or_verdict():
     reported = horse_race.gate_json(view, 3, STAMP, splits=splits)
     new = {"conviction_groups", "sides", "report_since"}
     assert {k: v for k, v in reported.items() if k not in new} == {k: v for k, v in plain.items() if k not in new}
-    assert horse_race.look_inputs(results, {}, days, index, 60, 3, 10) == before
+    assert horse_race.look_inputs(results, {}, days, index, 60, 3, 10) == raw
     assert sum(g.n for g in splits.conviction[MODEL_ARM]) == 60
     json.dumps(reported)
 
@@ -1243,3 +1245,48 @@ def test_an_intraday_reading_below_the_line_is_a_mid_day_warning_never_a_trip(tm
         horse_race.AccountRecord(equity=dict(record.equity, **{}) | {date(2026, 9, 25): 100_500.0},
                                  at=record.at, intraday=date(2026, 9, 25)), {}))
     assert calm["midday"]["equity"] == 100_500.0 and calm["midday_warning"] is None
+
+
+# --- the after-tax gate's record and the downturn label (Amendment 2026-10-02) -------------
+
+
+def test_the_race_reads_each_looks_after_tax_test_from_the_funds_record(tmp_path):
+    record = tmp_path / "funds.json"
+    record.write_text(json.dumps({"after_tax": {"looks": [
+        {"look": 1, "status": "ready", "tests": {"model": {"t": 3.6}, "momentum": {"t": -1.0}, "hybrid": {"t": None}}},
+        {"look": 2, "status": "unavailable", "reason": "calibration had not passed: no fund was run"},
+        {"look": "x"}, "junk",
+    ]}}))
+    records = horse_race.after_tax_records(record)
+    assert set(records) == {1, 2}
+    assert records[1] == decision_gate.AfterTax("ready", {"model": 3.6, "momentum": -1.0, "hybrid": None})
+    assert records[2].status == "unavailable" and "calibration" in records[2].reason
+    assert horse_race.after_tax_records(tmp_path / "missing.json") == {}
+    (tmp_path / "bad.json").write_text("{")
+    assert horse_race.after_tax_records(tmp_path / "bad.json") == {}
+    assert horse_race.FUNDS_RECORD.name == "funds.json"
+
+
+def test_the_gate_json_says_whether_each_look_has_its_after_tax_record_and_vt_s_fall():
+    waiting = decision_gate.LookInputs(entry_days=60, t_model_momentum=None, t_model_hybrid=None,
+                                       t_hybrid_momentum=None, model_mean=None, model_band_high=None,
+                                       vt_max_drawdown=0.04)
+    looks = tuple(decision_gate.evaluate({20: waiting}))
+    view = horse_race.GateView(registered=True, mismatches=(), window_lines=60, window_cycle_days=60,
+                               unanswered_in_window=0, entry_days=60, independent=20, looks=looks,
+                               next_estimate=None)
+    out = horse_race.gate_json(view, 3, STAMP)
+    assert out["looks"][0]["after_tax"] == "waiting" and out["looks"][0]["vt_max_drawdown"] == 0.04
+    assert out["looks"][1]["after_tax"] is None and out["downturn"] is None
+    final = tuple(decision_gate.evaluate({60: replace(waiting, t_vs_index={"momentum": 9.0}, after_tax=decision_gate.AfterTax(
+        "ready", {"momentum": 9.0}))}))
+    view = replace(view, looks=final, independent=60)
+    out = horse_race.gate_json(view, 3, STAMP)
+    assert out["outcome"] == momentum.NAME
+    assert out["downturn"] == {"vt_max_drawdown": 0.04, "tested": False, "label": "not tested in a downturn"}
+    assert out["status_line"].endswith("— NOT TESTED IN A DOWNTURN")
+
+
+def test_a_looks_window_ends_at_the_close_of_its_last_trades():
+    grid = [date(2026, 12, 17), date(2026, 12, 18)]
+    assert horse_race.look_last_close(grid, 2, 3) == date(2026, 12, 22)

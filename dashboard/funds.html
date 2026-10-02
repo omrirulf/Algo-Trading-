@@ -185,6 +185,34 @@
     funds.list[].order_matters   OrderSummary per fund; null for vt; shown only
                                  once calibration passed
 
+  After Israeli tax and in shekels (pre-registration sections 5c and 11.9,
+  the owner's decisions of 2 Oct 2026); an older record lacks all of these
+  and the page then draws nothing for them. Money in SHEKELS is marked _ils:
+    after_tax                    null, or the part below
+    after_tax.paper              null, or a TaxView for the real paper account
+    after_tax.funds              null until calibration passed, then {model,
+                                 momentum, hybrid, vt: TaxView}
+    after_tax.fx                 {available true|false, reason text when false,
+                                  source text, first/last ISO dates, counts
+                                  {boi, ecb, carried}, fallback_days[] [ISO
+                                  date, source], rates_sha256 text}
+    after_tax.paper_lots         {checked true|false, mismatches[] tickers
+                                  whose rebuilt lots differ from the positions}
+    after_tax.looks[]            {look 1|2|3, made_on ISO date, status ready |
+                                  unavailable, reason text, tests {model,
+                                  momentum, hybrid: {t, days, mean_daily_diff}}}
+    after_tax.breakeven          {years, growth fraction, dividend_yield
+                                  fraction, extra_per_year fraction}: for
+                                  information only
+  A TaxView is {from, through ISO dates, days count,
+                usd {start, equity, after_tax DOLLARS, return,
+                     after_tax_return fractions},
+                ils {start, equity, after_tax SHEKELS, return,
+                     after_tax_return, from_usd_ils, after_tax_from_usd_ils
+                     fractions},
+                tax_ils {paid_so_far, if_sold_today SHEKELS},
+                usd_ils {start, end rates, change fraction}, unpriced[]}.
+
   logs/race_gate.json, written nightly by analysis/horse_race.py (its gate-json
   option):
     generated_at                 ISO date-time the record was written
@@ -439,6 +467,7 @@ table.mini tr.over td{background:var(--warn-bg)}
 <div id="funds"></div>
 <section id="explore" aria-label="The exploratory funds against the model fund"></section>
 <section id="data" aria-label="Price gaps by month, and the names the paper account held"></section>
+<section id="after-tax" aria-label="After Israeli tax and in shekels"></section>
 
 <section id="order" aria-label="How often the buying order mattered"></section>
 
@@ -1134,6 +1163,70 @@ table.mini tr.over td{background:var(--warn-bg)}
     return html + `</div>`;
   }
 
+  // ------------------------------------------- after Israeli tax and in shekels
+  // Pre-registration sections 5c and 11.9 (the owner's decisions of 2 Oct
+  // 2026): before and after tax side by side, in dollars and in shekels, the
+  // dollar's part of the shekel result, and the two tax numbers. The paper
+  // account is shown every night (it is the account, not a fund result); the
+  // funds only once calibration has passed, like every fund result.
+  function afterTaxHtml(data){
+    data = asObj(data) || {};
+    const at = asObj(data.after_tax);
+    if(!at) return "";
+    const fx = asObj(at.fx) || {};
+    const ils = (v)=> !isNum(v) ? "n/a" : (v<0?"−":"") + "₪" + Math.abs(v).toLocaleString("en-US",{maximumFractionDigits:0});
+    const both = (amount, change)=> `${esc(amount)} <span class="${tone(change)}">${esc(signed(change, 2))}</span>`;
+    const row = (label, view)=>{
+      view = asObj(view);
+      if(!view) return "";
+      const u = asObj(view.usd) || {}, s = asObj(view.ils) || {}, t = asObj(view.tax_ils) || {};
+      return `<tr><td>${esc(label)}</td><td class="num">${both(money(u.equity), u.return)}</td>`
+        + `<td class="num">${both(money(u.after_tax), u.after_tax_return)}</td>`
+        + `<td class="num">${both(ils(s.equity), s.return)}</td><td class="num">${both(ils(s.after_tax), s.after_tax_return)}</td>`
+        + `<td class="num">${esc(pts(s.from_usd_ils))}</td><td class="num">${esc(ils(t.paid_so_far))}</td>`
+        + `<td class="num">${esc(ils(t.if_sold_today))}</td></tr>`;
+    };
+    const funds = asObj(at.funds);
+    const rows = row("Paper account (real)", at.paper)
+      + (funds ? ["model", "momentum", "hybrid", "vt"].map(n=> row(SHORT[n] + " fund", funds[n])).join("") : "");
+    let html = `<div class="card" style="margin-top:10px"><h3>After Israeli tax and in shekels <span class="faint" style="font-weight:400">(since each book's start)</span></h3>`;
+    if(fx.available === false){
+      html += `<p class="small muted">No rate table tonight (${esc(fx.reason)}): nothing is shown rather than a guessed rate.</p>`;
+    }
+    if(rows){
+      html += `<div class="scroll"><table class="mini"><thead><tr><th></th><th>Before tax ($)</th><th>After tax, if sold today ($)</th>`
+        + `<th>Before tax (₪)</th><th>After tax (₪)</th><th>From the $/₪ move</th><th>Tax paid so far</th><th>Tax if sold today</th></tr></thead>`
+        + `<tbody>${rows}</tbody></table></div>`;
+    }
+    if(!funds) html += `<p class="small muted">The funds are shown after tax once calibration has passed, like every fund result.</p>`;
+    const lots = asObj(at.paper_lots);
+    if(lots && Array.isArray(lots.mismatches) && lots.mismatches.length){
+      html += `<p class="small"><span class="chip bad">check</span> The lots rebuilt from the paper account's fills differ from its positions for ${esc(lots.mismatches.join(", "))}.</p>`;
+    }
+    const looks = (Array.isArray(at.looks) ? at.looks : []).map(asObj).filter(Boolean);
+    if(looks.length){
+      const line = (r)=>{
+        const tests = asObj(r.tests) || {};
+        const ts = ["model", "momentum", "hybrid"].filter(n=> asObj(tests[n])).map(n=> `${SHORT[n]} t ${bar2(tests[n].t)}`).join(" · ");
+        return `<li>Look ${esc(r.look)} (made ${esc(day(r.made_on, true))}): ${r.status === "ready" ? esc(ts || "no fund") : esc("not available: " + (r.reason || ""))}</li>`;
+      };
+      html += `<h4>The after-tax gate: each fund against the VT fund, after tax</h4><ul class="facts">${looks.map(line).join("")}</ul>`;
+    }
+    const counts = asObj(fx.counts);
+    if(fx.available === true && counts){
+      const other = (isNum(counts.ecb) ? counts.ecb : 0) + (isNum(counts.carried) ? counts.carried : 0);
+      html += `<p class="small muted">Rates: the Bank of Israel's representative rate${fx.first ? ` from ${esc(day(fx.first, true))}` : ""}; `
+        + `${esc(other)} ${other === 1 ? "day" : "days"} from another source, counted.</p>`;
+    }
+    const be = asObj(at.breakeven);
+    if(be && isNum(be.extra_per_year)){
+      html += `<p class="small muted">For information only, not a gate: an actively traded fund needs about `
+        + `${esc((be.extra_per_year * 100).toFixed(2))} points a year more before tax to tie with VT held ${esc(be.years)} years `
+        + `(${esc(plain(be.growth, 0))} growth, ${esc(plain(be.dividend_yield, 0))} dividend yield).</p>`;
+    }
+    return html + `<p class="small">${doc("after-tax", "After tax and in shekels")}</p></div>`;
+  }
+
   function orderHtml(data){
     data = data && typeof data === "object" ? data : {};
     const obj = (v)=> v && typeof v === "object" && !Array.isArray(v) ? v : null;
@@ -1214,6 +1307,7 @@ table.mini tr.over td{background:var(--warn-bg)}
     const todo = safely("calibration", ()=>renderCalibration(F)).concat(safely("funds", ()=>renderFunds(F)));
     safely("explore", ()=>{ $("explore").innerHTML = exploratoryHtml(F); return []; });
     safely("data", ()=>{ $("data").innerHTML = dataHtml(F); return []; });
+    safely("after-tax", ()=>{ $("after-tax").innerHTML = afterTaxHtml(F); return []; });
     safely("order", ()=>{ $("order").innerHTML = orderHtml(F); return []; });
     todo.forEach(([id, fn])=>safely(id, fn));
   }

@@ -34,7 +34,7 @@ on:
         default: "1000"
 
 permissions:
-  contents: write   # only to commit logs/funds.json, logs/race_gate.json and logs/concentration.json, and publish the desk
+  contents: write   # only to commit logs/funds.json, logs/race_gate.json, logs/concentration.json, logs/fx_rates.json and logs/after_tax.md, and publish the desk
 
 concurrency:
   group: shadow-funds
@@ -79,6 +79,31 @@ jobs:
           python -c "import json,sys; json.load(open(sys.argv[1]))" "$RUNNER_TEMP/race_gate.json"
           python -c "import json,sys; t=json.load(open(sys.argv[1])); assert t['kind']=='scoring-prices'" "$RUNNER_TEMP/scoring-prices/race-gate.json"
 
+      - name: The shekel rates
+        # Pre-registration sections 5c and 11.9 (Amendment 2026-10-02): the
+        # Bank of Israel's representative USD/ILS rate for every weekday from
+        # the paper account's first funded day (shadow/after_tax.py,
+        # FX_TABLE_START), another public source only for a day the Bank did
+        # not publish, every such day counted (analysis/boi_rates.py). Kept
+        # like the price tables: its SHA-256 goes into logs/fx_rates.json,
+        # which is committed, and the table itself into the scoring-prices
+        # artifact, which scoring-prices.yml copies into the archive. No key:
+        # both sources are public. A night the rates cannot be fetched leaves
+        # no table, and the funds run then says there is no after-tax view
+        # tonight -- it never guesses a rate.
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/scoring-prices"
+          if python -m analysis.boi_rates --start 2026-09-10 --end "$(date -u +%F)" --with-table > "$RUNNER_TEMP/fx.out" \
+             && test "$(wc -l < "$RUNNER_TEMP/fx.out")" = "2" \
+             && python -c "import json,sys; d=json.load(open(sys.argv[1])); assert d['kind']=='fx-rates'" <(head -n 1 "$RUNNER_TEMP/fx.out"); then
+            head -n 1 "$RUNNER_TEMP/fx.out" > "$RUNNER_TEMP/fx_rates.json"
+            tail -n 1 "$RUNNER_TEMP/fx.out" > "$RUNNER_TEMP/scoring-prices/fx-rates.json"
+          else
+            echo "::warning::the shekel rates were not fetched; no after-tax or shekel view tonight"
+          fi
+
       - name: Calibration and the funds
         env:
           RANDOM_FUNDS: ${{ inputs.random || '1000' }}
@@ -88,14 +113,32 @@ jobs:
           # The race's fresh gate says which looks are reached; the committed
           # funds.json carries each look's exploratory record unchanged
           # (pre-registration section 13.1).
+          # The night's shekel rates, when the step above fetched them
+          # (sections 5c and 11.9); without them the funds say so. The shadow
+          # stock universe's journal (section 13.9) is empty until 2027-01-01.
           python -m shadow.run --processes "$(nproc)" --random "$RANDOM_FUNDS" --with-prices \
-            --race-gate "$RUNNER_TEMP/race_gate.json" --previous logs/funds.json > "$RUNNER_TEMP/funds.out"
+            --race-gate "$RUNNER_TEMP/race_gate.json" --previous logs/funds.json \
+            --fx-table "$RUNNER_TEMP/scoring-prices/fx-rates.json" \
+            --universe logs/shadow_universe > "$RUNNER_TEMP/funds.out"
           mkdir -p "$RUNNER_TEMP/scoring-prices"
           head -n 1 "$RUNNER_TEMP/funds.out" > "$RUNNER_TEMP/funds.json"
           tail -n 1 "$RUNNER_TEMP/funds.out" > "$RUNNER_TEMP/scoring-prices/funds.json"
           test "$(wc -l < "$RUNNER_TEMP/funds.out")" = "2"
           python -c "import json,sys; json.load(open(sys.argv[1]))" "$RUNNER_TEMP/funds.json"
           python -c "import json,sys; t=json.load(open(sys.argv[1])); assert t['kind']=='scoring-prices'" "$RUNNER_TEMP/scoring-prices/funds.json"
+
+      - name: The after-tax report
+        # Pre-registration section 11.9 (2 Oct 2026): the after-tax part of
+        # tonight's funds record, as a short report for reading on the phone
+        # (shadow/after_tax.py). Read-only; a night that cannot make it leaves
+        # the committed report as it was.
+        continue-on-error: true
+        run: |
+          if python -m shadow.after_tax "$RUNNER_TEMP/funds.json" > "$RUNNER_TEMP/after_tax.md"; then
+            cp "$RUNNER_TEMP/after_tax.md" logs/after_tax.md
+          else
+            echo "::warning::the after-tax report was not made; the committed one is left as it was"
+          fi
 
       - name: The monthly concentration report
         # The owner's monthly report (27 Sep 2026), descriptive only: the
@@ -136,6 +179,13 @@ jobs:
           # The monthly concentration report (27 Sep 2026), on its own line:
           # it exists only once the first month has been made.
           git add -f logs/concentration.json 2>/dev/null || true
+          # The after-tax report (2 Oct 2026), when made.
+          git add -f logs/after_tax.md 2>/dev/null || true
+          # The shekel rate table's hash and counts (2 Oct 2026), when fetched.
+          if [ -s "$RUNNER_TEMP/fx_rates.json" ]; then
+            cp "$RUNNER_TEMP/fx_rates.json" logs/fx_rates.json
+            git add -f logs/fx_rates.json
+          fi
           if git diff --cached --quiet; then
             echo "no changes"
             exit 0
@@ -149,6 +199,10 @@ jobs:
             # On its own: one missing path makes git refuse the whole list.
             git checkout --theirs -- logs/concentration.json 2>/dev/null || true
             git add -f logs/concentration.json 2>/dev/null || true
+            git checkout --theirs -- logs/fx_rates.json 2>/dev/null || true
+            git add -f logs/fx_rates.json 2>/dev/null || true
+            git checkout --theirs -- logs/after_tax.md 2>/dev/null || true
+            git add -f logs/after_tax.md 2>/dev/null || true
             GIT_EDITOR=true git rebase --continue
           fi
           git push origin "HEAD:${GITHUB_REF_NAME}"

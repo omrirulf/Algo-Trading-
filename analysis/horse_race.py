@@ -203,6 +203,11 @@ GROUPS = ("all", "funds", "companies")
 #: (``app/account_snapshot.py``). Read for trigger (d) only.
 ACCOUNT_LOG = cfg.LOG_DIR / "account.jsonl"
 
+#: The funds run's document (``shadow.run``): each planned look's after-tax
+#: test against the VT fund (pre-registration section 5c) is recorded there,
+#: once, on the night the race first reaches the look, and read back here.
+FUNDS_RECORD = cfg.LOG_DIR / "funds.json"
+
 #: Alpaca stamps its daily portfolio history in the exchange's day.
 NEW_YORK = ZoneInfo("America/New_York")
 #: A history value is a close only once the session is over.
@@ -237,6 +242,9 @@ def build_parser() -> argparse.ArgumentParser:
                         help="also list every scored trade of every arm")
     parser.add_argument("--account", type=Path, default=None,
                         help="the paper account's record, for trigger (d) only (default: %s)" % ACCOUNT_LOG)
+    parser.add_argument("--funds", type=Path, default=FUNDS_RECORD,
+                        help="the funds run's last document, for each look's after-tax test against the VT "
+                             "fund (pre-registration section 5c; default: %(default)s)")
     parser.add_argument("--gate-json", action="store_true",
                         help="print only the decision gate, as JSON (for the dashboard), and stop")
     parser.add_argument("--with-prices", action="store_true",
@@ -813,6 +821,39 @@ def look_inputs(
     )
 
 
+def after_tax_records(path: Optional[Path]) -> dict[int, gate.AfterTax]:
+    """Each look's after-tax test (section 5c) from the funds run's document, by look number (1, 2, 3).
+
+    The record is made by ``shadow.run`` on the night the race first reaches
+    a look and kept unchanged after, so the race reads it back from the
+    committed document every night. A look with no record yet is absent:
+    the gate waits for it. A record made without funds (calibration had not
+    passed) reads as unavailable, and no arm can pass the test at that look.
+    """
+    try:
+        document = json.loads(Path(path).read_text(encoding="utf-8")) if path else None
+    except (OSError, ValueError):
+        return {}
+    records = ((document or {}).get("after_tax") or {}).get("looks") if isinstance(document, dict) else None
+    out: dict[int, gate.AfterTax] = {}
+    for record in records or []:
+        if not isinstance(record, dict) or not isinstance(record.get("look"), int):
+            continue
+        tests = record.get("tests") or {}
+        if record.get("status") == gate.AFTER_TAX_READY and isinstance(tests, dict):
+            ts = {name: (t.get("t") if isinstance(t, dict) else None) for name, t in tests.items()}
+            out[record["look"]] = gate.AfterTax(gate.AFTER_TAX_READY, ts)
+        else:
+            out[record["look"]] = gate.AfterTax(gate.AFTER_TAX_UNAVAILABLE, {},
+                                                str(record.get("reason") or "no fund was run"))
+    return out
+
+
+def look_last_close(grid: Sequence[date], entry_days: int, horizon: int) -> date:
+    """The trading day the look's last trades close: the end of its test window (section 5d)."""
+    return gate.trading_days_after(grid[entry_days - 1], max(0, horizon - 1))
+
+
 def look_data_problem(
     window: Sequence[JournalEntry], fetcher: OhlcFetcher, grid: Sequence[date],
     entry_days: int, horizon: int, today: date,
@@ -928,9 +969,24 @@ def gate_json(
         },
         "looks": [
             {"independent": look.independent, "bar": look.bar, "reached": look.reached,
-             "outcome": look.outcome, "reason": look.reason}
+             "outcome": look.outcome, "reason": look.reason,
+             # Section 5c: whether this look's after-tax record has been made, and with funds.
+             "after_tax": (None if look.inputs is None
+                           else "waiting" if look.inputs.after_tax is None else look.inputs.after_tax.status),
+             # Section 5d: VT's largest fall from its high in the look's window.
+             "vt_max_drawdown": None if look.inputs is None else look.inputs.vt_max_drawdown,
+             # The close of the look's last trades; the funds run cuts its after-tax test there.
+             "window_end": (None if look.inputs is None or look.inputs.window_end is None
+                            else look.inputs.window_end.isoformat())}
             for look in view.looks
         ],
+        # Section 5d: the label on a decided verdict, null until one.
+        "downturn": None if decided is None or decided.inputs is None else {
+            "vt_max_drawdown": decided.inputs.vt_max_drawdown,
+            "tested": gate.tested_in_a_downturn(decided.inputs.vt_max_drawdown),
+            "label": (gate.DOWNTURN_LABEL
+                      if gate.tested_in_a_downturn(decided.inputs.vt_max_drawdown) is False else None),
+        },
         **splits_json(splits),
         "run_timing": (None if timings is None
                        else run_timing.timing_json(timings, cutoff=gate.DECISION_CUTOFF)),
@@ -1332,6 +1388,7 @@ def main(argv: list[str] | None = None) -> int:
     entry_days = len(grid)
     independent = gate.independent_days(entry_days, args.horizon)
     inputs: dict[int, Optional[gate.LookInputs]] = {}
+    after_tax = after_tax_records(args.funds)
     if not mismatches:
         index = index_daily(bars, grid, args.horizon)
         gaps = frozenset(gate.index_gaps(bars, grid))
@@ -1342,6 +1399,13 @@ def main(argv: list[str] | None = None) -> int:
                                        args.horizon, args.seeds, index_gaps=gaps)
                 problem = look_data_problem(window, fetcher, grid, needed, args.horizon, today,
                                             source=source, entry_rule=args.entry)
+                number = [days for days, _ in gate.CHECKPOINTS].index(look_days) + 1
+                end = look_last_close(grid, needed, args.horizon)
+                computed = replace(
+                    computed, after_tax=after_tax.get(number), window_end=end,
+                    vt_max_drawdown=gate.vt_max_drawdown(((bar[0], bar[2]) for bar in bars),
+                                                         gate.DECISION_CUTOFF, end),
+                )
                 inputs[look_days] = replace(computed, unreadable=problem) if problem else computed
     looks = tuple(gate.evaluate(inputs))
     upcoming = gate.next_look(looks)
@@ -1846,6 +1910,13 @@ def _render_gate(view: GateView, horizon: int) -> list[str]:
             ) + f" ({i.index_days} days priced, {i.index_missing} not yet"
             + (f", {i.index_gaps} left out: the price source has no {gate.INDEX_TICKER} bar for them"
                if i.index_gaps else "") + ")",
+            "  after tax, fund vs the " + gate.INDEX_TICKER + " fund (section 5c): " + (
+                "not recorded yet (the funds run makes it the night the look is reached)" if i.after_tax is None
+                else (" | ".join(f"{name} {_num(t)}" for name, t in i.after_tax.t_vs_index.items())
+                      if i.after_tax.status == gate.AFTER_TAX_READY
+                      else f"not available: {i.after_tax.reason}")),
+            f"  {gate.INDEX_TICKER}'s largest fall from its high in the window (section 5d): "
+            f"{_pct(i.vt_max_drawdown, 1)}",
             f"  -> {gate.OUTCOME_TEXT[look.outcome] if look.decided else 'no decision at this look'}: "
             f"{look.reason}",
         ]

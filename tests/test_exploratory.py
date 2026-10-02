@@ -287,7 +287,7 @@ def test_between_checkpoints_there_are_counters_and_no_exploratory_result(monkey
     assert [r["name"] for r in out["funds"]["list"]] == ["model", "momentum", "hybrid", "vt"]
     assert out["exploratory"]["checkpoints"] == []
     assert set(out["exploratory"]["counters"]) == {"momentum_200", "vt_timing", "momentum_pullback",
-                                                   "model_same_day"}
+                                                   "model_same_day", "ic"}
     json.dumps(out, allow_nan=False)
 
 

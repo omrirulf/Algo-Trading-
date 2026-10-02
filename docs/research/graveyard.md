@@ -9,7 +9,8 @@ checkpoint (pre-registration, section 13.6; `analysis/multiple_tests.py`
 counts them). A new idea gets its row (and its card in `cards/`) before it
 runs, and a history screen gets its row before it runs.
 
-**N = 34** (2026-09-28: 18 ideas and 16 history screens).
+**N = 41** (2026-10-02: 18 ideas and 16 history screens by 2026-09-28, then the IC report's two universes, the
+four stress-period screens and the regime split, added on 2026-10-02).
 
 | Trial | Idea | Kind | Status | Dates | Why it is here / what happened | Card |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -77,6 +78,24 @@ rules already running live. It changes nothing in the locked test.
 | 33 | B's rule on SPY (the same code; a check of row 24) | history screen (real code) | smaller crash, lower return | 2026-09-28 | From 2007-06: 7.8% a year against 9.0% for the SPY fund, worst fall 25.3% against 49.6%; from 2010: 4.1% a year less (t -1.9). Same code as B; a check of row 24, not the registered rule. | [report](history/2026-09-rules-running-live/report.md) |
 | 34 | C: pullback limit entry, fund, 80 names | history screen (real code) | no clear difference from momentum | 2026-09-28 | Fill rate 61.2%; missed signals +0.88% against filled -0.93% per race trade (built in: a fill means the price fell first). C fund minus momentum fund +0.003% a day (t +0.7); most limits that were reached could not be bought, because the book was full. | [report](history/2026-09-rules-running-live/report.md) |
 
+## Added from 2026-10-02
+
+Rows in the order they were added, ideas and history screens together (the owner's instructions of 2026-10-02,
+items 4 to 7). The IC report's two rows are the owner's proposal of two trials in N and one idea against the
+quarterly limit, which the owner confirms or changes when it is registered at the 2026-12-22 checkpoint
+(pre-registration section 13.9). The stress-period screens are one row per rule over the four periods, as one
+screen; they are descriptive, with no t and no verdict.
+
+| Trial | Idea | Kind | Status | Dates | Why it is here / what happened | Card |
+| --- | --- | --- | --- | --- | --- | --- |
+| 35 | IC of the model's scores (blended and the five dimensions) against the forward return, production names | exploratory test (prepared) | card written; registers at the 2026-12-22 checkpoint | lines from 2026-09-28 | Pre-registration section 13.9. Counters only (lines with scores, days) until the checkpoint; no IC value is written before it. | [card](cards/ic-model-scores.md) |
+| 36 | The same IC test on the shadow stock universe (about 250 US large and mid caps and ADRs) | exploratory test (prepared) | built, switched off until 2027-01-01 | scored from 2027-01-01 | The second universe of trial 35's rule, on the same card (`cards/ic-model-scores.md`). Its list is published in the card on the registration date. Off by a flag; a test fails if the flag is on before 2027-01-01. |  |
+| 37 | Stress periods: momentum (the locked rule), fund, 80 names, in 2000-2002, 2008, 2020 and 2022 | history screen (real code; queued) | queued: runs by hand, history-screen.yml with kind "stress" | 2026-10-02 | Maximum drawdown and return against VT (against SPY where VT did not exist) in each period. Descriptive only. Report folder: [history/2026-10-stress-periods/](history/2026-10-stress-periods/). |  |
+| 38 | Stress periods: A (200-day veto), fund, 80 names | history screen (real code; queued) | queued, with trial 37 | 2026-10-02 | The same screen (history/2026-10-stress-periods/). |  |
+| 39 | Stress periods: B (10-month timing on VT) | history screen (real code; queued) | queued, with trial 37 | 2026-10-02 | The same screen. VT's prices start in 2008-06, so B cannot run in 2000-2002 or 2008; the report says so. |  |
+| 40 | Stress periods: C (pullback limit entry), fund, 80 names | history screen (real code; queued) | queued, with trial 37 | 2026-10-02 | The same screen (history/2026-10-stress-periods/). |  |
+| 41 | The race's and the funds' results split by market state (VT's 200-day average; VT's 21-day volatility terciles) | exploratory report | registered | from 2026-10-02 | Pre-registration section 13.10. Descriptive; hidden until the checkpoints; like rows 7 and 8. |  |
+
 ## Not counted, and why
 
 - **Controls and benchmarks**, which are not candidates to be picked: the
@@ -89,3 +108,8 @@ rules already running live. It changes nothing in the locked test.
 - **Risk, execution and operations settings** applied to every arm alike
   (stops, caps, sleeves, the conviction floor, the profit ladder, run timing,
   the journal split, calibration and the reports around it).
+- **The after-tax gate, the after-tax and shekel views and the verdict label**
+  (pre-registration sections 5c, 5d and 11.9, 2026-10-02): the same results,
+  taxed or in shekels, and rules applied to every arm alike. The break-even
+  simulator has no strategy returns. VT and SPY in the stress-period screen
+  are benchmarks.
