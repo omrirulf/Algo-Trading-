@@ -1192,9 +1192,11 @@ table.mini tr.over td{background:var(--warn-bg)}
       const u = asObj(view.usd) || {}, s = asObj(view.ils) || {}, t = asObj(view.tax_ils) || {};
       return `<tr><td>${esc(label)}</td><td class="num">${both(money(u.equity), u.return)}</td>`
         + `<td class="num">${both(money(u.after_tax), u.after_tax_return)}</td>`
+        + `<td class="num">${both(money(u.paid_so_far), u.paid_so_far_return)}</td>`
         + `<td class="num">${both(ils(s.equity), s.return)}</td><td class="num">${both(ils(s.after_tax), s.after_tax_return)}</td>`
-        + `<td class="num">${esc(pts(s.from_usd_ils))}</td><td class="num">${esc(ils(t.paid_so_far))}</td>`
-        + `<td class="num">${esc(ils(t.if_sold_today))}</td></tr>`;
+        + `<td class="num">${both(ils(s.paid_so_far), s.paid_so_far_return)}</td>`
+        + `<td class="num">${esc(pts(s.from_usd_ils))}</td><td class="num">${esc(pts(s.after_tax_from_usd_ils))}</td>`
+        + `<td class="num">${esc(ils(t.paid_so_far))}</td><td class="num">${esc(ils(t.if_sold_today))}</td></tr>`;
     };
     const funds = asObj(at.funds);
     const rows = row("Paper account (real)", at.paper)
@@ -1205,10 +1207,12 @@ table.mini tr.over td{background:var(--warn-bg)}
     }
     if(rows){
       html += `<div class="scroll"><table class="mini"><thead><tr><th></th><th>Before tax ($)</th><th>After tax, if sold today ($)</th>`
-        + `<th>Before tax (₪)</th><th>After tax (₪)</th><th>From the $/₪ move</th><th>Tax paid so far</th><th>Tax if sold today</th></tr></thead>`
+        + `<th>After tax, tax paid so far ($)</th><th>Before tax (₪)</th><th>After tax, if sold today (₪)</th>`
+        + `<th>After tax, tax paid so far (₪)</th><th>From the $/₪ move, before tax</th><th>From the $/₪ move, after tax</th>`
+        + `<th>Tax paid so far (₪)</th><th>Tax if sold today (₪)</th></tr></thead>`
         + `<tbody>${rows}</tbody></table></div>`;
     }
-    if(!funds) html += `<p class="small muted">The funds are shown after tax once calibration has passed, like every fund result.</p>`;
+    if(!funds && (asObj(data.calibration) || {}).status !== "passed") html += `<p class="small muted">The funds are shown after tax once calibration has passed, like every fund result.</p>`;
     const lots = asObj(at.paper_lots);
     if(lots && Array.isArray(lots.mismatches) && lots.mismatches.length){
       html += `<p class="small"><span class="chip bad">check</span> The lots rebuilt from the paper account's fills differ from its positions for ${esc(lots.mismatches.join(", "))}.</p>`;

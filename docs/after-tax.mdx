@@ -18,8 +18,9 @@ Pre-registration section 5c. The arm that would win must also beat the VT fund *
 - **The test** = the arm's fund minus the VT fund, day by day, from the first fund session (29 Sep 2026) to the
   close of the look's last trades.
 
-The funds run makes the test once, on the night the race first reaches a look, and keeps it. The race reads it
-back the next night. It can only stop an arm from winning; it never decides anything by itself.
+The funds run makes the test once, on the first night from the night the race reaches a look on which the race can
+read the look, the rate table is there and the funds' prices reach the look's last close, and keeps it. The race
+reads it back the next night. If a bug fix later moves the look's window, the test is made again at the new close. It can only stop an arm from winning; it never decides anything by itself.
 
 ## The tax rules
 
@@ -47,7 +48,8 @@ used, and if neither has the day, the Bank's last earlier rate; every such day i
 
 The view shows how much of each shekel result came from the dollar's move against the shekel: the shekel
 return minus the dollar return. If the dollar fell 3% against the shekel, a fund that made 2% in dollars lost
-about 1% in shekels, and the view says the dollar's move took about 3 points.
+about 1% in shekels, and the view says the dollar's move took about 3 points. It is shown before tax and after
+tax ("if sold today").
 
 The rate table is kept like the price table: its SHA-256 (`rates_sha256`) is committed in `logs/fx_rates.json`
 and `logs/funds.json`, and the table itself goes to the archive.
@@ -60,8 +62,9 @@ and `logs/funds.json`, and the table itself goes to the archive.
 - **`logs/funds.json`**, key `after_tax`: everything, with each look's after-tax test under `after_tax.looks`.
 - **The exploratory funds** after tax: only in the checkpoint records, at the race's looks.
 
-Before and after tax are side by side, with two tax numbers: **tax paid so far** (on everything sold or received
-so far, as if the year ended today) and **if sold today** (that, plus every open position sold at the close).
+Before and after tax are side by side, on two bases, in dollars and in shekels: **tax paid so far** (equity minus
+the tax on everything sold or received so far, as if the year ended today) and **if sold today** (equity minus that
+tax plus the tax on every open position sold at the close). Both tax amounts are shown too, in shekels.
 
 ## For information: the break-even
 

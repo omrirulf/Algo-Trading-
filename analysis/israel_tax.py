@@ -553,6 +553,8 @@ class AfterTaxDay:
     realised_tax_ils: float
     if_sold_tax_ils: float
     unpriced: tuple[str, ...] = ()
+    #: "Tax paid so far" in dollars (each part at its own rate, as ``TaxState.realised_usd``).
+    realised_tax_usd: Optional[float] = None
 
 
 @dataclass
@@ -619,6 +621,7 @@ def after_tax_series(
             day=day, fx=rate, equity_usd=equity, equity_ils=equity * rate,
             after_tax_usd=equity - state.if_sold_usd, after_tax_ils=equity * rate - state.if_sold_ils,
             realised_tax_ils=state.realised_ils, if_sold_tax_ils=state.if_sold_ils, unpriced=state.unpriced,
+            realised_tax_usd=state.realised_usd,
         ))
     return out
 

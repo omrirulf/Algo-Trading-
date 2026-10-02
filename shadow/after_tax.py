@@ -5,9 +5,11 @@ already has, with the rules of ``config.israel_tax`` (never a flat 25%):
 
 * **The after-tax gate's test** (pre-registration section 5c): each main
   fund minus the VT fund on daily after-tax returns, "if sold today", with
-  the fund test's own Newey-West t (lag 5). Made once, on the night the race
-  first reaches a look, over the fund sessions up to the close of that
-  look's last trades, and kept unchanged; the race reads it back
+  the fund test's own Newey-West t (lag 5). Made once, on the first night
+  from the night the race reaches a look on which the look is readable, the
+  rate table is there and the funds' prices reach the look's last close,
+  over the fund sessions up to that close, and kept unchanged (made again
+  only if a bug fix moves the look's window); the race reads it back
   (``analysis.horse_race.after_tax_records``).
 * **The after-tax and shekel views** (section 11.9): for the real paper
   account, the four funds and, at checkpoints only, the exploratory funds --
@@ -197,9 +199,13 @@ def account_lot_check(snapshots, rules: TaxRules = DEFAULT_RULES) -> dict:
 def view(series: Optional[AfterTaxSeries]) -> Optional[dict]:
     """Before and after tax side by side, in dollars and in shekels, and the dollar's part of the shekel result.
 
-    Returns since the series' start. "from_usd_ils" is the shekel return minus
-    the dollar return: what the dollar's move against the shekel added (or
-    took away) for someone counting in shekels.
+    Returns since the series' start. "after_tax" is "if sold today" (equity
+    minus the tax due if every position were sold at the close); "paid_so_far"
+    is equity minus the tax due on what was sold or received so far.
+    "from_usd_ils" is the shekel return minus the dollar return: what the
+    dollar's move against the shekel added (or took away) for someone counting
+    in shekels; "after_tax_from_usd_ils" is the same on the "if sold today"
+    returns.
     """
     if series is None or not series.days:
         return None
@@ -212,14 +218,18 @@ def view(series: Optional[AfterTaxSeries]) -> Optional[dict]:
 
     usd, usd_after = change(last.equity_usd, start_usd), change(last.after_tax_usd, start_usd)
     ils, ils_after = change(last.equity_ils, start_ils), change(last.after_tax_ils, start_ils)
+    paid_usd = last.realised_tax_usd if last.realised_tax_usd is not None else last.realised_tax_ils / last.fx
+    usd_paid, ils_paid = last.equity_usd - paid_usd, last.equity_ils - last.realised_tax_ils
     return {
         "from": series.days[0].day.isoformat(),
         "through": last.day.isoformat(),
         "days": len(series.days),
         "usd": {"start": round(start_usd, 2), "equity": round(last.equity_usd, 2),
-                "after_tax": round(last.after_tax_usd, 2), "return": usd, "after_tax_return": usd_after},
+                "after_tax": round(last.after_tax_usd, 2), "return": usd, "after_tax_return": usd_after,
+                "paid_so_far": round(usd_paid, 2), "paid_so_far_return": change(usd_paid, start_usd)},
         "ils": {"start": round(start_ils, 2), "equity": round(last.equity_ils, 2),
                 "after_tax": round(last.after_tax_ils, 2), "return": ils, "after_tax_return": ils_after,
+                "paid_so_far": round(ils_paid, 2), "paid_so_far_return": change(ils_paid, start_ils),
                 "from_usd_ils": None if ils is None or usd is None else ils - usd,
                 "after_tax_from_usd_ils": None if ils_after is None or usd_after is None else ils_after - usd_after},
         "tax_ils": {"paid_so_far": round(last.realised_tax_ils, 2), "if_sold_today": round(last.if_sold_tax_ils, 2)},
@@ -299,10 +309,12 @@ def _view_rows(label: str, v: Optional[dict]) -> list[str]:
     usd, ils, tax = v.get("usd") or {}, v.get("ils") or {}, v.get("tax_ils") or {}
     return [f"| {label} | {_money(usd.get('equity'), '$')} ({_pct(usd.get('return'))}) "
             f"| {_money(usd.get('after_tax'), '$')} ({_pct(usd.get('after_tax_return'))}) "
+            f"| {_money(usd.get('paid_so_far'), '$')} ({_pct(usd.get('paid_so_far_return'))}) "
             f"| {_money(ils.get('equity'), '₪')} ({_pct(ils.get('return'))}) "
             f"| {_money(ils.get('after_tax'), '₪')} ({_pct(ils.get('after_tax_return'))}) "
-            f"| {_points(ils.get('from_usd_ils'))} | {_money(tax.get('paid_so_far'), '₪')} "
-            f"| {_money(tax.get('if_sold_today'), '₪')} |"]
+            f"| {_money(ils.get('paid_so_far'), '₪')} ({_pct(ils.get('paid_so_far_return'))}) "
+            f"| {_points(ils.get('from_usd_ils'))} | {_points(ils.get('after_tax_from_usd_ils'))} "
+            f"| {_money(tax.get('paid_so_far'), '₪')} | {_money(tax.get('if_sold_today'), '₪')} |"]
 
 
 def render(document: dict) -> str:
@@ -325,30 +337,34 @@ def render(document: dict) -> str:
                   f"{other} day(s) from another source: {days}. Table SHA-256 `{fx.get('rates_sha256')}`.", ""]
     else:
         lines += [f"No rate table tonight ({fx.get('reason', 'unknown')}): nothing is shown rather than a guessed rate.", ""]
-    head = ["| | Before tax ($) | After tax, if sold today ($) | Before tax (₪) | After tax (₪) "
-            "| From the $/₪ move | Tax paid so far | Tax if sold today |",
-            "| --- | --- | --- | --- | --- | --- | --- | --- |"]
+    head = ["| | Before tax ($) | After tax, if sold today ($) | After tax, tax paid so far ($) | Before tax (₪) "
+            "| After tax, if sold today (₪) | After tax, tax paid so far (₪) | From the $/₪ move, before tax "
+            "| From the $/₪ move, after tax | Tax paid so far (₪) | Tax if sold today (₪) |",
+            "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
     paper = _view_rows("Paper account (real)", part.get("paper"))
     funds = part.get("funds")
     fund_rows = [r for name, label in (("model", "Model fund"), ("momentum", "Momentum fund"),
                                         ("hybrid", "Hybrid fund"), ("vt", "VT fund"))
                  for r in _view_rows(label, (funds or {}).get(name))]
     if paper or fund_rows:
-        lines += ["Returns since each book's start. \"From the $/₪ move\" is the shekel return minus the dollar "
-                  "return. \"Tax paid so far\" is the tax due on everything sold or received so far; \"if sold "
-                  "today\" adds every open position sold at the close.", ""] + head + paper + fund_rows + [""]
+        lines += ["Returns since each book's start. \"Tax paid so far\" is the tax due on everything sold or "
+                  "received so far; \"if sold today\" adds every open position sold at the close. \"From the $/₪ "
+                  "move\" is the shekel return minus the dollar return, before tax and after tax (if sold today).",
+                  ""] + head + paper + fund_rows + [""]
     if part.get("paper_problem"):
         lines += [f"The paper account: {part['paper_problem']}.", ""]
     lots = part.get("paper_lots") or {}
     if lots.get("mismatches"):
         lines += [f"Check: the lots rebuilt from the paper account's fills differ from its positions for "
                   f"{', '.join(lots['mismatches'])}.", ""]
-    if not funds:
+    if not funds and (document.get("calibration") or {}).get("status") != "passed":
         lines += ["The funds are shown after tax once calibration has passed, like every fund result.", ""]
     looks = [r for r in part.get("looks") or [] if isinstance(r, dict)]
     lines += ["## The after-tax gate (section 5c)", ""]
     if not looks:
-        lines += ["No look reached yet. Each look's test is made once, on the night the race reaches it.", ""]
+        lines += ["No look reached yet. Each look's test is made once, on the first night from the night the race reaches "
+                  "it on which the look is readable, the rate table is there and the funds' prices reach the look's "
+                  "last close.", ""]
     for r in looks:
         if r.get("status") == gate.AFTER_TAX_READY:
             tests = r.get("tests") or {}

@@ -28,7 +28,7 @@
 
 ## What is stored on every line (the owner asked)
 
-From the 233 lines the model answered between 2026-09-28 and 2026-10-01: the blended score, the news, technical and fundamental scores and the momentum arm are on every line; the analyst score is on 189 (the model leaves it empty for most funds, which have no analysts); the insider score is on 230. So every score can be used, each on the lines that have it.
+From the 233 lines the model answered between 2026-09-28 and 2026-10-01: the blended score, the news, technical and fundamental scores and the momentum arm are on every line; the analyst score is on 189 (the 44 without it are the 11 bond and commodity funds, which no analyst covers: SHY, LQD, HYG, SLV, CPER, USO, UNG, CORN, WEAT, SOYB and CANE, 4 lines each); the insider score is on 230 (not on one line each of XLK, VNQ and EWI). So every score can be used, each on the lines that have it.
 
 ## The shadow stock universe (published on the registration date)
 

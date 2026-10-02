@@ -62,8 +62,10 @@ COIN_FLIP_PERCENTILE = 95.0
 #: win must also beat the VT fund after Israeli tax, "if sold today", at the
 #: same bar. The test is the fund test's own paired test (section 11.4):
 #: the arm's fund minus the VT fund, daily, after-tax returns, Newey-West t
-#: at this lag. The funds run (``shadow.run``) makes it once, on the night
-#: the race first reaches the look, and keeps it unchanged.
+#: at this lag. The funds run (``shadow.run``) makes it once, on the first
+#: night from the night the race reaches the look on which the look is
+#: readable, the rate table is there and the funds' prices reach the look's
+#: last close, and keeps it unchanged.
 AFTER_TAX_LAG = 5
 #: An after-tax record holding the test, and one made without it because no
 #: fund could be run that night (calibration had not passed): the test is
@@ -357,7 +359,8 @@ def _after_tax(inputs: LookInputs, candidate: str, bar: float) -> tuple[Optional
     record = inputs.after_tax
     if record is None:
         return None, ("its after-tax test against the VT fund (section 5c) is made by the funds run on the "
-                      "night the look is reached, so this look waits for it")
+                      "first night the look is readable, the rate table is there and the funds' prices reach "
+                      "the look's last close, so this look waits for it")
     if record.status != AFTER_TAX_READY:
         why = record.reason or "no fund could be run when the look was reached"
         return False, f"its after-tax test against the VT fund could not be made ({why})"

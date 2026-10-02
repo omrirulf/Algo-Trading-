@@ -34,7 +34,7 @@ Until the owner has entered numbers, the message is a short checklist of questio
 - **Cost cap: $0.10 a month.** One call a month. With the production model (`openai/gpt-oss-120b` on
   DeepInfra, the provider already in use, so no new key and no new provider) at low reasoning, one call of
   about 1,500 tokens in and 400 out costs well under one cent. The code still checks the call's
-  `usage.cost_usd` and the month's total before asking, and refuses a second call that would pass $0.10.
+  `usage.cost_usd` and the month's total: it makes at most one call a month, and refuses it if the month's total would pass $0.10.
 
 ## 3. Where the owner's numbers live (the private-data design)
 

@@ -205,7 +205,9 @@ ACCOUNT_LOG = cfg.LOG_DIR / "account.jsonl"
 
 #: The funds run's document (``shadow.run``): each planned look's after-tax
 #: test against the VT fund (pre-registration section 5c) is recorded there,
-#: once, on the night the race first reaches the look, and read back here.
+#: once, on the first night from the night the race reaches the look on which
+#: the look is readable, the rate table is there and the funds' prices reach
+#: the look's last close, and read back here.
 FUNDS_RECORD = cfg.LOG_DIR / "funds.json"
 
 #: Alpaca stamps its daily portfolio history in the exchange's day.
@@ -824,9 +826,12 @@ def look_inputs(
 def after_tax_records(path: Optional[Path]) -> dict[int, gate.AfterTax]:
     """Each look's after-tax test (section 5c) from the funds run's document, by look number (1, 2, 3).
 
-    The record is made by ``shadow.run`` on the night the race first reaches
-    a look and kept unchanged after, so the race reads it back from the
-    committed document every night. A look with no record yet is absent:
+    The record is made by ``shadow.run`` once, on the first night from the
+    night the race reaches a look on which the look is readable, the rate
+    table is there and the funds' prices reach the look's last close, and
+    kept unchanged after (made again only if a bug fix moves the look's
+    window), so the race reads it back from the committed document every
+    night. A look with no record yet is absent:
     the gate waits for it. A record made without funds (calibration had not
     passed) reads as unavailable, and no arm can pass the test at that look.
     """
@@ -1429,12 +1434,17 @@ def main(argv: list[str] | None = None) -> int:
                 number = [days for days, _ in gate.CHECKPOINTS].index(look_days) + 1
                 end = look_last_close(grid, needed, args.horizon)
                 record = after_tax.get(number)
-                if problem is None and record is not None and record.window_end not in (None, end):
+                if (record is not None and record.status == gate.AFTER_TAX_READY
+                        and record.window_end not in (None, end)):
                     # Section 5c: the record must cover the look's own window. A
                     # window that moved (a bug fix re-ran the race) is never mixed
-                    # with a test cut at another close: the look waits instead.
-                    problem = (f"the after-tax record of look {number} covers a window ending "
-                               f"{record.window_end}; the look now ends {end}")
+                    # with a test cut at another close: the look waits, still
+                    # readable, and the funds run makes the record again at the
+                    # new close.
+                    print(f"the after-tax record of look {number} covers a window ending "
+                          f"{record.window_end}; the look now ends {end}: it waits for a record "
+                          "cut at the new close", file=sys.stderr)
+                    record = None
                 computed = replace(
                     computed, after_tax=record, window_end=end,
                     vt_max_drawdown=gate.vt_max_drawdown(total_return_closes(bars), gate.DECISION_CUTOFF, end),
@@ -1944,7 +1954,8 @@ def _render_gate(view: GateView, horizon: int) -> list[str]:
             + (f", {i.index_gaps} left out: the price source has no {gate.INDEX_TICKER} bar for them"
                if i.index_gaps else "") + ")",
             "  after tax, fund vs the " + gate.INDEX_TICKER + " fund (section 5c): " + (
-                "not recorded yet (the funds run makes it the night the look is reached)" if i.after_tax is None
+                "not recorded yet (the funds run makes it on the first night the look is readable, the rate table "
+                "is there and the funds' prices reach the look's last close)" if i.after_tax is None
                 else (" | ".join(f"{name} {_num(t)}" for name, t in i.after_tax.t_vs_index.items())
                       if i.after_tax.status == gate.AFTER_TAX_READY
                       else f"not available: {i.after_tax.reason}")),

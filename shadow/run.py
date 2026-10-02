@@ -541,6 +541,33 @@ def new_funds(feed: SimFeed, bars: Bars, long_bars: Bars, final_through: date, s
     ]
 
 
+def price_coverage(cycles: dict, bars: Bars, start: date, final_through: date) -> dict:
+    """Each ticker the funds could trade, as ``(first cycle day, last final bar)``, from the funds' own fetch.
+
+    What section 5c's "the funds' prices reach the close of the look's last
+    trades" is checked against (``after_tax_part``): a name with a cycle on
+    or before a look's last close must have a bar on that close. VT counts
+    from the fund start. A name with no bar at all has None for its last bar.
+    """
+    first: dict[str, date] = {}
+    for day in sorted(cycles):
+        for line in cycles[day]:
+            first.setdefault(line.ticker, day)
+    first.setdefault(INDEX_TICKER, start)
+    out = {}
+    for ticker, day in sorted(first.items()):
+        sessions = bars.sessions(ticker, start, final_through)
+        out[ticker] = (day, sessions[-1] if sessions else None)
+    return out
+
+
+def missing_prices(coverage: Optional[dict], end: date) -> Optional[list[str]]:
+    """The names whose prices do not reach ``end`` though a cycle named them by then; None without coverage."""
+    if coverage is None:
+        return None
+    return [t for t, (first, last) in sorted(coverage.items()) if first <= end and (last is None or last < end)]
+
+
 def run_funds(
     entries: Sequence[JournalEntry], start: date, final_through: date, fetcher, *,
     random_funds: int, processes: int, shortable_no, first_cycle: Optional[date] = None,
@@ -599,6 +626,7 @@ def run_funds(
         series = {f.name: tax.fund_series(f, f.bars, rates.rate) for f in [*four, *explore, *tests]}
         out["after_tax"] = {f.name: tax.view(series[f.name]) for f in four}
         out["_after_tax_series"] = series
+        out["_after_tax_coverage"] = price_coverage(cycles, bars, start, final_through)
     if tests:
         by_name = {f.name: f for f in four}
         out["tests"] |= {f.name: paired(f, by_name[xp.COMPARED_WITH[f.name]]) for f in tests}
@@ -753,14 +781,20 @@ def after_tax_part(now: datetime, final_through: date, snapshots, funds: Optiona
 
     * the paper account's view, every night (it is the account, not a fund result);
     * the four funds' views, once calibration has passed (``funds["after_tax"]``);
-    * each planned look's after-tax test against the VT fund, made once on the
-      night the race first reaches the look and carried unchanged after:
-      with funds when calibration has passed and the rate table is there;
-      "unavailable" when calibration has not passed; no record (the look
-      waits) when the funds ran but there was no rate table that night;
+    * each planned look's after-tax test against the VT fund, made once, on
+      the first night from the night the race reaches the look on which the
+      look is readable, and carried unchanged after: with funds when
+      calibration has passed, the rate table is there and the funds' own
+      prices reach the look's last close (every name a cycle named by then,
+      ``missing_prices``); "unavailable" when calibration has not passed; no
+      record (the look waits) otherwise. A ready record cut at another close
+      (a bug fix re-ran the race and moved the look's window) is made again
+      at the new close on the first night the same conditions hold, and the
+      old one is kept inside it under ``superseded``;
     * the break-even of an actively traded fund against VT held 20 years,
       for information only.
     """
+    from analysis import decision_gate as gate
     from analysis import tax_breakeven
     from shadow import after_tax as tax
     from shadow import calibration as calib
@@ -777,20 +811,27 @@ def after_tax_part(now: datetime, final_through: date, snapshots, funds: Optiona
         except (KeyError, ValueError) as exc:
             problem = f"the paper account could not be reckoned: {exc}"
     series = (funds or {}).pop("_after_tax_series", None)
+    coverage = (funds or {}).pop("_after_tax_coverage", None)
     for look in looks_reached(race_gate):
-        if look in {r.get("look") for r in records}:
-            continue
         entry = (race_gate.get("looks") or [])[look - 1]
         if entry.get("readable") is not True:
             continue                        # the race could not read the look tonight: it waits, and so does this
+        old = next((r for r in records if r.get("look") == look), None)
+        if old is not None and (old.get("status") != gate.AFTER_TAX_READY
+                                or old.get("window_end") in (None, entry.get("window_end"))):
+            continue                        # made once, carried unchanged
         end = date.fromisoformat(entry["window_end"]) if entry.get("window_end") else None
-        if not passed:
+        if old is None and not passed:
             records.append(tax.gate_record(look, now.date(), end, None, reason=(
                 "calibration had not passed when the race reached this look: no fund was run")))
-        elif series is not None and end is not None and all(
+        elif passed and series is not None and end is not None and all(
                 series.get(name) is not None and series[name].days and series[name].days[-1].day >= end
-                for name in (*tax.GATE_FUNDS, tax.VT_FUND)):
-            records.append(tax.gate_record(look, now.date(), end, series))
+                for name in (*tax.GATE_FUNDS, tax.VT_FUND)) and missing_prices(coverage, end) == []:
+            record = tax.gate_record(look, now.date(), end, series)
+            if old is not None:
+                records.remove(old)
+                record["superseded"] = old
+            records.append(record)
         # Otherwise no record tonight (no rate table, or the funds' prices do
         # not reach the look's last close yet): the look waits for the first
         # night that has both, and the test is cut at the same close then.
@@ -967,6 +1008,12 @@ def build(args: argparse.Namespace, now: datetime, fetchers: Optional[list] = No
     # Section 13.10: the regime split shows sessions per market state only, until the checkpoints.
     counters["regimes"] = regime_counters(long_bars, final_through)
     rates, fx = load_rates(getattr(args, "fx_table", None))
+    if rates is not None and rates.last < final_through:
+        # A table one session short would fail every fund's reckoning; no
+        # shekel view tonight instead, said in so many words.
+        rates, fx = None, {"available": False,
+                           "reason": f"the rate table ends {rates.last.isoformat()}, "
+                                     f"before the last final session {final_through.isoformat()}"}
     if fund_start is not None and passed and fund_start <= final_through:
         funds, checks = run_funds(read.entries, fund_start, final_through, fetcher,
                                   random_funds=args.random, processes=args.processes,
