@@ -11,8 +11,9 @@ one page in each of the ways Bright Data's CLI and MCP server ask (raw; raw
 as markdown; as JSON, which reports the target's status apart from the
 API's; from a US exit), tries the same story under Yahoo's older ``/news/``
 path and the site's front page, and fetches the page directly from this
-machine as a control. For each it prints the status, every response header
-and the first words of the body, so the answer is read rather than guessed.
+machine as a control (the ``/news/`` address too). For each it prints the
+status, every response header, how many bytes the header block takes and
+the first words of the body, so the answer is read rather than guessed.
 
 The Bright Data token goes only to ``news.BRIGHTDATA_REQUEST_URL``; the
 direct fetch carries no credential at all. Read-only: it fetches and prints.
@@ -60,6 +61,25 @@ def http_fetch(method: str, url: str, headers: dict, body: Optional[dict] = None
         return client.request(method, url, headers=headers, json=body)
 
 
+def header_size(headers: Any) -> tuple[int, str]:
+    """``(bytes the header block takes on the wire, "largest header: its bytes")``.
+
+    Each header counts as ``name: value`` plus a CRLF. A repeated header
+    (Set-Cookie) counts once per line, whether the headers came from a
+    client's response or from a JSON body's ``headers`` object, where a
+    repeated one is a list.
+    """
+    items = list(headers.multi_items()) if hasattr(headers, "multi_items") else list(dict(headers or {}).items())
+    lines: list[tuple[str, int]] = []
+    for name, value in items:
+        for one in (value if isinstance(value, (list, tuple)) else [value]):
+            lines.append((str(name), len(str(name)) + len(str(one)) + 4))
+    if not lines:
+        return 0, ""
+    biggest = max(lines, key=lambda line: line[1])
+    return sum(size for _, size in lines), f"{biggest[0]} {biggest[1]:,}"
+
+
 def news_path(url: str) -> Optional[str]:
     """Yahoo's older address for the same story, when the given one is the newer kind.
 
@@ -74,21 +94,25 @@ def news_path(url: str) -> Optional[str]:
     return urlunsplit((parts.scheme, parts.netloc, f"/news/{slug}", "", ""))
 
 
-def variants(url: str, zone: str) -> list[tuple[str, Optional[dict]]]:
-    """``(name, request body)`` in order; a body of None is the direct fetch."""
+def variants(url: str, zone: str) -> list[tuple[str, Optional[dict], str]]:
+    """``(name, request body, page url)`` in order; a body of None is a direct fetch of the page url."""
     front = urlunsplit((urlsplit(url).scheme, urlsplit(url).netloc, "/", "", ""))
-    out: list[tuple[str, Optional[dict]]] = [
-        ("direct from this machine, no Bright Data (control)", None),
-        ("unlocker, raw (what the probe and the archive send)", {"zone": zone, "url": url, "format": "raw"}),
-        ("unlocker, raw as markdown (what the MCP server sends)",
-         {"zone": zone, "url": url, "format": "raw", "data_format": "markdown"}),
-        ("unlocker, json (the target's status apart from the API's)", {"zone": zone, "url": url, "format": "json"}),
-        ("unlocker, raw, US exit", {"zone": zone, "url": url, "format": "raw", "country": "us"}),
-    ]
     alt = news_path(url)
+    out: list[tuple[str, Optional[dict], str]] = [
+        ("direct from this machine, no Bright Data (control)", None, url),
+        ("unlocker, raw (what the probe and the archive send)", {"zone": zone, "url": url, "format": "raw"}, url),
+        ("unlocker, raw as markdown (what the MCP server sends)",
+         {"zone": zone, "url": url, "format": "raw", "data_format": "markdown"}, url),
+        ("unlocker, json (the target's status apart from the API's)",
+         {"zone": zone, "url": url, "format": "json"}, url),
+        ("unlocker, raw, US exit", {"zone": zone, "url": url, "format": "raw", "country": "us"}, url),
+    ]
     if alt:
-        out.append(("unlocker, raw, the same story under /news/", {"zone": zone, "url": alt, "format": "raw"}))
-    out.append(("unlocker, raw, the site's front page", {"zone": zone, "url": front, "format": "raw"}))
+        out += [
+            ("direct from this machine, the same story under /news/ (control)", None, alt),
+            ("unlocker, raw, the same story under /news/", {"zone": zone, "url": alt, "format": "raw"}, alt),
+        ]
+    out.append(("unlocker, raw, the site's front page", {"zone": zone, "url": front, "format": "raw"}, front))
     return out
 
 
@@ -105,9 +129,13 @@ class Check:
     excerpt: str = ""
     reason: str = ""
     error: str = ""
+    header_bytes: int = 0
+    biggest_header: str = ""
     #: From the JSON form: what the page itself answered, as the API reports it.
     target_status: Optional[int] = None
     target_headers: dict = field(default_factory=dict)
+    target_header_bytes: int = 0
+    target_biggest_header: str = ""
 
 
 def run_check(fetch: Fetch, token: str, name: str, request: Optional[dict], url: str) -> Check:
@@ -126,7 +154,9 @@ def run_check(fetch: Fetch, token: str, name: str, request: Optional[dict], url:
     check.seconds = time.monotonic() - started
     check.status = int(response.status_code)
     check.final_url = str(getattr(response, "url", "") or "")
-    check.headers = {str(k): str(v)[:200] for k, v in dict(getattr(response, "headers", {}) or {}).items()}
+    raw_headers = getattr(response, "headers", None) or {}
+    check.headers = {str(k): str(v)[:200] for k, v in dict(raw_headers).items()}
+    check.header_bytes, check.biggest_header = header_size(raw_headers)
     text = response.text or ""
     check.body_bytes = len(text.encode("utf-8"))
     check.reason = brd_reason(response)
@@ -139,6 +169,7 @@ def run_check(fetch: Fetch, token: str, name: str, request: Optional[dict], url:
             if payload.get("status_code") is not None:
                 check.target_status = int(payload["status_code"])
             check.target_headers = {str(k): str(v)[:200] for k, v in dict(payload.get("headers") or {}).items()}
+            check.target_header_bytes, check.target_biggest_header = header_size(payload.get("headers") or {})
             text = str(payload.get("body") or "")
     match = _TITLE.search(text[:20000])
     check.title = " ".join(match.group(1).split())[:120] if match else ""
@@ -147,7 +178,7 @@ def run_check(fetch: Fetch, token: str, name: str, request: Optional[dict], url:
 
 
 def run_all(fetch: Fetch, token: str, zone: str, url: str) -> list[Check]:
-    return [run_check(fetch, token, name, request, url) for name, request in variants(url, zone)]
+    return [run_check(fetch, token, name, request, page) for name, request, page in variants(url, zone)]
 
 
 def render(checks: list[Check], url: str, zone: str) -> str:
@@ -161,10 +192,14 @@ def render(checks: list[Check], url: str, zone: str) -> str:
             continue
         out.append(f"   status: {check.status}   {check.seconds:.1f}s   {check.body_bytes:,} bytes"
                    + (f"   final url: {check.final_url}" if check.final_url and check.final_url != url else ""))
+        out.append(f"   header block: {check.header_bytes:,} bytes"
+                   + (f" (largest: {check.biggest_header})" if check.biggest_header else ""))
         if check.reason:
             out.append(f"   bright data says: {check.reason}")
         if check.target_status is not None:
-            out.append(f"   the page itself answered: {check.target_status}")
+            out.append(f"   the page itself answered: {check.target_status}; its own header block: "
+                       f"{check.target_header_bytes:,} bytes"
+                       + (f" (largest: {check.target_biggest_header})" if check.target_biggest_header else ""))
             for key, value in sorted(check.target_headers.items()):
                 out.append(f"      {key}: {value}")
         for key, value in sorted(check.headers.items()):

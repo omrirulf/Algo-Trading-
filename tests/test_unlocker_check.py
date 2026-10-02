@@ -14,6 +14,10 @@ ROOT = Path(__file__).resolve().parents[1]
 ARTICLE = "https://finance.yahoo.com/markets/stocks/articles/asml-asml-increases-despite-market-205005742.html"
 
 
+GATEWAY = ("<html><head><title>502 Bad Gateway</title></head>"
+           "<body><center><h1>502 Bad Gateway</h1></center></body></html>")
+
+
 class FakeResponse:
     def __init__(self, status=200, text="", headers=None, url=""):
         self.status_code = status
@@ -44,18 +48,48 @@ def test_the_token_goes_only_to_bright_data_and_the_control_carries_none():
     uc.run_all(fake_fetch(calls), "tok", "z", ARTICLE)
     direct = [c for c in calls if c[3] is None]
     unlocked = [c for c in calls if c[3] is not None]
-    assert len(direct) == 1 and direct[0][1] == ARTICLE and "Authorization" not in direct[0][2]
+    # Two controls: the story, and the same story under /news/. Neither carries the token.
+    assert [c[1] for c in direct] == [ARTICLE, uc.news_path(ARTICLE)]
+    assert all("Authorization" not in c[2] for c in direct)
     assert unlocked and all(url == news.BRIGHTDATA_REQUEST_URL for _, url, _, _ in unlocked)
     assert all(headers["Authorization"] == "Bearer tok" and body["zone"] == "z" for _, _, headers, body in unlocked)
 
 
 def test_it_asks_the_ways_bright_data_s_own_tools_ask():
-    bodies = [body for _, body in uc.variants(ARTICLE, "z") if body is not None]
+    bodies = [body for _, body, _ in uc.variants(ARTICLE, "z") if body is not None]
     assert {"zone": "z", "url": ARTICLE, "format": "raw"} in bodies                              # the probe
     assert {"zone": "z", "url": ARTICLE, "format": "raw", "data_format": "markdown"} in bodies   # the MCP server
     assert {"zone": "z", "url": ARTICLE, "format": "json"} in bodies                             # the CLI's --format json
     assert {"zone": "z", "url": ARTICLE, "format": "raw", "country": "us"} in bodies             # the CLI's --country
     assert {"zone": "z", "url": "https://finance.yahoo.com/", "format": "raw"} in bodies
+
+
+def test_header_blocks_are_measured_line_by_line_repeats_included():
+    total, biggest = uc.header_size({"server": "ATS", "set-cookie": ["a=1", "b=22"], "link": "x" * 100})
+    assert total == (len("server") + 3 + 4) + (len("set-cookie") + 3 + 4) + (len("set-cookie") + 4 + 4) + (4 + 100 + 4)
+    assert biggest == "link 108"
+    assert uc.header_size({}) == (0, "") and uc.header_size(None) == (0, "")
+
+    class Multi:
+        def multi_items(self):
+            return [("set-cookie", "a=1"), ("set-cookie", "b=22")]
+    assert uc.header_size(Multi())[0] == (len("set-cookie") + 3 + 4) + (len("set-cookie") + 4 + 4)
+
+
+def test_the_report_says_how_big_each_header_block_was():
+    def fetch(method, url, headers, body):
+        if body is not None and body.get("format") == "json":
+            return FakeResponse(200, json.dumps({"status_code": 200, "headers": {"link": "y" * 50, "server": "ATS"},
+                                                 "body": "<html></html>"}), {"server": "nginx"})
+        if body is None:
+            return FakeResponse(200, "<html></html>", {"link": "z" * 6000, "server": "ATS"})
+        return FakeResponse(502, GATEWAY, {"server": "nginx", "content-length": "122"})
+
+    text = uc.render(uc.run_all(fetch, "tok", "z", ARTICLE), ARTICLE, "z")
+    # "link: " + 6000 bytes + CRLF is 6,008; "server: ATS" + CRLF is 13.
+    assert "header block: 6,021 bytes (largest: link 6,008)" in text          # a direct fetch
+    assert "the page itself answered: 200; its own header block: 71 bytes (largest: link 58)" in text
+    assert "header block: 6" not in text.split("== unlocker, raw (what the probe")[1].split("==")[0]
 
 
 def test_yahoo_s_older_address_for_the_same_story():

@@ -232,8 +232,8 @@ def _unlock(http: Http, token: str, zone: str, url: str) -> Answer:
     """One page through the Unlocker: the raw form, then the json form when the gateway failed.
 
     The raw form is what the news fetch sends, and the page's own status
-    comes back as the API's. On 1 Oct 2026 it answered 502 for every Yahoo
-    Finance story under the newer ``/markets/.../articles/`` addresses -- a
+    comes back as the API's. On 1 Oct 2026 it answered 502 for each of the
+    nine Yahoo Finance ``/.../articles/`` stories in that day's cycle -- a
     bare nginx "502 Bad Gateway" from Bright Data's own gateway, none of its
     error headers -- while the json form fetched the same page with status
     200, as did a direct fetch (``replay/unlocker_check.py``). So a 5xx that
