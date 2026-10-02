@@ -499,3 +499,34 @@ def test_run_blocks_move_no_look_no_bar_and_no_verdict(tmp_path, monkeypatch, ca
         assert runs["run_timing"]["days"][0]["source"] == FROM_RUN_BLOCK
         assert runs["run_timing"]["days"][0]["started_by"] == "backup"
         assert "backup    run block LATE" in runs_text
+
+
+
+def test_the_race_reads_each_looks_after_tax_record_and_its_window(tmp_path, monkeypatch, capsys):
+    """End to end (pre-registration sections 5c and 5d): with the looks shrunk so one is reached, the gate
+    JSON says whether the look's after-tax record exists, where its window ends, VT's largest fall in it, and
+    refuses a record cut at another close."""
+    from analysis import horse_race
+    from tests.test_horse_race import _race
+
+    monkeypatch.setattr(decision_gate, "CHECKPOINTS", ((1, 3.47), (2, 2.45), (3, 2.00)))
+    _, waiting = _race(tmp_path, monkeypatch, capsys, _frames(), _journal(False), NOW,
+                       extra=("--seeds", "1000", "--gate-json"))
+    first = json.loads(waiting)["looks"][0]
+    assert first["reached"] is True and first["after_tax"] == "waiting"
+    assert first["window_end"] is not None and first["readable"] in (True, False)
+    assert first["vt_max_drawdown"] is None or 0.0 <= first["vt_max_drawdown"] < 1.0
+    end = first["window_end"]
+    unavailable = {"after_tax": {"looks": [{"look": 1, "status": "unavailable", "reason": "calibration had not passed",
+                                            "window_end": end}]}}
+    _, out = _race(tmp_path, monkeypatch, capsys, _frames(), _journal(False), NOW,
+                   extra=("--seeds", "1000", "--gate-json"), funds=unavailable)
+    look = json.loads(out)["looks"][0]
+    assert look["after_tax"] == "unavailable" and look["window_end"] == end
+    moved = {"after_tax": {"looks": [{"look": 1, "status": "ready", "window_end": "2000-01-03",
+                                      "tests": {"model": {"t": 9.0}, "momentum": {"t": 9.0}, "hybrid": {"t": 9.0}}}]}}
+    _, out = _race(tmp_path, monkeypatch, capsys, _frames(), _journal(False), NOW,
+                   extra=("--seeds", "1000", "--gate-json"), funds=moved)
+    look = json.loads(out)["looks"][0]
+    assert look["readable"] is False and look["outcome"] is None and "covers a window ending 2000-01-03" in look["reason"]
+    assert horse_race.FUNDS_RECORD.name == "funds.json"

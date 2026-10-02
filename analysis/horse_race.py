@@ -834,18 +834,41 @@ def after_tax_records(path: Optional[Path]) -> dict[int, gate.AfterTax]:
         document = json.loads(Path(path).read_text(encoding="utf-8")) if path else None
     except (OSError, ValueError):
         return {}
-    records = ((document or {}).get("after_tax") or {}).get("looks") if isinstance(document, dict) else None
+    part = document.get("after_tax") if isinstance(document, dict) else None
+    records = part.get("looks") if isinstance(part, dict) else None
     out: dict[int, gate.AfterTax] = {}
-    for record in records or []:
+    for record in records if isinstance(records, list) else []:
         if not isinstance(record, dict) or not isinstance(record.get("look"), int):
             continue
+        try:
+            end = date.fromisoformat(record["window_end"]) if record.get("window_end") else None
+        except (TypeError, ValueError):
+            end = None
         tests = record.get("tests") or {}
         if record.get("status") == gate.AFTER_TAX_READY and isinstance(tests, dict):
             ts = {name: (t.get("t") if isinstance(t, dict) else None) for name, t in tests.items()}
-            out[record["look"]] = gate.AfterTax(gate.AFTER_TAX_READY, ts)
+            out[record["look"]] = gate.AfterTax(gate.AFTER_TAX_READY, ts, window_end=end)
         else:
             out[record["look"]] = gate.AfterTax(gate.AFTER_TAX_UNAVAILABLE, {},
-                                                str(record.get("reason") or "no fund was run"))
+                                                str(record.get("reason") or "no fund was run"), window_end=end)
+    return out
+
+
+def total_return_closes(bars: Sequence[tuple[date, float, float, float]]) -> list[tuple[date, float]]:
+    """VT as a total-return level, dividends added back on their ex-dates (section 5d).
+
+    The same treatment the index test gives VT (``gate.index_window_return``):
+    a dividend is not a fall. Built from the race's own index bars.
+    """
+    out: list[tuple[date, float]] = []
+    level, previous = 1.0, None
+    for day, _, close, dividend in bars:
+        if not close > 0:
+            continue
+        if previous is not None:
+            level *= (close + (dividend or 0.0)) / previous
+        previous = close
+        out.append((day, level))
     return out
 
 
@@ -977,7 +1000,11 @@ def gate_json(
              "vt_max_drawdown": None if look.inputs is None else look.inputs.vt_max_drawdown,
              # The close of the look's last trades; the funds run cuts its after-tax test there.
              "window_end": (None if look.inputs is None or look.inputs.window_end is None
-                            else look.inputs.window_end.isoformat())}
+                            else look.inputs.window_end.isoformat()),
+             # Whether the look could be read tonight: the funds run makes its
+             # after-tax record only on a night it could (section 5c).
+             "readable": (None if look.inputs is None
+                          else look.inputs.unreadable is None and not look.inputs.index_missing)}
             for look in view.looks
         ],
         # Section 5d: the label on a decided verdict, null until one.
@@ -1401,10 +1428,16 @@ def main(argv: list[str] | None = None) -> int:
                                             source=source, entry_rule=args.entry)
                 number = [days for days, _ in gate.CHECKPOINTS].index(look_days) + 1
                 end = look_last_close(grid, needed, args.horizon)
+                record = after_tax.get(number)
+                if problem is None and record is not None and record.window_end not in (None, end):
+                    # Section 5c: the record must cover the look's own window. A
+                    # window that moved (a bug fix re-ran the race) is never mixed
+                    # with a test cut at another close: the look waits instead.
+                    problem = (f"the after-tax record of look {number} covers a window ending "
+                               f"{record.window_end}; the look now ends {end}")
                 computed = replace(
-                    computed, after_tax=after_tax.get(number), window_end=end,
-                    vt_max_drawdown=gate.vt_max_drawdown(((bar[0], bar[2]) for bar in bars),
-                                                         gate.DECISION_CUTOFF, end),
+                    computed, after_tax=record, window_end=end,
+                    vt_max_drawdown=gate.vt_max_drawdown(total_return_closes(bars), gate.DECISION_CUTOFF, end),
                 )
                 inputs[look_days] = replace(computed, unreadable=problem) if problem else computed
     looks = tuple(gate.evaluate(inputs))

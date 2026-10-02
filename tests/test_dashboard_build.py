@@ -1309,3 +1309,21 @@ def test_the_after_tax_view_shows_the_paper_account_now_and_the_funds_once_calib
     assert "Model t 1.23 · Momentum t -0.50 · Hybrid t 3.60" in both
     assert "No rate table tonight (no rate table was given)" in _text(out[2])
     assert out[3:] == ["", "", ""]
+
+
+@needs_node
+def test_the_counters_card_shows_counts_and_nothing_else(tmp_path, built_funds_page):
+    counters = {"ic": {"production": {"answered_lines": 233, "line_days": 4,
+                                      "lines_with_score": {"blend": 233, "analyst": 189}},
+                       "shadow": {"answered_lines": 0, "line_days": 0, "lines_with_score": {"blend": 0}}},
+                "regimes": {"sessions": 4, "first": "2026-09-29", "last": "2026-10-02",
+                            "trend": {"above": 4, "below": 0, "unknown": 0}, "vol": "cut-offs not fixed yet"}}
+    source = _page_functions(built_funds_page, "countersHtml")
+    out = _run_js(tmp_path, source, "CASES.map(countersHtml)",
+                  [{"exploratory": {"counters": counters}}, {"exploratory": {"counters": {}}}, {}, None])
+    text = _text(out[0])
+    assert "Counters until the checkpoints" in text and "no result is shown before a checkpoint" in text
+    assert "IC report, production names: 233 answered lines on 4 days" in text and "analyst 189" in text
+    assert "shadow stock universe (off until 1 Jan 2027): 0 answered lines" in text
+    assert "VT above its 200-day average on 4 sessions" in text and "cut-offs not fixed yet" in text
+    assert out[1:] == ["", "", ""]

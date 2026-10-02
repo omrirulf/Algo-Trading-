@@ -203,7 +203,8 @@ percentile of its coin flip) is unchanged at every look: it is one more
 condition that must also hold, so it cannot loosen the look.
 
 - **At the final look** the rule is read as in section 5, then the index
-  test: one of the four outcomes, always.
+  test and its after-tax gate (section 5c): one of the four outcomes, always,
+  once the look's after-tax record exists.
 - **At looks 1 and 2** an early stop is allowed in either direction, but only
   if the bar is met in the direction it stops:
   - *for the model*: it beats momentum and the hybrid at t above the bar,
@@ -212,8 +213,10 @@ condition that must also hold, so it cannot loosen the look.
     if the hybrid beat momentum at the bar) at t below minus the bar.
   
   The index test then has to be decisive too: the picked arm beats VT at t
-  above the bar (that arm is the answer), or trails it at t below minus the
-  bar (no arm trades). Anything else decides nothing, and the race goes on.
+  above the bar (that arm is the answer, if its fund also beats the VT fund
+  after Israeli tax at the bar, section 5c; otherwise the look decides
+  nothing), or trails it at t below minus the bar (no arm trades). Anything
+  else decides nothing, and the race goes on.
 - **No decisions between looks**, and none after a look has decided. Each
   look is computed on its own first 60, 120 or 180 entry days only, so it
   says the same thing every night after it is reached.
@@ -250,13 +253,16 @@ section 11.1) and for the VT fund, on every fund session:
 section 5a (3.47, 2.45, 2.00), the fund test's bar in section 11.7.
 
 **When it is made.** Once, by the funds run (`shadow/run.py`,
-`shadow/after_tax.py`), on the night the race first reaches the look; it is
-kept unchanged after, and the race reads it back
-(`analysis/horse_race.py`, `analysis/decision_gate.py`). A look that would
-pick an arm waits for it, as it waits for a price. If calibration has not
-passed on that night, no fund is run, and the test cannot be met at that
-look: an early look then decides nothing for an arm, and at the final look
-no arm trades.
+`shadow/after_tax.py`), on the first night from the night the race reaches
+the look on which the race can read the look, the funds run has its rate
+table, and the funds' prices reach the close of the look's last trades. It is
+cut at that close, kept unchanged after, and the race reads it back
+(`analysis/horse_race.py`, `analysis/decision_gate.py`); a record cut at
+another close is refused, and the look waits. A look that would pick an arm
+waits for its record, as it waits for a price. If calibration has not passed
+on the night the race reaches the look, no fund is run, and the test cannot
+be met at that look: an early look then decides nothing for an arm, and at
+the final look no arm trades.
 
 **It only stops an arm from winning.** It never decides anything by itself.
 At an early look, "no arm trades" still comes only from the index test
@@ -294,14 +300,18 @@ f. The exchange rate is the Bank of Israel's representative rate on the
    neither has the day, the Bank's latest earlier rate. Every such day is
    counted (`analysis/boi_rates.py`).
 
-Four conventions the rules leave open, fixed here and put to the accountant
-(`docs/research/cpa-questions.md`): a short sale is a lot opened by a sale
-and closed by a purchase, with the purchase as the cost (at its day's rate)
-and the sale as the proceeds (at its day's rate); a dividend a short
-position pays is an allowable loss on the day it is charged; the funds
-credit dividends gross, so the after-tax equity also takes off the US tax
-withheld; and "if sold today" sells at the close with no selling cost, as
-the equity it is taken from is marked.
+Five conventions the rules leave open, fixed here: (1) a short sale is a lot
+opened by a sale and closed by a purchase, with the purchase as the cost (at
+its day's rate) and the sale as the proceeds (at its day's rate); (2) a
+dividend a short position pays is an allowable loss on the day it is
+charged; (3) the funds credit dividends gross, so the after-tax equity also
+takes off the US tax withheld, a dollar amount; (4) "if sold today" sells at
+the close with no selling cost, as the equity it is taken from is marked;
+(5) tax for a finished year is turned into dollars at that year's last rate
+in the walk, the current year's at the day's own rate. The first two are put
+to the accountant (`docs/research/cpa-questions.md`, question 3), and the
+fifth with question 5; the third and fourth are how the books are kept, not
+tax questions.
 
 The owner's ten cases (fees 0, tax 25%) are unit tests,
 `tests/test_israel_tax.py`, T1 to T10. T5 (a nominal loss smaller than the
@@ -314,9 +324,9 @@ simulator (`analysis/tax_breakeven.py`; inputs: growth and dividend yield).
 At 6% growth and a 2% yield it is 0.82 points a year (the owner's rough
 estimate was about 0.8); at 5% growth, 0.62; at 8%, 1.26.
 
-**Made before any checkpoint result existed**: the first checkpoint is
-estimated for 2026-12-22, the race has 1 of 20 independent days, and no
-fund result has been computed (calibration is on day 2 of 15).
+**Made before any checkpoint result existed**: on 2026-10-02 the first
+checkpoint was estimated for 2026-12-22, the race had 1 of 20 independent
+days, and no fund result had been computed (calibration was on day 2 of 15).
 
 ## 5d. Verdict disclosure (Amendment 2026-10-02)
 
@@ -326,8 +336,10 @@ verdict "not tested in a downturn", and any real-money step starts small.**
 
 - The test window runs from 2026-09-23 (the decision cutoff) to the close of
   the last trades of the look that decides. The drawdown is measured on
-  VT's final closes, from the highest close inside the window
-  (`analysis/decision_gate.py`, `vt_max_drawdown`, `DOWNTURN_DRAWDOWN`).
+  VT's final closes with each dividend added back on its ex-date (the index
+  test's own treatment: a dividend is not a fall), from the highest level
+  inside the window (`analysis/decision_gate.py`, `vt_max_drawdown`,
+  `DOWNTURN_DRAWDOWN`; `analysis/horse_race.py`, `total_return_closes`).
 - The race prints it at every look reached, and on the look that decides it
   adds the label to the verdict and to the status line.
 - This is a label and a policy. It does not extend the test, move a look,
@@ -996,11 +1008,19 @@ checkpoint (2026-12-22).** Nothing here is in force as a test until then.
   any file, page or log before the checkpoint.
 - **Two universes, one rule**: the production names, and the shadow stock
   universe below. The owner's proposal: two trials in N (graveyard rows 35
-  and 36) and one idea against the quarterly limit (section 13.8), since it
-  is the same rule. **The owner confirms or changes this at registration.**
-  From that checkpoint each universe's main test (proposed on the card: the
-  blended score's IC at 3 sessions) is in the Benjamini-Hochberg family
-  (13.5) and gets its Deflated Sharpe Ratio (13.6).
+  and 36) and one idea against the quarterly limit (section 13.8), counted
+  in the first quarter of 2027, when its second universe starts, since it
+  is the same rule. From that checkpoint each universe's main test
+  (proposed on the card: the blended score's IC at 3 sessions) is in the
+  Benjamini-Hochberg family (13.5) and gets its Deflated Sharpe Ratio
+  (13.6).
+- **The owner's two decisions come before any IC number exists.** The owner
+  confirms or changes the count (two trials in N, one idea against the
+  limit) and the main test, in a dated Amendments row, before the funds run
+  of the night the race reaches the first look; no IC value exists before
+  that run. If nothing is logged by then, the proposals stand as registered.
+  If the owner chooses one trial in N, row 36 stays in the graveyard, marked
+  "counted with row 35", and the count of N changes in the same amendment.
 - **The shadow stock universe** (`config/shadow_universe.py`,
   `orchestrator/universe.py`): a fixed list of about 250 US-listed large and
   mid-cap stocks and ADRs, none of them production names, published in the
@@ -1035,9 +1055,14 @@ is not in the Benjamini-Hochberg family, and changes no rule.
   every session from its first 21 returns to 2026-09-30, a window that ends
   before this registration (`analysis.regimes.tercile_cutoffs`). They are
   computed once, by that rule, and written into `analysis/regimes.py`
-  (`VOL_CUTOFFS`) and this section; until they are, the volatility split
-  reports "cut-offs not fixed yet". Nothing can be fitted to them: the rule
-  and its window are fixed here.
+  (`VOL_CUTOFFS`) and this section, with a dated Amendments row of its own
+  (the numbers the registered rule gives; nothing else changes). Nothing can
+  be fitted to them: the rule and its window are fixed here.
+- **The cut-offs, fixed on 2026-10-02**: low up to **11.30%** a year, mid
+  over 11.30% up to **16.97%**, high above 16.97% (at full precision
+  0.11302353418809083 and 0.16965241927688823), from 4,573 sessions,
+  2008-07-28 to 2026-09-30, computed by the history screen's stress kind
+  (workflow run 37013435615, `docs/research/history/2026-10-stress-periods/`).
 - **Hidden until the checkpoints**, like section 13.1: between checkpoints
   only the number of sessions in each state is shown; at each checkpoint
   the split is computed once and kept in the checkpoint record.
@@ -1079,8 +1104,9 @@ is not in the Benjamini-Hochberg family, and changes no rule.
 | 2026-09-28 | **Calibration started** (the owner's decisions of 2026-09-24 and 2026-09-25; calibration of the shadow funds, not a rule of the race) | The pass rule (the six conditions, the fail rule and late-run copying with a 2-day limit) is in force, and calibration starts with the 2026-09-28 close: the first complete account snapshot (account, positions and stops all read, no error), checked after that day's cycle. `PASS_RULE.approved` and `CALIBRATION_START` changed together in one reviewed change. The fund test's start, sessions and bars are unchanged (start 2026-09-28; 60/120/180 sessions; bars 3.40/2.41/2.02); fund results are still computed only after calibration passes. |
 | 2026-09-29 | **Bug fix**: an answer with a value outside the schema gets the same one re-ask as an off-schema answer (the owner's decision; not a decision rule) | On 2026-09-28 the model answered XBI with conviction -0.35 (conviction must be 0 to 1). The answer was readable, so the off-schema re-ask of 2026-09-26 did not apply; the value check came later, and the name was lost for every arm and fund. It was the first such answer in about 230 from `openai/gpt-oss-120b`. Now the model is asked once more, with the problem stated (`orchestrator/llm.py`, `INVALID_VALUES_INSTRUCTION`); the two kinds of bad answer share the one re-ask. The code never mends a value: if the second answer is bad too, it is rejected and journalled exactly as before, and it counts as a model error for trigger (c). The first answer stays in the call record, marked `invalid_values`. The re-ask never depends on the side the answer takes. The new sentence is part of the prompt fingerprint, so the drift report shows one "prompt fingerprint changed" alert the day it ships. No model, provider, prompt text of the first ask, answer length or reasoning effort changes; no decision rule, arm, fund or calibration rule changes. |
 | 2026-09-29 | **Bug fix**: the full model's read timeout is 480 seconds instead of 300 (the owner's decision; not a decision rule) | About one first ask in fifteen reasons until the answer's 16,000-token limit (`MAX_TOKENS`) and gives no answer. At 300 seconds such an answer ends in time only when the model writes faster than 53 tokens a second. On 2026-09-28 (about 57 a second) 4 of 58 first asks ran to the limit in 255-284 seconds, got the off-schema re-ask of 2026-09-26, and all 4 answered. On 2026-09-29 (about 41 a second) no answer reached the limit: 3 first asks timed out instead (one in a slow spell of 16-31 tokens a second), the retry after a timeout asked the same question again, 2 were answered and EWU was lost after two timeouts. The first ask and the retry now wait 480 seconds (`orchestrator/llm.py`, `FULL_MODEL_TIMEOUT_SECONDS`; `TRANSPORT_RETRY_TIMEOUT_SECONDS` follows it), so an answer at the limit ends in time down to 33 tokens a second and reaches the re-ask that states the complaint. This changes no model, provider, prompt, answer length or reasoning effort; only how long we wait. The full-model stage's 90-minute budget is unchanged. Trigger (c) is unchanged: its window is not reset and timeouts still count as model errors. The weekly report's step gets 20 minutes and the article probe's workflow 80 (operational). In force from the first cycle after the change is merged. No decision rule changes. |
-| 2026-10-02 | **After-tax gate** (new registration of the decision rule, not a bug fix) | Asked by the owner on 2026-10-02. Section 5c, and one clause each in sections 5, 9, 11.6 and 11.8: the arm that would win must also beat the VT fund after Israeli tax, on an "if sold today" basis, at the same bar and with the same Newey-West test (the fund test's paired daily test, lag 5): after-tax equity = equity minus the tax due if every position were sold at that day's close (floored at 0), after-tax daily return = after-tax equity today ÷ yesterday − 1, then the same paired difference against VT. The tax rules are the owner's (shekel gains with the exchange rate as the index, Income Tax Ordinance s.88 and Circular 10/2025; 25%; a surtax as parameters, off; FIFO lots per account; dividends at 25% with a credit for the US tax withheld; this year's losses against this year's gains, `offset_losses_vs_dividends` on by default until the accountant answers, the rest carried forward against future capital gains only; the Bank of Israel's representative rate on the trade date), every number in `config/israel_tax.py`, the owner's ten cases T1 to T10 as unit tests (T5 needs confirmation), and four conventions the rules leave open written in section 5c and put to the accountant. The record is made once by the funds run on the night the race first reaches a look and read back by the race; a look waits for it; before calibration has passed it cannot be met. It can only stop an arm from winning and never decides by itself. Also reported, for information only and not a gate: the break-even simulator (0.82 points a year at 6% growth and a 2% yield). **It adds a gate, it changes no arm and no metric, and it was made before any checkpoint result existed**: the first checkpoint is estimated for 2026-12-22, the race had 1 of 20 independent days, and no fund result had been computed (calibration on day 2 of 15). |
+| 2026-10-02 | **After-tax gate** (new registration of the decision rule, not a bug fix) | Asked by the owner on 2026-10-02. Section 5c, and one clause each in sections 5, 5a, 9, 11.6 and 11.8: the arm that would win must also beat the VT fund after Israeli tax, on an "if sold today" basis, at the same bar and with the same Newey-West test (the fund test's paired daily test, lag 5): after-tax equity = equity minus the tax due if every position were sold at that day's close (floored at 0), after-tax daily return = after-tax equity today ÷ yesterday − 1, then the same paired difference against VT. The tax rules are the owner's (shekel gains with the exchange rate as the index, Income Tax Ordinance s.88 and Circular 10/2025; 25%; a surtax as parameters, off; FIFO lots per account; dividends at 25% with a credit for the US tax withheld; this year's losses against this year's gains, `offset_losses_vs_dividends` on by default until the accountant answers, the rest carried forward against future capital gains only; the Bank of Israel's representative rate on the trade date), every number in `config/israel_tax.py`, the owner's ten cases T1 to T10 as unit tests (T5 needs confirmation), and five conventions the rules leave open written in section 5c. The record is made once by the funds run, on the first night from the night the race reaches a look on which the look is readable, the rate table is there and the funds' prices reach the look's last close; it is cut at that close and read back by the race, which refuses a record cut at another close; a look waits for it; before calibration has passed it cannot be met. It can only stop an arm from winning and never decides by itself. Also reported, for information only and not a gate: the break-even simulator (0.82 points a year at 6% growth and a 2% yield). **It adds a gate, it changes no arm and no metric, and it was made before any checkpoint result existed**: the first checkpoint is estimated for 2026-12-22, the race had 1 of 20 independent days, and no fund result had been computed (calibration on day 2 of 15). |
 | 2026-10-02 | **Reporting only: the after-tax and shekel reports** | Asked by the owner on 2026-10-02. Section 11.9: the paper account, the four funds and (at checkpoints only) the exploratory funds, before and after tax side by side, with "tax paid so far" and "if sold today", by the rules of section 5c; the same results in shekels at the Bank of Israel's representative rate, with how much of each came from the USD/ILS change; the rate table kept like the price table (SHA-256 in git, the table in the archive), its fallback days counted. The paper account is shown from now; the funds once calibration has passed, like every fund result. They decide nothing beyond section 5c's test and change no rule. |
-| 2026-10-02 | **Prepared, not registered: the IC report and the shadow stock universe** | Asked by the owner on 2026-10-02. Section 13.9, the card `docs/research/cards/ic-model-scores.md`, and graveyard rows 35 and 36: built now, **registered at the 2026-12-22 checkpoint** over all lines from 2026-09-28; counters only (lines with scores, days) until then, and no IC value written anywhere before it. The shadow stock universe is built with its flag off (`SHADOW_UNIVERSE_ENABLED`, off until 2027-01-01; a test fails if it is on before that date); its list is published in the card on the registration date and never changed after. **Two decisions are the owner's, at registration**: whether it counts as two trials in N and one idea against the quarterly limit (the owner's proposal), and the main test of each universe (proposed: the blended score's IC at 3 sessions). No result of it exists: nothing has been computed. |
+| 2026-10-02 | **Prepared, not registered: the IC report and the shadow stock universe** | Asked by the owner on 2026-10-02. Section 13.9, the card `docs/research/cards/ic-model-scores.md`, and graveyard rows 35 and 36: built now, **registered at the 2026-12-22 checkpoint** over all lines from 2026-09-28; counters only (lines with scores, days) until then, and no IC value written anywhere before it. The shadow stock universe is built with its flag off (`SHADOW_UNIVERSE_ENABLED`, off until 2027-01-01; a test fails if it is on before that date); its list is published in the card on the registration date and never changed after. **Two decisions are the owner's**, logged before the funds run of the night the race reaches the first look (before any IC value exists): whether it counts as two trials in N and one idea against the quarterly limit, counted in the first quarter of 2027 (the owner's proposal), and the main test of each universe (proposed: the blended score's IC at 3 sessions); if nothing is logged by then, the proposals stand. No result of it exists: nothing has been computed. |
 | 2026-10-02 | **Regime split** (reporting only; descriptive) | Asked by the owner on 2026-10-02. Section 13.10: the race's and the funds' results split by VT above or not above its 200-day average and by VT's 21-day realized volatility in terciles, with cut-offs fixed by a rule over a window that ends on 2026-09-30, before this registration. Hidden until the checkpoints (sessions per state only between them); decides nothing, not in the Benjamini-Hochberg family; counts as one trial in N (graveyard row 41). Made before any checkpoint result existed. |
-| 2026-10-02 | **Verdict disclosure** (new registration; a label and a policy, not a rule) | Asked by the owner on 2026-10-02. Section 5d and a clause in section 9: if VT's maximum drawdown from its high inside the test window (2026-09-23 to the close of the deciding look's last trades, final closes) is below 10%, the verdict is labelled "not tested in a downturn" and any real-money step starts small. It does not extend the test, move a look or change an outcome. Made before any checkpoint result existed. |
+| 2026-10-02 | **Verdict disclosure** (new registration; a label and a policy, not a rule) | Asked by the owner on 2026-10-02. Section 5d and a clause in section 9: if VT's maximum drawdown from its high inside the test window (2026-09-23 to the close of the deciding look's last trades, final closes with dividends added back, as the index test treats them) is below 10%, the verdict is labelled "not tested in a downturn" and any real-money step starts small. It does not extend the test, move a look or change an outcome. Made before any checkpoint result existed. |
+| 2026-10-02 | **Regime split: the volatility cut-offs fixed** (the numbers the registered rule of section 13.10 gives; nothing else changes) | The rule of the row above, run once by the history screen's stress kind (workflow run 37013435615, from VT's final closes 2008-07-28 to 2026-09-30, 4,573 sessions; `docs/research/history/2026-10-stress-periods/results.json`, key `regime_cutoffs`): low up to 11.30% a year, mid up to 16.97%, high above (0.11302353418809083 and 0.16965241927688823), written into section 13.10 and `analysis/regimes.py` (`VOL_CUTOFFS`). The window ends before this registration; no race or fund result was read. |

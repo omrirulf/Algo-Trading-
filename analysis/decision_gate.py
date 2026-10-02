@@ -222,6 +222,9 @@ class AfterTax:
     status: str
     t_vs_index: Mapping[str, Optional[float]] = field(default_factory=dict)
     reason: str = ""
+    #: The close the record's test was cut at; the race checks it against
+    #: the look's own window end and refuses a record made for another window.
+    window_end: Optional[date] = None
 
 
 @dataclass(frozen=True)

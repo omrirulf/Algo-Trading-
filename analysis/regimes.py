@@ -80,11 +80,12 @@ TERCILES: Final[tuple[float, float]] = (1.0 / 3.0, 2.0 / 3.0)
 #: inclusive. It ends before the registration (2 Oct 2026), so nothing can be fitted to the cut-offs.
 VT_CUTOFF_WINDOW_END: Final[date] = date(2026, 9, 30)
 #: The two volatility cut-offs (low/mid, mid/high), annualised. Fixed at registration from
-#: ``tercile_cutoffs`` over VT's final closes from its first 21 returns to ``VT_CUTOFF_WINDOW_END``
-#: inclusive, and written into pre-registration section 13.10 and here by the integrator once computed
-#: (the history screen's stress kind computes them: ``results.json``, key ``regime_cutoffs``; the sandbox
-#: has no price access). While None, the volatility split reports ``NOT_FIXED``.
-VOL_CUTOFFS: Final[Optional[tuple[float, float]]] = None
+#: ``tercile_cutoffs`` over VT's final closes from its first 21 returns (2008-07-28) to
+#: ``VT_CUTOFF_WINDOW_END`` inclusive, 4,573 sessions, computed once by the history screen's stress kind
+#: (workflow run 37013435615, ``docs/research/history/2026-10-stress-periods/results.json``, key
+#: ``regime_cutoffs``) and written into pre-registration section 13.10 with its own Amendments row
+#: (2026-10-02). Nothing can move them. Were it None, the volatility split would report ``NOT_FIXED``.
+VOL_CUTOFFS: Final[Optional[tuple[float, float]]] = (0.11302353418809083, 0.16965241927688823)
 
 #: The trend states.
 ABOVE: Final[str] = "above"

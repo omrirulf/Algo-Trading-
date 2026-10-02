@@ -194,7 +194,8 @@ def test_a_look_reached_before_calibration_passes_records_an_unavailable_after_t
     monkeypatch.setattr(schedule, "CALIBRATION_START", None)
     monkeypatch.setattr(shadow_run, "OhlcFetcher", NoPrices)
     monkeypatch.setattr(shadow_run, "run_funds", lambda *a, **k: pytest.fail("no fund before calibration"))
-    race = {"looks": [{"reached": True, "window_end": "2026-12-22"}, {"reached": False}, {"reached": False}]}
+    race = {"looks": [{"reached": True, "readable": True, "window_end": "2026-12-22"}, {"reached": False},
+                      {"reached": False}]}
     out = shadow_run.build(build_args(tmp_path, race), NOW)
     (record,) = out["after_tax"]["looks"]
     assert record["look"] == 1 and record["status"] == gate.AFTER_TAX_UNAVAILABLE
@@ -207,26 +208,73 @@ def test_a_look_reached_before_calibration_passes_records_an_unavailable_after_t
     assert later["after_tax"]["looks"] == [record]
 
 
-def test_with_funds_a_look_gets_a_ready_test_cut_at_its_window(monkeypatch, tmp_path):
-    calls = []
-    passed_calibration(monkeypatch, calls)
-    series = AfterTaxSeries(start_equity_usd=100_000.0, start_fx=3.5)
+def _series_through(last: date, step: float) -> AfterTaxSeries:
+    from analysis.israel_tax import AfterTaxDay
+    days = [d.date() for d in pd.bdate_range(date(2026, 9, 29), last)]
+    out = AfterTaxSeries(start_equity_usd=100_000.0, start_fx=3.5)
+    for i, d in enumerate(days):
+        value = 100_000.0 * (1 + step * ((i * 7) % 5 - 2))
+        out.days.append(AfterTaxDay(d, 3.5, value, value * 3.5, value, value * 3.5, 0.0, 0.0))
+    return out
 
+
+def _with_series(monkeypatch, calls, series):
     def fake(entries, start, final_through, fetcher, **kw):
         calls.append(kw)
         out = {"start": start.isoformat(), "days": [], "band": {},
                "list": [{"name": n, "exploratory": False} for n in ("model", "momentum", "hybrid", "vt")],
-               "after_tax": {"vt": None}, "_after_tax_series": {"model": series, "momentum": series,
-                                                               "hybrid": series, "vt": series}}
+               "after_tax": {"vt": None}, "_after_tax_series": series}
         return out, {"four": {}, "coin": {}}
 
     monkeypatch.setattr(shadow_run, "run_funds", fake)
-    race = {"looks": [{"reached": True, "window_end": "2026-12-22"}, {"reached": False}, {"reached": False}]}
+
+
+def test_with_funds_a_look_gets_a_ready_test_cut_at_its_window(monkeypatch, tmp_path):
+    calls = []
+    passed_calibration(monkeypatch, calls)
+    series = {n: _series_through(date(2026, 12, 31), 0.001 * (k + 1))
+              for k, n in enumerate(("model", "momentum", "hybrid", "vt"))}
+    _with_series(monkeypatch, calls, series)
+    race = {"looks": [{"reached": True, "readable": True, "window_end": "2026-12-22"}, {"reached": False},
+                      {"reached": False}]}
     out = shadow_run.build(build_args(tmp_path, race), NOW)
     (record,) = out["after_tax"]["looks"]
     assert record["status"] == gate.AFTER_TAX_READY and set(record["tests"]) == {"model", "momentum", "hybrid"}
+    assert all(test["through"] == "2026-12-22" for test in record["tests"].values())   # cut at the look's close
     assert "_after_tax_series" not in out["funds"] and out["after_tax"]["funds"] == {"vt": None}
     json.dumps(out, allow_nan=False)
+
+
+def test_a_look_waits_when_the_race_cannot_read_it_or_the_funds_do_not_reach_its_close(monkeypatch, tmp_path):
+    calls = []
+    passed_calibration(monkeypatch, calls)
+    short = {n: _series_through(date(2026, 12, 21), 0.001) for n in ("model", "momentum", "hybrid", "vt")}
+    _with_series(monkeypatch, calls, short)
+    unreadable = {"looks": [{"reached": True, "readable": False, "window_end": "2026-12-22"}, {"reached": False},
+                            {"reached": False}]}
+    assert shadow_run.build(build_args(tmp_path, unreadable), NOW)["after_tax"]["looks"] == []
+    readable = {"looks": [{"reached": True, "readable": True, "window_end": "2026-12-22"}, {"reached": False},
+                          {"reached": False}]}
+    assert shadow_run.build(build_args(tmp_path, readable), NOW)["after_tax"]["looks"] == []   # funds end on the 21st
+
+
+def test_the_rate_table_is_read_from_its_tape_and_refused_when_it_does_not_check_out(tmp_path):
+    from analysis import boi_rates
+
+    entries = tuple(boi_rates.DayRate(d.date(), 3.70, boi_rates.BOI) for d in pd.bdate_range("2026-09-10", "2026-09-18"))
+    table = boi_rates.RateTable(entries)
+    tape = boi_rates.tape(table, datetime(2026, 9, 18, 23, tzinfo=timezone.utc), date(2026, 9, 18))
+    path = tmp_path / "fx.json"
+    path.write_text(json.dumps(tape))
+    rates, meta = shadow_run.load_rates(path)
+    assert rates.rate(date(2026, 9, 14)) == 3.70 and meta["available"] is True
+    assert meta["counts"] == {"boi": 7, "ecb": 0, "carried": 0} and meta["rates_sha256"] == tape["prices_sha256"]
+    tape["rows"][0]["close"] = 3.71
+    path.write_text(json.dumps(tape))
+    rates, meta = shadow_run.load_rates(path)
+    assert rates is None and meta["available"] is False and "could not be read" in meta["reason"]
+    assert shadow_run.load_rates(tmp_path / "missing.json")[0] is None
+    assert shadow_run.load_rates(None) == (None, {"available": False, "reason": "no rate table was given"})
 
 
 def test_the_ic_report_shows_counters_nightly_and_its_record_only_from_registration(monkeypatch, tmp_path):
@@ -245,3 +293,33 @@ def test_the_ic_report_shows_counters_nightly_and_its_record_only_from_registrat
     assert record["ic"]["universes"]["shadow"] == {"no_data": True}
     names = [row["name"] for row in record["table"]["rows"]]
     assert "IC, production names" in names and "IC, shadow stock universe" in names
+    # Section 13.10: the regime split is in the look's record; between looks only sessions per state.
+    assert set(record["regimes"]) == {"race", "funds", "counters", "cutoffs"}
+    assert set(early["exploratory"]["counters"]["regimes"]) == {"sessions", "first", "last", "trend", "vol"}
+
+
+def test_the_regime_split_reads_the_race_and_the_funds_by_vt_s_state(monkeypatch):
+    """checkpoint_regimes on crafted race trades and fund equity: every series is split, VT's own window is the
+    race's comparator, and the funds are paired with the VT fund."""
+    from types import SimpleNamespace as NS
+
+    from analysis import regimes
+    from shadow import exploratory as xp
+
+    days = [d.date() for d in pd.bdate_range("2025-10-01", "2026-12-31")]
+    vt = frame({d: (100 + i * 0.05, 101 + i * 0.05, 99 + i * 0.05, 100 + i * 0.05, 0.0) for i, d in enumerate(days)})
+    long_bars = Bars({"VT": vt})
+    entry = [d for d in days if d >= date(2026, 10, 1)][:5]
+    trades = {"model": [NS(entry_day=d, net=0.01) for d in entry], "momentum": [NS(entry_day=d, net=0.0) for d in entry],
+              "hybrid": []}
+    monkeypatch.setattr(xp, "race_settings", lambda today, final_through, lines: None)
+    monkeypatch.setattr(xp, "arm_trades", lambda name, entries, how: trades[name])
+    funds = {"days": [d.isoformat() for d in entry],
+             "list": [{"name": n, "equity": [100_000.0 * (1 + 0.001 * (i + 1)) for i in range(5)]}
+                      for n in ("model", "momentum", "hybrid", "vt")]}
+    out = shadow_run.checkpoint_regimes([], long_bars, date(2026, 12, 31), date(2026, 12, 31), funds)
+    assert out["cutoffs"] == list(regimes.VOL_CUTOFFS) and set(out["race"]["vol"]) == set(regimes.VOL_STATES)
+    above = out["race"]["trend"]["above"]
+    assert above["model"]["days"] == 5 and above["model"]["mean"] == pytest.approx(0.01)
+    assert above["model - momentum"]["mean"] == pytest.approx(0.01) and "model - vt" in above
+    assert out["funds"]["trend"]["above"]["model - vt"]["mean"] == pytest.approx(0.0)

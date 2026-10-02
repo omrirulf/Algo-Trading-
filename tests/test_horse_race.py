@@ -304,14 +304,16 @@ class FinalAwareFetcher:
 
 
 def _race(tmp_path, monkeypatch, capsys, frames, journal_lines, now, extra=(),
-          cutoff=date(2000, 1, 1), account=None):
+          cutoff=date(2000, 1, 1), account=None, funds=None):
     """Run the race on a tiny journal. These journals are dated early 2026,
     before the real cutoff, so by default the cutoff is moved back to take
     them in; a test about the cutoff itself passes ``cutoff=None``.
 
     ``account`` is the paper account's record for trigger (d): lines to
     write, or raw text; by default there is none, so no test here reads the
-    repository's own ``logs/account.jsonl``."""
+    repository's own ``logs/account.jsonl``. ``funds`` is the funds run's
+    document, for each look's after-tax record (section 5c); by default there
+    is none, so no test here reads the repository's own ``logs/funds.json``."""
     journal = tmp_path / "signal_journal.log"
     journal.write_text("\n".join(json.dumps(l) for l in journal_lines) + "\n", encoding="utf-8")
     record = tmp_path / "account.jsonl"
@@ -320,7 +322,12 @@ def _race(tmp_path, monkeypatch, capsys, frames, journal_lines, now, extra=(),
     else:
         record.write_text(account if isinstance(account, str)
                           else "\n".join(json.dumps(l) for l in account) + "\n", encoding="utf-8")
-    extra = ("--account", str(record), *extra)
+    funds_record = tmp_path / "funds.json"
+    if funds is None:
+        funds_record.unlink(missing_ok=True)
+    else:
+        funds_record.write_text(json.dumps(funds), encoding="utf-8")
+    extra = ("--account", str(record), "--funds", str(funds_record), *extra)
     if cutoff is not None:
         monkeypatch.setattr(decision_gate, "DECISION_CUTOFF", cutoff)
         monkeypatch.setattr(decision_gate, "FAILURE_WATCH_START", cutoff)
@@ -582,6 +589,22 @@ def test_the_registered_parameters_are_the_ones_the_code_runs():
     # The two exploratory reports (reporting only): the owner's groups and "too few" line.
     assert horse_race.MIN_REPORT_TRADES == 20
     assert '"too few" until a group or side has 20 trades' in text
+    # The after-tax gate and the verdict label (Amendment 2026-10-02, sections 5c and 5d).
+    from config import israel_tax
+    from shadow import run as shadow_run
+
+    assert decision_gate.AFTER_TAX_LAG == shadow_run.VS_MODEL_LAG == 5
+    assert "with the fund test's Newey-West t, **lag 5** (section 11.4)" in text
+    assert decision_gate.DOWNTURN_DRAWDOWN == 0.10 and "its high inside the test window is below 10%" in text
+    assert decision_gate.DOWNTURN_LABEL == "not tested in a downturn"
+    assert 'labels the verdict "not tested in a downturn"' in text
+    assert israel_tax.CAPITAL_GAINS_RATE == 0.25 and israel_tax.SURTAX_THRESHOLD_ILS == 721_560
+    assert "721,560 ILS" in text and "`offset_losses_vs_dividends` (default on" in text
+    assert israel_tax.OFFSET_LOSSES_VS_DIVIDENDS is True
+    rows = [r for r in raw.partition("## Amendments")[2].splitlines() if r.startswith("| 2026-10-02 | **After-tax gate**")]
+    assert len(rows) == 1 and ("It adds a gate, it changes no arm and no metric, and it was made before any "
+                               "checkpoint result existed") in rows[0]
+    assert sum(r.startswith("| 2026-10-02 | **Verdict disclosure**") for r in raw.splitlines()) == 1
     assert [g[0] for g in horse_race.CONVICTION_GROUPS] == ["0.30-0.40", "0.40-0.50", "0.50-0.60", "0.60+"]
     assert "(0.30-0.40, 0.40-0.50, 0.50-0.60, 0.60 and above;" in text
     assert gate.COIN_FLIP_PERCENTILE == 95.0 and "95th percentile" in text

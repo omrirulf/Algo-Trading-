@@ -95,7 +95,10 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p "$RUNNER_TEMP/scoring-prices"
-          if python -m analysis.boi_rates --start 2026-09-10 --end "$(date -u +%F)" --with-table > "$RUNNER_TEMP/fx.out" \
+          # Through the last final session -- the funds' own last close -- so a
+          # day no book is priced on is never counted as a fallback day.
+          END=$(python -c "from datetime import datetime, timezone; from analysis.returns import last_final_session; print(last_final_session(datetime.now(timezone.utc)))")
+          if python -m analysis.boi_rates --start 2026-09-10 --end "$END" --with-table > "$RUNNER_TEMP/fx.out" \
              && test "$(wc -l < "$RUNNER_TEMP/fx.out")" = "2" \
              && python -c "import json,sys; d=json.load(open(sys.argv[1])); assert d['kind']=='fx-rates'" <(head -n 1 "$RUNNER_TEMP/fx.out"); then
             head -n 1 "$RUNNER_TEMP/fx.out" > "$RUNNER_TEMP/fx_rates.json"

@@ -3,8 +3,9 @@
 Every strategy idea this project has tried, run, or dropped, including the
 ones dropped before they ran, and every test of an idea on history. Rows are
 never deleted: an idea that dies stays here with the reason. **The number of
-numbered rows in the two tables below (the ideas, then the history screens)
-is N**, the number of trials the Deflated Sharpe Ratio corrects for at each
+numbered rows in the tables below (the ideas, the history screens, and the
+rows added from 2026-10-02) is N**, the number of trials the Deflated Sharpe
+Ratio corrects for at each
 checkpoint (pre-registration, section 13.6; `analysis/multiple_tests.py`
 counts them). A new idea gets its row (and its card in `cards/`) before it
 runs, and a history screen gets its row before it runs.
@@ -84,16 +85,17 @@ Rows in the order they were added, ideas and history screens together (the owner
 items 4 to 7). The IC report's two rows are the owner's proposal of two trials in N and one idea against the
 quarterly limit, which the owner confirms or changes when it is registered at the 2026-12-22 checkpoint
 (pre-registration section 13.9). The stress-period screens are one row per rule over the four periods, as one
-screen; they are descriptive, with no t and no verdict.
+screen (workflow run 37013435615, `history/2026-10-stress-periods/`); they are descriptive, with no t and no
+verdict. VT and SPY in it are benchmarks, not counted.
 
 | Trial | Idea | Kind | Status | Dates | Why it is here / what happened | Card |
 | --- | --- | --- | --- | --- | --- | --- |
 | 35 | IC of the model's scores (blended and the five dimensions) against the forward return, production names | exploratory test (prepared) | card written; registers at the 2026-12-22 checkpoint | lines from 2026-09-28 | Pre-registration section 13.9. Counters only (lines with scores, days) until the checkpoint; no IC value is written before it. | [card](cards/ic-model-scores.md) |
 | 36 | The same IC test on the shadow stock universe (about 250 US large and mid caps and ADRs) | exploratory test (prepared) | built, switched off until 2027-01-01 | scored from 2027-01-01 | The second universe of trial 35's rule, on the same card (`cards/ic-model-scores.md`). Its list is published in the card on the registration date. Off by a flag; a test fails if the flag is on before 2027-01-01. |  |
-| 37 | Stress periods: momentum (the locked rule), fund, 80 names, in 2000-2002, 2008, 2020 and 2022 | history screen (real code; queued) | queued: runs by hand, history-screen.yml with kind "stress" | 2026-10-02 | Maximum drawdown and return against VT (against SPY where VT did not exist) in each period. Descriptive only. Report folder: [history/2026-10-stress-periods/](history/2026-10-stress-periods/). |  |
-| 38 | Stress periods: A (200-day veto), fund, 80 names | history screen (real code; queued) | queued, with trial 37 | 2026-10-02 | The same screen (history/2026-10-stress-periods/). |  |
-| 39 | Stress periods: B (10-month timing on VT) | history screen (real code; queued) | queued, with trial 37 | 2026-10-02 | The same screen. VT's prices start in 2008-06, so B cannot run in 2000-2002 or 2008; the report says so. |  |
-| 40 | Stress periods: C (pullback limit entry), fund, 80 names | history screen (real code; queued) | queued, with trial 37 | 2026-10-02 | The same screen (history/2026-10-stress-periods/). |  |
+| 37 | Stress periods: momentum (the locked rule), fund, 80 names, in 2000-2002, 2008, 2020 and 2022 | history screen (real code) | descriptive: no t, no verdict | 2026-10-02 | Total return (worst fall): 2000-2002 -29.5% (33.7%) against SPY -37.5% (46.6%), VT did not exist; 2008 -3.2% (19.0%) against SPY -36.6% (47.1%); 2020 -3.1% (21.5%) against VT +15.5% (34.2%); 2022 -12.4% (19.2%) against VT -18.4% (26.0%). Fell less than the index in the falls, and trailed it by 18.6 points in 2020's quick recovery. Run 37013435615. | [report](history/2026-10-stress-periods/report.md) |
+| 38 | Stress periods: A (200-day veto), fund, 80 names | history screen (real code) | descriptive: no t, no verdict | 2026-10-02 | 2000-2002 -27.9% (33.0%); 2008 +5.8% (17.4%); 2020 -1.8% (21.5%); 2022 -10.1% (16.0%). A little ahead of momentum in every period. Same screen as row 37. | [report](history/2026-10-stress-periods/report.md) |
+| 39 | Stress periods: B (10-month timing on VT) | history screen (real code) | descriptive: no t, no verdict | 2026-10-02 | Not possible in 2000-2002 and 2008 (VT's prices start 2008-06-26; BIL's 2007-05-30). 2020 +13.0% (worst fall 11.1%) against VT +15.5% (34.2%); 2022 -8.8% (9.9%) against VT -18.4% (26.0%): much smaller falls, as its purpose says. Same screen as row 37. | [report](history/2026-10-stress-periods/report.md) |
+| 40 | Stress periods: C (pullback limit entry), fund, 80 names | history screen (real code) | descriptive: no t, no verdict | 2026-10-02 | 2000-2002 -23.4% (27.1%); 2008 -5.5% (20.3%); 2020 +0.5% (23.5%); 2022 -14.2% (18.3%). Same screen as row 37. | [report](history/2026-10-stress-periods/report.md) |
 | 41 | The race's and the funds' results split by market state (VT's 200-day average; VT's 21-day volatility terciles) | exploratory report | registered | from 2026-10-02 | Pre-registration section 13.10. Descriptive; hidden until the checkpoints; like rows 7 and 8. |  |
 
 ## Not counted, and why

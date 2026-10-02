@@ -46,9 +46,11 @@ would publish a salary in a public log for good.
 
 **Proposed design (recommended):**
 
-1. **Inputs: a private Supabase table**, `coach_inputs`, in the project the archive already uses, with the same
-   pattern as every table there: row-level security on and no policy, so the publishable key reads nothing and
-   only the secret key can. One row per month: month, take-home pay, spending, the value of each asset class,
+1. **Inputs: a private Supabase table**, `coach_inputs`, in **a new Supabase project of its own** (not the archive's
+   project: that project's secret key is held by this public repository's workflows, and it bypasses row-level
+   security, so one stray query or print in public code could reach the owner's numbers). The table follows the
+   archive's pattern -- row-level security on and no policy, so the publishable key reads nothing -- and the new
+   project's secret key lives only in the private job below, never in this repository. One row per month: month, take-home pay, spending, the value of each asset class,
    contributions per account, and (in a second table, `coach_targets`) the target shares, the rebalancing band and
    the yearly contribution plan. The owner types them in once a month in the Supabase dashboard's table editor
    (no form to build, nothing public).

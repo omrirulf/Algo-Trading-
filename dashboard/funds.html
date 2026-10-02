@@ -204,6 +204,15 @@
     after_tax.breakeven          {years, growth fraction, dividend_yield
                                   fraction, extra_per_year fraction}: for
                                   information only
+  Counters until the checkpoints (pre-registration sections 13.9 and 13.10;
+  never a result before a checkpoint); an older record lacks them:
+    exploratory.counters.ic      {production, shadow: {answered_lines count,
+                                  lines_with_score {score: count}, line_days
+                                  count}}
+    exploratory.counters.regimes {sessions count, first/last ISO dates, trend
+                                  {above, below, unknown: count}, vol {low,
+                                  mid, high, unknown: count} or the text
+                                  "cut-offs not fixed yet"}
   A TaxView is {from, through ISO dates, days count,
                 usd {start, equity, after_tax DOLLARS, return,
                      after_tax_return fractions},
@@ -468,6 +477,7 @@ table.mini tr.over td{background:var(--warn-bg)}
 <section id="explore" aria-label="The exploratory funds against the model fund"></section>
 <section id="data" aria-label="Price gaps by month, and the names the paper account held"></section>
 <section id="after-tax" aria-label="After Israeli tax and in shekels"></section>
+<section id="counters" aria-label="Counters until the checkpoints"></section>
 
 <section id="order" aria-label="How often the buying order mattered"></section>
 
@@ -1227,6 +1237,35 @@ table.mini tr.over td{background:var(--warn-bg)}
     return html + `<p class="small">${doc("after-tax", "After tax and in shekels")}</p></div>`;
   }
 
+  // ------------------------------------------- counters until the checkpoints
+  // The IC report (section 13.9, registered at the 22 Dec 2026 checkpoint)
+  // and the regime split (section 13.10) show counts only between
+  // checkpoints: lines with scores, days, and sessions per market state.
+  function countersHtml(data){
+    data = asObj(data) || {};
+    const counters = asObj(asObj(data.exploratory) && data.exploratory.counters);
+    const ic = asObj(counters && counters.ic), regimes = asObj(counters && counters.regimes);
+    if(!ic && !regimes) return "";
+    const n = (v)=> isNum(v) ? String(v) : "n/a";
+    let html = `<div class="card" style="margin-top:10px"><h3>Counters until the checkpoints <span class="faint" style="font-weight:400">(no result is shown before a checkpoint)</span></h3><ul class="facts">`;
+    const universe = (label, u)=>{
+      u = asObj(u);
+      if(!u) return "";
+      const scores = asObj(u.lines_with_score) || {};
+      const parts = Object.keys(scores).map(k=> `${esc(k)} ${esc(n(scores[k]))}`).join(" · ");
+      return `<li>IC report, ${esc(label)}: <b class="num">${esc(n(u.answered_lines))}</b> answered lines on <span class="num">${esc(n(u.line_days))}</span> days${parts ? ` <span class="faint">(lines with each score: ${parts})</span>` : ""}</li>`;
+    };
+    if(ic){
+      html += universe("production names", ic.production) + universe("shadow stock universe (off until 1 Jan 2027)", ic.shadow);
+    }
+    if(regimes){
+      const trend = asObj(regimes.trend) || {}, vol = regimes.vol;
+      const volText = typeof vol === "string" ? vol : ["low", "mid", "high", "unknown"].map(k=> `${k} ${n((asObj(vol) || {})[k])}`).join(" · ");
+      html += `<li>Market state since ${esc(day(regimes.first, true))}: VT above its 200-day average on <span class="num">${esc(n(trend.above))}</span> sessions, not above on <span class="num">${esc(n(trend.below))}</span>${isNum(trend.unknown) && trend.unknown ? `, unknown on ${esc(trend.unknown)}` : ""}; volatility terciles: ${esc(volText)}</li>`;
+    }
+    return html + `</ul></div>`;
+  }
+
   function orderHtml(data){
     data = data && typeof data === "object" ? data : {};
     const obj = (v)=> v && typeof v === "object" && !Array.isArray(v) ? v : null;
@@ -1308,6 +1347,7 @@ table.mini tr.over td{background:var(--warn-bg)}
     safely("explore", ()=>{ $("explore").innerHTML = exploratoryHtml(F); return []; });
     safely("data", ()=>{ $("data").innerHTML = dataHtml(F); return []; });
     safely("after-tax", ()=>{ $("after-tax").innerHTML = afterTaxHtml(F); return []; });
+    safely("counters", ()=>{ $("counters").innerHTML = countersHtml(F); return []; });
     safely("order", ()=>{ $("order").innerHTML = orderHtml(F); return []; });
     todo.forEach(([id, fn])=>safely(id, fn));
   }

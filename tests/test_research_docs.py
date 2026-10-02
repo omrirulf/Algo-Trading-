@@ -93,7 +93,8 @@ def test_the_owners_items_of_2_oct_have_their_rows_before_they_run():
     assert "production names" in rows[35][1] and "(cards/ic-model-scores.md)" in rows[35][6]
     assert "shadow stock universe" in rows[36][1] and "cards/ic-model-scores.md" in rows[36][5]
     for trial in (37, 38, 39, 40):
-        assert rows[trial][2].startswith("history screen (real code") and "Stress periods" in rows[trial][1]
+        assert rows[trial][2] == "history screen (real code)" and "Stress periods" in rows[trial][1]
+        assert "(history/2026-10-stress-periods/report.md)" in rows[trial][6]
     assert "history/2026-10-stress-periods/" in (RESEARCH / "graveyard.md").read_text()
     assert "market state" in rows[41][1] and rows[41][2] == "exploratory report"
 
@@ -112,3 +113,17 @@ def test_the_ic_card_carries_the_shadow_universe_exactly_as_the_code_lists_it():
 
     card = (RESEARCH / "cards" / "ic-model-scores.md").read_text()
     assert shadow_universe.markdown_table() in card
+
+
+def test_the_regime_cut_offs_are_the_numbers_the_registered_rule_gave():
+    """Pre-registration 13.10: fixed once from VT's history to 2026-09-30, by the stress screen's run."""
+    import json
+
+    from analysis import regimes
+
+    found = json.loads((RESEARCH / "history" / "2026-10-stress-periods" / "results.json").read_text())["regime_cutoffs"]
+    assert found["complete"] is True and found["window_end"] == regimes.VT_CUTOFF_WINDOW_END.isoformat()
+    assert tuple(found["cutoffs"]) == regimes.VOL_CUTOFFS
+    text = " ".join((ROOT / "docs" / "horse-race-preregistration.md").read_text().split())
+    assert "low up to **11.30%** a year" in text and "up to **16.97%**" in text
+    assert "0.11302353418809083 and 0.16965241927688823" in text

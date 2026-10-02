@@ -781,12 +781,19 @@ def after_tax_part(now: datetime, final_through: date, snapshots, funds: Optiona
         if look in {r.get("look") for r in records}:
             continue
         entry = (race_gate.get("looks") or [])[look - 1]
+        if entry.get("readable") is not True:
+            continue                        # the race could not read the look tonight: it waits, and so does this
         end = date.fromisoformat(entry["window_end"]) if entry.get("window_end") else None
         if not passed:
             records.append(tax.gate_record(look, now.date(), end, None, reason=(
                 "calibration had not passed when the race reached this look: no fund was run")))
-        elif series is not None:
+        elif series is not None and end is not None and all(
+                series.get(name) is not None and series[name].days and series[name].days[-1].day >= end
+                for name in (*tax.GATE_FUNDS, tax.VT_FUND)):
             records.append(tax.gate_record(look, now.date(), end, series))
+        # Otherwise no record tonight (no rate table, or the funds' prices do
+        # not reach the look's last close yet): the look waits for the first
+        # night that has both, and the test is cut at the same close then.
     return {
         "rules": tax.rules_json(),
         "fx": fx,
@@ -824,6 +831,71 @@ def ic_record(lines: dict, final_through: date, fetchers: Optional[list]) -> dic
                                               final_through)
     made = ic.record(lines, bars, final_through)
     return made
+
+
+def vt_bars(long_bars: Bars, final_through: date) -> list[tuple[date, float, float, float]]:
+    """VT's ``(day, open, close, dividend)`` from the long history: the regime split's market and the race's index."""
+    frame = long_bars.history(xp.TIMING_IN, final_through)
+    out = []
+    for day in (ts.date() for ts in frame.index):
+        bar = long_bars.bar(xp.TIMING_IN, day)
+        if bar is not None:
+            out.append((day, bar[0], bar[3], bar[4]))
+    return out
+
+
+def regime_counters(long_bars: Bars, final_through: date) -> dict:
+    """Pre-registration section 13.10, between checkpoints: sessions per market state since the fund start, nothing else."""
+    from analysis import regimes
+
+    bars = vt_bars(long_bars, final_through)
+    sessions = [d for d, *_ in bars if schedule.FUND_START <= d <= final_through]
+    return regimes.counters(regimes.labels([(d, c) for d, _, c, _ in bars], sessions, regimes.VOL_CUTOFFS))
+
+
+def checkpoint_regimes(entries: Sequence[JournalEntry], long_bars: Bars, today: date, final_through: date,
+                       funds: Optional[dict], fetchers: Optional[list] = None) -> dict:
+    """Section 13.10 at a checkpoint: the race's and the funds' results split by VT's market state, once.
+
+    The race side: each main arm's mean daily net return per entry day over
+    the decision window (``horse_race``'s own scoring), each against VT's own
+    3-session window and against each other. The fund side, once the funds
+    run: each main fund's daily return and each against the VT fund.
+    Descriptive only (``analysis.regimes``).
+    """
+    from analysis import decision_gate as gate
+    from analysis import regimes
+    from analysis.horse_race import daily_net, entries_for_arm, on_grid
+
+    lines = [e for e in entries if e.timestamp is not None and e.model_answered
+             and gate.in_window(e.timestamp.date())]
+    how = xp.race_settings(today, final_through, lines)
+    if fetchers is not None:
+        fetchers += [("race_closes_regimes", how.source), ("race_ohlc_regimes", how.fetcher)]
+    daily = {name: daily_net(xp.arm_trades(name, entries_for_arm(name, lines), how))
+             for name in ("model", "momentum", "hybrid")}
+    grid = sorted(set().union(*(set(d) for d in daily.values())))
+    race = {name: dict(zip(grid, on_grid(values, grid))) for name, values in daily.items()}
+    bars = vt_bars(long_bars, final_through)
+    vt = {day: r for day in grid if (r := gate.index_window_return(bars, day, gate.REGISTERED_HORIZON)) is not None}
+    for name in ("model", "momentum", "hybrid"):
+        race[f"{name} - vt"] = {d: race[name][d] - vt[d] for d in grid if d in vt}
+    race["model - momentum"] = {d: race["model"][d] - race["momentum"][d] for d in grid}
+    race["model - hybrid"] = {d: race["model"][d] - race["hybrid"][d] for d in grid}
+    fund_series: dict = {}
+    sessions: list[date] = []
+    if funds:
+        sessions = [date.fromisoformat(d) for d in funds.get("days") or []]
+        for row in funds.get("list") or []:
+            equity = [STARTING_CASH] + list(row.get("equity") or [])
+            if len(equity) == len(sessions) + 1:
+                fund_series[row["name"]] = {d: (a / b - 1.0 if b else 0.0)
+                                            for d, b, a in zip(sessions, equity, equity[1:])}
+        for name in ("model", "momentum", "hybrid"):
+            if name in fund_series and "vt" in fund_series:
+                fund_series[f"{name} - vt"] = {d: fund_series[name][d] - fund_series["vt"][d] for d in sessions}
+    labels = regimes.labels([(d, c) for d, _, c, _ in bars], sorted(set(grid) | set(sessions)), regimes.VOL_CUTOFFS)
+    return regimes.record(race, fund_series, labels, regimes.VOL_CUTOFFS)
 
 
 def looks_reached(race_gate: Optional[dict]) -> list[int]:
@@ -892,6 +964,8 @@ def build(args: argparse.Namespace, now: datetime, fetchers: Optional[list] = No
     universe_dir = getattr(args, "universe", None)
     lines_for_ic = ic_lines(args.journal, universe_dir)
     counters["ic"] = ic.counters(lines_for_ic, final_through)
+    # Section 13.10: the regime split shows sessions per market state only, until the checkpoints.
+    counters["regimes"] = regime_counters(long_bars, final_through)
     rates, fx = load_rates(getattr(args, "fx_table", None))
     if fund_start is not None and passed and fund_start <= final_through:
         funds, checks = run_funds(read.entries, fund_start, final_through, fetcher,
@@ -923,6 +997,9 @@ def build(args: argparse.Namespace, now: datetime, fetchers: Optional[list] = No
             records[-1]["ic_main"] = {u: block.get("main") or {}
                                       for u, block in records[-1]["ic"]["universes"].items()}
         records[-1]["table"] = checkpoint_table_for(records[-1])
+        # Section 13.10: the regime split, once, kept with the look's record.
+        records[-1]["regimes"] = checkpoint_regimes(read.entries, long_bars, now.date(), final_through, funds,
+                                                    fetchers)
         # Section 11.9: the exploratory funds after tax, at checkpoints only.
         if tax_series is not None:
             from shadow import after_tax as tax
