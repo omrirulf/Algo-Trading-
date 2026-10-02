@@ -48,3 +48,13 @@ def test_the_report_says_it_is_for_information_only(capsys):
     out = capsys.readouterr().out
     assert "for information only; not a gate" in out and "| 6.0% | 2.0% |" in out
     assert be.main(["--years", "0"]) == 2
+
+
+def test_an_answer_outside_the_search_range_is_refused_not_clipped(capsys):
+    low, high = be.SEARCH_RANGE
+    assert (low, high) == (-0.05, 0.20)
+    with pytest.raises(ValueError, match=r"more than \+20 points a year"):
+        be.breakeven(growth=1.0)
+    assert be.main(["--growth", "1.0"]) == 2
+    captured = capsys.readouterr()
+    assert "no break-even inside the search range" in captured.err and captured.out == ""

@@ -27,8 +27,12 @@ IC, and only that score's.
 
 How each number is made (every setting is a ``Final`` constant below):
 
-* **Lines.** Answered lines only: a signal, no error, and not held (a held
-  name was never offered to the model). Journalled on or after ``IC_START``,
+* **Lines.** Answered lines only, by the race's rule: a signal about this
+  ticker (``JournalEntry.model_answered``) and not held (a held name was
+  never offered to the model). A line with such a signal and an error
+  written after the answer (``"webhook unreachable: ..."``, ``"engine
+  unavailable: ..."``) counts, as it does in the race; a signal about another
+  ticker (``"answered for X"``) does not. Journalled on or after ``IC_START``,
   by the UTC day of ``ts_utc``. The production lines are ``logs/journal/``;
   the shadow stock universe's (``logs/shadow_universe/``, same format, same
   reader) count from ``SHADOW_START``.
@@ -56,21 +60,38 @@ How each number is made (every setting is a ``Final`` constant below):
   ``series_stats`` of the daily ICs, for the Deflated Sharpe Ratio. The
   blended score minus momentum, day by day, is shown for reading only.
 * **n_eff**, the effective number of independent names, measured from the
-  return correlations: the daily close-to-close returns of the universe's
-  names over the IC window (the first entry day to the last resolved day).
-  A name with fewer than ``N_EFF_MIN_RETURNS`` returns there is dropped; then
-  only the dates on which every kept name has a return are used (fewer than
-  ``N_EFF_MIN_DATES``: no n_eff, and the reason). n_eff is the participation
-  ratio of their correlation matrix, (sum of eigenvalues)^2 / (sum of squared
-  eigenvalues): N names that move independently give about N, N names that
-  move as one give 1. A short window reads low -- pure noise over T dates
-  gives about N / (1 + (N - 1) / (T - 1)) -- which makes the smallest
-  detectable IC larger: the cautious side.
+  daily close-to-close returns of the universe's names over the IC window
+  (the first entry day to the last resolved day).
+  - *Which names and dates.* The window's dates are the dates on which any
+    name has a return there. A name whose returns cover less than
+    ``N_EFF_MIN_COVERAGE`` of them, or with fewer than ``N_EFF_MIN_RETURNS``
+    returns, is dropped first, so one name with a short history (a new
+    listing, a takeover) does not cut the window for every other name. Then
+    only the dates on which every kept name has a return are used (fewer
+    than ``N_EFF_MIN_DATES``: no n_eff, and the reason), and a name whose
+    price never moves on them is dropped.
+  - *The common move is taken out.* Each date's mean return across the
+    kept names is subtracted from every name's return that date. Moving
+    every name by the same amount does not change their ranks, so it does
+    not change a day's IC; left in, that one common move (the market)
+    would make the names look far less independent than a rank IC sees
+    them, and the smallest detectable IC far too large.
+  - *Two numbers.* C is the correlation matrix of these returns, over the
+    N names and T dates. ``n_eff_raw`` = N^2 / sum(C^2), the participation
+    ratio (sum of eigenvalues)^2 / (sum of squared eigenvalues). It reads
+    low on a short window: pure noise over T dates adds about
+    N(N - 1) / (T - 1) to sum(C^2), so it can never pass about
+    N / (1 + (N - 1) / (T - 1)). ``n_eff`` takes that noise out:
+    N^2 / max(sum(C^2) - N(N - 1) / (T - 1), N), so it is at most N.
+    Names that move independently apart from the common move give about
+    N - 1 (taking out the mean uses up one name); names that also move
+    together in groups give fewer. ``n_eff`` is the number reported and
+    used below; ``n_eff_raw`` is shown for reading.
 * **Smallest detectable IC** at t = ``MDE_T``. Measured: ``MDE_T`` x the
   Newey-West standard error. In theory: ``MDE_T`` / sqrt((n_eff - 1) x days /
-  h), because a day's IC over n_eff independent names has a standard error
-  of about 1 / sqrt(n_eff - 1), and 3-session windows that overlap give about
-  days / 3 independent days.
+  h), with the noise-corrected ``n_eff``, because a day's IC over n_eff
+  independent names has a standard error of about 1 / sqrt(n_eff - 1), and
+  3-session windows that overlap give about days / 3 independent days.
 
 **Hidden until the checkpoint.** ``counters`` is the only function the
 nightly run calls before the checkpoint: answered lines, lines with each
@@ -135,8 +156,14 @@ MDE_T: Final[float] = 2.4
 NW_LAG: Final[dict[int, int]] = {1: 1, 3: 3}
 #: n_eff: a name needs at least this many daily returns in the IC window to be kept.
 N_EFF_MIN_RETURNS: Final[int] = 20
+#: n_eff: and returns on at least this share of the window's dates, checked before the dates are intersected,
+#: so one name with a short history does not cut the window for every other name.
+N_EFF_MIN_COVERAGE: Final[float] = 0.9
 #: n_eff: and at least this many dates on which every kept name has a return, or n_eff is not measured.
 N_EFF_MIN_DATES: Final[int] = 20
+#: n_eff: a name whose returns, once each date's mean is taken out, vary by less than this share of its own
+#: returns' spread moves exactly with the others (what is left is rounding, not a move). Not a setting.
+_FLAT_SHARE: Final[float] = 1e-9
 #: The main test, PROPOSED: the blended score's IC at 3 sessions. The owner confirms it at registration.
 MAIN_SCORE: Final[str] = "blend"
 #: The main test's horizon, in sessions (proposed with ``MAIN_SCORE``).
@@ -235,12 +262,15 @@ def momentum_score(arms: Any) -> Optional[float]:
 def line_from(payload: Any) -> Optional[IcLine]:
     """An answered line's scores, or None for anything else.
 
-    Answered: a signal with a bias and a conviction, no error, not held --
-    the production rule (``JournalEntry.model_answered`` and not held) with
-    no error of any kind, which is also the shadow universe's rule. The two
-    agree on every production line journalled so far. The common fields
-    come from ``analysis.reader.entry_from``, so this reads a line exactly
-    as every other reader of the journal does; only ``arms`` is read here.
+    Answered, by the race's rule: a signal about this ticker
+    (``JournalEntry.model_answered``: a bias and a conviction, and not
+    journalled as "answered for X") and not held. An error written after
+    the answer -- "webhook unreachable: ...", "engine unavailable: ..." --
+    does not take the line out, as it does not in the race; the shadow
+    universe's failed lines carry no signal, so the same rule reads both.
+    The common fields come from ``analysis.reader.entry_from``, so this
+    reads a line exactly as every other reader of the journal does; only
+    ``arms`` is read here.
     """
     try:
         entry = entry_from(payload)
@@ -248,7 +278,7 @@ def line_from(payload: Any) -> Optional[IcLine]:
         return None
     if entry is None or entry.timestamp is None:
         return None
-    if not entry.model_answered or entry.error is not None or entry.held:
+    if not entry.model_answered or entry.held:
         return None
     scores: dict[str, Optional[float]] = {"blend": entry.composite}
     for name in DIMENSIONS:
@@ -538,9 +568,10 @@ def newey_west_se(xs: Sequence[float], lag: int) -> Optional[float]:
 def mde_theory(n_eff: Optional[float], days: int, horizon: int) -> Optional[float]:
     """``MDE_T`` / sqrt((n_eff - 1) x days / horizon); None without n_eff above 1 or without days.
 
-    A day's IC over n_eff independent names has a standard error of about
-    1 / sqrt(n_eff - 1); windows of ``horizon`` sessions that overlap give
-    about days / horizon independent days.
+    ``n_eff`` is the noise-corrected one, with the common move taken out
+    (``effective_names``). A day's IC over n_eff independent names has a
+    standard error of about 1 / sqrt(n_eff - 1); windows of ``horizon``
+    sessions that overlap give about days / horizon independent days.
     """
     if n_eff is None or n_eff <= 1 or days <= 0 or horizon < 1:
         return None
@@ -594,22 +625,40 @@ def paired(first: Mapping[date, float], second: Mapping[date, float], horizon: i
 
 def effective_names(bars: Mapping[str, Sequence[Bar]], names: Iterable[str], first: Optional[date],
                     last: Optional[date], through: Optional[date] = None) -> dict:
-    """n_eff from the names' daily close-to-close returns dated ``first`` to ``last``.
+    """n_eff from the names' daily close-to-close returns dated ``first`` to ``last``, the common move taken out.
 
-    Returns ``{"n_eff", "names", "dates", "mean_corr", "reason"}``: the
-    participation ratio of the correlation matrix, the names used, the dates
-    used, the mean correlation between two different names, and why n_eff is
-    None when it is. A name with fewer than ``N_EFF_MIN_RETURNS`` returns in
-    the window is dropped (and so is one whose price never moves); then only
-    dates on which every kept name has a return are used.
+    Returns ``{"n_eff", "n_eff_raw", "names", "dates", "window_dates",
+    "mean_corr", "reason"}``:
+
+    * ``window_dates``: the dates in the window on which any name has a
+      return. A name with returns on less than ``N_EFF_MIN_COVERAGE`` of
+      them, or with fewer than ``N_EFF_MIN_RETURNS``, is dropped before the
+      dates are intersected, so it cannot cut the window for the others.
+    * ``dates``: T, the dates on which every kept name has a return (at
+      least ``N_EFF_MIN_DATES``, or no n_eff). A name whose price never
+      moves on them is dropped too; ``names`` are the N names used.
+    * ``mean_corr``: the mean correlation between two different names'
+      returns as they are, the common move still in: for reading.
+    * Then each date's mean return across the names is subtracted from
+      every name's return that date (a move shared by every name does not
+      change their ranks, so it is no part of a rank IC), and C is the
+      correlation matrix of what is left. ``n_eff_raw`` = N^2 / sum(C^2),
+      the participation ratio (sum(C^2) is the sum of squared
+      eigenvalues, N their sum). ``n_eff`` = N^2 / max(sum(C^2) -
+      N(N - 1) / (T - 1), N): the same with the sampling noise of T dates
+      taken out (pure noise adds about N(N - 1) / (T - 1) to sum(C^2)).
+      Independent names give about N - 1; names that move as one leave
+      nothing to rank once the common move is out, and give no n_eff.
+    * ``reason``: why n_eff is None when it is.
     """
     import numpy as np
 
-    out: dict[str, Any] = {"n_eff": None, "names": [], "dates": 0, "mean_corr": None, "reason": None}
+    out: dict[str, Any] = {"n_eff": None, "n_eff_raw": None, "names": [], "dates": 0, "window_dates": 0,
+                           "mean_corr": None, "reason": None}
     if first is None or last is None:
         out["reason"] = "no resolved return yet"
         return out
-    returns: dict[str, dict[date, float]] = {}
+    every: dict[str, dict[date, float]] = {}
     for name in sorted(set(names)):
         tape = _tape(bars.get(name), through)
         if tape is None:
@@ -619,11 +668,15 @@ def effective_names(bars: Mapping[str, Sequence[Bar]], names: Iterable[str], fir
             day, before, now = tape.dates[i], tape.closes[i - 1], tape.closes[i]
             if first <= day <= last and _positive(before) and _positive(now):
                 series[day] = now / before - 1.0
-        if len(series) >= N_EFF_MIN_RETURNS:
-            returns[name] = series
+        every[name] = series
+    window = set().union(*every.values()) if every else set()
+    out["window_dates"] = len(window)
+    returns = {name: series for name, series in every.items()
+               if window and len(series) >= N_EFF_MIN_RETURNS and len(series) / len(window) >= N_EFF_MIN_COVERAGE}
     if len(returns) < 2:
-        out["reason"] = (f"{len(returns)} name(s) with at least {N_EFF_MIN_RETURNS} daily returns "
-                         f"from {first.isoformat()} to {last.isoformat()}; n_eff needs 2")
+        out["reason"] = (f"{len(returns)} name(s) with at least {N_EFF_MIN_RETURNS} daily returns, on at least "
+                         f"{N_EFF_MIN_COVERAGE:.0%} of the {len(window)} dates from {first.isoformat()} to "
+                         f"{last.isoformat()}; n_eff needs 2")
         return out
     common = sorted(set.intersection(*(set(s) for s in returns.values())))
     out["dates"] = len(common)
@@ -631,18 +684,25 @@ def effective_names(bars: Mapping[str, Sequence[Bar]], names: Iterable[str], fir
         out["reason"] = (f"only {len(common)} date(s) on which every one of {len(returns)} names has a return; "
                          f"n_eff needs {N_EFF_MIN_DATES}")
         return out
-    kept = [name for name in returns if np.std([returns[name][d] for d in common]) > 0]
-    if len(kept) < 2:
+    moving = [name for name in returns if np.std([returns[name][d] for d in common]) > 0]
+    if len(moving) < 2:
         out["reason"] = "fewer than 2 names whose price moves in the window"
         return out
-    matrix = np.array([[returns[name][d] for d in common] for name in kept], dtype=float)
-    corr = np.corrcoef(matrix)
-    eigenvalues = np.linalg.eigvalsh(corr)
-    off_diagonal = corr[~np.eye(len(kept), dtype=bool)]
+    raw = np.array([[returns[name][d] for d in common] for name in moving], dtype=float)
+    out["mean_corr"] = float(np.corrcoef(raw)[~np.eye(len(moving), dtype=bool)].mean())
+    apart = raw - raw.mean(axis=0, keepdims=True)
+    spread = apart.std(axis=1) > _FLAT_SHARE * raw.std(axis=1)
+    if int(spread.sum()) < 2:
+        out["reason"] = ("the names move as one: once each date's mean return is taken out, "
+                         "fewer than 2 names move apart from the others")
+        return out
+    corr = np.corrcoef(apart[spread])
+    n, t = int(spread.sum()), len(common)
+    squares = float((corr ** 2).sum())
     out.update({
-        "n_eff": float(eigenvalues.sum() ** 2 / (eigenvalues ** 2).sum()),
-        "names": kept,
-        "mean_corr": float(off_diagonal.mean()),
+        "n_eff": float(n * n / max(squares - n * (n - 1) / (t - 1), n)),
+        "n_eff_raw": float(n * n / squares),
+        "names": [name for name, keep in zip(moving, spread) if keep],
     })
     return out
 
@@ -665,6 +725,12 @@ def settings() -> dict:
         "nw_lag": {str(h): lag for h, lag in NW_LAG.items()},
         "n_eff_min_returns": N_EFF_MIN_RETURNS,
         "n_eff_min_dates": N_EFF_MIN_DATES,
+        "n_eff_min_coverage": N_EFF_MIN_COVERAGE,
+        "n_eff": ("daily close-to-close returns over the window; names with returns on less than "
+                  f"{N_EFF_MIN_COVERAGE:.0%} of its dates or fewer than {N_EFF_MIN_RETURNS} returns dropped, then the "
+                  "dates every kept name has; each date's mean return across the names taken out (a common move "
+                  "does not change ranks); C = their correlation matrix, N names, T dates: "
+                  "n_eff = N^2 / max(sum(C^2) - N(N - 1) / (T - 1), N), n_eff_raw = N^2 / sum(C^2)"),
         "main": {"score": MAIN_SCORE, "horizon": MAIN_HORIZON},
         "return": "price only: the next open to the close of the h-th session, no dividend, no cost",
     }
@@ -689,7 +755,9 @@ def universe_record(lines: Sequence[IcLine], bars: Mapping[str, Sequence[Bar]], 
         "lines": len(lines),
         "window": {"first": first.isoformat() if first else None, "last": last.isoformat() if last else None},
         "n_eff": spread["n_eff"],
+        "n_eff_raw": spread["n_eff_raw"],
         "n_eff_dates": spread["dates"],
+        "n_eff_window_dates": spread["window_dates"],
         "n_eff_reason": spread["reason"],
         "names": spread["names"],
         "mean_corr": spread["mean_corr"],
@@ -752,9 +820,11 @@ def card() -> str:
         f"Prepared on 2 Oct 2026 (the owner's item 4). Registration: the {_day(IC_REGISTRATION)} checkpoint. "
         "Shadow only: nothing is traded on it and no rule changes because of it. Code: `analysis/ic.py`.",
         "",
-        f"- **Lines.** Every line the model answered (a signal, no error, not held), journalled on or after "
-        f"**{IC_START.isoformat()}** (UTC day). Two universes: the production names (`logs/journal/`) and, "
-        f"from **{SHADOW_START.isoformat()}**, the shadow stock universe (`logs/shadow_universe/`).",
+        f"- **Lines.** Every line the model answered (a signal about this ticker, not held), journalled on or "
+        f"after **{IC_START.isoformat()}** (UTC day): the race's rule, so a line with an error written after the "
+        "answer (\"webhook unreachable\", \"engine unavailable\") counts and one \"answered for\" another ticker "
+        f"does not. Two universes: the production names (`logs/journal/`) and, from "
+        f"**{SHADOW_START.isoformat()}**, the shadow stock universe (`logs/shadow_universe/`).",
         f"- **Scores.** The blended score (`blend.composite`) and the five dimensions "
         f"({', '.join(f'`signal.{d}_score`' for d in DIMENSIONS)}). A null score leaves the line out of that "
         "score only. Comparator: the momentum rule, +conviction when BULLISH, -conviction when BEARISH, "
@@ -770,11 +840,19 @@ def card() -> str:
         f"for ties) between the score and the return, over the names that have both. At least **{MIN_NAMES} "
         "names**, or no IC that day (the day is counted as skipped). A name twice on one entry day: the last line.",
         f"- **Reported.** Mean IC, Newey-West t (lag = horizon: {lags}), two-sided p, days, the measured "
-        f"effective number of independent names (n_eff: the participation ratio of the names' daily return "
-        f"correlations, names with at least {N_EFF_MIN_RETURNS} returns, on at least {N_EFF_MIN_DATES} common "
-        f"dates), and the smallest IC detectable at **t = {MDE_T}**: measured ({MDE_T} x the Newey-West "
-        f"standard error) and in theory ({MDE_T} / sqrt((n_eff - 1) x days / h)). The same for momentum, and "
-        "the daily difference blend minus momentum, for reading.",
+        f"effective number of independent names (n_eff, below), and the smallest IC detectable at "
+        f"**t = {MDE_T}**: measured ({MDE_T} x the Newey-West standard error) and in theory "
+        f"({MDE_T} / sqrt((n_eff - 1) x days / h)). The same for momentum, and the daily difference blend minus "
+        "momentum, for reading.",
+        f"- **n_eff.** From the names' daily close-to-close returns over the window (first entry day to last "
+        f"resolved day). A name with returns on less than **{N_EFF_MIN_COVERAGE:.0%}** of the window's dates, or "
+        f"with fewer than {N_EFF_MIN_RETURNS} returns, is left out first, so one short history does not cut the "
+        f"window; then only the dates every kept name has (at least {N_EFF_MIN_DATES}, or no n_eff), and a name "
+        "whose price never moves is left out. The common move is taken out: each date's mean return across the "
+        "names is subtracted from every name's return that date, because a move shared by every name does not "
+        "change their ranks. With C the correlation matrix of what is left (N names, T dates): "
+        "n_eff = N^2 / max(sum of C^2 - N(N - 1) / (T - 1), N), the participation ratio with the sampling noise "
+        "of T dates taken out; the uncorrected N^2 / sum of C^2 is shown as n_eff_raw, for reading.",
         f"- **Main test (proposed; the owner confirms at registration).** The {_label(MAIN_SCORE)}'s IC at "
         f"{MAIN_HORIZON} sessions, one test per universe. It enters the Benjamini-Hochberg family and the "
         "Deflated Sharpe Ratio. Every other number is for reading only.",
@@ -807,9 +885,9 @@ def _positive(value: Any) -> bool:
 __all__ = [
     "ALL_SCORES", "Bar", "COMPARATOR", "COUNTER_KEYS", "DIMENSIONS", "DailyIcs", "FEW_NAMES", "Forward", "HORIZONS",
     "IC_REGISTRATION", "IC_START", "IcLine", "MAIN_HORIZON", "MAIN_SCORE", "MDE_T", "MIN_NAMES", "NO_PRICE",
-    "NO_SPREAD", "NW_LAG", "N_EFF_MIN_DATES", "N_EFF_MIN_RETURNS", "OK", "PAIRED", "PENDING", "SCORES",
-    "SHADOW_START", "UNIVERSES", "UNIVERSE_START", "bars_from_fetcher", "card", "counters", "daily_ics", "due",
-    "effective_names", "forward_return", "in_window", "line_from", "mde_theory", "momentum_score",
+    "NO_SPREAD", "NW_LAG", "N_EFF_MIN_COVERAGE", "N_EFF_MIN_DATES", "N_EFF_MIN_RETURNS", "OK", "PAIRED", "PENDING",
+    "SCORES", "SHADOW_START", "UNIVERSES", "UNIVERSE_START", "bars_from_fetcher", "card", "counters", "daily_ics",
+    "due", "effective_names", "forward_return", "in_window", "line_from", "mde_theory", "momentum_score",
     "newey_west_se", "paired", "read_lines", "read_universe", "record", "settings", "summarise", "tickers_of",
     "universe_record",
 ]

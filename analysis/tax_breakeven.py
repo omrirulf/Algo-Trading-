@@ -25,7 +25,9 @@ Both books start with one dollar and pay Israeli tax by ``analysis.israel_tax``
 ``extra`` is found by bisection: the smallest extra pre-tax return a year at
 which the active fund's after-tax wealth after ``years`` equals VT's. It
 leaves out what else an active fund pays (trading costs, the spread), so it
-is the tax drag alone.
+is the tax drag alone. The search looks only inside ``SEARCH_RANGE``; when
+the answer is outside it (a very large ``growth``, say), it says so and
+stops instead of giving the edge of the range as the answer.
 """
 
 from __future__ import annotations
@@ -34,7 +36,7 @@ import argparse
 import sys
 from datetime import date
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import Final, Optional, Sequence
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -47,6 +49,9 @@ DIVIDEND_YIELD = 0.02
 #: The exchange rate is held still, so shekel and dollar gains are the same.
 _FX = 1.0
 _TICKER = "VT"
+#: Where the bisection looks for ``extra``, a fraction a year (-5 to +20
+#: points). An answer outside it raises ``ValueError``; it is never clipped.
+SEARCH_RANGE: Final[tuple[float, float]] = (-0.05, 0.20)
 
 
 def _day(year: int) -> date:
@@ -102,9 +107,20 @@ def active(extra: float, years: int = YEARS, growth: float = GROWTH, dividend_yi
 
 def breakeven(years: int = YEARS, growth: float = GROWTH, dividend_yield: float = DIVIDEND_YIELD,
               rules: TaxRules = DEFAULT_RULES, tolerance: float = 1e-9) -> dict:
-    """The extra pre-tax return a year (a fraction: 0.008 is 0.8 points) at which the two tie."""
+    """The extra pre-tax return a year (a fraction: 0.008 is 0.8 points) at which the two tie.
+
+    Raises ``ValueError`` when the tie is not inside ``SEARCH_RANGE``.
+    """
     target = held(years, growth, dividend_yield, rules)
-    low, high = -0.05, 0.20
+    low, high = SEARCH_RANGE
+    at_low = active(low, years, growth, dividend_yield, rules)
+    at_high = active(high, years, growth, dividend_yield, rules)
+    if not at_low <= target <= at_high:
+        side = f"more than {high * 100:+.0f}" if target > at_high else f"less than {low * 100:+.0f}"
+        raise ValueError(
+            f"no break-even inside the search range ({low * 100:+.0f} to {high * 100:+.0f} points a year): "
+            f"the answer is {side} points a year (growth {growth:.1%}, dividend yield {dividend_yield:.1%}, "
+            f"{years} years; VT after tax {target:.3f}, the active fund {at_low:.3f} to {at_high:.3f})")
     while high - low > tolerance:
         middle = (low + high) / 2.0
         if active(middle, years, growth, dividend_yield, rules) < target:
@@ -152,7 +168,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     if args.years < 1:
         print("--years must be at least 1", file=sys.stderr)
         return 2
-    rows = table(years=args.years) if args.table else [breakeven(args.years, args.growth, args.dividend_yield)]
+    try:
+        rows = table(years=args.years) if args.table else [breakeven(args.years, args.growth, args.dividend_yield)]
+    except ValueError as error:
+        print(error, file=sys.stderr)
+        return 2
     print(render(rows))
     return 0
 
@@ -161,4 +181,4 @@ if __name__ == "__main__":
     raise SystemExit(main())
 
 
-__all__ = ["DIVIDEND_YIELD", "GROWTH", "YEARS", "active", "breakeven", "held", "render", "table"]
+__all__ = ["DIVIDEND_YIELD", "GROWTH", "SEARCH_RANGE", "YEARS", "active", "breakeven", "held", "render", "table"]

@@ -15,25 +15,39 @@ with them:
   carry-forward from earlier years against a net gain only, the switch
   ``offset_losses_vs_dividends`` setting a net loss against the year's
   dividends, and what carries forward. Never below 0.
-* ``surtax`` -- rule b's surtax, off by default.
+* ``surtax`` -- rule b's surtax, off by default. When it is on, a book is
+  charged only the surtax its own capital income adds to the salary's
+  (``surtax(salary, capital) - surtax(salary, 0)``): the salary's own surtax
+  is not the investments' doing.
 * ``TaxBook`` -- one account's lots, FIFO per ticker (rule c): buys, sales,
   dividends (a reinvested one is a new lot), and a short's dividend charge.
   ``TaxBook.state`` is the book's tax on a day: what is due on everything
   realised so far, and what would be due if every open lot were closed at
-  that day's close ("if sold today").
+  that day's close ("if sold today"). Each is Israel's tax plus the US tax
+  withheld from every dividend so far. The US tax withheld is a dollar
+  amount, fixed on the day it was taken: in dollars it never moves with the
+  exchange rate, in shekels it is turned at the day's own rate. The shekel
+  amount on the dividend's day is kept only for rule d's credit.
 * ``after_tax_series`` -- the walk the after-tax gate reads (pre-registration
   section 5c): for each day, the equity minus the tax due if everything were
-  sold at that day's close, in dollars and in shekels.
+  sold at that day's close, in dollars and in shekels. It refuses days that
+  are not sorted and unique, and an event on a day it is not given.
 
-Two conventions this module adds, both written into the pre-registration's
+Five conventions the rules leave open, written into the pre-registration's
 section 5c and put to the accountant (``docs/research/cpa-questions.md``):
 
-* **A short** is a lot opened by a sale and closed by a purchase. Rule a is
-  applied with the purchase as the cost (at the purchase day's rate) and the
-  sale as the proceeds (at the sale day's rate). A dividend a short pays is
-  an allowable loss on the day it is charged.
-* **Tax for a finished year** is converted to dollars at that year's last
-  rate in the walk; the current year's at the day's own rate.
+1. A short sale is a lot opened by a sale and closed by a purchase: rule a
+   with the purchase as the cost (at its day's rate) and the sale as the
+   proceeds (at its day's rate).
+2. A dividend a short position pays is an allowable loss on the day it is
+   charged.
+3. The funds credit dividends gross, so the after-tax equity also takes off
+   the US tax withheld (a dollar amount).
+4. "If sold today" sells at the close with no selling cost, as the equity it
+   is taken from is marked.
+5. Tax for a finished year is turned into dollars at that year's last rate
+   in the walk, the current year's at the day's own rate. (This is Israel's
+   tax; the US tax withheld is already in dollars, convention 3.)
 
 Pure arithmetic: no prices, no files, no clock, no network.
 """
@@ -163,8 +177,10 @@ def dividend_tax(gross_ils: float, rules: TaxRules = DEFAULT_RULES, offset_ils: 
 def surtax(salary_ils: float, capital_income_ils: float, rules: TaxRules = DEFAULT_RULES) -> float:
     """3% of taxable income above the line, plus 2% of capital income above the same line.
 
+    The whole surtax of a person with this salary and this capital income.
     Computed whether or not ``rules.surtax_enabled``; ``year_tax`` asks for it
-    only when it is.
+    only when it is, and then charges a book only the part its capital income
+    adds: ``surtax(salary, capital) - surtax(salary, 0)``.
     """
     line = rules.surtax_threshold
     return (rules.surtax_rate * max(0.0, salary_ils + capital_income_ils - line)
@@ -200,7 +216,12 @@ class YearTax:
 
     @property
     def total_tax(self) -> float:
-        """Every tax on the year's income, both countries: Israel's plus the US tax withheld."""
+        """Every tax on the year's income, both countries: Israel's plus the US tax withheld.
+
+        The US part here is in shekels at each dividend's own day's rate.
+        ``TaxBook.state`` does not use this sum: it adds the US tax withheld
+        as the dollar amount it is (``Received.us_withheld_usd``).
+        """
         return self.israeli_tax + self.us_withheld
 
 
@@ -216,6 +237,10 @@ def year_tax(year: int, gains: Iterable[float], losses: Iterable[float],
     set against the year's dividends when ``rules.offset_losses_vs_dividends``,
     and the rest is added to the carry-forward, which is used against future
     capital gains only, nominal, never expiring.
+
+    With ``rules.surtax_enabled`` the year is charged only the surtax its own
+    capital income causes: ``surtax(salary, capital) - surtax(salary, 0)``.
+    The withheld amounts are used only for rule d's credit.
     """
     gains = [float(g) for g in gains]
     losses = [float(x) for x in losses]
@@ -237,7 +262,10 @@ def year_tax(year: int, gains: Iterable[float], losses: Iterable[float],
         offset = min(left, divs) if rules.offset_losses_vs_dividends else 0.0
         carry_out = carry_in - (left - offset)
     div = dividend_tax(divs, rules, offset_ils=offset, us_withheld_ils=withheld)
-    extra = surtax(rules.salary_ils, taxable + max(0.0, divs - offset), rules) if rules.surtax_enabled else 0.0
+    extra = 0.0
+    if rules.surtax_enabled:
+        capital = taxable + max(0.0, divs - offset)
+        extra = surtax(rules.salary_ils, capital, rules) - surtax(rules.salary_ils, 0.0, rules)
     return YearTax(
         year=year, gains=total_gains, losses=total_losses, net_capital=net, carry_in=carry_in,
         carry_used=carry_used, dividend_offset=offset, taxable_capital=taxable,
@@ -288,7 +316,11 @@ class Received:
     gross_usd: float
     fx: float
     gross_ils: float
+    #: The US tax withheld at the dividend day's rate: only for rule d's credit (``year_tax``).
     us_withheld_ils: float
+    #: The US tax withheld, in dollars (``gross_usd`` x the withholding rate):
+    #: a fixed dollar amount, the one the after-tax equity takes off.
+    us_withheld_usd: float
 
 
 @dataclass(frozen=True)
@@ -298,15 +330,21 @@ class TaxState:
     ``realised`` is "tax paid so far": every finished year, plus this year's
     realised gains, losses and dividends as if the year ended today with
     nothing sold. ``if_sold`` adds every open lot closed at the day's close
-    (``closes``) at the day's rate. Both include the US tax withheld on
-    dividends (``YearTax.total_tax``).
+    (``closes``) at the day's rate. Each is two parts: Israel's tax
+    (``YearTax.israeli_tax``), and the US tax withheld from every dividend so
+    far, which is a dollar amount (``us_withheld_usd``).
+
+    In dollars: Israel's tax for a finished year at that year's last rate,
+    this year's at ``fx``, plus the US tax withheld as it is. In shekels:
+    Israel's tax as it is, plus the US tax withheld at ``fx`` (today's rate).
     """
 
     day: date
     fx: float
     realised_ils: float
     if_sold_ils: float
-    #: The same two in dollars: finished years at their own last rate, this year at ``fx``.
+    #: The same two in dollars: Israel's tax for finished years at their own
+    #: last rate and this year's at ``fx``, plus the US tax withheld in dollars.
     realised_usd: float
     if_sold_usd: float
     #: The loss carried forward after the realised-only reckoning (<= 0).
@@ -315,6 +353,9 @@ class TaxState:
     year: Optional[YearTax] = None
     #: Open lots no close was given for: valued at what they cost, so they add no gain.
     unpriced: tuple[str, ...] = ()
+    #: The US tax withheld from every dividend up to this year, in dollars
+    #: (in both ``realised`` and ``if_sold``).
+    us_withheld_usd: float = 0.0
 
 
 class TaxBook:
@@ -382,8 +423,8 @@ class TaxBook:
         if gross_usd < 0:
             raise ValueError("a dividend received is >= 0; a short's charge is ``charge``")
         gross_ils = gross_usd * fx
-        self.received.append(Received(day, ticker, gross_usd, fx, gross_ils,
-                                      gross_ils * self.rules.us_withholding))
+        withheld_usd = gross_usd * self.rules.us_withholding
+        self.received.append(Received(day, ticker, gross_usd, fx, gross_ils, withheld_usd * fx, withheld_usd))
         if reinvest is not None:
             qty, price = reinvest
             self.buy(day, ticker, qty, price, fx)
@@ -454,12 +495,19 @@ class TaxBook:
         return gains, sorted(set(unpriced))
 
     def state(self, day: date, closes: Mapping[str, float], fx: float) -> TaxState:
-        """The tax on ``day``: everything realised so far, and "if sold today" at ``closes``."""
+        """The tax on ``day``: everything realised so far, and "if sold today" at ``closes``.
+
+        Israel's tax (``YearTax.israeli_tax``): finished years in dollars at
+        each year's last rate, this year at ``fx``. Plus the US tax withheld
+        from every dividend of the finished years and this one: a dollar
+        amount as it is, and in shekels at ``fx``.
+        """
         self._seen(day, fx)
         finished = self.finished_years(day.year)
         carry = finished[-1].carry_out if finished else 0.0
-        done_ils = math.fsum(y.total_tax for y in finished)
-        done_usd = math.fsum(y.total_tax / self.year_end_fx[y.year] for y in finished)
+        done_ils = math.fsum(y.israeli_tax for y in finished)
+        done_usd = math.fsum(y.israeli_tax / self.year_end_fx[y.year] for y in finished)
+        withheld_usd = math.fsum(d.us_withheld_usd for d in self.received if d.day.year <= day.year)
         gains, losses, divs = self._year_parts(day.year)
         now = year_tax(day.year, gains, losses, divs, carry, self.rules)
         sold, unpriced = self.liquidation(day, closes, fx)
@@ -468,9 +516,11 @@ class TaxBook:
                            divs, carry, self.rules)
         return TaxState(
             day=day, fx=fx,
-            realised_ils=done_ils + now.total_tax, if_sold_ils=done_ils + if_sold.total_tax,
-            realised_usd=done_usd + now.total_tax / fx, if_sold_usd=done_usd + if_sold.total_tax / fx,
-            carry_forward_ils=now.carry_out, year=if_sold, unpriced=tuple(unpriced),
+            realised_ils=done_ils + now.israeli_tax + withheld_usd * fx,
+            if_sold_ils=done_ils + if_sold.israeli_tax + withheld_usd * fx,
+            realised_usd=done_usd + now.israeli_tax / fx + withheld_usd,
+            if_sold_usd=done_usd + if_sold.israeli_tax / fx + withheld_usd,
+            carry_forward_ils=now.carry_out, year=if_sold, unpriced=tuple(unpriced), us_withheld_usd=withheld_usd,
         )
 
 
@@ -535,9 +585,26 @@ def after_tax_series(
     as the funds and the paper account report it, dividends credited gross.
     After-tax equity = equity - the tax due if every position were sold at
     the day's close (floored at 0: a year never has negative tax).
+
+    ``days`` must be sorted with no day twice (a day listed twice would apply
+    its events twice), and every day with an event, up to the last of
+    ``days``, must be in ``days`` (an event on another day would be lost, and
+    the book would be wrong from then on). Either raises ``ValueError``.
+    Events after the last day are outside the walk and change none of its
+    days, so they are left out: the paper account's fills of a day whose
+    close is not yet recorded are one example.
     """
     if len(days) != len(equity_usd):
         raise ValueError("one equity per day")
+    listed = list(days)
+    if listed != sorted(set(listed)):
+        raise ValueError("days must be sorted and unique")
+    known = set(listed)
+    stray = sorted(d for d, happened in events.items()
+                   if happened and d not in known and listed and d < listed[-1])
+    if stray:
+        shown = ", ".join(d.isoformat() for d in stray[:5]) + (" ..." if len(stray) > 5 else "")
+        raise ValueError(f"{len(stray)} day(s) with events are not in days: {shown}")
     book = TaxBook(rules)
     out = AfterTaxSeries(start_equity_usd=start_equity_usd,
                          start_fx=start_fx if start_fx is not None else (fx.get(days[0]) if days else None))

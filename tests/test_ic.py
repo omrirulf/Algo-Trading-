@@ -11,6 +11,7 @@ import inspect
 import json
 import math
 import random
+import statistics
 from datetime import date, datetime, time, timedelta, timezone
 
 import pytest
@@ -89,6 +90,16 @@ def test_the_registered_settings():
     assert ic.MAIN_SCORE in ic.SCORES and ic.MAIN_HORIZON in ic.HORIZONS
     assert ic.PAIRED == ("blend", "momentum")
     assert ic.COUNTER_KEYS == ("answered_lines", "lines_with_score", "line_days")
+    assert (ic.N_EFF_MIN_RETURNS, ic.N_EFF_MIN_DATES, ic.N_EFF_MIN_COVERAGE) == (20, 20, 0.9)
+
+
+def test_the_record_carries_every_n_eff_setting():
+    found = ic.settings()
+    assert found["n_eff_min_coverage"] == ic.N_EFF_MIN_COVERAGE == 0.9
+    assert (found["n_eff_min_returns"], found["n_eff_min_dates"]) == (20, 20)
+    for phrase in ("90%", "mean return across the names taken out", "N^2 / max(sum(C^2) - N(N - 1) / (T - 1), N)",
+                   "n_eff_raw = N^2 / sum(C^2)"):
+        assert phrase in found["n_eff"], phrase
 
 
 def test_the_shadow_start_is_the_universes_own():
@@ -101,8 +112,11 @@ def test_the_card_carries_the_registered_settings():
     for phrase in ("2026-09-28", "2027-01-01", "22 Dec 2026", "**t = 2.4**", "**10 names**", "h = 1 and 3",
                    "lag = horizon", "Price only", "proposed; the owner confirms at registration",
                    "blended score's IC at 3 sessions", "Benjamini-Hochberg", "Deflated Sharpe Ratio",
-                   "No IC value is written to any file, page or log", "Shadow only"):
+                   "No IC value is written to any file, page or log", "Shadow only",
+                   "(a signal about this ticker, not held)", "webhook unreachable", "**90%**",
+                   "The common move is taken out", "N^2 / max(sum of C^2 - N(N - 1) / (T - 1), N)", "n_eff_raw"):
         assert phrase in text, phrase
+    assert "no error" not in text, "an error written after the answer does not take a line out (the race's rule)"
 
 
 # --------------------------------------------------------------------------- #
@@ -138,15 +152,29 @@ def test_the_momentum_sign(arms, expected):
 
 @pytest.mark.parametrize("line", [
     payload(held=True, signal=False),
+    payload(held=True),
     payload(signal=False, error="invalid LLM output: conviction"),
     payload(error="answered for MSFT"),
-    payload(error="something went wrong after the answer"),
     payload(when="not a time"),
     {"ticker": "", "signal": None},
     ["not", "a", "line"],
 ])
 def test_held_failed_and_unreadable_lines_are_left_out(line):
     assert ic.line_from(line) is None
+
+
+@pytest.mark.parametrize("error", [
+    "webhook unreachable: x",
+    "engine unavailable: paper engine down",
+    "something went wrong after the answer",
+])
+def test_an_error_written_after_the_answer_keeps_the_line_as_in_the_race(error):
+    """The race counts a line with a signal about its own ticker, whatever went wrong after (``model_answered``)."""
+    reader = pytest.importorskip("analysis.reader")
+    line = ic.line_from(payload(error=error, blend=0.2))
+    assert line is not None and line.scores["blend"] == 0.2
+    entry = reader.entry_from(payload(error=error))
+    assert entry.model_answered and not entry.held
 
 
 def test_a_null_score_leaves_the_line_out_of_that_score_only():
@@ -390,22 +418,115 @@ def _walks(n_names: int, n_days: int, seed: int, shared: float = 0.0) -> dict:
     return {name: [(d, c, c) for d, c in zip(days, cs)] for name, cs in closes.items()}, days
 
 
+def _by_hand(bars: dict, names: list, dates: list) -> tuple[float, float]:
+    """(n_eff, n_eff_raw) recomputed here from the closes: the common move out, then the two formulas."""
+    np = pytest.importorskip("numpy")
+    rows = []
+    for name in names:
+        close = {d: c for d, _, c in bars[name]}
+        days = sorted(close)
+        previous = {d: close[p] for p, d in zip(days, days[1:])}
+        rows.append([close[d] / previous[d] - 1.0 for d in dates])
+    matrix = np.array(rows)
+    matrix = matrix - matrix.mean(axis=0, keepdims=True)
+    squares = float((np.corrcoef(matrix) ** 2).sum())
+    n, t = len(names), len(dates)
+    return n * n / max(squares - n * (n - 1) / (t - 1), n), n * n / squares
+
+
 def test_n_eff_of_independent_names_is_about_their_number():
     bars, days = _walks(10, 1000, seed=1)
     found = ic.effective_names(bars, bars, days[1], days[-1])
-    assert found["reason"] is None and found["dates"] == 1000 and len(found["names"]) == 10
-    assert 9.5 < found["n_eff"] <= 10.0
+    assert found["reason"] is None and found["dates"] == found["window_dates"] == 1000
+    assert len(found["names"]) == 10
+    # Taking out each day's mean move uses up one name: 10 independent names give about 9.
+    assert 8.5 < found["n_eff"] <= 10.0
+    assert found["n_eff_raw"] < found["n_eff"], "the uncorrected ratio reads low (sampling noise)"
     assert abs(found["mean_corr"]) < 0.05
+    assert (found["n_eff"], found["n_eff_raw"]) == pytest.approx(_by_hand(bars, found["names"], days[1:]),
+                                                                  rel=1e-9)
 
 
-def test_n_eff_of_names_that_move_as_one_is_about_1():
+def _one_factor(n_names: int, n_days: int, seed: int, market: float = 0.012, own: float = 0.008):
+    """Every name = one market move + its own noise; each bar opens at the last close, so a bar's
+    open-to-close return is its close-to-close return. Each name has one fixed blended score."""
+    rng = random.Random(seed)
+    days = [date(2027, 1, 1) + timedelta(days=i) for i in range(n_days + 1)]
+    names = [f"F{i:02d}" for i in range(n_names)]
+    close = {name: 100.0 for name in names}
+    bars = {name: [(days[0], 100.0, 100.0)] for name in names}
+    for d in days[1:]:
+        common = rng.gauss(0.0, market)
+        for name in names:
+            move = common + rng.gauss(0.0, own)
+            bars[name].append((d, close[name], close[name] * (1.0 + move)))
+            close[name] *= 1.0 + move
+    fixed = {name: rng.uniform(-1.0, 1.0) for name in names}
+    lines = [make_line(name, d, blend=fixed[name]) for d in days[:-1] for name in names]
+    return bars, lines, days
+
+
+def test_the_common_move_is_taken_out_so_a_one_factor_universe_gives_about_n():
+    """A move shared by every name does not change a day's ranks, so it must not shrink n_eff (review 1, item 2)."""
+    np = pytest.importorskip("numpy")
+    n = 40
+    bars, lines, days = _one_factor(n, 120, seed=1)
+    found = ic.universe_record(lines, bars, days[-1])
+    assert found["mean_corr"] > 0.5, "the names move together strongly"
+    assert 0.9 * n < found["n_eff"] <= n and found["n_eff_dates"] == 120
+    assert found["n_eff_raw"] < found["n_eff"]
+    assert (found["n_eff"], found["n_eff_raw"]) == pytest.approx(_by_hand(bars, found["names"], days[1:]), rel=1e-9)
+
+    # The spread of the daily IC is what n_eff says it is: about 1 / sqrt(n_eff - 1).
+    daily = ic.daily_ics(lines, bars, 1, days[-1]).ics["blend"]
+    assert len(daily) == 120
+    spread = statistics.stdev(daily.values())
+    assert 0.8 < spread * math.sqrt(found["n_eff"] - 1.0) < 1.25
+
+    # Left in, the common move would make 40 names look like fewer than 3: what the review found.
+    raw = np.array([[c / p - 1.0 for (_, _, p), (_, _, c) in zip(bars[name], bars[name][1:])]
+                    for name in found["names"]])
+    assert n * n / float((np.corrcoef(raw) ** 2).sum()) < 3.0
+    one = found["horizons"]["1"]["blend"]
+    assert one["mde_theory"] == pytest.approx(ic.mde_theory(found["n_eff"], 120, 1))
+    assert 0.5 < one["mde_theory"] / one["mde_measured"] < 2.0, "the theory now agrees with the measured spread"
+
+
+def test_names_that_move_as_one_leave_nothing_to_rank():
     bars, days = _walks(10, 200, seed=2, shared=1.0)
     found = ic.effective_names(bars, bars, days[1], days[-1])
-    assert found["n_eff"] == pytest.approx(1.0) and found["mean_corr"] == pytest.approx(1.0)
+    assert found["n_eff"] is None and found["n_eff_raw"] is None and "move as one" in found["reason"]
+    assert found["mean_corr"] == pytest.approx(1.0)
     one, _ = _walks(5, 400, seed=3, shared=1.0)
     other, _ = _walks(5, 400, seed=4, shared=1.0)
     two = {**{f"A{k}": v for k, v in one.items()}, **{f"B{k}": v for k, v in other.items()}}
-    assert ic.effective_names(two, two, days[1], days[-1])["n_eff"] == pytest.approx(2.0, abs=0.05)
+    # Two blocks that each move as one: once the common move is out, one contrast is left (A against B).
+    found = ic.effective_names(two, two, days[1], days[-1])
+    assert found["n_eff"] == pytest.approx(1.0, abs=0.01) and found["n_eff_raw"] == pytest.approx(1.0)
+    assert ic.mde_theory(found["n_eff"], 60, 3) > 1.0, "no IC could be detected"
+
+
+def test_a_short_history_is_dropped_by_coverage_and_does_not_cut_the_window(monkeypatch):
+    bars, days = _walks(30, 120, seed=7)
+    bars["NEW"] = _walks(1, 120, seed=8)[0]["W00"][-26:]   # 25 returns of the window's 120: a new listing
+    found = ic.effective_names(bars, bars, days[1], days[-1])
+    assert found["reason"] is None and "NEW" not in found["names"] and len(found["names"]) == 30
+    assert found["dates"] == found["window_dates"] == 120
+    assert 0.85 * 30 < found["n_eff"] <= 30
+    # Without the coverage rule the new name has enough returns (25 >= 20) and cuts every name to 25 dates.
+    monkeypatch.setattr(ic, "N_EFF_MIN_COVERAGE", 0.0)
+    cut = ic.effective_names(bars, bars, days[1], days[-1])
+    assert "NEW" in cut["names"] and cut["dates"] == 25 and cut["window_dates"] == 120
+
+
+def test_coverage_is_counted_on_the_windows_dates_and_the_boundary_is_kept():
+    bars, days = _walks(3, 30, seed=12)
+    # Three bars missing: 27 returns of the 30 dates is exactly 90%, kept; four missing is 26 of 30, dropped.
+    bars["EDGE"] = [b for i, b in enumerate(_walks(1, 30, seed=13)[0]["W00"]) if i not in (5, 10, 15)]
+    bars["SHORT"] = [b for i, b in enumerate(_walks(1, 30, seed=14)[0]["W00"]) if i not in (5, 10, 15, 20)]
+    found = ic.effective_names(bars, bars, days[1], days[-1])
+    assert found["window_dates"] == 30
+    assert "EDGE" in found["names"] and "SHORT" not in found["names"] and found["dates"] == 27
 
 
 def test_n_eff_drops_thin_names_and_says_why_it_cannot_be_measured():
@@ -416,12 +537,52 @@ def test_n_eff_drops_thin_names_and_says_why_it_cannot_be_measured():
 
     halves = {"EARLY": bars["W00"][:31], "LATE": [bars["W01"][0]] + bars["W01"][31:]}
     found = ic.effective_names(halves, halves, days[1], days[-1])
-    assert found["n_eff"] is None and "date" in found["reason"]
+    assert found["n_eff"] is None and "90% of the 60 dates" in found["reason"] and "needs 2" in found["reason"]
+
+    # Each name covers 21 of the 23 dates (91%, kept), but each misses different ones: 17 shared dates.
+    short, short_days = _walks(3, 23, seed=10)
+    gaps = {"W00": (3, 4), "W01": (8, 9), "W02": (13, 14)}
+    holes = {name: [b for i, b in enumerate(rows) if i not in gaps[name]] for name, rows in short.items()}
+    found = ic.effective_names(holes, holes, short_days[1], short_days[-1])
+    assert found["n_eff"] is None and found["dates"] == 17 and found["window_dates"] == 23
+    assert "only 17 date(s)" in found["reason"] and "needs 20" in found["reason"]
 
     found = ic.effective_names(bars, bars, None, None)
     assert found["n_eff"] is None and found["reason"] == "no resolved return yet"
     found = ic.effective_names(bars, ["W00"], days[1], days[-1])
     assert found["n_eff"] is None and "needs 2" in found["reason"]
+    found = ic.effective_names({}, ["W00", "W01"], days[1], days[-1])
+    assert found["n_eff"] is None and found["window_dates"] == 0 and "needs 2" in found["reason"]
+
+
+def test_names_whose_price_never_moves_are_left_out():
+    bars, days = _walks(3, 60, seed=15)
+    for name in ("FLAT1", "FLAT2"):
+        bars[name] = [(d, 50.0, 50.0) for d in days]
+    found = ic.effective_names(bars, bars, days[1], days[-1])
+    assert found["reason"] is None and found["names"] == ["W00", "W01", "W02"]
+    assert (found["n_eff"], found["n_eff_raw"]) == pytest.approx(_by_hand(bars, found["names"], days[1:]), rel=1e-9)
+
+    lonely = {"W00": bars["W00"], "FLAT1": bars["FLAT1"], "FLAT2": bars["FLAT2"]}
+    found = ic.effective_names(lonely, lonely, days[1], days[-1])
+    assert found["n_eff"] is None and found["reason"] == "fewer than 2 names whose price moves in the window"
+    assert found["dates"] == 60 and found["names"] == []
+
+
+def test_paired_is_the_daily_difference_on_shared_days_by_hand():
+    d1, d2, d3, d4, d5 = SESSIONS[:5]
+    first = {d1: 0.5, d2: 0.3, d3: 0.4, d4: 0.9}
+    second = {d1: 0.2, d2: 0.2, d3: 0.2, d5: -0.3}
+    # Shared days d1..d3; differences 0.3, 0.1, 0.2: mean 0.2, deviations 0.1, -0.1, 0.
+    # Variance 0.02/3; autocovariance at lag 1 -0.01/3, at lag 2 0.
+    # Lag 1 (weight 1/2): variance 0.01/3, se = sqrt(0.01/9) = 0.1/3, t = 6.
+    # Lag 3 cut to 2 (weights 3/4, 1/2): variance 0.005/3, se = 0.1/(3 sqrt 2), t = 6 sqrt 2.
+    one = ic.paired(first, second, 1)
+    assert one["days"] == 3 and one["mean"] == pytest.approx(0.2) and one["t"] == pytest.approx(6.0)
+    three = ic.paired(first, second, 3)
+    assert three["days"] == 3 and three["t"] == pytest.approx(6.0 * math.sqrt(2.0))
+    assert ic.paired(first, {d4: 0.1}, 1) == {"days": 1, "mean": pytest.approx(0.8), "t": None}
+    assert ic.paired(first, {d5: 0.1}, 1) == {"days": 0, "mean": None, "t": None}
 
 
 # --------------------------------------------------------------------------- #
@@ -503,6 +664,8 @@ def test_the_record_has_the_registered_shape():
     assert three["analyst"]["days"] == 28, "11 names carry the analyst score: still enough"
     assert production["n_eff"] is not None and production["n_eff_reason"] is None
     assert production["names"] == ic.tickers_of(lines) and production["n_eff_dates"] == 30
+    assert production["n_eff_window_dates"] == 30 and 0 < production["n_eff_raw"] <= production["n_eff"] <= 12
+    assert found["settings"]["n_eff_min_coverage"] == ic.N_EFF_MIN_COVERAGE
     assert three["blend"]["mde_theory"] == pytest.approx(ic.mde_theory(production["n_eff"], 28, 3))
     main = production["main"]
     assert {"t", "stats", "mean_daily_diff", "days"} <= set(main)
