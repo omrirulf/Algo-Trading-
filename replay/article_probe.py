@@ -877,6 +877,8 @@ def _note(page: Page) -> str:
         notes.append("short: paywall or teaser?")
     if page.final_url and page.final_url != page.url:
         notes.append(f"via Google to {host_of(page.final_url)}")
+    if page.form == "json":
+        notes.append("raw form refused; read in json form")
     return "; ".join(notes)
 
 
@@ -1030,7 +1032,7 @@ def as_json(probe: Probe) -> dict:
         "pages": [
             {
                 "index": p.index, "source": p.source, "url": p.url, "kind": p.kind,
-                "final_url": p.final_url, "status": p.status, "page_bytes": p.page_bytes,
+                "final_url": p.final_url, "status": p.status, "form": p.form, "page_bytes": p.page_bytes,
                 "requests": p.requests, "seconds": round(p.seconds, 1), "error": p.error,
                 "title": p.title, "date": p.date, "paywall_suspected": p.paywall,
                 "names_the_company": p.mentions,

@@ -88,6 +88,9 @@ class FakeResponse:
         self.text = text
         self.headers = headers or {}
 
+    def json(self):
+        return json.loads(self.text)
+
 
 class FakeUnlocker:
     """The Unlocker's request API: serves ``pages`` by the URL in the body."""
@@ -172,6 +175,15 @@ def test_a_cycle_already_archived_is_not_fetched_again(tmp_path):
     assert "already archived" in said[-1]
 
 
+def test_a_fetch_only_run_reads_an_archived_cycle_again(tmp_path):
+    """It stores nothing, and it is the pull-request run's one real test of the fetch."""
+    (tmp_path / "article_archive.jsonl").write_text(
+        json.dumps({"cycle": "222", "ok": True, "object": "model-io/articles/x.jsonl.xz"}) + "\n")
+    archive = FakeArchive()
+    (line_, code), http, _ = archive_run(tmp_path, archive=archive, no_upload=True)
+    assert code == 0 and line_["cycle"] == "222" and http.posts and not archive.uploads
+
+
 def test_a_failed_archive_is_not_counted_as_done(tmp_path):
     (tmp_path / "article_archive.jsonl").write_text(json.dumps({"cycle": "222", "ok": False}) + "\n")
     (line_, code), http, _ = archive_run(tmp_path)
@@ -215,6 +227,7 @@ def test_the_text_goes_to_the_private_bucket_and_only_counts_come_out(tmp_path):
     assert records[0]["paragraphs"] == NOVO_TEXT.splitlines()
     assert records[1]["final_url"] == PUBLISHER and records[1]["paragraphs"] == [BENZINGA_TEXT]
     assert all("html" not in r for r in records)
+    assert all(r["form"] == "raw" for r in records) and line_["read_in_json_form"] == 0
 
     # The index line carries counts: no text, no headline, no link.
     printed = json.dumps(line_)
@@ -256,6 +269,24 @@ def test_no_archive_stops_before_any_page_is_paid_for(tmp_path):
     line_, code = sa.run(args_for(two_cycles(tmp_path), tmp_path), http=http, archive=None, token="tok",
                          zone="z", extract=plain_text, say=lambda _: None)
     assert code == 1 and "SUPABASE_URL" in line_["error"] and not http.posts
+
+
+def test_a_page_the_raw_form_cannot_read_is_read_in_the_json_form(tmp_path):
+    """The Yahoo case of 1 Oct 2026: the archive gets the story, and the index says how."""
+    class JsonUnlocker(FakeUnlocker):
+        def post(self, url, body, headers):
+            if body.get("format") == "json" and body["url"] == YAHOO:
+                self.posts.append((url, body, headers))
+                return FakeResponse(200, json.dumps({"status_code": 200, "headers": {}, "body": NOVO_TEXT}))
+            return super().post(url, body, headers)
+
+    http = JsonUnlocker({news.absolute_url(GOOGLE_STUB): (200, GOOGLE_NOTICE), PUBLISHER: (200, BENZINGA_TEXT)})
+    archive = FakeArchive()
+    line_, code = sa.run(args_for(two_cycles(tmp_path), tmp_path), http=http, archive=archive, token="tok",
+                         zone="z", extract=plain_text, say=lambda _: None, fetch_kwargs={"workers": 1})
+    assert code == 0 and line_["with_text"] == 2 and line_["read_in_json_form"] == 1 and line_["no_text"] == {}
+    records = [json.loads(r) for r in lzma.decompress(archive.uploads[0][2]).decode("utf-8").splitlines()]
+    assert [(r["index"], r["form"]) for r in records] == [(0, "json"), (3, "raw")]
 
 
 def test_a_page_with_no_text_is_counted_by_why(tmp_path):

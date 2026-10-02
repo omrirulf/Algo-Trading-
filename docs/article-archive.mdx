@@ -43,8 +43,9 @@ is started after 25 minutes.
 
 The first real run, on the 29 Sep cycle, took under two minutes: 98 links
 from 16 companies, 82 with article text (43,635 words kept), 15 refused with
-HTTP 502 (Yahoo Finance) and 1 page with no article on it. The file was
-85 KB, which is about 22 MB a year.
+HTTP 502 (Yahoo Finance; read since 1 Oct through the Unlocker's `json`
+form, below) and 1 page with no article on it. The file was 85 KB, which is
+about 22 MB a year.
 
 ## Where it goes: private, never the repository
 
@@ -89,10 +90,30 @@ One line per article in the object:
 - **The pages are fetched an hour or two after the cycle read the
   headlines.** Each line says when (`fetched_at`). A story edited in between
   is saved as it was when fetched.
-- **Some sites cannot be read.** Yahoo Finance answered HTTP 502 to every
-  article the probe tried on 29 Sep. Those results are counted by the reason they have no
-  text. Scraper Studio was tested for them and left out until the December
-  checkpoint (see [Article probe](/article-probe)).
+- **Yahoo Finance, and the two forms of the Unlocker's API.** Every Yahoo
+  Finance `/…/articles/` story the probe and the archive tried on 29 Sep was
+  refused with HTTP 502. The owner could open them all, and asked for a
+  double check. `replay/unlocker_check.py` (the **unlocker check**
+  workflow) asks for one page every way Bright Data's own tools ask, plus a
+  direct fetch from the runner as a control. The answer: the page is
+  reachable (the direct fetch and the Unlocker's `json` form both got it),
+  but the Unlocker's `raw` form, which the news fetch and the archive send,
+  answers with a bare "502 Bad Gateway" that came from Bright Data's own
+  gateway (a 122-byte nginx page, none of its error headers), not from
+  Yahoo. All 9 `/…/articles/` pages of the 1 Oct cycle failed that way.
+  Yahoo's responses carry a very large header block, 29 to 35 KB, of which
+  the `Link` header alone is 19 to 24 KB. The `raw` form relays those
+  headers to the caller; the `json` form carries them inside the body. On
+  2 Oct the `raw` form failed at 32.9 KB and 35.3 KB and worked at 29.4 KB
+  (Yahoo's front page), and the `json` form worked at 34.3 KB. That fits a
+  limit near 32 KB at the gateway, but Bright Data has not confirmed it.
+  It is not the address form: the same story under `/news/` read in the
+  `raw` form on 1 Oct and failed on 2 Oct (its headers that day: 32.9 KB).
+  So a 5xx with no reason and no page is asked once more in the `json`
+  form; the index counts those (`read_in_json_form`), and each line says
+  which form read it (`form`). Scraper Studio also read little of Yahoo
+  (its batch run failed on both pages it was given, its realtime run read
+  one of two); whether that has the same cause is not known.
 - **Each cycle is archived once.** A cycle with a stored object in the index
   is skipped. The file is never overwritten, so a run that repeats one
   stores nothing new. You can archive a named cycle again by hand with the

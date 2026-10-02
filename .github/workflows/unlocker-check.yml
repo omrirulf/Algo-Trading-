@@ -1,0 +1,64 @@
+name: unlocker check
+
+# Why can the Web Unlocker not read this page? One URL, asked every way
+# Bright Data's own tools ask it (raw, raw as markdown, json, from a US
+# exit, the same story under Yahoo's /news/ path, the site's front page),
+# plus a direct fetch from the runner as a control. The status, every
+# response header and the first words of each answer go to the run summary.
+# See replay/unlocker_check.py.
+#
+# It costs six Unlocker requests. It never trades, asks no model and holds
+# no broker key.
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "The page to ask for"
+        default: "https://finance.yahoo.com/markets/stocks/articles/asml-asml-increases-despite-market-205005742.html"
+  # workflow_dispatch does not exist until this file is on main, so -- like
+  # article-probe.yml -- it also runs on its own pull request, and only when
+  # it changes.
+  pull_request:
+    paths:
+      - replay/unlocker_check.py
+      - .github/workflows/unlocker-check.yml
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    # A pull request from a fork gets no secrets, so there is nothing to ask with.
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    # Seven requests, one after another, at 60 seconds each at the worst.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Ask for the page every way
+        # The Bright Data token and zone the news fetch uses, and nothing
+        # else. The input reaches the script as a variable, never as shell text.
+        env:
+          BRIGHTDATA_API_TOKEN: ${{ secrets.BRIGHTDATA_API_TOKEN }}
+          BRIGHTDATA_SERP_ZONE: ${{ vars.BRIGHTDATA_SERP_ZONE }}
+          URL: ${{ inputs.url }}
+        run: |
+          args=()
+          [ -n "$URL" ] && args+=(--url "$URL")
+          status=0
+          python replay/unlocker_check.py "${args[@]}" > "$RUNNER_TEMP/check.txt" || status=$?
+          cat "$RUNNER_TEMP/check.txt"
+          {
+            echo '## Unlocker check'
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/check.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $status
