@@ -34,12 +34,14 @@ repository small (250 names is three times the production journal), the
 line's ``context`` keeps the structured sections and the gaps but not the
 news text: ``headline_count`` says how many headlines the model saw.
 
-The cost cap. At most $1 of model cost per UTC day
-(``DAILY_COST_CAP_USD``). The running total starts from the lines already
-written today and adds each call's measured ``usage.cost_usd``. Before each
-new call the total is checked; at the cap no new call starts and the run
-ends with ``cap_reached`` (exit code 3, so the workflow can alert the
-owner's phone). Calls run four at a time, so the check-and-reserve is done
+The cost cap. At most ``DAILY_COST_CAP_USD`` ($1.50) per UTC day for the
+model and the Bright Data news searches together (the owner's instruction of
+3 Oct 2026). The running total starts from the lines already written today
+and adds each call's measured ``usage.cost_usd`` and each news request at
+``NEWS_USD_PER_REQUEST`` (counted by ``orchestrator.news.requests_sent`` and
+written on the line as ``news_requests``). Before each name and each new call
+the total is checked; at the cap no new name starts and the run ends with
+``cap_reached`` (exit code 3, so the workflow can alert the owner's phone). Calls run four at a time, so the check-and-reserve is done
 under a lock, and calls already in flight may finish slightly above the cap:
 the summary reports the real total. An answer with no known price is charged
 at the estimate, and so is a call that failed with no usage (it is billed for
@@ -58,6 +60,7 @@ which one stops it.
 from __future__ import annotations
 
 import argparse
+import functools
 import json
 import logging
 import sys
@@ -79,7 +82,7 @@ from config import journal_files
 from config import settings as cfg
 from config import shadow_universe as su
 from config.market_calendar import is_trading_day
-from orchestrator import blend, heartbeat, journal, llm
+from orchestrator import blend, heartbeat, journal, llm, news
 from orchestrator.context import TickerContext
 from orchestrator.llm import Completion, LLMError
 from orchestrator.pricing import Usage
@@ -102,7 +105,9 @@ WORKERS: Final[int] = cfg.FULL_MODEL_MAX_CONCURRENCY
 
 #: No new name is started after this many seconds, so a slow day still ends
 #: inside the workflow's clock with its lines committed. 251 names, four at a
-#: time, at about two and a half minutes a name, take about 160 minutes.
+#: time, take about 190 to 205 minutes on a typical day and 222 on the slowest
+#: day measured (production's cycles of 23 Sep to 2 Oct 2026: 196 and 212
+#: seconds a name per worker).
 RUN_BUDGET_SECONDS: Final[float] = 240 * 60
 
 #: No new name is started at or after this UTC time, and a run that starts
@@ -119,7 +124,13 @@ NO_NEW_NAME_AFTER_UTC: Final[clock_time] = clock_time(23, 15)
 #: What one name is expected to cost: the day's estimate shared over the
 #: list. Held in reserve for each call in flight, and charged for an answer
 #: whose price is unknown.
-ESTIMATED_COST_PER_NAME_USD: Final[float] = su.ESTIMATED_DAILY_COST_USD / len(su.TICKERS)
+ESTIMATED_COST_PER_NAME_USD: Final[float] = su.ESTIMATED_DAILY_MODEL_COST_USD / len(su.TICKERS)
+
+#: What one Bright Data news request is charged to the cap (``config.shadow_universe``).
+NEWS_USD_PER_REQUEST: Final[float] = su.NEWS_USD_PER_REQUEST
+
+#: What one name's news is expected to cost: the day's news estimate shared over the list. For the summary only.
+ESTIMATED_NEWS_PER_NAME_USD: Final[float] = su.ESTIMATED_DAILY_NEWS_COST_USD / len(su.TICKERS)
 
 #: The context sections kept on each line: the structured ones the scores
 #: are read from (and that ``analysis.reader`` checks to tell a null score
@@ -259,6 +270,13 @@ def _line_day(payload: Mapping[str, Any]) -> Optional[date]:
         return None
 
 
+def news_charged_usd(requests: Any) -> float:
+    """What a line's news searches count against the cap: ``news_requests`` at ``NEWS_USD_PER_REQUEST``."""
+    if isinstance(requests, bool) or not isinstance(requests, int) or requests < 0:
+        return 0.0
+    return requests * NEWS_USD_PER_REQUEST
+
+
 def _was_asked(payload: Mapping[str, Any]) -> bool:
     """Whether a line's name reached the model: every line but a context-stage failure."""
     return payload.get("stage") != CONTEXT_FAILED
@@ -279,6 +297,7 @@ def day_lines(directory: Path | str, day: date) -> DayLines:
         if not isinstance(payload, dict) or _line_day(payload) != day:
             continue
         spent += charged_usd(payload.get("usage"), asked=_was_asked(payload))
+        spent += news_charged_usd(payload.get("news_requests"))
         ticker = payload.get("ticker")
         if isinstance(ticker, str) and payload.get("signal") is not None and payload.get("error") is None:
             answered.add(ticker)
@@ -286,13 +305,14 @@ def day_lines(directory: Path | str, day: date) -> DayLines:
 
 
 class CostGuard:
-    """The day's model cost against the cap, safe to share between threads.
+    """The day's cost, model and news, against the cap, safe to share between threads.
 
     ``reserve`` is the check before a call: under the lock it refuses once
     the money spent plus the estimate held for calls in flight has reached
     the cap, and otherwise holds one estimate for the new call. ``settle``
-    swaps that estimate for what the call really cost. A call in flight
-    always finishes, so the real total can end slightly above the cap.
+    swaps that estimate for what the call really cost. ``charge_news`` adds a
+    name's news requests as they are made. A call in flight always finishes,
+    so the real total can end slightly above the cap.
     """
 
     def __init__(self, cap_usd: float, spent_usd: float = 0.0,
@@ -302,6 +322,8 @@ class CostGuard:
         self._spent = max(0.0, spent_usd)
         self._held = 0.0
         self._asked = 0
+        self._news_requests = 0
+        self._news_usd = 0.0
         self._stopped = False
         self._lock = threading.Lock()
 
@@ -331,10 +353,30 @@ class CostGuard:
             self._held = max(0.0, self._held - self._per_name)
             self._spent += max(0.0, cost_usd)
 
+    def charge_news(self, requests: int) -> None:
+        """Add one name's news requests, at ``NEWS_USD_PER_REQUEST`` each."""
+        cost = news_charged_usd(requests)
+        with self._lock:
+            self._news_requests += max(0, requests)
+            self._news_usd += cost
+            self._spent += cost
+
     @property
     def spent_usd(self) -> float:
         with self._lock:
             return self._spent
+
+    @property
+    def news_requests(self) -> int:
+        """News requests made in this run."""
+        with self._lock:
+            return self._news_requests
+
+    @property
+    def news_usd(self) -> float:
+        """What this run's news requests cost."""
+        with self._lock:
+            return self._news_usd
 
     @property
     def asked(self) -> int:
@@ -371,6 +413,7 @@ def journal_line(
     stage: Optional[str] = None,
     setup: Optional[dict[str, Any]] = None,
     effort: Optional[str] = None,
+    news_requests: int = 0,
 ) -> dict[str, Any]:
     """One line of the shadow universe's journal (the format the IC report reads).
 
@@ -390,6 +433,7 @@ def journal_line(
         "arms": shadow["arms"],
         "context": compact_context(context),
         "usage": usage.as_dict() if usage is not None else None,
+        "news_requests": news_requests,
         "error": error,
         "stage": stage,
         "held": False,
@@ -437,12 +481,14 @@ class _Shared:
 
 
 def _write(shared: _Shared, context: TickerContext, *, signal: Optional[LLMSignal] = None,
-           usage: Optional[Usage] = None, error: Optional[str] = None, stage: Optional[str] = None) -> str:
+           usage: Optional[Usage] = None, error: Optional[str] = None, stage: Optional[str] = None,
+           news_requests: int = 0) -> str:
     """Write the name's line and say what became of the name."""
     now = utc_now()
     try:
         line = journal_line(context, now, signal=signal, weights=shared.weights, usage=usage,
-                            error=error, stage=stage, setup=shared.setup, effort=shared.effort)
+                            error=error, stage=stage, setup=shared.setup, effort=shared.effort,
+                            news_requests=news_requests)
         shared.writer.write(line, now)
     except Exception:  # noqa: BLE001 - one name's line must not end the run
         log.exception("%s: could not write its line", context.ticker)
@@ -453,27 +499,28 @@ def _write(shared: _Shared, context: TickerContext, *, signal: Optional[LLMSigna
 
 
 def _judge(ticker: str, context: TickerContext, answer: "Completion | BaseException",
-           shared: _Shared) -> str:
+           shared: _Shared, news_requests: int = 0) -> str:
     """Everything after the model answered, as ``heartbeat.judge_answer`` does it, minus the engine."""
     usage = answer.usage if isinstance(answer, Completion) else None
+    write = functools.partial(_write, shared, context, news_requests=news_requests)
     try:
         if isinstance(answer, BaseException):
             raise answer
         signal = heartbeat.scores_without_a_source(heartbeat.parse_signal(answer.text), context)
     except LLMError as exc:
         log.error("%s: %s", ticker, exc)
-        return _write(shared, context, usage=usage, error=str(exc))
+        return write(usage=usage, error=str(exc))
     except (json.JSONDecodeError, ValidationError) as exc:
         log.error("%s: model output rejected: %s", ticker, exc)
-        return _write(shared, context, usage=usage, error=f"invalid LLM output: {exc}")
+        return write(usage=usage, error=f"invalid LLM output: {exc}")
     except Exception as exc:  # noqa: BLE001
         log.exception("%s: failed to produce a signal", ticker)
-        return _write(shared, context, usage=usage, error=f"unexpected {type(exc).__name__}: {exc}")
+        return write(usage=usage, error=f"unexpected {type(exc).__name__}: {exc}")
 
     if signal.ticker != ticker:
         log.error("%s: the model answered for %s instead", ticker, signal.ticker)
-        return _write(shared, context, signal=signal, usage=usage, error=f"answered for {signal.ticker}")
-    return _write(shared, context, signal=signal, usage=usage)
+        return write(signal=signal, usage=usage, error=f"answered for {signal.ticker}")
+    return write(signal=signal, usage=usage)
 
 
 def _score(ticker: str, shared: _Shared) -> str:
@@ -485,20 +532,31 @@ def _score(ticker: str, shared: _Shared) -> str:
     if not shared.guard.has_room():
         return NOT_ASKED
 
+    # The news searches are made in this thread, inside the context gather:
+    # every request is charged to the cap, whatever the gather's outcome.
+    before = news.requests_sent()
     try:
         context = heartbeat.build_context(ticker)
     except Exception as exc:  # noqa: BLE001
         log.exception("%s: failed to gather context", ticker)
-        return _write(shared, TickerContext(ticker=ticker), error=str(exc) or repr(exc), stage=CONTEXT_FAILED)
+        requests = news.requests_sent() - before
+        shared.guard.charge_news(requests)
+        return _write(shared, TickerContext(ticker=ticker), error=str(exc) or repr(exc), stage=CONTEXT_FAILED,
+                      news_requests=requests)
+    requests = news.requests_sent() - before
+    shared.guard.charge_news(requests)
     try:
         system_prompt = heartbeat.system_prompt_for(context.ticker, context)
         user_prompt = heartbeat.build_user_prompt(context)
     except Exception as exc:  # noqa: BLE001
         log.exception("%s: failed to render context into a prompt", ticker)
-        return _write(shared, context, error=str(exc) or repr(exc), stage=CONTEXT_FAILED)
+        return _write(shared, context, error=str(exc) or repr(exc), stage=CONTEXT_FAILED, news_requests=requests)
 
     if not shared.guard.reserve():
+        # Its news is paid for: a line says so, so a re-run today counts it too.
         log.warning("%s: the day's cost cap is reached; not asked", ticker)
+        _write(shared, context, error="not asked: the day's cost cap is reached", stage=CONTEXT_FAILED,
+               news_requests=requests)
         return NOT_ASKED
     prepared = heartbeat.PreparedTicker(ticker, context, system_prompt, user_prompt, len(context.gaps))
     try:
@@ -507,7 +565,7 @@ def _score(ticker: str, shared: _Shared) -> str:
         answer = exc
     usage = answer.usage if isinstance(answer, Completion) else None
     shared.guard.settle(charged_usd(usage.as_dict() if usage is not None else None, asked=True))
-    return _judge(ticker, context, answer, shared)
+    return _judge(ticker, context, answer, shared, requests)
 
 
 def _score_name(ticker: str, shared: _Shared) -> str:
@@ -537,15 +595,19 @@ class UniverseRun:
     failed: int = 0
     not_asked: int = 0
     already_answered: int = 0
+    #: The day's total so far, model and news, as the cap counts it.
     cost_usd: float = 0.0
+    #: This run's news requests and what they cost (inside ``cost_usd``).
+    news_requests: int = 0
+    news_cost_usd: float = 0.0
     cap_usd: float = su.DAILY_COST_CAP_USD
     cap_reached: bool = False
     error: Optional[str] = None
 
     @property
     def estimated_usd(self) -> float:
-        """The expected cost of the names this run was given."""
-        return round(self.names * ESTIMATED_COST_PER_NAME_USD, 4)
+        """The expected cost of the names this run was given, model and news."""
+        return round(self.names * (ESTIMATED_COST_PER_NAME_USD + ESTIMATED_NEWS_PER_NAME_USD), 4)
 
     @property
     def exit_code(self) -> int:
@@ -570,6 +632,8 @@ class UniverseRun:
             "not_asked": self.not_asked,
             "already_answered": self.already_answered,
             "cost_usd": round(self.cost_usd, 6),
+            "news_requests": self.news_requests,
+            "news_cost_usd": round(self.news_cost_usd, 6),
             "cap_usd": self.cap_usd,
             "cap_reached": self.cap_reached,
             "estimated_usd": self.estimated_usd,
@@ -647,6 +711,8 @@ def score_universe(
         failed=outcomes[CONTEXT_FAILED] + outcomes[MODEL_FAILED] + outcomes[UNRECORDED],
         not_asked=outcomes[NOT_ASKED],
         cost_usd=guard.spent_usd,
+        news_requests=guard.news_requests,
+        news_cost_usd=guard.news_usd,
         cap_reached=guard.cap_reached,
     )
     log.info("shadow universe: %s", json.dumps(run.summary(), sort_keys=True))
@@ -693,12 +759,14 @@ __all__ = [
     "CostGuard",
     "DayLines",
     "ESTIMATED_COST_PER_NAME_USD",
+    "ESTIMATED_NEWS_PER_NAME_USD",
     "EVENT",
     "EXIT_CAP_REACHED",
     "EXIT_FAILED",
     "EXIT_OK",
     "LineWriter",
     "MODEL_FAILED",
+    "NEWS_USD_PER_REQUEST",
     "NOT_ASKED",
     "NO_NEW_NAME_AFTER_UTC",
     "RUN_BUDGET_SECONDS",
@@ -712,6 +780,7 @@ __all__ = [
     "day_lines",
     "journal_line",
     "main",
+    "news_charged_usd",
     "production_ran",
     "score_universe",
     "too_late",

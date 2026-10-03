@@ -59,9 +59,11 @@ have no price to be measured against, so the IC report leaves them out.
 
 Off until ``START``. ``SHADOW_UNIVERSE_ENABLED`` keeps the scorer off, the
 same pattern as the screening flag; a test fails if the flag is on before the
-date the pre-registration names. Cost: about $0.65 a day (measured: the full
-model's 61 production calls in October 2026 averaged $0.0025 each), with a
-hard cap of $1 a day and a phone alert when the cap stops a run
+date the pre-registration names. Cost: about $1.05 a day -- the model about
+$0.65 (measured: the full model's 61 production calls in October 2026
+averaged $0.0025 each) and the Bright Data news searches about $0.40 (about
+270 requests at $1.50 per 1,000; about $102 a year) -- with a hard cap of
+$1.50 a day on the two together and a phone alert when the cap stops a run
 (``orchestrator/universe.py``).
 
 Standard library only and no side effects, so any package may import it --
@@ -90,15 +92,36 @@ REGISTRATION: Final[date] = date(2026, 12, 22)
 #: The day the list below was chosen.
 SELECTED_ON: Final[date] = date(2026, 10, 2)
 
-#: Hard cap on the model's cost for the universe in one UTC day, in dollars.
-#: The scorer stops asking once it is reached and the workflow alerts the
-#: owner's phone (the owner's instruction of 2 Oct 2026).
-DAILY_COST_CAP_USD: Final[float] = 1.00
+#: Hard cap on the universe's cost in one UTC day, in dollars: the model and
+#: the Bright Data news searches together (the owner's instruction of 3 Oct
+#: 2026: "add it to the cost cap and the alert"). The scorer stops asking once
+#: it is reached and the workflow alerts the owner's phone. $1 when it counted
+#: the model only (2 Oct 2026); $1.50 since the news is counted too, because
+#: the two together are expected at about $1.05 a day and a $1 cap would stop
+#: the run before the end of the list every day. Proposed on 3 Oct 2026; the
+#: owner confirms it before the pull request is merged.
+DAILY_COST_CAP_USD: Final[float] = 1.50
 
-#: What a full day is expected to cost, in dollars (about 250 calls at the
-#: measured $0.0025 each). For the summary line only; the cap above is what
-#: stops a run.
-ESTIMATED_DAILY_COST_USD: Final[float] = 0.65
+#: What a full day's model calls are expected to cost, in dollars (about 250
+#: calls at the measured $0.0025 each).
+ESTIMATED_DAILY_MODEL_COST_USD: Final[float] = 0.65
+
+#: Bright Data's price per request (pay as you go: $1.50 per 1,000 successful
+#: requests, the same for the SERP API and the Web Unlocker since the price
+#: list of 14 Jul 2026). Every request sent is charged to the cap, answered or
+#: not, so the cap never counts less than may be billed.
+NEWS_USD_PER_REQUEST: Final[float] = 0.0015
+
+#: What a full day's news searches are expected to cost, in dollars: about
+#: 270 requests (one per name, plus the retries production's journal shows,
+#: plus re-runs for failed names) at ``NEWS_USD_PER_REQUEST``. About $102 a
+#: year (252 trading days); $0.38 a day ($95 a year) with exactly one request
+#: per name.
+ESTIMATED_DAILY_NEWS_COST_USD: Final[float] = 0.40
+
+#: What a full day is expected to cost, model and news, in dollars. For the
+#: summary line only; the cap above is what stops a run.
+ESTIMATED_DAILY_COST_USD: Final[float] = ESTIMATED_DAILY_MODEL_COST_USD + ESTIMATED_DAILY_NEWS_COST_USD
 
 #: The repository root, worked out the same way ``config/settings.py`` does
 #: it, so this module needs nothing outside the standard library.
@@ -211,8 +234,11 @@ __all__ = [
     "BLOCKS",
     "DAILY_COST_CAP_USD",
     "ESTIMATED_DAILY_COST_USD",
+    "ESTIMATED_DAILY_MODEL_COST_USD",
+    "ESTIMATED_DAILY_NEWS_COST_USD",
     "GICS_SECTORS",
     "JOURNAL_DIR",
+    "NEWS_USD_PER_REQUEST",
     "REGISTRATION",
     "SECTORS",
     "SELECTED_ON",

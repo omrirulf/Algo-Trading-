@@ -93,9 +93,15 @@ def test_the_registered_settings():
     assert su.START == date(2027, 1, 1)
     assert su.REGISTRATION == date(2026, 12, 22)
     assert su.REGISTRATION < su.START
-    assert su.DAILY_COST_CAP_USD == 1.00
-    assert su.ESTIMATED_DAILY_COST_USD == 0.65
+    # The cap counts the model and the news searches together (the owner, 3 Oct 2026).
+    assert su.DAILY_COST_CAP_USD == 1.50
+    assert (su.ESTIMATED_DAILY_MODEL_COST_USD, su.ESTIMATED_DAILY_NEWS_COST_USD) == (0.65, 0.40)
+    assert su.ESTIMATED_DAILY_COST_USD == pytest.approx(1.05)
     assert su.ESTIMATED_DAILY_COST_USD < su.DAILY_COST_CAP_USD
+    assert su.NEWS_USD_PER_REQUEST == 0.0015
+    # About 270 requests a day at $1.50 per 1,000 is the news estimate; one request per name is the floor.
+    assert su.ESTIMATED_DAILY_NEWS_COST_USD == pytest.approx(270 * su.NEWS_USD_PER_REQUEST, abs=0.01)
+    assert len(su.TICKERS) * su.NEWS_USD_PER_REQUEST < su.ESTIMATED_DAILY_NEWS_COST_USD
 
 
 def test_the_journal_has_its_own_directory_beside_the_production_one():
@@ -337,11 +343,13 @@ def test_the_scorer_reads_no_credential_and_does_not_import_the_price_reader():
 
 def test_the_workers_and_the_budget_are_production_s_and_fit_the_list():
     assert universe.WORKERS == cfg.FULL_MODEL_MAX_CONCURRENCY
-    # About two and a half minutes a name (context, then one call at high
-    # effort): the whole list fits the budget with room to spare.
-    expected_minutes = math.ceil(len(su.TICKERS) / universe.WORKERS) * 150 / 60
-    assert expected_minutes <= universe.RUN_BUDGET_SECONDS / 60
-    assert universe.ESTIMATED_COST_PER_NAME_USD * len(su.TICKERS) == pytest.approx(su.ESTIMATED_DAILY_COST_USD)
+    # Measured on production's cycles of 23 Sep to 2 Oct 2026: 196 seconds a
+    # name per worker on the median day, 212 on the slowest (context, then
+    # one call at high effort). The whole list fits the budget even then.
+    for seconds in (196, 212):
+        assert math.ceil(len(su.TICKERS) / universe.WORKERS) * seconds <= universe.RUN_BUDGET_SECONDS
+    assert universe.ESTIMATED_COST_PER_NAME_USD * len(su.TICKERS) == pytest.approx(su.ESTIMATED_DAILY_MODEL_COST_USD)
+    assert universe.ESTIMATED_NEWS_PER_NAME_USD * len(su.TICKERS) == pytest.approx(su.ESTIMATED_DAILY_NEWS_COST_USD)
 
 
 # --------------------------------------------------------------------------- #
@@ -616,26 +624,30 @@ def test_a_run_started_after_the_cut_off_does_nothing_and_says_why(wired, monkey
 
 def test_the_cap_stops_asking_and_the_cli_exits_3(wired, monkeypatch, capsys):
     wired.model.usage = THIRTY_CENTS
-    names = ("AAPL", "ABBV", "ABT", "ADBE", "AMD", "AMZN", "KO", "SAP")
+    names = ("AAPL", "ABBV", "ABT", "ADBE", "AMD", "AMZN", "KO", "SAP", "NKE", "TSM")
     monkeypatch.setattr(su, "TICKERS", names)
     monkeypatch.setattr(su, "JOURNAL_DIR", wired.dir)
     monkeypatch.setattr(universe, "WORKERS", 1)  # one at a time, so the count is exact
     assert universe.main([]) == universe.EXIT_CAP_REACHED
     summary = json.loads(capsys.readouterr().out)
-    # 0.30, 0.60, 0.90: still under $1, so a fourth call starts; then no more.
-    assert (summary["asked"], summary["answered"], summary["not_asked"]) == (4, 4, 4)
-    assert summary["cap_reached"] is True and summary["cap_usd"] == 1.0
-    assert summary["cost_usd"] == pytest.approx(4 * THIRTY_CENTS.cost_usd)
-    assert summary["estimated_usd"] == pytest.approx(8 * universe.ESTIMATED_COST_PER_NAME_USD, abs=1e-4)
-    assert len(_lines(wired.month)) == 4
-    assert wired.gathered == list(names[:4])  # nothing is even gathered past the cap
+    # A call starts while the day's total is under the cap: 0, 0.30, ... so ceil(cap / 0.30) calls.
+    calls = math.ceil(su.DAILY_COST_CAP_USD / THIRTY_CENTS.cost_usd)
+    assert calls < len(names)
+    assert (summary["asked"], summary["answered"], summary["not_asked"]) == (calls, calls, len(names) - calls)
+    assert summary["cap_reached"] is True and summary["cap_usd"] == su.DAILY_COST_CAP_USD
+    assert summary["cost_usd"] == pytest.approx(calls * THIRTY_CENTS.cost_usd)
+    assert summary["estimated_usd"] == pytest.approx(
+        len(names) * (universe.ESTIMATED_COST_PER_NAME_USD + universe.ESTIMATED_NEWS_PER_NAME_USD), abs=1e-4)
+    assert (summary["news_requests"], summary["news_cost_usd"]) == (0, 0.0)   # the stand-in context asks no news
+    assert len(_lines(wired.month)) == calls
+    assert wired.gathered == list(names[:calls])  # nothing is even gathered past the cap
 
 
 def test_the_cap_counts_what_was_already_spent_today(wired):
     yesterday = A_DAY_ON - timedelta(days=1)
     wired.dir.mkdir(parents=True)
     with wired.month.open("w", encoding="utf-8") as handle:
-        for when, cost in ((yesterday, 5.0), (A_DAY_ON - timedelta(hours=2), 0.6),
+        for when, cost in ((yesterday, 5.0), (A_DAY_ON - timedelta(hours=2), su.DAILY_COST_CAP_USD - 0.4),
                            (A_DAY_ON - timedelta(hours=1), 0.45)):
             handle.write(json.dumps({"ts_utc": when.isoformat(), "ticker": "OLD", "signal": None,
                                      "error": "x", "usage": {"cost_usd": cost}}) + "\n")
@@ -643,7 +655,7 @@ def test_the_cap_counts_what_was_already_spent_today(wired):
     run = universe.score_universe(("AAPL", "KO"), journal_dir=wired.dir)
     assert run.cap_reached is True and run.exit_code == universe.EXIT_CAP_REACHED
     assert (run.asked, run.not_asked) == (0, 2)
-    assert run.cost_usd == pytest.approx(1.05)  # yesterday's $5 is not today's
+    assert run.cost_usd == pytest.approx(su.DAILY_COST_CAP_USD + 0.05)  # yesterday's $5 is not today's
     assert wired.model.calls == []
 
 
@@ -652,12 +664,44 @@ def test_with_four_workers_the_cap_holds_up_to_the_calls_in_flight(wired):
     names = su.TICKERS[:20]
     run = universe.score_universe(names, journal_dir=wired.dir, workers=4)
     assert run.cap_reached is True and run.exit_code == universe.EXIT_CAP_REACHED
-    # A call starts only while spent + in flight is under $1, so at most three
-    # finished calls ($0.90) plus four in flight: never more than seven.
-    assert 4 <= run.asked <= 7
+    # A call starts only while spent + in flight is under the cap, so at most
+    # ceil(cap / 0.30) - 1 finished calls plus four in flight.
+    calls = math.ceil(su.DAILY_COST_CAP_USD / THIRTY_CENTS.cost_usd)
+    assert calls <= run.asked <= calls + 3
     assert run.cost_usd == pytest.approx(run.asked * THIRTY_CENTS.cost_usd)
     assert run.asked + run.not_asked == len(names)
-    assert len(_lines(wired.month)) == run.asked
+    # A name gathered but refused at the call still writes a line, so a re-run counts its news.
+    lines = _lines(wired.month)
+    asked = [line for line in lines if line["stage"] is None]
+    refused = [line for line in lines if line["stage"] == "context"]
+    assert len(asked) == run.asked and len(refused) <= 3
+    assert all(line["error"] == "not asked: the day's cost cap is reached" for line in refused)
+
+
+def test_every_news_request_counts_against_the_cap_and_is_written_on_the_line(wired, monkeypatch):
+    """The owner, 3 Oct 2026: the Bright Data searches are added to the cost cap. Each request the gather
+    sends (counted per thread by ``news.requests_sent``) is charged, also when the gather fails."""
+    from orchestrator import news
+
+    gather = heartbeat.build_context
+
+    def build_context(ticker: str):
+        news._SENT.count = news.requests_sent() + (3 if ticker == "KO" else 1)   # KO needed two retries
+        return gather(ticker)
+
+    monkeypatch.setattr(heartbeat, "build_context", build_context)
+    wired.failing_context.add("SAP")
+    run = universe.score_universe(("AAPL", "KO", "SAP"), journal_dir=wired.dir)
+    by_name = {line["ticker"]: line for line in _lines(wired.month)}
+    assert {t: by_name[t]["news_requests"] for t in by_name} == {"AAPL": 1, "KO": 3, "SAP": 1}
+    assert run.news_requests == 5 and run.news_cost_usd == pytest.approx(5 * su.NEWS_USD_PER_REQUEST)
+    assert run.cost_usd == pytest.approx(2 * CHEAP.cost_usd + 5 * su.NEWS_USD_PER_REQUEST)
+    summary = run.summary()
+    assert summary["news_requests"] == 5 and summary["news_cost_usd"] == pytest.approx(0.0075)
+    # A re-run the same day reads the news cost back from the lines.
+    assert universe.day_lines(wired.dir, A_DAY_ON.date()).spent_usd == pytest.approx(run.cost_usd)
+    assert universe.news_charged_usd(2) == pytest.approx(0.003)
+    assert universe.news_charged_usd(None) == universe.news_charged_usd(True) == universe.news_charged_usd(-1) == 0.0
 
 
 def test_the_guard_reserves_under_a_lock_and_settles_the_real_cost():
@@ -817,7 +861,8 @@ def test_the_cap_alert_is_fixed_words_through_the_topic_secret():
     assert '"topic": os.environ["NTFY_TOPIC"]' in run
     assert "https://ntfy.sh/ " in run and "ntfy.sh/$" not in run
     words = " ".join(re.findall(r'"([^"]*)"', re.search(r'"message": \((.*?)\),', run, re.S).group(1)))
-    cap = f"${su.DAILY_COST_CAP_USD:g}"
+    cap = f"${su.DAILY_COST_CAP_USD:.2f}"
+    assert "news" in words, "the cap counts the news searches too"
     assert cap in words
     assert re.findall(r"\d", words.replace(cap, "")) == []  # no number but the cap
 

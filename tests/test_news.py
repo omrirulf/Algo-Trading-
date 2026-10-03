@@ -547,3 +547,25 @@ def test_html_keeps_its_own_clearer_message():
     """The one failure mode that already explained itself must not regress."""
     with pytest.raises(news.NewsFetchError, match="returned HTML"):
         news._unwrap("<!doctype html><html>blocked</html>")
+
+
+def test_every_request_sent_is_counted_per_thread_for_a_caller_that_pays_per_request(monkeypatch):
+    """The shadow universe charges each Bright Data request to its daily cap (the owner, 3 Oct 2026). The
+    count includes the retry after a refused 200, and one thread's requests are not another's."""
+    import threading
+
+    monkeypatch.setattr(news.time, "sleep", lambda s: None)
+    answers = iter([httpx.Response(200, text=json.dumps(PARSED_NEWS)),
+                    httpx.Response(200, text=""), httpx.Response(200, text=json.dumps(PARSED_NEWS))])
+    with httpx.Client(transport=httpx.MockTransport(lambda request: next(answers))) as client:
+        provider = news.BrightDataNewsProvider("tok", "zone", client=client)
+        before = news.requests_sent()
+        provider.fetch("AAPL")
+        assert news.requests_sent() - before == 1
+        provider.fetch("KO")                           # an empty 200, then the retry
+        assert news.requests_sent() - before == 3
+    seen = []
+    worker = threading.Thread(target=lambda: seen.append(news.requests_sent()))
+    worker.start()
+    worker.join()
+    assert seen == [0]

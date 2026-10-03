@@ -18,8 +18,9 @@ name: shadow universe
 # dated the next day), and today's production cycle already journalled (so
 # the two never ask the model provider at the same time).
 #
-# Cost cap: $1 a UTC day for the model. The scorer stops asking at the cap and
-# exits 3; the job then tells the owner's phone, in fixed words.
+# Cost cap: $1.50 a UTC day for the model and the Bright Data news searches
+# together (about $0.65 + $0.40 expected). The scorer stops asking at the cap
+# and exits 3; the job then tells the owner's phone, in fixed words.
 #
 # A by-hand run with `verify` only checks that every name resolves on Yahoo
 # (backtest/verify_tickers.py's check), with no model and no key -- the check
@@ -77,7 +78,8 @@ jobs:
     # that may need a 480-second ask and its 480-second retry, twice when the
     # answer has to be asked again (32 minutes), plus its context, the setup
     # and the commit. tests/test_shadow_universe.py keeps this number and
-    # those constants in step. Expected: about 160 minutes.
+    # those constants in step. Expected: about 190 to 205 minutes (measured
+    # on production's cycles of 23 Sep to 2 Oct 2026; 222 on the slowest).
     timeout-minutes: 300
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -195,9 +197,10 @@ jobs:
           import json, os
           print(json.dumps({"topic": os.environ["NTFY_TOPIC"],
                             "title": "⚠️ Shadow universe stopped at its cost cap",
-                            "message": ("Today's shadow universe run reached its $1 daily cost cap and stopped "
-                                        "asking the model. Nothing is traded. The names not asked today have no "
-                                        "score for today, and tomorrow starts again from zero."),
+                            "message": ("Today's shadow universe run reached its $1.50 daily cost cap (the model "
+                                        "and the news searches together) and stopped. Nothing is traded. The "
+                                        "names not asked today have no score for today, and tomorrow starts "
+                                        "again from zero."),
                             "priority": 3, "tags": ["warning"], "click": os.environ["RUN_URL"]}))
           EOF
           code=$(curl -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' \
