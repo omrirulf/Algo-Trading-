@@ -23,7 +23,9 @@ name: shadow universe
 #
 # A by-hand run with `verify` only checks that every name resolves on Yahoo
 # (backtest/verify_tickers.py's check), with no model and no key -- the check
-# the list needs before it is frozen on 2026-12-22.
+# the list needs before it is frozen on 2026-12-22. The same check runs on
+# every pull request that changes the list, so a name that does not resolve
+# cannot be merged.
 on:
   # The main start: as soon as a production run ends. That run is started on
   # time by the Supabase starter (heartbeat.yml), while GitHub delivers this
@@ -33,6 +35,12 @@ on:
   workflow_run:
     workflows: ["heartbeat"]
     types: [completed]
+    branches: [main]
+  pull_request:
+    # Only the verify job runs on a pull request (no key, nothing committed).
+    paths:
+      - config/shadow_universe.py
+      - .github/workflows/shadow-universe.yml
   schedule:
     # A backup, weekdays at 18:30 UTC. It does only what the main start left
     # undone (names already answered today are not asked again), and the
@@ -52,15 +60,16 @@ on:
 permissions:
   contents: write   # only to commit logs/shadow_universe/
 
-# One run at a time, so two runs never ask the same name on the same day or
-# race to append to the same month's file.
+# One scoring run at a time, so two runs never ask the same name on the same
+# day or race to append to the same month's file. A verify run has its own
+# group, so it can never take the place of a scoring run waiting its turn.
 concurrency:
-  group: shadow-universe
+  group: ${{ (github.event_name == 'pull_request' || inputs.verify) && 'shadow-universe-verify' || 'shadow-universe' }}
   cancel-in-progress: false
 
 jobs:
   score:
-    if: ${{ !inputs.verify }}
+    if: ${{ github.event_name != 'pull_request' && !inputs.verify }}
     runs-on: ubuntu-latest
     # Sized for 251 names asked four at a time (production's full-model
     # setting) with the 480-second model timeout. The scorer starts no new
@@ -200,9 +209,9 @@ jobs:
           esac
 
   verify:
-    # By hand only. Reads prices from Yahoo, asks no model, holds no key and
-    # commits nothing.
-    if: ${{ inputs.verify }}
+    # By hand, and on a pull request that changes the list. Reads prices from
+    # Yahoo, asks no model, holds no key and commits nothing.
+    if: ${{ github.event_name == 'pull_request' || inputs.verify }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:

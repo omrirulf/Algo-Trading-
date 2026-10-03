@@ -776,13 +776,20 @@ def test_the_scoring_step_gets_exactly_the_cycle_s_model_news_and_source_keys():
 def test_the_workflow_runs_after_each_production_run_on_weekdays_and_by_hand():
     wf = _workflow()
     triggers = wf.get("on") or wf[True]
-    assert set(triggers) == {"workflow_run", "schedule", "workflow_dispatch"}
+    assert set(triggers) == {"workflow_run", "pull_request", "schedule", "workflow_dispatch"}
     heartbeat_wf = yaml.safe_load((ROOT / ".github/workflows/heartbeat.yml").read_text(encoding="utf-8"))
-    assert triggers["workflow_run"] == {"workflows": [heartbeat_wf["name"]], "types": ["completed"]}
+    # Only production's runs on main start it, as the article archive's start (tests/test_store_articles.py).
+    assert triggers["workflow_run"] == {"workflows": [heartbeat_wf["name"]], "types": ["completed"],
+                                        "branches": ["main"]}
+    # A pull request that changes the list runs the verify job only.
+    assert triggers["pull_request"] == {"paths": ["config/shadow_universe.py",
+                                                  ".github/workflows/shadow-universe.yml"]}
     (cron,) = [entry["cron"] for entry in triggers["schedule"]]
     assert cron.split()[-1] == "1-5"
     assert wf["permissions"] == {"contents": "write"}
-    assert wf["concurrency"]["group"] == "shadow-universe"
+    group = wf["concurrency"]["group"]
+    assert "'shadow-universe-verify'" in group and group.endswith("|| 'shadow-universe' }}")
+    assert wf["concurrency"]["cancel-in-progress"] is False
 
 
 def test_the_workflow_checks_before_it_scores_and_skips_everything_after():
@@ -839,8 +846,8 @@ def test_the_job_clock_outlasts_the_budget_and_one_slow_name():
 
 def test_the_verify_run_checks_every_name_without_a_model():
     wf = _workflow()
-    assert wf["jobs"]["verify"]["if"] == "${{ inputs.verify }}"
-    assert wf["jobs"]["score"]["if"] == "${{ !inputs.verify }}"
+    assert wf["jobs"]["verify"]["if"] == "${{ github.event_name == 'pull_request' || inputs.verify }}"
+    assert wf["jobs"]["score"]["if"] == "${{ github.event_name != 'pull_request' && !inputs.verify }}"
     assert wf["jobs"]["verify"]["permissions"] == {"contents": "read"}
     run = _step("Does every name resolve?", "verify")["run"]
     assert "from backtest.verify_tickers import check" in run and "TICKERS" in run

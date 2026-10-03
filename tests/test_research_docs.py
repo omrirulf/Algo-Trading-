@@ -127,6 +127,18 @@ def test_the_accountant_questions_are_the_owners_ten_then_the_two_added_earlier(
     assert "OFFSET_LOSSES_VS_DIVIDENDS" in flat[places[1]:places[2]]
 
 
+def test_the_card_states_the_replacement_rule_and_the_five_replaced_names():
+    """The owner, 3 Oct 2026: the rule for the five replaced names is written on the card before the list freezes."""
+    from config import shadow_universe
+
+    card = " ".join((RESEARCH / "cards" / "ic-model-scores.md").read_text().split())
+    assert "Replacement rule (written 2026-10-03, before the list freezes)" in card
+    assert "never because of its price, its returns or its scores" in card
+    for old, new in (("JNJ", "EW"), ("MDT", "IDXX"), ("SPGI", "MET"), ("DOW", "MLM"), ("ASX", "UMC")):
+        assert f"({old}" in card and f"({new})" in card
+        assert old not in shadow_universe.TICKERS and new in shadow_universe.TICKERS
+
+
 def test_the_ic_card_carries_the_shadow_universe_exactly_as_the_code_lists_it():
     """Published in the card on the registration date and never changed after (pre-registration 13.9)."""
     from config import shadow_universe
