@@ -753,10 +753,13 @@ def test_a_sleeve_with_fewer_than_ten_names_a_day_has_no_ic_and_says_why():
 
 
 def test_a_sleeve_without_lines_is_no_data_and_the_shadow_universe_has_no_split():
-    lines, bars, through = _universe()   # N00..N11: not funds, so every line is a single name's
-    found = ic.record({"production": lines, "shadow": lines}, {"production": bars, "shadow": bars}, through)
+    lines, bars, _ = _universe()   # N00..N11: not funds, so every line is a single name's
+    day = ic.SHADOW_START          # the shadow lines must be in their own window, or the check proves nothing
+    shadow = [make_line(f"N{i:02d}", day, blend=0.1 * i) for i in range(12)]
+    found = ic.record({"production": lines, "shadow": shadow}, {"production": bars, "shadow": bars}, day)
     assert found["universes"]["production"]["groups"]["funds"] == {"no_data": True}
     assert found["universes"]["production"]["groups"]["single_names"]["members"] == 12
+    assert found["universes"]["shadow"]["lines"] == 12, "the shadow universe has a record to look in"
     assert "groups" not in found["universes"]["shadow"]
 
 

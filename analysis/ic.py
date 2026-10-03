@@ -12,8 +12,10 @@ value is written to any file, page or log before the checkpoint. Registered
 at the 22 Dec 2026 checkpoint, over every line from 28 Sep 2026.
 
 **Split by sleeve, descriptive only** (the owner's decision of 3 Oct 2026,
-after a news audit found the race's news relevant for 76% of single-name
-headlines but 23% of fund headlines: ``docs/research/news-relevance.md``).
+after a news audit found the race's news relevant for about three in four
+single-name headlines but 23% of fund headlines: 74% and 23% on the lines the
+model answered, 76% and 23% on every journalled line;
+``docs/research/news-relevance.md``).
 For the production names the record also carries the same numbers, made
 the same way, for the single names and for the funds separately
 (``GROUPS``, by ``config.instruments.is_fund``). Not tests: no group has a

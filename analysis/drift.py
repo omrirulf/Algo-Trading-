@@ -51,13 +51,18 @@ next week), and the daily health check raises a warning on that day only. A
 setting's alert is said on the day it is seen (``setting_alert_on``).
 
 Held lines (no model was asked) and lines that failed before the model was
-asked (``stage == "context"``) are left out of every number: the question
-is what the model did with the calls it got. The one exception is the count
-of names with no headlines, which reads held lines too: a held name's news
-is still searched and journalled, and leaving those lines out would miss a
-name held all week or count a name as silent when its held line had news.
-Lines that failed before the model was asked still stay out (their empty
-context is not a search that found nothing).
+asked (``stage == "context"``) are left out of the answer numbers (the
+NEUTRAL share, conviction, agreement, the long share, the error shares and
+the names): the question is what the model did with the calls it got. Two
+things read more lines. The run start, its lateness and the starter share
+read every line, because the question there is when the cycle ran
+(``analysis/run_timing.day_timings``). The count of names with no headlines
+reads held lines too -- a held name's news is still searched and journalled,
+and leaving those lines out would miss a name held all week or count a name
+as silent when its held line had news -- and a line that failed before the
+model was asked counts only when it carried headlines: a failed gather
+journals an empty context, which is not a search that found nothing, while a
+prompt that failed to render journals the context it gathered.
 
 Read-only, like everything in ``analysis``: no broker, no model, no network,
 no file written. The workflow redirects the output.
@@ -197,16 +202,19 @@ def no_headlines(entries: Sequence[JournalEntry]) -> dict[str, Any]:
     """The names whose news was empty on every line of the week, and which of them had a failed search.
 
     Every line that says how many headlines it carried counts, held lines
-    included; a line that failed before the model was asked
-    (``stage == "context"``) and a line without the field do not. A name is
-    listed when all its counted lines that week had zero headlines.
+    included. A line without the field does not, and neither does a line
+    that failed before the model was asked (``stage == "context"``) with no
+    headline: a failed gather journals an empty context, which is not a
+    search that found nothing. A prompt that failed to render journals the
+    context it gathered, so its headlines count. A name is listed when all
+    its counted lines that week had zero headlines.
     ``search_failed`` names those of them with at least one failed news
     search that week (a gap starting ``NEWS_GAP_PREFIX``): for them "no
     headlines" may be the vendor's fault, not an empty search.
     """
     lines: dict[str, list[JournalEntry]] = {}
     for e in entries:
-        if e.stage == "context" or e.headline_count is None:
+        if e.headline_count is None or (e.stage == "context" and not e.headline_count):
             continue
         lines.setdefault(e.ticker, []).append(e)
     silent = sorted(t for t, own in lines.items() if not any(e.headline_count for e in own))

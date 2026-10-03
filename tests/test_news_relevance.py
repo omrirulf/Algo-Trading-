@@ -110,6 +110,24 @@ def test_journal_headlines_reads_each_line_s_news_from_a_day_on(tmp_path):
         "NVDA": [{"title": "Nvidia rises", "snippet": "s"}]}
 
 
+def test_answered_only_keeps_the_lines_the_model_answered_and_drops_held_and_failed_ones(tmp_path):
+    """The news the model read, by the race's rule: a signal about this ticker, and not held."""
+    def line(ticker, title, **extra):
+        return json.dumps({"ticker": ticker, "ts_utc": "2026-09-24T14:00:00+00:00",
+                           "context": {"sources": [{"title": title}]}, **extra})
+
+    answered = {"signal": {"ticker": "NVDA", "bias": "NEUTRAL", "conviction": 0.0}}
+    (tmp_path / "2026-09.log").write_text("\n".join([
+        line("NVDA", "answered", **answered),
+        line("NVDA", "held", held=True),
+        line("NVDA", "failed", error="read timeout"),
+    ]) + "\n", encoding="utf-8")
+    every = nr.journal_headlines(tmp_path, date(2026, 9, 23))
+    read = nr.journal_headlines(tmp_path, date(2026, 9, 23), answered_only=True)
+    assert [r["title"] for r in every["NVDA"]] == ["answered", "held", "failed"]
+    assert [r["title"] for r in read["NVDA"]] == ["answered"]
+
+
 def test_the_module_is_pure():
     """No network, no model, no file written."""
     tree = ast.parse(SOURCE.read_text(encoding="utf-8"))

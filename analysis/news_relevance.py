@@ -7,9 +7,11 @@ sentence. No model is asked. It is used two ways:
 * on the shadow stock universe's news (its own query, company name plus
   ticker: ``orchestrator/universe_news.py``), to find the names whose search
   still finds something else -- the card's replacement rule (2);
-* once, as a description only, on the news the main race used for its 80
-  names (``logs/journal/``): how often the headlines the model read were about
-  the name it scored. Nothing in production changes because of it.
+* once, as a description only, on the race's news for its 80 names
+  (``logs/journal/``): on the lines the model answered (the news it read,
+  ``--answered-only``) and on every journalled line (held lines included: a
+  held name's news is searched, but no model is asked). Nothing in production
+  changes because of it.
 
 How it reads the rule:
 
@@ -44,6 +46,7 @@ from typing import Any, Final, Iterable, Mapping, Optional, Sequence
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from analysis.reader import entry_from  # noqa: E402
 from config import journal_files  # noqa: E402
 from config import shadow_universe as su  # noqa: E402
 
@@ -204,8 +207,15 @@ def report(shares: Sequence[Share], title: str) -> str:
     return "\n".join(lines) + "\n"
 
 
-def journal_headlines(directory: Path, since: date, until: Optional[date] = None) -> dict[str, list[dict]]:
-    """Every answered line's news records in a production journal, per ticker, from ``since`` (UTC days)."""
+def journal_headlines(directory: Path, since: date, until: Optional[date] = None, *,
+                      answered_only: bool = False) -> dict[str, list[dict]]:
+    """Every journalled line's news records in a production journal, per ticker, from ``since`` (UTC days).
+
+    Held lines (a held name's news is searched, but no model is asked) and
+    failed lines are included; with ``answered_only``, only the lines the
+    model answered and that were not held -- the news the model read, by the
+    race's rule (``JournalEntry.model_answered``).
+    """
     out: dict[str, list[dict]] = defaultdict(list)
     files = sorted(Path(directory).glob("*.log")) if Path(directory).is_dir() else [Path(directory)]
     for path in files:
@@ -222,6 +232,10 @@ def journal_headlines(directory: Path, since: date, until: Optional[date] = None
                 continue
             if day < since or (until is not None and day > until):
                 continue
+            if answered_only:
+                entry = entry_from(line)
+                if entry is None or not entry.model_answered or entry.held:
+                    continue
             ctx = line.get("context") if isinstance(line.get("context"), dict) else {}
             records = ctx.get("sources") or ctx.get("headlines") or []
             out[line["ticker"]].extend(r if isinstance(r, dict) else {"title": _title_snippet(r)[0],
@@ -237,11 +251,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--journal", type=Path, default=Path(__file__).resolve().parent.parent / "logs" / "journal")
     parser.add_argument("--since", default="2026-09-23", help="first UTC day (default: the full model's first day)")
     parser.add_argument("--until", default=None)
+    parser.add_argument("--answered-only", action="store_true",
+                        help="only the lines the model answered (the news it read), not held or failed lines")
     args = parser.parse_args(argv)
     found = journal_headlines(args.journal, date.fromisoformat(args.since),
-                              date.fromisoformat(args.until) if args.until else None)
+                              date.fromisoformat(args.until) if args.until else None,
+                              answered_only=args.answered_only)
     shares = [share(t, RACE_NAMES.get(t, ()), found.get(t, [])) for t in RACE_NAMES]
-    print(report(shares, f"News relevance: the race's 80 names, lines from {args.since} (descriptive only)"))
+    which = "the lines the model answered" if args.answered_only else "every journalled line"
+    print(report(shares, f"News relevance: the race's 80 names, {which} from {args.since} (descriptive only)"))
     return 0
 
 

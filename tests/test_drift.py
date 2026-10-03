@@ -241,17 +241,37 @@ def test_a_failed_search_is_named_apart_and_a_line_failed_before_asking_or_witho
     assert week["news"] == {"names": 1, "no_headlines": ["EWN"], "search_failed": ["EWN"]}
 
 
+def test_a_prompt_that_failed_to_render_still_counts_the_news_it_gathered():
+    """A failed gather journals an empty context; a failed render journals what was gathered, headlines included."""
+    monday = MONDAYS[0]
+    lines = [line(d, "XLE", None, error="template broke", stage="context", headlines=["a", "b", "c"])
+             for d in _days(monday, 4)]
+    lines.append(line(monday + timedelta(days=4), "XLE", headlines=[]))
+    lines += [line(d, "EWU", headlines=[]) for d in _days(monday)]
+    week = build(lines, MONDAYS[1])["weeks"][0]
+    assert week["news"] == {"names": 2, "no_headlines": ["EWU"], "search_failed": []}
+
+
 def test_the_count_has_no_band_and_no_alert_and_the_text_shows_it():
+    """One silent name a week for four weeks, then six two weeks running: a band on the count would alert."""
     weeks = []
-    for k in range(6):   # six complete weeks, each with a different silent name
+    for k in range(6):
+        silent = 1 if k < 4 else 6
         weeks += week_of_lines(MONDAYS[k], neutral=8, longs=2)
-        weeks += [line(MONDAYS[k], f"Q{k}", headlines=[]), line(MONDAYS[k], "NVDA", headlines=["x"])]
+        weeks += [line(MONDAYS[k], f"Q{k}{i}", headlines=[]) for i in range(silent)]
+        weeks.append(line(MONDAYS[k], "NVDA", headlines=["x"]))
     record = build(weeks, MONDAYS[6])
     last = record["weeks"][5]
-    assert last["news"]["no_headlines"] == ["Q5"] and "news" not in (last["bands"] or {})
-    assert record["alerts"] == [] and "news" not in dict(drift.NUMBERS)
+    assert len(last["news"]["no_headlines"]) == 6 and last["news"]["names"] == 7
+    assert set(last["bands"]) == {key for key, _ in drift.BANDED} == {
+        "neutral_pct", "conviction_mean", "agreement_pct", "long_pct", "setup_error_pct", "model_error_pct",
+        "minutes_late_mean"}
+    assert record["alerts"] == [] and all(w["alerts"] == [] for w in record["weeks"])
+    assert not any("headline" in key for key, _ in drift.NUMBERS) and set(last["values"]) == {
+        key for key, _ in drift.NUMBERS}
     text = "\n".join(drift.render_week(last))
-    assert "- names with no headlines all week: 1 of 2 (Q5)" in text
+    assert "- names with no headlines all week: 6 of 7 (Q50, Q51, Q52, Q53, Q54, Q55)" in text
+    assert "band" not in next(l for l in drift.render_week(last) if "no headlines" in l)
     assert json.loads(json.dumps(record, allow_nan=False)) == record
 
 

@@ -39,11 +39,13 @@ Each week, from the journal alone:
   band, no alert, and nothing in the cycle reads it. The phone lists at most
   12 names; the Markdown report lists them all.
 
-Held lines and lines that failed before the model was asked are left out:
-the question is what the model did with the calls it got. The count of names
-with no headlines is the one exception: it reads held lines too, because a
-held name's news is still searched and journalled (lines that failed before
-the model was asked still stay out).
+Held lines and lines that failed before the model was asked are left out of
+the answer numbers: the question is what the model did with the calls it
+got. The run start, its lateness and the starter share read every line (the
+question there is when the cycle ran). The count of names with no headlines
+reads held lines too, because a held name's news is still searched and
+journalled; a line that failed before the model was asked counts only when
+it carried headlines (a failed gather journals no news at all).
 
 **The rule (the owner's, changed on 27 Sep 2026 before any data existed).**
 
