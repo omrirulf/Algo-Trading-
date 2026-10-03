@@ -38,6 +38,8 @@ The list as prepared on 2026-10-02 (`config/shadow_universe.py`). It is checked 
 
 **Replaced on 2026-10-02, before any score of these names existed** (no price, return or score was looked at): Johnson & Johnson (JNJ, DePuy Synthes separation), Medtronic (MDT, MiniMed separation) and S&P Global (SPGI, Mobility spin-off), by rule (1), with Edwards Lifesciences (EW), IDEXX Laboratories (IDXX) and MetLife (MET); Dow Inc. (DOW: "DOW stock" finds the Dow Jones index) and ASE Technology (ASX: "ASX stock" finds the Australian Securities Exchange), by rule (2), with Martin Marietta Materials (MLM) and United Microelectronics (UMC).
 
+**Replaced on 2026-10-03, by rule (3):** BNY Mellon (BK: no prices returned) and AvalonBay Communities (AVB: fewer than two closes in three months) failed the verify check in two runs that day, and were replaced with State Street (STT) and Iron Mountain (IRM). Again no price, return or score was looked at beyond whether prices exist.
+
 Shadow stock universe: 251 names, chosen on 2026-10-02, frozen on 2026-12-22.
 
 | Sector | Names | Tickers |
@@ -48,11 +50,11 @@ Shadow stock universe: 251 names, chosen on 2026-10-02, frozen on 2026-12-22.
 | Consumer discretionary | 19 | ABNB, AMZN, AZO, BKNG, CMG, F, GM, HD, HLT, LOW, MAR, MCD, NKE, ORLY, ROST, SBUX, TJX, TSLA, YUM |
 | Consumer staples | 16 | ADM, CL, COST, GIS, HSY, KMB, KO, KR, MDLZ, MNST, MO, PEP, PM, SYY, TGT, WMT |
 | Health care | 22 | ABBV, ABT, AMGN, BMY, BSX, CI, CVS, DHR, ELV, EW, GILD, HCA, IDXX, ISRG, MRK, PFE, REGN, SYK, TMO, UNH, VRTX, ZTS |
-| Financials | 24 | AIG, AXP, BAC, BK, BLK, BX, C, CB, CME, COF, GS, ICE, MA, MCO, MET, MS, PGR, PNC, PYPL, SCHW, TRV, USB, V, WFC |
+| Financials | 24 | AIG, AXP, BAC, BLK, BX, C, CB, CME, COF, GS, ICE, MA, MCO, MET, MS, PGR, PNC, PYPL, SCHW, STT, TRV, USB, V, WFC |
 | Information technology | 23 | AAPL, ACN, ADBE, ADI, AMAT, AMD, ANET, AVGO, CDNS, CRM, CSCO, IBM, INTC, INTU, KLAC, LRCX, MU, NOW, ORCL, PANW, QCOM, SNPS, TXN |
 | Communication services | 13 | CHTR, CMCSA, DIS, FOXA, LYV, META, NFLX, OMC, SPOT, T, TMUS, TTWO, VZ |
 | Utilities | 12 | AEP, CEG, D, DUK, ED, EXC, NEE, PEG, SO, SRE, VST, XEL |
-| Real estate | 12 | AMT, AVB, CBRE, CCI, DLR, EQIX, O, PLD, PSA, SPG, VICI, WELL |
+| Real estate | 12 | AMT, CBRE, CCI, DLR, EQIX, IRM, O, PLD, PSA, SPG, VICI, WELL |
 | ADR: Europe | 17 | AZN, BBVA, BP, BTI, DEO, GSK, HSBC, ING, NVS, RIO, SAN, SAP, SHEL, SNY, TTE, UBS, UL |
 | ADR: Japan | 8 | HMC, IX, MFG, MUFG, NMR, SMFG, SONY, TAK |
 | ADR: China and Hong Kong | 8 | BABA, BEKE, BIDU, JD, NTES, PDD, TCOM, ZTO |

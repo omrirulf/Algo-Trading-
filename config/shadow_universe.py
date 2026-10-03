@@ -36,6 +36,10 @@ of large foreign companies that trade in New York. Rules:
   bigger in market news. Dow Inc. ("DOW stock" finds the Dow Jones index) and
   ASE Technology ("ASX stock" finds the Australian exchange) were replaced by
   Martin Marietta and UMC.
+* A name that does not resolve in the verify check is replaced. On 3 Oct 2026
+  BNY Mellon (BK: no prices returned) and AvalonBay (AVB: fewer than two
+  closes in three months) failed it in two runs, and were replaced by State
+  Street and Iron Mountain. The card states the replacement rule.
 * The ADR block holds large foreign companies bought in dollars on a US
   exchange. Most trade as ADRs; a few list their own shares directly (Check
   Point, Wix, monday.com, ICL, Nu, UBS). For this list they are the same
@@ -178,8 +182,8 @@ BLOCKS: Final[dict[str, tuple[str, ...]]] = {
         "HCA", "IDXX", "ISRG", "MRK", "PFE", "REGN", "SYK", "TMO", "UNH", "VRTX", "ZTS",
     ),
     "Financials": (
-        "AIG", "AXP", "BAC", "BK", "BLK", "BX", "C", "CB", "CME", "COF", "GS", "ICE",
-        "MA", "MCO", "MET", "MS", "PGR", "PNC", "PYPL", "SCHW", "TRV", "USB", "V", "WFC",
+        "AIG", "AXP", "BAC", "BLK", "BX", "C", "CB", "CME", "COF", "GS", "ICE", "MA",
+        "MCO", "MET", "MS", "PGR", "PNC", "PYPL", "SCHW", "STT", "TRV", "USB", "V", "WFC",
     ),
     "Information technology": (
         "AAPL", "ACN", "ADBE", "ADI", "AMAT", "AMD", "ANET", "AVGO", "CDNS", "CRM", "CSCO", "IBM",
@@ -193,7 +197,7 @@ BLOCKS: Final[dict[str, tuple[str, ...]]] = {
         "AEP", "CEG", "D", "DUK", "ED", "EXC", "NEE", "PEG", "SO", "SRE", "VST", "XEL",
     ),
     "Real estate": (
-        "AMT", "AVB", "CBRE", "CCI", "DLR", "EQIX", "O", "PLD", "PSA", "SPG", "VICI", "WELL",
+        "AMT", "CBRE", "CCI", "DLR", "EQIX", "IRM", "O", "PLD", "PSA", "SPG", "VICI", "WELL",
     ),
     ADR_PREFIX + "Europe": (
         "AZN", "BBVA", "BP", "BTI", "DEO", "GSK", "HSBC", "ING", "NVS",

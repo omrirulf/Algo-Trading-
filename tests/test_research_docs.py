@@ -134,7 +134,8 @@ def test_the_card_states_the_replacement_rule_and_the_five_replaced_names():
     card = " ".join((RESEARCH / "cards" / "ic-model-scores.md").read_text().split())
     assert "Replacement rule (written 2026-10-03, before the list freezes)" in card
     assert "never because of its price, its returns or its scores" in card
-    for old, new in (("JNJ", "EW"), ("MDT", "IDXX"), ("SPGI", "MET"), ("DOW", "MLM"), ("ASX", "UMC")):
+    for old, new in (("JNJ", "EW"), ("MDT", "IDXX"), ("SPGI", "MET"), ("DOW", "MLM"), ("ASX", "UMC"),
+                     ("BK", "STT"), ("AVB", "IRM")):
         assert f"({old}" in card and f"({new})" in card
         assert old not in shadow_universe.TICKERS and new in shadow_universe.TICKERS
 
