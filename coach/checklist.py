@@ -53,7 +53,7 @@ TITLE: Final[str] = "🗓️ Monthly check-in"
 
 #: The checklist, word for word. No question asks for a number to be sent anywhere.
 QUESTIONS: Final[tuple[str, ...]] = (
-    "Did you save part of your take-home pay this month? Think of the share, not the amount.",
+    "Did you save part of your take-home pay last month? Think of the share, not the amount.",
     "Your savings by part (world stocks, Israeli bonds, cash, anything else): is any part far from where "
     "you want it?",
     "Have you chosen a target share for each part, and how far from it you let a part drift before you "
@@ -108,7 +108,7 @@ def _checkpoint_text(checkpoint: Optional[str]) -> str:
 def message(today: date, race_gate: Optional[dict]) -> dict[str, Any]:
     """The month's push: ``{"title", "message", "month"}``. Fixed words, the public checkpoint date, nothing else."""
     number = month_number(today)
-    lines = [f"Questions for {today:%B %Y}:"]
+    lines = [f"Check-in for {today:%B %Y}:"]
     lines += [f"{i}. {q}" for i, q in enumerate(QUESTIONS, start=1)]
     lines.append(KEEP_IT_PRIVATE)
     lines.append(_checkpoint_text(next_checkpoint(race_gate)))

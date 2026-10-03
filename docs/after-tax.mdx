@@ -55,8 +55,8 @@ The rate table is kept like the price table: its SHA-256 (`rates_sha256`) is com
 and `logs/funds.json`, and the table itself goes to the archive.
 
 Each night's result is in `logs/after_tax.md` and the funds job's summary: whether the table was written, how many
-days came from the Bank of Israel and how many from another source. A night with no table, or with no day from the
-Bank of Israel at all, and a night the funds run itself fails, are sent to the phone (`scoring-prices.yml`, because
+days came from the Bank of Israel and how many from another source. A night with no table, or one in which none of
+the last three days came from the Bank of Israel, and a night the funds run itself fails, are sent to the phone (`scoring-prices.yml`, because
 the funds run holds no secret). On a pull request that changes the rate code, the funds smoke test fetches the rates
 from a GitHub runner too, as a reachability check.
 

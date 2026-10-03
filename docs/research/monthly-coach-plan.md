@@ -97,7 +97,7 @@ or a self-hosted server) or a private messenger bot; both would need the owner's
 Sent by push on the first working day of each month (`coach/checklist.py`, `.github/workflows/coach.yml`). It
 asks the owner to think; it asks nobody to send a number, and nothing is collected:
 
-1. Did you save part of your take-home pay this month? Think of the share, not the amount.
+1. Did you save part of your take-home pay last month? Think of the share, not the amount.
 2. Your savings by part (world stocks, Israeli bonds, cash, anything else): is any part far from where you want
    it?
 3. Have you chosen a target share for each part, and how far from it you let a part drift before you rebalance?

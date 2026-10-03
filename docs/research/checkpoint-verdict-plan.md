@@ -95,10 +95,10 @@ no decision yet
 The JSON says `"verdict": {"text": "no decision yet"}` in `logs/race_gate.json` and `logs/funds.json`, and the
 4 Funds page shows one card: "Checkpoint verdict: no decision yet".
 
-**Between checkpoints, after a look that decided nothing,** the block says "no decision yet" and, under it, the
-last look's frozen tables, for reading; nothing is recomputed between looks. **After a test has decided,** the
-block shows the deciding look's frozen table and verdict, which do not change; later looks are shown for reading
-only.
+**Between checkpoints, after a look that decided nothing,** the block prints only "no decision yet" (as the owner
+asked); the last look's frozen tables stay in `logs/race_gate.json` and `logs/funds.json`, and nothing is
+recomputed between looks. **After a test has decided,** the block shows the deciding look's frozen table and
+verdict, which do not change; later looks go into the JSON for reading only.
 
 ### (v) When calibration has not passed at a checkpoint
 

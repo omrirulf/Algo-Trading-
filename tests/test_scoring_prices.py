@@ -354,12 +354,17 @@ def test_a_failed_shekel_rate_night_reaches_the_phone_from_the_archive_workflow(
         return subprocess.run([sys.executable, "-", str(folder)], input=script, capture_output=True,
                               text=True, check=True).stdout.strip()
 
-    boi = {"rows": [{"ticker": "USDILS", "close": 3.7}, {"ticker": "USDILS.ECB", "close": 3.71}]}
-    ecb_only = {"rows": [{"ticker": "USDILS.ECB", "close": 3.71}]}
+    def tape(*tickers):
+        return {"rows": [{"ticker": t, "date": f"2026-10-{i + 1:02d}", "close": 3.7} for i, t in enumerate(tickers)]}
+
+    boi = tape("USDILS", "USDILS", "USDILS.ECB", "USDILS.ECB")           # two holiday days at the end: fine
+    ecb_only = tape("USDILS.ECB")
+    stale = tape("USDILS", "USDILS", "USDILS.ECB", "USDILS.CARRIED", "USDILS.ECB")   # the feed stopped
     assert verdict({"race_gate.json": "{}"}) == "not-funds"            # a horse race run: nothing to check
     assert verdict({"funds.json": "{}"}) == "missing"
     assert verdict({"funds.json": "{}", "fx-rates.json": "not json"}) == "missing"
     assert verdict({"funds.json": "{}", "fx-rates.json": ecb_only}) == "no-boi"
+    assert verdict({"funds.json": "{}", "fx-rates.json": stale}) == "no-boi"
     assert verdict({"funds.json": "{}", "fx-rates.json": boi}) == "ok"
 
 

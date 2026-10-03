@@ -124,8 +124,8 @@ jobs:
         # fetches the Bank of Israel's rates every night, and it holds no
         # secret (a CI guardrail), so its alert is sent from here. Only for a
         # shadow funds run, whose artifact holds funds.json: no rate table
-        # (fx-rates.json missing or unreadable), or a table with no day from
-        # the Bank of Israel at all, is a failed night. Fixed words; the
+        # (fx-rates.json missing or unreadable), or a table in which none of
+        # the last three days came from the Bank of Israel, is a failed night. Fixed words; the
         # night's counts are public in logs/after_tax.md.
         # Not on a by-hand retry of an old night's archive push: that night's
         # alert was sent then.
@@ -141,12 +141,16 @@ jobs:
               print("not-funds")
               raise SystemExit
           try:
-              rows = json.loads((folder / "fx-rates.json").read_text(encoding="utf-8"))["rows"]
-              boi = sum(1 for row in rows if row.get("ticker") == "USDILS")
+              rows = sorted(json.loads((folder / "fx-rates.json").read_text(encoding="utf-8"))["rows"],
+                            key=lambda row: row["date"])
+              latest = [row.get("ticker") == "USDILS" for row in rows[-3:]]
           except (OSError, ValueError, KeyError, TypeError, AttributeError):
               print("missing")
               raise SystemExit
-          print("ok" if boi else "no-boi")
+          # None of the last three days from the Bank of Israel: its feed has
+          # stopped, or answers without new days (one Israeli holiday, or two
+          # together, never makes three).
+          print("ok" if any(latest) else "no-boi")
           EOF
           )
           echo "shekel rates tonight: $verdict"
@@ -166,8 +170,9 @@ jobs:
                          "again.")
           else:
               title = "⚠️ Bank of Israel not reached tonight"
-              message = ("Tonight's shekel rate table has no day from the Bank of Israel: every day came from "
-                         "another source, counted in logs/after_tax.md. Nothing is traded.")
+              message = ("None of the last three days in tonight's shekel rate table came from the Bank of "
+                         "Israel: they came from another source, counted in logs/after_tax.md. Nothing is "
+                         "traded.")
           print(json.dumps({"topic": os.environ["NTFY_TOPIC"], "title": title, "message": message,
                             "priority": 3, "tags": ["warning"], "click": os.environ["RUN_URL"]}))
           EOF
