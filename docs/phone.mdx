@@ -82,7 +82,12 @@ What arrives, and when:
 
 The topic is the only secret and it never appears in a URL or a log: the
 message is posted as JSON to ntfy's root, and the temporary file that carried
-it is removed. A push step never fails the run; the run's verdict is the
+it is removed. The **phone topic check** workflow (run it by hand from the
+Actions tab) says whether the name is long and random — at least 20
+characters, at least 12 letters and digits after any readable prefix, about 60
+bits or more — printing only yes or no for each test, never the name. ntfy.sh
+is public, so nothing personal is ever pushed; moving to a private channel is
+on the [before real money checklist](/next-steps#before-real-money-the-checklist). A push step never fails the run; the run's verdict is the
 cycle's.
 
 Tapping a notification opens the desk; tapping the weekly report opens its full
