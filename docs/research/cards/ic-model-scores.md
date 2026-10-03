@@ -1,6 +1,6 @@
 # The IC report: do the model's scores rank tomorrow's returns?
 
-**Date:** 2026-10-02 (prepared; **registered at the first checkpoint, 2026-12-22**, pre-registration section 13.9). Nothing on this card is changed after registration.
+**Date:** 2026-10-02 (prepared; **registered at the first checkpoint, 2026-12-22**, pre-registration section 13.9). The owner's decisions on the main metric and the trial count: 2026-10-03, before any IC value existed. Nothing on this card is changed after registration.
 
 **Source:** The information coefficient, the cross-sectional rank correlation of a forecast with the next return (Grinold and Kahn, *Active Portfolio Management*, 2000). The owner's choice of scores, horizons and comparator (2026-10-02).
 
@@ -10,7 +10,7 @@
 
 **Compared against:** Zero (no ranking skill), and, for reading, the momentum score's IC on the same lines and days, with the daily difference (blended IC minus momentum IC) and its Newey-West t.
 
-**Main metric:** Proposed: in each universe, the blended score's IC at 3 sessions (its mean daily IC, Newey-West t, lag 3). The owner confirms or changes it in a dated Amendments row before the funds run of the night the race reaches the first look, before any IC value exists; if nothing is logged by then, this proposal stands. That is the test in the Benjamini-Hochberg family (section 13.5), one per universe, and it gets its Deflated Sharpe Ratio on the daily IC series (section 13.6). Every other score and horizon is reported for reading.
+**Main metric:** The owner's decision of 2026-10-03: one primary test per universe, the blended score's mean daily rank-IC at 1 session (Newey-West t, lag 1). These two primary tests are the only IC members of the Benjamini-Hochberg family (section 13.5), and each gets its Deflated Sharpe Ratio on the daily IC series (section 13.6). Secondary and descriptive only, not in the family: the IC at 3 sessions (the blended score's included), the five single scores at 1 and 3 sessions, the momentum score's IC and the daily difference blended minus momentum.
 
 **Survives its history screen if:** No history screen (uses the AI).
 
@@ -18,13 +18,13 @@
 
 **Read on:** At each checkpoint only, from the one at which it is registered: 2026-12-22 (over every line from 2026-09-28), 2027-03-22, 2027-06-16 (estimated: the race's looks). Between checkpoints only counters are computed or shown: answered lines with each score, and days. No IC value is written to any file, page or log before the checkpoint (`analysis/ic.py`, `counters` and `due`).
 
-**Acting differently:** A day with an IC for the main score (at least 10 names with both values). Fewer than 20 such days by the final checkpoint is "not tested" (section 13.7).
+**Acting differently:** A day with an IC for the primary test (the blended score at 1 session; at least 10 names with both values). Fewer than 20 such days by the final checkpoint is "not tested" (section 13.7).
 
-**Promising if:** At a checkpoint, the main test's mean IC is above zero and passes Benjamini-Hochberg at 5% (section 13.5). The Deflated Sharpe Ratio is shown beside it (13.6). A promising result is only a candidate for a later registration (for example a ranking arm, which the owner said not to build unless this report shows the scores are too coarse); it changes nothing in this one.
+**Promising if:** At a checkpoint, the primary test's mean IC is above zero and passes Benjamini-Hochberg at 5% (section 13.5). The Deflated Sharpe Ratio is shown beside it (13.6). A promising result is only a candidate for a later registration (for example a ranking arm, which the owner said not to build unless this report shows the scores are too coarse); it changes nothing in this one.
 
-**Dead if:** At any checkpoint the main test's mean IC is below zero and passes Benjamini-Hochberg in that direction; or at the final checkpoint its mean IC is zero or below (section 13.7).
+**Dead if:** At any checkpoint the primary test's mean IC is below zero and passes Benjamini-Hochberg in that direction; or at the final checkpoint its mean IC is zero or below (section 13.7).
 
-**Trial number:** 35 (the production names); the shadow stock universe is trial 36, the same rule. The owner's proposal: two trials in N, one idea against the quarterly limit (section 13.8), counted in the first quarter of 2027; confirmed or changed by the owner, like the main metric, before any IC value exists.
+**Trial number:** 35 (the production names); the shadow stock universe is trial 36, the same rule. The owner's decision of 2026-10-03: two trials in N (two universes) and one idea against the quarterly limit (section 13.8), counted in the first quarter of 2027.
 
 ## What is stored on every line (the owner asked)
 

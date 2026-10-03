@@ -312,15 +312,18 @@ charged; (3) the funds credit dividends gross, so the after-tax equity also
 takes off the US tax withheld, a dollar amount; (4) "if sold today" sells at
 the close with no selling cost, as the equity it is taken from is marked;
 (5) tax for a finished year is turned into dollars at that year's last rate
-in the walk, the current year's at the day's own rate. The first two are put
-to the accountant (`docs/research/cpa-questions.md`, question 3), and the
-fifth with question 5; the third and fourth are how the books are kept, not
-tax questions.
+in the walk, the current year's at the day's own rate. The first two are not
+among the owner's questions to the accountant of 3 Oct 2026 and stay as
+written here; the third, fourth and fifth are how the books are kept, not tax
+questions. When tax is really paid during the year (the half-year advance
+payments) is the accountant's question 7 (`docs/research/cpa-questions.md`).
 
 The owner's ten cases (fees 0, tax 25%) are unit tests,
 `tests/test_israel_tax.py`, T1 to T10. T5 (a nominal loss smaller than the
 exchange-rate loss is not deductible) is the owner's reading of the
-circular's two-step rule and **needs confirmation** by the accountant.
+circular's two-step rule and **needs confirmation** by the accountant
+(`docs/research/cpa-questions.md`, question 1); it is not treated as
+confirmed.
 
 **For information only, not a gate:** the extra pre-tax return a year an
 actively traded fund needs to tie with VT held for 20 years, from the
@@ -1014,20 +1017,18 @@ checkpoint (2026-12-22).** Nothing here is in force as a test until then.
   computed or shown: lines with scores, and days. No IC value is written to
   any file, page or log before the checkpoint.
 - **Two universes, one rule**: the production names, and the shadow stock
-  universe below. The owner's proposal: two trials in N (graveyard rows 35
-  and 36) and one idea against the quarterly limit (section 13.8), counted
-  in the first quarter of 2027, when its second universe starts, since it
-  is the same rule. From that checkpoint each universe's main test
-  (proposed on the card: the blended score's IC at 3 sessions) is in the
-  Benjamini-Hochberg family (13.5) and gets its Deflated Sharpe Ratio
-  (13.6).
-- **The owner's two decisions come before any IC number exists.** The owner
-  confirms or changes the count (two trials in N, one idea against the
-  limit) and the main test, in a dated Amendments row, before the funds run
-  of the night the race reaches the first look; no IC value exists before
-  that run. If nothing is logged by then, the proposals stand as registered.
-  If the owner chooses one trial in N, row 36 stays in the graveyard, marked
-  "counted with row 35", and the count of N changes in the same amendment.
+  universe below. **The owner's decision (Amendment 2026-10-03, before any
+  IC value existed):** two trials in N (graveyard rows 35 and 36, one per
+  universe) and one idea against the quarterly limit (section 13.8),
+  counted in the first quarter of 2027, when its second universe starts,
+  since it is the same rule.
+- **One primary test per universe (Amendment 2026-10-03):** the blended
+  score's mean daily rank-IC at 1 session (Newey-West t, lag 1). From the
+  checkpoint at which it is registered, these two primary tests are the
+  only IC members of the Benjamini-Hochberg family (13.5), and each gets
+  its Deflated Sharpe Ratio (13.6). The IC at 3 sessions, the five single
+  scores and the momentum comparison are secondary and descriptive only;
+  they are not in the family.
 - **The shadow stock universe** (`config/shadow_universe.py`,
   `orchestrator/universe.py`): a fixed list of about 250 US-listed large and
   mid-cap stocks and ADRs, none of them production names, published in the
@@ -1121,3 +1122,5 @@ is not in the Benjamini-Hochberg family, and changes no rule.
 | 2026-10-02 | **Regime split** (reporting only; descriptive) | Asked by the owner on 2026-10-02. Section 13.10: the race's and the funds' results split by VT above or not above its 200-day average and by VT's 21-day realized volatility in terciles, with cut-offs fixed by a rule over a window that ends on 2026-09-30, before this registration. Hidden until the checkpoints (sessions per state only between them); decides nothing, not in the Benjamini-Hochberg family; counts as one trial in N (graveyard row 41). Made before any checkpoint result existed. |
 | 2026-10-02 | **Verdict disclosure** (new registration; a label and a policy, not a rule) | Asked by the owner on 2026-10-02. Section 5d and a clause in section 9: if VT's maximum drawdown from its high inside the test window (2026-09-23 to the close of the deciding look's last trades, final closes with dividends added back, as the index test treats them) is below 10%, the verdict is labelled "not tested in a downturn" and any real-money step starts small. It does not extend the test, move a look or change an outcome. Made before any checkpoint result existed. |
 | 2026-10-02 | **Regime split: the volatility cut-offs fixed** (the numbers the registered rule of section 13.10 gives; nothing else changes) | The rule of the row above, run once by the history screen's stress kind (workflow run 37013435615, from VT's final closes 2008-07-28 to 2026-09-30, 4,573 sessions; `docs/research/history/2026-10-stress-periods/results.json`, key `regime_cutoffs`): low up to 11.30% a year, mid up to 16.97%, high above (0.11302353418809083 and 0.16965241927688823), written into section 13.10 and `analysis/regimes.py` (`VOL_CUTOFFS`). The window ends before this registration; no race or fund result was read. |
+| 2026-10-03 | **The IC test's main metric and trial count** (the owner's decisions, which section 13.9 left to the owner; registered with the card on 2026-12-22) | Decided by the owner on 2026-10-03, **before any IC value existed**: until the 2026-12-22 checkpoint the IC report writes counters only, and no IC has been computed. Two trials in N (graveyard rows 35 and 36, one per universe) and one idea against the quarterly limit, counted in the first quarter of 2027. One primary test per universe: the blended score's mean daily rank-IC at 1 session (Newey-West t, lag 1), in place of the proposed 3 sessions; these two primary tests are the only IC members of the Benjamini-Hochberg family. The IC at 3 sessions, the five single scores and the momentum comparison are secondary and descriptive only, not in the family. Section 13.9, the card `docs/research/cards/ic-model-scores.md`, graveyard rows 35 and 36, and `analysis/ic.py` (`MAIN_HORIZON` = 1). No arm, bar or rule of the race changes. |
+| 2026-10-03 | **Cross-references only: the accountant's questions** (no rule changes) | The owner replaced the eight questions to the accountant written on 2026-10-02 with the owner's own list of ten (`docs/research/cpa-questions.md`, followed by the two added on 2026-10-02). Section 5c now points at the new numbers: T5 is question 1 and still **needs confirmation** (it is not treated as confirmed); conventions (1) and (2), on short sales, are no longer put to the accountant and stay as written; when tax is really paid during the year is question 7. No setting, number or rule changes. |

@@ -58,7 +58,7 @@ W8BEN_FILED: Final[bool] = True
 #: dividends. On by default -- the harsher case for an actively traded fund,
 #: whose losses then shield dividends already credited with US tax instead
 #: of carrying forward -- until the accountant answers
-#: (``docs/research/cpa-questions.md``, question 1).
+#: (``docs/research/cpa-questions.md``, question 2).
 OFFSET_LOSSES_VS_DIVIDENDS: Final[bool] = True
 #: Rule e: a loss carried forward never expires (``None``) and is used
 #: against future capital gains only, at its nominal shekel amount.
@@ -77,10 +77,12 @@ SURTAX_CAPITAL_RATE: Final[float] = 0.02
 #: The owner's salary for the surtax: an input, 0 here. Never commit a real one.
 SALARY_ILS: Final[float] = 0.0
 
-#: Rule c: the order lots are sold in, per account.
+#: Rule c: the order lots are sold in, per account (``docs/research/cpa-questions.md``,
+#: question 3).
 LOT_METHOD: Final[str] = "FIFO"
 
-#: Rule f: where the exchange rate comes from.
+#: Rule f: where the exchange rate comes from (``docs/research/cpa-questions.md``,
+#: question 4).
 FX_SOURCE: Final[str] = "Bank of Israel representative rate (USD/ILS), on the trade date"
 #: Only for a day the Bank of Israel did not publish: the European Central
 #: Bank's reference rates, crossed through the euro (USD/ILS = EUR/ILS divided

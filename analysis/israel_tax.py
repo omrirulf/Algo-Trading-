@@ -34,7 +34,8 @@ with them:
   are not sorted and unique, and an event on a day it is not given.
 
 Five conventions the rules leave open, written into the pre-registration's
-section 5c and put to the accountant (``docs/research/cpa-questions.md``):
+section 5c (the open tax questions, with what the code assumes until each is
+answered, are in ``docs/research/cpa-questions.md``):
 
 1. A short sale is a lot opened by a sale and closed by a purchase: rule a
    with the purchase as the cost (at its day's rate) and the sale as the

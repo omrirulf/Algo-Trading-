@@ -86,7 +86,8 @@ def test_the_registered_settings():
     assert ic.NW_LAG == {h: h for h in ic.HORIZONS}, "the Newey-West lag is the horizon (the race's convention)"
     assert ic.UNIVERSES == ("production", "shadow")
     assert ic.UNIVERSE_START == {"production": ic.IC_START, "shadow": ic.SHADOW_START}
-    assert (ic.MAIN_SCORE, ic.MAIN_HORIZON) == ("blend", 3)
+    # The owner's decision of 3 Oct 2026: the primary test is the blended score's IC at 1 session.
+    assert (ic.MAIN_SCORE, ic.MAIN_HORIZON) == ("blend", 1)
     assert ic.MAIN_SCORE in ic.SCORES and ic.MAIN_HORIZON in ic.HORIZONS
     assert ic.PAIRED == ("blend", "momentum")
     assert ic.COUNTER_KEYS == ("answered_lines", "lines_with_score", "line_days")
@@ -110,8 +111,10 @@ def test_the_shadow_start_is_the_universes_own():
 def test_the_card_carries_the_registered_settings():
     text = ic.card()
     for phrase in ("2026-09-28", "2027-01-01", "22 Dec 2026", "**t = 2.4**", "**10 names**", "h = 1 and 3",
-                   "lag = horizon", "Price only", "proposed; the owner confirms at registration",
-                   "blended score's IC at 3 sessions", "Benjamini-Hochberg", "Deflated Sharpe Ratio",
+                   "lag = horizon", "Price only", "the owner's decision of 3 Oct 2026",
+                   "blended score's mean daily rank-IC at 1 session", "only IC members of the Benjamini-Hochberg",
+                   "Secondary, descriptive only, not in the family:** the IC at 3 sessions", "five single scores",
+                   "Two trials in N", "one idea against the quarterly limit", "Deflated Sharpe Ratio",
                    "No IC value is written to any file, page or log", "Shadow only",
                    "(a signal about this ticker, not held)", "webhook unreachable", "**90%**",
                    "The common move is taken out", "N^2 / max(sum of C^2 - N(N - 1) / (T - 1), N)", "n_eff_raw"):
@@ -645,7 +648,7 @@ def test_the_record_has_the_registered_shape():
     assert json.loads(json.dumps(found)) == found, "the record is plain JSON"
     assert (found["through"], found["registered"], found["start"]) == (through.isoformat(), "2026-12-22",
                                                                        "2026-09-28")
-    assert found["settings"]["main"] == {"score": "blend", "horizon": 3}
+    assert found["settings"]["main"] == {"score": "blend", "horizon": 1}
     assert found["universes"]["shadow"] == {"no_data": True}
     production = found["universes"]["production"]
     assert production["lines"] == 31 * 12, "lines after ``through`` are not read"
@@ -667,11 +670,12 @@ def test_the_record_has_the_registered_shape():
     assert production["n_eff_window_dates"] == 30 and 0 < production["n_eff_raw"] <= production["n_eff"] <= 12
     assert found["settings"]["n_eff_min_coverage"] == ic.N_EFF_MIN_COVERAGE
     assert three["blend"]["mde_theory"] == pytest.approx(ic.mde_theory(production["n_eff"], 28, 3))
-    main = production["main"]
+    # The primary test (the family's only IC member for this universe) is the blended score at 1 session.
+    main, one = production["main"], production["horizons"]["1"]
     assert {"t", "stats", "mean_daily_diff", "days"} <= set(main)
-    assert main["t"] == three["blend"]["t"] and main["days"] == three["blend"]["days"]
-    assert main["mean_daily_diff"] == three["blend"]["mean_ic"] and main["stats"] == three["blend"]["stats"]
-    assert main["name"] == "ic_production_blend_3"
+    assert main["t"] == one["blend"]["t"] and main["days"] == one["blend"]["days"] == 31 - 1
+    assert main["mean_daily_diff"] == one["blend"]["mean_ic"] and main["stats"] == one["blend"]["stats"]
+    assert main["name"] == "ic_production_blend_1" and main["horizon"] == 1
 
 
 def test_a_record_does_not_move_with_later_lines_or_bars():

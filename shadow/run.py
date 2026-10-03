@@ -702,9 +702,12 @@ FAMILY: Final[tuple[tuple[str, str, str, Optional[tuple[str, ...]]], ...]] = (
     ("model_sized", "tests", "model_sized", ("tests", "model_sized", "acted")),
     ("model_same_day", "tests", "model_same_day", None),
     # Section 13.9 (prepared 2026-10-02, registered at the 2026-12-22
-    # checkpoint): the IC report's main test, one per universe, from the
-    # checkpoint record it is first made in. A universe with no data yet is
-    # left out of the family, as 13.5 says; "acting" is a day with an IC.
+    # checkpoint): the IC report's primary test, one per universe (the
+    # blended score's IC at 1 session, the owner's decision of 3 Oct 2026),
+    # from the checkpoint record it is first made in. These two are the only
+    # IC members of the family; the other IC numbers are descriptive. A
+    # universe with no data yet is left out of the family, as 13.5 says;
+    # "acting" is a day with an IC.
     ("IC, production names", "ic_main", "production", ("ic_main", "production", "days")),
     ("IC, shadow stock universe", "ic_main", "shadow", ("ic_main", "shadow", "days")),
 )

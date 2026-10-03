@@ -67,7 +67,7 @@ def test_t4_a_nominal_gain_smaller_than_the_currency_gain_is_not_taxed():
 
 def test_t5_a_loss_made_only_by_the_exchange_rate_is_not_deductible():
     """The owner's reading of the circular's two-step rule: NEEDS CONFIRMATION by the accountant
-    (``docs/research/cpa-questions.md``, question 2)."""
+    (``docs/research/cpa-questions.md``, question 1). Not to be treated as confirmed (the owner, 3 Oct 2026)."""
     g = tax.lot_gain(10_000, 3.70, 10_500, 3.40)
     assert (g.cost_ils, g.proceeds_ils) == (approx(37_000), approx(35_700))
     assert g.nominal == approx(-1_300) and g.inflation == approx(-3_000)

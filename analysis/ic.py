@@ -99,10 +99,12 @@ score, and line days -- counts only. It is given no prices, so it cannot
 compute a return, and it checks its own output. ``due`` is True only on a
 night a new look of the race is reached on or after ``IC_REGISTRATION``;
 ``record`` is then made once and kept unchanged, like the exploratory
-tests' records (``shadow/run.py``). The main test, PROPOSED as the blended
-score at 3 sessions (``MAIN_SCORE``, ``MAIN_HORIZON``; the owner confirms it
-at registration), enters the Benjamini-Hochberg family and the Deflated
-Sharpe Ratio; every other number is for reading. ``card`` is the
+tests' records (``shadow/run.py``). The primary test, the owner's decision
+of 3 Oct 2026, is one per universe: the blended score's mean daily rank-IC
+at 1 session (``MAIN_SCORE``, ``MAIN_HORIZON``). Those two are the only IC
+members of the Benjamini-Hochberg family (and get its Deflated Sharpe
+Ratio); the 3-session IC, the five single scores, momentum and the paired
+difference are secondary and descriptive only. ``card`` is the
 pre-registration card, made from these same constants.
 
 Pure computation: bars come in (``bars_from_fetcher`` builds them from a
@@ -164,10 +166,11 @@ N_EFF_MIN_DATES: Final[int] = 20
 #: n_eff: a name whose returns, once each date's mean is taken out, vary by less than this share of its own
 #: returns' spread moves exactly with the others (what is left is rounding, not a move). Not a setting.
 _FLAT_SHARE: Final[float] = 1e-9
-#: The main test, PROPOSED: the blended score's IC at 3 sessions. The owner confirms it at registration.
+#: The primary test, one per universe (the owner's decision of 3 Oct 2026): the blended score's mean daily
+#: rank-IC at 1 session. These two are the only IC members of the Benjamini-Hochberg family.
 MAIN_SCORE: Final[str] = "blend"
-#: The main test's horizon, in sessions (proposed with ``MAIN_SCORE``).
-MAIN_HORIZON: Final[int] = 3
+#: The primary test's horizon, in sessions (the owner's decision of 3 Oct 2026, with ``MAIN_SCORE``).
+MAIN_HORIZON: Final[int] = 1
 #: For reading only: the blended score's daily IC minus the comparator's, on the days both have one.
 PAIRED: Final[tuple[str, str]] = ("blend", COMPARATOR)
 #: Everything ``counters`` may show, per universe, and nothing else.
@@ -853,9 +856,14 @@ def card() -> str:
         "change their ranks. With C the correlation matrix of what is left (N names, T dates): "
         "n_eff = N^2 / max(sum of C^2 - N(N - 1) / (T - 1), N), the participation ratio with the sampling noise "
         "of T dates taken out; the uncorrected N^2 / sum of C^2 is shown as n_eff_raw, for reading.",
-        f"- **Main test (proposed; the owner confirms at registration).** The {_label(MAIN_SCORE)}'s IC at "
-        f"{MAIN_HORIZON} sessions, one test per universe. It enters the Benjamini-Hochberg family and the "
-        "Deflated Sharpe Ratio. Every other number is for reading only.",
+        f"- **Primary test (the owner's decision of 3 Oct 2026).** The {_label(MAIN_SCORE)}'s mean daily "
+        f"rank-IC at {MAIN_HORIZON} session{'s' if MAIN_HORIZON > 1 else ''}, one test per universe. These two "
+        "are the only IC members of the Benjamini-Hochberg family, and each gets the family's Deflated Sharpe "
+        "Ratio. **Secondary, descriptive only, not in the family:** the IC at "
+        f"{', '.join(str(h) for h in HORIZONS if h != MAIN_HORIZON)} sessions, the five single scores at every "
+        "horizon, the momentum comparator and the blend-minus-momentum difference.",
+        "- **Trials.** Two trials in N (graveyard rows 35 and 36, one per universe) and one idea against the "
+        "quarterly limit, counted in the first quarter of 2027 (the owner's decision of 3 Oct 2026).",
         f"- **Hidden until the checkpoint.** Before {_day(IC_REGISTRATION)} only counters are shown: answered "
         "lines, lines with each score, and days. No IC value is written to any file, page or log before it. "
         "The record is made once at each checkpoint from then on and kept unchanged.",

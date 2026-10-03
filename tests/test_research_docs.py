@@ -99,12 +99,32 @@ def test_the_owners_items_of_2_oct_have_their_rows_before_they_run():
     assert "market state" in rows[41][1] and rows[41][2] == "exploratory report"
 
 
-def test_the_accountant_questions_are_listed_with_the_two_new_ones():
+def test_the_accountant_questions_are_the_owners_ten_then_the_two_added_earlier():
     text = (RESEARCH / "cpa-questions.md").read_text()
     numbered = re.findall(r"^(\d+)\. \*\*", text, re.M)
-    assert numbered == [str(n) for n in range(1, 11)]
-    assert "ILS-hedged fund" in text and "kupat gemel lehashkaa" in text and "Arbitrage Committee" in text
-    assert "OFFSET_LOSSES_VS_DIVIDENDS" in text and "T5" in text
+    assert numbered == [str(n) for n in range(1, 13)]
+    # The owner's list of 3 Oct 2026, in order, in the owner's words.
+    owners = [
+        "is the allowable loss zero under Circular 10/2025?",
+        "Must a current-year capital loss first be offset against foreign dividends",
+        "may I use specific-lot identification instead of FIFO",
+        "Which Bank of Israel representative rate applies: the trade date or the settlement date?",
+        "For an accumulating Irish UCITS ETF bought abroad in USD",
+        "exposed to section 86 (artificial transaction)?",
+        "Do the half-year advance-payment reports net losses realized in the same half?",
+        "What are the penalties for late filing and late payment",
+        "What does Form 1324 cover",
+        "With automatic withholding through HYBRID and Form 867",
+    ]
+    flat = " ".join(text.split())
+    places = [flat.index(" ".join(q.split())) for q in owners]
+    assert places == sorted(places)
+    assert flat.index("ILS-hedged fund") > places[-1] and "kupat gemel lehashkaa" in text
+    assert "Arbitrage Committee" in text
+    # T5 is question 1 and stays unconfirmed; the switch it does not decide is question 2.
+    first = flat[places[0] - 200:places[1]]
+    assert "T5" in first and "needs confirmation" in first
+    assert "OFFSET_LOSSES_VS_DIVIDENDS" in flat[places[1]:places[2]]
 
 
 def test_the_ic_card_carries_the_shadow_universe_exactly_as_the_code_lists_it():
@@ -139,6 +159,19 @@ def test_the_ic_card_states_the_settings_the_code_registers():
     assert ic.N_EFF_MIN_COVERAGE == 0.9 and ic.NW_LAG == {1: 1, 3: 3} and ic.HORIZONS == (1, 3)
     for phrase in ("at least 10 of them", "fewer than 20 returns", "fewer than 90% of the window's dates",
                    "at least 20 of them", "t = 2.4", "lag equal to the horizon (1 and 3)", "h = 1 and h = 3",
-                   "the blended score's IC at 3 sessions"):
+                   "the blended score's mean daily rank-IC at 1 session (Newey-West t, lag 1)",
+                   "only IC members of the Benjamini-Hochberg family", "the IC at 3 sessions",
+                   "two trials in N (two universes) and one idea against the quarterly limit"):
         assert phrase in card, phrase
-    assert (ic.MAIN_SCORE, ic.MAIN_HORIZON) == ("blend", 3)
+    assert (ic.MAIN_SCORE, ic.MAIN_HORIZON) == ("blend", 1)
+
+
+def test_only_the_two_primary_ic_tests_are_in_the_family():
+    """The owner's decision of 3 Oct 2026: one primary IC test per universe in the Benjamini-Hochberg family;
+    the 3-session IC and the single scores are descriptive only."""
+    from shadow import run as shadow_run
+
+    ic_rows = [row for row in shadow_run.FAMILY if row[0].startswith("IC") or row[1].startswith("ic")]
+    assert [row[1:3] for row in ic_rows] == [("ic_main", "production"), ("ic_main", "shadow")]
+    text = " ".join((ROOT / "docs" / "horse-race-preregistration.md").read_text().split())
+    assert "these two primary tests are the only IC members of the Benjamini-Hochberg family" in text
