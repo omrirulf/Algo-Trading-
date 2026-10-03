@@ -180,3 +180,24 @@ def test_the_concentration_report_is_made_by_the_credential_free_funds_workflow(
     assert step["continue-on-error"] is True and "env" not in step
     assert "python -m analysis.concentration --previous --history logs/concentration.json" in step["run"]
     assert "git add -f logs/concentration.json 2>/dev/null || true" in steps["Commit the two files"]["run"]
+
+
+def test_the_phone_and_the_markdown_name_the_names_with_no_headlines(tmp_path):
+    """The owner, 3 Oct 2026: a weekly count of names with zero headlines, with the list (a report only)."""
+    record = drift_record()
+    record["weeks"][0]["news"] = {"names": 80, "no_headlines": ["CANE", "EWU", "EWW", "EZA", "WEAT"],
+                                  "search_failed": []}
+    folder = logs(tmp_path, drift=record, digest=digest_record())
+    text = weekly.phone(WEEK, URL, folder)
+    assert "Names with no headlines all week: 5 of 80 (CANE, EWU, EWW, EZA, WEAT)" in text
+    assert "- names with no headlines all week: 5 of 80 (CANE, EWU, EWW, EZA, WEAT)" in weekly.markdown(WEEK, folder)
+
+
+def test_a_long_list_is_capped_on_the_phone_and_an_old_record_shows_no_line(tmp_path):
+    record = drift_record()
+    record["weeks"][0]["news"] = {"names": 80, "no_headlines": [f"T{i:02d}" for i in range(40)],
+                                  "search_failed": []}
+    text = weekly.phone(WEEK, URL, logs(tmp_path, drift=record, digest=digest_record()))
+    assert "40 of 80 (T00," in text and "T11, …)" in text and "T12" not in text
+    old = weekly.phone(WEEK, URL, logs(tmp_path, drift=drift_record(), digest=digest_record()))
+    assert "no headlines" not in old

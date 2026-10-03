@@ -1,0 +1,1151 @@
+{
+ "meta": {
+  "kind": "stress",
+  "generated_at": "2026-10-02T13:35:08+00:00",
+  "final_through": "2026-10-01",
+  "last_session": "2026-10-01",
+  "watchlist_names": 80,
+  "prices_sha256": "53c10c908d66284a330f327fec181651052e790052abe8ad0af937eb6bc46591",
+  "prices_fetched_at": "2026-10-02T13:30:57+00:00",
+  "journal_sha256": "f0826e889bc1982041fa395c12f7a028d648e2fe5b95ebe5a2d70e33feb84d89",
+  "journal_lines": 87089,
+  "starting_cash": 100000.0,
+  "cost_per_side": 0.001,
+  "missing_tickers": [],
+  "run": {
+   "run_id": "37013435615",
+   "commit": "1f28fec6c71037d852ec793a97aa16bc26334caa"
+  },
+  "seconds": 217
+ },
+ "periods": {
+  "2000-2002": {
+   "first": "2000-01-03",
+   "last": "2002-12-31",
+   "names": {
+    "watchlist": 80,
+    "with_prices": 44,
+    "from_the_first_session": 33
+   },
+   "vt": {
+    "first_price": "2008-06-26",
+    "in_period": "none",
+    "note": "VT did not exist; against SPY instead"
+   },
+   "sessions": 752,
+   "first_session": "2000-01-03",
+   "last_session": "2002-12-31",
+   "first_cycle": "1999-12-31",
+   "funds": {
+    "momentum": {
+     "possible": true,
+     "first": "2000-01-03",
+     "last": "2002-12-31",
+     "sessions": 752,
+     "total_return": -0.2951502069703422,
+     "max_drawdown": 0.33704107618336987,
+     "mean_invested": 0.7198635689350538,
+     "vs_vt": {
+      "possible": false,
+      "why": "VT did not exist (its first price is 2008-06-26)"
+     },
+     "vs_spy": {
+      "possible": true,
+      "from": "2000-01-03",
+      "to": "2002-12-31",
+      "sessions": 752,
+      "fund_return": -0.2951502069703422,
+      "compared_return": -0.3751385899078369,
+      "difference": 0.07998838293749466
+     },
+     "entries": 1467
+    },
+    "momentum_200": {
+     "possible": true,
+     "first": "2000-01-03",
+     "last": "2002-12-31",
+     "sessions": 752,
+     "total_return": -0.2789671394710772,
+     "max_drawdown": 0.3298045893936238,
+     "mean_invested": 0.6973423315644,
+     "vs_vt": {
+      "possible": false,
+      "why": "VT did not exist (its first price is 2008-06-26)"
+     },
+     "vs_spy": {
+      "possible": true,
+      "from": "2000-01-03",
+      "to": "2002-12-31",
+      "sessions": 752,
+      "fund_return": -0.2789671394710772,
+      "compared_return": -0.3751385899078369,
+      "difference": 0.09617145043675968
+     },
+     "entries": 1382
+    },
+    "vt_timing": {
+     "possible": false,
+     "why": "VT did not exist (its first price is 2008-06-26); BIL (B's T-bills) did not exist yet (its first price is 2007-05-30)"
+    },
+    "momentum_pullback": {
+     "possible": true,
+     "first": "2000-01-03",
+     "last": "2002-12-31",
+     "sessions": 752,
+     "total_return": -0.23380626168246,
+     "max_drawdown": 0.2711211224041219,
+     "mean_invested": 0.7090693482887388,
+     "vs_vt": {
+      "possible": false,
+      "why": "VT did not exist (its first price is 2008-06-26)"
+     },
+     "vs_spy": {
+      "possible": true,
+      "from": "2000-01-03",
+      "to": "2002-12-31",
+      "sessions": 752,
+      "fund_return": -0.23380626168246,
+      "compared_return": -0.3751385899078369,
+      "difference": 0.1413323282253769
+     },
+     "entries": 1269
+    },
+    "vt": {
+     "possible": false,
+     "why": "VT did not exist (its first price is 2008-06-26)"
+    },
+    "spy": {
+     "possible": true,
+     "first": "2000-01-03",
+     "last": "2002-12-31",
+     "sessions": 752,
+     "total_return": -0.3751385899078369,
+     "max_drawdown": 0.4661354491412628,
+     "mean_invested": 0.9797546497437105,
+     "vs_vt": {
+      "possible": false,
+      "why": "VT did not exist (its first price is 2008-06-26)"
+     }
+    }
+   },
+   "integrity": {
+    "ok": true,
+    "problems": [],
+    "data_holes": 0,
+    "data_hole_examples": []
+   }
+  },
+  "2008": {
+   "first": "2008-01-02",
+   "last": "2008-12-31",
+   "names": {
+    "watchlist": 80,
+    "with_prices": 69,
+    "from_the_first_session": 67
+   },
+   "vt": {
+    "first_price": "2008-06-26",
+    "in_period": "part",
+    "note": "VT only from 2008-06-26 (its first price): against VT over its sessions only"
+   },
+   "sessions": 253,
+   "first_session": "2008-01-02",
+   "last_session": "2008-12-31",
+   "first_cycle": "2007-12-31",
+   "funds": {
+    "momentum": {
+     "possible": true,
+     "first": "2008-01-02",
+     "last": "2008-12-31",
+     "sessions": 253,
+     "total_return": -0.032180760812312914,
+     "max_drawdown": 0.19025875241360413,
+     "mean_invested": 0.8552887644091708,
+     "vs_vt": {
+      "possible": true,
+      "from": "2008-06-26",
+      "to": "2008-12-31",
+      "sessions": 131,
+      "fund_return": 0.10073769198164362,
+      "compared_return": -0.33590624168380734,
+      "difference": 0.43664393366545096
+     },
+     "vs_spy": {
+      "possible": true,
+      "from": "2008-01-02",
+      "to": "2008-12-31",
+      "sessions": 253,
+      "fund_return": -0.032180760812312914,
+      "compared_return": -0.3658027655264282,
+      "difference": 0.3336220047141153
+     },
+     "entries": 629
+    },
+    "momentum_200": {
+     "possible": true,
+     "first": "2008-01-02",
+     "last": "2008-12-31",
+     "sessions": 253,
+     "total_return": 0.057787649294336996,
+     "max_drawdown": 0.17431962768263898,
+     "mean_invested": 0.8526071943368936,
+     "vs_vt": {
+      "possible": true,
+      "from": "2008-06-26",
+      "to": "2008-12-31",
+      "sessions": 131,
+      "fund_return": 0.1243999572741239,
+      "compared_return": -0.33590624168380734,
+      "difference": 0.46030619895793123
+     },
+     "vs_spy": {
+      "possible": true,
+      "from": "2008-01-02",
+      "to": "2008-12-31",
+      "sessions": 253,
+      "fund_return": 0.057787649294336996,
+      "compared_return": -0.3658027655264282,
+      "difference": 0.4235904148207652
+     },
+     "entries": 602
+    },
+    "vt_timing": {
+     "possible": false,
+     "why": "B needs VT's month-end closes for the 10 months up to 2007-12-31, its first decision; VT's first price is 2008-06-26"
+    },
+    "momentum_pullback": {
+     "possible": true,
+     "first": "2008-01-02",
+     "last": "2008-12-31",
+     "sessions": 253,
+     "total_return": -0.05544674032688057,
+     "max_drawdown": 0.2025124061567659,
+     "mean_invested": 0.8530753952612552,
+     "vs_vt": {
+      "possible": true,
+      "from": "2008-06-26",
+      "to": "2008-12-31",
+      "sessions": 131,
+      "fund_return": 0.11164485194144413,
+      "compared_return": -0.33590624168380734,
+      "difference": 0.4475510936252515
+     },
+     "vs_spy": {
+      "possible": true,
+      "from": "2008-01-02",
+      "to": "2008-12-31",
+      "sessions": 253,
+      "fund_return": -0.05544674032688057,
+      "compared_return": -0.3658027655264282,
+      "difference": 0.31035602519954764
+     },
+     "entries": 607
+    },
+    "vt": {
+     "possible": true,
+     "first": "2008-06-26",
+     "last": "2008-12-31",
+     "sessions": 131,
+     "total_return": -0.33590624168380734,
+     "max_drawdown": 0.4672318457308958,
+     "mean_invested": 0.9996277429547481,
+     "vs_spy": {
+      "possible": true,
+      "from": "2008-06-26",
+      "to": "2008-12-31",
+      "sessions": 131,
+      "fund_return": -0.33590624168380734,
+      "compared_return": -0.30130391690274083,
+      "difference": -0.03460232478106651
+     }
+    },
+    "spy": {
+     "possible": true,
+     "first": "2008-01-02",
+     "last": "2008-12-31",
+     "sessions": 253,
+     "total_return": -0.3658027655264282,
+     "max_drawdown": 0.4714190617611693,
+     "mean_invested": 0.9886770568159653,
+     "vs_vt": {
+      "possible": true,
+      "from": "2008-06-26",
+      "to": "2008-12-31",
+      "sessions": 131,
+      "fund_return": -0.30130391690274083,
+      "compared_return": -0.33590624168380734,
+      "difference": 0.03460232478106651
+     }
+    }
+   },
+   "integrity": {
+    "ok": true,
+    "problems": [],
+    "data_holes": 0,
+    "data_hole_examples": []
+   }
+  },
+  "2020": {
+   "first": "2020-01-02",
+   "last": "2020-12-31",
+   "names": {
+    "watchlist": 80,
+    "with_prices": 80,
+    "from_the_first_session": 80
+   },
+   "vt": {
+    "first_price": "2008-06-26",
+    "in_period": "whole",
+    "note": null
+   },
+   "sessions": 253,
+   "first_session": "2020-01-02",
+   "last_session": "2020-12-31",
+   "first_cycle": "2019-12-31",
+   "funds": {
+    "momentum": {
+     "possible": true,
+     "first": "2020-01-02",
+     "last": "2020-12-31",
+     "sessions": 253,
+     "total_return": -0.03141950350242739,
+     "max_drawdown": 0.2153700393506568,
+     "mean_invested": 0.8654245869913674,
+     "vs_vt": {
+      "possible": true,
+      "from": "2020-01-02",
+      "to": "2020-12-31",
+      "sessions": 253,
+      "fund_return": -0.03141950350242739,
+      "compared_return": 0.15453204690353406,
+      "difference": -0.18595155040596145
+     },
+     "vs_spy": {
+      "possible": true,
+      "from": "2020-01-02",
+      "to": "2020-12-31",
+      "sessions": 253,
+      "fund_return": -0.03141950350242739,
+      "compared_return": 0.17157896549438467,
+      "difference": -0.20299846899681206
+     },
+     "entries": 719
+    },
+    "momentum_200": {
+     "possible": true,
+     "first": "2020-01-02",
+     "last": "2020-12-31",
+     "sessions": 253,
+     "total_return": -0.018017415648862944,
+     "max_drawdown": 0.2152183204928878,
+     "mean_invested": 0.8587439262045933,
+     "vs_vt": {
+      "possible": true,
+      "from": "2020-01-02",
+      "to": "2020-12-31",
+      "sessions": 253,
+      "fund_return": -0.018017415648862944,
+      "compared_return": 0.15453204690353406,
+      "difference": -0.172549462552397
+     },
+     "vs_spy": {
+      "possible": true,
+      "from": "2020-01-02",
+      "to": "2020-12-31",
+      "sessions": 253,
+      "fund_return": -0.018017415648862944,
+      "compared_return": 0.17157896549438467,
+      "difference": -0.18959638114324762
+     },
+     "entries": 717
+    },
+    "vt_timing": {
+     "possible": true,
+     "first": "2020-01-02",
+     "last": "2020-12-31",
+     "sessions": 253,
+     "total_return": 0.12990585952995337,
+     "max_drawdown": 0.11114382722240546,
+     "mean_invested": 0.9980352359173159,
+     "vs_vt": {
+      "possible": true,
+      "from": "2020-01-02",
+      "to": "2020-12-31",
+      "sessions": 253,
+      "fund_return": 0.12990585952995337,
+      "compared_return": 0.15453204690353406,
+      "difference": -0.024626187373580688
+     },
+     "vs_spy": {
+      "possible": true,
+      "from": "2020-01-02",
+      "to": "2020-12-31",
+      "sessions": 253,
+      "fund_return": 0.12990585952995337,
+      "compared_return": 0.17157896549438467,
+      "difference": -0.0416731059644313
+     },
+     "switches": 2,
+     "first_decision": "2019-12-31"
+    },
+    "momentum_pullback": {
+     "possible": true,
+     "first": "2020-01-02",
+     "last": "2020-12-31",
+     "sessions": 253,
+     "total_return": 0.00478391141376,
+     "max_drawdown": 0.23507542324026276,
+     "mean_invested": 0.8745021191846931,
+     "vs_vt": {
+      "possible": true,
+      "from": "2020-01-02",
+      "to": "2020-12-31",
+      "sessions": 253,
+      "fund_return": 0.00478391141376,
+      "compared_return": 0.15453204690353406,
+      "difference": -0.14974813548977406
+     },
+     "vs_spy": {
+      "possible": true,
+      "from": "2020-01-02",
+      "to": "2020-12-31",
+      "sessions": 253,
+      "fund_return": 0.00478391141376,
+      "compared_return": 0.17157896549438467,
+      "difference": -0.16679505408062467
+     },
+     "entries": 707
+    },
+    "vt": {
+     "possible": true,
+     "first": "2020-01-02",
+     "last": "2020-12-31",
+     "sessions": 253,
+     "total_return": 0.15453204690353406,
+     "max_drawdown": 0.34207417256923667,
+     "mean_invested": 0.9932832526282324,
+     "vs_spy": {
+      "possible": true,
+      "from": "2020-01-02",
+      "to": "2020-12-31",
+      "sessions": 253,
+      "fund_return": 0.15453204690353406,
+      "compared_return": 0.17157896549438467,
+      "difference": -0.017046918590850613
+     }
+    },
+    "spy": {
+     "possible": true,
+     "first": "2020-01-02",
+     "last": "2020-12-31",
+     "sessions": 253,
+     "total_return": 0.17157896549438467,
+     "max_drawdown": 0.33608551877220805,
+     "mean_invested": 0.9906803646610398,
+     "vs_vt": {
+      "possible": true,
+      "from": "2020-01-02",
+      "to": "2020-12-31",
+      "sessions": 253,
+      "fund_return": 0.17157896549438467,
+      "compared_return": 0.15453204690353406,
+      "difference": 0.017046918590850613
+     }
+    }
+   },
+   "integrity": {
+    "ok": true,
+    "problems": [],
+    "data_holes": 0,
+    "data_hole_examples": []
+   }
+  },
+  "2022": {
+   "first": "2022-01-03",
+   "last": "2022-12-30",
+   "names": {
+    "watchlist": 80,
+    "with_prices": 80,
+    "from_the_first_session": 80
+   },
+   "vt": {
+    "first_price": "2008-06-26",
+    "in_period": "whole",
+    "note": null
+   },
+   "sessions": 251,
+   "first_session": "2022-01-03",
+   "last_session": "2022-12-30",
+   "first_cycle": "2021-12-31",
+   "funds": {
+    "momentum": {
+     "possible": true,
+     "first": "2022-01-03",
+     "last": "2022-12-30",
+     "sessions": 251,
+     "total_return": -0.12409951398730246,
+     "max_drawdown": 0.19178031721915545,
+     "mean_invested": 0.8734535113641555,
+     "vs_vt": {
+      "possible": true,
+      "from": "2022-01-03",
+      "to": "2022-12-30",
+      "sessions": 251,
+      "fund_return": -0.12409951398730246,
+      "compared_return": -0.1843701788253782,
+      "difference": 0.06027066483807575
+     },
+     "vs_spy": {
+      "possible": true,
+      "from": "2022-01-03",
+      "to": "2022-12-30",
+      "sessions": 251,
+      "fund_return": -0.12409951398730246,
+      "compared_return": -0.183974956769409,
+      "difference": 0.05987544278210655
+     },
+     "entries": 709
+    },
+    "momentum_200": {
+     "possible": true,
+     "first": "2022-01-03",
+     "last": "2022-12-30",
+     "sessions": 251,
+     "total_return": -0.10118624326683345,
+     "max_drawdown": 0.16045467897095322,
+     "mean_invested": 0.8698905360893344,
+     "vs_vt": {
+      "possible": true,
+      "from": "2022-01-03",
+      "to": "2022-12-30",
+      "sessions": 251,
+      "fund_return": -0.10118624326683345,
+      "compared_return": -0.1843701788253782,
+      "difference": 0.08318393555854475
+     },
+     "vs_spy": {
+      "possible": true,
+      "from": "2022-01-03",
+      "to": "2022-12-30",
+      "sessions": 251,
+      "fund_return": -0.10118624326683345,
+      "compared_return": -0.183974956769409,
+      "difference": 0.08278871350257555
+     },
+     "entries": 705
+    },
+    "vt_timing": {
+     "possible": true,
+     "first": "2022-01-03",
+     "last": "2022-12-30",
+     "sessions": 251,
+     "total_return": -0.08779101944427459,
+     "max_drawdown": 0.09854798862038505,
+     "mean_invested": 0.9970192065799165,
+     "vs_vt": {
+      "possible": true,
+      "from": "2022-01-03",
+      "to": "2022-12-30",
+      "sessions": 251,
+      "fund_return": -0.08779101944427459,
+      "compared_return": -0.1843701788253782,
+      "difference": 0.09657915938110362
+     },
+     "vs_spy": {
+      "possible": true,
+      "from": "2022-01-03",
+      "to": "2022-12-30",
+      "sessions": 251,
+      "fund_return": -0.08779101944427459,
+      "compared_return": -0.183974956769409,
+      "difference": 0.09618393732513442
+     },
+     "switches": 2,
+     "first_decision": "2021-12-31"
+    },
+    "momentum_pullback": {
+     "possible": true,
+     "first": "2022-01-03",
+     "last": "2022-12-30",
+     "sessions": 251,
+     "total_return": -0.14216440269238662,
+     "max_drawdown": 0.1829443175520471,
+     "mean_invested": 0.8813117519257382,
+     "vs_vt": {
+      "possible": true,
+      "from": "2022-01-03",
+      "to": "2022-12-30",
+      "sessions": 251,
+      "fund_return": -0.14216440269238662,
+      "compared_return": -0.1843701788253782,
+      "difference": 0.04220577613299159
+     },
+     "vs_spy": {
+      "possible": true,
+      "from": "2022-01-03",
+      "to": "2022-12-30",
+      "sessions": 251,
+      "fund_return": -0.14216440269238662,
+      "compared_return": -0.183974956769409,
+      "difference": 0.04181055407702239
+     },
+     "entries": 738
+    },
+    "vt": {
+     "possible": true,
+     "first": "2022-01-03",
+     "last": "2022-12-30",
+     "sessions": 251,
+     "total_return": -0.1843701788253782,
+     "max_drawdown": 0.2603249075993741,
+     "mean_invested": 0.9914724147819431,
+     "vs_spy": {
+      "possible": true,
+      "from": "2022-01-03",
+      "to": "2022-12-30",
+      "sessions": 251,
+      "fund_return": -0.1843701788253782,
+      "compared_return": -0.183974956769409,
+      "difference": -0.0003952220559692021
+     }
+    },
+    "spy": {
+     "possible": true,
+     "first": "2022-01-03",
+     "last": "2022-12-30",
+     "sessions": 251,
+     "total_return": -0.183974956769409,
+     "max_drawdown": 0.24324230431607807,
+     "mean_invested": 0.9896419511063999,
+     "vs_vt": {
+      "possible": true,
+      "from": "2022-01-03",
+      "to": "2022-12-30",
+      "sessions": 251,
+      "fund_return": -0.183974956769409,
+      "compared_return": -0.1843701788253782,
+      "difference": 0.0003952220559692021
+     }
+    }
+   },
+   "integrity": {
+    "ok": true,
+    "problems": [],
+    "data_holes": 0,
+    "data_hole_examples": []
+   }
+  }
+ },
+ "regime_cutoffs": {
+  "possible": true,
+  "cutoffs": [
+   0.11302353418809083,
+   0.16965241927688823
+  ],
+  "window_end": "2026-09-30",
+  "first_session": "2008-07-28",
+  "last_session": "2026-09-30",
+  "sessions": 4573,
+  "by_tercile": {
+   "low": 1525,
+   "mid": 1524,
+   "high": 1524
+  },
+  "complete": true,
+  "method": "numpy.quantile (default method 'linear') at 1/3 and 2/3 of the daily 21-day volatility, each session's from the 21 log returns ending at its own close, x sqrt(252)"
+ },
+ "data": {
+  "first_prices": {
+   "SPY": "1997-01-02",
+   "VT": "2008-06-26",
+   "BIL": "2007-05-30"
+  },
+  "warm_up": {
+   "needed_from": "1997-12-24",
+   "calendar_first_bar": "1997-01-02",
+   "enough": true
+  },
+  "coverage": [
+   {
+    "ticker": "MSFT",
+    "first": "1997-01-02",
+    "last": "2026-10-01",
+    "bars": 7484
+   },
+   {
+    "ticker": "NVDA",
+    "first": "1999-01-22",
+    "last": "2026-10-01",
+    "bars": 6966
+   },
+   {
+    "ticker": "ASML",
+    "first": "1997-01-02",
+    "last": "2026-10-01",
+    "bars": 7484
+   },
+   {
+    "ticker": "GOOGL",
+    "first": "2004-08-19",
+    "last": "2026-10-01",
+    "bars": 5565
+   },
+   {
+    "ticker": "JPM",
+    "first": "1997-01-02",
+    "last": "2026-10-01",
+    "bars": 7484
+   },
+   {
+    "ticker": "RY",
+    "first": "1997-01-02",
+    "last": "2026-10-01",
+    "bars": 7484
+   },
+   {
+    "ticker": "HDB",
+    "first": "2001-07-20",
+    "last": "2026-10-01",
+    "bars": 6337
+   },
+   {
+    "ticker": "LLY",
+    "first": "1997-01-02",
+    "last": "2026-10-01",
+    "bars": 7484
+   },
+   {
+    "ticker": "NVO",
+    "first": "1997-01-02",
+    "last": "2026-10-01",
+    "bars": 7484
+   },
+   {
+    "ticker": "TEVA",
+    "first": "1997-01-02",
+    "last": "2026-10-01",
+    "bars": 7484
+   },
+   {
+    "ticker": "CAT",
+    "first": "1997-01-02",
+    "last": "2026-10-01",
+    "bars": 7484
+   },
+   {
+    "ticker": "ESLT",
+    "first": "1997-01-02",
+    "last": "2026-10-01",
+    "bars": 7484
+   },
+   {
+    "ticker": "TM",
+    "first": "1997-01-02",
+    "last": "2026-10-01",
+    "bars": 7484
+   },
+   {
+    "ticker": "MELI",
+    "first": "2007-08-10",
+    "last": "2026-10-01",
+    "bars": 4816
+   },
+   {
+    "ticker": "PG",
+    "first": "1997-01-02",
+    "last": "2026-10-01",
+    "bars": 7484
+   },
+   {
+    "ticker": "XOM",
+    "first": "1997-01-02",
+    "last": "2026-10-01",
+    "bars": 7484
+   },
+   {
+    "ticker": "RSP",
+    "first": "2003-05-01",
+    "last": "2026-10-01",
+    "bars": 5893
+   },
+   {
+    "ticker": "IWM",
+    "first": "2000-05-26",
+    "last": "2026-10-01",
+    "bars": 6626
+   },
+   {
+    "ticker": "VGK",
+    "first": "2005-03-10",
+    "last": "2026-10-01",
+    "bars": 5425
+   },
+   {
+    "ticker": "VWO",
+    "first": "2005-03-10",
+    "last": "2026-10-01",
+    "bars": 5425
+   },
+   {
+    "ticker": "SHY",
+    "first": "2002-07-30",
+    "last": "2026-10-01",
+    "bars": 6083
+   },
+   {
+    "ticker": "IEF",
+    "first": "2002-07-30",
+    "last": "2026-10-01",
+    "bars": 6083
+   },
+   {
+    "ticker": "TLT",
+    "first": "2002-07-30",
+    "last": "2026-10-01",
+    "bars": 6083
+   },
+   {
+    "ticker": "TIP",
+    "first": "2003-12-05",
+    "last": "2026-10-01",
+    "bars": 5741
+   },
+   {
+    "ticker": "LQD",
+    "first": "2002-07-30",
+    "last": "2026-10-01",
+    "bars": 6083
+   },
+   {
+    "ticker": "HYG",
+    "first": "2007-04-11",
+    "last": "2026-10-01",
+    "bars": 4901
+   },
+   {
+    "ticker": "EMB",
+    "first": "2007-12-19",
+    "last": "2026-10-01",
+    "bars": 4725
+   },
+   {
+    "ticker": "DBC",
+    "first": "2006-02-06",
+    "last": "2026-10-01",
+    "bars": 5196
+   },
+   {
+    "ticker": "DBA",
+    "first": "2007-01-05",
+    "last": "2026-10-01",
+    "bars": 4966
+   },
+   {
+    "ticker": "UUP",
+    "first": "2007-03-01",
+    "last": "2026-10-01",
+    "bars": 4929
+   },
+   {
+    "ticker": "XLE",
+    "first": "1998-12-22",
+    "last": "2026-10-01",
+    "bars": 6986
+   },
+   {
+    "ticker": "XLF",
+    "first": "1998-12-22",
+    "last": "2026-10-01",
+    "bars": 6986
+   },
+   {
+    "ticker": "KRE",
+    "first": "2006-06-22",
+    "last": "2026-10-01",
+    "bars": 5101
+   },
+   {
+    "ticker": "XLV",
+    "first": "1998-12-22",
+    "last": "2026-10-01",
+    "bars": 6986
+   },
+   {
+    "ticker": "XBI",
+    "first": "2006-02-06",
+    "last": "2026-10-01",
+    "bars": 5196
+   },
+   {
+    "ticker": "XLK",
+    "first": "1998-12-22",
+    "last": "2026-10-01",
+    "bars": 6986
+   },
+   {
+    "ticker": "XLC",
+    "first": "2018-06-19",
+    "last": "2026-10-01",
+    "bars": 2083
+   },
+   {
+    "ticker": "SMH",
+    "first": "2000-06-05",
+    "last": "2026-10-01",
+    "bars": 6621
+   },
+   {
+    "ticker": "IGV",
+    "first": "2001-07-17",
+    "last": "2026-10-01",
+    "bars": 6340
+   },
+   {
+    "ticker": "XLI",
+    "first": "1998-12-22",
+    "last": "2026-10-01",
+    "bars": 6986
+   },
+   {
+    "ticker": "ITA",
+    "first": "2006-05-05",
+    "last": "2026-10-01",
+    "bars": 5134
+   },
+   {
+    "ticker": "IYT",
+    "first": "2004-01-02",
+    "last": "2026-10-01",
+    "bars": 5723
+   },
+   {
+    "ticker": "XLY",
+    "first": "1998-12-22",
+    "last": "2026-10-01",
+    "bars": 6986
+   },
+   {
+    "ticker": "XLP",
+    "first": "1998-12-22",
+    "last": "2026-10-01",
+    "bars": 6986
+   },
+   {
+    "ticker": "XLU",
+    "first": "1998-12-22",
+    "last": "2026-10-01",
+    "bars": 6986
+   },
+   {
+    "ticker": "XLB",
+    "first": "1998-12-22",
+    "last": "2026-10-01",
+    "bars": 6986
+   },
+   {
+    "ticker": "VNQ",
+    "first": "2004-09-29",
+    "last": "2026-10-01",
+    "bars": 5537
+   },
+   {
+    "ticker": "XHB",
+    "first": "2006-02-06",
+    "last": "2026-10-01",
+    "bars": 5196
+   },
+   {
+    "ticker": "GDX",
+    "first": "2006-05-22",
+    "last": "2026-10-01",
+    "bars": 5123
+   },
+   {
+    "ticker": "EWJ",
+    "first": "1997-01-02",
+    "last": "2026-10-01",
+    "bars": 7484
+   },
+   {
+    "ticker": "EIS",
+    "first": "2008-03-28",
+    "last": "2026-10-01",
+    "bars": 4658
+   },
+   {
+    "ticker": "EWU",
+    "first": "1997-01-02",
+    "last": "2026-10-01",
+    "bars": 7484
+   },
+   {
+    "ticker": "EWG",
+    "first": "1997-01-02",
+    "last": "2026-10-01",
+    "bars": 7484
+   },
+   {
+    "ticker": "EWL",
+    "first": "1997-01-02",
+    "last": "2026-10-01",
+    "bars": 7484
+   },
+   {
+    "ticker": "EWN",
+    "first": "1997-01-02",
+    "last": "2026-10-01",
+    "bars": 7484
+   },
+   {
+    "ticker": "EWI",
+    "first": "1997-01-02",
+    "last": "2026-10-01",
+    "bars": 7484
+   },
+   {
+    "ticker": "EWP",
+    "first": "1997-01-02",
+    "last": "2026-10-01",
+    "bars": 7484
+   },
+   {
+    "ticker": "EWD",
+    "first": "1997-01-02",
+    "last": "2026-10-01",
+    "bars": 7484
+   },
+   {
+    "ticker": "EWC",
+    "first": "1997-01-02",
+    "last": "2026-10-01",
+    "bars": 7484
+   },
+   {
+    "ticker": "EWA",
+    "first": "1997-01-02",
+    "last": "2026-10-01",
+    "bars": 7484
+   },
+   {
+    "ticker": "MCHI",
+    "first": "2011-03-31",
+    "last": "2026-10-01",
+    "bars": 3899
+   },
+   {
+    "ticker": "INDA",
+    "first": "2012-02-03",
+    "last": "2026-10-01",
+    "bars": 3686
+   },
+   {
+    "ticker": "EWY",
+    "first": "2000-05-12",
+    "last": "2026-10-01",
+    "bars": 6636
+   },
+   {
+    "ticker": "EWT",
+    "first": "2000-06-23",
+    "last": "2026-10-01",
+    "bars": 6607
+   },
+   {
+    "ticker": "EWZ",
+    "first": "2000-07-14",
+    "last": "2026-10-01",
+    "bars": 6593
+   },
+   {
+    "ticker": "EWW",
+    "first": "1997-01-02",
+    "last": "2026-10-01",
+    "bars": 7484
+   },
+   {
+    "ticker": "KSA",
+    "first": "2015-09-17",
+    "last": "2026-10-01",
+    "bars": 2776
+   },
+   {
+    "ticker": "TUR",
+    "first": "2008-03-28",
+    "last": "2026-10-01",
+    "bars": 4658
+   },
+   {
+    "ticker": "EZA",
+    "first": "2003-02-07",
+    "last": "2026-10-01",
+    "bars": 5950
+   },
+   {
+    "ticker": "EPOL",
+    "first": "2010-05-26",
+    "last": "2026-10-01",
+    "bars": 4113
+   },
+   {
+    "ticker": "ARGT",
+    "first": "2011-03-03",
+    "last": "2026-10-01",
+    "bars": 3919
+   },
+   {
+    "ticker": "GLD",
+    "first": "2004-11-18",
+    "last": "2026-10-01",
+    "bars": 5501
+   },
+   {
+    "ticker": "SLV",
+    "first": "2006-04-28",
+    "last": "2026-10-01",
+    "bars": 5139
+   },
+   {
+    "ticker": "CPER",
+    "first": "2011-11-15",
+    "last": "2026-10-01",
+    "bars": 3740
+   },
+   {
+    "ticker": "USO",
+    "first": "2006-04-10",
+    "last": "2026-10-01",
+    "bars": 5152
+   },
+   {
+    "ticker": "UNG",
+    "first": "2007-04-18",
+    "last": "2026-10-01",
+    "bars": 4896
+   },
+   {
+    "ticker": "CORN",
+    "first": "2010-06-09",
+    "last": "2026-10-01",
+    "bars": 4104
+   },
+   {
+    "ticker": "WEAT",
+    "first": "2011-09-19",
+    "last": "2026-10-01",
+    "bars": 3781
+   },
+   {
+    "ticker": "SOYB",
+    "first": "2011-09-19",
+    "last": "2026-10-01",
+    "bars": 3781
+   },
+   {
+    "ticker": "CANE",
+    "first": "2011-09-19",
+    "last": "2026-10-01",
+    "bars": 3781
+   }
+  ]
+ }
+}

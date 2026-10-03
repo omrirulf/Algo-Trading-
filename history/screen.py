@@ -4,6 +4,8 @@
     python -m history.screen fetch --out OUT          # the price table (needs Yahoo: run it on GitHub)
     python -m history.screen run --out OUT            # the journal, the race, the funds, the report
     python -m history.screen run --out OUT --processes 4 --seeds 1000
+    python -m history.screen fetch --out OUT --kind stress   # the stress kind's table
+    python -m history.screen run --out OUT --kind stress     # the funds in 2000-2002, 2008, 2020 and 2022
 
 ``fetch`` writes ``OUT/prices.csv.gz`` (and its SHA-256 beside it). ``run``
 reads it and writes, all under ``OUT``:
@@ -11,6 +13,14 @@ reads it and writes, all under ``OUT``:
 * ``journal/YYYY-MM.log``: the history journal (``history.journal``);
 * ``results.json``: every number, for checking and for the next screen;
 * ``report.md``: the report (``history.report``).
+
+Two kinds (``--kind``, default ``full``): ``full`` is the screen of the rules
+running live, the race and the funds over 2000 to now; ``stress`` is the
+owner's stress screen of 2 Oct 2026 (``history.stress``): momentum, A, B, C,
+VT and SPY, each from a fresh $100,000, in 2000-2002, 2008, 2020 and 2022,
+descriptive only, with the regime split's volatility cut-offs beside it. The
+stress kind builds its own journal (the periods' sessions only) and reads
+neither ``--seeds`` nor ``--first``: it has no race.
 
 The workflow ``.github/workflows/history-screen.yml`` runs both, by hand only,
 and commits ``results.json`` and ``report.md`` to ``docs/research/history/``.
@@ -35,12 +45,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from analysis import horse_race as hr  # noqa: E402
 from config import journal_files  # noqa: E402
 from config.watchlist import DEFAULT_WATCHLIST  # noqa: E402
-from history import journal, prices, race, report  # noqa: E402
+from history import journal, prices, race, report, stress  # noqa: E402
 from history import funds as fund_screen  # noqa: E402
 from history.sessions import production_differences  # noqa: E402
+from shadow.broker import DEFAULT_COST_PER_SIDE  # noqa: E402
+from shadow.fund import STARTING_CASH  # noqa: E402
 from shadow.market import Bars  # noqa: E402
 
 log = logging.getLogger("history.screen")
+
+#: The screen's kinds: the rules running live over every year, and the owner's stress periods.
+FULL = "full"
+KINDS = (FULL, stress.KIND)
 
 #: What the forked fund worker reads (set before the pool forks).
 _FUNDS: dict = {}
@@ -91,6 +107,8 @@ def run(args: argparse.Namespace) -> int:
               if t not in table.frames or table.frames[t].empty]
     if absent:
         raise SystemExit(f"history screen: no prices for {', '.join(absent)}; nothing was run")
+    if args.kind == stress.KIND:
+        return run_stress(args, table, prices_sha, started)
     sessions = sessions_of(table)
     final_through = table.final_through
     log.info("prices through %s, %d sessions, sha256 %s", final_through, len(sessions), prices_sha)
@@ -162,8 +180,65 @@ def run(args: argparse.Namespace) -> int:
     return 0
 
 
+def run_stress(args: argparse.Namespace, table: prices.PriceTable, prices_sha: str, started: float) -> int:
+    """The stress kind (``history.stress``): its journal, the funds in each period, the cut-offs, the report."""
+    out: Path = args.out
+    if args.reuse_journal:
+        raise SystemExit("history screen: the stress kind always builds its own journal; drop --reuse-journal")
+    journal_dir = out / "journal"
+    if journal_files.exists(journal_dir):
+        raise SystemExit(f"history screen: {journal_dir} already holds a journal; give the stress kind a fresh --out")
+    sessions = sessions_of(table)
+    final_through = table.final_through
+    log.info("stress: prices through %s, %d sessions, sha256 %s", final_through, len(sessions), prices_sha)
+    months = stress.build_journal(table.frames, sessions, processes=args.processes)
+    lines = journal.write(months, journal_dir)
+    del months
+    journal_sha = hashlib.sha256(journal_files.read_bytes(journal_dir)).hexdigest() if lines else None
+    log.info("stress journal: %d lines, sha256 %s (%.0fs)", lines, journal_sha, time.monotonic() - started)
+    periods = stress.run_periods(journal_dir, table.frames, sessions, processes=args.processes)
+    log.info("stress funds: %d periods (%.0fs)", len(periods), time.monotonic() - started)
+    spy_first = table.first_bar(prices.CALENDAR_TICKER)
+    results = {
+        "meta": {
+            "kind": stress.KIND,
+            "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "final_through": final_through.isoformat(),
+            "last_session": sessions[-1].isoformat(),
+            "watchlist_names": len(DEFAULT_WATCHLIST),
+            "prices_sha256": prices_sha,
+            "prices_fetched_at": table.fetched_at,
+            "journal_sha256": journal_sha,
+            "journal_lines": lines,
+            "starting_cash": STARTING_CASH,
+            "cost_per_side": DEFAULT_COST_PER_SIDE,
+            "missing_tickers": list(table.missing),
+            "run": {"run_id": args.run_id, "commit": args.commit},
+            "seconds": round(time.monotonic() - started),
+        },
+        "periods": periods,
+        "regime_cutoffs": stress.regime_cutoffs(table.frames, final_through),
+        "data": {
+            "first_prices": {t: (table.first_bar(t).isoformat() if table.first_bar(t) else None)
+                             for t in (prices.CALENDAR_TICKER, prices.INDEX_TICKER, prices.BILLS_TICKER)},
+            "warm_up": {"needed_from": stress.WARM_UP_FROM.isoformat(),
+                        "calendar_first_bar": spy_first.isoformat() if spy_first else None,
+                        "enough": spy_first is not None and spy_first <= stress.WARM_UP_FROM},
+            "coverage": prices.coverage(table),
+        },
+    }
+    out.mkdir(parents=True, exist_ok=True)
+    text = json.dumps(results, indent=1, default=str) + "\n"
+    (out / "results.json").write_text(text, encoding="utf-8")
+    # From the file's own text, so the report can always be written again from results.json alone.
+    (out / "report.md").write_text(report.render(json.loads(text)), encoding="utf-8")
+    log.info("wrote %s (%.0fs)", out, time.monotonic() - started)
+    return 0
+
+
 def fetch(args: argparse.Namespace) -> int:
-    table = prices.fetch()
+    # The full kind's call is unchanged; the stress kind starts where its warm-up needs (``history.stress``).
+    table = prices.fetch() if args.kind == FULL else prices.fetch(start=stress.FETCH_FROM)
     digest = prices.save(table, args.out / "prices.csv.gz")
     print(f"prices through {table.final_through}: {len(table.frames)} tickers, sha256 {digest}")
     if table.missing:
@@ -184,8 +259,12 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
     f = sub.add_parser("fetch", help="fetch the price table (needs Yahoo)")
     f.add_argument("--out", type=Path, required=True)
+    f.add_argument("--kind", choices=KINDS, default=FULL, help="the screen the table is for (default: %(default)s)")
     r = sub.add_parser("run", help="build the journal, race and run the funds, write the report")
     r.add_argument("--out", type=Path, required=True)
+    r.add_argument("--kind", choices=KINDS, default=FULL,
+                   help="full: the race and the funds over every year; stress: the funds in the owner's four "
+                        "periods (default: %(default)s)")
     r.add_argument("--prices", type=Path, default=None, help="the table (default: OUT/prices.csv.gz)")
     r.add_argument("--processes", type=int, default=os.cpu_count() or 2)
     r.add_argument("--seeds", type=_positive, default=hr.DEFAULT_SEEDS,

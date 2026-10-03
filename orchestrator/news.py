@@ -21,6 +21,7 @@ import json
 import logging
 import os
 import sys
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -365,6 +366,19 @@ def resolve_token(api_token: str = "") -> Optional[str]:
     return (api_token or "").strip() or os.environ.get(CLI_ENV_VAR, "").strip() or token_from_cli()
 
 
+#: Requests sent to Bright Data by each thread, for a caller that pays per
+#: request: the shadow universe charges every one to its daily cost cap
+#: (``orchestrator/universe.py``). Counted when sent, whatever comes back, so
+#: the count never understates what may be billed. Production reads nothing
+#: here; the requests themselves are unchanged.
+_SENT = threading.local()
+
+
+def requests_sent() -> int:
+    """How many requests the calling thread has sent to Bright Data so far."""
+    return getattr(_SENT, "count", 0)
+
+
 class BrightDataNewsProvider:
     def __init__(
         self,
@@ -391,6 +405,7 @@ class BrightDataNewsProvider:
         self._client = client
 
     def _post(self, body: dict[str, Any]) -> httpx.Response:
+        _SENT.count = requests_sent() + 1
         headers = {"Authorization": f"Bearer {self._token}", "Content-Type": "application/json"}
         if self._client is not None:
             return self._client.post(BRIGHTDATA_REQUEST_URL, json=body, headers=headers)

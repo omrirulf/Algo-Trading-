@@ -304,14 +304,16 @@ class FinalAwareFetcher:
 
 
 def _race(tmp_path, monkeypatch, capsys, frames, journal_lines, now, extra=(),
-          cutoff=date(2000, 1, 1), account=None):
+          cutoff=date(2000, 1, 1), account=None, funds=None):
     """Run the race on a tiny journal. These journals are dated early 2026,
     before the real cutoff, so by default the cutoff is moved back to take
     them in; a test about the cutoff itself passes ``cutoff=None``.
 
     ``account`` is the paper account's record for trigger (d): lines to
     write, or raw text; by default there is none, so no test here reads the
-    repository's own ``logs/account.jsonl``."""
+    repository's own ``logs/account.jsonl``. ``funds`` is the funds run's
+    document, for each look's after-tax record (section 5c); by default there
+    is none, so no test here reads the repository's own ``logs/funds.json``."""
     journal = tmp_path / "signal_journal.log"
     journal.write_text("\n".join(json.dumps(l) for l in journal_lines) + "\n", encoding="utf-8")
     record = tmp_path / "account.jsonl"
@@ -320,7 +322,12 @@ def _race(tmp_path, monkeypatch, capsys, frames, journal_lines, now, extra=(),
     else:
         record.write_text(account if isinstance(account, str)
                           else "\n".join(json.dumps(l) for l in account) + "\n", encoding="utf-8")
-    extra = ("--account", str(record), *extra)
+    funds_record = tmp_path / "funds.json"
+    if funds is None:
+        funds_record.unlink(missing_ok=True)
+    else:
+        funds_record.write_text(json.dumps(funds), encoding="utf-8")
+    extra = ("--account", str(record), "--funds", str(funds_record), *extra)
     if cutoff is not None:
         monkeypatch.setattr(decision_gate, "DECISION_CUTOFF", cutoff)
         monkeypatch.setattr(decision_gate, "FAILURE_WATCH_START", cutoff)
@@ -582,6 +589,22 @@ def test_the_registered_parameters_are_the_ones_the_code_runs():
     # The two exploratory reports (reporting only): the owner's groups and "too few" line.
     assert horse_race.MIN_REPORT_TRADES == 20
     assert '"too few" until a group or side has 20 trades' in text
+    # The after-tax gate and the verdict label (Amendment 2026-10-02, sections 5c and 5d).
+    from config import israel_tax
+    from shadow import run as shadow_run
+
+    assert decision_gate.AFTER_TAX_LAG == shadow_run.VS_MODEL_LAG == 5
+    assert "with the fund test's Newey-West t, **lag 5** (section 11.4)" in text
+    assert decision_gate.DOWNTURN_DRAWDOWN == 0.10 and "its high inside the test window is below 10%" in text
+    assert decision_gate.DOWNTURN_LABEL == "not tested in a downturn"
+    assert 'labels the verdict "not tested in a downturn"' in text
+    assert israel_tax.CAPITAL_GAINS_RATE == 0.25 and israel_tax.SURTAX_THRESHOLD_ILS == 721_560
+    assert "721,560 ILS" in text and "`offset_losses_vs_dividends` (default on" in text
+    assert israel_tax.OFFSET_LOSSES_VS_DIVIDENDS is True
+    rows = [r for r in raw.partition("## Amendments")[2].splitlines() if r.startswith("| 2026-10-02 | **After-tax gate**")]
+    assert len(rows) == 1 and ("It adds a gate, it changes no arm and no metric, and it was made before any "
+                               "checkpoint result existed") in rows[0]
+    assert sum(r.startswith("| 2026-10-02 | **Verdict disclosure**") for r in raw.splitlines()) == 1
     assert [g[0] for g in horse_race.CONVICTION_GROUPS] == ["0.30-0.40", "0.40-0.50", "0.50-0.60", "0.60+"]
     assert "(0.30-0.40, 0.40-0.50, 0.50-0.60, 0.60 and above;" in text
     assert gate.COIN_FLIP_PERCENTILE == 95.0 and "95th percentile" in text
@@ -984,7 +1007,9 @@ def test_the_reports_move_no_look_bar_or_verdict():
         _arm(control.NAME, []),
     ]
     index = {d: 0.0 for d in days}
-    before = horse_race.look_inputs(results, {}, days, index, 60, 3, 10)
+    raw = horse_race.look_inputs(results, {}, days, index, 60, 3, 10)
+    # Momentum's fund also clears the after-tax test (section 5c), recorded by the funds run.
+    before = replace(raw, after_tax=decision_gate.AfterTax(decision_gate.AFTER_TAX_READY, {momentum.NAME: 9.0}))
     looks = tuple(decision_gate.evaluate({20: before}))
     assert looks[0].outcome == momentum.NAME, "the crafted race decides at the first look"
     view = horse_race.GateView(registered=True, mismatches=(), window_lines=60, window_cycle_days=60,
@@ -995,7 +1020,7 @@ def test_the_reports_move_no_look_bar_or_verdict():
     reported = horse_race.gate_json(view, 3, STAMP, splits=splits)
     new = {"conviction_groups", "sides", "report_since"}
     assert {k: v for k, v in reported.items() if k not in new} == {k: v for k, v in plain.items() if k not in new}
-    assert horse_race.look_inputs(results, {}, days, index, 60, 3, 10) == before
+    assert horse_race.look_inputs(results, {}, days, index, 60, 3, 10) == raw
     assert sum(g.n for g in splits.conviction[MODEL_ARM]) == 60
     json.dumps(reported)
 
@@ -1243,3 +1268,48 @@ def test_an_intraday_reading_below_the_line_is_a_mid_day_warning_never_a_trip(tm
         horse_race.AccountRecord(equity=dict(record.equity, **{}) | {date(2026, 9, 25): 100_500.0},
                                  at=record.at, intraday=date(2026, 9, 25)), {}))
     assert calm["midday"]["equity"] == 100_500.0 and calm["midday_warning"] is None
+
+
+# --- the after-tax gate's record and the downturn label (Amendment 2026-10-02) -------------
+
+
+def test_the_race_reads_each_looks_after_tax_test_from_the_funds_record(tmp_path):
+    record = tmp_path / "funds.json"
+    record.write_text(json.dumps({"after_tax": {"looks": [
+        {"look": 1, "status": "ready", "tests": {"model": {"t": 3.6}, "momentum": {"t": -1.0}, "hybrid": {"t": None}}},
+        {"look": 2, "status": "unavailable", "reason": "calibration had not passed: no fund was run"},
+        {"look": "x"}, "junk",
+    ]}}))
+    records = horse_race.after_tax_records(record)
+    assert set(records) == {1, 2}
+    assert records[1] == decision_gate.AfterTax("ready", {"model": 3.6, "momentum": -1.0, "hybrid": None})
+    assert records[2].status == "unavailable" and "calibration" in records[2].reason
+    assert horse_race.after_tax_records(tmp_path / "missing.json") == {}
+    (tmp_path / "bad.json").write_text("{")
+    assert horse_race.after_tax_records(tmp_path / "bad.json") == {}
+    assert horse_race.FUNDS_RECORD.name == "funds.json"
+
+
+def test_the_gate_json_says_whether_each_look_has_its_after_tax_record_and_vt_s_fall():
+    waiting = decision_gate.LookInputs(entry_days=60, t_model_momentum=None, t_model_hybrid=None,
+                                       t_hybrid_momentum=None, model_mean=None, model_band_high=None,
+                                       vt_max_drawdown=0.04)
+    looks = tuple(decision_gate.evaluate({20: waiting}))
+    view = horse_race.GateView(registered=True, mismatches=(), window_lines=60, window_cycle_days=60,
+                               unanswered_in_window=0, entry_days=60, independent=20, looks=looks,
+                               next_estimate=None)
+    out = horse_race.gate_json(view, 3, STAMP)
+    assert out["looks"][0]["after_tax"] == "waiting" and out["looks"][0]["vt_max_drawdown"] == 0.04
+    assert out["looks"][1]["after_tax"] is None and out["downturn"] is None
+    final = tuple(decision_gate.evaluate({60: replace(waiting, t_vs_index={"momentum": 9.0}, after_tax=decision_gate.AfterTax(
+        "ready", {"momentum": 9.0}))}))
+    view = replace(view, looks=final, independent=60)
+    out = horse_race.gate_json(view, 3, STAMP)
+    assert out["outcome"] == momentum.NAME
+    assert out["downturn"] == {"vt_max_drawdown": 0.04, "tested": False, "label": "not tested in a downturn"}
+    assert out["status_line"].endswith("— NOT TESTED IN A DOWNTURN")
+
+
+def test_a_looks_window_ends_at_the_close_of_its_last_trades():
+    grid = [date(2026, 12, 17), date(2026, 12, 18)]
+    assert horse_race.look_last_close(grid, 2, 3) == date(2026, 12, 22)

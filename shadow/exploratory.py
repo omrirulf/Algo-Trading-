@@ -260,6 +260,11 @@ class TimingFund:
         self.switches = 0
         self.waited = 0
         self._last_close: dict[str, float] = {}
+        #: Every leg, for the after-tax view (``shadow.after_tax``): (day,
+        #: ticker, "buy"/"sell", shares, the open, the fee). And every
+        #: dividend credited: (day, ticker, shares, per share).
+        self.trades: list[tuple[date, str, str, int, float, float]] = []
+        self.dividends: list[tuple[date, str, int, float]] = []
 
     def target(self, day: date) -> Optional[str]:
         """The fund to hold at ``day``'s open: the latest decision made on a day before it."""
@@ -281,6 +286,7 @@ class TimingFund:
                 self.waited += 1
             else:
                 self.cash += self.qty * bar[0] * (1 - self.cost)
+                self.trades.append((day, self.holding, "sell", self.qty, bar[0], self.qty * bar[0] * self.cost))
                 self.holding, self.qty = None, 0
                 self.switches += 1
         if self.holding is None:
@@ -292,9 +298,13 @@ class TimingFund:
                 self.cash -= self.qty * bar[0] * (1 + self.cost)
                 self.holding = target
                 self.tally.accepted += 1
+                if self.qty:
+                    self.trades.append((day, target, "buy", self.qty, bar[0], self.qty * bar[0] * self.cost))
         before, before_qty = held_at_open
         if before is not None and bars[before] is not None and bars[before][4]:
             self.cash += before_qty * bars[before][4]
+            if before_qty:
+                self.dividends.append((day, before, before_qty, bars[before][4]))
         for ticker, bar in bars.items():
             if bar is not None:
                 self._last_close[ticker] = bar[3]

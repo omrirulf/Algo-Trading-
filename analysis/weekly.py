@@ -99,7 +99,8 @@ def drift_lines(week: Optional[dict[str, Any]]) -> list[str]:
     who = (f"{'/'.join(names.get('model') or ['?'])} @ {'/'.join(names.get('provider') or ['?'])}, "
            f"{'/'.join(names.get('reasoning_effort') or ['?'])}, screening "
            f"{'/'.join(names.get('screening') or ['?'])}, prompt {'/'.join(names.get('prompt') or ['?'])}")
-    return [head] + [f"- {a}" for a in alerts] + [numbers, who]
+    quiet = drift.no_headlines_line(week.get("news"), limit=drift.PHONE_NAMES)
+    return [head] + [f"- {a}" for a in alerts] + [numbers, who] + ([quiet[0].upper() + quiet[1:]] if quiet else [])
 
 
 def digest_lines(record: Optional[dict[str, Any]], limit: int = 25) -> list[str]:

@@ -1,0 +1,97 @@
+name: universe news check
+
+# Does the universe's news search find the company? (The owner's decision of
+# 3 Oct 2026, and the card's replacement rule (2).)
+#
+# The shadow universe has its own news query, company name plus ticker
+# ("Southern Company SO stock": config/shadow_universe.py, news_query, used
+# by orchestrator/universe_news.py); production's "<ticker> stock" is
+# unchanged. This job asks that search once for every name of the list (251,
+# the replacements included) and counts, by code and with no model, the
+# headlines that are relevant: the company name, or the ticker as a whole
+# word, in the title or the first sentence (analysis/news_relevance.py). It
+# prints the share per name, the names under 30% relevant, and the overall
+# share, plus the first headlines of every name under 30% (by the rule, or by
+# the company name alone; public news), to the log and the job summary. Nothing is kept: no commit, no artifact.
+#
+# On a trading day only (a weekend's news is thin), by hand or by putting
+# the label "universe-news-check" on a pull request. It holds the Bright Data
+# key and zone the cycle uses, under Bright Data's own names, and nothing
+# else: no broker key, no model key. About 255 requests, about $0.40.
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [labeled]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.label.name == 'universe-news-check' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: How relevant is each name's news?
+        env:
+          BRIGHTDATA_API_KEY: ${{ secrets.BRIGHTDATA_API_TOKEN }}
+          BRIGHTDATA_UNLOCKER_ZONE: ${{ vars.BRIGHTDATA_SERP_ZONE || 'cli_unlocker' }}
+        run: |
+          python - <<'EOF'
+          import json, os, sys
+          from concurrent.futures import ThreadPoolExecutor
+          from datetime import datetime, timezone
+          from analysis.news_relevance import FAIL_BELOW, report, universe_share
+          from config.market_calendar import is_trading_day
+          from config.shadow_universe import REPLACED, TICKERS, news_query
+          from orchestrator.news import NewsFetchError
+          from orchestrator.universe_news import fetch
+
+          today = datetime.now(timezone.utc).date()
+          if not is_trading_day(today):
+              print(f"{today} is not a trading day: nothing asked (the check runs on a weekday)")
+              sys.exit(0)
+
+          def ask(ticker):
+              try:
+                  return ticker, fetch(ticker), None
+              except NewsFetchError as exc:  # one name must not end the check
+                  return ticker, [], type(exc).__name__
+
+          with ThreadPoolExecutor(max_workers=4) as pool:
+              found = {t: (items, error) for t, items, error in pool.map(ask, TICKERS)}
+          # A search that failed is asked once more: no headline because the request broke is not
+          # a search that finds something else.
+          for ticker in [t for t, (_, error) in found.items() if error]:
+              _, items, error = ask(ticker)
+              found[ticker] = (items, error)
+
+          shares = [universe_share(t, found[t][0]) for t in TICKERS]
+          text = report(shares, f"Universe news relevance on {today} (query: company name plus ticker)")
+          broken = [t for t in TICKERS if found[t][1]]
+          if broken:
+              text += "\nThe search itself failed (asked twice) for: " + ", ".join(broken) + "\n"
+          replaced = {new: (old, rule) for old, (new, rule) in REPLACED.items()}
+          # Also where the company is named by name in under 30%: there the ticker alone carried it,
+          # which is weak evidence for a one- or two-letter ticker ("Class C").
+          text += "\n## First headlines of the names under 30%, by the rule or by name alone\n"
+          for s in shares:
+              if not (s.fails or (s.named_share or 0) < FAIL_BELOW):
+                  continue
+              note = f" (replaced {replaced[s.ticker][0]}, rule {replaced[s.ticker][1]})" if s.ticker in replaced else ""
+              text += f"\n**{s.ticker}**{note}: query `{news_query(s.ticker)}`\n"
+              text += "".join(f"- {h.title[:140]}\n" for h in found[s.ticker][0][:5]) or "- no headline\n"
+          print(text)
+          print("RESULT " + json.dumps({s.ticker: [s.headlines, s.relevant, s.named] for s in shares}))
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              summary.write(text)
+          EOF

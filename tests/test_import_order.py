@@ -23,6 +23,7 @@ MODULES = [
     "config.settings",
     "config.watchlist",
     "config.instruments",
+    "config.shadow_universe",
     "orchestrator.pricing",
     "orchestrator.llm",
     "orchestrator.heartbeat",
@@ -30,6 +31,7 @@ MODULES = [
     "orchestrator.news",
     "orchestrator.fx",
     "orchestrator.journal",
+    "orchestrator.universe",
     "replay.compare_configs",
     "replay.compare_models",
     "replay.signal_sanity",
@@ -39,6 +41,9 @@ MODULES = [
     "backtest.verify_tickers",
     "analysis.score_journal",
     "analysis.blend",
+    "analysis.regimes",
+    "analysis.ic",
+    "analysis.boi_rates",
     "learn.fit_weights",
 ]
 

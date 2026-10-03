@@ -499,3 +499,80 @@ def test_run_blocks_move_no_look_no_bar_and_no_verdict(tmp_path, monkeypatch, ca
         assert runs["run_timing"]["days"][0]["source"] == FROM_RUN_BLOCK
         assert runs["run_timing"]["days"][0]["started_by"] == "backup"
         assert "backup    run block LATE" in runs_text
+
+
+
+def test_the_race_reads_each_looks_after_tax_record_and_its_window(tmp_path, monkeypatch, capsys):
+    """End to end (pre-registration sections 5c and 5d): with the looks shrunk so one is reached, the gate
+    JSON says whether the look's after-tax record exists, where its window ends, VT's largest fall in it, and
+    refuses a record cut at another close."""
+    from analysis import horse_race
+    from tests.test_horse_race import _race
+
+    monkeypatch.setattr(decision_gate, "CHECKPOINTS", ((1, 3.47), (2, 2.45), (3, 2.00)))
+    _, waiting = _race(tmp_path, monkeypatch, capsys, _frames(), _journal(False), NOW,
+                       extra=("--seeds", "1000", "--gate-json"))
+    first = json.loads(waiting)["looks"][0]
+    assert first["reached"] is True and first["after_tax"] == "waiting"
+    assert first["window_end"] is not None and first["readable"] in (True, False)
+    assert first["vt_max_drawdown"] is None or 0.0 <= first["vt_max_drawdown"] < 1.0
+    end = first["window_end"]
+    unavailable = {"after_tax": {"looks": [{"look": 1, "status": "unavailable", "reason": "calibration had not passed",
+                                            "window_end": end}]}}
+    _, out = _race(tmp_path, monkeypatch, capsys, _frames(), _journal(False), NOW,
+                   extra=("--seeds", "1000", "--gate-json"), funds=unavailable)
+    look = json.loads(out)["looks"][0]
+    assert look["after_tax"] == "unavailable" and look["window_end"] == end
+    moved = {"after_tax": {"looks": [{"look": 1, "status": "ready", "window_end": "2000-01-03",
+                                      "tests": {"model": {"t": 9.0}, "momentum": {"t": 9.0}, "hybrid": {"t": 9.0}}}]}}
+    _, out = _race(tmp_path, monkeypatch, capsys, _frames(), _journal(False), NOW,
+                   extra=("--seeds", "1000", "--gate-json"), funds=moved)
+    look = json.loads(out)["looks"][0]
+    # A ready record cut at another close is not read: the look waits for one cut at its own close (the funds
+    # run makes it again), and stays readable.
+    assert look["after_tax"] == "waiting" and look["outcome"] == first["outcome"]
+    assert look["readable"] == first["readable"] and look["window_end"] == end
+    assert horse_race.FUNDS_RECORD.name == "funds.json"
+
+
+def test_vts_fall_in_a_look_adds_dividends_back_and_starts_at_the_cutoff(tmp_path, monkeypatch, capsys):
+    """Section 5d: VT's largest fall is read from the decision cutoff to the look's last close, on a
+    total-return level (a dividend is not a fall); a higher close before the cutoff does not count."""
+    from analysis import horse_race
+    from tests.test_horse_race import _race
+
+    monkeypatch.setattr(decision_gate, "CHECKPOINTS", ((1, 3.47), (2, 2.45), (3, 2.00)))
+    cutoff = date(2026, 9, 16)
+    frames = _frames()
+    vt = frames[decision_gate.INDEX_TICKER].copy()
+    days = [stamp.date() for stamp in vt.index]
+    vt["Dividends"] = 0.0
+    vt.iloc[days.index(date(2026, 9, 15)), vt.columns.get_loc("Close")] = 500.0   # a high before the cutoff
+    paid = days.index(date(2026, 9, 18))
+    vt.iloc[paid, vt.columns.get_loc("Dividends")] = 4.0                             # paid inside the window
+    vt.iloc[paid, vt.columns.get_loc("Close")] -= 4.0
+    frames[decision_gate.INDEX_TICKER] = vt
+    _, out = _race(tmp_path, monkeypatch, capsys, frames, _journal(False), NOW,
+                   extra=("--seeds", "1000", "--gate-json"), cutoff=cutoff)
+    first = json.loads(out)["looks"][0]
+    assert first["reached"] is True
+    end = date.fromisoformat(first["window_end"])
+    bars = [(d, float(r.Open), float(r.Close), float(r.Dividends)) for d, r in zip(days, vt.itertuples())
+            if d <= end]
+    expected = decision_gate.vt_max_drawdown(horse_race.total_return_closes(bars), cutoff, end)
+    raw = decision_gate.vt_max_drawdown([(d, c) for d, _, c, _ in bars], cutoff, end)
+    assert first["vt_max_drawdown"] == pytest.approx(expected)
+    assert expected < raw            # the dividend is added back
+    assert expected < 0.1            # the 500 close before the cutoff is not the high
+
+
+def test_total_return_closes_add_the_dividend_back():
+    from analysis import horse_race
+
+    bars = [(date(2026, 9, 23), 100.0, 100.0, 0.0), (date(2026, 9, 24), 100.0, 100.0, 0.0),
+            (date(2026, 9, 25), 99.5, 99.2, 0.8), (date(2026, 9, 28), 91.0, 90.6, 0.0)]
+    closes = horse_race.total_return_closes(bars)
+    assert decision_gate.vt_max_drawdown(closes, date(2026, 9, 23), date(2026, 9, 28)) == \
+        pytest.approx(1 - 90.6 / 99.2)                                   # 8.67%
+    raw = [(d, c) for d, _, c, _ in bars]
+    assert decision_gate.vt_max_drawdown(raw, date(2026, 9, 23), date(2026, 9, 28)) == pytest.approx(0.094)

@@ -22,7 +22,10 @@ This watches the answers themselves, every week:
   that reached the model;
 * when each day's run started, and which starter started it;
 * the model, the host that served it, its settings (reasoning level,
-  screening) and the prompt fingerprint (``model_setup`` on each line).
+  screening) and the prompt fingerprint (``model_setup`` on each line);
+* the names whose news search found no headline on any of their lines that
+  week, with their list (the owner's request of 3 Oct 2026; a report only,
+  with no band and no alert), and which of them had a failed search.
 
 The owner's rule, as changed on 27 Sep 2026 before any data existed:
 
@@ -48,8 +51,18 @@ next week), and the daily health check raises a warning on that day only. A
 setting's alert is said on the day it is seen (``setting_alert_on``).
 
 Held lines (no model was asked) and lines that failed before the model was
-asked (``stage == "context"``) are left out of every number: the question
-is what the model did with the calls it got.
+asked (``stage == "context"``) are left out of the answer numbers (the
+NEUTRAL share, conviction, agreement, the long share, the error shares and
+the names): the question is what the model did with the calls it got. Two
+things read more lines. The run start, its lateness and the starter share
+read every line, because the question there is when the cycle ran
+(``analysis/run_timing.day_timings``). The count of names with no headlines
+reads held lines too -- a held name's news is still searched and journalled,
+and leaving those lines out would miss a name held all week or count a name
+as silent when its held line had news -- and a line that failed before the
+model was asked counts only when it carried headlines: a failed gather
+journals an empty context, which is not a search that found nothing, while a
+prompt that failed to render journals the context it gathered.
 
 Read-only, like everything in ``analysis``: no broker, no model, no network,
 no file written. The workflow redirects the output.
@@ -69,6 +82,7 @@ from typing import Any, Iterable, Optional, Sequence
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from analysis.health import NEWS_GAP_PREFIX  # noqa: E402
 from analysis.reader import JournalEntry, read_journal  # noqa: E402
 from analysis.run_timing import day_timings  # noqa: E402
 from config import settings as cfg  # noqa: E402
@@ -180,6 +194,49 @@ def _names(entries: Sequence[JournalEntry]) -> dict[str, list[str]]:
     return {key: sorted(values) for key, values in seen.items()}
 
 
+#: The most names the phone line lists; the report and the record list them all.
+PHONE_NAMES = 12
+
+
+def no_headlines(entries: Sequence[JournalEntry]) -> dict[str, Any]:
+    """The names whose news was empty on every line of the week, and which of them had a failed search.
+
+    Every line that says how many headlines it carried counts, held lines
+    included. A line without the field does not, and neither does a line
+    that failed before the model was asked (``stage == "context"``) with no
+    headline: a failed gather journals an empty context, which is not a
+    search that found nothing. A prompt that failed to render journals the
+    context it gathered, so its headlines count. A name is listed when all
+    its counted lines that week had zero headlines.
+    ``search_failed`` names those of them with at least one failed news
+    search that week (a gap starting ``NEWS_GAP_PREFIX``): for them "no
+    headlines" may be the vendor's fault, not an empty search.
+    """
+    lines: dict[str, list[JournalEntry]] = {}
+    for e in entries:
+        if e.headline_count is None or (e.stage == "context" and not e.headline_count):
+            continue
+        lines.setdefault(e.ticker, []).append(e)
+    silent = sorted(t for t, own in lines.items() if not any(e.headline_count for e in own))
+    failed = [t for t in silent if any(g.startswith(NEWS_GAP_PREFIX) for e in lines[t] for g in e.gaps)]
+    return {"names": len(lines), "no_headlines": silent, "search_failed": failed}
+
+
+def no_headlines_line(news: Optional[dict[str, Any]], limit: Optional[int] = None) -> Optional[str]:
+    """The count and the list in one line; ``limit`` caps the names shown. None when nothing could be counted."""
+    if not isinstance(news, dict) or not news.get("names"):
+        return None
+    silent = list(news.get("no_headlines") or [])
+    shown = silent if limit is None or len(silent) <= limit else silent[:limit] + ["…"]
+    line = f"names with no headlines all week: {len(silent)} of {news['names']}"
+    line += f" ({', '.join(shown)})" if silent else ""
+    failed = list(news.get("search_failed") or [])
+    if failed:
+        listed = failed if limit is None or len(failed) <= limit else failed[:limit] + ["…"]
+        line += f"; the news search failed at least once for {len(failed)} of them ({', '.join(listed)})"
+    return line
+
+
 def week_numbers(entries: Sequence[JournalEntry]) -> dict[str, Any]:
     """Every number of one week, from its lines. Pure: the same lines always give the same record."""
     asked = [e for e in entries if not e.held and e.stage != "context"]
@@ -234,6 +291,7 @@ def week_numbers(entries: Sequence[JournalEntry]) -> dict[str, Any]:
         "conviction_groups": groups,
         "starts": starts,
         "names": _names(asked),
+        "news": no_headlines(entries),
     }
 
 
@@ -369,6 +427,9 @@ def render_week(week: dict[str, Any]) -> list[str]:
     for key, words in NAMES:
         names = week["names"].get(key) or ["none recorded"]
         out.append(f"- {words}: {', '.join(names)}")
+    quiet = no_headlines_line(week.get("news"))
+    if quiet:
+        out.append(f"- {quiet}")
     for alert in week.get("alerts") or []:
         out.append(f"- ALERT: {alert}")
     return out
