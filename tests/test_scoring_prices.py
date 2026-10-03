@@ -341,7 +341,7 @@ def test_a_failed_shekel_rate_night_reaches_the_phone_from_the_archive_workflow(
 
     wf = _workflow("scoring-prices.yml")
     step = next(s for s in wf["jobs"]["push"]["steps"] if s.get("name") == "Tell the owner's phone the shekel rates failed")
-    assert step["if"] == "always() && steps.download.outcome == 'success'"
+    assert step["if"] == "always() && github.event_name == 'workflow_run' && steps.download.outcome == 'success'"
     assert '"topic": os.environ["NTFY_TOPIC"]' in step["run"] and 'rm -f "$RUNNER_TEMP/phone.json"' in step["run"]
     assert "secrets." not in (ROOT / ".github" / "workflows" / "funds.yml").read_text()
     script = _rates_check_script()
@@ -369,7 +369,8 @@ def test_a_failed_funds_run_reaches_the_phone_too():
 
     wf = _workflow("scoring-prices.yml")
     job = wf["jobs"]["funds-failed"]
-    for guard in ("workflow_run.name == 'shadow funds'", "conclusion == 'failure'", "head_branch == 'main'",
+    for guard in ("workflow_run.name == 'shadow funds'", "conclusion != 'success'", "conclusion != 'skipped'",
+                  "head_branch == 'main'",
                   "head_repository.full_name == github.repository", "event == 'schedule'"):
         assert guard in job["if"]
     (step,) = job["steps"]

@@ -213,6 +213,16 @@ BLOCKS: Final[dict[str, tuple[str, ...]]] = {
     ADR_PREFIX + "Australia": ("BHP",),
 }
 
+#: The names replaced before registration, old -> (new, the card's rule: 1 a
+#: separation or deal inside the window, 2 a news search that finds something
+#: else, 3 not resolving in the verify check). For the record and the card;
+#: the verify job reports whether the rule-3 names resolve again.
+REPLACED: Final[dict[str, tuple[str, int]]] = {
+    "JNJ": ("EW", 1), "MDT": ("IDXX", 1), "SPGI": ("MET", 1),
+    "DOW": ("MLM", 2), "ASX": ("UMC", 2),
+    "BK": ("STT", 3), "AVB": ("IRM", 3),
+}
+
 #: Every name, in block order then alphabetical: the order the scorer asks in.
 TICKERS: Final[tuple[str, ...]] = tuple(t for names in BLOCKS.values() for t in names)
 
@@ -245,6 +255,7 @@ __all__ = [
     "JOURNAL_DIR",
     "NEWS_USD_PER_REQUEST",
     "REGISTRATION",
+    "REPLACED",
     "SECTORS",
     "SELECTED_ON",
     "SHADOW_UNIVERSE_ENABLED",

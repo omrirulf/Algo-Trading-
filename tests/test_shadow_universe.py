@@ -832,7 +832,8 @@ def test_the_workflow_runs_after_each_production_run_on_weekdays_and_by_hand():
     assert cron.split()[-1] == "1-5"
     assert wf["permissions"] == {"contents": "write"}
     group = wf["concurrency"]["group"]
-    assert "'shadow-universe-verify'" in group and group.endswith("|| 'shadow-universe' }}")
+    assert "format('shadow-universe-verify-{0}', github.head_ref || github.run_id)" in group
+    assert group.endswith("|| 'shadow-universe' }}")
     assert wf["concurrency"]["cancel-in-progress"] is False
 
 

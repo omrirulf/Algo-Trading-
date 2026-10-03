@@ -36,7 +36,11 @@ jobs:
               print("::warning::NTFY_TOPIC is not set (or this run cannot see it): nothing to check")
               raise SystemExit
           # A readable prefix such as "algo-desk-" is allowed; the strength is in the rest.
-          tail = re.sub(r"^(?:[A-Za-z]+[-_])+", "", topic)
+          tail = re.sub(r"^(?:[A-Za-z][A-Za-z0-9]*[-_])+", "", topic)
+          # Length cannot tell a word or a year from random characters, so look for the usual ones.
+          words = ("algo", "trad", "alert", "desk", "phone", "ntfy", "stock", "money", "topic", "notif",
+                   "push", "test", "pass", "secret", "admin", "market", "invest", "signal")
+          guessable = bool(re.search(r"(?:19|20)\d\d", tail)) or any(w in tail.lower() for w in words)
           classes = [bool(re.search(p, tail)) for p in ("[a-z]", "[A-Z]", "[0-9]")]
           alphabet = 26 * classes[0] + 26 * classes[1] + 10 * classes[2] + (10 if re.search(r"[^A-Za-z0-9]", tail) else 0)
           bits = len(tail) * math.log2(alphabet) if alphabet else 0.0
@@ -48,13 +52,15 @@ jobs:
               "letters and digits mixed in that part": (classes[0] or classes[1]) and classes[2],
               "no character makes up more than a quarter of that part": bool(tail) and most <= len(tail) / 4,
               "at least 60 bits of guessing (length x alphabet)": bits >= 60,
+              "no year and no common word after the prefix": not guessable,
           }
           if all(tests.values()):
               for name in tests:
                   print(f"yes  {name}")
-              print("The phone topic looks long and random.")
+              print("The phone topic passes the length and pattern checks. They cannot prove a name is random: "
+                    "if it was typed by hand rather than generated, replace it with a generated one.")
           else:
               # The log is public: which test failed is not said.
-              print("::warning::The phone topic does not look long and random: choose a new one "
-                    "(docs/phone.mdx) in the ntfy app and in the NTFY_TOPIC secret")
+              print("::warning::The phone topic does not pass the length and pattern checks: choose a new, "
+                    "generated one (docs/phone.mdx) in the ntfy app and in the NTFY_TOPIC secret")
           EOF

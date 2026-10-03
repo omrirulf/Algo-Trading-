@@ -89,12 +89,14 @@ The topic is the only secret and it never appears in a URL or a log: the
 message is posted as JSON to ntfy's root, and the temporary file that carried
 it is removed. The **phone topic check** workflow says whether the name is
 long and random — only characters ntfy accepts, at least 20 in all, at least
-12 after any readable prefix with letters and digits mixed and no character
-more than a quarter of them, about 60 bits or more. It
+12 after any readable prefix with letters and digits mixed, no character more
+than a quarter of them, no year and no common word in them, about 60 bits or
+more. Length and patterns cannot prove a name is random, so a name typed by
+hand should be replaced with a generated one. It
 prints only the verdict, never the name (the log is public, so a weak name's
 failing test is not named either). It runs on any pull request that changes
 it, and by hand from the Actions tab once it is on `main`. If a freshly
-generated name is warned about, generate another. It passed on 3 Oct 2026.
+generated name is warned about, generate another.
 ntfy.sh is public, so nothing personal is ever pushed; moving to a private
 channel is on the [before real money checklist](/next-steps#before-real-money-the-checklist). A push step never fails the run; the run's verdict is the
 cycle's.

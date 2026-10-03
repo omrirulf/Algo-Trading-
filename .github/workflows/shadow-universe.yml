@@ -65,7 +65,7 @@ permissions:
 # day or race to append to the same month's file. A verify run has its own
 # group, so it can never take the place of a scoring run waiting its turn.
 concurrency:
-  group: ${{ (github.event_name == 'pull_request' || inputs.verify) && 'shadow-universe-verify' || 'shadow-universe' }}
+  group: ${{ (github.event_name == 'pull_request' || inputs.verify) && format('shadow-universe-verify-{0}', github.head_ref || github.run_id) || 'shadow-universe' }}
   cancel-in-progress: false
 
 jobs:
@@ -233,17 +233,34 @@ jobs:
           pip install -r requirements.txt
 
       - name: Does every name resolve?
+        # A name that fails is asked again twice, 30 seconds apart, so a
+        # passing refusal or throttle from Yahoo is not taken for a name that
+        # does not resolve (the card's rule 3 replaces such a name). Then,
+        # for the record only, whether the names replaced by rule 3 resolve
+        # now; the list does not change because of it.
         run: |
           python - <<'EOF'
-          import sys
+          import sys, time
           from backtest.verify_tickers import check
-          from config.shadow_universe import SECTORS, TICKERS
-          results = [check(ticker) for ticker in TICKERS]
-          broken = [r for r in results if not r.resolved]
-          for r in results:
-              print(f"{r.ticker:<6} {'ok' if r.resolved else 'NO':<3} {SECTORS[r.ticker]:<28} {r.note}")
+          from config.shadow_universe import REPLACED, SECTORS, TICKERS
+          results = {ticker: check(ticker) for ticker in TICKERS}
+          for attempt in (1, 2):
+              broken = [t for t, r in results.items() if not r.resolved]
+              if not broken:
+                  break
+              print(f"{len(broken)} name(s) did not resolve; asking again in 30 seconds: {', '.join(broken)}")
+              time.sleep(30)
+              for ticker in broken:
+                  results[ticker] = check(ticker)
+          broken = [t for t, r in results.items() if not r.resolved]
+          for ticker, r in results.items():
+              print(f"{ticker:<6} {'ok' if r.resolved else 'NO':<3} {SECTORS[ticker]:<28} {r.note}")
           print(f"{len(results) - len(broken)} of {len(results)} names resolve")
+          for old, (new, rule) in REPLACED.items():
+              if rule == 3:
+                  print(f"for the record: {old} (replaced by {new}, rule 3) "
+                        f"{'resolves now' if check(old).resolved else 'still does not resolve'}")
           if broken:
-              print("Does not resolve: " + ", ".join(r.ticker for r in broken))
+              print("Does not resolve: " + ", ".join(broken))
               sys.exit(1)
           EOF
