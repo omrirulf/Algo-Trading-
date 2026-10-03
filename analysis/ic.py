@@ -11,6 +11,16 @@ could be detected at t = 2.4. Between checkpoints show only counters; no IC
 value is written to any file, page or log before the checkpoint. Registered
 at the 22 Dec 2026 checkpoint, over every line from 28 Sep 2026.
 
+**Split by sleeve, descriptive only** (the owner's decision of 3 Oct 2026,
+after a news audit found the race's news relevant for 76% of single-name
+headlines but 23% of fund headlines: ``docs/research/news-relevance.md``).
+For the production names the record also carries the same numbers, made
+the same way, for the single names and for the funds separately
+(``GROUPS``, by ``config.instruments.is_fund``). Not tests: no group has a
+``main``, so none enters the Benjamini-Hochberg family or the Deflated
+Sharpe Ratio, none is a trial in N, and they exist only inside the
+checkpoint record, hidden until the checkpoints like every other IC value.
+
 The IC (information coefficient) of a day is that rank correlation. A score
 that knows nothing has ICs around 0; a score that puts the names in exactly
 the order they then move has an IC of 1.
@@ -103,9 +113,9 @@ tests' records (``shadow/run.py``). The primary test, the owner's decision
 of 3 Oct 2026, is one per universe: the blended score's mean daily rank-IC
 at 1 session (``MAIN_SCORE``, ``MAIN_HORIZON``). Those two are the only IC
 members of the Benjamini-Hochberg family (and get its Deflated Sharpe
-Ratio); the 3-session IC, the five single scores, momentum and the paired
-difference are secondary and descriptive only. ``card`` is the
-pre-registration card, made from these same constants.
+Ratio); the 3-session IC, the five single scores, momentum, the paired
+difference and the split by sleeve are secondary and descriptive only.
+``card`` is the pre-registration card, made from these same constants.
 
 Pure computation: bars come in (``bars_from_fetcher`` builds them from a
 fetcher for the nightly run), nothing is fetched here, no file is written,
@@ -129,6 +139,7 @@ from analysis.metrics import spearman
 from analysis.multiple_tests import p_two_sided, series_stats
 from analysis.reader import entry_from
 from config import journal_files
+from config.instruments import is_fund
 
 #: Lines journalled on or after this UTC day are in the test ("over all lines from 2026-09-28").
 IC_START: Final[date] = date(2026, 9, 28)
@@ -173,6 +184,11 @@ MAIN_SCORE: Final[str] = "blend"
 MAIN_HORIZON: Final[int] = 1
 #: For reading only: the blended score's daily IC minus the comparator's, on the days both have one.
 PAIRED: Final[tuple[str, str]] = ("blend", COMPARATOR)
+#: Descriptive only (the owner's decision of 3 Oct 2026): the production names split by sleeve, single names
+#: and funds (``config.instruments.is_fund``). The same numbers per group; no group is a test.
+GROUPS: Final[tuple[str, ...]] = ("single_names", "funds")
+#: The universe whose record carries the split: the race's 80 names.
+GROUPS_UNIVERSE: Final[str] = "production"
 #: Everything ``counters`` may show, per universe, and nothing else.
 COUNTER_KEYS: Final[tuple[str, ...]] = ("answered_lines", "lines_with_score", "line_days")
 
@@ -735,13 +751,14 @@ def settings() -> dict:
                   "does not change ranks); C = their correlation matrix, N names, T dates: "
                   "n_eff = N^2 / max(sum(C^2) - N(N - 1) / (T - 1), N), n_eff_raw = N^2 / sum(C^2)"),
         "main": {"score": MAIN_SCORE, "horizon": MAIN_HORIZON},
+        "groups": {"universe": GROUPS_UNIVERSE, "names": list(GROUPS), "rule": "config.instruments.is_fund",
+                   "descriptive": True},
         "return": "price only: the next open to the close of the h-th session, no dividend, no cost",
     }
 
 
-def universe_record(lines: Sequence[IcLine], bars: Mapping[str, Sequence[Bar]], through: date,
-                    name: str = "production") -> dict:
-    """One universe's checkpoint numbers, from its lines already in the window (``in_window``)."""
+def _numbers(lines: Sequence[IcLine], bars: Mapping[str, Sequence[Bar]], through: date) -> dict:
+    """Every number of the report for these lines, without the primary test's ``main``."""
     by_horizon = {h: daily_ics(lines, bars, h, through) for h in HORIZONS}
     firsts = [d.first_entry for d in by_horizon.values() if d.first_entry is not None]
     lasts = [d.last_exit for d in by_horizon.values() if d.last_exit is not None]
@@ -753,7 +770,6 @@ def universe_record(lines: Sequence[IcLine], bars: Mapping[str, Sequence[Bar]], 
                for score in ALL_SCORES}
         row[f"{PAIRED[0]}_minus_{PAIRED[1]}"] = paired(found.ics[PAIRED[0]], found.ics[PAIRED[1]], h)
         horizons[str(h)] = row
-    main = horizons[str(MAIN_HORIZON)][MAIN_SCORE]
     return {
         "lines": len(lines),
         "window": {"first": first.isoformat() if first else None, "last": last.isoformat() if last else None},
@@ -768,6 +784,15 @@ def universe_record(lines: Sequence[IcLine], bars: Mapping[str, Sequence[Bar]], 
         "pending": by_horizon[max(HORIZONS)].pending,
         "pending_by_horizon": {str(h): d.pending for h, d in by_horizon.items()},
         "no_price": by_horizon[max(HORIZONS)].no_price,
+    }
+
+
+def universe_record(lines: Sequence[IcLine], bars: Mapping[str, Sequence[Bar]], through: date,
+                    name: str = "production") -> dict:
+    """One universe's checkpoint numbers, from its lines already in the window (``in_window``)."""
+    out = _numbers(lines, bars, through)
+    main = out["horizons"][str(MAIN_HORIZON)][MAIN_SCORE]
+    return out | {
         "main": {
             "name": f"ic_{name}_{MAIN_SCORE}_{MAIN_HORIZON}",
             "score": MAIN_SCORE,
@@ -781,6 +806,25 @@ def universe_record(lines: Sequence[IcLine], bars: Mapping[str, Sequence[Bar]], 
     }
 
 
+def group_of(ticker: str) -> str:
+    """A name's sleeve for the descriptive split: ``"funds"`` for a fund, else ``"single_names"``."""
+    return GROUPS[1] if is_fund(ticker) else GROUPS[0]
+
+
+def groups_record(lines: Sequence[IcLine], bars: Mapping[str, Sequence[Bar]], through: date) -> dict:
+    """The descriptive split: the same numbers for each sleeve's lines, and no ``main`` anywhere.
+
+    Each group is measured on its own lines only -- its daily ICs over its
+    own names (at least ``MIN_NAMES`` a day, as for the universe), its n_eff
+    from its own names' returns. A group with no line is ``{"no_data": True}``.
+    """
+    out: dict[str, Any] = {"descriptive": True, "in_family": False, "rule": "config.instruments.is_fund"}
+    for group in GROUPS:
+        own = [line for line in lines if group_of(line.ticker) == group]
+        out[group] = (_numbers(own, bars, through) | {"members": len(tickers_of(own))}) if own else {"no_data": True}
+    return out
+
+
 def record(lines_by_universe: Mapping[str, Sequence[IcLine]],
            bars_by_universe: Mapping[str, Mapping[str, Sequence[Bar]]], through: date) -> dict:
     """The checkpoint record: every number of the IC report, once, through ``through``.
@@ -790,7 +834,9 @@ def record(lines_by_universe: Mapping[str, Sequence[IcLine]],
     its window yet is ``{"no_data": True}``. Each universe's ``main`` is the
     test that enters the Benjamini-Hochberg family and the Deflated Sharpe
     Ratio, with the keys the family reads (``t``, ``stats``,
-    ``mean_daily_diff`` -- here the mean IC -- and ``days``).
+    ``mean_daily_diff`` -- here the mean IC -- and ``days``). The production
+    universe also carries ``groups``, the descriptive split by sleeve
+    (``groups_record``), which has no ``main`` and is not in the family.
     """
     universes: dict[str, dict] = {}
     for universe in UNIVERSES:
@@ -799,6 +845,8 @@ def record(lines_by_universe: Mapping[str, Sequence[IcLine]],
             universes[universe] = {"no_data": True}
             continue
         universes[universe] = universe_record(lines, bars_by_universe.get(universe) or {}, through, universe)
+        if universe == GROUPS_UNIVERSE:
+            universes[universe]["groups"] = groups_record(lines, bars_by_universe.get(universe) or {}, through)
     return {
         "through": through.isoformat(),
         "registered": IC_REGISTRATION.isoformat(),
@@ -861,7 +909,12 @@ def card() -> str:
         "are the only IC members of the Benjamini-Hochberg family, and each gets the family's Deflated Sharpe "
         "Ratio. **Secondary, descriptive only, not in the family:** the IC at "
         f"{', '.join(str(h) for h in HORIZONS if h != MAIN_HORIZON)} sessions, the five single scores at every "
-        "horizon, the momentum comparator and the blend-minus-momentum difference.",
+        "horizon, the momentum comparator, the blend-minus-momentum difference and the split by sleeve below.",
+        f"- **Split by sleeve, descriptive only (the owner's decision of 3 Oct 2026).** For the production "
+        "names, the same numbers made the same way for the single names and for the funds separately "
+        f"(`config.instruments.is_fund`: 16 single names, 64 funds), each group on its own lines and names, at "
+        f"least {MIN_NAMES} names a day as above. Not tests: not in the Benjamini-Hochberg family, no Deflated "
+        "Sharpe Ratio, no trial in N, and hidden until the checkpoints like every other IC value.",
         "- **Trials.** Two trials in N (graveyard rows 35 and 36, one per universe) and one idea against the "
         "quarterly limit, counted in the first quarter of 2027 (the owner's decision of 3 Oct 2026).",
         f"- **Hidden until the checkpoint.** Before {_day(IC_REGISTRATION)} only counters are shown: answered "
@@ -892,10 +945,10 @@ def _positive(value: Any) -> bool:
 
 __all__ = [
     "ALL_SCORES", "Bar", "COMPARATOR", "COUNTER_KEYS", "DIMENSIONS", "DailyIcs", "FEW_NAMES", "Forward", "HORIZONS",
-    "IC_REGISTRATION", "IC_START", "IcLine", "MAIN_HORIZON", "MAIN_SCORE", "MDE_T", "MIN_NAMES", "NO_PRICE",
+    "GROUPS", "GROUPS_UNIVERSE", "IC_REGISTRATION", "IC_START", "IcLine", "MAIN_HORIZON", "MAIN_SCORE", "MDE_T", "MIN_NAMES", "NO_PRICE",
     "NO_SPREAD", "NW_LAG", "N_EFF_MIN_COVERAGE", "N_EFF_MIN_DATES", "N_EFF_MIN_RETURNS", "OK", "PAIRED", "PENDING",
     "SCORES", "SHADOW_START", "UNIVERSES", "UNIVERSE_START", "bars_from_fetcher", "card", "counters", "daily_ics",
-    "due", "effective_names", "forward_return", "in_window", "line_from", "mde_theory", "momentum_score",
+    "due", "effective_names", "forward_return", "group_of", "groups_record", "in_window", "line_from", "mde_theory", "momentum_score",
     "newey_west_se", "paired", "read_lines", "read_universe", "record", "settings", "summarise", "tickers_of",
     "universe_record",
 ]

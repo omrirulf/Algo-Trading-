@@ -175,9 +175,15 @@ def test_the_ic_card_states_the_settings_the_code_registers():
                    "at least 20 of them", "t = 2.4", "lag equal to the horizon (1 and 3)", "h = 1 and h = 3",
                    "the blended score's mean daily rank-IC at 1 session (Newey-West t, lag 1)",
                    "only IC members of the Benjamini-Hochberg family", "the IC at 3 sessions",
-                   "two trials in N (two universes) and one idea against the quarterly limit"):
+                   "two trials in N (two universes) and one idea against the quarterly limit",
+                   "the production names split by sleeve", "for the 16 single names and for the 64 funds separately",
+                   "not in the Benjamini-Hochberg family, no Deflated Sharpe Ratio, no trial in N",
+                   "The split by sleeve is hidden the same way"):
         assert phrase in card, phrase
     assert (ic.MAIN_SCORE, ic.MAIN_HORIZON) == ("blend", 1)
+    assert ic.GROUPS == ("single_names", "funds")
+    text = " ".join((ROOT / "docs" / "horse-race-preregistration.md").read_text().split())
+    assert "**Split by sleeve, descriptive only (Amendment 2026-10-03):**" in text
 
 
 def test_only_the_two_primary_ic_tests_are_in_the_family():

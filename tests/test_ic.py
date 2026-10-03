@@ -92,6 +92,8 @@ def test_the_registered_settings():
     assert ic.PAIRED == ("blend", "momentum")
     assert ic.COUNTER_KEYS == ("answered_lines", "lines_with_score", "line_days")
     assert (ic.N_EFF_MIN_RETURNS, ic.N_EFF_MIN_DATES, ic.N_EFF_MIN_COVERAGE) == (20, 20, 0.9)
+    # Descriptive only (the owner's decision of 3 Oct 2026): the production names split by sleeve.
+    assert ic.GROUPS == ("single_names", "funds") and ic.GROUPS_UNIVERSE == "production"
 
 
 def test_the_record_carries_every_n_eff_setting():
@@ -117,7 +119,9 @@ def test_the_card_carries_the_registered_settings():
                    "Two trials in N", "one idea against the quarterly limit", "Deflated Sharpe Ratio",
                    "No IC value is written to any file, page or log", "Shadow only",
                    "(a signal about this ticker, not held)", "webhook unreachable", "**90%**",
-                   "The common move is taken out", "N^2 / max(sum of C^2 - N(N - 1) / (T - 1), N)", "n_eff_raw"):
+                   "The common move is taken out", "N^2 / max(sum of C^2 - N(N - 1) / (T - 1), N)", "n_eff_raw",
+                   "Split by sleeve, descriptive only", "16 single names, 64 funds",
+                   "Not tests: not in the Benjamini-Hochberg family", "hidden until the checkpoints"):
         assert phrase in text, phrase
     assert "no error" not in text, "an error written after the answer does not take a line out (the race's rule)"
 
@@ -684,6 +688,76 @@ def test_a_record_does_not_move_with_later_lines_or_bars():
     early = [line for line in lines if line.day <= through]
     clipped = {name: [b for b in rows if b[0] <= through] for name, rows in bars.items()}
     assert ic.record({"production": early}, {"production": clipped}, through) == found
+
+
+def _sleeves(n_days: int = 31, seed: int = 5, singles: int = 12, funds: int = 12):
+    """Lines and bars for real production tickers: ``singles`` single names and ``funds`` funds."""
+    from config.instruments import FUNDS, SINGLE_NAMES
+
+    rng = random.Random(seed)
+    names = list(SINGLE_NAMES[:singles]) + list(FUNDS[:funds])
+    days = SESSIONS[:n_days + 5]
+    returns = {name: {d: rng.gauss(0.0, 0.02) for d in days} for name in names}
+    lines = [make_line(name, d, blend=rng.uniform(-0.3, 0.3), news=rng.uniform(-1, 1),
+                       technical=rng.uniform(-1, 1), fundamental=rng.uniform(-1, 1), analyst=rng.uniform(-1, 1),
+                       insider=rng.uniform(-1, 1), momentum=rng.choice([0.0, 0.4, -0.7]))
+             for d in days for name in names]
+    return lines, bars_from_returns(returns, days), days[n_days - 1]
+
+
+def _keys(node) -> set:
+    """Every dict key anywhere inside ``node``."""
+    if isinstance(node, dict):
+        return set(node) | {k for value in node.values() for k in _keys(value)}
+    if isinstance(node, list):
+        return {k for value in node for k in _keys(value)}
+    return set()
+
+
+def test_the_split_by_sleeve_is_descriptive_has_no_main_and_measures_each_group_on_its_own():
+    """The owner, 3 Oct 2026: the race's 80 names split into single names and funds, descriptive only."""
+    from config.instruments import is_fund
+
+    lines, bars, through = _sleeves()
+    found = ic.record({"production": lines}, {"production": bars}, through)
+    assert json.loads(json.dumps(found)) == found
+    production = found["universes"]["production"]
+    groups = production["groups"]
+    assert {k: groups[k] for k in ("descriptive", "in_family", "rule")} == {
+        "descriptive": True, "in_family": False, "rule": "config.instruments.is_fund"}
+    assert set(groups) == {"descriptive", "in_family", "rule", "single_names", "funds"}
+    assert "main" not in _keys(groups), "no group is a test: nothing for the family to read"
+    window = ic.in_window(lines, "production", through)
+    for group, fund in (("single_names", False), ("funds", True)):
+        own = [line for line in window if is_fund(line.ticker) == fund]
+        assert groups[group] == ic._numbers(own, bars, through) | {"members": 12}
+        assert groups[group]["lines"] == 31 * 12 and groups[group]["names"] == ic.tickers_of(own)
+        assert groups[group]["horizons"]["1"]["blend"]["days"] == 31 - 1
+    # The universe's own numbers and its primary test are exactly as without the split.
+    whole = {k: v for k, v in production.items() if k != "groups"}
+    assert whole == ic.universe_record(window, bars, through, "production")
+    assert found["settings"]["groups"] == {"universe": "production", "names": ["single_names", "funds"],
+                                           "rule": "config.instruments.is_fund", "descriptive": True}
+    # Hidden like the rest: only the checkpoint record has it; the nightly counters do not.
+    assert "groups" not in _keys(ic.counters({"production": lines}, through))
+
+
+def test_a_sleeve_with_fewer_than_ten_names_a_day_has_no_ic_and_says_why():
+    """Today about 4 to 7 single names a day are answered (the others are held): fewer than ``MIN_NAMES``."""
+    lines, bars, through = _sleeves(singles=6, funds=12)
+    groups = ic.record({"production": lines}, {"production": bars}, through)["universes"]["production"]["groups"]
+    one = groups["single_names"]["horizons"]["1"]["blend"]
+    assert one["days"] == 0 and one["t"] is None and one["mean_ic"] is None
+    assert one["skipped"]["few_names"] == 31 - 1 and groups["single_names"]["members"] == 6
+    assert groups["funds"]["horizons"]["1"]["blend"]["days"] == 31 - 1
+
+
+def test_a_sleeve_without_lines_is_no_data_and_the_shadow_universe_has_no_split():
+    lines, bars, through = _universe()   # N00..N11: not funds, so every line is a single name's
+    found = ic.record({"production": lines, "shadow": lines}, {"production": bars, "shadow": bars}, through)
+    assert found["universes"]["production"]["groups"]["funds"] == {"no_data": True}
+    assert found["universes"]["production"]["groups"]["single_names"]["members"] == 12
+    assert "groups" not in found["universes"]["shadow"]
 
 
 def test_a_universe_without_prices_is_all_no_price_and_without_lines_no_data():

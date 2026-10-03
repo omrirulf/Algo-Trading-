@@ -151,8 +151,8 @@ Amendments table before any checkpoint result exists):
 
 ## 4. Where it appears
 
-- `logs/race_gate.json` (`verdict`, a new last key) and the horse-race report (a "CHECKPOINT VERDICT" block after
-  the gate).
+- `logs/race_gate.json` (`verdict`, a new key just before `prices_sha256`) and the horse-race report (a
+  "CHECKPOINT VERDICT" block after the gate).
 - `logs/funds.json`: the frozen fund-test records (`fund_test.looks`), the fund-test table (`fund_test.verdict`)
   and the combined line (`verdict`).
 - The 4 Funds page: one "Checkpoint verdict" card with both tables and the combined line.
