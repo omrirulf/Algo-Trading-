@@ -230,4 +230,11 @@ jobs:
             echo '```'
             python -c "import json,sys; d=json.load(open(sys.argv[1]))['calibration']; print(d['status'], d.get('days_done'), 'of', d.get('days_needed'))" "$RUNNER_TEMP/funds.json" 2>/dev/null || echo "(no funds file)"
             echo '```'
+            # Section 11.9: was tonight's rate table written, and how many
+            # days came from another source? (A failed night is also sent to
+            # the phone by scoring-prices.yml; this job holds no secret.)
+            echo '## Shekel rates'
+            echo '```'
+            python -c "import json,sys; f=json.load(open(sys.argv[1]))['after_tax']['fx']; c=f.get('counts') or {}; print(('written: Bank of Israel %s days, from another source %s (ECB %s, carried %s), %s to %s' % (c.get('boi', 0), c.get('ecb', 0) + c.get('carried', 0), c.get('ecb', 0), c.get('carried', 0), f.get('first'), f.get('last'))) if f.get('available') else 'NOT written: ' + str(f.get('reason')))" "$RUNNER_TEMP/funds.json" 2>/dev/null || echo "(no funds file)"
+            echo '```'
           } >> "$GITHUB_STEP_SUMMARY"

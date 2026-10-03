@@ -156,3 +156,21 @@ that design choice was made deliberately.
   live positions and intentions. No real money goes in before the June 2027
   verdict (pre-registration, section 9), so this decision is due before then.
 </Warning>
+
+### Before real money: the checklist
+
+Recorded 3 Oct 2026, at the owner's request. Every item is open today. Each one is done, and written down, before
+any real money goes in — which in any case is not before the June 2027 verdict (pre-registration, section 9).
+
+1. **Move the phone notifications to a private channel.** The push goes through the public server ntfy.sh: the
+   only protection is the topic name (the `NTFY_TOPIC` secret), anyone who knows it can read or send, and the
+   server's operator can see every message. Options: an ntfy topic with access control (a paid ntfy.sh plan or a
+   self-hosted server), or a private messenger bot. Until then nothing personal is ever pushed, and the topic name
+   stays long and random (checked without being printed; see [Phone notifications](/phone)).
+2. **Make the repository private** (the decision above): the journal, the account snapshots and the model-call
+   artifacts are public today.
+3. **Decide where personal numbers live.** The monthly coach's approved plan puts them in a private Supabase project
+   of its own, never in this repository, its logs, its artifacts or a push, with the model seeing percentages only
+   (`docs/research/monthly-coach-plan.md`). Nothing personal is collected until the owner confirms it.
+4. **The paper-only literal.** `paper=True` in `app/broker_client.py` is removed only by an explicit, reviewed code
+   change, after the three items above.

@@ -65,6 +65,7 @@ jobs:
       - run: pip install -r requirements.txt
 
       - name: Download the run's price tables
+        id: download
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: scoring-prices
@@ -108,6 +109,64 @@ jobs:
                             "message": ("Tonight's scoring prices could not be copied to the Supabase archive. "
                                         "Nothing is lost: the table is the run's artifact for 90 days, and its "
                                         "hash is in git. Run scoring-prices.yml with that run's id to retry."),
+                            "priority": 3, "tags": ["warning"], "click": os.environ["RUN_URL"]}))
+          EOF
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' \
+                 --data-binary @"$RUNNER_TEMP/phone.json" https://ntfy.sh/ || echo "000")
+          rm -f "$RUNNER_TEMP/phone.json"
+          case "$code" in
+            2*) echo "phone notified (HTTP $code)";;
+            *)  echo "::warning::phone not notified (HTTP $code)";;
+          esac
+
+      - name: Tell the owner's phone the shekel rates failed
+        # Pre-registration section 11.9 (the owner, 3 Oct 2026). The funds run
+        # fetches the Bank of Israel's rates every night, and it holds no
+        # secret (a CI guardrail), so its alert is sent from here. Only for a
+        # shadow funds run, whose artifact holds funds.json: no rate table
+        # (fx-rates.json missing or unreadable), or a table with no day from
+        # the Bank of Israel at all, is a failed night. Fixed words; the
+        # night's counts are public in logs/after_tax.md.
+        if: always() && steps.download.outcome == 'success'
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          verdict=$(python - "$RUNNER_TEMP/scoring-prices" <<'EOF'
+          import json, pathlib, sys
+          folder = pathlib.Path(sys.argv[1])
+          if not (folder / "funds.json").is_file():
+              print("not-funds")
+              raise SystemExit
+          try:
+              rows = json.loads((folder / "fx-rates.json").read_text(encoding="utf-8"))["rows"]
+              boi = sum(1 for row in rows if row.get("ticker") == "USDILS")
+          except (OSError, ValueError, KeyError, TypeError, AttributeError):
+              print("missing")
+              raise SystemExit
+          print("ok" if boi else "no-boi")
+          EOF
+          )
+          echo "shekel rates tonight: $verdict"
+          case "$verdict" in
+            ok|not-funds) exit 0;;
+          esac
+          if [ -z "${NTFY_TOPIC:-}" ]; then
+            echo "no phone configured (NTFY_TOPIC secret unset); nothing sent"
+            exit 0
+          fi
+          VERDICT="$verdict" python - <<'EOF' > "$RUNNER_TEMP/phone.json"
+          import json, os
+          if os.environ["VERDICT"] == "missing":
+              title = "⚠️ No shekel rate table tonight"
+              message = ("The Bank of Israel rate table could not be made tonight, so there is no after-tax or "
+                         "shekel view tonight. Nothing is traded and no rate is guessed. The next night tries "
+                         "again.")
+          else:
+              title = "⚠️ Bank of Israel not reached tonight"
+              message = ("Tonight's shekel rate table has no day from the Bank of Israel: every day came from "
+                         "another source, counted in logs/after_tax.md. Nothing is traded.")
+          print(json.dumps({"topic": os.environ["NTFY_TOPIC"], "title": title, "message": message,
                             "priority": 3, "tags": ["warning"], "click": os.environ["RUN_URL"]}))
           EOF
           code=$(curl -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' \

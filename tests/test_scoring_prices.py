@@ -323,3 +323,41 @@ def test_the_capture_directory_is_never_committed():
     assert "logs/model_io/" in (ROOT / ".gitignore").read_text().splitlines()
     heartbeat = (ROOT / ".github" / "workflows" / "heartbeat.yml").read_text()
     assert all("model_io" not in line for line in heartbeat.splitlines() if "git add" in line)
+
+
+def _rates_check_script() -> str:
+    wf = _workflow("scoring-prices.yml")
+    step = next(s for s in wf["jobs"]["push"]["steps"] if s.get("name") == "Tell the owner's phone the shekel rates failed")
+    run = step["run"]
+    start = run.index("<<'EOF'\n") + len("<<'EOF'\n")
+    return run[start:run.index("\nEOF", start)]
+
+
+def test_a_failed_shekel_rate_night_reaches_the_phone_from_the_archive_workflow(tmp_path):
+    """The owner, 3 Oct 2026: alert when the rate table failed. The funds run holds no secret, so the alert
+    is sent by scoring-prices.yml, which reads the funds run's artifact: no table, or no Bank of Israel day."""
+    import subprocess
+    import sys
+
+    wf = _workflow("scoring-prices.yml")
+    step = next(s for s in wf["jobs"]["push"]["steps"] if s.get("name") == "Tell the owner's phone the shekel rates failed")
+    assert step["if"] == "always() && steps.download.outcome == 'success'"
+    assert '"topic": os.environ["NTFY_TOPIC"]' in step["run"] and 'rm -f "$RUNNER_TEMP/phone.json"' in step["run"]
+    assert "secrets." not in (ROOT / ".github" / "workflows" / "funds.yml").read_text()
+    script = _rates_check_script()
+
+    def verdict(files: dict) -> str:
+        folder = tmp_path / str(len(list(tmp_path.iterdir())))
+        folder.mkdir()
+        for name, body in files.items():
+            (folder / name).write_text(body if isinstance(body, str) else json.dumps(body))
+        return subprocess.run([sys.executable, "-", str(folder)], input=script, capture_output=True,
+                              text=True, check=True).stdout.strip()
+
+    boi = {"rows": [{"ticker": "USDILS", "close": 3.7}, {"ticker": "USDILS.ECB", "close": 3.71}]}
+    ecb_only = {"rows": [{"ticker": "USDILS.ECB", "close": 3.71}]}
+    assert verdict({"race_gate.json": "{}"}) == "not-funds"            # a horse race run: nothing to check
+    assert verdict({"funds.json": "{}"}) == "missing"
+    assert verdict({"funds.json": "{}", "fx-rates.json": "not json"}) == "missing"
+    assert verdict({"funds.json": "{}", "fx-rates.json": ecb_only}) == "no-boi"
+    assert verdict({"funds.json": "{}", "fx-rates.json": boi}) == "ok"
