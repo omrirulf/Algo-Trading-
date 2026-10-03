@@ -334,6 +334,7 @@ def render(document: dict) -> str:
         other = (counts.get("ecb") or 0) + (counts.get("carried") or 0)
         days = ", ".join(f"{d} ({src})" for d, src in fx.get("fallback_days") or []) or "none"
         lines += [f"Rates: the Bank of Israel's representative rate, {fx.get('first')} to {fx.get('last')}; "
+                  f"{counts.get('boi') or 0} day(s) from the Bank of Israel, "
                   f"{other} day(s) from another source: {days}. Table SHA-256 `{fx.get('rates_sha256')}`.", ""]
     else:
         lines += [f"No rate table tonight ({fx.get('reason', 'unknown')}): nothing is shown rather than a guessed rate.", ""]

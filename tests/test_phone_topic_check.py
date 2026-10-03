@@ -42,12 +42,12 @@ def test_the_docs_example_shape_passes():
     assert "looks long and random" in _check("algo-desk-a8f3k29dm4q7")
 
 
-def test_weak_topics_are_warned_about():
+def test_weak_topics_are_warned_about_without_saying_which_test_failed():
     for weak in ("algotrading", "algo-desk-alerts", "algo-desk-123456789012", "mytopicmytopicmytopic",
-                 "algo-desk-aaaaaaaaaaa1"):
+                 "algo-desk-aaaaaaaaaaa1", "algo.desk.k7Qx2mPz9wLr4Tb!", "algo-desk-" + "k7Qx2mPz9w" * 7):
         out = _check(weak)
         assert "::warning::The phone topic does not look long and random" in out, weak
-        assert weak not in out
+        assert weak not in out and "yes " not in out and "NO" not in out, weak   # the log is public
 
 
 def test_an_unset_topic_says_so():

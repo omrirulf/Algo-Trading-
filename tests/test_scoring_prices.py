@@ -361,3 +361,20 @@ def test_a_failed_shekel_rate_night_reaches_the_phone_from_the_archive_workflow(
     assert verdict({"funds.json": "{}", "fx-rates.json": "not json"}) == "missing"
     assert verdict({"funds.json": "{}", "fx-rates.json": ecb_only}) == "no-boi"
     assert verdict({"funds.json": "{}", "fx-rates.json": boi}) == "ok"
+
+
+def test_a_failed_funds_run_reaches_the_phone_too():
+    """A red funds run keeps no rate table and sends nothing itself; scoring-prices.yml says so."""
+    from tests.test_phone import _is_a_safe_push
+
+    wf = _workflow("scoring-prices.yml")
+    job = wf["jobs"]["funds-failed"]
+    for guard in ("workflow_run.name == 'shadow funds'", "conclusion == 'failure'", "head_branch == 'main'",
+                  "head_repository.full_name == github.repository", "event == 'schedule'"):
+        assert guard in job["if"]
+    (step,) = job["steps"]
+    _is_a_safe_push(step)
+    assert "shekel rate table was kept" in step["run"] and "The shadow funds run failed tonight" in step["run"]
+    # The rate alert after a green run is a safe push too.
+    rates = next(s for s in wf["jobs"]["push"]["steps"] if s.get("name") == "Tell the owner's phone the shekel rates failed")
+    _is_a_safe_push(rates)

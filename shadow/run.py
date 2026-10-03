@@ -762,6 +762,8 @@ def load_rates(path: Optional[Path]) -> tuple[Optional[object], dict]:
 
     if path is None:
         return None, {"available": False, "reason": "no rate table was given"}
+    if not Path(path).is_file():
+        return None, {"available": False, "reason": "tonight's rate step wrote no table; the run's log says why"}
     try:
         text = Path(path).read_text(encoding="utf-8")
         table = boi_rates.load_tape(text)

@@ -176,3 +176,46 @@ jobs:
             2*) echo "phone notified (HTTP $code)";;
             *)  echo "::warning::phone not notified (HTTP $code)";;
           esac
+
+  funds-failed:
+    # A shadow funds run that ends red sends nothing itself (it holds no
+    # secret), and the push job above runs only after a green one -- so a
+    # night with no funds record also has no shekel rate table, and nothing
+    # would say so (the owner, 3 Oct 2026: "alert me if it failed"). Fixed
+    # words and the failed run's link; nothing from the run is read.
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.name == 'shadow funds' &&
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      (github.event.workflow_run.event == 'schedule' || github.event.workflow_run.event == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Tell the owner's phone the funds run failed
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+        run: |
+          if [ -z "${NTFY_TOPIC:-}" ]; then
+            echo "no phone configured (NTFY_TOPIC secret unset); nothing sent"
+            exit 0
+          fi
+          python - <<'EOF' > "$RUNNER_TEMP/phone.json"
+          import json, os
+          print(json.dumps({"topic": os.environ["NTFY_TOPIC"],
+                            "title": "⚠️ The shadow funds run failed tonight",
+                            "message": ("Tonight's shadow funds run did not finish, so the race gate, the 4 Funds "
+                                        "page and the after-tax report keep the last night's numbers, and no "
+                                        "shekel rate table was kept. Nothing is traded. Open the run to see why."),
+                            "priority": 3, "tags": ["warning"], "click": os.environ["RUN_URL"]}))
+          EOF
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' \
+                 --data-binary @"$RUNNER_TEMP/phone.json" https://ntfy.sh/ || echo "000")
+          rm -f "$RUNNER_TEMP/phone.json"
+          case "$code" in
+            2*) echo "phone notified (HTTP $code)";;
+            *)  echo "::warning::phone not notified (HTTP $code)";;
+          esac
+

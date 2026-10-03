@@ -100,7 +100,8 @@ jobs:
           END=$(python -c "from datetime import datetime, timezone; from analysis.returns import last_final_session; print(last_final_session(datetime.now(timezone.utc)))")
           if python -m analysis.boi_rates --start 2026-09-10 --end "$END" --with-table > "$RUNNER_TEMP/fx.out" \
              && test "$(wc -l < "$RUNNER_TEMP/fx.out")" = "2" \
-             && python -c "import json,sys; d=json.load(open(sys.argv[1])); assert d['kind']=='fx-rates'" <(head -n 1 "$RUNNER_TEMP/fx.out"); then
+             && python -c "import json,sys; d=json.load(open(sys.argv[1])); assert d['kind']=='fx-rates'" <(head -n 1 "$RUNNER_TEMP/fx.out") \
+             && python -c "import sys; from analysis.boi_rates import load_tape; load_tape(open(sys.argv[1]).read())" <(tail -n 1 "$RUNNER_TEMP/fx.out"); then
             head -n 1 "$RUNNER_TEMP/fx.out" > "$RUNNER_TEMP/fx_rates.json"
             tail -n 1 "$RUNNER_TEMP/fx.out" > "$RUNNER_TEMP/scoring-prices/fx-rates.json"
           else
@@ -235,6 +236,6 @@ jobs:
             # the phone by scoring-prices.yml; this job holds no secret.)
             echo '## Shekel rates'
             echo '```'
-            python -c "import json,sys; f=json.load(open(sys.argv[1]))['after_tax']['fx']; c=f.get('counts') or {}; print(('written: Bank of Israel %s days, from another source %s (ECB %s, carried %s), %s to %s' % (c.get('boi', 0), c.get('ecb', 0) + c.get('carried', 0), c.get('ecb', 0), c.get('carried', 0), f.get('first'), f.get('last'))) if f.get('available') else 'NOT written: ' + str(f.get('reason')))" "$RUNNER_TEMP/funds.json" 2>/dev/null || echo "(no funds file)"
+            python -c "import json,sys; f=(json.load(open(sys.argv[1])).get('after_tax') or {}).get('fx') or {'reason': 'no after-tax part in the funds file'}; c=f.get('counts') or {}; print(('written: Bank of Israel %s days, from another source %s (ECB %s, carried %s), %s to %s' % (c.get('boi', 0), c.get('ecb', 0) + c.get('carried', 0), c.get('ecb', 0), c.get('carried', 0), f.get('first'), f.get('last'))) if f.get('available') else 'NOT written: ' + str(f.get('reason')))" "$RUNNER_TEMP/funds.json" 2>/dev/null || echo "(no funds file)"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"

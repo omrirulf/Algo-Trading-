@@ -175,7 +175,7 @@ def test_the_report_reads_in_plain_words():
         "breakeven": {"years": 20, "growth": 0.06, "dividend_yield": 0.02, "extra_per_year": 0.0082}}}
     text = tax.render(document)
     assert "# After Israeli tax and in shekels" in text and "losses also against dividends: on" in text
-    assert "1 day(s) from another source: 2026-09-23 (ecb)" in text
+    assert "16 day(s) from the Bank of Israel, 1 day(s) from another source: 2026-09-23 (ecb)" in text
     assert ("| Paper account (real) | $101,000 (+1.00%) | $100,800 (+0.80%) | $101,000 (+1.00%) "
             "| ₪310,000 (+2.00%) | ₪309,000 (+1.70%) | ₪310,000 (+2.00%) | +1.00 points | +0.90 points | ₪0 | ₪600 |") in text
     assert "After tax, if sold today (₪) | After tax, tax paid so far (₪)" in text
@@ -384,7 +384,8 @@ def test_the_rate_table_is_read_from_its_tape_and_refused_when_it_does_not_check
     path.write_text(json.dumps(tape))
     rates, meta = shadow_run.load_rates(path)
     assert rates is None and meta["available"] is False and "could not be read" in meta["reason"]
-    assert shadow_run.load_rates(tmp_path / "missing.json")[0] is None
+    assert shadow_run.load_rates(tmp_path / "missing.json") == (None, {
+        "available": False, "reason": "tonight's rate step wrote no table; the run's log says why"})
     assert shadow_run.load_rates(None) == (None, {"available": False, "reason": "no rate table was given"})
 
 

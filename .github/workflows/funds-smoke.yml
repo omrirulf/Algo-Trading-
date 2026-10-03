@@ -36,6 +36,7 @@ on:
       - "rules/**"
       - "analysis/reader.py"
       - "analysis/baseline_compare.py"
+      - "analysis/boi_rates.py"
       - ".github/workflows/funds-smoke.yml"
 
 permissions:
@@ -61,3 +62,15 @@ jobs:
         run: |
           case "$SESSIONS" in (*[!0-9]*|'') echo "sessions must be a number"; exit 2;; esac
           python -m shadow.smoke --sessions "$SESSIONS" --random 20
+
+      - name: The shekel rates, fetched as the nightly job will (reachability only)
+        # Can a GitHub runner reach the Bank of Israel's service, and does its
+        # answer still read as rates (pre-registration section 11.9)? Prints
+        # the one summary line only: the counts per source, the days from
+        # another source and the table's hash; nothing is kept. Both sources
+        # are public, so no key. A refusal is a warning here: the nightly job
+        # decides on its own fetch.
+        continue-on-error: true
+        run: |
+          END=$(python -c "from datetime import datetime, timezone; from analysis.returns import last_final_session; print(last_final_session(datetime.now(timezone.utc)))")
+          python -m analysis.boi_rates --start 2026-09-10 --end "$END"
