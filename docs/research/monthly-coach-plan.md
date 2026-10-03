@@ -1,7 +1,18 @@
 # The monthly coach: plan and private-data design
 
-**Status: a plan for the owner to approve. Nothing here is built.** (The owner's instruction of 2 Oct 2026, item 3:
-"plan first, don't build yet".)
+**Status: approved by the owner on 3 Oct 2026, with conditions. Only the checklist is built** (`coach/checklist.py`,
+`.github/workflows/coach.yml`). (The owner's instruction of 2 Oct 2026, item 3: "plan first, don't build yet".)
+
+## 0. The owner's conditions (3 Oct 2026)
+
+1. **Checklist only for the first two months** (November and December 2026), and after that until the owner
+   confirms that they want to enter numbers. **Collect no personal numbers yet.** The checklist is fixed text made
+   by code, so no model is asked and it costs nothing.
+2. **Later, the owner's numbers go only into a private Supabase project, and the model sees percentages only.**
+   Nothing personal goes on ntfy.sh, in the repository, in logs or in artifacts.
+3. **The cost cap stays at $0.10 a month.**
+4. **The data entry is not built until the owner confirms** that they want to enter numbers. Sections 1 to 4
+   below describe that later stage; only section 5 (the checklist) runs now.
 
 ## 1. What it does
 
@@ -82,23 +93,31 @@ dashboard (or, if the owner prefers, an email to the owner's own address from th
 later wants the percentages on the phone, the options are an ntfy topic with access control (a paid ntfy.sh plan
 or a self-hosted server) or a private messenger bot; both would need the owner's decision first.
 
-## 5. Until the owner enters numbers: the checklist
+## 5. Now: the checklist (built, runs from November 2026)
 
-Sent by push (no personal data in it), once a month:
+Sent by push on the first working day of each month (`coach/checklist.py`, `.github/workflows/coach.yml`). It
+asks the owner to think; it asks nobody to send a number, and nothing is collected:
 
-1. What was your take-home pay this month, and what did you spend? (Enter both in `coach_inputs`.)
-2. What is each part of your savings worth today: world stocks, Israeli bonds, cash, anything else?
-3. What target share do you want for each part, and how far from target before you rebalance?
-4. How much have you put into your keren hishtalmut, kupat gemel lehashkaa and pension this year, and how much
-   do you plan to put in?
-5. Reminder: the experiment's next checkpoint is 22 Dec 2026. No decisions before it.
+1. Did you save part of your take-home pay this month? Think of the share, not the amount.
+2. Your savings by part (world stocks, Israeli bonds, cash, anything else): is any part far from where you want
+   it?
+3. Have you chosen a target share for each part, and how far from it you let a part drift before you rebalance?
+4. Keren hishtalmut, kupat gemel lehashkaa and pension: are this year's deposits on plan?
 
-## 6. What the owner decides before it is built
+Then: "Keep your answers to yourself: send no number anywhere. Nothing is collected yet." and the experiment's
+next checkpoint date from the public `logs/race_gate.json` ("No decisions before it."). The second month's push
+also says that the two checklist-only months are over and asks the owner to tell Claude when they want to start
+entering numbers; until then the checklist goes on. No model is asked, so it costs nothing.
 
-1. Approve the design in section 3 (private repository or Supabase Edge Function), or choose the alternative.
+## 6. What the owner decides before the data entry is built
+
+Decided on 3 Oct 2026: the plan is approved with the conditions in section 0; the private place is a private
+Supabase project; the model sees percentages only; the cap is $0.10 a month; the checklist runs on the first
+working day of each month. Still open, for when the owner confirms that they want to enter numbers:
+
+1. Where the private job runs: a small private repository, or a Supabase scheduled Edge Function (section 3).
 2. The asset classes, the targets and the rebalancing band (they go in `coach_targets`, never in the repository).
 3. Where to read the full message: the Supabase dashboard, or an email.
-4. The day of the month it runs (proposed: the first working day, with the research backlog's monthly update).
 
 ## 7. What it will not do
 
