@@ -38,7 +38,7 @@ The list as prepared on 2026-10-02 (`config/shadow_universe.py`). It is checked 
 
 **Replaced on 2026-10-02, before any score of these names existed** (no price, return or score was looked at): Johnson & Johnson (JNJ, DePuy Synthes separation), Medtronic (MDT, MiniMed separation) and S&P Global (SPGI, Mobility spin-off), by rule (1), with Edwards Lifesciences (EW), IDEXX Laboratories (IDXX) and MetLife (MET); Dow Inc. (DOW: "DOW stock" finds the Dow Jones index) and ASE Technology (ASX: "ASX stock" finds the Australian Securities Exchange), by rule (2), with Martin Marietta Materials (MLM) and United Microelectronics (UMC).
 
-**Replaced on 2026-10-03, by rule (3):** BNY Mellon (BK: no prices returned) and AvalonBay Communities (AVB: fewer than two closes in three months) failed the verify check in two runs that day, and were replaced with State Street (STT) and Iron Mountain (IRM). Again no price, return or score was looked at beyond whether prices exist.
+**Replaced on 2026-10-03, by rule (3):** BNY Mellon (BK: Yahoo answered "quote not found" and returned no prices) and AvalonBay Communities (AVB: fewer than two closes in three months) failed the verify check in three runs that day (18:14, 18:15 and 18:16 UTC), while the other 249 names resolved in the same runs, and were replaced with State Street (STT) and Iron Mountain (IRM). Again no price, return or score was looked at beyond whether prices exist.
 
 Shadow stock universe: 251 names, chosen on 2026-10-02, frozen on 2026-12-22.
 

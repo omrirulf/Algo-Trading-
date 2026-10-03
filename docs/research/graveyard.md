@@ -82,9 +82,9 @@ rules already running live. It changes nothing in the locked test.
 ## Added from 2026-10-02
 
 Rows in the order they were added, ideas and history screens together (the owner's instructions of 2026-10-02,
-items 4 to 7). The IC report's two rows are the owner's proposal of two trials in N and one idea against the
-quarterly limit, which the owner confirms or changes when it is registered at the 2026-12-22 checkpoint
-(pre-registration section 13.9). The stress-period screens are one row per rule over the four periods, as one
+items 4 to 7). The IC report's two rows are two trials in N and one idea against the quarterly limit, the
+owner's decision of 2026-10-03 (pre-registration section 13.9); the test is registered at the 2026-12-22
+checkpoint. The stress-period screens are one row per rule over the four periods, as one
 screen (workflow run 37013435615, `history/2026-10-stress-periods/`); they are descriptive, with no t and no
 verdict. VT and SPY in it are benchmarks, not counted.
 

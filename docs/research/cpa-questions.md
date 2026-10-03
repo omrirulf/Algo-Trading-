@@ -80,10 +80,17 @@ Questions 11 and 12 are the two the owner added on 2 Oct 2026.
 
 ## Not on the list
 
-Two conventions of section 5c are no longer put to the accountant, since the owner's list of 3 Oct 2026 does not
-ask about them: how a short sale is measured in shekels, and that a dividend a short position pays is an allowable
-loss on its day. They stay as section 5c writes them. The model is long-only; the momentum and hybrid funds can
-short.
+The owner's list of 3 Oct 2026 replaced the eight questions of 2 Oct, so these points are no longer put to the
+accountant. The code keeps its assumption for each:
+
+- **Short sales** (section 5c, conventions 1 and 2): a short sale is measured with the purchase that closes it as the
+  cost and the sale as the proceeds, each at its day's rate, and a dividend a short position pays is an allowable
+  loss on its day. The model is long-only; the momentum and hybrid funds can short.
+- **Capital gains or business income:** every fund is taxed as capital gains at 25%; business-income treatment of
+  frequent trading is not modelled.
+- **The surtax formula:** off by default (`SURTAX_ENABLED = False`); when on, 2% on all capital income above the
+  line, as test T8 has it.
+- **Fees:** broker fees are added to the cost and taken off the proceeds.
 
 ## Answers
 

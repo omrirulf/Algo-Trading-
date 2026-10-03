@@ -89,7 +89,8 @@ The topic is the only secret and it never appears in a URL or a log: the
 message is posted as JSON to ntfy's root, and the temporary file that carried
 it is removed. The **phone topic check** workflow says whether the name is
 long and random — only characters ntfy accepts, at least 20 in all, at least
-12 letters and digits after any readable prefix, about 60 bits or more. It
+12 after any readable prefix with letters and digits mixed and no character
+more than a quarter of them, about 60 bits or more. It
 prints only the verdict, never the name (the log is public, so a weak name's
 failing test is not named either). It runs on any pull request that changes
 it, and by hand from the Actions tab once it is on `main`. If a freshly

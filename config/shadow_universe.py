@@ -38,8 +38,9 @@ of large foreign companies that trade in New York. Rules:
   Martin Marietta and UMC.
 * A name that does not resolve in the verify check is replaced. On 3 Oct 2026
   BNY Mellon (BK: no prices returned) and AvalonBay (AVB: fewer than two
-  closes in three months) failed it in two runs, and were replaced by State
-  Street and Iron Mountain. The card states the replacement rule.
+  closes in three months) failed it in three runs while the other 249 names
+  resolved, and were replaced by State Street and Iron Mountain. The card
+  states the replacement rule.
 * The ADR block holds large foreign companies bought in dollars on a US
   exchange. Most trade as ADRs; a few list their own shares directly (Check
   Point, Wix, monday.com, ICL, Nu, UBS). For this list they are the same

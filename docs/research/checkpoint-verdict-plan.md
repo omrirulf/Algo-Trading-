@@ -10,8 +10,9 @@ of the verdict table before you build it."
   stops, index first, the after-tax gate (5c), the coin-flip condition, the bars 3.47 / 2.45 / 2.00 and the
   "not tested in a downturn" label. What it lacks is a **table**: today it prints one line of free text.
 - **The fund test does not decide anywhere** (section 11.6). Nothing computes its paired t values at a look, its
-  coin-flip condition, its own bar (3.40 / 2.41 / 2.02 if the looks fall as planned), its skip when calibration has
-  not passed, or its verdict.
+  coin-flip condition or its verdict. Its own bar (3.40 / 2.41 / 2.02 if the looks fall as planned) and its skip
+  when calibration has not passed exist only as a forecast (`shadow/fund_test.py`: `fund_test_plan`,
+  `skipped_look`), made from calibration's estimated end and the estimated look dates, not at the look.
 - **The combined answer** (section 11.8: real money only if the same arm wins both) is not computed anywhere.
 
 The build adds the two tables and the combined line, and the fund test's verdict. It changes no rule, no bar and
@@ -60,7 +61,7 @@ planned (share 0.333); bar t > 3.40 (by the spending rule of 11.7; planned 3.40)
 | 5 | Replacement, 11.6 | hybrid fund − momentum fund, Newey-West t, lag 5 | t = −1.90 | > 3.40 | FAIL, so the momentum fund |
 | 6 | Early stop, 11.6 (as 5a) | against the model: model fund − momentum fund | t = −2.31 | < −3.40 | FAIL: no early stop |
 | 7 | Index first, before tax, 11.6 | momentum fund − VT fund, daily, Newey-West t, lag 5 | t = 1.12 | > 3.40 / < −3.40 | NOT APPLIED |
-| 8 | Index first, after tax, 11.6 and 5c | momentum fund − VT fund after tax (the same record as race row 8) | t = 0.98 | > 3.40 | NOT APPLIED |
+| 8 | Index first, after tax, 11.6 and 5c | momentum fund − VT fund after tax (the same record as race row 8: the same t, the fund test's own bar) | t = 3.52 | > 3.40 | NOT APPLIED |
 | 9 | Downturn, 5d | the same number as the race's | 4.1% | 10% or more = tested | no label (nothing decided) |
 | → | **Fund-test verdict** | | | | **NO DECISION AT THIS LOOK — read again at checkpoint 2 (about 2027-03-22; planned bar 2.41)** |
 
@@ -94,6 +95,11 @@ no decision yet
 The JSON says `"verdict": {"text": "no decision yet"}` in `logs/race_gate.json` and `logs/funds.json`, and the
 4 Funds page shows one card: "Checkpoint verdict: no decision yet".
 
+**Between checkpoints, after a look that decided nothing,** the block says "no decision yet" and, under it, the
+last look's frozen tables, for reading; nothing is recomputed between looks. **After a test has decided,** the
+block shows the deciding look's frozen table and verdict, which do not change; later looks are shown for reading
+only.
+
 ### (v) When calibration has not passed at a checkpoint
 
 The race's row 8 reads "record UNAVAILABLE: calibration had not passed when the race reached this look" with the
@@ -104,34 +110,44 @@ is replaced by one block:
 > Not read, no part of the 5% spent, no bar used. The next bars come from the same rule using only the looks
 > actually read (planned: checkpoint 2 at 2.41, checkpoint 3 at 2.02).
 
-## 3. Readings the owner decides before the build
+## 3. Already registered, and what the owner decides
 
-The rules leave these points open. Each proposed reading is the one closest to the text; none is a new rule. The
-owner's answers go into the Amendments table before any checkpoint result exists.
+**Already registered: the build only applies these** (restated here so the layout can be checked against them; they
+are not open choices):
 
-1. **How the two verdicts combine.** Each test stops at its own first deciding look and is then frozen. The answer
-   is the index as soon as either test says "no arm trades", or the two pick different arms; it is the arm when
-   both pick the same one; otherwise "no decision yet". An early answer is final; section 9 only delays the money
-   to June 2027. Later looks are still shown, for reading only.
-2. **The fund test uses its own bar for every step,** including its after-tax step (section 5c: "the bar of the step
-   it belongs to"). The race keeps its bar. Both tables show which bar was used.
-3. **An after-tax failure at an early look decides nothing** in the fund test either; at the final look it means
-   no arm trades. (The same as the race, section 5c.)
-4. **The fund test's window ends at the race look's last close** (the after-tax record's close), never at a later
-   night's close. Its record is made once and frozen, like the after-tax record, and made again only if a bug fix
-   moves the window (the old one kept inside it).
-5. **Calibration is judged on the first night the race's look is readable** — the same night the after-tax record
-   uses — so the fund test's skip and the race's "unavailable" record can never disagree.
-6. **One downturn number:** the race's VT figure for both tests and the combined line. If it cannot be measured,
+- The fund test uses **its own bar for every step**, its after-tax step included (section 5c: "the bar of the step
+  it belongs to"; 11.7: its bars "are its own"). The race keeps its bar. The after-tax record is one record with one
+  t per fund; each test compares it with its own bar.
+- **An after-tax failure at an early look decides nothing**; at the final look it means no arm trades (5c: it "only
+  stops an arm from winning"; 11.6: early stops "exactly as section 5a").
+- **The fund test's window ends at the race look's last close** (5c, 11.7: "read on the same days as the race's
+  looks").
+- **The fund test's bar at a look** comes from the spending rule of 11.7 with the fund sessions actually there, and
+  bars already used stay as they were (11.7). Code cannot write an amendment, so the verdict prints "bar X (planned
+  Y): log it in the Amendments table" for the owner, as 11.7 asks.
+- **1,000 coin-flip funds** (11.1, 11.5). A by-hand run with fewer makes no fund-test record and says why.
+- **"Above" the coin-flip 95th percentile is strict:** a tie fails (5, 11.5; the race's code already does this).
+
+**Open: the owner decides** (each proposed reading is the one closest to the text; the answers go into the
+Amendments table before any checkpoint result exists):
+
+1. **How the two verdicts combine when they decide at different looks.** Each test stops at its own first deciding
+   look and is then frozen. The answer is the index as soon as either test says "no arm trades", or the two pick
+   different arms; it is the arm when both pick the same one; otherwise "no decision yet". An early answer is
+   final; section 9 only delays the money to June 2027. Later looks are still shown, for reading only.
+2. **The fund-test record is made once and frozen**, like the after-tax record, and made again only if a bug fix
+   moves the look's window (the old one kept inside it). The text does not say whether the fund test is frozen or
+   recomputed nightly.
+3. **When calibration is judged for a look.** Three places say it differently today: section 5c's text ("on the
+   night the race reaches the look"), the after-tax record in `shadow/run.py` (the first night the look is
+   readable), and the forecast in `shadow/fund_test.py` (`skipped_look`: a look on or before calibration's
+   *estimated* end). Proposed: the first night the look is readable, for both the fund-test skip and the race's
+   "unavailable" record, so the two can never disagree; `skipped_look` stays a forecast only, and `fund_test.py`
+   says so.
+4. **One downturn number:** the race's VT figure for both tests and the combined line. If it cannot be measured,
    the verdict says "downturn not measured" and the owner decides.
-7. **The fund test's bar at a look** comes from the spending rule of 11.7 with the fund sessions actually there;
-   the rounded bars of earlier looks count as used. The verdict prints "bar X (planned Y): log it in the Amendments
-   table" for the owner, because code cannot write an amendment.
-8. **The fund-test record is made only with the registered 1,000 coin-flip funds.** A by-hand run with fewer waits
-   and says why.
-9. **A tie with the coin-flip 95th percentile fails** (the rule says "above").
-10. **The 4 Funds page's fund-test banner** shows fund sessions of 180 and the fund test's own next bar, not the
-    race's (a display fix).
+5. **The 4 Funds page's fund-test banner** shows fund sessions of 180 and the fund test's own next bar, not the
+   race's (a display fix).
 
 ## 4. Where it appears
 

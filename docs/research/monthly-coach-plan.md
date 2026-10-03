@@ -66,16 +66,15 @@ would publish a salary in a public log for good.
    the yearly contribution plan. The owner types them in once a month in the Supabase dashboard's table editor
    (no form to build, nothing public).
 2. **The job runs outside the public repository**: a small private GitHub repository (`coach-private`), or a
-   Supabase scheduled Edge Function. Either way its logs are private. It reads the two tables with the secret
-   key, computes the numbers in memory, sends the model percentages only, checks the answer (section 2), and
+   Supabase scheduled Edge Function. Its logs hold nothing personal either: it logs no amount, share or
+   message, only whether it ran. It reads the two tables with the secret key, computes the numbers in memory, sends the model percentages only, checks the answer (section 2), and
    writes the finished message to a third private table, `coach_messages`.
 3. **What this public repository gives it**: only the experiment's status, read from the public
    `logs/race_gate.json` (next checkpoint date). Nothing flows the other way.
 4. **What is never stored anywhere public**: amounts, balances, salary, contributions, and the finished message.
 
-**A cheaper alternative (not recommended):** keep the job in this repository with a test that fails if the coach
-module prints or logs anything, and run it in a step whose output is thrown away. It saves one repository, but
-the protection is a rule people must keep, not a wall.
+(A cheaper design that kept the job in this public repository was dropped: the owner's conditions of 3 Oct 2026
+put nothing personal in the repository or in any log.)
 
 ## 4. Is the phone channel private? No.
 
