@@ -19,8 +19,14 @@ name: shadow universe
 # the two never ask the model provider at the same time).
 #
 # Cost cap: $1.50 a UTC day for the model and the Bright Data news searches
-# together (about $0.65 + $0.40 expected). The scorer stops asking at the cap
-# and exits 3; the job then tells the owner's phone, in fixed words.
+# together (about $0.65 + $0.40 expected; approved by the owner on 3 Oct
+# 2026). When a run takes the day past $1.20 the job tells the owner's phone,
+# and the run goes on; the scorer stops asking at the cap and exits 3, and the
+# job tells the phone that instead. Both in fixed words.
+#
+# The news: the universe has its own query, company name plus ticker
+# ("Southern Company SO stock", orchestrator/universe_news.py), on the owner's
+# decision of 3 Oct 2026; production's query is unchanged.
 #
 # A by-hand run with `verify` only checks that every name resolves on Yahoo
 # (backtest/verify_tickers.py's check), with no model and no key -- the check
@@ -113,14 +119,19 @@ jobs:
       - name: Score the universe
         id: score
         if: steps.check.outputs.run == 'yes'
-        # Exactly the model, news and data-source keys the production cycle
-        # step gets (heartbeat.yml, "Run one cycle"), and nothing else: no
-        # Alpaca key, no webhook secret, no execution mode. Insiders and
-        # analysts come from yfinance and need no key.
+        # Exactly the model and data-source keys the production cycle step
+        # gets (heartbeat.yml, "Run one cycle"), and nothing else: no Alpaca
+        # key, no webhook secret, no execution mode. Insiders and analysts
+        # come from yfinance and need no key. The news key and zone are the
+        # cycle's too (the same secret, the same zone, else the zone
+        # `brightdata login` creates), under Bright Data's own names, which
+        # the provider reads itself, so the universe's news module reads no
+        # credential (the CI guardrail "Market context carries no
+        # credentials").
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          BRIGHTDATA_API_TOKEN: ${{ secrets.BRIGHTDATA_API_TOKEN }}
-          BRIGHTDATA_SERP_ZONE: ${{ vars.BRIGHTDATA_SERP_ZONE }}
+          BRIGHTDATA_API_KEY: ${{ secrets.BRIGHTDATA_API_TOKEN }}
+          BRIGHTDATA_UNLOCKER_ZONE: ${{ vars.BRIGHTDATA_SERP_ZONE || 'cli_unlocker' }}
           EIA_API_KEY: ${{ secrets.EIA_API_KEY }}
           USDA_NASS_KEY: ${{ secrets.USDA_NASS_KEY }}
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
@@ -148,6 +159,9 @@ jobs:
             cat "$RUNNER_TEMP/summary.json"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          warn=$(python -c 'import json,sys; print("yes" if json.load(open(sys.argv[1])).get("warn_crossed") else "no")' \
+                 "$RUNNER_TEMP/summary.json" 2>/dev/null || echo "no")
+          echo "warn=$warn" >> "$GITHUB_OUTPUT"
           if [ "$status" = "3" ]; then
             echo "cap=yes" >> "$GITHUB_OUTPUT"
             echo "::warning::the daily cost cap stopped the run; the names not asked have no score today"
@@ -179,6 +193,36 @@ jobs:
           done
           echo "::error::the shadow universe's lines were not committed"
           exit 1
+
+      - name: Tell the owner's phone the day passed $1.20
+        # The owner's decision of 3 Oct 2026. Once a day at most: only the
+        # run that takes the day's total past the line says so. Not when the
+        # cap stopped the same run: the cap's alert below says more.
+        if: always() && steps.score.outputs.warn == 'yes' && steps.score.outputs.cap != 'yes'
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "${NTFY_TOPIC:-}" ]; then
+            echo "no phone configured (NTFY_TOPIC secret unset); nothing sent"
+            exit 0
+          fi
+          python - <<'EOF' > "$RUNNER_TEMP/phone.json"
+          import json, os
+          print(json.dumps({"topic": os.environ["NTFY_TOPIC"],
+                            "title": "💸 Shadow universe passed $1.20 today",
+                            "message": ("Today's shadow universe cost (the model and the news searches "
+                                        "together) passed $1.20, above the expected level. The run goes on; "
+                                        "it stops at the $1.50 daily cap. Nothing is traded."),
+                            "priority": 3, "tags": ["warning"], "click": os.environ["RUN_URL"]}))
+          EOF
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' \
+                 --data-binary @"$RUNNER_TEMP/phone.json" https://ntfy.sh/ || echo "000")
+          rm -f "$RUNNER_TEMP/phone.json"
+          case "$code" in
+            2*) echo "phone notified (HTTP $code)";;
+            *)  echo "::warning::phone not notified (HTTP $code)";;
+          esac
 
       - name: Tell the owner's phone the cost cap stopped the run
         # Like scoring-prices.yml's alert: fixed words and the run's link,

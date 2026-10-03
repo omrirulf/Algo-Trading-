@@ -31,11 +31,19 @@ of large foreign companies that trade in New York. Rules:
   (MiniMed) and S&P Global (Mobility) were replaced by Edwards Lifesciences,
   IDEXX and MetLife for the same reason: each has a separation announced that
   may fall inside the scoring window.
-* The news search asks for ``"<ticker> stock"`` (``orchestrator/news.py``,
-  unchanged), so no ticker whose letters are the usual name of something
-  bigger in market news. Dow Inc. ("DOW stock" finds the Dow Jones index) and
-  ASE Technology ("ASX stock" finds the Australian exchange) were replaced by
-  Martin Marietta and UMC.
+* When the list was chosen, the news search asked for ``"<ticker> stock"``
+  (production's query, ``orchestrator/news.py``), so no ticker whose letters
+  are the usual name of something bigger in market news. Dow Inc. ("DOW
+  stock" finds the Dow Jones index) and ASE Technology ("ASX stock" finds the
+  Australian exchange) were replaced by Martin Marietta and UMC. A news check
+  on 3 Oct 2026 showed that this query also finds other things for short
+  tickers (SO, C, D, T, ED, NOW, V, ICE, O, F, MET, EW), so on the owner's
+  decision of the same day the universe has its own query, company name plus
+  ticker (``"Southern Company SO stock"``: ``COMPANIES`` and ``news_query``,
+  used by ``orchestrator/universe_news.py``); production's query is
+  unchanged. Those names were kept. A name whose headlines are still under
+  30% relevant with the new query (``analysis/news_relevance.py``) may be
+  replaced by the card's rule (2), never for its returns.
 * A name that does not resolve in the verify check is replaced. On 3 Oct 2026
   BNY Mellon (BK: no prices returned) and AvalonBay (AVB: fewer than two
   closes in three months) failed it in three runs while the other 249 names
@@ -68,8 +76,9 @@ date the pre-registration names. Cost: about $1.05 a day -- the model about
 $0.65 (measured: the full model's 61 production calls in October 2026
 averaged $0.0025 each) and the Bright Data news searches about $0.40 (about
 270 requests at $1.50 per 1,000; about $102 a year) -- with a hard cap of
-$1.50 a day on the two together and a phone alert when the cap stops a run
-(``orchestrator/universe.py``).
+$1.50 a day on the two together (approved by the owner on 3 Oct 2026), a
+phone alert when the day's cost passes $1.20, and another when the cap stops
+a run (``orchestrator/universe.py``).
 
 Standard library only and no side effects, so any package may import it --
 including the read-only report that reads these lines.
@@ -103,9 +112,14 @@ SELECTED_ON: Final[date] = date(2026, 10, 2)
 #: it is reached and the workflow alerts the owner's phone. $1 when it counted
 #: the model only (2 Oct 2026); $1.50 since the news is counted too, because
 #: the two together are expected at about $1.05 a day and a $1 cap would stop
-#: the run before the end of the list every day. Proposed on 3 Oct 2026; the
-#: owner confirms it before the pull request is merged.
+#: the run before the end of the list every day. Approved by the owner on
+#: 3 Oct 2026.
 DAILY_COST_CAP_USD: Final[float] = 1.50
+
+#: The day's cost at which the owner's phone is told, before the cap (the
+#: owner's decision of 3 Oct 2026: "add a phone alert at $1.20 a day"). Only an
+#: alert: the run goes on to the cap.
+DAILY_COST_WARN_USD: Final[float] = 1.20
 
 #: What a full day's model calls are expected to cost, in dollars (about 250
 #: calls at the measured $0.0025 each).
@@ -223,6 +237,148 @@ REPLACED: Final[dict[str, tuple[str, int]]] = {
     "BK": ("STT", 3), "AVB": ("IRM", 3),
 }
 
+#: Each name's company name, for the universe's own news search and the
+#: relevance check (the owner's decision of 3 Oct 2026). The first entry is
+#: the name the search asks for, as ``"<name> <ticker> stock"``
+#: (``news_query``); every entry is a name a headline may call the company
+#: (``match_names``). Written down before the first weekday check, and frozen
+#: with the list.
+COMPANIES: Final[dict[str, tuple[str, ...]]] = {
+    # Energy
+    "BKR": ("Baker Hughes",), "CNQ": ("Canadian Natural Resources", "Canadian Natural"),
+    "COP": ("ConocoPhillips",), "CVX": ("Chevron",), "ENB": ("Enbridge",), "EOG": ("EOG Resources",),
+    "FANG": ("Diamondback Energy", "Diamondback"), "HAL": ("Halliburton",), "KMI": ("Kinder Morgan",),
+    "MPC": ("Marathon Petroleum",), "OKE": ("ONEOK", "Oneok"), "OXY": ("Occidental Petroleum", "Occidental"),
+    "PSX": ("Phillips 66",), "SLB": ("SLB", "Schlumberger"), "VLO": ("Valero",),
+    "WMB": ("Williams Companies", "Williams Cos"),
+    # Materials
+    "ALB": ("Albemarle",), "APD": ("Air Products",), "CRH": ("CRH",), "DD": ("DuPont",), "ECL": ("Ecolab",),
+    "FCX": ("Freeport-McMoRan", "Freeport McMoRan"), "LIN": ("Linde",),
+    "MLM": ("Martin Marietta",), "NEM": ("Newmont",), "NTR": ("Nutrien",), "NUE": ("Nucor",),
+    "PPG": ("PPG Industries", "PPG"), "SHW": ("Sherwin-Williams", "Sherwin Williams"),
+    "VMC": ("Vulcan Materials",),
+    # Industrials
+    "ADP": ("Automatic Data Processing", "ADP"), "BA": ("Boeing",), "CMI": ("Cummins",), "CSX": ("CSX",),
+    "DE": ("Deere", "John Deere"), "EMR": ("Emerson Electric", "Emerson"), "ETN": ("Eaton",),
+    "GD": ("General Dynamics",), "GE": ("GE Aerospace", "General Electric"),
+    "ITW": ("Illinois Tool Works",), "JCI": ("Johnson Controls",), "LHX": ("L3Harris",),
+    "LMT": ("Lockheed Martin", "Lockheed"), "MMM": ("3M",), "NOC": ("Northrop Grumman", "Northrop"),
+    "PH": ("Parker Hannifin", "Parker-Hannifin"), "RSG": ("Republic Services",),
+    "RTX": ("RTX", "Raytheon"), "TT": ("Trane Technologies", "Trane"), "UNP": ("Union Pacific",),
+    "UPS": ("UPS", "United Parcel Service"), "WM": ("Waste Management",),
+    # Consumer discretionary
+    "ABNB": ("Airbnb",), "AMZN": ("Amazon",), "AZO": ("AutoZone",),
+    "BKNG": ("Booking Holdings", "Booking.com"), "CMG": ("Chipotle",), "F": ("Ford Motor", "Ford"),
+    "GM": ("General Motors",), "HD": ("Home Depot",), "HLT": ("Hilton",), "LOW": ("Lowe's", "Lowe’s"),
+    "MAR": ("Marriott",), "MCD": ("McDonald's", "McDonald’s"), "NKE": ("Nike",),
+    "ORLY": ("O'Reilly Automotive", "O'Reilly", "O’Reilly"), "ROST": ("Ross Stores",), "SBUX": ("Starbucks",),
+    "TJX": ("TJX",), "TSLA": ("Tesla",), "YUM": ("Yum! Brands", "Yum Brands"),
+    # Consumer staples
+    "ADM": ("Archer-Daniels-Midland", "Archer Daniels Midland", "ADM"),
+    "CL": ("Colgate-Palmolive", "Colgate"), "COST": ("Costco",), "GIS": ("General Mills",),
+    "HSY": ("Hershey",), "KMB": ("Kimberly-Clark", "Kimberly Clark"), "KO": ("Coca-Cola", "Coca Cola"),
+    "KR": ("Kroger",), "MDLZ": ("Mondelez",), "MNST": ("Monster Beverage",), "MO": ("Altria",),
+    "PEP": ("PepsiCo",), "PM": ("Philip Morris International", "Philip Morris"), "SYY": ("Sysco",),
+    "TGT": ("Target", "Target Corp", "Target Corporation", "Target's", "Target’s"),
+    "WMT": ("Walmart",),
+    # Health care
+    "ABBV": ("AbbVie",), "ABT": ("Abbott Laboratories", "Abbott"), "AMGN": ("Amgen",),
+    "BMY": ("Bristol-Myers Squibb", "Bristol Myers"), "BSX": ("Boston Scientific",), "CI": ("Cigna",),
+    "CVS": ("CVS Health", "CVS"), "DHR": ("Danaher",), "ELV": ("Elevance Health", "Elevance"),
+    "EW": ("Edwards Lifesciences",), "GILD": ("Gilead Sciences", "Gilead"), "HCA": ("HCA Healthcare", "HCA"),
+    "IDXX": ("IDEXX Laboratories", "IDEXX", "Idexx"), "ISRG": ("Intuitive Surgical",), "MRK": ("Merck",),
+    "PFE": ("Pfizer",), "REGN": ("Regeneron",), "SYK": ("Stryker",),
+    "TMO": ("Thermo Fisher Scientific", "Thermo Fisher"), "UNH": ("UnitedHealth",),
+    "VRTX": ("Vertex Pharmaceuticals", "Vertex"), "ZTS": ("Zoetis",),
+    # Financials
+    "AIG": ("AIG", "American International Group"), "AXP": ("American Express", "Amex"),
+    "BAC": ("Bank of America", "BofA"), "BLK": ("BlackRock",), "BX": ("Blackstone",),
+    "C": ("Citigroup", "Citi"), "CB": ("Chubb",), "CME": ("CME Group", "CME"), "COF": ("Capital One",),
+    "GS": ("Goldman Sachs", "Goldman"), "ICE": ("Intercontinental Exchange",), "MA": ("Mastercard",),
+    "MCO": ("Moody's", "Moody’s"), "MET": ("MetLife",), "MS": ("Morgan Stanley",),
+    "PGR": ("Progressive", "Progressive Corp", "Progressive Corporation", "Progressive Insurance",
+            "Progressive's", "Progressive’s"),
+    "PNC": ("PNC Financial", "PNC"), "PYPL": ("PayPal", "Paypal"), "SCHW": ("Charles Schwab", "Schwab"),
+    "STT": ("State Street",), "TRV": ("Travelers",), "USB": ("U.S. Bancorp", "US Bancorp"),
+    "V": ("Visa",), "WFC": ("Wells Fargo",),
+    # Information technology
+    "AAPL": ("Apple",), "ACN": ("Accenture",), "ADBE": ("Adobe",), "ADI": ("Analog Devices",),
+    "AMAT": ("Applied Materials",), "AMD": ("AMD", "Advanced Micro Devices"), "ANET": ("Arista Networks", "Arista"),
+    "AVGO": ("Broadcom",), "CDNS": ("Cadence Design Systems", "Cadence Design", "Cadence"),
+    "CRM": ("Salesforce",), "CSCO": ("Cisco",), "IBM": ("IBM",), "INTC": ("Intel",), "INTU": ("Intuit",),
+    "KLAC": ("KLA",), "LRCX": ("Lam Research",), "MU": ("Micron Technology", "Micron"),
+    "NOW": ("ServiceNow",), "ORCL": ("Oracle",), "PANW": ("Palo Alto Networks",), "QCOM": ("Qualcomm",),
+    "SNPS": ("Synopsys",), "TXN": ("Texas Instruments",),
+    # Communication services
+    "CHTR": ("Charter Communications", "Charter"), "CMCSA": ("Comcast",), "DIS": ("Walt Disney", "Disney"),
+    "FOXA": ("Fox Corporation", "Fox Corp"), "LYV": ("Live Nation",), "META": ("Meta Platforms", "Meta"),
+    "NFLX": ("Netflix",), "OMC": ("Omnicom",), "SPOT": ("Spotify",), "T": ("AT&T",),
+    "TMUS": ("T-Mobile",), "TTWO": ("Take-Two Interactive", "Take-Two"), "VZ": ("Verizon",),
+    # Utilities
+    "AEP": ("American Electric Power", "AEP"), "CEG": ("Constellation Energy",),
+    "D": ("Dominion Energy",), "DUK": ("Duke Energy",), "ED": ("Consolidated Edison", "Con Edison", "ConEd"),
+    "EXC": ("Exelon",), "NEE": ("NextEra Energy", "NextEra"),
+    "PEG": ("Public Service Enterprise Group", "PSEG"), "SO": ("Southern Company", "Southern Co"),
+    "SRE": ("Sempra",), "VST": ("Vistra",), "XEL": ("Xcel Energy", "Xcel"),
+    # Real estate
+    "AMT": ("American Tower",), "CBRE": ("CBRE Group", "CBRE"), "CCI": ("Crown Castle",),
+    "DLR": ("Digital Realty",), "EQIX": ("Equinix",), "IRM": ("Iron Mountain",), "O": ("Realty Income",),
+    "PLD": ("Prologis",), "PSA": ("Public Storage",), "SPG": ("Simon Property Group", "Simon Property"),
+    "VICI": ("VICI Properties", "VICI"), "WELL": ("Welltower",),
+    # ADR: Europe
+    "AZN": ("AstraZeneca",), "BBVA": ("BBVA",), "BP": ("BP",), "BTI": ("British American Tobacco",),
+    "DEO": ("Diageo",), "GSK": ("GSK",), "HSBC": ("HSBC",), "ING": ("ING Groep", "ING"), "NVS": ("Novartis",),
+    "RIO": ("Rio Tinto",), "SAN": ("Banco Santander", "Santander"), "SAP": ("SAP",), "SHEL": ("Shell",),
+    "SNY": ("Sanofi",), "TTE": ("TotalEnergies",), "UBS": ("UBS",), "UL": ("Unilever",),
+    # ADR: Japan
+    "HMC": ("Honda",), "IX": ("ORIX", "Orix"), "MFG": ("Mizuho",), "MUFG": ("Mitsubishi UFJ", "MUFG"),
+    "NMR": ("Nomura",), "SMFG": ("Sumitomo Mitsui",), "SONY": ("Sony",), "TAK": ("Takeda",),
+    # ADR: China and Hong Kong
+    "BABA": ("Alibaba",), "BEKE": ("KE Holdings", "Beike"), "BIDU": ("Baidu",), "JD": ("JD.com",),
+    "NTES": ("NetEase",), "PDD": ("PDD Holdings", "Pinduoduo", "Temu"), "TCOM": ("Trip.com",),
+    "ZTO": ("ZTO Express",),
+    # ADR: India
+    "IBN": ("ICICI Bank", "ICICI"), "INFY": ("Infosys",), "MMYT": ("MakeMyTrip",),
+    "RDY": ("Dr. Reddy's", "Dr Reddy's", "Dr. Reddy’s", "Dr Reddy’s"), "WIT": ("Wipro",),
+    # ADR: Latin America
+    "ABEV": ("Ambev",), "AMX": ("America Movil", "América Móvil"), "BAP": ("Credicorp",),
+    "FMX": ("FEMSA", "Fomento Economico Mexicano"), "ITUB": ("Itau Unibanco", "Itaú Unibanco", "Itaú", "Itau"),
+    "NU": ("Nu Holdings", "Nubank"), "PBR": ("Petrobras",), "SQM": ("SQM", "Sociedad Quimica y Minera"),
+    "VALE": ("Vale",),
+    # ADR: Israel
+    "CHKP": ("Check Point Software", "Check Point"), "ICL": ("ICL Group", "ICL"), "MNDY": ("monday.com", "Monday.com"),
+    "NICE": ("NICE",), "WIX": ("Wix.com", "Wix"),
+    # ADR: Korea and Taiwan
+    "KB": ("KB Financial",), "PKX": ("POSCO",), "SHG": ("Shinhan Financial", "Shinhan"),
+    "TSM": ("TSMC", "Taiwan Semiconductor"), "UMC": ("United Microelectronics", "UMC"),
+    # ADR: Australia
+    "BHP": ("BHP",),
+}
+
+#: Names whose search name is also a common word in market news ("price
+#: target", "progressive policies"): searched for by that name, but a headline
+#: counts as theirs only by a longer form (or the ticker). Stricter, never
+#: looser.
+SEARCH_NAME_NOT_MATCHED: Final[frozenset[str]] = frozenset({"TGT", "PGR"})
+
+
+def news_query(ticker: str) -> str:
+    """The universe's news search: company name plus ticker (``"Southern Company SO stock"``).
+
+    Only the shadow universe uses it (``orchestrator/universe_news.py``);
+    production still asks for ``"<ticker> stock"``. When the name is the
+    ticker itself (``"BP"``), it is said once.
+    """
+    name = COMPANIES[ticker][0]
+    return f"{ticker} stock" if name == ticker else f"{name} {ticker} stock"
+
+
+def match_names(ticker: str) -> tuple[str, ...]:
+    """The names a headline may call the company, for the relevance check."""
+    names = COMPANIES[ticker]
+    return names[1:] if ticker in SEARCH_NAME_NOT_MATCHED else names
+
+
 #: Every name, in block order then alphabetical: the order the scorer asks in.
 TICKERS: Final[tuple[str, ...]] = tuple(t for names in BLOCKS.values() for t in names)
 
@@ -247,7 +403,9 @@ def markdown_table() -> str:
 __all__ = [
     "ADR_PREFIX",
     "BLOCKS",
+    "COMPANIES",
     "DAILY_COST_CAP_USD",
+    "DAILY_COST_WARN_USD",
     "ESTIMATED_DAILY_COST_USD",
     "ESTIMATED_DAILY_MODEL_COST_USD",
     "ESTIMATED_DAILY_NEWS_COST_USD",
@@ -256,10 +414,13 @@ __all__ = [
     "NEWS_USD_PER_REQUEST",
     "REGISTRATION",
     "REPLACED",
+    "SEARCH_NAME_NOT_MATCHED",
     "SECTORS",
     "SELECTED_ON",
     "SHADOW_UNIVERSE_ENABLED",
     "START",
     "TICKERS",
     "markdown_table",
+    "match_names",
+    "news_query",
 ]

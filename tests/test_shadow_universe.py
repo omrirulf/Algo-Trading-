@@ -32,7 +32,7 @@ from config.instruments import FUNDS, is_fund
 from config.journal_files import month_file
 from config.market_calendar import is_trading_day
 from config.watchlist import DEFAULT_WATCHLIST
-from orchestrator import context, heartbeat, journal, llm, sources, universe
+from orchestrator import context, heartbeat, journal, llm, sources, universe, universe_news
 from orchestrator.llm import Completion, LLMError
 from orchestrator.pricing import Usage
 from rules import ARMS
@@ -188,6 +188,7 @@ def nothing_may_happen(monkeypatch, tmp_path):
 
     for name in ("build_context", "call_llm", "full_model_provider", "model_setup"):
         monkeypatch.setattr(heartbeat, name, refuse)
+    monkeypatch.setattr(universe_news, "build_context", refuse)
     return tmp_path / "shadow_universe"
 
 
@@ -318,14 +319,17 @@ def test_the_only_journal_function_the_scorer_uses_makes_the_blend_and_arms_reco
 
 
 def test_the_scorer_calls_the_production_functions():
-    """Same model, settings and prompt: the steps are heartbeat's own, not copies."""
+    """Same model, settings and prompt: the steps are heartbeat's own, not copies. The one exception is the
+    context, which is the universe's (its own news query, the owner's decision of 3 Oct 2026)."""
     tree = _tree()
     attributes = {(n.value.id, n.attr) for n in ast.walk(tree)
                   if isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name)}
-    for name in ("build_context", "system_prompt_for", "build_user_prompt", "call_llm", "_ask",
+    for name in ("system_prompt_for", "build_user_prompt", "call_llm", "_ask",
                  "parse_signal", "scores_without_a_source", "PreparedTicker", "model_setup",
                  "full_model_provider"):
         assert ("heartbeat", name) in attributes, name
+    assert ("universe_news", "build_context") in attributes
+    assert ("heartbeat", "build_context") not in attributes
     assert ("blend", "load_weights") in attributes
     # The blend's and the arms' records are made by the journal, the one module besides theirs the CI
     # guardrails let compute and write them down.
@@ -418,7 +422,7 @@ def wired(monkeypatch, tmp_path):
             raise RuntimeError(f"yfinance fell over for {ticker}")
         return context.gather(ticker, HEADLINES, provider=full_provider())
 
-    monkeypatch.setattr(heartbeat, "build_context", build_context)
+    monkeypatch.setattr(universe_news, "build_context", build_context)
 
     def never(*_args, **_kwargs):
         raise AssertionError("the shadow universe reached the engine or the production journal")
@@ -683,13 +687,13 @@ def test_every_news_request_counts_against_the_cap_and_is_written_on_the_line(wi
     sends (counted per thread by ``news.requests_sent``) is charged, also when the gather fails."""
     from orchestrator import news
 
-    gather = heartbeat.build_context
+    gather = universe_news.build_context
 
     def build_context(ticker: str):
         news._SENT.count = news.requests_sent() + (3 if ticker == "KO" else 1)   # KO needed two retries
         return gather(ticker)
 
-    monkeypatch.setattr(heartbeat, "build_context", build_context)
+    monkeypatch.setattr(universe_news, "build_context", build_context)
     wired.failing_context.add("SAP")
     run = universe.score_universe(("AAPL", "KO", "SAP"), journal_dir=wired.dir)
     by_name = {line["ticker"]: line for line in _lines(wired.month)}
@@ -786,8 +790,14 @@ ALLOWED_SECRETS = {
 
 #: The production cycle step's entries the scoring step copies, unchanged.
 COPIED_FROM_THE_CYCLE = {
-    "ANTHROPIC_API_KEY", "BRIGHTDATA_API_TOKEN", "BRIGHTDATA_SERP_ZONE", "EIA_API_KEY",
-    "USDA_NASS_KEY", "FRED_API_KEY", "FINNHUB_API_KEY", "FULL_MODEL_API_KEY",
+    "ANTHROPIC_API_KEY", "EIA_API_KEY", "USDA_NASS_KEY", "FRED_API_KEY", "FINNHUB_API_KEY", "FULL_MODEL_API_KEY",
+}
+
+#: The cycle's news key and zone, under the names Bright Data's provider reads itself (``news.CLI_ENV_VAR``
+#: and ``news.CLI_UNLOCKER_ENV_VAR``), so ``orchestrator/universe_news.py`` reads no credential.
+UNIVERSE_NEWS_ENV = {
+    "BRIGHTDATA_API_KEY": "${{ secrets.BRIGHTDATA_API_TOKEN }}",
+    "BRIGHTDATA_UNLOCKER_ZONE": "${{ vars.BRIGHTDATA_SERP_ZONE || 'cli_unlocker' }}",
 }
 
 
@@ -810,9 +820,16 @@ def test_the_scoring_step_gets_exactly_the_cycle_s_model_news_and_source_keys():
     cycle = next(s for s in yaml.safe_load((ROOT / ".github/workflows/heartbeat.yml").read_text())
                  ["jobs"]["cycle"]["steps"] if s.get("name") == "Run one cycle")["env"]
     score = _step("Score the universe")["env"]
-    assert set(score) - {"LIMIT"} == COPIED_FROM_THE_CYCLE
+    assert set(score) - {"LIMIT"} == COPIED_FROM_THE_CYCLE | set(UNIVERSE_NEWS_ENV)
     for key in COPIED_FROM_THE_CYCLE:
         assert score[key] == cycle[key], key
+    # The news: the cycle's secret and zone (its zone, else the one `brightdata login` creates).
+    from orchestrator import news
+    assert {k: score[k] for k in UNIVERSE_NEWS_ENV} == UNIVERSE_NEWS_ENV
+    assert set(UNIVERSE_NEWS_ENV) == {news.CLI_ENV_VAR, news.CLI_UNLOCKER_ENV_VAR}
+    assert cycle["BRIGHTDATA_API_TOKEN"] == "${{ secrets.BRIGHTDATA_API_TOKEN }}"
+    assert cycle["BRIGHTDATA_SERP_ZONE"] == "${{ vars.BRIGHTDATA_SERP_ZONE }}"
+    assert cfg.Settings.model_fields["brightdata_unlocker_zone"].default == "cli_unlocker"
     for spellings in sources.KEY_ENV_VARS.values():
         assert spellings[0] in score
 
@@ -866,6 +883,33 @@ def test_the_cap_alert_is_fixed_words_through_the_topic_secret():
     assert "news" in words, "the cap counts the news searches too"
     assert cap in words
     assert re.findall(r"\d", words.replace(cap, "")) == []  # no number but the cap
+
+
+def test_the_warning_at_1_20_is_fixed_words_once_a_day_and_not_beside_the_cap_alert():
+    """The owner, 3 Oct 2026: "add a phone alert at $1.20 a day"."""
+    assert su.DAILY_COST_WARN_USD == 1.20 and su.DAILY_COST_WARN_USD < su.DAILY_COST_CAP_USD
+    score = _step("Score the universe")["run"]
+    assert '"warn_crossed"' in score and 'echo "warn=$warn" >> "$GITHUB_OUTPUT"' in score
+    assert score.index("warn=$warn") < score.index('exit "$status"')  # set also when the run fails
+    alert = _step("Tell the owner's phone the day passed $1.20")
+    assert alert["if"] == "always() && steps.score.outputs.warn == 'yes' && steps.score.outputs.cap != 'yes'"
+    assert alert["env"]["NTFY_TOPIC"] == "${{ secrets.NTFY_TOPIC }}"
+    run = alert["run"]
+    assert '"topic": os.environ["NTFY_TOPIC"]' in run
+    assert "https://ntfy.sh/ " in run and "ntfy.sh/$" not in run
+    words = " ".join(re.findall(r'"([^"]*)"', re.search(r'"message": \((.*?)\),', run, re.S).group(1)))
+    warn, cap = f"${su.DAILY_COST_WARN_USD:.2f}", f"${su.DAILY_COST_CAP_USD:.2f}"
+    assert warn in words and cap in words and "news" in words
+    assert re.findall(r"\d", words.replace(warn, "").replace(cap, "")) == []  # no number but the two lines
+
+
+@pytest.mark.parametrize("before, after, crossed", [
+    (0.0, 1.05, False), (0.0, 1.20, True), (1.10, 1.25, True), (1.21, 1.40, False), (0.5, 1.55, True),
+])
+def test_warn_crossed_fires_only_in_the_run_that_passes_the_line(before, after, crossed):
+    run = universe.UniverseRun(day=A_DAY_ON.date(), ran=True, spent_before_usd=before, cost_usd=after)
+    assert run.warn_crossed is crossed
+    assert run.summary()["warn_crossed"] is crossed and run.summary()["warn_usd"] == su.DAILY_COST_WARN_USD
 
 
 def test_every_tee_step_sets_pipefail():

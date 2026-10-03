@@ -21,8 +21,10 @@ conditions, and this module is built to them:
 * **Cost cap: $0.10 a month** (``MONTHLY_COST_CAP_USD``), for the day a model
   call is added; the checklist itself makes none (``MODEL_CALLS``).
 
-It runs on the first working day (Monday to Friday) of each month: the
-workflow wakes on the 1st, 2nd and 3rd, and ``due`` says yes on one of them.
+It runs on the first working day of each month, Sunday to Thursday (the
+Israeli working week; the owner's decision of 3 Oct 2026), so the first push
+is on Sunday 1 Nov 2026: the workflow wakes on the 1st, 2nd and 3rd, and
+``due`` says yes on one of them.
 Standard library only; it reads one public file and prints JSON.
 """
 
@@ -66,10 +68,14 @@ KEEP_IT_PRIVATE: Final[str] = ("Keep your answers to yourself: send no number an
                                "collected yet.")
 
 
+#: The days that are not working days: Friday and Saturday (``date.weekday()``: Monday is 0).
+WEEKEND: Final[frozenset[int]] = frozenset({4, 5})
+
+
 def first_working_day(year: int, month: int) -> date:
-    """The month's first Monday-to-Friday."""
+    """The month's first Sunday-to-Thursday."""
     day = date(year, month, 1)
-    while day.weekday() >= 5:
+    while day.weekday() in WEEKEND:
         day = day.replace(day=day.day + 1)
     return day
 

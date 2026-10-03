@@ -1038,20 +1038,25 @@ checkpoint (2026-12-22).** Nothing here is in force as a test until then.
   production cycle is journalled, so the two never ask the model provider
   at the same time (a day with no production cycle has no universe lines),
   and it starts no name from 23:15 UTC, so no line is dated the next day.
-  No trading. The existing news,
-  insider, analyst and earnings sources are used where they exist. Cost cap
-  $1.50 a day for the model and the Bright Data news searches together
-  (Amendment 2026-10-03, **proposed; the owner confirms it before the pull
-  request is merged**; it was $1 for the model alone), with an alert to
-  the owner's phone when it is reached (estimate about $1.05 a day: the
-  model about $0.65, the news about $0.40, about $102 a year). Until the
-  registration date a name may be replaced for one of three reasons only,
-  and never because of its price, its returns or its scores (the card's
-  replacement rule, word for word): (1) a merger, buy-out, spin-off or
-  split-off announced for 2026-2027 that could fall inside the scoring
-  window; (2) the news search for its ticker finds something else, because
-  the ticker's letters are the usual name of something bigger in market
-  news; (3) it does not resolve in the verify check. From the registration
+  No trading. The existing insider,
+  analyst and earnings sources are used where they exist; the news comes
+  from production's provider with the universe's own query, company name
+  plus ticker (for example "Southern Company SO stock"; Amendment
+  2026-10-03; production's query is unchanged). Cost cap $1.50 a day for
+  the model and the Bright Data news searches together (Amendment
+  2026-10-03, approved by the owner on 2026-10-03; it was $1 for the model
+  alone), with an alert to the owner's phone when the day's cost passes
+  $1.20 and another when the cap is reached (estimate about $1.05 a day:
+  the model about $0.65, the news about $0.40, about $102 a year). Until
+  the registration date a name may be replaced for one of three reasons
+  only, and never because of its price, its returns or its scores (the
+  card's replacement rule, word for word): (1) a merger, buy-out, spin-off
+  or split-off announced for 2026-2027 that could fall inside the scoring
+  window; (2) the news search for it finds something else: with the
+  universe's query, under 30% of its headlines are relevant by the
+  code-only check (the company name, or the ticker as a whole word, in the
+  title or the first sentence), on a weekday check of every name; (3) it
+  does not resolve in the verify check. From the registration
   date nothing is replaced. Its lines are evaluated by the IC report, at 1
   and 3 sessions, hidden until the checkpoints. **The flag
   `SHADOW_UNIVERSE_ENABLED` keeps it off**; `tests/test_shadow_universe.py`
@@ -1136,3 +1141,4 @@ is not in the Benjamini-Hochberg family, and changes no rule.
 | 2026-10-03 | **The IC test's main metric and trial count** (the owner's decisions, which section 13.9 left to the owner; registered with the card on 2026-12-22) | Decided by the owner on 2026-10-03, **before any IC value existed**: until the 2026-12-22 checkpoint the IC report writes counters only, and no IC has been computed. Two trials in N (graveyard rows 35 and 36, one per universe) and one idea against the quarterly limit, counted in the first quarter of 2027. One primary test per universe: the blended score's mean daily rank-IC at 1 session (Newey-West t, lag 1), in place of the proposed 3 sessions; these two primary tests are the only IC members of the Benjamini-Hochberg family. The IC at 3 sessions, the five single scores and the momentum comparison are secondary and descriptive only, not in the family. Section 13.9, the card `docs/research/cards/ic-model-scores.md`, graveyard rows 35 and 36, and `analysis/ic.py` (`MAIN_HORIZON` = 1). No arm, bar or rule of the race changes. |
 | 2026-10-03 | **Cross-references only: the accountant's questions** (no rule changes) | The owner replaced the eight questions to the accountant written on 2026-10-02 with the owner's own list of ten (`docs/research/cpa-questions.md`, followed by the two added on 2026-10-02). Section 5c now points at the new numbers: T5 is question 1 and still **needs confirmation** (it is not treated as confirmed); conventions (1) and (2), on short sales, are no longer put to the accountant and stay as written; convention (5), the dollar conversion of a finished year's tax, was put with the old question 5 and is now listed with (3) and (4) as how the books are kept; when tax is really paid during the year is question 7. No setting, number or rule changes. |
 | 2026-10-03 | **Shadow stock universe: the news searches in the cost cap, and the replacement rule** (operational; no rule of the race or of the IC test changes) | Asked by the owner on 2026-10-03. The cost cap of section 13.9 now counts the Bright Data news searches as well as the model: about 270 requests a day at $1.50 per 1,000 (pay as you go), about $0.40 a day and about $102 a year, so about $1.05 a day with the model. A $1 cap would stop the run before the end of the list every day, so the cap is **$1.50 a day for the two together, proposed on 2026-10-03; the owner confirms it before the pull request is merged**. Every request sent is charged, written on the line, and counted again by a same-day re-run; the phone alert names the model and the news. The replacement rule for the list, written on the card before the list freezes and copied into section 13.9: until 2026-12-22 a name may be replaced for one of three reasons only, and never because of its price, its returns or its scores: (1) a merger, buy-out, spin-off or split-off announced for 2026-2027 that could fall inside the scoring window; (2) the news search for its ticker finds something else; (3) it does not resolve in the verify check; the five names replaced on 2026-10-02 (JNJ, MDT, SPGI by EW, IDXX, MET; DOW, ASX by MLM, UMC) are listed there, and the two replaced on 2026-10-03 by rule (3), because they did not resolve in three verify runs that day while the other 249 names did (BK, AVB by STT, IRM). The verify check now also runs on every pull request that changes the list. The universe is still off until 2027-01-01 and has no line yet. |
+| 2026-10-03 | **Shadow stock universe: the $1.50 cap approved, a $1.20 alert, and its own news query** (operational; no rule of the race or of the IC test changes) | Decided by the owner on 2026-10-03, after reading the row above. (a) The cost cap of $1.50 a day for the model and the news searches together is **approved** (expected about $1.05 a day). (b) A phone alert when the day's cost passes $1.20 (`DAILY_COST_WARN_USD`): only an alert, the run goes on to the cap; at most once a day, and not from a run whose cap alert is sent. (c) The universe's news searches use their own query, company name plus ticker (for example "Southern Company SO stock"; `config/shadow_universe.py`, `orchestrator/universe_news.py`), because a news check the same day found that "<ticker> stock" finds other things for short tickers (SO, C, D and MET: none of ten headlines named the company; EW: none of two; T, ED, NOW, V, ICE, O and F: one to three of ten). Production's query and code are unchanged, because they feed the main race. Those names are kept. (d) A code-only relevance check, with no model: a headline is relevant if the company name, or the ticker as a whole word, is in its title or first sentence (`analysis/news_relevance.py`), run once on a weekday over all 251 names (`.github/workflows/universe-news-check.yml`). Replacement rule (2) of the card and of section 13.9 now reads: "the news search for it finds something else: with the universe's query, under 30% of its headlines are relevant by the code-only check (the company name, or the ticker as a whole word, in the title or the first sentence), on a weekday check of every name". A name is replaced by it only for that reason, never for its returns, and each replacement is recorded with its reason. (e) The same check, once and as a description only, on the news the race used for its 80 names (`docs/research/news-relevance.md`); nothing in production changes because of it. The universe is still off until 2027-01-01 and has no line yet. |

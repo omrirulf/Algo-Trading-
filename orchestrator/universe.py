@@ -9,13 +9,16 @@ name, and written to their own journal for the IC report. They are never
 traded.
 
 The same path as production, step by step. For each name this module calls
-the production functions in ``orchestrator.heartbeat`` and nothing else:
-``build_context`` (news, technicals, fundamentals, analysts, insiders,
-earnings, the keyed sources), ``system_prompt_for`` and ``build_user_prompt``
-(the same texts, so the same prompt fingerprint), ``call_llm`` through the
-same ``_ask`` and ``call_label`` wrapper the cycle uses, ``parse_signal`` and
-``scores_without_a_source``; the learned blend (the weights read once per
-run, like the cycle) and the rule arms are computed by
+the production functions in ``orchestrator.heartbeat`` and nothing else, with
+one exception: the context is ``orchestrator.universe_news.build_context``,
+which is ``heartbeat.build_context`` (news, technicals, fundamentals,
+analysts, insiders, earnings, the keyed sources) with the universe's own
+news query, company name plus ticker (the owner's decision of 3 Oct 2026;
+production's query is unchanged). Then ``system_prompt_for`` and
+``build_user_prompt`` (the same texts, so the same prompt fingerprint),
+``call_llm`` through the same ``_ask`` and ``call_label`` wrapper the cycle
+uses, ``parse_signal`` and ``scores_without_a_source``; the learned blend (the
+weights read once per run, like the cycle) and the rule arms are computed by
 ``orchestrator/journal.py`` (``journal.universe_records``), exactly as it
 computes them for a production line. The model's key reaches the call only through
 heartbeat's own functions; this module reads no key itself.
@@ -45,7 +48,10 @@ the total is checked; at the cap no new name starts and the run ends with
 under a lock, and calls already in flight may finish slightly above the cap:
 the summary reports the real total. An answer with no known price is charged
 at the estimate, and so is a call that failed with no usage (it is billed for
-what it generated), so neither can hide spending from the cap.
+what it generated), so neither can hide spending from the cap. Before the
+cap, when the day's total passes ``DAILY_COST_WARN_USD`` ($1.20) during a
+run, the summary says ``warn_crossed`` and the workflow tells the owner's
+phone (the owner's decision of 3 Oct 2026); the run goes on.
 
 Off until 2027-01-01. Nothing happens unless ``SHADOW_UNIVERSE_ENABLED`` is
 on, today (UTC) is on or after ``START``, and today is a trading day
@@ -82,7 +88,7 @@ from config import journal_files
 from config import settings as cfg
 from config import shadow_universe as su
 from config.market_calendar import is_trading_day
-from orchestrator import blend, heartbeat, journal, llm, news
+from orchestrator import blend, heartbeat, journal, llm, news, universe_news
 from orchestrator.context import TickerContext
 from orchestrator.llm import Completion, LLMError
 from orchestrator.pricing import Usage
@@ -536,7 +542,7 @@ def _score(ticker: str, shared: _Shared) -> str:
     # every request is charged to the cap, whatever the gather's outcome.
     before = news.requests_sent()
     try:
-        context = heartbeat.build_context(ticker)
+        context = universe_news.build_context(ticker)
     except Exception as exc:  # noqa: BLE001
         log.exception("%s: failed to gather context", ticker)
         requests = news.requests_sent() - before
@@ -602,7 +608,15 @@ class UniverseRun:
     news_cost_usd: float = 0.0
     cap_usd: float = su.DAILY_COST_CAP_USD
     cap_reached: bool = False
+    #: The day's total before this run, so ``warn_crossed`` fires once a day.
+    spent_before_usd: float = 0.0
+    warn_usd: float = su.DAILY_COST_WARN_USD
     error: Optional[str] = None
+
+    @property
+    def warn_crossed(self) -> bool:
+        """The day's total passed the alert line during this run (not before it)."""
+        return self.spent_before_usd < self.warn_usd <= self.cost_usd
 
     @property
     def estimated_usd(self) -> float:
@@ -636,6 +650,8 @@ class UniverseRun:
             "news_cost_usd": round(self.news_cost_usd, 6),
             "cap_usd": self.cap_usd,
             "cap_reached": self.cap_reached,
+            "warn_usd": self.warn_usd,
+            "warn_crossed": self.warn_crossed,
             "estimated_usd": self.estimated_usd,
             "error": self.error,
         }
@@ -674,7 +690,8 @@ def score_universe(
     today = day_lines(directory, day)
     due = tuple(t for t in names if t not in today.answered)
     guard = CostGuard(cap, today.spent_usd)
-    base = dict(day=day, ran=True, names=len(names), already_answered=len(names) - len(due), cap_usd=cap)
+    base = dict(day=day, ran=True, names=len(names), already_answered=len(names) - len(due), cap_usd=cap,
+                spent_before_usd=today.spent_usd)
     if not due or not guard.has_room():
         return UniverseRun(**base, not_asked=len(due), cost_usd=guard.spent_usd,
                            cap_reached=guard.cap_reached)

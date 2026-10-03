@@ -26,20 +26,24 @@ def test_the_owners_conditions_are_the_settings():
     assert checklist.DATA_ENTRY_BUILT is False, "no data entry until the owner confirms"
 
 
-def test_it_runs_on_each_months_first_working_day_from_november():
-    assert checklist.first_working_day(2026, 11) == date(2026, 11, 2)   # the 1st is a Sunday
-    assert checklist.first_working_day(2026, 12) == date(2026, 12, 1)
-    assert checklist.first_working_day(2027, 5) == date(2027, 5, 3)     # Saturday the 1st
+def test_it_runs_on_each_months_first_sunday_to_thursday_from_november():
+    """The owner, 3 Oct 2026: the first Sunday-to-Thursday working day; the first push on 1 Nov 2026."""
+    assert checklist.WEEKEND == {4, 5}                                  # Friday and Saturday
+    assert checklist.first_working_day(2026, 11) == date(2026, 11, 1)   # the 1st is a Sunday
+    assert checklist.first_working_day(2026, 12) == date(2026, 12, 1)   # a Tuesday
+    assert checklist.first_working_day(2027, 1) == date(2027, 1, 3)     # Friday the 1st
+    assert checklist.first_working_day(2027, 5) == date(2027, 5, 2)     # Saturday the 1st
     assert not checklist.due(date(2026, 10, 1)), "not before November 2026"
-    assert not checklist.due(date(2026, 11, 1)) and checklist.due(date(2026, 11, 2))
+    assert checklist.due(date(2026, 11, 1)) and not checklist.due(date(2026, 11, 2))
     assert checklist.due(date(2026, 12, 1)) and not checklist.due(date(2026, 12, 2))
+    assert not checklist.due(date(2027, 1, 1)) and checklist.due(date(2027, 1, 3))
     # The workflow wakes on the 1st to the 3rd: one of them is always the first working day.
     for year, month in ((2026, 11), (2027, 1), (2027, 5), (2028, 4)):
         assert checklist.first_working_day(year, month).day <= 3
 
 
 def test_the_message_is_fixed_words_and_the_public_checkpoint_date():
-    made = checklist.message(date(2026, 11, 2), GATE)
+    made = checklist.message(date(2026, 11, 1), GATE)
     assert made["title"] == "🗓️ Monthly check-in" and made["month"] == 1
     text = made["message"]
     for question in checklist.QUESTIONS:
@@ -71,9 +75,9 @@ def test_it_asks_for_no_number_and_reads_nothing_personal():
 def test_the_cli_prints_json_and_sends_nothing(tmp_path, capsys):
     gate = tmp_path / "race_gate.json"
     gate.write_text(json.dumps(GATE))
-    assert checklist.main(["--race-gate", str(gate), "--today", "2026-11-03"]) == 0
-    assert json.loads(capsys.readouterr().out) == {"date": "2026-11-03", "due": False}
     assert checklist.main(["--race-gate", str(gate), "--today", "2026-11-02"]) == 0
+    assert json.loads(capsys.readouterr().out) == {"date": "2026-11-02", "due": False}
+    assert checklist.main(["--race-gate", str(gate), "--today", "2026-11-01"]) == 0
     out = json.loads(capsys.readouterr().out)
     assert out["due"] is True and "22 Dec 2026" in out["message"]
     assert checklist.main(["--race-gate", str(tmp_path / "missing.json"), "--today", "2026-11-04", "--force"]) == 0

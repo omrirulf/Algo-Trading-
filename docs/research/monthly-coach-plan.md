@@ -94,7 +94,8 @@ or a self-hosted server) or a private messenger bot; both would need the owner's
 
 ## 5. Now: the checklist (built, runs from November 2026)
 
-Sent by push on the first working day of each month (`coach/checklist.py`, `.github/workflows/coach.yml`). It
+Sent by push on the first working day of each month, Sunday to Thursday, from Sunday 1 November 2026
+(`coach/checklist.py`, `.github/workflows/coach.yml`). It
 asks the owner to think; it asks nobody to send a number, and nothing is collected:
 
 1. Did you save part of your take-home pay last month? Think of the share, not the amount.
@@ -112,7 +113,7 @@ entering numbers; until then the checklist goes on. No model is asked, so it cos
 
 Decided on 3 Oct 2026: the plan is approved with the conditions in section 0; the private place is a private
 Supabase project; the model sees percentages only; the cap is $0.10 a month; the checklist runs on the first
-working day of each month. Still open, for when the owner confirms that they want to enter numbers:
+working day of each month, Sunday to Thursday (the first push on Sunday 1 November 2026). Still open, for when the owner confirms that they want to enter numbers:
 
 1. Where the private job runs: a small private repository, or a Supabase scheduled Edge Function (section 3).
 2. The asset classes, the targets and the rebalancing band (they go in `coach_targets`, never in the repository).
