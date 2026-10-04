@@ -27,8 +27,9 @@ def test_the_graveyard_is_numbered_one_by_one_and_states_its_count():
     text = (RESEARCH / "graveyard.md").read_text()
     assert f"**N = {len(rows)}**" in text
     # 18 ideas when section 13 was registered, then the 16 history screens of 2026-09-27 and 28, then on
-    # 2026-10-02 the IC report's two universes, the four stress-period screens and the regime split.
-    assert len(rows) == 41
+    # 2026-10-02 the IC report's two universes, the four stress-period screens and the regime split, then on
+    # 2026-10-04 the voting arm and the thesis check.
+    assert len(rows) == 43
 
 
 def test_the_checkpoints_read_n_from_every_numbered_row_history_screens_included():
@@ -67,6 +68,37 @@ def test_the_card_template_asks_for_the_history_screen_and_the_backlog_says_hist
     assert "otation" not in waiting and "urn-of-the-month" not in waiting
 
 
+def test_the_backlog_is_in_three_sections_and_lists_every_ai_idea():
+    """The owner, 4 Oct 2026: AI ideas, trading rules and index-first reports, in that order; each AI idea with
+    its status, cost and trial number."""
+    backlog = (RESEARCH / "backlog.md").read_text()
+    heads = re.findall(r"^## (.+)$", backlog, re.M)
+    assert [h for h in heads if h in ("AI ideas", "Trading rules", "Index-first reports")] == [
+        "AI ideas", "Trading rules", "Index-first reports"]
+    ai = backlog.split("\n## AI ideas\n", 1)[1].split("\n## ", 1)[0]
+    rules = backlog.split("\n## Trading rules\n", 1)[1].split("\n## ", 1)[0]
+    assert "### History first, live second" in rules and "### Waiting" in rules
+    assert "### Dropped after a history screen" in rules
+    rows = {}
+    for line in ai.splitlines():
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if line.startswith("| ") and len(cells) == 5 and cells[0] not in ("Idea", "---"):
+            rows[cells[0]] = cells
+    assert len(rows) == 7
+    by_word = {word: next(c for name, c in rows.items() if word in name)
+               for word in ("IC report", "Shadow stock universe", "model_vote", "Thesis check", "1-to-5 ranking arm",
+                            "cross-model vote", "Event tags and annual-report flags")}
+    assert by_word["IC report"][3] == "35" and "Built, switched off" in by_word["IC report"][1]
+    assert by_word["Shadow stock universe"][3] == "36" and "until 2027-01-01" in by_word["Shadow stock universe"][1]
+    assert by_word["model_vote"][3] == "42" and "until 2026-12-22" in by_word["model_vote"][1]
+    assert "$1.00 a day" in by_word["model_vote"][2] and "$0.80" in by_word["model_vote"][2]
+    assert by_word["Thesis check"][3] == "43" and "until 2027-04-01" in by_word["Thesis check"][1]
+    assert "$0.10 a week" in by_word["Thesis check"][2]
+    assert "Deferred" in by_word["1-to-5 ranking arm"][1] and "too coarse" in by_word["1-to-5 ranking arm"][1]
+    assert "not registered" in by_word["cross-model vote"][1]
+    assert "Dropped: too few events" in by_word["Event tags and annual-report flags"][1]
+
+
 def test_the_dropped_fifty_day_version_is_kept_and_counted():
     row = next(r for r in trials() if "50-day moving-average veto" in r[1])
     assert row[3] == "dropped before it ran" and "signal counts only" in row[5]
@@ -97,6 +129,38 @@ def test_the_owners_items_of_2_oct_have_their_rows_before_they_run():
         assert "(history/2026-10-stress-periods/report.md)" in rows[trial][6]
     assert "history/2026-10-stress-periods/" in (RESEARCH / "graveyard.md").read_text()
     assert "market state" in rows[41][1] and rows[41][2] == "exploratory report"
+
+
+def test_the_owners_items_of_4_oct_have_their_rows_and_cards_before_they_run():
+    """The voting arm (one trial in N, a race arm and a fund) and the thesis check (a log and a description)."""
+    from config import model_vote as mv
+    from config import thesis_check as tc
+
+    rows = {int(r[0]): r for r in trials()}
+    assert mv.TRIAL == 42 and tc.TRIAL == 43
+    assert "`model_vote`" in rows[42][1] and rows[42][2] == "exploratory arm and fund (prepared)"
+    assert "(cards/model_vote.md)" in rows[42][6] and "until 2026-12-22" in rows[42][3]
+    assert "Thesis check" in rows[43][1] or "thesis check" in rows[43][1]
+    assert rows[43][2] == "exploratory report (prepared)" and "(cards/thesis-check.md)" in rows[43][6]
+    assert "until 2027-04-01" in rows[43][3]
+    for card in ("model_vote.md", "thesis-check.md"):
+        text = (RESEARCH / "cards" / card).read_text()
+        assert "**Survives its history screen if:** No history screen (uses the AI)." in text
+        assert "**History screen:** Not possible (uses the AI)." in text
+
+
+def test_the_vote_card_says_what_the_owner_asked_it_to_say():
+    """The owner, 4 Oct 2026: same-model repetition reduces sampling noise, not shared bias; the crowd study used
+    12 different models and forecasting questions, not stock returns; a cross-model vote is a separate later idea."""
+    card = " ".join((RESEARCH / "cards" / "model_vote.md").read_text().split())
+    assert "Repeating the same model only reduces sampling noise, not shared bias." in card
+    assert "Schoenegger et al. (*Science Advances*, 2024) used 12 different models, and forecasting questions, not stock returns." in card
+    assert "A cross-model vote would be a separate, later idea" in card
+    for words in ("at least 3 successful votes", "if it has at least 3 of the 5", "A tie for the most votes is NEUTRAL",
+                  "Conviction = (votes for that side ÷ 5) × (the mean conviction of those votes)",
+                  "0.30", "Newey-West t (lag 3)", "Newey-West t (lag 5)", "$1.00 a day", "$0.80", "23:15 UTC",
+                  "fewer than 20 such lines by the final checkpoint", "Benjamini-Hochberg family"):
+        assert words.lower() in card.lower(), words
 
 
 def test_the_accountant_questions_are_the_owners_ten_then_the_two_added_earlier():

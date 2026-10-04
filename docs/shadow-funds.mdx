@@ -233,6 +233,21 @@ Benjamini-Hochberg adjusted p-values and Deflated Sharpe Ratios (N from
 (`exploratory.checkpoints`), carried unchanged every night after. None of it
 can change the decision.
 
+**Prepared, switched off until their dates** (pre-registration sections 13.11
+and 13.12). The voting arm `model_vote` asks the model four more times on
+each answered line, with the same archived input, and trades the side that
+has at least 3 of the 5 votes. From 2026-12-22 it joins the checkpoint
+record: its race arm under `race`, its fund under `tests` (against
+`model_vote_comparator`, a fund that runs the model's own answers on exactly
+the vote's lines, so the four funds are untouched), both in the
+Benjamini-Hochberg table, and the descriptive IC comparison under `vote_ic`;
+between checkpoints only its counters (`exploratory.counters.model_vote`:
+lines voted, answered, dropped, calls). The weekly thesis check is a log;
+from 2027-04-01 its description (the forward returns of names it called
+BROKEN against VALID) goes under `thesis_check` at the checkpoints, and its
+counters under `exploratory.counters.thesis_check`. Before those dates none
+of these keys exists.
+
 ## How often the buying order matters (report only)
 
 Each cycle the engine works through the day's signals one at a time, in

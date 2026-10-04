@@ -1,0 +1,42 @@
+# model_vote: five calls of the same model, one vote (race arm and fund)
+
+**Date:** 2026-10-04 (prepared; **registered at the first checkpoint, 2026-12-22**, as the second new idea of the first quarter of 2027, after the IC test; pre-registration section 13.11). Built now and switched off: `MODEL_VOTE_ENABLED` is off until 2026-12-22, and a test fails if it is turned on before that date. Nothing on this card is changed after registration.
+
+**Source:** None for these settings: the owner's fixed choice of 2026-10-04. Background only, not a source of settings: the wisdom-of-the-crowd study of Schoenegger, Tuminauskaite, Park, Bastos and Tetlock (*Science Advances*, 2024), which found that the average forecast of 12 different language models was about as accurate as a crowd of human forecasters, on 31 forecasting questions (see "What this can and cannot show" below).
+
+**Exact rule and settings:** Every number is in `config/model_vote.py`.
+- *Lines:* every production journal line the model answered (the race's rule: a signal about this ticker, not held), journalled on or after 2026-12-22 (UTC).
+- *Votes:* vote 1 is the production answer, as journalled. Votes 2 to 5 are four more calls to the same model with the same settings, each re-sending the archived request body of that line's first ask (the heartbeat's model-call capture, kept as the run's artifact), through production's own call path, so the retries and re-asks are production's. Before any call, the body that path would send is rebuilt from the archived messages and its SHA-256 must equal the `prompt_sha256` the production line carries; if it does not, or the archive has no copy, the line is not voted, and it is counted. The first ask's body, because the body of a re-ask carries a complaint about an answer the other votes never gave. Each answer is read as production reads one (`parse_signal`, then a score with no source set to null); a failed call, an answer that cannot be read and an answer about another ticker are failed votes.
+- *Sides:* each vote's own bias as answered, before any floor: BULLISH is LONG, BEARISH is SHORT, NEUTRAL is NEUTRAL.
+- *Answer:* with at least 3 successful votes (vote 1 counted), the side with the most votes if it has at least 3 of the 5; otherwise NEUTRAL. A tie for the most votes is NEUTRAL. Conviction = (votes for that side ÷ 5) × (the mean conviction of those votes); a failed vote counts as a vote that does not agree, so the share is always out of 5. A NEUTRAL answer never trades.
+- *Floor:* 0.30 (`MIN_CONVICTION`, as production): a LONG or SHORT under it is not traded, by the vote and its comparator alike.
+- *Failures:* fewer than 3 successful votes: no answer for that line. The line is dropped for the vote and for its comparator alike, the same rule as production's for a line with no answer. The registered race and funds are not touched.
+- *Vote score* (for the IC comparison only): the mean blended score of the successful votes. Vote 1's is the line's own `blend.composite`; each other vote is blended with the weights the production line itself applied (`blend.applied`).
+- *Timing:* once a trading day, after the day's production run and the shadow universe's run have finished, never at the same time as either (a job of the shadow universe's workflow run, after its scoring job; the job also checks that the production run has completed). No new line is started from 23:15 UTC. A line not voted that day has no answer, counted.
+- *Cost:* about $0.70 a day expected (about 58 answered lines, four calls each); a hard cap of $1.00 a day, an alert to the owner's phone when the day passes $0.80, and another when the cap stops a run. Every HTTP ask is counted, retries and re-asks included; an ask with no price is charged at $0.003.
+
+**Data used:** The production journal's answered lines (signal, five scores, blend record, `model_calls`, `run`); the heartbeat's archived request bodies (the run's `model-io` artifact; never committed, checked against the journal's SHA-256); the vote's own lines (`logs/model_vote/`, one file per UTC month); the race's and the funds' prices.
+
+**Compared against:** The model, one call, on the same lines: the model race arm restricted to the lines with a vote answer, and `model_vote_comparator`, a fund that runs the model's own answers on exactly those lines, from the same start and with the same machinery. The four registered funds are unchanged.
+
+**Main metric:** Mean daily net return, vote minus model. Race arm: section 3's machinery (3 sessions, the next open, the same stop, cost and floor), Newey-West t (lag 3). Fund: the model fund's machinery with the vote's signals against the comparator fund, paired daily over the sessions after 2026-12-22, Newey-West t (lag 5). Both are in the Benjamini-Hochberg family (section 13.5), each with its Deflated Sharpe Ratio (13.6). Secondary and descriptive only, not in the family and with no Deflated Sharpe Ratio: the daily IC of the vote score minus the daily IC of the single call's blended score, on the same lines, by the IC report's rule (at least 10 names a day), at 1 and 3 sessions, with a Newey-West t (lag = horizon).
+
+**Survives its history screen if:** No history screen (uses the AI).
+
+**History screen:** Not possible (uses the AI).
+
+**Read on:** At each checkpoint after registration: 2027-03-22 and 2027-06-16 (estimated: the race's looks). The 2026-12-22 checkpoint has no vote data, so its rows read "no data". Between checkpoints, from 2026-12-22, only counters: lines voted, lines with an answer, lines dropped, lines not voted, calls and failed calls. No signal comparison, return, IC, t or count of acting differently is written to any file, page or log before a checkpoint, and nothing at all before 2026-12-22.
+
+**Acting differently:** A line where the vote's signal differs from the single call's: after the 0.30 floor, one trades and the other does not, or they take opposite sides (LONG, SHORT or no trade). Fewer than 20 such lines by the final checkpoint is "not tested" (section 13.7).
+
+**Promising if:** At a checkpoint, it beats its comparator and passes Benjamini-Hochberg at 5% (section 13.5). The Deflated Sharpe Ratio is shown beside it (13.6). A promising result is only a candidate for a later registration; it changes nothing in this one.
+
+**Dead if:** At any checkpoint it trails its comparator and passes Benjamini-Hochberg in that direction; or at the final checkpoint its mean difference is zero or below (section 13.7). At the final checkpoint, fewer than 20 times acting differently is "not tested", whatever the numbers.
+
+**Trial number:** 42 (one trial in N: the race arm and the fund are one idea, as A's are)
+
+## What this can and cannot show (the owner asked for this on the card)
+
+- **Repeating the same model only reduces sampling noise, not shared bias.** The five votes are five draws from one model, reading one prompt with one training. Where that model is wrong in a consistent way, all five are wrong together, and a vote cannot see it. What a vote can remove is the part of one answer that is chance: an answer that would come out differently if the same question were asked again.
+- **The wisdom-of-the-crowd study is not evidence for this test.** Schoenegger et al. (*Science Advances*, 2024) used 12 different models, and forecasting questions, not stock returns. Different models make partly different mistakes, which is where a crowd's gain comes from; five calls of one model share most of theirs. Its result does not carry over to five calls of one model on stock returns.
+- **A cross-model vote would be a separate, later idea**, with its own card, graveyard row and registration (`docs/research/backlog.md`, "AI ideas"). Nothing here tests it.
