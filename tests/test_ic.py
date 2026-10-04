@@ -125,7 +125,8 @@ def test_the_card_carries_the_registered_settings():
                    "Split by sleeve, descriptive only", "16 single names, 64 funds",
                    "Not tests: not in the Benjamini-Hochberg family", "hidden until the checkpoints",
                    "Pooled number for the single names, descriptive, very noisy", "The minimum stays 10 names a day",
-                   "after each entry day's average return across them is taken out",
+                   "after each entry day's average return across the lines with that score "
+                   "is taken out (a day with fewer than two such lines is left out)",
                    "the number of lines used and a t with errors clustered by entry day"):
         assert phrase in text, phrase
     assert "no error" not in text, "an error written after the answer does not take a line out (the race's rule)"
@@ -746,7 +747,8 @@ def test_the_split_by_sleeve_is_descriptive_has_no_main_and_measures_each_group_
         "universe": "production", "names": ["single_names", "funds"], "rule": "config.instruments.is_fund",
         "descriptive": True, "pooled": {"group": "single_names", "label": "descriptive, very noisy",
                                         "cluster": "entry day",
-                                        "demeaned": "each entry day's mean return across the group's lines"}}
+                                        "demeaned": ("each entry day's mean return across the group's lines with the "
+                                                     "score (a day with fewer than two such lines is left out)")}}
     # Hidden like the rest: only the checkpoint record has it; the nightly counters do not.
     assert "groups" not in _keys(ic.counters({"production": lines}, through))
 

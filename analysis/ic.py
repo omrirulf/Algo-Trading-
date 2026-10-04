@@ -767,7 +767,8 @@ def settings() -> dict:
         "groups": {"universe": GROUPS_UNIVERSE, "names": list(GROUPS), "rule": "config.instruments.is_fund",
                    "descriptive": True,
                    "pooled": {"group": POOLED_GROUP, "label": POOLED_LABEL, "cluster": "entry day",
-                              "demeaned": "each entry day's mean return across the group's lines"}},
+                              "demeaned": ("each entry day's mean return across the group's lines with the score "
+                                           "(a day with fewer than two such lines is left out)")}},
         "return": "price only: the next open to the close of the h-th session, no dividend, no cost",
     }
 
@@ -884,16 +885,17 @@ def pooled(lines: Sequence[IcLine], bars: Mapping[str, Sequence[Bar]], through: 
 
     For each score and horizon: the lines with the score and a resolved
     return, one per name and entry day as for the daily IC; each entry day's
-    mean return across them is subtracted from their returns (a day with a
-    single line has nothing left and is left out); then ``pooled_rank_ic``
-    over all of them, the entry day as the cluster. At 3 sessions the
-    windows of nearby days overlap, which clustering by day does not cover.
+    mean return across them is subtracted from their returns (a day with
+    fewer than two such lines has nothing left and is left out); then
+    ``pooled_rank_ic`` over all of them, the entry day as the cluster. At 3
+    sessions the windows of nearby days overlap, which clustering by day does
+    not cover: that t is then too far from zero, in either direction.
     """
     out: dict[str, Any] = {
         "label": POOLED_LABEL, "descriptive": True, "in_family": False,
-        "rule": ("the rank correlation of the score with the return less its entry day's mean across these "
-                 "lines, over all the lines pooled; t with errors clustered by entry day (CR1); a day with one "
-                 "line is left out"),
+        "rule": ("the rank correlation of the score with the return less its entry day's mean across the lines "
+                 "with that score, over all the lines pooled; t with errors clustered by entry day (CR1); a day "
+                 "with fewer than two such lines is left out"),
         "horizons": {},
     }
     for h in HORIZONS:
@@ -1033,8 +1035,9 @@ def card() -> str:
         "Sharpe Ratio, no trial in N, and hidden until the checkpoints like every other IC value.",
         f"- **Pooled number for the single names, {POOLED_LABEL} (the owner's decision of 4 Oct 2026).** The "
         f"minimum stays {MIN_NAMES} names a day. For the single names only, also: the rank correlation across "
-        "all their answered lines pooled, after each entry day's average return across them is taken out (a day "
-        "with one line is left out), with the number of lines used and a t with errors clustered by entry day; "
+        "all their answered lines pooled, after each entry day's average return across the lines with that score "
+        "is taken out (a day with fewer than two such lines is left out), with the number of lines used and a t "
+        "with errors clustered by entry day; "
         "for each score and horizon. Not a test: not in the Benjamini-Hochberg family, no trial in N, and "
         "hidden until the checkpoints like the rest of the record.",
         "- **Trials.** Two trials in N (graveyard rows 35 and 36, one per universe) and one idea against the "

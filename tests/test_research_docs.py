@@ -180,7 +180,8 @@ def test_the_ic_card_states_the_settings_the_code_registers():
                    "not in the Benjamini-Hochberg family, no Deflated Sharpe Ratio, no trial in N",
                    "The split by sleeve and the pooled number are hidden the same way",
                    "labelled \"descriptive, very noisy\"", "The minimum stays 10 names a day",
-                   "after each entry day's average return across them is taken out",
+                   "after each entry day's average return across the lines with that score is taken out",
+                   "(a day with fewer than two such lines is left out)", "too far from zero, in either direction",
                    "the number of lines used and a t with errors clustered by entry day"):
         assert phrase in card, phrase
     assert (ic.MAIN_SCORE, ic.MAIN_HORIZON) == ("blend", 1)
