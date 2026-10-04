@@ -63,8 +63,39 @@ def test_the_card_template_asks_for_the_history_screen_and_the_backlog_says_hist
     for words in ("after its source was published", "0.10% per side", "using the real code",
                   "skips the history screen", "do not use live slots", "counts in N"):
         assert words in backlog, words
-    waiting = backlog.split("## Waiting", 1)[1].split("##", 1)[0]
-    assert "otation" not in waiting and "urn-of-the-month" not in waiting
+    tables = [part.split("\n#", 1)[0] for part in backlog.split("### Waiting\n")[1:]]
+    assert len(tables) == 2                                 # one under AI ideas, one under Trading rules
+    for waiting in tables:
+        assert "otation" not in waiting and "urn-of-the-month" not in waiting
+
+
+def test_the_backlog_has_the_owners_three_parts_and_the_index_first_items():
+    """The owner's layout of 4 Oct 2026: AI ideas, Trading rules, Index-first reports, each item with its status."""
+    backlog = (RESEARCH / "backlog.md").read_text()
+    heads = re.findall(r"^## (.+)$", backlog, re.M)
+    parts = ["AI ideas", "Trading rules", "Index-first reports"]
+    assert [h for h in heads if h in parts] == parts
+    index_first = backlog.split("## Index-first reports", 1)[1].split("\n## ", 1)[0]
+    rows = {cells[0]: cells[1] for cells in ([c.strip() for c in line.strip("|").split("|")]
+                                             for line in index_first.splitlines() if line.startswith("| "))}
+    assert rows["After-tax gate and report"].startswith("**Built**")
+    assert rows["ILS report"].startswith("**Built**")
+    assert rows["Monthly coach"] == "**Checklist built; data entry not built**"
+    assert rows["Investor simulator"].startswith("**Plan, waiting for the owner's approval.** Nothing built.")
+    assert rows["Before-real-money checklist"].startswith("**Open")
+    # The count of accountant questions is the file's own, and none is answered while its Answers table is empty.
+    cpa = (RESEARCH / "cpa-questions.md").read_text()
+    asked = len(re.findall(r"^\d+\. \*\*", cpa, re.M))
+    answers = cpa.split("## Answers", 1)[1]
+    assert "*(none yet)*" in answers
+    assert rows["Accountant questions"] == f"**Open: {asked} questions, none answered yet**"
+    flat = " ".join(index_first.split())
+    for item in ("Make the repository private", "A private notification channel", "Where personal numbers live",
+                 "The broker decision", "The fund-domicile decision"):
+        assert f"**{item}" in flat, item
+    assert flat.count("Waits for the June 2027 verdict") == 2
+    assert "use no experiment slot" in flat and "never trade" in flat
+    assert (RESEARCH / "investor-simulator-plan.md").exists()
 
 
 def test_the_dropped_fifty_day_version_is_kept_and_counted():
