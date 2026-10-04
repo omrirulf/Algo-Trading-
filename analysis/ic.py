@@ -22,6 +22,12 @@ the same way, for the single names and for the funds separately
 ``main``, so none enters the Benjamini-Hochberg family or the Deflated
 Sharpe Ratio, none is a trial in N, and they exist only inside the
 checkpoint record, hidden until the checkpoints like every other IC value.
+For the single names only, the record also carries a pooled number, labelled
+"descriptive, very noisy" (the owner's decision of 4 Oct 2026, keeping
+``MIN_NAMES`` at 10): the rank correlation across all their answered lines,
+after each entry day's average return is taken out, with the number of
+lines used and a t with errors clustered by entry day (``pooled``). It is
+not a test either, and it is hidden the same way.
 
 The IC (information coefficient) of a day is that rank correlation. A score
 that knows nothing has ICs around 0; a score that puts the names in exactly
@@ -137,7 +143,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Final, Iterable, Mapping, Optional, Sequence
 
-from analysis.metrics import spearman
+from analysis.metrics import _ranks, spearman
 from analysis.multiple_tests import p_two_sided, series_stats
 from analysis.reader import entry_from
 from config import journal_files
@@ -191,6 +197,11 @@ PAIRED: Final[tuple[str, str]] = ("blend", COMPARATOR)
 GROUPS: Final[tuple[str, ...]] = ("single_names", "funds")
 #: The universe whose record carries the split: the race's 80 names.
 GROUPS_UNIVERSE: Final[str] = "production"
+#: Descriptive, very noisy (the owner's decision of 4 Oct 2026): the group that also gets the pooled number,
+#: because too few of its names are answered on a day for a daily IC (``MIN_NAMES`` stays 10).
+POOLED_GROUP: Final[str] = "single_names"
+#: The pooled number's label, word for word.
+POOLED_LABEL: Final[str] = "descriptive, very noisy"
 #: Everything ``counters`` may show, per universe, and nothing else.
 COUNTER_KEYS: Final[tuple[str, ...]] = ("answered_lines", "lines_with_score", "line_days")
 
@@ -754,7 +765,9 @@ def settings() -> dict:
                   "n_eff = N^2 / max(sum(C^2) - N(N - 1) / (T - 1), N), n_eff_raw = N^2 / sum(C^2)"),
         "main": {"score": MAIN_SCORE, "horizon": MAIN_HORIZON},
         "groups": {"universe": GROUPS_UNIVERSE, "names": list(GROUPS), "rule": "config.instruments.is_fund",
-                   "descriptive": True},
+                   "descriptive": True,
+                   "pooled": {"group": POOLED_GROUP, "label": POOLED_LABEL, "cluster": "entry day",
+                              "demeaned": "each entry day's mean return across the group's lines"}},
         "return": "price only: the next open to the close of the h-th session, no dividend, no cost",
     }
 
@@ -808,6 +821,103 @@ def universe_record(lines: Sequence[IcLine], bars: Mapping[str, Sequence[Bar]], 
     }
 
 
+def _resolved(lines: Sequence[IcLine], bars: Mapping[str, Sequence[Bar]], horizon: int,
+              through: date) -> list[tuple[date, IcLine, float]]:
+    """Each kept line (one per name and entry day) whose return at ``horizon`` is resolved: (entry day, line, return)."""
+    tapes = {ticker: _tape(rows, through) for ticker, rows in bars.items()}
+    out = []
+    for line in _one_per_name_and_day(lines, tapes):
+        result = _forward(tapes.get(line.ticker), line.day, horizon)
+        if result.status == OK:
+            out.append((result.entry_day, line, result.pct))
+    return out
+
+
+def clustered_t(xs: Sequence[float], ys: Sequence[float], clusters: Sequence[Any]) -> Optional[float]:
+    """The t of the slope of ``ys`` on ``xs`` (both with mean zero), with errors clustered by ``clusters``.
+
+    The usual cluster-robust variance (CR1): the sandwich
+    sum over clusters of (sum of x * residual)^2 / (sum of x^2)^2, times
+    G / (G - 1) x (N - 1) / (N - 2) for G clusters and N points (two
+    parameters: the slope and the mean taken out). None with fewer than 3
+    points, fewer than 2 clusters, or no spread.
+    """
+    n, groups = len(xs), len(set(clusters))
+    sxx = sum(x * x for x in xs)
+    if n < 3 or groups < 2 or sxx <= 0:
+        return None
+    slope = sum(x * y for x, y in zip(xs, ys)) / sxx
+    by_cluster: dict[Any, float] = {}
+    for x, y, cluster in zip(xs, ys, clusters):
+        by_cluster[cluster] = by_cluster.get(cluster, 0.0) + x * (y - slope * x)
+    variance = groups / (groups - 1) * (n - 1) / (n - 2) * sum(v * v for v in by_cluster.values()) / sxx ** 2
+    return slope / math.sqrt(variance) if variance > 0 else None
+
+
+def pooled_rank_ic(pairs: Sequence[tuple[float, float]], days: Sequence[date]) -> dict:
+    """One pooled rank correlation of (score, return less its day's mean), with a t clustered by day.
+
+    The ranks of each side (average ranks for ties) are standardised over
+    all the pairs, so the slope of one on the other is exactly Spearman's
+    rho over the pooled pairs; its t uses ``clustered_t`` with the entry day
+    as the cluster.
+    """
+    n, clusters = len(pairs), len(set(days))
+    out: dict[str, Any] = {"lines": n, "days": clusters, "rho": None, "t": None}
+    if n < 3:
+        return out
+    standard = []
+    for ranks in (_ranks([s for s, _ in pairs]), _ranks([r for _, r in pairs])):
+        mean = statistics.fmean(ranks)
+        spread = math.sqrt(sum((r - mean) ** 2 for r in ranks) / n)
+        if spread == 0:
+            return out
+        standard.append([(r - mean) / spread for r in ranks])
+    xs, ys = standard
+    out["rho"] = max(-1.0, min(1.0, sum(x * y for x, y in zip(xs, ys)) / n))
+    out["t"] = clustered_t(xs, ys, days)
+    return out
+
+
+def pooled(lines: Sequence[IcLine], bars: Mapping[str, Sequence[Bar]], through: date) -> dict:
+    """The pooled number for one group's lines: every score at every horizon. Descriptive, very noisy.
+
+    For each score and horizon: the lines with the score and a resolved
+    return, one per name and entry day as for the daily IC; each entry day's
+    mean return across them is subtracted from their returns (a day with a
+    single line has nothing left and is left out); then ``pooled_rank_ic``
+    over all of them, the entry day as the cluster. At 3 sessions the
+    windows of nearby days overlap, which clustering by day does not cover.
+    """
+    out: dict[str, Any] = {
+        "label": POOLED_LABEL, "descriptive": True, "in_family": False,
+        "rule": ("the rank correlation of the score with the return less its entry day's mean across these "
+                 "lines, over all the lines pooled; t with errors clustered by entry day (CR1); a day with one "
+                 "line is left out"),
+        "horizons": {},
+    }
+    for h in HORIZONS:
+        found = _resolved(lines, bars, h, through)
+        row = {}
+        for name in ALL_SCORES:
+            by_day: dict[date, list[tuple[float, float]]] = {}
+            for day, line, pct in found:
+                if line.scores.get(name) is not None:
+                    by_day.setdefault(day, []).append((float(line.scores[name]), pct))
+            pairs: list[tuple[float, float]] = []
+            days: list[date] = []
+            for day in sorted(by_day):
+                items = by_day[day]
+                if len(items) < 2:
+                    continue
+                mean = statistics.fmean(r for _, r in items)
+                pairs += [(s, r - mean) for s, r in items]
+                days += [day] * len(items)
+            row[name] = pooled_rank_ic(pairs, days)
+        out["horizons"][str(h)] = row
+    return out
+
+
 def group_of(ticker: str) -> str:
     """A name's sleeve for the descriptive split: ``"funds"`` for a fund, else ``"single_names"``."""
     return GROUPS[1] if is_fund(ticker) else GROUPS[0]
@@ -819,11 +929,15 @@ def groups_record(lines: Sequence[IcLine], bars: Mapping[str, Sequence[Bar]], th
     Each group is measured on its own lines only -- its daily ICs over its
     own names (at least ``MIN_NAMES`` a day, as for the universe), its n_eff
     from its own names' returns. A group with no line is ``{"no_data": True}``.
+    ``POOLED_GROUP`` (the single names) also carries ``pooled``, the pooled
+    number, descriptive and very noisy (``pooled``).
     """
     out: dict[str, Any] = {"descriptive": True, "in_family": False, "rule": "config.instruments.is_fund"}
     for group in GROUPS:
         own = [line for line in lines if group_of(line.ticker) == group]
         out[group] = (_numbers(own, bars, through) | {"members": len(tickers_of(own))}) if own else {"no_data": True}
+        if own and group == POOLED_GROUP:
+            out[group]["pooled"] = pooled(own, bars, through)
     return out
 
 
@@ -917,6 +1031,12 @@ def card() -> str:
         f"(`config.instruments.is_fund`: 16 single names, 64 funds), each group on its own lines and names, at "
         f"least {MIN_NAMES} names a day as above. Not tests: not in the Benjamini-Hochberg family, no Deflated "
         "Sharpe Ratio, no trial in N, and hidden until the checkpoints like every other IC value.",
+        f"- **Pooled number for the single names, {POOLED_LABEL} (the owner's decision of 4 Oct 2026).** The "
+        f"minimum stays {MIN_NAMES} names a day. For the single names only, also: the rank correlation across "
+        "all their answered lines pooled, after each entry day's average return across them is taken out (a day "
+        "with one line is left out), with the number of lines used and a t with errors clustered by entry day; "
+        "for each score and horizon. Not a test: not in the Benjamini-Hochberg family, no trial in N, and "
+        "hidden until the checkpoints like the rest of the record.",
         "- **Trials.** Two trials in N (graveyard rows 35 and 36, one per universe) and one idea against the "
         "quarterly limit, counted in the first quarter of 2027 (the owner's decision of 3 Oct 2026).",
         f"- **Hidden until the checkpoint.** Before {_day(IC_REGISTRATION)} only counters are shown: answered "
@@ -949,8 +1069,8 @@ __all__ = [
     "ALL_SCORES", "Bar", "COMPARATOR", "COUNTER_KEYS", "DIMENSIONS", "DailyIcs", "FEW_NAMES", "Forward", "HORIZONS",
     "GROUPS", "GROUPS_UNIVERSE", "IC_REGISTRATION", "IC_START", "IcLine", "MAIN_HORIZON", "MAIN_SCORE", "MDE_T", "MIN_NAMES", "NO_PRICE",
     "NO_SPREAD", "NW_LAG", "N_EFF_MIN_COVERAGE", "N_EFF_MIN_DATES", "N_EFF_MIN_RETURNS", "OK", "PAIRED", "PENDING",
-    "SCORES", "SHADOW_START", "UNIVERSES", "UNIVERSE_START", "bars_from_fetcher", "card", "counters", "daily_ics",
+    "POOLED_GROUP", "POOLED_LABEL", "SCORES", "SHADOW_START", "UNIVERSES", "UNIVERSE_START", "bars_from_fetcher", "card", "clustered_t", "counters", "daily_ics",
     "due", "effective_names", "forward_return", "group_of", "groups_record", "in_window", "line_from", "mde_theory", "momentum_score",
-    "newey_west_se", "paired", "read_lines", "read_universe", "record", "settings", "summarise", "tickers_of",
+    "newey_west_se", "paired", "pooled", "pooled_rank_ic", "read_lines", "read_universe", "record", "settings", "summarise", "tickers_of",
     "universe_record",
 ]

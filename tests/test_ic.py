@@ -94,6 +94,8 @@ def test_the_registered_settings():
     assert (ic.N_EFF_MIN_RETURNS, ic.N_EFF_MIN_DATES, ic.N_EFF_MIN_COVERAGE) == (20, 20, 0.9)
     # Descriptive only (the owner's decision of 3 Oct 2026): the production names split by sleeve.
     assert ic.GROUPS == ("single_names", "funds") and ic.GROUPS_UNIVERSE == "production"
+    # The owner, 4 Oct 2026: the minimum stays 10; the single names also get a pooled number, so labelled.
+    assert ic.POOLED_GROUP == "single_names" and ic.POOLED_LABEL == "descriptive, very noisy"
 
 
 def test_the_record_carries_every_n_eff_setting():
@@ -121,7 +123,10 @@ def test_the_card_carries_the_registered_settings():
                    "(a signal about this ticker, not held)", "webhook unreachable", "**90%**",
                    "The common move is taken out", "N^2 / max(sum of C^2 - N(N - 1) / (T - 1), N)", "n_eff_raw",
                    "Split by sleeve, descriptive only", "16 single names, 64 funds",
-                   "Not tests: not in the Benjamini-Hochberg family", "hidden until the checkpoints"):
+                   "Not tests: not in the Benjamini-Hochberg family", "hidden until the checkpoints",
+                   "Pooled number for the single names, descriptive, very noisy", "The minimum stays 10 names a day",
+                   "after each entry day's average return across them is taken out",
+                   "the number of lines used and a t with errors clustered by entry day"):
         assert phrase in text, phrase
     assert "no error" not in text, "an error written after the answer does not take a line out (the race's rule)"
 
@@ -730,14 +735,18 @@ def test_the_split_by_sleeve_is_descriptive_has_no_main_and_measures_each_group_
     window = ic.in_window(lines, "production", through)
     for group, fund in (("single_names", False), ("funds", True)):
         own = [line for line in window if is_fund(line.ticker) == fund]
-        assert groups[group] == ic._numbers(own, bars, through) | {"members": 12}
+        extra = {"pooled": ic.pooled(own, bars, through)} if group == ic.POOLED_GROUP else {}
+        assert groups[group] == ic._numbers(own, bars, through) | {"members": 12} | extra
         assert groups[group]["lines"] == 31 * 12 and groups[group]["names"] == ic.tickers_of(own)
         assert groups[group]["horizons"]["1"]["blend"]["days"] == 31 - 1
     # The universe's own numbers and its primary test are exactly as without the split.
     whole = {k: v for k, v in production.items() if k != "groups"}
     assert whole == ic.universe_record(window, bars, through, "production")
-    assert found["settings"]["groups"] == {"universe": "production", "names": ["single_names", "funds"],
-                                           "rule": "config.instruments.is_fund", "descriptive": True}
+    assert found["settings"]["groups"] == {
+        "universe": "production", "names": ["single_names", "funds"], "rule": "config.instruments.is_fund",
+        "descriptive": True, "pooled": {"group": "single_names", "label": "descriptive, very noisy",
+                                        "cluster": "entry day",
+                                        "demeaned": "each entry day's mean return across the group's lines"}}
     # Hidden like the rest: only the checkpoint record has it; the nightly counters do not.
     assert "groups" not in _keys(ic.counters({"production": lines}, through))
 
@@ -750,6 +759,79 @@ def test_a_sleeve_with_fewer_than_ten_names_a_day_has_no_ic_and_says_why():
     assert one["days"] == 0 and one["t"] is None and one["mean_ic"] is None
     assert one["skipped"]["few_names"] == 31 - 1 and groups["single_names"]["members"] == 6
     assert groups["funds"]["horizons"]["1"]["blend"]["days"] == 31 - 1
+
+
+def _cr1_reference(xs, ys, clusters) -> float:
+    """An independent CR1 t of the slope, by matrices, with an intercept (numpy)."""
+    import numpy as np
+
+    X = np.column_stack([np.ones(len(xs)), np.asarray(xs, float)])
+    y = np.asarray(ys, float)
+    bread = np.linalg.inv(X.T @ X)
+    beta = bread @ X.T @ y
+    e = y - X @ beta
+    meat = np.zeros((2, 2))
+    for g in set(clusters):
+        idx = [i for i, c in enumerate(clusters) if c == g]
+        s = X[idx].T @ e[idx]
+        meat += np.outer(s, s)
+    n, k, groups = len(xs), 2, len(set(clusters))
+    v = groups / (groups - 1) * (n - 1) / (n - k) * bread @ meat @ bread
+    return float(beta[1] / np.sqrt(v[1, 1]))
+
+
+def test_the_pooled_rank_ic_is_spearman_over_the_pairs_and_its_t_is_clustered_by_day():
+    """The owner, 4 Oct 2026: a rank correlation over all pooled lines, with a t clustered by day."""
+    rng = random.Random(7)
+    days = [SESSIONS[i // 5] for i in range(40)]            # 8 days of 5 lines
+    pairs = [(rng.choice([-0.4, 0.0, 0.3, 0.6]), rng.gauss(0.0, 0.02)) for _ in days]   # ties in the score
+    found = ic.pooled_rank_ic(pairs, days)
+    assert found["lines"] == 40 and found["days"] == 8
+    assert found["rho"] == pytest.approx(spearman([s for s, _ in pairs], [r for _, r in pairs]).rho)
+    from analysis.metrics import _ranks
+    rx, ry = _ranks([s for s, _ in pairs]), _ranks([r for _, r in pairs])
+    mx, my = statistics.fmean(rx), statistics.fmean(ry)
+    assert found["t"] == pytest.approx(_cr1_reference([x - mx for x in rx], [y - my for y in ry], days), rel=1e-9)
+    # Too little to say: fewer than 3 lines, one day only, or no spread.
+    assert ic.pooled_rank_ic(pairs[:2], days[:2])["rho"] is None
+    one_day = ic.pooled_rank_ic(pairs[:5], days[:5])
+    assert one_day["rho"] is not None and one_day["t"] is None
+    flat = ic.pooled_rank_ic([(0.1, r) for _, r in pairs], days)
+    assert flat["rho"] is None and flat["t"] is None and flat["lines"] == 40
+
+
+def test_the_pooled_number_takes_out_each_day_s_average_and_leaves_out_one_line_days():
+    from config.instruments import SINGLE_NAMES
+
+    rng = random.Random(3)
+    names = list(SINGLE_NAMES[:6])
+    days = SESSIONS[:25]
+    returns = {n: {d: rng.gauss(0.0, 0.02) for d in days} for n in names}
+    lines = [make_line(n, d, blend=rng.uniform(-0.5, 0.5)) for d in days[:20] for n in names]
+    lines += [make_line(names[0], days[20], blend=0.2)]          # a day with one line: left out
+    through = days[23]
+    base = ic.pooled(lines, bars_from_returns(returns, days), through)
+    one = base["horizons"]["1"]["blend"]
+    assert one["lines"] == 6 * 20 and one["days"] == 20     # 20 days of six lines; the one-line day is left out
+    # Moving every name by the same amount on a day changes nothing: that day's average is taken out.
+    shifted = {n: {d: r + (0.05 if d.day % 2 else -0.03) for d, r in by.items()} for n, by in returns.items()}
+    moved = ic.pooled(lines, bars_from_returns(shifted, days), through)["horizons"]["1"]["blend"]
+    assert moved["rho"] == pytest.approx(one["rho"]) and moved["t"] == pytest.approx(one["t"])
+    assert base["label"] == "descriptive, very noisy" and base["in_family"] is False and base["descriptive"] is True
+    assert set(base["horizons"]) == {"1", "3"} and set(base["horizons"]["3"]) == set(ic.ALL_SCORES)
+    assert ic.pooled(lines, bars_from_returns(returns, days), through)["horizons"]["1"]["momentum"]["lines"] == 0
+
+
+def test_only_the_single_names_get_the_pooled_number_and_it_is_hidden_with_the_record():
+    lines, bars, through = _sleeves(singles=6, funds=12)
+    found = ic.record({"production": lines}, {"production": bars}, through)
+    groups = found["universes"]["production"]["groups"]
+    pooled = groups["single_names"]["pooled"]
+    assert pooled["horizons"]["1"]["blend"]["lines"] > 0 and pooled["horizons"]["1"]["blend"]["t"] is not None
+    assert groups["single_names"]["horizons"]["1"]["blend"]["days"] == 0, "the daily IC still needs 10 names"
+    assert "pooled" not in groups["funds"] and "main" not in _keys(groups)
+    assert "pooled" not in _keys(ic.counters({"production": lines}, through))
+    assert json.loads(json.dumps(found, allow_nan=False)) == found
 
 
 def test_a_sleeve_without_lines_is_no_data_and_the_shadow_universe_has_no_split():
