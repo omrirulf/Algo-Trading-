@@ -242,37 +242,40 @@ REPLACED: Final[dict[str, tuple[str, int]]] = {
 #: the name the search asks for, as ``"<name> <ticker> stock"``
 #: (``news_query``); every entry is a name a headline may call the company
 #: (``match_names``). Written down before the first weekday check, and frozen
-#: with the list.
+#: with the list. The first entry is never the bare ticker: on 5 Oct 2026 the
+#: first check found 18 names whose first entry was (``"UPS stock"``, ``"SQM
+#: stock"``), which is production's query, not the owner's; their full
+#: company names were put first (``"United Parcel Service UPS stock"``).
 COMPANIES: Final[dict[str, tuple[str, ...]]] = {
     # Energy
     "BKR": ("Baker Hughes",), "CNQ": ("Canadian Natural Resources", "Canadian Natural"),
     "COP": ("ConocoPhillips",), "CVX": ("Chevron",), "ENB": ("Enbridge",), "EOG": ("EOG Resources",),
     "FANG": ("Diamondback Energy", "Diamondback"), "HAL": ("Halliburton",), "KMI": ("Kinder Morgan",),
     "MPC": ("Marathon Petroleum",), "OKE": ("ONEOK", "Oneok"), "OXY": ("Occidental Petroleum", "Occidental"),
-    "PSX": ("Phillips 66",), "SLB": ("SLB", "Schlumberger"), "VLO": ("Valero",),
+    "PSX": ("Phillips 66",), "SLB": ("Schlumberger", "SLB"), "VLO": ("Valero",),
     "WMB": ("Williams Companies", "Williams Cos"),
     # Materials
-    "ALB": ("Albemarle",), "APD": ("Air Products",), "CRH": ("CRH",), "DD": ("DuPont",), "ECL": ("Ecolab",),
+    "ALB": ("Albemarle",), "APD": ("Air Products",), "CRH": ("CRH plc", "CRH"), "DD": ("DuPont",), "ECL": ("Ecolab",),
     "FCX": ("Freeport-McMoRan", "Freeport McMoRan"), "LIN": ("Linde",),
     "MLM": ("Martin Marietta",), "NEM": ("Newmont",), "NTR": ("Nutrien",), "NUE": ("Nucor",),
     "PPG": ("PPG Industries", "PPG"), "SHW": ("Sherwin-Williams", "Sherwin Williams"),
     "VMC": ("Vulcan Materials",),
     # Industrials
-    "ADP": ("Automatic Data Processing", "ADP"), "BA": ("Boeing",), "CMI": ("Cummins",), "CSX": ("CSX",),
+    "ADP": ("Automatic Data Processing", "ADP"), "BA": ("Boeing",), "CMI": ("Cummins",), "CSX": ("CSX Corporation", "CSX"),
     "DE": ("Deere", "John Deere"), "EMR": ("Emerson Electric", "Emerson"), "ETN": ("Eaton",),
     "GD": ("General Dynamics",), "GE": ("GE Aerospace", "General Electric"),
     "ITW": ("Illinois Tool Works",), "JCI": ("Johnson Controls",), "LHX": ("L3Harris",),
     "LMT": ("Lockheed Martin", "Lockheed"), "MMM": ("3M",), "NOC": ("Northrop Grumman", "Northrop"),
     "PH": ("Parker Hannifin", "Parker-Hannifin"), "RSG": ("Republic Services",),
-    "RTX": ("RTX", "Raytheon"), "TT": ("Trane Technologies", "Trane"), "UNP": ("Union Pacific",),
-    "UPS": ("UPS", "United Parcel Service"), "WM": ("Waste Management",),
+    "RTX": ("RTX Corporation", "RTX", "Raytheon"), "TT": ("Trane Technologies", "Trane"), "UNP": ("Union Pacific",),
+    "UPS": ("United Parcel Service", "UPS"), "WM": ("Waste Management",),
     # Consumer discretionary
     "ABNB": ("Airbnb",), "AMZN": ("Amazon",), "AZO": ("AutoZone",),
     "BKNG": ("Booking Holdings", "Booking.com"), "CMG": ("Chipotle",), "F": ("Ford Motor", "Ford"),
     "GM": ("General Motors",), "HD": ("Home Depot",), "HLT": ("Hilton",), "LOW": ("Lowe's", "Lowe’s"),
     "MAR": ("Marriott",), "MCD": ("McDonald's", "McDonald’s"), "NKE": ("Nike",),
     "ORLY": ("O'Reilly Automotive", "O'Reilly", "O’Reilly"), "ROST": ("Ross Stores",), "SBUX": ("Starbucks",),
-    "TJX": ("TJX",), "TSLA": ("Tesla",), "YUM": ("Yum! Brands", "Yum Brands"),
+    "TJX": ("TJX Companies", "TJX"), "TSLA": ("Tesla",), "YUM": ("Yum! Brands", "Yum Brands"),
     # Consumer staples
     "ADM": ("Archer-Daniels-Midland", "Archer Daniels Midland", "ADM"),
     "CL": ("Colgate-Palmolive", "Colgate"), "COST": ("Costco",), "GIS": ("General Mills",),
@@ -291,7 +294,7 @@ COMPANIES: Final[dict[str, tuple[str, ...]]] = {
     "TMO": ("Thermo Fisher Scientific", "Thermo Fisher"), "UNH": ("UnitedHealth",),
     "VRTX": ("Vertex Pharmaceuticals", "Vertex"), "ZTS": ("Zoetis",),
     # Financials
-    "AIG": ("AIG", "American International Group"), "AXP": ("American Express", "Amex"),
+    "AIG": ("American International Group", "AIG"), "AXP": ("American Express", "Amex"),
     "BAC": ("Bank of America", "BofA"), "BLK": ("BlackRock",), "BX": ("Blackstone",),
     "C": ("Citigroup", "Citi"), "CB": ("Chubb",), "CME": ("CME Group", "CME"), "COF": ("Capital One",),
     "GS": ("Goldman Sachs", "Goldman"), "ICE": ("Intercontinental Exchange",), "MA": ("Mastercard",),
@@ -303,9 +306,9 @@ COMPANIES: Final[dict[str, tuple[str, ...]]] = {
     "V": ("Visa",), "WFC": ("Wells Fargo",),
     # Information technology
     "AAPL": ("Apple",), "ACN": ("Accenture",), "ADBE": ("Adobe",), "ADI": ("Analog Devices",),
-    "AMAT": ("Applied Materials",), "AMD": ("AMD", "Advanced Micro Devices"), "ANET": ("Arista Networks", "Arista"),
+    "AMAT": ("Applied Materials",), "AMD": ("Advanced Micro Devices", "AMD"), "ANET": ("Arista Networks", "Arista"),
     "AVGO": ("Broadcom",), "CDNS": ("Cadence Design Systems", "Cadence Design", "Cadence"),
-    "CRM": ("Salesforce",), "CSCO": ("Cisco",), "IBM": ("IBM",), "INTC": ("Intel",), "INTU": ("Intuit",),
+    "CRM": ("Salesforce",), "CSCO": ("Cisco",), "IBM": ("International Business Machines", "IBM"), "INTC": ("Intel",), "INTU": ("Intuit",),
     "KLAC": ("KLA",), "LRCX": ("Lam Research",), "MU": ("Micron Technology", "Micron"),
     "NOW": ("ServiceNow",), "ORCL": ("Oracle",), "PANW": ("Palo Alto Networks",), "QCOM": ("Qualcomm",),
     "SNPS": ("Synopsys",), "TXN": ("Texas Instruments",),
@@ -326,10 +329,10 @@ COMPANIES: Final[dict[str, tuple[str, ...]]] = {
     "PLD": ("Prologis",), "PSA": ("Public Storage",), "SPG": ("Simon Property Group", "Simon Property"),
     "VICI": ("VICI Properties", "VICI"), "WELL": ("Welltower",),
     # ADR: Europe
-    "AZN": ("AstraZeneca",), "BBVA": ("BBVA",), "BP": ("BP",), "BTI": ("British American Tobacco",),
-    "DEO": ("Diageo",), "GSK": ("GSK",), "HSBC": ("HSBC",), "ING": ("ING Groep", "ING"), "NVS": ("Novartis",),
-    "RIO": ("Rio Tinto",), "SAN": ("Banco Santander", "Santander"), "SAP": ("SAP",), "SHEL": ("Shell",),
-    "SNY": ("Sanofi",), "TTE": ("TotalEnergies",), "UBS": ("UBS",), "UL": ("Unilever",),
+    "AZN": ("AstraZeneca",), "BBVA": ("Banco Bilbao Vizcaya Argentaria", "BBVA"), "BP": ("BP plc", "BP"), "BTI": ("British American Tobacco",),
+    "DEO": ("Diageo",), "GSK": ("GSK plc", "GSK"), "HSBC": ("HSBC Holdings", "HSBC"), "ING": ("ING Groep", "ING"), "NVS": ("Novartis",),
+    "RIO": ("Rio Tinto",), "SAN": ("Banco Santander", "Santander"), "SAP": ("SAP SE", "SAP"), "SHEL": ("Shell",),
+    "SNY": ("Sanofi",), "TTE": ("TotalEnergies",), "UBS": ("UBS Group", "UBS"), "UL": ("Unilever",),
     # ADR: Japan
     "HMC": ("Honda",), "IX": ("ORIX", "Orix"), "MFG": ("Mizuho",), "MUFG": ("Mitsubishi UFJ", "MUFG"),
     "NMR": ("Nomura",), "SMFG": ("Sumitomo Mitsui",), "SONY": ("Sony",), "TAK": ("Takeda",),
@@ -343,16 +346,16 @@ COMPANIES: Final[dict[str, tuple[str, ...]]] = {
     # ADR: Latin America
     "ABEV": ("Ambev",), "AMX": ("America Movil", "América Móvil"), "BAP": ("Credicorp",),
     "FMX": ("FEMSA", "Fomento Economico Mexicano"), "ITUB": ("Itau Unibanco", "Itaú Unibanco", "Itaú", "Itau"),
-    "NU": ("Nu Holdings", "Nubank"), "PBR": ("Petrobras",), "SQM": ("SQM", "Sociedad Quimica y Minera"),
+    "NU": ("Nu Holdings", "Nubank"), "PBR": ("Petrobras",), "SQM": ("Sociedad Quimica y Minera", "SQM"),
     "VALE": ("Vale",),
     # ADR: Israel
     "CHKP": ("Check Point Software", "Check Point"), "ICL": ("ICL Group", "ICL"), "MNDY": ("monday.com", "Monday.com"),
-    "NICE": ("NICE",), "WIX": ("Wix.com", "Wix"),
+    "NICE": ("NICE Ltd", "NICE"), "WIX": ("Wix.com", "Wix"),
     # ADR: Korea and Taiwan
     "KB": ("KB Financial",), "PKX": ("POSCO",), "SHG": ("Shinhan Financial", "Shinhan"),
     "TSM": ("TSMC", "Taiwan Semiconductor"), "UMC": ("United Microelectronics", "UMC"),
     # ADR: Australia
-    "BHP": ("BHP",),
+    "BHP": ("BHP Group", "BHP"),
 }
 
 #: Names whose search name is also a common word in market news ("price

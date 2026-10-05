@@ -23,7 +23,7 @@ def test_it_asks_every_name_with_the_universe_query_and_counts_by_code():
     """All 251 names (the replacements included), the universe's own search, the code-only rule."""
     script = _script()
     assert "from config.shadow_universe import REPLACED, TICKERS, news_query" in script
-    assert "pool.map(ask, TICKERS)" in script
+    assert "pool.map(ask, names)" in script and "names = [t for t in TICKERS if not only or t in only]" in script
     assert "from orchestrator.universe_news import fetch" in script
     assert "fetch_news" not in script and "heartbeat" not in script   # not production's search
     assert "from analysis.news_relevance import FAIL_BELOW, report, universe_share" in script
@@ -51,5 +51,16 @@ def test_it_holds_only_the_news_key_and_zone_the_cycle_uses():
     text = WORKFLOW.read_text(encoding="utf-8")
     assert set(re.findall(r"secrets\.([A-Z_]+)", text)) == {"BRIGHTDATA_API_TOKEN"}
     env = _workflow()["jobs"]["check"]["steps"][-1]["env"]
-    assert env == {"BRIGHTDATA_API_KEY": "${{ secrets.BRIGHTDATA_API_TOKEN }}",
-                   "BRIGHTDATA_UNLOCKER_ZONE": "${{ vars.BRIGHTDATA_SERP_ZONE || 'cli_unlocker' }}"}
+    assert {k: v for k, v in env.items() if k != "ONLY_NAMES"} == {
+        "BRIGHTDATA_API_KEY": "${{ secrets.BRIGHTDATA_API_TOKEN }}",
+        "BRIGHTDATA_UNLOCKER_ZONE": "${{ vars.BRIGHTDATA_SERP_ZONE || 'cli_unlocker' }}"}
+
+
+def test_a_failed_search_is_asked_again_and_never_counted_as_irrelevant():
+    """5 Oct 2026: Bright Data answered many requests with an empty body; a broken request is not a finding."""
+    script = _script()
+    assert "max_workers=2" in script and "for _round in range(3):" in script and "time.sleep(60)" in script
+    assert "shares = [universe_share(t, found[t][0]) for t in names if t not in broken]" in script
+    assert 'print("FAILED " + json.dumps(broken))' in script
+    # ONLY_NAMES lists names of the list only; an unknown ticker stops the check.
+    assert 'sys.exit(f"not in the list:' in script
