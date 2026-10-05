@@ -1,7 +1,8 @@
-🟡 1 warning: 1 of 80 ticker(s) produced no signal
-Equity $101,914 · 20 positions · $92,022 gross · $2,129 at risk · unrealised +$1,847
-Traded: HYG, XLK
+🟡 3 warnings: Price gaps: 50.0% of ticker-days missing in 2026-10
+Equity $102,302 · 24 positions · $114,369 gross · $3,605 at risk · unrealised +$1,952
+Traded: GDX, EWU, EWZ, EPOL, ARGT
 Started by supabase-cron at 14:40 UTC (0 min after 14:40)
-Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-10-01
-Closed: KRE
-Cycle 80 tickers, $0.15 · 2026-10-02
+Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-10-02
+Closed: HDB, KRE
+Also: 3 of 80 ticker(s) produced no signal; 5 of 80 ticker(s) were judged without news
+Cycle 80 tickers, $0.14 · 2026-10-05
