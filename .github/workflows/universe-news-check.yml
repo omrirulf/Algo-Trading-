@@ -53,7 +53,7 @@ jobs:
         env:
           BRIGHTDATA_API_KEY: ${{ secrets.BRIGHTDATA_API_TOKEN }}
           BRIGHTDATA_UNLOCKER_ZONE: ${{ vars.BRIGHTDATA_SERP_ZONE || 'cli_unlocker' }}
-          ONLY_NAMES: "BKR,SLB,CRH,CSX,MMM,RTX,UPS,TJX,ABT,AIG,CME,GS,PNC,AMAT,AMD,IBM,KLAC,MU,SNPS,META,TMUS,DUK,NEE,BBVA,BP,GSK,HSBC,SAP,TTE,UBS,MUFG,NMR,ZTO,IBN,ITUB,PBR,SQM,VALE,CHKP,MNDY,NICE,KB,SHG,BHP"
+          ONLY_NAMES: ""
         run: |
           python - <<'EOF'
           import json, os, sys, time
