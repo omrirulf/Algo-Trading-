@@ -8,7 +8,8 @@ one of the ways an example could leak opens:
 
 1. a printed example line without the "TEST DATA" mark;
 2. an example table that a real writer would accept (``table_json``,
-   ``render_real``, ``block``);
+   ``render_real``, ``block``), or a real output (the race's gate JSON and
+   report block, the funds run's records) written other than through them;
 3. an example's inputs that a real builder would build into a real table
    (every example date is in 2099, outside the experiment);
 4. a module outside ``tests/`` that imports the examples;
@@ -89,6 +90,45 @@ def test_the_mark_is_what_stops_the_writers():
     assert verdict.table_json(table)["kind"] == "race"
 
 
+def test_the_races_real_writers_refuse_an_example_table(monkeypatch):
+    """The gate JSON's ``verdict`` and the report's CHECKPOINT VERDICT block are written only through
+    ``table_json`` and ``block``: an example table handed to them, in place of a real one, is refused."""
+    from datetime import date
+
+    from analysis import horse_race
+    from tests.test_horse_race import _view
+    from tests.test_verdict import plan_inputs
+
+    example, every = examples.race_early_stop(), examples.tables()
+    monkeypatch.setattr(verdict, "race_table", lambda *a, **k: example)
+    with pytest.raises(ValueError, match="TEST DATA"):
+        horse_race.race_verdict(_view(plan_inputs()), None, date(2026, 12, 23))
+    for table in every:
+        with pytest.raises(ValueError, match="TEST DATA"):
+            horse_race.checkpoint_lines(horse_race.RaceVerdict({"text": "x"}, (table,)))
+
+
+@pytest.mark.parametrize("example", ["fund_no_decision", "fund_skipped"])
+def test_the_funds_runs_real_writer_refuses_an_example_table(monkeypatch, example):
+    """Every fund-test table the funds run writes goes through ``table_json``: an example table in place of a
+    real one, read or skipped, is refused, so the document is never printed."""
+    from datetime import datetime, timezone
+
+    from shadow import run as shadow_run
+
+    table = getattr(examples, example)()
+    monkeypatch.setattr(verdict, "fund_test_table", lambda *a, **k: table)
+    race = {"looks": [{"reached": True, "readable": True, "window_end": "2026-12-22"}, {"reached": False},
+                      {"reached": False}]}
+    with pytest.raises(ValueError, match="TEST DATA"):
+        shadow_run.fund_test_part(datetime(2026, 12, 23, 23, tzinfo=timezone.utc), race, [], False, None, None, [],
+                                  {})
+    from tests.test_fund_test_verdict import record_at
+
+    with pytest.raises(ValueError, match="TEST DATA"):
+        record_at(1, 60)
+
+
 # --- 3. no real builder accepts an example's inputs ---------------------------------------------------------
 
 
@@ -111,6 +151,23 @@ def test_the_real_fund_test_builder_refuses_the_examples_records():
                "status": verdict.FUND_SKIPPED}
     with pytest.raises(ValueError, match="outside the experiment"):
         verdict.fund_test_table(skipped)
+
+
+def test_the_funds_runs_record_builder_refuses_the_examples_dates():
+    from shadow import run as shadow_run
+
+    record = examples.fund_record_no_decision()
+    with pytest.raises(ValueError, match="outside the experiment"):
+        shadow_run.fund_test_record(1, examples.MADE_ON, examples.LOOK_DAYS[0], [examples.LOOK_DAYS[0].isoformat()],
+                                    {"funds": {}, "coin": []}, record["after_tax"], 0.041, [],
+                                    examples.CALIBRATION_PASSED.isoformat())
+    race = {"looks": [{"reached": True, "readable": True, "window_end": examples.LOOK_DAYS[0].isoformat()},
+                      {"reached": False}, {"reached": False}]}
+    from datetime import datetime, timezone
+
+    with pytest.raises(ValueError, match="outside the experiment"):
+        shadow_run.fund_test_part(datetime(2026, 12, 23, 23, tzinfo=timezone.utc), race, [], False, None, None, [],
+                                  {})
 
 
 def test_the_combined_line_refuses_the_examples_dates():
