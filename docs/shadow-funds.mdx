@@ -138,7 +138,9 @@ look that comes before calibration has passed is skipped: it is not read and
 spends none of the 5%, and the next look's bar comes from the same rule with
 the bars actually used before it. The race's own bars (3.47, 2.45, 2.00) are
 unchanged. The 4 Funds page shows the plan beside calibration
-(`calibration.fund_test_plan`), with any skipped look.
+(`calibration.fund_test_plan`), with any skipped look. That plan is a
+forecast; what is read at each look is in
+[the checkpoint verdict](#the-checkpoint-verdict).
 
 ### Late runs
 
@@ -163,6 +165,64 @@ to reach it, so the warning normally comes with the next day's brief. A
 stopped calibration gives neither a pass nor a fail and no end date until
 the owner decides; the 4 Funds page shows it, and the daily health check
 raises a warning that reaches the owner's phone with the brief.
+
+## The checkpoint verdict
+
+The layout the owner approved on 6 Oct 2026
+(`docs/research/checkpoint-verdict-plan.md`), with the five open readings
+answered "yes" (pre-registration, Amendment 2026-10-06). It changes no rule,
+no bar and no arm: the fund test's decision is the race's own code
+(`analysis.decision_gate.decide`) at the fund test's own bar, and the tables
+are made by `analysis/verdict.py`.
+
+- **Calibration is judged on the first night the look is readable** (owner
+  reading 3), for both the fund test's skip and the race's "unavailable"
+  after-tax record, so the two can never disagree. If it has not passed
+  that night, the look is skipped: "Not read, no part of the 5% spent, no
+  bar used. The next bars come from the same rule using only the looks
+  actually read." The skip in `shadow/fund_test.py` (`skipped_look`) stays
+  a forecast only.
+- **Read** once the funds reach the look's last close and the look's
+  after-tax record exists, everything cut at that close: the fund sessions
+  since 29 Sep 2026; the bar by the spending rule of section 11.7 from the
+  looks actually read (bars already used stay as they were); the six paired
+  before-tax tests (Newey-West, lag 5); the coin flip, the model fund's
+  total return against the 95th percentile of the 1,000 coin-flip funds'
+  total returns (a tie fails); the after-tax record; and one downturn
+  number, the race's VT figure (owner reading 4: "downturn not measured"
+  means the owner decides). A by-hand run with fewer than 1,000 coin-flip
+  funds makes no record and says why (`fund_test.note`). With 180 or more
+  fund sessions before the final look, the owner decides.
+- **Made once and frozen** (owner reading 2), like the after-tax record:
+  `fund_test.looks` in `logs/funds.json` carries each look's record and its
+  table unchanged every night after. It is made again only if a bug fix
+  moves the look's window, the old one kept inside it (`superseded`).
+- **The verdict.** `fund_test.verdict` is the first deciding look's; later
+  looks are recorded for reading only. The document's last key, `verdict`,
+  is the one combined line of section 11.8 (owner reading 1): "The answer is
+  the index as soon as either test says 'no arm trades', or the two pick
+  different arms; it is the arm when both pick the same one; otherwise 'no
+  decision yet'. An early answer is final; section 9 only delays the money
+  to June 2027." Before any look it is `{"text": "no decision yet"}`.
+- **The bar alert** (owner Addition 1). When the bar used at a look differs
+  from the planned bar (3.40, 2.41, 2.02), the table's title ends "Bar x
+  (planned y): log it in the Amendments table.", and the owner's phone gets
+  *⚠️ Fund test bar differs from the plan* on the night the record is made
+  (sent by `scoring-prices` after the shadow funds run; see
+  [Phone notifications](/phone)). The race's bars are the fixed 3.47, 2.45
+  and 2.00 and cannot differ, so the race has no such alert.
+- **On the 4 Funds page**, a "Checkpoint verdict" card near the top shows
+  each test's deciding look's table (else its latest look's) and the
+  combined line; before any look it is one card, "Checkpoint verdict: no
+  decision yet". The fund-test banner counts fund sessions of the planned
+  180 and names the fund test's own next bar, not the race's (owner
+  reading 5).
+- **Examples** (owner Addition 2): `python tests/verdict_examples.py` prints
+  one example of each table from test data, every line marked TEST DATA and
+  every date in 2099. Tests fail if an example could reach a real output:
+  the real writers refuse a test-data table, the real table builders refuse
+  any date outside 2026-09-23 to 2027-12-31, and nothing under `logs/` or in
+  the pages may hold "TEST DATA" or "2099-".
 
 ## Three exploratory funds
 

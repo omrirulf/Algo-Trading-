@@ -1,8 +1,18 @@
 # The checkpoint verdict: layout and readings for the owner
 
-**Status: for the owner's approval (3 Oct 2026). Nothing here is built yet.** The owner's item 6 of 3 Oct 2026:
-"Build the automatic checkpoint verdict for both the race and the fund test, with unit tests … Show me the layout
-of the verdict table before you build it."
+**Status: approved by the owner on 6 Oct 2026, and built.** The owner's words: "Verdict layout (Document 2):
+approved. My answers to the five open readings: yes to all five, as you proposed." With two additions: (1) "when the
+bar used at a look differs from the planned bar, send a phone alert that tells me to log it in the Amendments
+table"; (2) "before the verdict build is merged, show me one printed example of each table made from test data,
+clearly marked 'TEST DATA'. A test must fail if any example value can appear in a real output." Logged in the
+pre-registration's Amendments table (2026-10-06). Built in `analysis/verdict.py` (the tables and the combined line),
+`analysis/horse_race.py` (the race's frozen tables and the CHECKPOINT VERDICT block), `shadow/run.py` (the fund
+test's frozen records, its verdict and the combined line), the 4 Funds page (the card and the banner), the phone
+alert in `.github/workflows/scoring-prices.yml` (Addition 1, the fund test only: the race's bars are fixed), and
+`tests/verdict_examples.py` with its guards (Addition 2). The layout below is unchanged: it is the contract.
+
+The owner's item 6 of 3 Oct 2026: "Build the automatic checkpoint verdict for both the race and the fund test, with
+unit tests … Show me the layout of the verdict table before you build it."
 
 ## 1. What exists today, and what is missing
 
@@ -129,24 +139,25 @@ are not open choices):
 - **"Above" the coin-flip 95th percentile is strict:** a tie fails (5, 11.5; the race's code already does this).
 
 **Open: the owner decides** (each proposed reading is the one closest to the text; the answers go into the
-Amendments table before any checkpoint result exists):
+Amendments table before any checkpoint result exists). **All five decided: yes, as proposed (the owner, 6 Oct 2026;
+Amendment 2026-10-06).**
 
-1. **How the two verdicts combine when they decide at different looks.** Each test stops at its own first deciding
+1. *Decided: yes.* **How the two verdicts combine when they decide at different looks.** Each test stops at its own first deciding
    look and is then frozen. The answer is the index as soon as either test says "no arm trades", or the two pick
    different arms; it is the arm when both pick the same one; otherwise "no decision yet". An early answer is
    final; section 9 only delays the money to June 2027. Later looks are still shown, for reading only.
-2. **The fund-test record is made once and frozen**, like the after-tax record, and made again only if a bug fix
+2. *Decided: yes.* **The fund-test record is made once and frozen**, like the after-tax record, and made again only if a bug fix
    moves the look's window (the old one kept inside it). The text does not say whether the fund test is frozen or
    recomputed nightly.
-3. **When calibration is judged for a look.** Three places say it differently today: section 5c's text ("on the
+3. *Decided: yes.* **When calibration is judged for a look.** Three places say it differently today: section 5c's text ("on the
    night the race reaches the look"), the after-tax record in `shadow/run.py` (the first night the look is
    readable), and the forecast in `shadow/fund_test.py` (`skipped_look`: a look on or before calibration's
    *estimated* end). Proposed: the first night the look is readable, for both the fund-test skip and the race's
    "unavailable" record, so the two can never disagree; `skipped_look` stays a forecast only, and `fund_test.py`
    says so.
-4. **One downturn number:** the race's VT figure for both tests and the combined line. If it cannot be measured,
+4. *Decided: yes.* **One downturn number:** the race's VT figure for both tests and the combined line. If it cannot be measured,
    the verdict says "downturn not measured" and the owner decides.
-5. **The 4 Funds page's fund-test banner** shows fund sessions of 180 and the fund test's own next bar, not the
+5. *Decided: yes.* **The 4 Funds page's fund-test banner** shows fund sessions of 180 and the fund test's own next bar, not the
    race's (a display fix).
 
 ## 4. Where it appears
