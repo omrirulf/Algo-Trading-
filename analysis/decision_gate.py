@@ -227,6 +227,12 @@ class AfterTax:
     #: The close the record's test was cut at; the race checks it against
     #: the look's own window end and refuses a record made for another window.
     window_end: Optional[date] = None
+    #: The test's own days, ``(from, through)``, and its Newey-West lag, as
+    #: the record wrote them: printed in the checkpoint verdict's after-tax
+    #: row (``analysis.verdict``). Shown only; ``decide`` never reads them.
+    #: ``None`` when the reader did not have them (an older record).
+    window: Optional[tuple[date, date]] = None
+    lag: Optional[int] = None
 
 
 @dataclass(frozen=True)
@@ -369,6 +375,16 @@ def _after_tax(inputs: LookInputs, candidate: str, bar: float) -> tuple[Optional
     if _above(t, bar):
         return True, f"and its fund beat the VT fund after Israeli tax at t > {bar:.2f} (t = {shown})"
     return False, f"its fund did not beat the VT fund after Israeli tax at t > {bar:.2f} (t = {shown})"
+
+
+#: Public names for the three steps ``_decide`` applies, so the checkpoint
+#: verdict (``analysis.verdict``) recomputes its table rows with the very
+#: same predicates instead of copies of them. The same functions, not
+#: wrappers: nothing about the decision changes (the owner's approval of
+#: the verdict layout, 6 Oct 2026).
+above = _above
+below = _below
+after_tax_result = _after_tax
 
 
 def _decide(inputs: LookInputs, bar: float, final: bool) -> tuple[Optional[str], Optional[str], str]:
@@ -986,6 +1002,9 @@ __all__ = [
     "WATCH_DAYS",
     "WATCH_MAX_FAILED_SHARE",
     "WatchDay",
+    "above",
+    "after_tax_result",
+    "below",
     "decide",
     "drawdown_trips",
     "drawdown_watch",
