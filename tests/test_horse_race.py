@@ -304,7 +304,7 @@ class FinalAwareFetcher:
 
 
 def _race(tmp_path, monkeypatch, capsys, frames, journal_lines, now, extra=(),
-          cutoff=date(2000, 1, 1), account=None, funds=None):
+          cutoff=date(2000, 1, 1), account=None, funds=None, previous_gate=None):
     """Run the race on a tiny journal. These journals are dated early 2026,
     before the real cutoff, so by default the cutoff is moved back to take
     them in; a test about the cutoff itself passes ``cutoff=None``.
@@ -313,7 +313,10 @@ def _race(tmp_path, monkeypatch, capsys, frames, journal_lines, now, extra=(),
     write, or raw text; by default there is none, so no test here reads the
     repository's own ``logs/account.jsonl``. ``funds`` is the funds run's
     document, for each look's after-tax record (section 5c); by default there
-    is none, so no test here reads the repository's own ``logs/funds.json``."""
+    is none, so no test here reads the repository's own ``logs/funds.json``.
+    ``previous_gate`` is last night's gate record, for the checkpoint
+    verdict's frozen tables: text, or a dict to write; by default there is
+    none, so no test here reads the repository's own ``logs/race_gate.json``."""
     journal = tmp_path / "signal_journal.log"
     journal.write_text("\n".join(json.dumps(l) for l in journal_lines) + "\n", encoding="utf-8")
     record = tmp_path / "account.jsonl"
@@ -327,7 +330,13 @@ def _race(tmp_path, monkeypatch, capsys, frames, journal_lines, now, extra=(),
         funds_record.unlink(missing_ok=True)
     else:
         funds_record.write_text(json.dumps(funds), encoding="utf-8")
-    extra = ("--account", str(record), "--funds", str(funds_record), *extra)
+    gate_record = tmp_path / "race_gate.json"
+    if previous_gate is None:
+        gate_record.unlink(missing_ok=True)
+    else:
+        gate_record.write_text(previous_gate if isinstance(previous_gate, str) else json.dumps(previous_gate),
+                               encoding="utf-8")
+    extra = ("--account", str(record), "--funds", str(funds_record), "--previous-gate", str(gate_record), *extra)
     if cutoff is not None:
         monkeypatch.setattr(decision_gate, "DECISION_CUTOFF", cutoff)
         monkeypatch.setattr(decision_gate, "FAILURE_WATCH_START", cutoff)
@@ -1313,3 +1322,233 @@ def test_the_gate_json_says_whether_each_look_has_its_after_tax_record_and_vt_s_
 def test_a_looks_window_ends_at_the_close_of_its_last_trades():
     grid = [date(2026, 12, 17), date(2026, 12, 18)]
     assert horse_race.look_last_close(grid, 2, 3) == date(2026, 12, 22)
+
+
+# --- the checkpoint verdict (the owner's approval of 6 Oct 2026) ---------------------------------------------
+
+from analysis import verdict as checkpoint  # noqa: E402
+from tests.test_verdict import plan_inputs  # noqa: E402
+
+GATE_KEYS = ["generated_at", "status_line", "registered", "independent", "of", "trading_days", "decided", "outcome",
+             "outcome_text", "next", "looks", "downturn", "report_since", "conviction_groups", "sides", "run_timing",
+             "watch", "verdict"]
+FIRST_NIGHT, SECOND_NIGHT = date(2026, 12, 23), date(2026, 12, 24)
+
+
+def _view(*inputs_by_look, estimate=date(2027, 3, 22)):
+    """A gate view with looks 1, 2, ... reached on ``inputs_by_look`` (None: not reached)."""
+    inputs = {days: look for (days, _), look in zip(decision_gate.CHECKPOINTS, inputs_by_look)}
+    looks = tuple(decision_gate.evaluate(inputs))
+    reached = [look for look in looks if look.reached]
+    return horse_race.GateView(registered=True, mismatches=(), window_lines=60, window_cycle_days=60,
+                               unanswered_in_window=0, entry_days=60 * max(1, len(reached)),
+                               independent=reached[-1].independent if reached else 0, looks=looks,
+                               next_estimate=estimate)
+
+
+def test_the_gate_json_ends_with_the_verdict_just_before_the_price_hash():
+    out = horse_race.gate_json(_view(), 3, STAMP)
+    assert list(out) == GATE_KEYS
+    json.dumps(out, allow_nan=False)
+
+
+def test_before_the_first_look_the_verdict_is_no_decision_yet_in_the_json_and_the_text():
+    view = _view()
+    assert horse_race.gate_json(view, 3, STAMP)["verdict"] == {"text": "no decision yet"}
+    race = horse_race.race_verdict(view, None, FIRST_NIGHT)
+    assert race.data == {"text": "no decision yet"}
+    assert horse_race.checkpoint_lines(race) == ["CHECKPOINT VERDICT", "", "no decision yet"]
+
+
+def test_a_complete_look_is_frozen_on_its_first_night_and_carried_after():
+    first = horse_race.race_verdict(_view(plan_inputs()), None, FIRST_NIGHT)
+    (entry,) = first.data["looks"]
+    assert entry["look"] == 1 and entry["made_on"] == "2026-12-23" and entry["window_end"] == "2026-12-22"
+    assert entry["table"]["complete"] is True and entry["table"]["status"] == checkpoint.DECIDED
+    assert first.data["text"] == "EARLY STOP AT 20: REPLACE THE MODEL WITH MOMENTUM — NOT TESTED IN A DOWNTURN"
+    assert first.data["decided_at"] == 1
+    # The next night reads the same look again: the table is carried from last night's record, unchanged.
+    previous = json.loads(json.dumps({"verdict": first.data}))
+    second = horse_race.race_verdict(_view(plan_inputs()), previous, SECOND_NIGHT)
+    assert second.data == previous["verdict"] and second.notes == ()
+
+
+def test_tonight_reading_a_frozen_look_differently_is_noted_and_the_frozen_table_stays():
+    first = horse_race.race_verdict(_view(plan_inputs()), None, FIRST_NIGHT)
+    previous = json.loads(json.dumps({"verdict": first.data}))
+    moved = plan_inputs(t_model_momentum=-1.0)                      # no early stop tonight
+    second = horse_race.race_verdict(_view(moved), previous, SECOND_NIGHT)
+    (entry,) = second.data["looks"]
+    assert entry["table"] == previous["verdict"]["looks"][0]["table"]
+    assert entry["made_on"] == "2026-12-23"
+    assert entry["differs_tonight"].startswith("NO DECISION AT THIS LOOK — read again at checkpoint 2")
+    assert second.notes == ("Note: tonight's data reads checkpoint 1 differently: " + entry["differs_tonight"],)
+    assert second.data["decided_at"] == 1
+    lines = horse_race.checkpoint_lines(second)
+    assert lines[-1] == second.notes[0]
+    # The night after that reads it as the table does again: the note goes.
+    third = horse_race.race_verdict(_view(plan_inputs()), json.loads(json.dumps({"verdict": second.data})),
+                                    SECOND_NIGHT + timedelta(days=1))
+    assert "differs_tonight" not in third.data["looks"][0] and third.notes == ()
+
+
+def test_a_moved_window_makes_the_table_again_and_keeps_the_old_one_inside():
+    first = horse_race.race_verdict(_view(plan_inputs()), None, FIRST_NIGHT)
+    previous = json.loads(json.dumps({"verdict": first.data}))
+    fixed = plan_inputs(window_end=date(2026, 12, 23))
+    second = horse_race.race_verdict(_view(fixed), previous, SECOND_NIGHT)
+    (entry,) = second.data["looks"]
+    assert entry["window_end"] == "2026-12-23" and entry["made_on"] == "2026-12-24"
+    assert entry["superseded"] == previous["verdict"]["looks"][0]
+    assert "2026-09-23 to 2026-12-23" in entry["table"]["title"]
+
+
+def test_a_look_waiting_for_its_after_tax_record_is_recomputed_nightly_and_never_frozen():
+    waiting = plan_inputs(after_tax=None)
+    first = horse_race.race_verdict(_view(waiting), None, FIRST_NIGHT)
+    (entry,) = first.data["looks"]
+    assert entry["table"]["complete"] is False and entry["table"]["status"] == checkpoint.STATUS_WAITING
+    assert first.data["text"] == "no decision yet" and first.data["decided_at"] is None
+    assert [t.status for t in first.shown] == [checkpoint.STATUS_WAITING]
+    previous = json.loads(json.dumps({"verdict": first.data}))
+    second = horse_race.race_verdict(_view(waiting), previous, SECOND_NIGHT)
+    assert second.data["looks"][0]["made_on"] == "2026-12-24"            # made again, shown again
+    assert len(second.shown) == 1
+    # The night the record arrives, the table is complete and frozen from then on.
+    third = horse_race.race_verdict(_view(plan_inputs()), json.loads(json.dumps({"verdict": second.data})),
+                                    SECOND_NIGHT + timedelta(days=1))
+    assert third.data["looks"][0]["table"]["complete"] is True and third.data["decided_at"] == 1
+
+
+def test_an_unreadable_look_waits_on_every_row_and_is_not_frozen():
+    unreadable = replace(plan_inputs(), unreadable="no final prices through 2026-12-22 for 1 ticker(s): XOM")
+    race = horse_race.race_verdict(_view(unreadable), None, FIRST_NIGHT)
+    table = race.shown[0]
+    assert table.status == checkpoint.UNREADABLE and not table.complete
+    assert table.verdict == "NOT READABLE TONIGHT: no final prices through 2026-12-22 for 1 ticker(s): XOM"
+    assert all(r.result == checkpoint.WAITING for r in table.rows if r.n != checkpoint.VERDICT_ROW)
+
+
+def test_the_text_block_in_its_three_states():
+    """Before the first look; the night a look's table is first made, and while a reached look is incomplete;
+    between looks after one that decided nothing (only "no decision yet"); and, once decided, the deciding
+    look's frozen table every night."""
+    nothing = plan_inputs(t_model_momentum=-1.0)
+    made = horse_race.race_verdict(_view(nothing), None, FIRST_NIGHT)
+    lines = horse_race.checkpoint_lines(made)
+    assert lines[:3] == ["CHECKPOINT VERDICT", "", made.shown[0].title]
+    assert lines[-1] == ("- → · Race verdict ·  ·  ·  · NO DECISION AT THIS LOOK — read again at checkpoint 2 "
+                         "(about 2027-03-22; bar 2.45)")
+    between = horse_race.race_verdict(_view(nothing), json.loads(json.dumps({"verdict": made.data})), SECOND_NIGHT)
+    assert horse_race.checkpoint_lines(between) == ["CHECKPOINT VERDICT", "", "no decision yet"]
+    assert between.data["looks"] == made.data["looks"]                   # frozen, kept in the JSON
+    decided = horse_race.race_verdict(_view(plan_inputs()), None, FIRST_NIGHT)
+    later = horse_race.race_verdict(_view(plan_inputs()), json.loads(json.dumps({"verdict": decided.data})),
+                                    date(2027, 1, 30))
+    assert horse_race.checkpoint_lines(later) == ["CHECKPOINT VERDICT", "", *checkpoint.render(decided.shown[0])]
+
+
+def test_after_the_deciding_look_a_later_look_is_for_reading_only_and_the_block_keeps_the_decision():
+    decided = horse_race.race_verdict(_view(plan_inputs()), None, FIRST_NIGHT)
+    second = plan_inputs(window_end=date(2027, 3, 22))
+    later = horse_race.race_verdict(_view(plan_inputs(), second), json.loads(json.dumps({"verdict": decided.data})),
+                                    date(2027, 3, 23))
+    one, two = later.data["looks"]
+    assert one == decided.data["looks"][0]
+    assert two["table"]["verdict"] == "FOR READING ONLY" and two["table"]["status"] == checkpoint.READING_ONLY
+    assert later.data["decided_at"] == 1 and later.shown == decided.shown
+
+
+def test_a_damaged_previous_record_starts_fresh():
+    for previous in (None, {}, {"verdict": "x"}, {"verdict": {"looks": ["junk", {"look": 9}, {"look": 1}]}},
+                     {"verdict": {"looks": [{"look": 1, "table": {"kind": "race"}}]}}):
+        race = horse_race.race_verdict(_view(plan_inputs()), previous, FIRST_NIGHT)
+        assert race.data["looks"][0]["made_on"] == "2026-12-23"
+
+
+def test_the_crafted_race_shows_its_verdict_table_and_the_reports_do_not_move_it():
+    """The crafted 60-day race of ``test_the_reports_move_no_look_bar_or_verdict``: the verdict table says what
+    the gate says, row for row, with and without the reports."""
+    days = [date(2026, 10, 1) + timedelta(days=i) for i in range(60)]
+    noise = lambda i: 0.001 * ((i * 7) % 5 - 2)
+    stamp = lambda d: datetime.combine(d, datetime.min.time(), tzinfo=timezone.utc)
+    make = lambda arm, r, d, conviction, side: scored(r, arm=arm, entry=d.isoformat(), ticker=f"T{d.toordinal()}",
+                                                      stamp=stamp(d), conviction=conviction, side=side)
+    results = [
+        _arm(MODEL_ARM, [make(MODEL_ARM, -0.02 + noise(i), d, 0.3 + 0.01 * (i % 40), "buy" if i % 3 else "sell")
+                         for i, d in enumerate(days)]),
+        _arm(momentum.NAME, [make(momentum.NAME, 0.02 + noise(i + 1), d, 0.5, "buy") for i, d in enumerate(days)]),
+        _arm(hybrid.NAME, [make(hybrid.NAME, noise(i + 2), d, 0.55, "buy") for i, d in enumerate(days)]),
+        _arm(control.NAME, []),
+    ]
+    raw = horse_race.look_inputs(results, {}, days, {d: 0.0 for d in days}, 60, 3, 10)
+    record = decision_gate.AfterTax(decision_gate.AFTER_TAX_READY, {momentum.NAME: 9.0},
+                                    window=(date(2026, 9, 29), date(2026, 12, 2)), lag=5)
+    look = replace(raw, after_tax=record, window_end=date(2026, 12, 2), vt_max_drawdown=0.041)
+    view = _view(look)
+    plain = horse_race.gate_json(view, 3, STAMP)
+    reported = horse_race.gate_json(view, 3, STAMP, splits=horse_race.trade_splits(results))
+    assert reported["verdict"] == plain["verdict"]
+    table = checkpoint.table_from_json(plain["verdict"]["looks"][0]["table"])
+    assert plain["verdict"]["text"] == table.verdict == (
+        "EARLY STOP AT 20: REPLACE THE MODEL WITH MOMENTUM — NOT TESTED IN A DOWNTURN")
+    assert plain["outcome"] == momentum.NAME and table.outcome == momentum.NAME
+    rows = {r.n: r for r in table.rows}
+    assert rows["4"].result == "NOT KEPT" and rows["6"].result == "PASS: momentum is the candidate"
+    assert rows["7"].result == "PASS: beats VT" and rows["8"].result == "PASS"
+    assert rows["8"].measured.endswith("Newey-West t, lag 5, 2026-09-29 to 2026-12-02")
+    assert rows["9"].value == "4.1%"
+    assert table.title.startswith("Race, checkpoint 1 of 3: 20 independent days (60 entry days), window "
+                                  "2026-09-23 to 2026-12-02, bar t > 3.47. Readable tonight: yes.")
+
+
+def test_the_after_tax_reader_keeps_each_records_days_and_lag(tmp_path):
+    record = tmp_path / "funds.json"
+    tests = {arm: {"t": t, "from": "2026-09-29", "through": "2026-12-22", "lag": 5}
+             for arm, t in (("model", 3.6), ("momentum", -1.0), ("hybrid", None))}
+    record.write_text(json.dumps({"after_tax": {"looks": [
+        {"look": 1, "status": "ready", "window_end": "2026-12-22", "lag": 5, "tests": tests},
+        {"look": 2, "status": "ready", "window_end": "2027-03-22",
+         "tests": {"model": {"t": 1.0, "from": "2026-09-29", "through": "2027-03-22", "lag": 5},
+                   "momentum": {"t": 1.0, "from": "2026-09-30", "through": "2027-03-22", "lag": 5}}},
+        {"look": 3, "status": "unavailable", "lag": 5, "reason": "calibration had not passed"},
+    ]}}))
+    records = horse_race.after_tax_records(record)
+    assert records[1].window == (date(2026, 9, 29), date(2026, 12, 22)) and records[1].lag == 5
+    assert records[1].t_vs_index == {"model": 3.6, "momentum": -1.0, "hybrid": None}
+    assert records[2].window is None and records[2].lag == 5       # the tests' days differ; their lag is one
+    assert records[3].window is None and records[3].lag == 5 and records[3].status == "unavailable"
+    # decide() never reads them.
+    bare = replace(records[1], window=None, lag=None)
+    inputs = plan_inputs(after_tax=records[1])
+    assert decision_gate.decide(inputs, 3.47, False) == decision_gate.decide(replace(inputs, after_tax=bare), 3.47,
+                                                                             False)
+
+
+def test_the_race_writes_its_tables_only_through_the_real_writers(monkeypatch):
+    """Guard 2 of the owner's Addition 2: a test-data table reaching the gate JSON or the report is refused."""
+    real = checkpoint.race_table
+    monkeypatch.setattr(checkpoint, "race_table", lambda *a, **k: replace(real(*a, **k), test_data=True))
+    with pytest.raises(ValueError, match="TEST DATA"):
+        horse_race.race_verdict(_view(plan_inputs()), None, FIRST_NIGHT)
+    with pytest.raises(ValueError, match="TEST DATA"):
+        horse_race.gate_json(_view(plan_inputs()), 3, STAMP)
+    marked = replace(real(decision_gate.evaluate({20: plan_inputs()})[0], 1), test_data=True)
+    with pytest.raises(ValueError, match="TEST DATA"):
+        horse_race.checkpoint_lines(horse_race.RaceVerdict({"text": "x"}, (marked,)))
+
+
+def test_the_report_prints_the_block_after_the_gate_and_before_the_model_watch(tmp_path, monkeypatch, capsys):
+    warm = _warm_frame()
+    stamp = _at(warm.index[MIN_WARMUP_BARS].date())
+    now = datetime.combine(warm.index[-1].date(), datetime.min.time(), tzinfo=timezone.utc) + timedelta(days=1)
+    code, out = _race(tmp_path, monkeypatch, capsys, {"NVDA": warm}, [_journal_line("NVDA", stamp)], now,
+                      previous_gate="{not json")
+    assert code == 0
+    assert out.index("DECISION GATE") < out.index("CHECKPOINT VERDICT\n\nno decision yet\n") < out.index("MODEL WATCH")
+    code, raw = _race(tmp_path, monkeypatch, capsys, {"NVDA": warm}, [_journal_line("NVDA", stamp)], now,
+                      extra=("--gate-json",), previous_gate={"verdict": {"looks": "junk"}})
+    data = json.loads(raw)
+    assert list(data) == GATE_KEYS and data["verdict"] == {"text": "no decision yet"}
+    assert horse_race.PREVIOUS_GATE.name == "race_gate.json"
+    assert horse_race.build_parser().parse_args([]).previous_gate == horse_race.PREVIOUS_GATE

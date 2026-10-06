@@ -70,7 +70,18 @@ signal is made, never the price it is entered at, because every arm enters
 at the open of the next session after the signal's day
 (``tests/test_race_entry_timing.py``).
 
-The model watch follows the gate: the owner's triggers, where a trip means
+The checkpoint verdict follows the gate (the layout the owner approved on
+2026-10-06, ``docs/research/checkpoint-verdict-plan.md``): each reached
+look as a table, rows 1 to 9 and the verdict, made by ``analysis/verdict.py``
+from the gate's own decision. A look's table is made on the first night the
+look is reached, readable and complete, frozen in the gate JSON's
+``verdict`` and carried from last night's record (``--previous-gate``,
+default ``logs/race_gate.json``) every night after; the text prints it on
+that night, every night a reached look is incomplete, the deciding look's
+table every night once the race is decided, and otherwise only "no
+decision yet". Like the reports, nothing that decides reads it.
+
+The model watch follows the verdict: the owner's triggers, where a trip means
 stop and tell the owner and nothing reverts or trades. (a) is closed, (b)
 is retired (the owner's decision of 2026-09-26: the model is long-only, so
 it would only say SPY fell), (c) counts model errors from the journal, and
@@ -85,7 +96,7 @@ session is shown on its own line, and in the JSON as ``midday`` with a
 Nothing here is fitted. The momentum arm's parameters are the textbook
 values and this file never touches them; it judges the rule, it does not
 tune it. Read-only in every direction -- it reads the journal and the
-account record, fetches prices, and prints.
+account record and last night's gate record, fetches prices, and prints.
 """
 
 from __future__ import annotations
@@ -108,6 +119,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from analysis import decision_gate as gate  # noqa: E402
 from analysis import price_tape, run_timing  # noqa: E402
+from analysis import verdict as checkpoint  # noqa: E402
 from analysis.call_errors import MODEL as MODEL_ERROR  # noqa: E402
 from analysis.call_errors import SETUP as SETUP_ERROR  # noqa: E402
 from analysis.baseline_compare import (  # noqa: E402
@@ -210,6 +222,13 @@ ACCOUNT_LOG = cfg.LOG_DIR / "account.jsonl"
 #: the look's last close, and read back here.
 FUNDS_RECORD = cfg.LOG_DIR / "funds.json"
 
+#: The race's last gate record (``--gate-json``, committed nightly by the
+#: funds workflow): each look's checkpoint verdict table is made once, on the
+#: first night the look is reached, readable and complete, and carried from
+#: here unchanged every night after (the owner's approval of the verdict
+#: layout, 6 Oct 2026: "nothing is recomputed between looks").
+PREVIOUS_GATE = cfg.LOG_DIR / "race_gate.json"
+
 #: Alpaca stamps its daily portfolio history in the exchange's day.
 NEW_YORK = ZoneInfo("America/New_York")
 #: A history value is a close only once the session is over.
@@ -247,6 +266,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--funds", type=Path, default=FUNDS_RECORD,
                         help="the funds run's last document, for each look's after-tax test against the VT "
                              "fund (pre-registration section 5c; default: %(default)s)")
+    parser.add_argument("--previous-gate", type=Path, default=PREVIOUS_GATE,
+                        help="the race's last gate record, whose frozen checkpoint verdict tables are carried "
+                             "unchanged (default: %(default)s)")
     parser.add_argument("--gate-json", action="store_true",
                         help="print only the decision gate, as JSON (for the dashboard), and stop")
     parser.add_argument("--with-prices", action="store_true",
@@ -834,6 +856,13 @@ def after_tax_records(path: Optional[Path]) -> dict[int, gate.AfterTax]:
     night. A look with no record yet is absent:
     the gate waits for it. A record made without funds (calibration had not
     passed) reads as unavailable, and no arm can pass the test at that look.
+
+    Each record also keeps its test's own days, ``window`` = (from,
+    through), and its Newey-West ``lag``, for the checkpoint verdict's
+    after-tax row (row 8: "lag 5, 2026-09-29 to 2026-12-22"); ``decide``
+    never reads them. The window is the one every fund's test in the record
+    shares (they are all paired with the VT fund on the same days); None if
+    the tests disagree or an older record did not write it.
     """
     try:
         document = json.loads(Path(path).read_text(encoding="utf-8")) if path else None
@@ -852,11 +881,34 @@ def after_tax_records(path: Optional[Path]) -> dict[int, gate.AfterTax]:
         tests = record.get("tests") or {}
         if record.get("status") == gate.AFTER_TAX_READY and isinstance(tests, dict):
             ts = {name: (t.get("t") if isinstance(t, dict) else None) for name, t in tests.items()}
-            out[record["look"]] = gate.AfterTax(gate.AFTER_TAX_READY, ts, window_end=end)
+            out[record["look"]] = gate.AfterTax(gate.AFTER_TAX_READY, ts, window_end=end,
+                                                window=_test_window(tests), lag=_record_lag(record, tests))
         else:
             out[record["look"]] = gate.AfterTax(gate.AFTER_TAX_UNAVAILABLE, {},
-                                                str(record.get("reason") or "no fund was run"), window_end=end)
+                                                str(record.get("reason") or "no fund was run"), window_end=end,
+                                                lag=_record_lag(record, {}))
     return out
+
+
+def _test_window(tests: dict) -> Optional[tuple[date, date]]:
+    """The (from, through) every test of an after-tax record shares; None if they differ or one is missing."""
+    windows = set()
+    for test in tests.values():
+        try:
+            windows.add((date.fromisoformat(test["from"]), date.fromisoformat(test["through"])))
+        except (KeyError, TypeError, ValueError):
+            return None
+    return windows.pop() if len(windows) == 1 else None
+
+
+def _record_lag(record: dict, tests: dict) -> Optional[int]:
+    """The record's Newey-West lag: its own ``lag``, else its tests' (one value), else None."""
+    lag = record.get("lag")
+    if isinstance(lag, int) and not isinstance(lag, bool):
+        return lag
+    lags = {t.get("lag") for t in tests.values() if isinstance(t, dict)}
+    found = lags.pop() if len(lags) == 1 else None
+    return found if isinstance(found, int) and not isinstance(found, bool) else None
 
 
 def total_return_closes(bars: Sequence[tuple[date, float, float, float]]) -> list[tuple[date, float]]:
@@ -958,7 +1010,7 @@ class GateView:
 def gate_json(
     view: GateView, horizon: int, now: datetime, splits: Optional[TradeSplits] = None,
     timings: Optional[Sequence[run_timing.DayTiming]] = None,
-    account: Optional[AccountWatch] = None,
+    account: Optional[AccountWatch] = None, verdict: Optional[dict] = None,
 ) -> dict:
     """The gate as data, for the dashboard's banner: the same numbers the header prints.
 
@@ -976,6 +1028,13 @@ def gate_json(
     account (``account_watch_json``). Computed from the account record and
     VT's closes after the gate has been evaluated, and read by nothing that
     decides; ``watch`` is ``null`` when not given.
+
+    ``verdict`` is the checkpoint verdict (``race_verdict(...).data``): each
+    reached look's table, frozen once complete, and the race's verdict text,
+    ``{"text": "no decision yet"}`` before any look. The last key, so it
+    lands just before ``prices_sha256``. Made from the looks after they were
+    evaluated; nothing that decides reads it. When not given it is made from
+    ``view`` alone, with no frozen table carried.
     """
     decided = gate.first_decision(view.looks)
     upcoming = None if decided else gate.next_look(view.looks)
@@ -1023,7 +1082,165 @@ def gate_json(
         "run_timing": (None if timings is None
                        else run_timing.timing_json(timings, cutoff=gate.DECISION_CUTOFF)),
         "watch": None if account is None else {"d": account_watch_json(account)},
+        "verdict": verdict if verdict is not None else race_verdict(view, None, now.date()).data,
     }
+
+
+# --------------------------------------------------------------------------- #
+# The checkpoint verdict (the owner's approval of 6 Oct 2026)
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True)
+class RaceVerdict:
+    """The race's checkpoint verdict tonight.
+
+    ``data`` is the gate JSON's ``verdict``; ``shown`` the tables the text
+    report prints tonight (``checkpoint_lines``); ``notes`` one line per
+    frozen look that tonight's data reads differently.
+    """
+
+    data: dict
+    shown: tuple[checkpoint.Table, ...] = ()
+    notes: tuple[str, ...] = ()
+
+
+def read_previous_gate(path: Optional[Path]) -> Optional[dict]:
+    """Last night's gate record, or None when it is missing or cannot be read (the verdict then starts fresh)."""
+    try:
+        value = json.loads(Path(path).read_text(encoding="utf-8")) if path else None
+    except (OSError, ValueError):
+        return None
+    return value if isinstance(value, dict) else None
+
+
+def frozen_looks(previous: Optional[dict]) -> dict[int, tuple[dict, checkpoint.Table]]:
+    """Each look's entry in last night's ``verdict``, with its table read back, by checkpoint number.
+
+    An entry that is not a dict, has no checkpoint number 1 to 3, or whose
+    table does not read (``verdict.table_from_json``) is left out: that look
+    is made again tonight, as if it had never been made.
+    """
+    part = previous.get("verdict") if isinstance(previous, dict) else None
+    entries = part.get("looks") if isinstance(part, dict) else None
+    out: dict[int, tuple[dict, checkpoint.Table]] = {}
+    for entry in entries if isinstance(entries, list) else []:
+        if not isinstance(entry, dict):
+            continue
+        number = entry.get("look")
+        if not isinstance(number, int) or isinstance(number, bool) or not 1 <= number <= len(gate.CHECKPOINTS):
+            continue
+        try:
+            table = checkpoint.table_from_json(entry.get("table"))
+        except ValueError:
+            continue
+        if table.kind == checkpoint.RACE and table.look == number:
+            out[number] = (entry, table)
+    return out
+
+
+def _next_look(view: GateView, number: int) -> Optional[tuple[int, date, float]]:
+    """``(checkpoint, estimated date, bar)`` of the look after ``number``; None after the final one.
+
+    The date is tonight's estimate when that look is the next one not
+    reached, else the planned day (the looks were planned for 2026-12-22,
+    2027-03-22 and 2027-06-16; ``verdict.LOOK_ESTIMATES``, the days the fund
+    test is read on). An estimate outside the experiment
+    (``verdict.EXPERIMENT_END``) is not printed: the planned day is.
+    """
+    if number >= len(gate.CHECKPOINTS):
+        return None
+    when = checkpoint.LOOK_ESTIMATES[number]
+    following = view.looks[number] if number < len(view.looks) else None
+    if (following is not None and following is gate.next_look(view.looks) and view.next_estimate is not None
+            and checkpoint.inside_experiment(view.next_estimate)):
+        when = view.next_estimate
+    return number + 1, when, gate.CHECKPOINTS[number][1]
+
+
+def race_verdict(view: GateView, previous: Optional[dict], today: date) -> RaceVerdict:
+    """The race's checkpoint verdict tonight: one table per reached look, frozen once complete.
+
+    The plan (``docs/research/checkpoint-verdict-plan.md``, approved 6 Oct
+    2026; owner readings 1 and 2):
+
+    * A look's table (``verdict.race_table``) is made on the first night the
+      look is reached, readable and complete (no WAITING row), and carried
+      unchanged from last night's record (``previous``) every night after:
+      nothing is recomputed between looks. It is made again only if the
+      look's ``window_end`` changed (a bug fix moved the window), the old
+      entry kept inside the new one under ``superseded`` -- the after-tax
+      record's rule (section 5c).
+    * A look that is not complete (it waits for its after-tax record, or
+      cannot be read tonight) is recomputed every night and shown, never
+      frozen.
+    * If tonight's data decides a frozen look differently, the frozen table
+      stays and its entry says ``differs_tonight`` with tonight's verdict;
+      ``notes`` carries one line for the report.
+    * The race is decided at the first look whose table decided (an early
+      answer is final); a later look's table is for reading only.
+
+    Each look's decision is ``decide(inputs, bar, final)`` -- the gate's own,
+    unchanged -- recomputed per look, so a table never depends on another
+    look's words. Before any look: ``{"text": "no decision yet"}``.
+    """
+    reached = [(number, look) for number, look in enumerate(view.looks, start=1) if look.inputs is not None]
+    if not reached:
+        return RaceVerdict({"text": checkpoint.NO_DECISION_YET})
+    frozen = frozen_looks(previous)
+    entries: list[dict] = []
+    shown: list[checkpoint.Table] = []
+    notes: list[str] = []
+    decided: Optional[tuple[int, checkpoint.Table]] = None
+    for number, look in reached:
+        inputs = look.inputs
+        fresh = gate.Look(look.independent, look.bar, look.final, inputs,
+                          *gate.decide(inputs, look.bar, look.final))
+        tonight = checkpoint.race_table(fresh, number, window_start=gate.DECISION_CUTOFF,
+                                        next_look=_next_look(view, number),
+                                        decided_at=decided[0] if decided else None)
+        end = inputs.window_end.isoformat() if inputs.window_end is not None else None
+        old, old_table = frozen.get(number, (None, None))
+        if old is not None and old_table.complete and old.get("window_end") == end:
+            entry = {k: v for k, v in old.items() if k != "differs_tonight"}
+            table = old_table
+            if tonight.complete and tonight.status != checkpoint.UNREADABLE and (
+                    tonight.status, tonight.outcome) != (old_table.status, old_table.outcome):
+                entry["differs_tonight"] = tonight.verdict
+                notes.append(f"Note: tonight's data reads checkpoint {number} differently: {tonight.verdict}")
+        else:
+            entry = {"look": number, "made_on": today.isoformat(), "window_end": end,
+                     "table": checkpoint.table_json(tonight)}
+            if old is not None and old_table.complete:
+                entry["superseded"] = {k: v for k, v in old.items() if k != "differs_tonight"}
+            elif old is not None and old.get("superseded") is not None:
+                entry["superseded"] = old["superseded"]
+            table = tonight
+        entries.append(entry)
+        if decided is None and table.decided:
+            decided = (number, table)
+        if entry.get("made_on") == today.isoformat() or not table.complete:
+            shown.append(table)
+    if decided is not None:
+        shown = [decided[1]]
+    data = {"text": decided[1].verdict if decided else checkpoint.NO_DECISION_YET,
+            "decided_at": decided[0] if decided else None, "looks": entries}
+    return RaceVerdict(data, tuple(shown), tuple(notes))
+
+
+def checkpoint_lines(race: RaceVerdict) -> list[str]:
+    """The report's CHECKPOINT VERDICT block (the plan's (iv)).
+
+    The deciding look's frozen table once the race is decided, every night;
+    otherwise the tables made tonight and every reached look that is not
+    complete; with none, only "no decision yet" (before the first look, and
+    between looks after one that decided nothing). Then the notes. A real
+    output: ``verdict.block`` refuses a test-data table.
+    """
+    lines = checkpoint.block(race.shown)
+    if race.notes:
+        lines += ["", *race.notes]
+    return lines
 
 
 def watch_days(entries: Sequence[JournalEntry]) -> list[gate.WatchDay]:
@@ -1483,8 +1700,15 @@ def main(argv: list[str] | None = None) -> int:
     vt_close = {day: price for day, price in
                 basket.closes(gate.INDEX_TICKER, min(earliest, gate.DRAWDOWN_START), today).bars}
     account = account_watch(read_account(args.account or ACCOUNT_LOG), vt_close)
+    # The checkpoint verdict: each reached look as a table, frozen once
+    # complete and carried from last night's gate record. Made from the looks
+    # already evaluated; nothing that decides reads it.
+    verdict = race_verdict(view, read_previous_gate(args.previous_gate), today)
     if args.gate_json:
-        out = gate_json(view, args.horizon, now, splits=splits, timings=timings, account=account)
+        for note in verdict.notes:
+            print(note, file=sys.stderr)
+        out = gate_json(view, args.horizon, now, splits=splits, timings=timings, account=account,
+                        verdict=verdict.data)
         tape = None
         if args.with_prices:
             # Read from the sources after everything above has run, so it is
@@ -1536,6 +1760,7 @@ def main(argv: list[str] | None = None) -> int:
         watched=days, account=account,
         spend=llm_spend(in_window), spend_whole=llm_spend(read.entries),
         warnings=window_warnings(read.entries), splits=splits, timings=timings,
+        checkpoint_block=checkpoint_lines(verdict),
     ))
     if args.with_prices:
         tape = price_tape.tape(
@@ -1745,7 +1970,7 @@ def render(
     spend: Optional[Spend] = None, spend_whole: Optional[Spend] = None,
     warnings: Sequence[str] = (), splits: Optional[TradeSplits] = None,
     timings: Optional[Sequence[run_timing.DayTiming]] = None,
-    account: Optional[AccountWatch] = None,
+    account: Optional[AccountWatch] = None, checkpoint_block: Optional[Sequence[str]] = None,
 ) -> str:
     held = sum(1 for e in read.entries if e.held)
     no_stamp = sum(1 for e in read.entries if not e.held and e.timestamp is None)
@@ -1755,6 +1980,10 @@ def render(
     ]
     if gate_view is not None:
         out += _render_gate(gate_view, horizon)
+        # The checkpoint verdict, right after the gate (the plan's (iv)); made
+        # from the view alone, with nothing frozen carried, when not given.
+        out += ["", *(checkpoint_block if checkpoint_block is not None
+                      else checkpoint_lines(race_verdict(gate_view, None, now.date())))]
     out += _render_watch(trips or {}, watch_counts, watched, account)
     if spend is not None:
         out += _render_spend(spend, spend_whole)

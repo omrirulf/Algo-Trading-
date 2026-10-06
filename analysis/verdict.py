@@ -132,6 +132,11 @@ FUND_TEST_PAIRS: Final[tuple[tuple[str, str], ...]] = (
     ("model", "momentum"), ("model", "hybrid"), ("hybrid", "momentum"),
     ("model", "vt"), ("momentum", "vt"), ("hybrid", "vt"),
 )
+#: The planned day of each look, 1 to 3 (the race's estimates when the bars
+#: were registered; the fund test is read on the race's look days, 11.7):
+#: what "read again at checkpoint 2 (about ...)" prints when tonight has no
+#: estimate of its own.
+LOOK_ESTIMATES: Final[tuple[date, ...]] = schedule.FUND_TEST_LOOK_ESTIMATES
 #: The fund test's planned final sample, in fund sessions (section 11.7).
 FUND_PLANNED_SESSIONS: Final[int] = schedule.FUND_TEST_PLANNED_SESSIONS[-1]
 #: A fund-test look record's status: read, skipped (calibration had not
@@ -331,9 +336,21 @@ def check_dates(*days: Optional[DateLike], test_data: bool = False) -> None:
         if day is None:
             continue
         value = as_date(day)
-        if not EXPERIMENT_START <= value <= EXPERIMENT_END:
-            raise ValueError(f"{value.isoformat()} is outside the experiment ({EXPERIMENT_START.isoformat()} to "
-                             f"{EXPERIMENT_END.isoformat()}): a real verdict cannot hold it")
+        if not inside_experiment(value):
+            raise ValueError(f"{value.isoformat()} is outside the experiment ({gate.DECISION_CUTOFF.isoformat()} "
+                             f"to {EXPERIMENT_END.isoformat()}): a real verdict cannot hold it")
+
+
+def inside_experiment(day: DateLike) -> bool:
+    """Whether ``day`` is inside the experiment: from the decision window's opening to ``EXPERIMENT_END``.
+
+    The opening is read from ``decision_gate.DECISION_CUTOFF`` when asked
+    (it is ``EXPERIMENT_START`` unless a test moves the window), so a race
+    run on an older journal with the window moved back can still print its
+    tables; the 2099 examples are refused either way.
+    """
+    value = as_date(day)
+    return gate.DECISION_CUTOFF <= value <= EXPERIMENT_END
 
 
 def _minus(text: str) -> str:
@@ -1004,6 +1021,7 @@ __all__ = [
     "KEPT",
     "LABEL",
     "LOOKS",
+    "LOOK_ESTIMATES",
     "MINUS",
     "MONEY_NOTE",
     "NA",
@@ -1040,6 +1058,7 @@ __all__ = [
     "fund_inputs",
     "fund_pair",
     "fund_test_table",
+    "inside_experiment",
     "planned_fund_bars",
     "race_table",
     "render",
