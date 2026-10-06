@@ -635,11 +635,11 @@ THESIS_STEPS = [
 ]
 
 
-def test_the_thesis_job_runs_after_the_vote():
+def test_the_thesis_job_runs_last_after_the_universe():
     jobs = _workflow()["jobs"]
     job = jobs["thesis"]
-    assert job["needs"] == "vote"
-    # After the vote's job whether it passed or failed, never after a cancel: a cancel stops the spending.
+    assert job["needs"] == "score"
+    # After the universe's job whether it passed or failed, never after a cancel: a cancel stops the spending.
     assert job["if"] == "${{ !cancelled() && github.event_name != 'pull_request' && !inputs.verify }}"
     assert job["permissions"] == {"contents": "write"}
     assert [s.get("name") for s in job["steps"] if s.get("name")] == ["Install dependencies", *THESIS_STEPS]

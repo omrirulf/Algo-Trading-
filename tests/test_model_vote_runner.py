@@ -1034,13 +1034,17 @@ VOTE_STEPS = [
 ]
 
 
-def test_the_vote_job_runs_after_the_universe_and_only_where_the_universe_may():
+def test_the_vote_job_runs_first_and_the_universe_after_it():
+    """The owner's order of 6 Oct 2026: production, then the vote, then the universe."""
     jobs = _workflow()["jobs"]
     job = jobs["vote"]
-    assert job["needs"] == "score"
-    # After the universe's job whether it passed or failed, never after a cancel: a cancel stops the spending.
-    assert job["if"] == "${{ !cancelled() && github.event_name != 'pull_request' && !inputs.verify }}"
-    assert jobs["score"]["if"] == "${{ github.event_name != 'pull_request' && !inputs.verify }}"
+    assert "needs" not in job
+    assert job["if"] == "${{ github.event_name != 'pull_request' && !inputs.verify }}"
+    # The universe after the vote's job whether it passed or failed, never after a cancel:
+    # a cancel stops the spending.
+    assert jobs["score"]["needs"] == "vote"
+    assert jobs["score"]["if"] == "${{ !cancelled() && github.event_name != 'pull_request' && !inputs.verify }}"
+    assert list(jobs)[:3] == ["vote", "score", "thesis"]
     assert job["permissions"] == {"contents": "write", "actions": "read"}
     assert job["runs-on"] == "ubuntu-latest"
     names = [s.get("name") for s in job["steps"] if s.get("name")]

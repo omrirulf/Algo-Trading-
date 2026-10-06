@@ -14,6 +14,8 @@ Pure functions, standard library only:
   Sharpe ratio estimated from T returns when the true one is zero);
   DSR = Phi((SR - SR0) sqrt(T - 1) / sqrt(1 - skew SR + (kurt - 1)/4 SR^2)).
 * ``graveyard_n``: N, the number of trials in ``docs/research/graveyard.md``.
+* ``dsr_t_bar``: the bar N sets, as a t (the owner's request of 6 Oct 2026,
+  shown on the graveyard page).
 
 Nothing here decides anything: the numbers are read at the checkpoints and
 can change no rule (section 13).
@@ -106,6 +108,27 @@ def graveyard_n(path: Path = GRAVEYARD) -> int:
                if re.match(r"^\| \d+ \|", line))
 
 
+def dsr_t_bar(n_trials: int, t_days: int, skew: float = 0.0, kurt: float = 3.0) -> float:
+    """The smallest t = SR x sqrt(T) whose DSR is above ``DSR_LEVEL``, for N trials and T days.
+
+    Solved exactly from ``deflated_sharpe`` (bisection on SR), for a daily
+    series with the given skewness and kurtosis (by default a normal one).
+    For a long series it tends to ``Phi^-1(DSR_LEVEL)`` plus SR0 x sqrt(T).
+    """
+    lo, hi = 0.0, 1.0
+    while (deflated_sharpe({"sr": hi, "t_days": t_days, "skew": skew, "kurt": kurt}, n_trials) or 0.0) <= DSR_LEVEL:
+        lo, hi = hi, hi * 2
+        if hi > 1e6:
+            raise ValueError("no Sharpe ratio passes for these settings")
+    for _ in range(200):
+        mid = (lo + hi) / 2
+        if (deflated_sharpe({"sr": mid, "t_days": t_days, "skew": skew, "kurt": kurt}, n_trials) or 0.0) > DSR_LEVEL:
+            hi = mid
+        else:
+            lo = mid
+    return hi * math.sqrt(t_days)
+
+
 def checkpoint_table(tests: Sequence[dict], n_trials: int) -> list[dict]:
     """Every test of the family with its p-value, BH-adjusted p-value and DSR.
 
@@ -128,5 +151,5 @@ def checkpoint_table(tests: Sequence[dict], n_trials: int) -> list[dict]:
     return out
 
 
-__all__ = ["BH_LEVEL", "DSR_LEVEL", "bh_adjust", "checkpoint_table", "deflated_sharpe", "expected_max_sr",
-           "graveyard_n", "p_two_sided", "series_stats"]
+__all__ = ["BH_LEVEL", "DSR_LEVEL", "bh_adjust", "checkpoint_table", "deflated_sharpe", "dsr_t_bar",
+           "expected_max_sr", "graveyard_n", "p_two_sided", "series_stats"]

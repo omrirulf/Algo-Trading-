@@ -345,6 +345,22 @@ def test_p_values_and_the_deflated_sharpe_ratio():
     assert mt.series_stats([0.0, 0.0, 0.0]) is None
 
 
+def test_the_t_bar_is_where_the_dsr_crosses_its_level():
+    for n, t_days in ((18, 61), (43, 121), (43, 54), (2, 30)):
+        bar = mt.dsr_t_bar(n, t_days)
+        sr = bar / t_days ** 0.5
+        at = {"sr": sr * 1.0001, "t_days": t_days, "skew": 0.0, "kurt": 3.0}
+        below = {"sr": sr * 0.9999, "t_days": t_days, "skew": 0.0, "kurt": 3.0}
+        assert mt.deflated_sharpe(at, n) > mt.DSR_LEVEL > mt.deflated_sharpe(below, n)
+    # A long series: the 95% normal quantile plus the expected best of N null trials, in t (the owner's 3.5 and 3.9).
+    for n in (18, 43):
+        assert mt.dsr_t_bar(n, 10**8) == pytest.approx(1.6449 + mt.expected_max_sr(n, 10**8) * 10**4, abs=1e-3)
+    assert round(mt.dsr_t_bar(18, 10**8), 1) == 3.5 and round(mt.dsr_t_bar(43, 10**8), 1) == 3.9
+    # More trials, a higher bar; fat tails, a higher bar still.
+    assert mt.dsr_t_bar(44, 121) > mt.dsr_t_bar(43, 121) > mt.dsr_t_bar(18, 121)
+    assert mt.dsr_t_bar(43, 121, kurt=6.0) > mt.dsr_t_bar(43, 121)
+
+
 def test_n_is_the_graveyard_count_and_the_table_leaves_out_tests_with_no_data():
     # 18 ideas at registration, the 16 history screens logged on 2026-09-27 and 28 (they count in N too),
     # rows 35 to 41 of 2026-10-02 (the IC report's two universes, the stress screens, the regime split), and

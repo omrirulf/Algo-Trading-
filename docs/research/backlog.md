@@ -12,7 +12,7 @@ all three; the record of monthly changes is at the end.
 
 ## Rules for every idea
 
-### The limits (pre-registration, section 13.8; unchanged)
+### The limits (pre-registration, section 13.8)
 
 Section 13.8 says "new ideas"; the owner's reading of 2026-09-27 is that these
 are **live** ideas, and a history screen is not one.
@@ -21,9 +21,14 @@ are **live** ideas, and a history screen is not one.
   the first checkpoint (2026-12-22).**
 - **From 2027-01-01: at most 2 new live ideas per quarter, registered only
   at checkpoints** (the race's looks). History screens are not live ideas
-  and do not use these slots. The first quarter of 2027 is full: the IC test
-  and the vote, both registered at the 2026-12-22 checkpoint. The thesis
-  check is an idea of the second quarter of 2027.
+  and do not use these slots.
+- **An idea counts in the quarter it starts producing data** (the owner's
+  rule of 2026-10-06), not in the quarter of the checkpoint that registers
+  it. The IC test and the vote are both registered at the 2026-12-22
+  checkpoint: the IC test counts in the first quarter of 2027 (its second
+  universe starts on 2027-01-01), the vote in the fourth quarter of 2026
+  (it starts on 2026-12-22). The thesis check counts in the second quarter
+  of 2027 (registered on 2027-03-22, it starts on 2027-04-01).
 - Every idea tried, including one dropped before it runs and every history
   screen, gets a row in `graveyard.md`, and the count there is N for the
   Deflated Sharpe Ratio. So every idea added makes every other result a
@@ -48,7 +53,7 @@ possible (uses the AI)". Every one below is shadow-only: none trades.
 | --- | --- | --- | --- | --- |
 | IC report: do the model's scores rank the next session's returns? (the 80 production names) | **Built, switched off**: counters only until it is registered at the 2026-12-22 checkpoint (pre-registration section 13.9). The first new idea of the first quarter of 2027. | None: it reads the journal and the prices, and asks no model. | 35 | [card](cards/ic-model-scores.md) |
 | Shadow stock universe: the same IC test on 251 more names, scored every day by the same model | **Built, switched off until 2027-01-01** (`SHADOW_UNIVERSE_ENABLED`). The IC test's second universe: same card, same idea. | About $1.05 a day (the model about $0.65, the news searches about $0.40); cap $1.50 a day, phone alert at $1.20. | 36 | [card](cards/ic-model-scores.md) |
-| Voting arm `model_vote`: the production answer and four more calls of the same model on the same input; a side needs 3 of 5 votes | **Built, switched off until 2026-12-22** (`MODEL_VOTE_ENABLED`), registered at that checkpoint (section 13.11). The second new idea of the first quarter of 2027. A race arm and a fund against the model, one call, on the same lines. | About $0.70 a day; cap $1.00 a day, phone alert at $0.80. | 42 | [card](cards/model_vote.md) |
+| Voting arm `model_vote`: the production answer and four more calls of the same model on the same input; a side needs 3 of 5 votes | **Built, switched off until 2026-12-22** (`MODEL_VOTE_ENABLED`), registered at that checkpoint (section 13.11). An idea of the fourth quarter of 2026, when it starts producing data (first written as the second idea of the first quarter of 2027). A race arm and a fund against the model, one call, on the same lines. | About $0.70 a day; cap $1.00 a day, phone alert at $0.80. | 42 | [card](cards/model_vote.md) |
 | Thesis check: once a week, does the reason each held name was bought still hold? (VALID, WEAKENED or BROKEN) | **Built, switched off until 2027-04-01** (`THESIS_CHECK_ENABLED`), registered at the 2027-03-22 checkpoint as an idea of the second quarter of 2027 (section 13.12). Log only; BROKEN against VALID names described at the checkpoints after that. | About $0.06 a week; cap $0.10 a week. | 43 | [card](cards/thesis-check.md) |
 | A 1-to-5 ranking arm: the model ranks names instead of calling each one | **Deferred**: built only if the IC report shows the scores are too coarse (the owner's decision of 2026-10-02). Not registered. | Not estimated. | None (no card, no row) | |
 | A cross-model vote: different models vote on each line | **A later idea, not registered.** The wisdom-of-the-crowd result (12 different models) is about different models; `model_vote` (one model, five calls) does not test it. It would need its own card, row and registration. | Not estimated. | None (no card, no row) | |
@@ -118,3 +123,4 @@ The owner's next message fills this section.
 | 2026-09 | 28 Sep: the owner's decisions. The momentum quick test counts as three rows (held 3, 21 and 63 sessions), so N goes from 33 to 34; the quick tests of momentum, A and C stay counted; the survival rule above is approved; the owner's note on when the quick tests of A, B and C were run is under pre-registration section 13. |
 | 2026-10 | 2 Oct: the owner's instructions. Graveyard rows 35 to 41 (N from 34 to 41): the IC report of the model's scores on two universes (prepared; registered at the 2026-12-22 checkpoint; one idea against the quarterly limit, if the owner confirms), the stress-period history screens of momentum, A, B and C (descriptive; they use no live slot), and the regime split (descriptive). Not built, by the owner's decision: a 1-to-5 ranking arm (only if the IC report shows the scores are too coarse), an ILS fund, and any change of model, provider or broker. |
 | 2026-10 | 4 Oct: the owner's instructions. The backlog is now in three sections (AI ideas, trading rules, index-first reports); the AI ideas are listed with their status, cost and trial. Graveyard rows 42 and 43 (N from 41 to 43): the voting arm `model_vote` (built, switched off until 2026-12-22; registered at that checkpoint as the second idea of the first quarter of 2027) and the thesis check (built, switched off until 2027-04-01; an idea of the second quarter of 2027). A cross-model vote is a later idea, not registered; event tags and annual-report flags are dropped (too few events). |
+| 2026-10 | 6 Oct: the owner's decisions. The rule that an idea counts in the quarter it starts producing data (pre-registration section 13.8): the IC test counts in the first quarter of 2027 and the thesis check in the second, as before; the vote, which starts on 2026-12-22, counts in the fourth quarter of 2026 (its dates are unchanged). The daily order is now production, the vote, the universe, the thesis check. The graveyard page shows the bar N sets (t 3.92 at N = 43 against t 3.55 at N = 18, at the 2027-03-22 look). No idea added, dropped or changed. |

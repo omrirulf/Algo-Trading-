@@ -40,6 +40,46 @@ def test_the_checkpoints_read_n_from_every_numbered_row_history_screens_included
     assert [int(r[0]) for r in history] == list(range(19, 35)) + list(range(37, 41))
 
 
+def test_the_bar_n_sets_is_computed_exactly_and_names_today_s_n():
+    """The owner's request of 2026-10-06: the bar for N = 43 next to the bar for N = 18, computed exactly."""
+    import math
+
+    from analysis.multiple_tests import dsr_t_bar
+
+    text = (RESEARCH / "graveyard.md").read_text()
+    head, rows = None, []
+    for line in text.split("### The bar N sets", 1)[1].splitlines():
+        if line.startswith("| The look"):
+            head = [cell.strip() for cell in line.strip("|").split("|")]
+        elif head and line.startswith("| ") and not line.startswith("| ---"):
+            rows.append([cell.strip() for cell in line.strip("|").split("|")])
+        elif head and rows and not line.startswith("|"):
+            break
+    ns = [int(re.match(r"N = (\d+)", cell).group(1)) for cell in head[1:]]
+    assert ns == [18, 41, 43] and len(trials()) == 43 and head[-1] == "N = 43 (now)"
+    sessions = [int(re.search(r"T = (\d+)", row[0]).group(1)) if "T =" in row[0] else 10**8 for row in rows]
+    assert sessions == [61, 121, 181, 10**8]
+    from datetime import date, timedelta
+
+    from config.market_calendar import is_trading_day
+
+    def count(first: date, last: date) -> int:
+        return sum(is_trading_day(first + timedelta(days=i)) for i in range((last - first).days + 1))
+
+    for row, t_days in zip(rows[:3], sessions):
+        assert count(date(2026, 9, 28), date.fromisoformat(row[0][:10])) == t_days
+    assert count(date(2026, 12, 22), date(2027, 3, 22)) == 61 and count(date(2027, 1, 1), date(2027, 3, 22)) == 54
+    for row, t_days in zip(rows, sessions):
+        for cell, n in zip(row[1:], ns):
+            assert cell == f"t {dsr_t_bar(n, t_days):.2f}", (row[0], n)
+    # The lines under the table, recomputed.
+    assert f"t {dsr_t_bar(43, 121):.2f} is an\nannualised Sharpe ratio of about {dsr_t_bar(43, 121) / math.sqrt(121) * math.sqrt(252):.1f}" in text
+    assert f"(t {dsr_t_bar(18, 121):.2f}, N = 18: about {dsr_t_bar(18, 121) / math.sqrt(121) * math.sqrt(252):.1f})" in text
+    assert f"T = 61, t {dsr_t_bar(43, 61):.2f} at N = 43; the shadow universe, from 2027-01-01, T = 54,\nt {dsr_t_bar(43, 54):.2f})" in text
+    assert round(dsr_t_bar(43, 121) - dsr_t_bar(18, 121), 2) == 0.37
+    assert round(dsr_t_bar(44, 121) - dsr_t_bar(43, 121), 2) == 0.01
+
+
 def test_no_row_is_left_with_a_placeholder_and_every_real_code_screen_links_its_report():
     text = (RESEARCH / "graveyard.md").read_text()
     assert not re.search(r"\b(RESULT|DETAIL)_\d+\b", text)

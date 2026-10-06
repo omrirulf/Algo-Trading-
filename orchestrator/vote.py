@@ -31,9 +31,11 @@ lines go to ``logs/model_vote/``, one per production line, one file per UTC
 month. ``tests/test_model_vote_runner.py`` checks all of this by reading this
 file.
 
-Timing. The vote runs in the shadow-universe workflow, in a job after the
-universe's job, and only once the day's production run has finished. So it
-never runs at the same time as either of them, and the model provider is
+Timing. The vote runs in the shadow-universe workflow, in the run's first
+job, once the day's production run has finished; the universe's job waits
+for it (the owner's order of 6 Oct 2026: production, the vote, the
+universe, so a late day reaches the cut-off in the universe, not here). So
+it never runs at the same time as either of them, and the model provider is
 never asked by two of them at once. No new name is started from 23:15 UTC,
 so no line is dated the next day. A name, once started, gets its four calls.
 

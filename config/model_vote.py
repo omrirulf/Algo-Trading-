@@ -68,9 +68,11 @@ START: Final[date] = date(2026, 12, 22)
 #: The day this was prepared.
 PREPARED_ON: Final[date] = date(2026, 10, 4)
 
-#: The quarter whose limit of two new ideas it counts against (section 13.8),
-#: as the second idea, after the IC test.
-QUARTER: Final[str] = "2027-Q1"
+#: The quarter it counts in (section 13.8): the quarter it starts producing
+#: data, ``START`` (the owner's rule of 6 Oct 2026). First written as the
+#: second idea of the first quarter of 2027; by that rule it is an idea of the
+#: fourth quarter of 2026.
+QUARTER: Final[str] = "2026-Q4"
 
 #: Its row in ``docs/research/graveyard.md`` (one trial in N).
 TRIAL: Final[int] = 42

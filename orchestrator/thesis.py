@@ -28,8 +28,9 @@ asked again on a later day of the same week while it is still held, at most
 once a day. A name with a successful check this week is done, and so is a
 name with no entry record or one the week's cost cap stopped: each gets one
 line saying so, and waits for the next week. The job runs
-in the shadow-universe workflow after the vote, so the model provider is
-never asked by two of them at once, and starts no new name from 23:15 UTC.
+in the shadow-universe workflow last, after the vote and the universe, so the
+model provider is never asked by two of them at once, and starts no new name
+from 23:15 UTC.
 
 The cost cap. At most ``WEEKLY_COST_CAP_USD`` ($0.10) an ISO week, about
 $0.06 expected. Every HTTP ask counts (an ask with no price is charged the
