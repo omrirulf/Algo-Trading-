@@ -993,11 +993,17 @@ def _read_looks(records: Sequence[dict], before: int) -> list[tuple[float, float
 
 
 def _first_decision(records: Sequence[dict], before: int = 4) -> Optional[int]:
-    """The first checkpoint before ``before`` whose fund-test record decided; None if none did."""
+    """The first checkpoint before ``before`` whose fund-test record decided; None if none did.
+
+    Read from the record's table, as ``fund_test_verdict`` reads it, so the
+    two can never name different deciding looks.
+    """
+    from analysis import verdict
+
     for record in sorted(records, key=lambda r: r["look"]):
         if record["look"] >= before:
             break
-        if record.get("status") == "read" and (record.get("decision") or {}).get("outcome") is not None:
+        if record.get("status") == "read" and (record.get("table") or {}).get("status") == verdict.DECIDED:
             return record["look"]
     return None
 
@@ -1126,7 +1132,9 @@ def fund_test_part(now: datetime, race_gate: Optional[dict], records: list, pass
 
     A run with fewer coin-flip funds than the registered 1,000 (a run by
     hand; 11.1, 11.5) makes no read record and returns why, for
-    ``fund_test.note``; otherwise returns None.
+    ``fund_test.note``; so does a look whose close or making night is
+    outside the experiment (``verdict.EXPERIMENT_END``; owner Addition 2),
+    so the funds run still prints. Otherwise returns None.
     """
     from analysis import verdict
 
@@ -1143,10 +1151,14 @@ def fund_test_part(now: datetime, race_gate: Optional[dict], records: list, pass
         if entry.get("readable") is not True or not end_text:
             break                           # the race cannot read the look tonight: it waits, and so does this
         end = date.fromisoformat(end_text)
+        try:
+            verdict.check_dates(now.date(), end)
+        except ValueError as error:         # refused (owner Addition 2), and the document still prints
+            note = f"checkpoint {look}: no fund-test record was made: {error}"
+            break
         if not passed:
             if old is not None:
                 break
-            verdict.check_dates(now.date(), end)
             record = {"look": look, "made_on": now.date().isoformat(), "window_end": end_text,
                       "status": verdict.FUND_SKIPPED, "reason": verdict.FUND_SKIP_REASON}
             record["table"] = verdict.table_json(verdict.fund_test_table(record, read_before=_read_looks(records,
@@ -1176,8 +1188,12 @@ def carried_fund_looks(previous: Optional[dict]) -> list[dict]:
     """Last night's ``fund_test.looks``, carried unchanged (owner reading 2); a damaged record is left out.
 
     A record is kept only if it is a dict with a checkpoint number 1 to 3, a
-    known status, and -- for a read look -- the share and bar the spending
-    rule reads back. A record left out is made again, as if it never was.
+    known status, a table that reads back (``verdict.table_from_json``, a
+    fund-test table of the same checkpoint, as the race's ``frozen_looks``
+    asks), and -- for a read look -- the share and bar the spending rule
+    reads back and a table that says it decided exactly when its decision
+    has an outcome (a later look's "for reading only" table excepted). A
+    record left out is made again, as if it never was.
     """
     from analysis import verdict
 
@@ -1196,6 +1212,17 @@ def carried_fund_looks(previous: Optional[dict]) -> list[dict]:
         if status == verdict.FUND_READ and not all(
                 isinstance(record.get(k), (int, float)) and not isinstance(record.get(k), bool)
                 for k in ("share", "bar")):
+            continue
+        try:
+            table = verdict.table_from_json(record.get("table"))
+        except ValueError:
+            continue
+        if table.kind != verdict.FUND_TEST or table.look != look:
+            continue
+        decision = record.get("decision")
+        outcome = decision.get("outcome") if isinstance(decision, dict) else None
+        if status == verdict.FUND_READ and table.status != verdict.READING_ONLY and (
+                table.decided != (outcome is not None) or (table.decided and table.outcome != outcome)):
             continue
         seen.add(look)
         out.append(record)
@@ -1240,6 +1267,9 @@ def combined_verdict(race_gate: Optional[dict], records: Sequence[dict], fund_ve
     early answer is final, and section 9 only delays the money. The race's
     side is tonight's race gate (its ``verdict``); the fund test's is its
     records. Before any look of either: ``{"text": "no decision yet"}``.
+    While the race waits on a look it has reached but could not complete
+    tonight, the line names no later checkpoint: that look is read again
+    the next night.
     """
     from analysis import decision_gate as gate
     from analysis import verdict
@@ -1271,6 +1301,13 @@ def combined_verdict(race_gate: Optional[dict], records: Sequence[dict], fund_ve
     if isinstance(upcoming, dict) and upcoming.get("independent") in [d for d, _ in gate.CHECKPOINTS]:
         race_next = {"look": [d for d, _ in gate.CHECKPOINTS].index(upcoming["independent"]) + 1,
                      "estimated": inside(upcoming.get("estimated"))}
+    # A look reached but not complete (its after-tax record waits, or it cannot be read tonight) is
+    # read again the next night: the race waits for that checkpoint, not for the next one not reached.
+    pending = next((entry.get("look") for entry in race_part.get("looks") or []
+                    if isinstance(entry, dict) and isinstance(entry.get("table"), dict)
+                    and entry["table"].get("complete") is False), None)
+    if outcome is None and pending is not None:
+        race_next = {"look": pending, "estimated": None}
     race_look = max(reached) if reached else None
     race = {"decided_at": decided_at if outcome is not None else None, "outcome": outcome,
             "final_read": final_read, "skipped_all": False, "look": race_look,

@@ -1466,6 +1466,68 @@ def test_a_damaged_previous_record_starts_fresh():
         assert race.data["looks"][0]["made_on"] == "2026-12-23"
 
 
+def test_a_frozen_table_is_carried_on_a_night_tonight_reaches_no_look():
+    """A registered mismatch or fewer entry days leave tonight's view with no look reached: the table made
+    on an earlier night is carried unchanged, the race stays decided, and it is not made again later."""
+    first = horse_race.race_verdict(_view(plan_inputs()), None, FIRST_NIGHT)
+    previous = json.loads(json.dumps({"verdict": first.data}))
+    second = horse_race.race_verdict(_view(), previous, SECOND_NIGHT)
+    assert second.data == previous["verdict"] and second.notes == ()
+    assert horse_race.checkpoint_lines(second) == ["CHECKPOINT VERDICT", "", *checkpoint.render(first.shown[0])]
+    third = horse_race.race_verdict(_view(plan_inputs()), json.loads(json.dumps({"verdict": second.data})),
+                                    SECOND_NIGHT + timedelta(days=1))
+    assert third.data["looks"][0]["made_on"] == "2026-12-23" and third.data == previous["verdict"]
+
+
+@pytest.mark.parametrize("dd, tonight", [
+    (None, "EARLY STOP AT 20: REPLACE THE MODEL WITH MOMENTUM — DOWNTURN NOT MEASURED: the owner decides"),
+    (0.125, "EARLY STOP AT 20: REPLACE THE MODEL WITH MOMENTUM"),
+], ids=["downturn not measured tonight", "tested in a downturn tonight"])
+def test_other_words_tonight_for_a_frozen_decided_look_are_noted(dd, tonight):
+    """The same outcome with another downturn label is another verdict (owner reading 4): noted, not hidden."""
+    first = horse_race.race_verdict(_view(plan_inputs()), None, FIRST_NIGHT)
+    previous = json.loads(json.dumps({"verdict": first.data}))
+    second = horse_race.race_verdict(_view(plan_inputs(vt_max_drawdown=dd)), previous, SECOND_NIGHT)
+    (entry,) = second.data["looks"]
+    assert entry["table"] == previous["verdict"]["looks"][0]["table"]       # the frozen table stays
+    assert entry["differs_tonight"] == tonight
+    assert second.notes == (f"Note: tonight's data reads checkpoint 1 differently: {tonight}",)
+
+
+def test_a_reading_only_table_is_made_again_when_the_earlier_look_no_longer_decides():
+    """Look 1 decided and look 2 was frozen for reading only; a bug fix moves look 1's window and it decides
+    nothing: look 2's table is made again (the old one kept inside), and it decides, as the gate's own
+    ``first_decision`` says."""
+    second_look = plan_inputs(window_end=date(2027, 3, 22), entry_days=120)
+    first = horse_race.race_verdict(_view(plan_inputs()), None, FIRST_NIGHT)
+    both = horse_race.race_verdict(_view(plan_inputs(), second_look), json.loads(json.dumps({"verdict": first.data})),
+                                   date(2027, 3, 23))
+    assert both.data["looks"][1]["table"]["status"] == checkpoint.READING_ONLY
+    moved = plan_inputs(window_end=date(2026, 12, 21), t_model_momentum=-1.0)
+    view = _view(moved, second_look)
+    after = horse_race.race_verdict(view, json.loads(json.dumps({"verdict": both.data})), date(2027, 3, 24))
+    one, two = after.data["looks"]
+    assert two["table"]["status"] == checkpoint.DECIDED and two["made_on"] == "2027-03-24"
+    assert two["superseded"] == json.loads(json.dumps(both.data["looks"][1]))
+    assert after.data["decided_at"] == 2 and decision_gate.first_decision(view.looks).independent == 40
+    assert after.data["text"] == two["table"]["verdict"] and after.notes == ()
+
+
+def test_a_look_with_a_date_beyond_the_experiment_gets_a_note_and_the_gate_still_prints():
+    """The date guard of the owner's Addition 2 refuses the table, not the night: the other looks, the gate
+    JSON and the report are still made."""
+    first = plan_inputs(t_model_momentum=-1.0)
+    second = plan_inputs(t_model_momentum=-1.0, window_end=date(2027, 3, 22), entry_days=120)
+    late = plan_inputs(t_model_momentum=-1.0, window_end=date(2028, 1, 4), entry_days=180, index_days=180)
+    view = _view(first, second, late)
+    race = horse_race.race_verdict(view, None, date(2028, 1, 5))
+    assert [entry["look"] for entry in race.data["looks"]] == [1, 2]
+    assert race.notes == ("Note: checkpoint 3's table was not made tonight: 2028-01-04 is outside the experiment "
+                          "(2026-09-23 to 2027-12-31): a real verdict cannot hold it",)
+    assert horse_race.checkpoint_lines(race)[-1] == race.notes[0]
+    assert horse_race.gate_json(view, 3, STAMP)["verdict"]["looks"][1]["look"] == 2
+
+
 def test_the_crafted_race_shows_its_verdict_table_and_the_reports_do_not_move_it():
     """The crafted 60-day race of ``test_the_reports_move_no_look_bar_or_verdict``: the verdict table says what
     the gate says, row for row, with and without the reports."""

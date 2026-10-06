@@ -12,7 +12,9 @@ one of the ways an example could leak opens:
    report block, the funds run's records) written other than through them;
 3. an example's inputs that a real builder would build into a real table
    (every example date is in 2099, outside the experiment);
-4. a module outside ``tests/`` that imports the examples;
+4. a module outside ``tests/`` that imports the examples, or a workflow,
+   shell script, page or setting file outside ``tests/`` that names them
+   (it could run them into a step summary, a log or a page);
 5. a committed real output (``logs/``, ``dashboard/*.html``) that already
    holds "TEST DATA" or a 2099 date.
 """
@@ -174,9 +176,11 @@ def test_the_funds_runs_record_builder_refuses_the_examples_dates():
                       {"reached": False}, {"reached": False}]}
     from datetime import datetime, timezone
 
-    with pytest.raises(ValueError, match="outside the experiment"):
-        shadow_run.fund_test_part(datetime(2026, 12, 23, 23, tzinfo=timezone.utc), race, [], False, None, None, [],
-                                  {})
+    # The look is refused, not built: no record, and the note says why (the funds run still prints).
+    records: list = []
+    note = shadow_run.fund_test_part(datetime(2026, 12, 23, 23, tzinfo=timezone.utc), race, records, False, None,
+                                     None, [], {})
+    assert records == [] and "outside the experiment" in note
 
 
 def test_the_combined_line_refuses_the_examples_dates():
@@ -299,6 +303,27 @@ def test_no_module_outside_tests_imports_the_examples():
                 names = [node.value]
             if any("verdict_examples" in name for name in names):
                 bad.append(f"{path.relative_to(ROOT)}:{node.lineno}")
+    assert bad == []
+
+
+#: Files outside tests/ that can run a script into a real output: everything under .github/, and any
+#: shell script, workflow or setting file, page or script of the site wherever it is.
+RUNNERS = {".sh", ".bash", ".yml", ".yaml", ".html", ".js", ".mjs", ".toml", ".cfg", ".ini"}
+
+
+def test_no_workflow_script_or_page_outside_tests_names_the_examples():
+    """``python tests/verdict_examples.py >> "$GITHUB_STEP_SUMMARY"`` in a workflow would print the examples
+    into a real output without importing them: no such file outside ``tests/`` may name them at all."""
+    skip = {".git", "tests", "node_modules", ".venv", "venv", "__pycache__", ".pytest_cache"}
+    bad = []
+    for path in sorted(ROOT.rglob("*")):
+        parts = path.relative_to(ROOT).parts
+        if not path.is_file() or any(part in skip for part in parts):
+            continue
+        if parts[0] != ".github" and path.suffix not in RUNNERS and path.name not in ("Makefile", "Dockerfile"):
+            continue
+        if b"verdict_examples" in path.read_bytes():
+            bad.append(str(path.relative_to(ROOT)))
     assert bad == []
 
 

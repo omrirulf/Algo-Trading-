@@ -209,8 +209,12 @@ are made by `analysis/verdict.py`.
   (planned y): log it in the Amendments table.", and the owner's phone gets
   *⚠️ Fund test bar differs from the plan* on the night the record is made
   (sent by `scoring-prices` after the shadow funds run; see
-  [Phone notifications](/phone)). The race's bars are the fixed 3.47, 2.45
-  and 2.00 and cannot differ, so the race has no such alert.
+  [Phone notifications](/phone)). A re-run of that job does not send it
+  again. If that night's push fails (`main` cannot be fetched, or ntfy
+  refuses it), it is not sent again; the look's table title still ends
+  "Bar x (planned y): log it in the Amendments table." The race's bars are
+  the fixed 3.47, 2.45 and 2.00 and cannot differ, so the race has no such
+  alert.
 - **On the 4 Funds page**, a "Checkpoint verdict" card near the top shows
   each test's deciding look's table (else its latest look's) and the
   combined line; before any look it is one card, "Checkpoint verdict: no

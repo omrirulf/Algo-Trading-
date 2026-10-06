@@ -1174,55 +1174,82 @@ def race_verdict(view: GateView, previous: Optional[dict], today: date) -> RaceV
     * A look that is not complete (it waits for its after-tax record, or
       cannot be read tonight) is recomputed every night and shown, never
       frozen.
-    * If tonight's data decides a frozen look differently, the frozen table
-      stays and its entry says ``differs_tonight`` with tonight's verdict;
-      ``notes`` carries one line for the report.
+    * A frozen table is carried on a night tonight's view does not reach its
+      look at all (the registered settings differ, or fewer entry days): it
+      was made once and is not lost.
+    * A later look's table frozen "for reading only" is made again when no
+      earlier look decides tonight (that look was made again on a moved
+      window), and one frozen as deciding is made again when an earlier
+      look now decides: its words would no longer be true.
+    * If tonight's data decides a frozen look differently (another outcome,
+      or other words for a decided look, such as its downturn label), the
+      frozen table stays and its entry says ``differs_tonight`` with
+      tonight's verdict; ``notes`` carries one line for the report.
+    * A look whose dates the table builder refuses (outside the experiment,
+      ``verdict.EXPERIMENT_END``) gets no table tonight, only a note: the
+      gate and the report still print.
     * The race is decided at the first look whose table decided (an early
       answer is final); a later look's table is for reading only.
 
     Each look's decision is ``decide(inputs, bar, final)`` -- the gate's own,
     unchanged -- recomputed per look, so a table never depends on another
-    look's words. Before any look: ``{"text": "no decision yet"}``.
+    look's words. Before any look (and with no table, made or frozen):
+    ``{"text": "no decision yet"}``.
     """
-    reached = [(number, look) for number, look in enumerate(view.looks, start=1) if look.inputs is not None]
-    if not reached:
-        return RaceVerdict({"text": checkpoint.NO_DECISION_YET})
     frozen = frozen_looks(previous)
     entries: list[dict] = []
     shown: list[checkpoint.Table] = []
     notes: list[str] = []
     decided: Optional[tuple[int, checkpoint.Table]] = None
-    for number, look in reached:
+    for number, look in enumerate(view.looks, start=1):
         inputs = look.inputs
-        fresh = gate.Look(look.independent, look.bar, look.final, inputs,
-                          *gate.decide(inputs, look.bar, look.final))
-        tonight = checkpoint.race_table(fresh, number, window_start=gate.DECISION_CUTOFF,
-                                        next_look=_next_look(view, number),
-                                        decided_at=decided[0] if decided else None)
-        end = inputs.window_end.isoformat() if inputs.window_end is not None else None
         old, old_table = frozen.get(number, (None, None))
-        if old is not None and old_table.complete and old.get("window_end") == end:
+        tonight = None
+        if inputs is not None:
+            fresh = gate.Look(look.independent, look.bar, look.final, inputs,
+                              *gate.decide(inputs, look.bar, look.final))
+            try:
+                tonight = checkpoint.race_table(fresh, number, window_start=gate.DECISION_CUTOFF,
+                                                next_look=_next_look(view, number),
+                                                decided_at=decided[0] if decided else None)
+            except ValueError as error:     # a date outside the experiment: refused, and the gate still prints
+                notes.append(f"Note: checkpoint {number}'s table was not made tonight: {error}")
+        if tonight is None:
+            # Not reached tonight (or refused): a frozen table is carried unchanged, nothing recomputed.
+            if old is None or not old_table.complete:
+                continue
             entry = {k: v for k, v in old.items() if k != "differs_tonight"}
             table = old_table
-            if tonight.complete and tonight.status != checkpoint.UNREADABLE and (
-                    tonight.status, tonight.outcome) != (old_table.status, old_table.outcome):
-                # Through the real writer, as every table word that reaches an output.
-                words = checkpoint.table_json(tonight)["verdict"]
-                entry["differs_tonight"] = words
-                notes.append(f"Note: tonight's data reads checkpoint {number} differently: {words}")
         else:
-            entry = {"look": number, "made_on": today.isoformat(), "window_end": end,
-                     "table": checkpoint.table_json(tonight)}
-            if old is not None and old_table.complete:
-                entry["superseded"] = {k: v for k, v in old.items() if k != "differs_tonight"}
-            elif old is not None and old.get("superseded") is not None:
-                entry["superseded"] = old["superseded"]
-            table = tonight
+            end = inputs.window_end.isoformat() if inputs.window_end is not None else None
+            # Frozen only while it still reads as it was made: the same window, and for reading only
+            # exactly when an earlier look decides tonight (that look may have been made again).
+            if (old is not None and old_table.complete and old.get("window_end") == end
+                    and (old_table.status == checkpoint.READING_ONLY) == (decided is not None)):
+                entry = {k: v for k, v in old.items() if k != "differs_tonight"}
+                table = old_table
+                if tonight.complete and tonight.status != checkpoint.UNREADABLE and (
+                        (tonight.status, tonight.outcome) != (old_table.status, old_table.outcome)
+                        or (tonight.decided and tonight.verdict != old_table.verdict)):
+                    # Through the real writer, as every table word that reaches an output.
+                    words = checkpoint.table_json(tonight)["verdict"]
+                    entry["differs_tonight"] = words
+                    notes.append(f"Note: tonight's data reads checkpoint {number} differently: {words}")
+            else:
+                entry = {"look": number, "made_on": today.isoformat(), "window_end": end,
+                         "table": checkpoint.table_json(tonight)}
+                if old is not None and old_table.complete:
+                    entry["superseded"] = {k: v for k, v in old.items() if k != "differs_tonight"}
+                elif old is not None and old.get("superseded") is not None:
+                    entry["superseded"] = old["superseded"]
+                table = tonight
         entries.append(entry)
         if decided is None and table.decided:
             decided = (number, table)
         if entry.get("made_on") == today.isoformat() or not table.complete:
             shown.append(table)
+    if not entries:
+        return RaceVerdict({"text": checkpoint.NO_DECISION_YET}, notes=tuple(notes))
     if decided is not None:
         shown = [decided[1]]
     data = {"text": decided[1].verdict if decided else checkpoint.NO_DECISION_YET,

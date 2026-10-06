@@ -614,6 +614,14 @@ def test_numbers_are_printed_as_the_plan_prints_them():
     assert v.bar_text(2.0) == "2.00"
 
 
+def test_a_number_that_rounds_to_zero_prints_without_a_minus_sign():
+    """Two funds a hair apart: ``t = 0.00``, not ``t = −0.00`` (and the same for the returns)."""
+    assert v.t_text(-0.004) == "t = 0.00" and v.t_text(-0.0) == "t = 0.00"
+    assert v.daily_text(-1e-7) == "+0.000%" and v.daily_text(0.0) == "+0.000%"
+    assert v.total_text(-0.00001) == "+0.00%" and v.total_text(-0.0) == "+0.00%"
+    assert v.t_text(-0.005001) == "t = −0.01" and v.total_text(-0.00006) == "−0.01%"
+
+
 def test_dates_outside_the_experiment_are_refused():
     v.check_dates(date(2026, 9, 23), "2027-12-31", None)
     for bad in (date(2026, 9, 22), "2028-01-01", "2099-06-22T00:00:00Z"):

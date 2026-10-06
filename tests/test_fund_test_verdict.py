@@ -433,6 +433,57 @@ def test_a_damaged_record_from_last_night_is_made_again(monkeypatch, tmp_path):
     assert record["status"] == "read" and "superseded" not in record
 
 
+@pytest.mark.parametrize("table", ["junk", [1, 2], None, {"kind": "race"}], ids=["text", "list", "none", "not one"])
+@pytest.mark.parametrize("status", ["read", "skipped"])
+def test_a_record_whose_table_does_not_read_back_is_made_again(monkeypatch, tmp_path, table, status):
+    """A damaged table (as the race's ``frozen_looks`` reads it) leaves the record out: the look is made again,
+    and the night never fails on it."""
+    damaged = dict(record_at(1, 60), table=table) if status == "read" else {
+        "look": 1, "status": "skipped", "made_on": "2026-12-22", "window_end": "2026-12-22", "table": table}
+    previous = with_tax(tax_record(1, LOOK_DAYS[1])) | {"fund_test": {"looks": [damaged]}}
+    out = night(monkeypatch, tmp_path, race_gate(gate_entry()), previous)
+    (record,) = out["fund_test"]["looks"]
+    assert record["status"] == "read" and record["made_on"] == "2026-12-23" and "superseded" not in record
+    assert out["fund_test"]["verdict"]["decided_at"] == 1
+
+
+def test_a_record_of_another_look_or_test_is_not_carried():
+    one = record_at(1, 60)
+    assert shadow_run.carried_fund_looks({"fund_test": {"looks": [one]}}) == [one]
+    for table in (dict(one["table"], look=2), dict(one["table"], kind="race")):
+        assert shadow_run.carried_fund_looks({"fund_test": {"looks": [dict(one, table=table)]}}) == []
+
+
+def test_the_deciding_look_is_the_same_for_the_verdict_and_the_later_looks(monkeypatch, tmp_path):
+    """A read record whose table does not say what its decision says (here: a table with no status, which
+    reads as no decision, beside a decision for momentum) is made again, so ``fund_test.verdict`` and the
+    later look's "for reading only" can never name different deciding looks."""
+    good = record_at(1, 60)
+    table = {k: v for k, v in good["table"].items() if k not in ("status", "outcome")}
+    race = race_gate(gate_entry(), gate_entry(LOOK_DAYS[2]))
+    previous = {"fund_test": {"looks": [dict(good, table=table)]}} | with_tax(tax_record(1, LOOK_DAYS[1]),
+                                                                             tax_record(2, LOOK_DAYS[2]))
+    later = night(monkeypatch, tmp_path, race, previous, n=120, now=datetime(2027, 3, 23, 23, tzinfo=timezone.utc))
+    one, two = later["fund_test"]["looks"]
+    assert one["table"]["status"] == v.DECIDED and one["made_on"] == "2027-03-23"
+    assert two["table"]["verdict"] == "FOR READING ONLY"
+    assert later["fund_test"]["verdict"]["decided_at"] == 1
+    # The first deciding look is read from the table, as the verdict reads it.
+    assert shadow_run._first_decision([dict(good, decision={"outcome": None})]) == 1
+    assert shadow_run._first_decision([dict(good, table=table)]) is None
+
+
+def test_a_night_beyond_the_experiment_makes_no_record_and_says_why(monkeypatch, tmp_path):
+    """The date guard of the owner's Addition 2 refuses the record, not the night: the document is still made."""
+    late = race_gate(gate_entry(), gate_entry(LOOK_DAYS[2]), gate_entry(date(2028, 1, 4)))
+    previous = {"fund_test": {"looks": [record_at(1, 60), record_at(2, 120, records=[record_at(1, 60)])]}}
+    out = night(monkeypatch, tmp_path, late, json.loads(json.dumps(previous)), passed=False,
+                now=datetime(2028, 1, 5, 23, tzinfo=timezone.utc))
+    assert [r["look"] for r in out["fund_test"]["looks"]] == [1, 2]
+    assert out["fund_test"]["note"] == ("checkpoint 3: no fund-test record was made: 2028-01-05 is outside the "
+                                        "experiment (2026-09-23 to 2027-12-31): a real verdict cannot hold it")
+
+
 # --- the combined line, from tonight's race gate and the fund test's records ----------------------------------
 
 
@@ -488,6 +539,27 @@ def test_the_combined_line_before_any_look_and_with_an_older_race_gate():
     late = race_gate(gate_entry(), upcoming={"independent": 40, "estimated": "2028-02-01"})
     out = shadow_run.combined_verdict(late, [], shadow_run.fund_test_verdict([]), None)
     assert out["line"].endswith("combined: NO DECISION YET — waiting for the race.")
+
+
+def test_while_the_race_waits_on_a_reached_look_the_line_names_no_later_checkpoint():
+    """The race reached look 1 but its table waits (row 8, or unreadable tonight): it is read again the next
+    night, so the line must not send the owner to checkpoint 2 in March."""
+    waiting = {"text": "no decision yet", "decided_at": None,
+               "looks": [{"look": 1, "table": {"outcome": None, "complete": False, "status": v.STATUS_WAITING}}]}
+    gate_record = race_gate(gate_entry(), verdict=waiting,
+                            upcoming={"independent": 40, "estimated": "2027-03-30", "bar": 2.45})
+    records = fund_records((1, "read", "momentum"))
+    out = shadow_run.combined_verdict(gate_record, records, shadow_run.fund_test_verdict(records),
+                                      shadow_run.fund_test_next(records))
+    assert out["line"].endswith("combined: NO DECISION YET — waiting for the race.")
+    assert "checkpoint 2" not in out["line"]
+    # A look that decided nothing and is complete: the race waits for the next checkpoint, as before.
+    nothing = {"text": "no decision yet", "decided_at": None,
+               "looks": [{"look": 1, "table": {"outcome": None, "complete": True, "status": v.NO_DECISION}}]}
+    out = shadow_run.combined_verdict(race_gate(gate_entry(), verdict=nothing, upcoming={
+        "independent": 40, "estimated": "2027-03-30", "bar": 2.45}), records, shadow_run.fund_test_verdict(records),
+        shadow_run.fund_test_next(records))
+    assert out["line"].endswith("waiting for the race (checkpoint 2, about 2027-03-30).")
 
 
 def test_the_fund_tests_next_look_and_bar_follow_the_looks_read():

@@ -198,8 +198,9 @@ jobs:
         # with bar_differs true. Only the look's number and its two bars are
         # sent, both public. The race's bars are fixed (3.47, 2.45, 2.00), so
         # the race has no such alert. Not on a by-hand retry of an old night's
-        # push: that night's alert was sent then.
-        if: always() && github.event_name == 'workflow_run' && github.event.workflow_run.name == 'shadow funds'
+        # push, nor on a re-run of this job ("Re-run jobs" keeps the
+        # workflow_run event): that night's alert was sent, or tried, then.
+        if: always() && github.event_name == 'workflow_run' && github.event.workflow_run.name == 'shadow funds' && github.run_attempt == '1'
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

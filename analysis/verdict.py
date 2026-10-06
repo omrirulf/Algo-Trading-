@@ -358,8 +358,8 @@ def _minus(text: str) -> str:
 
 
 def t_text(t: Optional[float]) -> str:
-    """``t = −3.62``, ``t = 0.84``; ``t = n/a`` when there is no t."""
-    return "t = n/a" if not _number(t) else "t = " + _minus(f"{t:.2f}")
+    """``t = −3.62``, ``t = 0.84``; ``t = n/a`` when there is no t. A t that rounds to zero is ``t = 0.00``."""
+    return "t = n/a" if not _number(t) else "t = " + _minus(f"{t:z.2f}")
 
 
 def bar_text(bar: float) -> str:
@@ -367,13 +367,13 @@ def bar_text(bar: float) -> str:
 
 
 def daily_text(x: Optional[float]) -> str:
-    """A mean daily net return, a fraction, as ``+0.012%``."""
-    return NA if not _number(x) else _minus(f"{x * 100:+.3f}%")
+    """A mean daily net return, a fraction, as ``+0.012%``; one that rounds to zero as ``+0.000%``."""
+    return NA if not _number(x) else _minus(f"{x * 100:+z.3f}%")
 
 
 def total_text(x: Optional[float]) -> str:
-    """A fund's total return, a fraction, as ``+3.90%``."""
-    return NA if not _number(x) else _minus(f"{x * 100:+.2f}%")
+    """A fund's total return, a fraction, as ``+3.90%``; one that rounds to zero as ``+0.00%``."""
+    return NA if not _number(x) else _minus(f"{x * 100:+z.2f}%")
 
 
 def drawdown_text(dd: Optional[float]) -> str:

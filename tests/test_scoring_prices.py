@@ -412,7 +412,7 @@ def test_the_fund_test_bar_alert_is_a_safe_push_sent_only_after_a_shadow_funds_r
     step = _bar_step()
     _is_a_safe_push(step)
     assert step["if"] == ("always() && github.event_name == 'workflow_run' && "
-                          "github.event.workflow_run.name == 'shadow funds'")
+                          "github.event.workflow_run.name == 'shadow funds' && github.run_attempt == '1'")
     run = step["run"]
     # The committed record, from main fetched fresh, never the artifact (every *.json there is pushed as prices).
     assert "git fetch --no-tags --depth=1 origin main" in run and "git show FETCH_HEAD:logs/funds.json" in run
@@ -426,6 +426,17 @@ def test_the_fund_test_bar_alert_is_a_safe_push_sent_only_after_a_shadow_funds_r
     row = next(line for line in (ROOT / "docs" / "phone.mdx").read_text().splitlines()
                if line.startswith("| *⚠️ Fund test bar differs from the plan* |"))
     assert "`scoring-prices`" in row and "Amendments table" in row and row.endswith("| high |")
+
+
+def test_the_bar_alert_is_not_resent_by_a_rerun_and_the_docs_say_a_missed_one_is_not_retried():
+    """"Once, on the night the record is made": a re-run of the job keeps the workflow_run event, so only the
+    first attempt sends; a push that fails that night is never retried, and both pages say so."""
+    assert _bar_step()["if"].endswith("&& github.run_attempt == '1'")
+    for page in ("phone.mdx", "shadow-funds.mdx"):
+        text = " ".join((ROOT / "docs" / page).read_text().split())
+        assert "A re-run of" in text or "a re-run of the job does not send it again" in text, page
+        assert ("If that night's push fails (`main` cannot be fetched, or ntfy refuses it), it is not sent again; "
+                "the look's table title still ends \"Bar x (planned y): log it in the Amendments table.\"") in text, page
 
 
 def test_the_fund_test_bar_alert_speaks_only_for_a_look_made_tonight_whose_bar_differs(tmp_path):
