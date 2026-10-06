@@ -1014,7 +1014,7 @@ def _planned_next(look: int, read: Sequence[tuple[float, float]]) -> Optional[tu
 
 def fund_test_record(look: int, made_on: date, end: date, days: Sequence[str], raw: dict, after_tax: dict,
                      downturn: Optional[float], records: Sequence[dict],
-                     calibration_passed_on: Optional[str]) -> dict:
+                     calibration_passed_on: Optional[str], made_at: Optional[datetime] = None) -> dict:
     """One look of the fund test, read (section 11.6), as the record ``fund_test.looks`` keeps.
 
     Everything through the race look's last close ``end`` only (5c, 11.7):
@@ -1035,6 +1035,9 @@ def fund_test_record(look: int, made_on: date, end: date, days: Sequence[str], r
     spending rule has no bar for it; the record says the owner decides.
     Raises ``ValueError`` for a date outside the experiment (owner
     Addition 2: the 2099 examples can never become a real record).
+    ``made_at`` is the making run's full stamp (the document's
+    ``generated_at`` that night): the bar alert speaks only for the run
+    whose stamp it is, so a second run the same day sends nothing.
     """
     from analysis import decision_gate as gate
     from analysis import verdict
@@ -1043,8 +1046,8 @@ def fund_test_record(look: int, made_on: date, end: date, days: Sequence[str], r
     verdict.check_dates(made_on, end, calibration_passed_on, schedule.FUND_START)
     sessions = sum(1 for d in days if date.fromisoformat(d) <= end)
     final = look == verdict.LOOKS
-    base = {"look": look, "made_on": made_on.isoformat(), "window_end": end.isoformat(),
-            "start": schedule.FUND_START.isoformat()}
+    base = {"look": look, "made_on": made_on.isoformat(), "made_at": made_at.isoformat() if made_at else None,
+            "window_end": end.isoformat(), "start": schedule.FUND_START.isoformat()}
     read = _read_looks(records, look)
     share = 1.0 if final else min(1.0, sessions / verdict.FUND_PLANNED_SESSIONS)
     owner = None
@@ -1160,7 +1163,7 @@ def fund_test_part(now: datetime, race_gate: Optional[dict], records: list, pass
             break
         passed_on = calibration.get("end_estimate") if isinstance(calibration.get("end_estimate"), str) else None
         record = fund_test_record(look, now.date(), end, days, raw, after_tax, entry.get("vt_max_drawdown"),
-                                  [r for r in records if r is not old], passed_on)
+                                  [r for r in records if r is not old], passed_on, made_at=now)
         if old is not None:
             records.remove(old)
             record["superseded"] = old
@@ -1211,7 +1214,7 @@ def fund_test_verdict(records: Sequence[dict]) -> dict:
 
 
 def fund_test_next(records: Sequence[dict]) -> Optional[dict]:
-    """``fund_test.next_checkpoint``: the next look with no record, its planned day and its bar.
+    """``fund_test.next_look``: the next look with no record, its planned day and its bar.
 
     The bar by the spending rule of 11.7 from the looks read so far and the
     planned sessions (60, 120, 180); ``planned_bar`` is the registered one
@@ -1612,8 +1615,7 @@ def build(args: argparse.Namespace, now: datetime, fetchers: Optional[list] = No
             "start": fund_start.isoformat() if fund_start else None,
             "sessions": len(funds["days"]) if funds else 0,
             "independent": (len(funds["days"]) // 3) if funds else None,
-            # The fund test's own next look and bar (owner reading 5), not the race's.
-            "next_checkpoint": fund_next,
+            "next_checkpoint": None,
             "first_cycle": schedule.FUND_FIRST_CYCLE.isoformat(),
             # Why nothing is shown yet, when nothing is: the gate, not the date.
             "waiting_for": None if funds else ("calibration" if not passed else "the first session"),
@@ -1621,6 +1623,10 @@ def build(args: argparse.Namespace, now: datetime, fetchers: Optional[list] = No
             # final sample, each look's frozen record and table, and the
             # verdict of the first look that decided.
             "planned_sessions": schedule.FUND_TEST_PLANNED_SESSIONS[-1],
+            # The fund test's own next look and bar (owner reading 5), not the
+            # race's. A new key: next_checkpoint above stays null, as it always
+            # was (the owner's identity condition: only keys are added).
+            "next_look": fund_next,
             "looks": fund_looks,
             "verdict": fund_verdict,
             "note": fund_note,

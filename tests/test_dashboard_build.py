@@ -480,12 +480,13 @@ def test_the_fund_test_banner_counts_fund_sessions_and_names_its_own_next_bar(tm
     """Owner reading 5 (6 Oct 2026): fund sessions of 180 and the fund test's own next bar, never the race's."""
     base = {"status": "running", "start": "2026-09-29", "sessions": 12, "independent": 4, "planned_sessions": 180,
             "looks": [], "verdict": {"text": "no decision yet", "decided_at": None, "outcome": None}}
-    planned = dict(base, next_checkpoint={"look": 1, "estimated": "2026-12-22", "bar": 3.4, "planned_bar": 3.4})
-    moved = dict(base, sessions=70, next_checkpoint={"look": 2, "estimated": "2027-03-22", "bar": 2.43,
-                                                    "planned_bar": 2.41})
-    none_left = dict(base, sessions=181, next_checkpoint=None)
-    no_bar = dict(base, next_checkpoint={"look": 2, "estimated": "2027-03-22", "bar": None, "planned_bar": 2.41})
-    decided = dict(base, sessions=61, next_checkpoint=None, verdict={
+    base = dict(base, next_checkpoint=None)                     # always null, as before the verdict
+    planned = dict(base, next_look={"look": 1, "estimated": "2026-12-22", "bar": 3.4, "planned_bar": 3.4})
+    moved = dict(base, sessions=70, next_look={"look": 2, "estimated": "2027-03-22", "bar": 2.43,
+                                              "planned_bar": 2.41})
+    none_left = dict(base, sessions=181, next_look=None)
+    no_bar = dict(base, next_look={"look": 2, "estimated": "2027-03-22", "bar": None, "planned_bar": 2.41})
+    decided = dict(base, sessions=61, next_look=None, verdict={
         "text": "EARLY STOP AT CHECKPOINT 1: REPLACE THE MODEL FUND WITH THE MOMENTUM FUND", "decided_at": 1,
         "outcome": "momentum"})
     other_planned = dict(planned, planned_sessions=150)
@@ -1454,20 +1455,39 @@ def test_the_verdict_card_escapes_every_string_it_draws(tmp_path, built_funds_pa
     F, R = _verdict_records()
     nasty = '<img src=x onerror="alert(1)">'
     table = R["verdict"]["looks"][0]["table"]
-    crafted_table = dict(table, title=nasty, rows=[dict(r, value=nasty, result=nasty) for r in table["rows"]])
+    # Every field of every row (the "→" row keeps its mark, so its own branch draws its rule and result).
+    fields = ("n", "rule", "measured", "value", "bar", "result")
+    crafted_rows = [dict(r, **{f: nasty for f in fields if not (r["n"] == "→" and f == "n")}) for r in table["rows"]]
+    crafted_table = dict(table, title=nasty, rows=crafted_rows)
+    assert any(r["n"] == "→" for r in crafted_table["rows"]) and any(r["n"] == nasty for r in crafted_table["rows"])
     crafted_R = dict(R, verdict=dict(R["verdict"], looks=[dict(R["verdict"]["looks"][0], table=crafted_table,
                                                                differs_tonight=nasty)]))
     crafted_F = dict(F, verdict=dict(F["verdict"], line=nasty, note=nasty),
                      fund_test=dict(F["fund_test"], note=nasty))
+    # A skipped look's table has no rows: its title and verdict alone.
+    skipped_F = dict(F, fund_test=dict(F["fund_test"], looks=[
+        {"look": 1, "status": "skipped", "table": {"title": nasty, "rows": [], "verdict": nasty}}]))
+    # Before any look: the no-decision card, with the fund test's note.
+    waiting_F = dict(F, verdict={"text": "no decision yet"}, fund_test=dict(
+        F["fund_test"], looks=[], note=nasty, verdict={"text": "no decision yet", "decided_at": None, "outcome": None}))
     source = _page_functions(built_funds_page, "VT_COLUMNS", "verdictTable", "verdictHtml")
-    out = _run_js(tmp_path, source, "CASES.map(([F, R])=>verdictHtml(F, R))", [[crafted_F, crafted_R]])
-    assert "<img" not in out[0] and "&lt;img src=x onerror=&quot;alert(1)&quot;&gt;" in out[0]
+    out = _run_js(tmp_path, source, "CASES.map(([F, R])=>verdictHtml(F, R))",
+                  [[crafted_F, crafted_R], [skipped_F, {}], [waiting_F, {}]])
+    for html in out:
+        assert "<img" not in html and "&lt;img src=x onerror=&quot;alert(1)&quot;&gt;" in html
+    assert "no decision yet" in out[2]
+    # The fund-test banner, decided: the verdict's words.
+    decided = {"status": "running", "start": "2026-09-29", "sessions": 61, "planned_sessions": 180,
+               "next_checkpoint": None, "next_look": None, "verdict": {"text": nasty, "decided_at": 1}}
+    banner = _run_js(tmp_path, _page_functions(built_funds_page, "nextText", "fundNextText", "fundTestBanner"),
+                     "CASES.map(([ft, R])=>fundTestBanner(ft, R))", [[decided, RACE_SAMPLE]])
+    assert "<img" not in banner[0] and "decided at checkpoint 1" in banner[0]
 
 
 def test_the_contract_names_the_checkpoint_verdict_fields():
     text = (ROOT / "dashboard" / "funds.html").read_text()
     comment = text[text.index("<!--") + 4:text.index("-->")]
-    for field in ("fund_test.sessions", "fund_test.planned_sessions", "fund_test.next_checkpoint", "planned_bar",
+    for field in ("fund_test.sessions", "fund_test.planned_sessions", "fund_test.next_look", "planned_bar",
                   "fund_test.looks[]", "bar_differs", "fund_test.verdict", "fund_test.note", "decided_at",
                   "differs_tonight", "A Table", "table_json"):
         assert field in comment, field

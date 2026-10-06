@@ -442,9 +442,9 @@ def test_the_fund_test_bar_alert_speaks_only_for_a_look_made_tonight_whose_bar_d
         return subprocess.run([sys.executable, "-", str(path)], input=check, capture_output=True,
                               text=True, check=True).stdout.strip()
 
-    def record(look=1, made_on="2026-12-23", status="read", bar=3.37, planned=3.40, differs=True):
-        return {"look": look, "made_on": made_on, "window_end": "2026-12-22", "status": status, "bar": bar,
-                "planned_bar": planned, "bar_differs": differs}
+    def record(look=1, made_at="2026-12-23T22:10:00+00:00", status="read", bar=3.37, planned=3.40, differs=True):
+        return {"look": look, "made_on": made_at[:10], "made_at": made_at, "window_end": "2026-12-22",
+                "status": status, "bar": bar, "planned_bar": planned, "bar_differs": differs}
 
     def funds(*looks, generated_at="2026-12-23T22:10:00+00:00"):
         return {"generated_at": generated_at, "simulated": True, "fund_test": {"looks": list(looks)}}
@@ -454,7 +454,10 @@ def test_the_fund_test_bar_alert_speaks_only_for_a_look_made_tonight_whose_bar_d
                     "Log it in the Amendments table.")
     # Only the look and its two bars: nothing else from the record is sent.
     assert message(funds(record(look=2, bar=2.43, planned=2.41))).startswith("Checkpoint 2 used bar 2.43 (planned 2.41)")
-    assert message(funds(record(made_on="2026-12-22"))) == ""                  # an older record: sent on its own night
+    assert message(funds(record(made_at="2026-12-22T22:10:00+00:00"))) == ""   # an older record: sent on its own night
+    # A second funds run the same day (by hand, or a re-run) carries the record: it was sent by the run that made it.
+    assert message(funds(record(), generated_at="2026-12-23T23:50:00+00:00")) == ""
+    assert message(funds(dict(record(), made_at=None))) == ""                  # no stamp: nothing to match
     assert message(funds(record(bar=3.40, planned=3.40, differs=False))) == ""  # the planned bar
     skipped = {"look": 1, "made_on": "2026-12-23", "window_end": "2026-12-22", "status": "skipped",
                "reason": "calibration had not passed on the night the race's look was readable"}
@@ -503,8 +506,9 @@ def test_the_fund_test_bar_step_runs_whole_against_a_fetched_main(tmp_path):
     commit({"generated_at": "2026-12-22T22:10:00+00:00", "fund_test": {"looks": []}})
     subprocess.run([*git, "clone", "-q", str(origin), str(checkout)], check=True)
     # Tonight's funds commit lands on main after this job's checkout was made: the step fetches it.
-    commit({"generated_at": "2026-12-23T22:10:00+00:00", "fund_test": {"looks": [
-        {"look": 1, "made_on": "2026-12-23", "status": "read", "bar": 3.37, "planned_bar": 3.4, "bar_differs": True}]}})
+    made = {"look": 1, "made_on": "2026-12-23", "made_at": "2026-12-23T22:10:00+00:00", "status": "read",
+            "bar": 3.37, "planned_bar": 3.4, "bar_differs": True}
+    commit({"generated_at": "2026-12-23T22:10:00+00:00", "fund_test": {"looks": [made]}})
     sent = tmp_path / "sent.json"
     (bin_dir / "curl").write_text(f'#!/bin/sh\nfor a in "$@"; do case "$a" in @*) cp "${{a#@}}" "{sent}";; esac; done\n'
                                   'printf 200\n')
@@ -524,9 +528,9 @@ def test_the_fund_test_bar_step_runs_whole_against_a_fetched_main(tmp_path):
     assert body["title"] == "⚠️ Fund test bar differs from the plan"
     assert body["message"].startswith("Checkpoint 1 used bar 3.37 (planned 3.40)")
     assert list(temp.iterdir()) == []                                  # the record and the push file are gone
-    # The next night carries the same frozen record: nothing is sent again.
-    commit({"generated_at": "2026-12-24T22:10:00+00:00", "fund_test": {"looks": [
-        {"look": 1, "made_on": "2026-12-23", "status": "read", "bar": 3.37, "planned_bar": 3.4, "bar_differs": True}]}})
+    # A second funds run the same day, and the next night, carry the same frozen record: nothing is sent again.
     sent.unlink()
-    again = step("topic-x")
-    assert again.returncode == 0 and "its bar is the planned one" in again.stdout and not sent.exists()
+    for stamp in ("2026-12-23T23:50:00+00:00", "2026-12-24T22:10:00+00:00"):
+        commit({"generated_at": stamp, "fund_test": {"looks": [made]}})
+        again = step("topic-x")
+        assert again.returncode == 0 and "its bar is the planned one" in again.stdout and not sent.exists()

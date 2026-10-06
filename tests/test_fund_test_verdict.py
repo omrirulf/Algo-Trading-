@@ -151,7 +151,7 @@ def test_a_look_with_180_sessions_before_the_final_one_is_left_to_the_owner():
 
 def test_a_read_record_has_every_field_and_is_cut_at_the_looks_close():
     record = record_at(1, 60)
-    assert list(record) == ["look", "made_on", "window_end", "start", "status", "sessions", "sessions_calendar",
+    assert list(record) == ["look", "made_on", "made_at", "window_end", "start", "status", "sessions", "sessions_calendar",
                             "share", "bar", "bar_exact", "planned_bar", "bar_differs", "calibration_passed_on",
                             "tests", "coin_flip", "after_tax", "downturn", "decision", "table"]
     assert set(record["tests"]) == {"model-momentum", "model-hybrid", "hybrid-momentum", "model-vt",
@@ -316,6 +316,8 @@ def test_a_look_read_on_its_night_is_frozen_after_it(monkeypatch, tmp_path):
     first = night(monkeypatch, tmp_path, race, with_tax(tax_record(1, LOOK_DAYS[1])))
     (record,) = first["fund_test"]["looks"]
     assert record["status"] == "read" and record["made_on"] == "2026-12-23" and record["bar"] == 3.40
+    # The making run's full stamp: the bar alert speaks only for the run that made the record.
+    assert record["made_at"] == first["generated_at"]
     assert record["calibration_passed_on"] == "2026-10-19"
     assert "_fund_test" not in first["funds"]
     assert first["fund_test"]["verdict"] == {"text": record["table"]["verdict"], "decided_at": 1,
@@ -353,8 +355,8 @@ def test_a_look_readable_before_calibration_passes_is_skipped_for_good(monkeypat
     assert record["table"]["verdict"].endswith("(planned: checkpoint 2 at 2.41, checkpoint 3 at 2.02).")
     # The same night the race's after-tax record is unavailable: the two agree (owner reading 3).
     assert out["after_tax"]["looks"][0]["status"] == gate.AFTER_TAX_UNAVAILABLE
-    assert out["fund_test"]["next_checkpoint"] == {"look": 2, "estimated": "2027-03-22", "bar": 2.41,
-                                                   "planned_bar": 2.41}
+    assert out["fund_test"]["next_look"] == {"look": 2, "estimated": "2027-03-22", "bar": 2.41,
+                                             "planned_bar": 2.41}
     # Calibration passes later: the skipped look stays skipped, even on a moved window.
     later = night(monkeypatch, tmp_path, race_gate(gate_entry(LOOK_DAYS[1] + timedelta(days=1))), out,
                   now=NIGHT + timedelta(days=2))
@@ -414,9 +416,10 @@ def test_the_fund_test_block_and_the_document_end_with_the_new_keys(monkeypatch,
     block = out["fund_test"]
     assert list(block)[:7] == ["status", "start", "sessions", "independent", "next_checkpoint", "first_cycle",
                                "waiting_for"]
-    assert list(block)[7:] == ["planned_sessions", "looks", "verdict", "note"]
+    assert list(block)[7:] == ["planned_sessions", "next_look", "looks", "verdict", "note"]
     assert block["planned_sessions"] == 180
-    assert block["next_checkpoint"] == {"look": 1, "estimated": "2026-12-22", "bar": 3.40, "planned_bar": 3.40}
+    assert block["next_checkpoint"] is None                     # as it always was: only keys are added
+    assert block["next_look"] == {"look": 1, "estimated": "2026-12-22", "bar": 3.40, "planned_bar": 3.40}
     assert block["verdict"] == {"text": "no decision yet", "decided_at": None, "outcome": None}
     assert list(out)[-2:] == ["after_tax", "verdict"]
     assert out["verdict"] == {"text": "no decision yet"}
@@ -527,16 +530,18 @@ def test_every_existing_key_is_as_the_code_before_wrote_it():
 
 
 def test_the_identity_check_sees_the_new_keys_it_removes():
-    """The check above is not empty: the documents it reads do carry the verdict, and the one existing key
-    the verdict fills (``fund_test.next_checkpoint``, null before) is the only one it puts back."""
+    """The check above is not empty: the documents it reads do carry the verdict, and it puts no existing
+    value back: ``fund_test.next_checkpoint`` stays null, and the fund test's next look is the new key
+    ``fund_test.next_look``."""
     from tests import verdict_identity as identity
 
     funds = identity.funds_documents()
     running = funds["running_1"]
     assert running["fund_test"]["looks"][0]["status"] == "skipped"
     assert running["verdict"]["text"] == "NO DECISION YET — waiting for the race"
-    assert running["fund_test"]["next_checkpoint"]["look"] == 2
+    assert running["fund_test"]["next_look"]["look"] == 2 and running["fund_test"]["next_checkpoint"] is None
+    assert identity.FILLED_FUND_TEST_KEYS == ()
     stripped = identity.without_new_keys(running, "funds")
-    assert stripped["fund_test"]["next_checkpoint"] is None and "verdict" not in stripped
+    assert "next_look" not in stripped["fund_test"] and "verdict" not in stripped
     gates = identity.gate_documents()
     assert gates["crafted"]["verdict"]["decided_at"] == 1 and list(gates["crafted"])[-1] == "verdict"

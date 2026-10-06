@@ -130,19 +130,23 @@
     fund_test.independent        count of independent days, or null (no longer
                                  shown: the banner counts fund sessions)
     fund_test.sessions           fund sessions so far (count)
+    fund_test.next_checkpoint    always null (kept as it was; the fund test's
+                                 own next look is fund_test.next_look below)
     The checkpoint verdict (docs/research/checkpoint-verdict-plan.md, the
     owner's approval of 6 Oct 2026); an older record lacks all of these and
     the page then draws no verdict card, and the banner falls back to the
     race's next look:
     fund_test.planned_sessions   the planned final sessions (count, 180)
-    fund_test.next_checkpoint    null once every look has a record, else {look
+    fund_test.next_look          null once every look has a record, else {look
                                  1|2|3, estimated ISO date (the planned look
                                  day), bar t-statistic by the spending rule of
                                  11.7 from the looks read so far (or null),
                                  planned_bar the registered bar}: the fund
                                  test's own next look, never the race's
     fund_test.looks[]            one frozen record per look: {look 1|2|3,
-                                 made_on ISO date, window_end ISO date, status
+                                 made_on ISO date, made_at ISO date-time (the
+                                 making run's generated_at; read and owner
+                                 looks), window_end ISO date, status
                                  read | skipped | owner, bar and planned_bar
                                  t-statistics and bar_differs true|false (read
                                  looks only), table Table}
@@ -763,7 +767,7 @@ table.vt tr.to td{font-weight:700;border-bottom:0}
     const sessions = isNum(ft.sessions) ? ft.sessions : 0;
     const planned = isNum(ft.planned_sessions) ? ft.planned_sessions : 180;
     let next;
-    if(asObj(ft.next_checkpoint)) next = fundNextText(ft.next_checkpoint);
+    if(asObj(ft.next_look) || asObj(ft.next_checkpoint)) next = fundNextText(asObj(ft.next_look) || ft.next_checkpoint);
     else if("planned_sessions" in ft) next = fundNextText(null);
     else if(R.next) next = `${nextText(R.next)} <span class="faint">(the race's next look)</span>`;
     else if(!isNum(R.independent)) next = "Next checkpoint: not known until the decision gate writes its record.";

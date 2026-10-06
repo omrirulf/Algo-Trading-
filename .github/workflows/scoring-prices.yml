@@ -193,7 +193,8 @@ jobs:
         # committed: main is fetched fresh here (this job's own checkout may be
         # older than the funds commit), and nothing is taken from the artifact,
         # whose every *.json is pushed as prices. Once: only for a look record
-        # made tonight (its made_on is the record's generated_at date), read,
+        # made by this funds run (its made_at is the document's generated_at,
+        # the full stamp, so a second run the same day sends nothing), read,
         # with bar_differs true. Only the look's number and its two bars are
         # sent, both public. The race's bars are fixed (3.47, 2.45, 2.00), so
         # the race has no such alert. Not on a by-hand retry of an old night's
@@ -215,7 +216,7 @@ jobs:
           try:
               with open(sys.argv[1], encoding="utf-8") as handle:
                   document = json.load(handle)
-              tonight = document["generated_at"][:10]
+              tonight = document["generated_at"]
               looks = document["fund_test"]["looks"]
           except (OSError, ValueError, KeyError, TypeError, AttributeError):
               raise SystemExit   # no record, or one from before the checkpoint verdict: nothing to say
@@ -225,7 +226,7 @@ jobs:
           for look in looks if isinstance(looks, list) else []:
               if not isinstance(look, dict) or look.get("look") not in (1, 2, 3):
                   continue
-              if look.get("made_on") != tonight or look.get("status") != "read":
+              if not isinstance(tonight, str) or look.get("made_at") != tonight or look.get("status") != "read":
                   continue
               if look.get("bar_differs") is not True or not (number(look.get("bar")) and number(look.get("planned_bar"))):
                   continue

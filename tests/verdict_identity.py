@@ -24,12 +24,12 @@ from dataclasses import replace
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
-#: The keys the verdict adds, and the one existing key it fills (section C6 of
-#: the build: ``fund_test.next_checkpoint`` was always null; it now names the
-#: fund test's next look and bar, the owner's reading 5).
+#: The keys the verdict adds. It fills no existing key: ``fund_test.next_checkpoint``
+#: stays null, as it always was, and the fund test's next look and bar (the
+#: owner's reading 5) go in the new key ``fund_test.next_look``.
 NEW_FUNDS_KEYS = ("verdict",)
-NEW_FUND_TEST_KEYS = ("looks", "verdict", "planned_sessions", "note")
-FILLED_FUND_TEST_KEYS = ("next_checkpoint",)
+NEW_FUND_TEST_KEYS = ("looks", "verdict", "planned_sessions", "next_look", "note")
+FILLED_FUND_TEST_KEYS: tuple[str, ...] = ()
 NEW_GATE_KEYS = ("verdict",)
 
 
