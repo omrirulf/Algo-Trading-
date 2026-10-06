@@ -384,3 +384,149 @@ def test_a_failed_funds_run_reaches_the_phone_too():
     # The rate alert after a green run is a safe push too.
     rates = next(s for s in wf["jobs"]["push"]["steps"] if s.get("name") == "Tell the owner's phone the shekel rates failed")
     _is_a_safe_push(rates)
+
+
+BAR_STEP = "Tell the owner's phone the fund test's bar differs from the plan"
+
+
+def _bar_step() -> dict:
+    wf = _workflow("scoring-prices.yml")
+    return next(s for s in wf["jobs"]["push"]["steps"] if s.get("name") == BAR_STEP)
+
+
+def _heredocs(run: str) -> list[str]:
+    """Each ``<<'EOF'`` script of a step, in order."""
+    scripts, at = [], 0
+    while "<<'EOF'" in run[at:]:
+        start = run.index("\n", run.index("<<'EOF'", at)) + 1
+        end = run.index("\nEOF", start)
+        scripts.append(run[start:end])
+        at = end
+    return scripts
+
+
+def test_the_fund_test_bar_alert_is_a_safe_push_sent_only_after_a_shadow_funds_run():
+    """Owner Addition 1 (6 Oct 2026): a bar that differs from the plan reaches the phone, from the keyed workflow."""
+    from tests.test_phone import _is_a_safe_push
+
+    step = _bar_step()
+    _is_a_safe_push(step)
+    assert step["if"] == ("always() && github.event_name == 'workflow_run' && "
+                          "github.event.workflow_run.name == 'shadow funds'")
+    run = step["run"]
+    # The committed record, from main fetched fresh, never the artifact (every *.json there is pushed as prices).
+    assert "git fetch --no-tags --depth=1 origin main" in run and "git show FETCH_HEAD:logs/funds.json" in run
+    assert "scoring-prices" not in run
+    assert '"title": "⚠️ Fund test bar differs from the plan"' in run and '"priority": 4' in run
+    # The step comes after the push and the rate alert, and the job still holds only its three secrets.
+    names = [s.get("name") for s in _workflow("scoring-prices.yml")["jobs"]["push"]["steps"]]
+    assert names.index(BAR_STEP) > names.index("Tell the owner's phone the shekel rates failed")
+    assert "secrets." not in (ROOT / ".github" / "workflows" / "funds.yml").read_text()
+    # The phone page lists it with the other pushes.
+    row = next(line for line in (ROOT / "docs" / "phone.mdx").read_text().splitlines()
+               if line.startswith("| *⚠️ Fund test bar differs from the plan* |"))
+    assert "`scoring-prices`" in row and "Amendments table" in row and row.endswith("| high |")
+
+
+def test_the_fund_test_bar_alert_speaks_only_for_a_look_made_tonight_whose_bar_differs(tmp_path):
+    """The step's own script on crafted funds records: once, on the night the record is made, never otherwise."""
+    import subprocess
+    import sys
+
+    check, payload = _heredocs(_bar_step()["run"])
+
+    def message(document) -> str:
+        path = tmp_path / f"funds-{len(list(tmp_path.iterdir()))}.json"
+        if document is not None:
+            path.write_text(document if isinstance(document, str) else json.dumps(document))
+        return subprocess.run([sys.executable, "-", str(path)], input=check, capture_output=True,
+                              text=True, check=True).stdout.strip()
+
+    def record(look=1, made_on="2026-12-23", status="read", bar=3.37, planned=3.40, differs=True):
+        return {"look": look, "made_on": made_on, "window_end": "2026-12-22", "status": status, "bar": bar,
+                "planned_bar": planned, "bar_differs": differs}
+
+    def funds(*looks, generated_at="2026-12-23T22:10:00+00:00"):
+        return {"generated_at": generated_at, "simulated": True, "fund_test": {"looks": list(looks)}}
+
+    sent = message(funds(record()))
+    assert sent == ("Checkpoint 1 used bar 3.37 (planned 3.40), by the spending rule of section 11.7. "
+                    "Log it in the Amendments table.")
+    # Only the look and its two bars: nothing else from the record is sent.
+    assert message(funds(record(look=2, bar=2.43, planned=2.41))).startswith("Checkpoint 2 used bar 2.43 (planned 2.41)")
+    assert message(funds(record(made_on="2026-12-22"))) == ""                  # an older record: sent on its own night
+    assert message(funds(record(bar=3.40, planned=3.40, differs=False))) == ""  # the planned bar
+    skipped = {"look": 1, "made_on": "2026-12-23", "window_end": "2026-12-22", "status": "skipped",
+               "reason": "calibration had not passed on the night the race's look was readable"}
+    assert message(funds(skipped)) == ""                                       # a skipped look uses no bar
+    assert message(funds(dict(record(), status="owner"))) == ""                # the owner decides: no bar used
+    assert message(None) == ""                                                 # no file
+    assert message("not json") == ""
+    assert message({"generated_at": "2026-12-23T22:10:00+00:00", "fund_test": {"status": "running"}}) == ""  # older
+    assert message(funds(record(bar="3.37"), "junk", record(look=7))) == ""     # damaged entries are skipped
+    assert message(funds(record(differs="yes"))) == ""
+    # Two looks the same night (only after a moved window): one push naming both.
+    both = message(funds(record(), record(look=2, bar=2.43, planned=2.41)))
+    assert both.count("Log it in the Amendments table.") == 2
+
+    # The push itself: the fixed title, the message as the check printed it, the topic only in the body.
+    done = subprocess.run([sys.executable, "-"], input=payload, capture_output=True, text=True, check=True,
+                          env={"NTFY_TOPIC": "topic-x", "RUN_URL": "https://example.invalid/run", "MESSAGE": sent})
+    body = json.loads(done.stdout)
+    assert body == {"topic": "topic-x", "title": "⚠️ Fund test bar differs from the plan", "message": sent,
+                    "priority": 4, "tags": ["warning"], "click": "https://example.invalid/run"}
+
+
+def test_the_fund_test_bar_step_runs_whole_against_a_fetched_main(tmp_path):
+    """The whole step under bash: main fetched from a stand-in remote, a stand-in curl, and one push or none."""
+    import os
+    import shutil
+    import subprocess
+
+    if shutil.which("bash") is None or shutil.which("git") is None:
+        pytest.skip("bash and git are needed")
+    git = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "init.defaultBranch=main"]
+    origin, work, temp, bin_dir = (tmp_path / n for n in ("origin", "work", "temp", "bin"))
+    for folder in (temp, bin_dir):
+        folder.mkdir()
+    subprocess.run([*git, "init", "-q", str(work)], check=True)
+    (work / "logs").mkdir()
+
+    def commit(document):
+        (work / "logs" / "funds.json").write_text(json.dumps(document))
+        subprocess.run([*git, "-C", str(work), "add", "logs/funds.json"], check=True)
+        subprocess.run([*git, "-C", str(work), "commit", "-q", "-m", "night"], check=True)
+        subprocess.run([*git, "-C", str(work), "push", "-q", "-f", str(origin), "HEAD:main"], check=True)
+
+    subprocess.run([*git, "init", "-q", "--bare", str(origin)], check=True)
+    checkout = tmp_path / "checkout"
+    commit({"generated_at": "2026-12-22T22:10:00+00:00", "fund_test": {"looks": []}})
+    subprocess.run([*git, "clone", "-q", str(origin), str(checkout)], check=True)
+    # Tonight's funds commit lands on main after this job's checkout was made: the step fetches it.
+    commit({"generated_at": "2026-12-23T22:10:00+00:00", "fund_test": {"looks": [
+        {"look": 1, "made_on": "2026-12-23", "status": "read", "bar": 3.37, "planned_bar": 3.4, "bar_differs": True}]}})
+    sent = tmp_path / "sent.json"
+    (bin_dir / "curl").write_text(f'#!/bin/sh\nfor a in "$@"; do case "$a" in @*) cp "${{a#@}}" "{sent}";; esac; done\n'
+                                  'printf 200\n')
+    (bin_dir / "curl").chmod(0o755)
+    run = _bar_step()["run"]
+
+    def step(topic):
+        env = dict(os.environ, RUNNER_TEMP=str(temp), RUN_URL="https://example.invalid/run",
+                   PATH=f"{bin_dir}{os.pathsep}{os.environ['PATH']}", NTFY_TOPIC=topic)
+        return subprocess.run(["bash", "-e", "-c", run], cwd=checkout, env=env, capture_output=True, text=True)
+
+    quiet = step("")
+    assert quiet.returncode == 0 and "no phone configured" in quiet.stdout and not sent.exists()
+    loud = step("topic-x")
+    assert loud.returncode == 0 and "phone notified (HTTP 200)" in loud.stdout, loud.stdout + loud.stderr
+    body = json.loads(sent.read_text())
+    assert body["title"] == "⚠️ Fund test bar differs from the plan"
+    assert body["message"].startswith("Checkpoint 1 used bar 3.37 (planned 3.40)")
+    assert list(temp.iterdir()) == []                                  # the record and the push file are gone
+    # The next night carries the same frozen record: nothing is sent again.
+    commit({"generated_at": "2026-12-24T22:10:00+00:00", "fund_test": {"looks": [
+        {"look": 1, "made_on": "2026-12-23", "status": "read", "bar": 3.37, "planned_bar": 3.4, "bar_differs": True}]}})
+    sent.unlink()
+    again = step("topic-x")
+    assert again.returncode == 0 and "its bar is the planned one" in again.stdout and not sent.exists()
