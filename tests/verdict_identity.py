@@ -4,7 +4,8 @@ Not a test module (no ``test_`` prefix): ``tests/test_fund_test_verdict.py``
 runs these documents in a fresh interpreter and compares every existing key
 of ``logs/funds.json`` (``shadow.run.build``) and ``logs/race_gate.json``
 (``horse_race.gate_json``) with hashes recorded from the code BEFORE the
-verdict was wired in (commit ccdb477), the new keys removed. The owner's
+verdict was wired in (main at 428c974, after PR #142, with only the verdict's
+own module added: commit 56167d4), the new keys removed. The owner's
 identity condition (26 Sep 2026): no number in a race or fund output moves;
 the verdict only adds keys.
 

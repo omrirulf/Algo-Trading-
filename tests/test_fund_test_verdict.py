@@ -221,8 +221,9 @@ def test_the_record_refuses_a_date_outside_the_experiment():
 # --- paired(..., through=) leaves the exploratory tests as they were -------------------------------------------
 
 
-def _paired_before(fund, other) -> dict:
-    """``shadow.run.paired`` as it was before ``through`` (commit ccdb477), for the byte-for-byte check."""
+def _paired_before(fund, other, after=None) -> dict:
+    """``shadow.run.paired`` as it was before ``through`` (main at 428c974, with PR #142's ``after``), for the
+    byte-for-byte check."""
     from analysis.horse_race import newey_west_t
     from analysis.multiple_tests import p_two_sided, series_stats
 
@@ -231,7 +232,7 @@ def _paired_before(fund, other) -> dict:
         return {d.day: today / before - 1.0 for d, before, today in zip(f.days, equity, equity[1:])}
 
     mine, theirs = by_day(fund), by_day(other)
-    days = sorted(set(mine) & set(theirs))
+    days = sorted(d for d in set(mine) & set(theirs) if after is None or d > after)
     diffs = [mine[d] - theirs[d] for d in days]
     t = newey_west_t(diffs, shadow_run.VS_MODEL_LAG)
     return {"compare_to": other.name, "days": len(diffs), "from": days[0].isoformat() if days else None,
@@ -247,6 +248,10 @@ def test_paired_without_through_is_byte_for_byte_what_it_was():
     for a, b in (("model", "momentum"), ("hybrid", "vt"), ("vt", "model")):
         dumped = json.dumps(shadow_run.paired(funds[a], funds[b]), allow_nan=False)
         assert dumped == json.dumps(_paired_before(funds[a], funds[b]), allow_nan=False)
+        # The vote's call (PR #142: only the sessions after its first cycle) is unchanged too.
+        after = DAYS[10]
+        assert json.dumps(shadow_run.paired(funds[a], funds[b], after=after), allow_nan=False) == json.dumps(
+            _paired_before(funds[a], funds[b], after=after), allow_nan=False)
     cut = shadow_run.paired(funds["model"], funds["momentum"], through=DAYS[59])
     assert cut["days"] == 60 and cut["through"] == "2026-12-22" and cut["from"] == "2026-09-29"
     assert "through" not in shadow_run.paired(funds["model"], funds["momentum"])
@@ -592,7 +597,7 @@ def test_every_existing_key_is_as_the_code_before_wrote_it():
     readable and the night after; calibration passed with the real funds) and the race gate (no look, a
     decided look, a waiting look, a final look), with the verdict's new keys removed, hash part for part
     exactly as the code before the verdict wrote them (``tests/verdict_identity_before.json``, recorded at
-    commit ccdb477). Run in a fresh interpreter with a fixed hash seed, as they were recorded."""
+    main 428c974 plus the verdict's own module, commit 56167d4). Run in a fresh interpreter with a fixed hash seed, as they were recorded."""
     before = json.loads((ROOT / "tests" / "verdict_identity_before.json").read_text())
     done = subprocess.run([sys.executable, "-m", "tests.verdict_identity"], cwd=ROOT, capture_output=True,
                           text=True, timeout=600, env={**os.environ, "PYTHONHASHSEED": "0"}, check=True)
