@@ -12,10 +12,12 @@ name: output identity check
 # Both read the same logs/ (checked, byte for byte). Each side runs the race
 # report, the race's gate JSON and the funds' JSON, which carries
 # calibration ("calibration" in logs/funds.json is the calibration copy
-# against the real paper account), with the same command line the nightly
-# funds workflow uses. The after side runs the funds twice: once with the
-# before side's command line, so only the code differs, and once with the
-# command line the merged funds.yml will use.
+# against the real paper account), with the command line its own nightly
+# funds workflow uses (its funds.yml: with the night's shekel rate table and
+# the universe's journal when that funds.yml passes them). The after side runs
+# the funds twice: once with the before side's command line, so only the code
+# differs, and once with its own. The shekel rate table is fetched once and
+# given to every side that uses it, like the prices.
 #
 # Prices come from yfinance, which a second fetch could answer slightly
 # differently, so every price request is recorded on a tape the first time
@@ -135,7 +137,8 @@ jobs:
           EOF
           cat > "$RUNNER_TEMP/side.sh" <<'EOF'
           #!/usr/bin/env bash
-          # side.sh <checkout> <label> <same|production>: the race and the funds, as the nightly workflows run them.
+          # side.sh <checkout> <label> <own|as-before>: the race and the funds, as a nightly workflow runs them.
+          # "own": the command line of this checkout's funds.yml; "as-before": the before side's.
           set -euo pipefail
           dir=$1 label=$2 mode=$3
           out="$RUNNER_TEMP/out/$label"
@@ -149,18 +152,18 @@ jobs:
           test "$(wc -l < "$out/gate.out")" = "2"
           head -n 1 "$out/gate.out" > "$out/gate.json"
           tail -n 1 "$out/gate.out" > "$out/gate-prices.json"
-          extra=()
-          if [ "$mode" = "production" ]; then
-            # As the merged funds.yml: the night's shekel rates, then the funds with them and the universe's journal.
-            end=$(python -c "import os; from datetime import datetime; from analysis.returns import last_final_session; print(last_final_session(datetime.fromisoformat(os.environ['FROZEN_NOW'])))")
-            if python "$RUNNER_TEMP/tape.py" "$tape" analysis.boi_rates --start 2026-09-10 --end "$end" --with-table > "$out/fx.out" \
-               && test "$(wc -l < "$out/fx.out")" = "2"; then
-              tail -n 1 "$out/fx.out" > "$out/fx-rates.json"
-            else
-              echo "::warning::the shekel rates were not fetched; the production run goes without them, as funds.yml would"
-            fi
-            extra=(--fx-table "$out/fx-rates.json" --universe logs/shadow_universe)
+          if [ "$mode" = "own" ]; then
+            # Does this checkout's funds.yml give the funds the night's shekel rates and the universe's journal?
+            if grep -q -- "--fx-table" .github/workflows/funds.yml; then echo yes > "$out/fx"; else echo no > "$out/fx"; fi
+          else
+            cp "$RUNNER_TEMP/out/before/fx" "$out/fx"
           fi
+          extra=()
+          if [ "$(cat "$out/fx")" = "yes" ]; then
+            # The one rate table fetched for every side; without it the run goes on, as funds.yml would.
+            extra=(--fx-table "$RUNNER_TEMP/fx-rates.json" --universe logs/shadow_universe)
+          fi
+          echo "funds command line: shadow.run --processes 1 --random 1000 --with-prices --race-gate GATE --previous logs/funds.json ${extra[*]:-}"
           python "$RUNNER_TEMP/tape.py" "$tape" shadow.run --processes 1 --random 1000 --with-prices \
             --race-gate "$out/gate.json" --previous logs/funds.json "${extra[@]}" > "$out/funds.out"
           test "$(wc -l < "$out/funds.out")" = "2"
@@ -170,20 +173,32 @@ jobs:
           EOF
           chmod +x "$RUNNER_TEMP/side.sh"
 
+      - name: The shekel rates, once for every side
+        run: |
+          # As funds.yml's rate step, through the last final session of the frozen clock. A failed fetch leaves no
+          # table, and the sides that use one run without it, as the nightly job would.
+          end=$(python -c "import os; from datetime import datetime; from analysis.returns import last_final_session; print(last_final_session(datetime.fromisoformat(os.environ['FROZEN_NOW'])))")
+          if python -m analysis.boi_rates --start 2026-09-10 --end "$end" --with-table > "$RUNNER_TEMP/fx.out" \
+             && test "$(wc -l < "$RUNNER_TEMP/fx.out")" = "2"; then
+            tail -n 1 "$RUNNER_TEMP/fx.out" > "$RUNNER_TEMP/fx-rates.json"
+          else
+            echo "::warning::the shekel rates were not fetched; every side goes without them, as funds.yml would"
+          fi
+
       - name: Before
         run: |
           set -o pipefail
-          "$RUNNER_TEMP/side.sh" "$RUNNER_TEMP/before" before same
+          "$RUNNER_TEMP/side.sh" "$RUNNER_TEMP/before" before own
 
       - name: After, with the before side's command line
         run: |
           set -o pipefail
-          "$RUNNER_TEMP/side.sh" "$GITHUB_WORKSPACE" after-same same
+          "$RUNNER_TEMP/side.sh" "$GITHUB_WORKSPACE" after-same as-before
 
-      - name: After, with the merged funds workflow's command line
+      - name: After, with its own funds workflow's command line
         run: |
           set -o pipefail
-          "$RUNNER_TEMP/side.sh" "$GITHUB_WORKSPACE" after-production production
+          "$RUNNER_TEMP/side.sh" "$GITHUB_WORKSPACE" after-production own
 
       - name: Compare
         run: |
@@ -322,7 +337,7 @@ jobs:
 
 
           for label, title in (("after-same", "After, with the before side's command line (only the code differs)"),
-                               ("after-production", "After, with the merged funds workflow's command line")):
+                               ("after-production", "After, with its own funds workflow's command line")):
               lines.append(f"### {title}")
               for name in FUNDS:
                   compare(label, name, OUT / "before" / name, OUT / label / name, strict=True)

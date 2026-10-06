@@ -45,21 +45,25 @@ def test_both_sides_read_the_same_journal_prices_and_clock():
     assert _workflow()["jobs"]["compare"]["env"] == {"PYTHONHASHSEED": "0"}
 
 
-def test_the_funds_run_as_the_nightly_workflow_runs_them_both_ways():
+def test_the_funds_run_as_each_sides_nightly_workflow_runs_them():
+    """Each side with its own funds.yml's command line; the after side also with the before side's."""
     text = _text()
-    assert "side.sh\" \"$RUNNER_TEMP/before\" before same" in text
-    assert "side.sh\" \"$GITHUB_WORKSPACE\" after-same same" in text
-    assert "side.sh\" \"$GITHUB_WORKSPACE\" after-production production" in text
-    # The before side's command line is the nightly one without the new arguments; the production
-    # side adds exactly what funds.yml adds.
+    assert 'side.sh" "$RUNNER_TEMP/before" before own' in text
+    assert 'side.sh" "$GITHUB_WORKSPACE" after-same as-before' in text
+    assert 'side.sh" "$GITHUB_WORKSPACE" after-production own' in text
+    # "own": the rate table and the universe's journal exactly when that side's funds.yml passes them.
+    assert 'if grep -q -- "--fx-table" .github/workflows/funds.yml; then echo yes > "$out/fx"' in text
+    assert 'cp "$RUNNER_TEMP/out/before/fx" "$out/fx"' in text
     assert ("shadow.run --processes 1 --random 1000 --with-prices \\\n"
             '            --race-gate "$out/gate.json" --previous logs/funds.json "${extra[@]}"') in text
-    assert 'extra=(--fx-table "$out/fx-rates.json" --universe logs/shadow_universe)' in text
+    assert 'extra=(--fx-table "$RUNNER_TEMP/fx-rates.json" --universe logs/shadow_universe)' in text
     funds = FUNDS.read_text(encoding="utf-8")
     for argument in ("--with-prices", "--race-gate", "--previous logs/funds.json", "--fx-table",
                      "--universe logs/shadow_universe"):
         assert argument in funds, argument
+    # One rate table for every side, fetched as funds.yml fetches it.
     assert "analysis.boi_rates --start 2026-09-10" in text and "analysis.boi_rates --start 2026-09-10" in funds
+    assert text.count("analysis.boi_rates --start") == 1
 
 
 def test_it_fails_on_any_change_to_calibration_or_to_a_value_the_funds_had():
