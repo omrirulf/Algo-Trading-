@@ -26,6 +26,9 @@ This watches the answers themselves, every week:
 * the names whose news search found no headline on any of their lines that
   week, with their list (the owner's request of 3 Oct 2026; a report only,
   with no band and no alert), and which of them had a failed search.
+* how many of production's own news fetches failed that week, of how many
+  lines, and on which day (the owner's request of 6 Oct 2026; a report only,
+  with no band and no alert).
 
 The owner's rule, as changed on 27 Sep 2026 before any data existed:
 
@@ -237,6 +240,41 @@ def no_headlines_line(news: Optional[dict[str, Any]], limit: Optional[int] = Non
     return line
 
 
+def news_fetches(entries: Sequence[JournalEntry]) -> dict[str, Any]:
+    """How many of production's news fetches failed: lines with a failed search, of the lines that searched.
+
+    A line searched when it says how many headlines it carried, by the same
+    rule as ``no_headlines`` (held lines included; not a line that failed
+    before the model was asked with no headline). A fetch failed when the
+    line's gaps start with ``NEWS_GAP_PREFIX``: the search failed after
+    production's own retry and the name was judged without news. Per line,
+    so a name searched twice in a day counts twice; and per day.
+    """
+    searched = [e for e in entries
+                if e.headline_count is not None and not (e.stage == "context" and not e.headline_count)]
+    by_day: dict[str, list[int]] = {}
+    failed_names: set[str] = set()
+    for e in searched:
+        day = e.timestamp.date().isoformat() if e.timestamp is not None else "unknown"
+        counts = by_day.setdefault(day, [0, 0])
+        counts[1] += 1
+        if any(g.startswith(NEWS_GAP_PREFIX) for g in e.gaps):
+            counts[0] += 1
+            failed_names.add(e.ticker)
+    return {"lines": len(searched), "failed": sum(c[0] for c in by_day.values()),
+            "names": sorted(failed_names), "by_day": dict(sorted(by_day.items()))}
+
+
+def news_fetches_line(fetches: Optional[dict[str, Any]]) -> Optional[str]:
+    """The week's failed news fetches in one line, with each day's count. None when nothing searched."""
+    if not isinstance(fetches, dict) or not fetches.get("lines"):
+        return None
+    days = fetches.get("by_day") or {}
+    each = ", ".join(f"{failed}" for failed, _ in days.values())
+    return (f"production news fetches that failed: {fetches['failed']} of {fetches['lines']} lines"
+            + (f" (by day: {each})" if days else ""))
+
+
 def week_numbers(entries: Sequence[JournalEntry]) -> dict[str, Any]:
     """Every number of one week, from its lines. Pure: the same lines always give the same record."""
     asked = [e for e in entries if not e.held and e.stage != "context"]
@@ -292,6 +330,7 @@ def week_numbers(entries: Sequence[JournalEntry]) -> dict[str, Any]:
         "starts": starts,
         "names": _names(asked),
         "news": no_headlines(entries),
+        "news_fetches": news_fetches(entries),
     }
 
 
@@ -430,6 +469,9 @@ def render_week(week: dict[str, Any]) -> list[str]:
     quiet = no_headlines_line(week.get("news"))
     if quiet:
         out.append(f"- {quiet}")
+    fetches = news_fetches_line(week.get("news_fetches"))
+    if fetches:
+        out.append(f"- {fetches}")
     for alert in week.get("alerts") or []:
         out.append(f"- ALERT: {alert}")
     return out

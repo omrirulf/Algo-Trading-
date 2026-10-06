@@ -24,11 +24,28 @@ of every orchestrator module but a few, and this is not one of them.
 ``build_context`` is ``heartbeat.build_context`` with this search in place
 of production's: the same sections, and a failed search is the same explicit
 news gap, never the name's whole day.
+
+Two at a time, four tries (the owner's decision of 6 Oct 2026). Bright Data
+throttled the news check of 5 Oct 2026 (an empty body with its 200, or "auto-
+throttled") while it asked several names at once. So the universe, whose
+calls run four names at a time, lets at most two of them search the news at
+once (``NEWS_AT_ONCE``), and a search that fails is asked again, up to four
+times in all (``TRIES``), a minute apart (``TRY_PAUSE_SECONDS``, outside the
+two-at-a-time limit). One try is one ``fetch``: production's provider, whose
+own one retry after an empty body or a broken connection is unchanged. A
+missing key or zone is not tried again: it is the same every time.
+``news_step`` asks every name that way and nothing else -- no model, no
+journal -- to see how many get no answer (the owner asked for one full run in
+the week of 14 Dec 2026).
 """
 
 from __future__ import annotations
 
 import logging
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
+from typing import Callable, Final, Iterable, Optional
 from urllib.parse import urlencode
 
 from config import shadow_universe as su
@@ -75,10 +92,75 @@ def fetch(ticker: str) -> list[Headline]:
     return UniverseNewsProvider("", "", unlocker_zone=DEFAULT_ZONE).fetch_items(ticker)
 
 
+#: At most this many universe names search the news at once (the owner, 6 Oct 2026: "two at a time").
+NEWS_AT_ONCE: Final[int] = 2
+#: A name's search is asked up to this many times in all (the owner: "up to four tries per name").
+TRIES: Final[int] = 4
+#: The pause between two tries of one name (the check of 5 Oct 2026 waited a minute between rounds).
+TRY_PAUSE_SECONDS: Final[float] = 60.0
+#: The provider's own words for a missing key or zone: the same on every try, so never tried again.
+NOT_RETRIED: Final[tuple[str, ...]] = ("No Bright Data credentials", "No Bright Data zone")
+
+_AT_ONCE = threading.BoundedSemaphore(NEWS_AT_ONCE)
+
+
+def fetch_with_tries(ticker: str, *, tries: int = TRIES, pause: float = TRY_PAUSE_SECONDS,
+                     sleep: Optional[Callable[[float], None]] = None) -> list[Headline]:
+    """``fetch``, with at most ``NEWS_AT_ONCE`` names searching at once, a failed search asked up to ``tries`` times.
+
+    Raises ``NewsFetchError`` after the last try, saying how many there were.
+    """
+    sleep = time.sleep if sleep is None else sleep
+    failure: Optional[NewsFetchError] = None
+    for attempt in range(1, tries + 1):
+        with _AT_ONCE:
+            try:
+                return fetch(ticker)
+            except NewsFetchError as exc:
+                failure = exc
+        if str(failure).startswith(NOT_RETRIED):
+            raise failure
+        if attempt < tries:
+            log.warning("%s: news search failed (try %d of %d): %s", ticker, attempt, tries, failure)
+            sleep(pause)
+    raise NewsFetchError(f"asked {tries} times: {failure}") from failure
+
+
+def news_step(tickers: Iterable[str], workers: int, *, tries: int = TRIES, pause: float = TRY_PAUSE_SECONDS,
+              sleep: Optional[Callable[[float], None]] = None) -> dict:
+    """Every name's news search as the universe makes it, ``workers`` names at a time, and nothing else.
+
+    No model, no journal, no file: each name's headline count, or the error
+    of its last try. What the owner asked to know: how many got no answer.
+    """
+    names = list(tickers)
+    started = time.monotonic()
+
+    def ask(ticker: str) -> tuple[str, Optional[int], Optional[str]]:
+        try:
+            return ticker, len(fetch_with_tries(ticker, tries=tries, pause=pause, sleep=sleep)), None
+        except NewsFetchError as exc:
+            return ticker, None, str(exc)[:200]
+
+    with ThreadPoolExecutor(max_workers=max(1, min(workers, len(names) or 1))) as pool:
+        found = list(pool.map(ask, names))
+    no_answer = [t for t, count, _ in found if count is None]
+    return {
+        "names": len(names),
+        "answered": len(names) - len(no_answer),
+        "with_headlines": sum(1 for _, count, _ in found if count),
+        "no_headline": sum(1 for _, count, _ in found if count == 0),
+        "no_answer": no_answer,
+        "errors": {t: error for t, _, error in found if error},
+        "workers": workers, "news_at_once": NEWS_AT_ONCE, "tries": tries,
+        "minutes": round((time.monotonic() - started) / 60, 1),
+    }
+
+
 def build_context(ticker: str) -> TickerContext:
     """``heartbeat.build_context`` with the universe's search: never raises for want of news."""
     try:
-        headlines = fetch(ticker)
+        headlines = fetch_with_tries(ticker)
     except NewsFetchError as exc:
         log.warning("%s: news unavailable, continuing on the other sections (%s)", ticker, exc)
         return context.gather(
@@ -87,4 +169,5 @@ def build_context(ticker: str) -> TickerContext:
     return context.gather(ticker, headlines)
 
 
-__all__ = ["DEFAULT_ZONE", "UniverseNewsProvider", "build_context", "fetch", "search_url"]
+__all__ = ["DEFAULT_ZONE", "NEWS_AT_ONCE", "TRIES", "TRY_PAUSE_SECONDS", "UniverseNewsProvider", "build_context",
+           "fetch", "fetch_with_tries", "news_step", "search_url"]

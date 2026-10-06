@@ -365,20 +365,34 @@ COMPANIES: Final[dict[str, tuple[str, ...]]] = {
 SEARCH_NAME_NOT_MATCHED: Final[frozenset[str]] = frozenset({"TGT", "PGR"})
 
 
+#: The names a replacement may come from (card rule (2), Amendment 2026-10-06), as ticker -> (block,
+#: company names; the first is the search name). A candidate is asked by the news check (``ONLY_NAMES``
+#: in ``.github/workflows/universe-news-check.yml``) and by the verify job before it can join the list,
+#: and it is never part of the list: the scorer asks ``TICKERS`` only. Empty until a name needs
+#: replacing; chosen as the card says, never by price, return or score.
+CANDIDATES: Final[dict[str, tuple[str, tuple[str, ...]]]] = {}
+
+
+def company_names(ticker: str) -> tuple[str, ...]:
+    """A name's company names: from the list, or from the candidates."""
+    return COMPANIES[ticker] if ticker in COMPANIES else CANDIDATES[ticker][1]
+
+
 def news_query(ticker: str) -> str:
     """The universe's news search: company name plus ticker (``"Southern Company SO stock"``).
 
     Only the shadow universe uses it (``orchestrator/universe_news.py``);
     production still asks for ``"<ticker> stock"``. When the name is the
-    ticker itself (``"BP"``), it is said once.
+    ticker itself (``"BP"``), it is said once. A candidate is searched the
+    same way.
     """
-    name = COMPANIES[ticker][0]
+    name = company_names(ticker)[0]
     return f"{ticker} stock" if name == ticker else f"{name} {ticker} stock"
 
 
 def match_names(ticker: str) -> tuple[str, ...]:
     """The names a headline may call the company, for the relevance check."""
-    names = COMPANIES[ticker]
+    names = company_names(ticker)
     return names[1:] if ticker in SEARCH_NAME_NOT_MATCHED else names
 
 

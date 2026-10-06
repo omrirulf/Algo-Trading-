@@ -942,3 +942,18 @@ def test_the_verify_run_checks_every_name_without_a_model():
     run = _step("Does every name resolve?", "verify")["run"]
     assert "from backtest.verify_tickers import check" in run and "TICKERS" in run
     assert "orchestrator" not in run
+
+
+def test_the_candidates_are_never_in_the_list_or_production_and_are_searched_like_the_list(monkeypatch):
+    """Card rule (2), Amendment 2026-10-06: a candidate is news-checked and verified before it can join."""
+    from config.watchlist import DEFAULT_WATCHLIST
+
+    for ticker, (block, names) in su.CANDIDATES.items():
+        assert ticker not in su.TICKERS and ticker not in DEFAULT_WATCHLIST, ticker
+        assert block in su.BLOCKS and names and all(n.strip() == n and n for n in names), ticker
+    monkeypatch.setitem(su.CANDIDATES, "XYZW", ("Utilities", ("Example Power", "Example")))
+    assert su.news_query("XYZW") == "Example Power XYZW stock"
+    assert su.match_names("XYZW") == ("Example Power", "Example")
+    assert su.news_query("SO") == "Southern Company SO stock"          # the list as before
+    verify = (ROOT / ".github" / "workflows" / "shadow-universe.yml").read_text(encoding="utf-8")
+    assert "for ticker, (block, _names) in CANDIDATES.items():" in verify

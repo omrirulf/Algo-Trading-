@@ -286,7 +286,7 @@ jobs:
           python - <<'EOF'
           import sys, time
           from backtest.verify_tickers import check
-          from config.shadow_universe import REPLACED, SECTORS, TICKERS
+          from config.shadow_universe import CANDIDATES, REPLACED, SECTORS, TICKERS
           results = {ticker: check(ticker) for ticker in TICKERS}
           for attempt in (1, 2):
               broken = [t for t, r in results.items() if not r.resolved]
@@ -304,6 +304,11 @@ jobs:
               if rule == 3:
                   print(f"for the record: {old} (replaced by {new}, rule 3) "
                         f"{'resolves now' if check(old).resolved else 'still does not resolve'}")
+          # A candidate replacement must resolve before it can join the list (card rule (2)); a candidate
+          # that does not is not used, and the list itself does not fail because of it.
+          for ticker, (block, _names) in CANDIDATES.items():
+              r = check(ticker)
+              print(f"candidate {ticker:<6} {'ok' if r.resolved else 'NO':<3} {block:<28} {r.note}")
           if broken:
               print("Does not resolve: " + ", ".join(broken))
               sys.exit(1)

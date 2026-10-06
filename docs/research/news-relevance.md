@@ -48,6 +48,18 @@ IRM 100% (1 of 1), EW 62%, IDXX 100% (1 of 1), MET 71%, MLM 71%, UMC 78%; SO 25%
 30% had 0 to 7 headlines, and their misses are mostly sector pages and market wraps (Google News filling a quiet
 day), not another meaning of the letters; one more headline would move most of them over 30%. The owner decides.
 
+**The owner's decision of 2026-10-06: rule (2) pooled over five weekday checks** (Amendment 2026-10-06). The same
+check runs on four more weekdays, five in total, before the list freezes on 2026-12-22, spread over at least two
+different weeks; this day is the first. Each day is kept as one file, `docs/research/news-checks/YYYY-MM-DD.json`
+(each name's headlines, relevant and named-by-name counts, or `null` for no answer), made from the run's `RESULT` and
+`FAILED` lines by `python -m analysis.news_pooled --from-log LOG --day DAY --run ID`. After the fifth check,
+`python -m analysis.news_pooled` pools the five for every name: a name is replaced only if its pooled share is under
+30% with at least 10 pooled headlines, or if it had zero headlines on all five days (a day with no answer counts as
+zero, so ZTO is replaced if it never answers); a name with fewer than 10 pooled headlines is kept unless it had zero
+on all five days. STT and IRM are kept. A replacement comes from the same sector or ADR region, is not a production
+name, passes the verify check and passes the news check (at least 30% relevant) on at least one weekday; each is
+recorded on the card with its reason.
+
 Per name (the recheck's result for the 44 names it asked, the first run's for the others):
 
 | Name | Block | Headlines | Relevant | Share | Run |
