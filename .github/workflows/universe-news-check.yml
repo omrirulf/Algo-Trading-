@@ -18,6 +18,14 @@ name: universe news check
 # the label "universe-news-check" on a pull request. It holds the Bright Data
 # key and zone the cycle uses, under Bright Data's own names, and nothing
 # else: no broker key, no model key. About 255 requests, about $0.40.
+#
+# Bright Data sometimes answers 200 with an empty body (on 5 Oct 2026 about
+# one first request in two, all through the run). So names are asked two at
+# a time, and a name whose search failed is asked again in up to three more
+# rounds, a minute apart; a name that still fails is listed apart, with no
+# share, because no headline from a broken request is not a search that finds
+# something else. ONLY_NAMES, when not empty, asks only the names it lists (a
+# recheck of the names that failed, or whose search name changed).
 on:
   workflow_dispatch:
   pull_request:
@@ -45,9 +53,10 @@ jobs:
         env:
           BRIGHTDATA_API_KEY: ${{ secrets.BRIGHTDATA_API_TOKEN }}
           BRIGHTDATA_UNLOCKER_ZONE: ${{ vars.BRIGHTDATA_SERP_ZONE || 'cli_unlocker' }}
+          ONLY_NAMES: ""
         run: |
           python - <<'EOF'
-          import json, os, sys
+          import json, os, sys, time
           from concurrent.futures import ThreadPoolExecutor
           from datetime import datetime, timezone
           from analysis.news_relevance import FAIL_BELOW, report, universe_share
@@ -61,25 +70,38 @@ jobs:
               print(f"{today} is not a trading day: nothing asked (the check runs on a weekday)")
               sys.exit(0)
 
+          only = [t.strip().upper() for t in os.environ.get("ONLY_NAMES", "").split(",") if t.strip()]
+          unknown = sorted(set(only) - set(TICKERS))
+          if unknown:
+              sys.exit(f"not in the list: {', '.join(unknown)}")
+          names = [t for t in TICKERS if not only or t in only]
+
           def ask(ticker):
               try:
                   return ticker, fetch(ticker), None
               except NewsFetchError as exc:  # one name must not end the check
                   return ticker, [], type(exc).__name__
 
-          with ThreadPoolExecutor(max_workers=4) as pool:
-              found = {t: (items, error) for t, items, error in pool.map(ask, TICKERS)}
-          # A search that failed is asked once more: no headline because the request broke is not
-          # a search that finds something else.
-          for ticker in [t for t, (_, error) in found.items() if error]:
-              _, items, error = ask(ticker)
-              found[ticker] = (items, error)
+          with ThreadPoolExecutor(max_workers=2) as pool:
+              found = {t: (items, error) for t, items, error in pool.map(ask, names)}
+          # A search that failed is asked again, up to three more rounds a minute apart: no headline
+          # because the request broke is not a search that finds something else.
+          for _round in range(3):
+              again = [t for t, (_, error) in found.items() if error]
+              if not again:
+                  break
+              time.sleep(60)
+              for ticker in again:
+                  _, items, error = ask(ticker)
+                  found[ticker] = (items, error)
 
-          shares = [universe_share(t, found[t][0]) for t in TICKERS]
-          text = report(shares, f"Universe news relevance on {today} (query: company name plus ticker)")
-          broken = [t for t in TICKERS if found[t][1]]
+          broken = [t for t in names if found[t][1]]
+          shares = [universe_share(t, found[t][0]) for t in names if t not in broken]
+          scope = f"recheck of {len(names)} names" if only else "all names"
+          text = report(shares, f"Universe news relevance on {today}, {scope} (query: company name plus ticker)")
           if broken:
-              text += "\nThe search itself failed (asked twice) for: " + ", ".join(broken) + "\n"
+              text += ("\nThe search itself failed (asked four times) for: " + ", ".join(broken)
+                       + " -- no share for them, and not counted above.\n")
           replaced = {new: (old, rule) for old, (new, rule) in REPLACED.items()}
           # Also where the company is named by name in under 30%: there the ticker alone carried it,
           # which is weak evidence for a one- or two-letter ticker ("Class C").
@@ -92,6 +114,7 @@ jobs:
               text += "".join(f"- {h.title[:140]}\n" for h in found[s.ticker][0][:5]) or "- no headline\n"
           print(text)
           print("RESULT " + json.dumps({s.ticker: [s.headlines, s.relevant, s.named] for s in shares}))
+          print("FAILED " + json.dumps(broken))
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
               summary.write(text)
           EOF
