@@ -19,11 +19,290 @@ It is used two ways.
 
 The universe has its own news query, company name plus ticker ("Southern Company SO stock",
 `config/shadow_universe.py`), and production's query is unchanged. The check asks that search once for each of
-the 251 names on a weekday (`.github/workflows/universe-news-check.yml`, about $0.40) and reports the share per
-name, the names under 30% and the overall share. A name still under 30% may be replaced by the card's rule (2),
-never for its returns, and each replacement is recorded with its reason.
+the 251 names on a weekday (`.github/workflows/universe-news-check.yml`) and reports the share per name, the
+names under 30% and the overall share. A name still under 30% may be replaced by the card's rule (2), never for
+its returns, and each replacement is recorded with its reason.
 
-The first run is on the first weekday, Monday 5 Oct 2026. Its results are added here.
+### The check of Monday 2026-10-05
+
+Two runs on the same day, both with the universe's query and the code-only rule:
+
+- **First run, all 251 names** (run 37345386044, 17:02-17:42 UTC). Bright Data throttled the requests all
+  through the run: about one first request in two came back as an empty body with its 200, and 29 names had no
+  answer even when asked twice. It also showed that 18 names had their ticker as their search name, so they were
+  searched as "<ticker> stock" (production's query: "SQM stock" found square-metre property news), not as
+  company name plus ticker. Their company names now lead (`"United Parcel Service UPS stock"`).
+- **Recheck, 44 names** (run 37351217326, 17:49-17:59 UTC): the 29 with no answer and the 18 renamed (3 were
+  both). Asked two at a time, a failed search up to four times. 43 answered; ZTO did not.
+
+**Overall: 75% relevant** (1149 of 1537 headlines, 250 of 251 names; ZTO no answer). The
+median name had 6 headlines.
+
+**Under 30% or no headline: 19 names**: OKE (n/a, 0 of 0), APD (17%, 1 of 6), ECL (20%, 2 of 10), GD (20%, 1 of 5), BKNG (20%, 1 of 5), ORLY (25%, 1 of 4), HSY (29%, 2 of 7), INTU (25%, 2 of 8), FOXA (25%, 1 of 4), PEG (17%, 1 of 6), SO (25%, 1 of 4), GSK (29%, 2 of 7), NMR (n/a, 0 of 0), IBN (n/a, 0 of 0), AMX (0%, 0 of 1), CHKP (0%, 0 of 1), ICL (0%, 0 of 1), PKX (n/a, 0 of 0), SHG (n/a, 0 of 0).
+
+**The replacements of 2026-10-02 and 2026-10-03, and the short tickers kept on 2026-10-03:** STT 80% (4 of 5),
+IRM 100% (1 of 1), EW 62%, IDXX 100% (1 of 1), MET 71%, MLM 71%, UMC 78%; SO 25%, C 78%, D 75%, T 60%, ED
+75%, NOW 44%, V 78%, ICE 70%, O 60%, F 60% (with "<ticker> stock" on 2026-10-03: SO, C, D and MET 0 of 10).
+
+**No name is replaced on this day.** Rule (2) allows a replacement; it does not require one. Most names under
+30% had 0 to 7 headlines, and their misses are mostly sector pages and market wraps (Google News filling a quiet
+day), not another meaning of the letters; one more headline would move most of them over 30%. The owner decides.
+
+Per name (the recheck's result for the 44 names it asked, the first run's for the others):
+
+| Name | Block | Headlines | Relevant | Share | Run |
+| --- | --- | ---: | ---: | ---: | --- |
+| BKR | Energy | 7 | 5 | 71% | recheck |
+| CNQ | Energy | 10 | 5 | 50% | first |
+| COP | Energy | 6 | 5 | 83% | first |
+| CVX | Energy | 10 | 10 | 100% | first |
+| ENB | Energy | 9 | 7 | 78% | first |
+| EOG | Energy | 4 | 3 | 75% | first |
+| FANG | Energy | 3 | 1 | 33% | first |
+| HAL | Energy | 6 | 2 | 33% | first |
+| KMI | Energy | 3 | 2 | 67% | first |
+| MPC | Energy | 4 | 4 | 100% | first |
+| OKE | Energy | 0 | 0 | n/a | first |
+| OXY | Energy | 7 | 5 | 71% | first |
+| PSX | Energy | 10 | 8 | 80% | first |
+| SLB | Energy | 1 | 1 | 100% | recheck |
+| VLO | Energy | 6 | 4 | 67% | first |
+| WMB | Energy | 4 | 3 | 75% | first |
+| ALB | Materials | 3 | 2 | 67% | first |
+| APD | Materials | 6 | 1 | 17% | first |
+| CRH | Materials | 7 | 6 | 86% | recheck |
+| DD | Materials | 3 | 3 | 100% | first |
+| ECL | Materials | 10 | 2 | 20% | first |
+| FCX | Materials | 8 | 7 | 88% | first |
+| LIN | Materials | 4 | 4 | 100% | first |
+| MLM | Materials | 7 | 5 | 71% | first |
+| NEM | Materials | 7 | 6 | 86% | first |
+| NTR | Materials | 8 | 8 | 100% | first |
+| NUE | Materials | 5 | 5 | 100% | first |
+| PPG | Materials | 5 | 2 | 40% | first |
+| SHW | Materials | 4 | 4 | 100% | first |
+| VMC | Materials | 8 | 7 | 88% | first |
+| ADP | Industrials | 5 | 4 | 80% | first |
+| BA | Industrials | 9 | 7 | 78% | first |
+| CMI | Industrials | 6 | 6 | 100% | first |
+| CSX | Industrials | 8 | 3 | 38% | recheck |
+| DE | Industrials | 6 | 6 | 100% | first |
+| EMR | Industrials | 5 | 2 | 40% | first |
+| ETN | Industrials | 9 | 7 | 78% | first |
+| GD | Industrials | 5 | 1 | 20% | first |
+| GE | Industrials | 9 | 5 | 56% | first |
+| ITW | Industrials | 8 | 4 | 50% | first |
+| JCI | Industrials | 7 | 3 | 43% | first |
+| LHX | Industrials | 4 | 4 | 100% | first |
+| LMT | Industrials | 4 | 2 | 50% | first |
+| MMM | Industrials | 3 | 3 | 100% | recheck |
+| NOC | Industrials | 5 | 3 | 60% | first |
+| PH | Industrials | 3 | 2 | 67% | first |
+| RSG | Industrials | 5 | 4 | 80% | first |
+| RTX | Industrials | 10 | 9 | 90% | recheck |
+| TT | Industrials | 2 | 2 | 100% | first |
+| UNP | Industrials | 6 | 5 | 83% | first |
+| UPS | Industrials | 2 | 1 | 50% | recheck |
+| WM | Industrials | 6 | 4 | 67% | first |
+| ABNB | Consumer discretionary | 5 | 5 | 100% | first |
+| AMZN | Consumer discretionary | 9 | 9 | 100% | first |
+| AZO | Consumer discretionary | 3 | 2 | 67% | first |
+| BKNG | Consumer discretionary | 5 | 1 | 20% | first |
+| CMG | Consumer discretionary | 9 | 8 | 89% | first |
+| F | Consumer discretionary | 10 | 6 | 60% | first |
+| GM | Consumer discretionary | 10 | 7 | 70% | first |
+| HD | Consumer discretionary | 9 | 4 | 44% | first |
+| HLT | Consumer discretionary | 2 | 1 | 50% | first |
+| LOW | Consumer discretionary | 7 | 3 | 43% | first |
+| MAR | Consumer discretionary | 6 | 2 | 33% | first |
+| MCD | Consumer discretionary | 10 | 9 | 90% | first |
+| NKE | Consumer discretionary | 9 | 9 | 100% | first |
+| ORLY | Consumer discretionary | 4 | 1 | 25% | first |
+| ROST | Consumer discretionary | 5 | 2 | 40% | first |
+| SBUX | Consumer discretionary | 10 | 8 | 80% | first |
+| TJX | Consumer discretionary | 6 | 5 | 83% | recheck |
+| TSLA | Consumer discretionary | 10 | 10 | 100% | first |
+| YUM | Consumer discretionary | 2 | 2 | 100% | first |
+| ADM | Consumer staples | 6 | 6 | 100% | first |
+| CL | Consumer staples | 9 | 6 | 67% | first |
+| COST | Consumer staples | 9 | 9 | 100% | first |
+| GIS | Consumer staples | 6 | 6 | 100% | first |
+| HSY | Consumer staples | 7 | 2 | 29% | first |
+| KMB | Consumer staples | 7 | 6 | 86% | first |
+| KO | Consumer staples | 10 | 10 | 100% | first |
+| KR | Consumer staples | 4 | 4 | 100% | first |
+| MDLZ | Consumer staples | 4 | 3 | 75% | first |
+| MNST | Consumer staples | 7 | 3 | 43% | first |
+| MO | Consumer staples | 3 | 2 | 67% | first |
+| PEP | Consumer staples | 10 | 9 | 90% | first |
+| PM | Consumer staples | 6 | 4 | 67% | first |
+| SYY | Consumer staples | 4 | 2 | 50% | first |
+| TGT | Consumer staples | 10 | 4 | 40% | first |
+| WMT | Consumer staples | 9 | 9 | 100% | first |
+| ABBV | Health care | 3 | 3 | 100% | first |
+| ABT | Health care | 7 | 5 | 71% | recheck |
+| AMGN | Health care | 5 | 4 | 80% | first |
+| BMY | Health care | 7 | 6 | 86% | first |
+| BSX | Health care | 5 | 3 | 60% | first |
+| CI | Health care | 4 | 3 | 75% | first |
+| CVS | Health care | 10 | 8 | 80% | first |
+| DHR | Health care | 6 | 6 | 100% | first |
+| ELV | Health care | 4 | 3 | 75% | first |
+| EW | Health care | 8 | 5 | 62% | first |
+| GILD | Health care | 5 | 4 | 80% | first |
+| HCA | Health care | 6 | 2 | 33% | first |
+| IDXX | Health care | 1 | 1 | 100% | first |
+| ISRG | Health care | 6 | 3 | 50% | first |
+| MRK | Health care | 10 | 10 | 100% | first |
+| PFE | Health care | 5 | 5 | 100% | first |
+| REGN | Health care | 3 | 3 | 100% | first |
+| SYK | Health care | 5 | 5 | 100% | first |
+| TMO | Health care | 8 | 7 | 88% | first |
+| UNH | Health care | 9 | 9 | 100% | first |
+| VRTX | Health care | 6 | 3 | 50% | first |
+| ZTS | Health care | 2 | 1 | 50% | first |
+| AIG | Financials | 4 | 2 | 50% | recheck |
+| AXP | Financials | 8 | 8 | 100% | first |
+| BAC | Financials | 7 | 4 | 57% | first |
+| BLK | Financials | 5 | 5 | 100% | first |
+| BX | Financials | 8 | 5 | 62% | first |
+| C | Financials | 9 | 7 | 78% | first |
+| CB | Financials | 7 | 7 | 100% | first |
+| CME | Financials | 10 | 8 | 80% | recheck |
+| COF | Financials | 8 | 3 | 38% | first |
+| GS | Financials | 10 | 5 | 50% | recheck |
+| ICE | Financials | 10 | 7 | 70% | first |
+| MA | Financials | 10 | 9 | 90% | first |
+| MCO | Financials | 3 | 2 | 67% | first |
+| MET | Financials | 7 | 5 | 71% | first |
+| MS | Financials | 10 | 9 | 90% | first |
+| PGR | Financials | 6 | 5 | 83% | first |
+| PNC | Financials | 10 | 3 | 30% | recheck |
+| PYPL | Financials | 6 | 4 | 67% | first |
+| SCHW | Financials | 6 | 5 | 83% | first |
+| STT | Financials | 5 | 4 | 80% | first |
+| TRV | Financials | 4 | 4 | 100% | first |
+| USB | Financials | 4 | 3 | 75% | first |
+| V | Financials | 9 | 7 | 78% | first |
+| WFC | Financials | 7 | 7 | 100% | first |
+| AAPL | Information technology | 10 | 10 | 100% | first |
+| ACN | Information technology | 10 | 9 | 90% | first |
+| ADBE | Information technology | 9 | 8 | 89% | first |
+| ADI | Information technology | 5 | 4 | 80% | first |
+| AMAT | Information technology | 6 | 5 | 83% | recheck |
+| AMD | Information technology | 9 | 9 | 100% | recheck |
+| ANET | Information technology | 6 | 6 | 100% | first |
+| AVGO | Information technology | 9 | 8 | 89% | first |
+| CDNS | Information technology | 9 | 4 | 44% | first |
+| CRM | Information technology | 10 | 8 | 80% | first |
+| CSCO | Information technology | 9 | 7 | 78% | first |
+| IBM | Information technology | 3 | 3 | 100% | recheck |
+| INTC | Information technology | 10 | 10 | 100% | first |
+| INTU | Information technology | 8 | 2 | 25% | first |
+| KLAC | Information technology | 8 | 4 | 50% | recheck |
+| LRCX | Information technology | 6 | 6 | 100% | first |
+| MU | Information technology | 10 | 9 | 90% | recheck |
+| NOW | Information technology | 9 | 4 | 44% | first |
+| ORCL | Information technology | 9 | 9 | 100% | first |
+| PANW | Information technology | 8 | 4 | 50% | first |
+| QCOM | Information technology | 10 | 10 | 100% | first |
+| SNPS | Information technology | 8 | 8 | 100% | recheck |
+| TXN | Information technology | 5 | 5 | 100% | first |
+| CHTR | Communication services | 8 | 3 | 38% | first |
+| CMCSA | Communication services | 8 | 6 | 75% | first |
+| DIS | Communication services | 10 | 9 | 90% | first |
+| FOXA | Communication services | 4 | 1 | 25% | first |
+| LYV | Communication services | 2 | 1 | 50% | first |
+| META | Communication services | 8 | 8 | 100% | recheck |
+| NFLX | Communication services | 9 | 8 | 89% | first |
+| OMC | Communication services | 1 | 1 | 100% | first |
+| SPOT | Communication services | 10 | 8 | 80% | first |
+| T | Communication services | 10 | 6 | 60% | first |
+| TMUS | Communication services | 10 | 6 | 60% | recheck |
+| TTWO | Communication services | 7 | 5 | 71% | first |
+| VZ | Communication services | 9 | 6 | 67% | first |
+| AEP | Utilities | 10 | 7 | 70% | first |
+| CEG | Utilities | 6 | 6 | 100% | first |
+| D | Utilities | 4 | 3 | 75% | first |
+| DUK | Utilities | 7 | 7 | 100% | recheck |
+| ED | Utilities | 4 | 3 | 75% | first |
+| EXC | Utilities | 2 | 2 | 100% | first |
+| NEE | Utilities | 10 | 3 | 30% | recheck |
+| PEG | Utilities | 6 | 1 | 17% | first |
+| SO | Utilities | 4 | 1 | 25% | first |
+| SRE | Utilities | 2 | 2 | 100% | first |
+| VST | Utilities | 10 | 10 | 100% | first |
+| XEL | Utilities | 2 | 2 | 100% | first |
+| AMT | Real estate | 4 | 3 | 75% | first |
+| CBRE | Real estate | 6 | 6 | 100% | first |
+| CCI | Real estate | 4 | 3 | 75% | first |
+| DLR | Real estate | 5 | 3 | 60% | first |
+| EQIX | Real estate | 2 | 2 | 100% | first |
+| IRM | Real estate | 1 | 1 | 100% | first |
+| O | Real estate | 10 | 6 | 60% | first |
+| PLD | Real estate | 5 | 4 | 80% | first |
+| PSA | Real estate | 2 | 1 | 50% | first |
+| SPG | Real estate | 6 | 4 | 67% | first |
+| VICI | Real estate | 6 | 6 | 100% | first |
+| WELL | Real estate | 4 | 3 | 75% | first |
+| AZN | ADR: Europe | 10 | 9 | 90% | first |
+| BBVA | ADR: Europe | 6 | 2 | 33% | recheck |
+| BP | ADR: Europe | 10 | 9 | 90% | recheck |
+| BTI | ADR: Europe | 4 | 3 | 75% | first |
+| DEO | ADR: Europe | 1 | 1 | 100% | first |
+| GSK | ADR: Europe | 7 | 2 | 29% | recheck |
+| HSBC | ADR: Europe | 10 | 8 | 80% | recheck |
+| ING | ADR: Europe | 10 | 4 | 40% | first |
+| NVS | ADR: Europe | 3 | 3 | 100% | first |
+| RIO | ADR: Europe | 10 | 7 | 70% | first |
+| SAN | ADR: Europe | 9 | 5 | 56% | first |
+| SAP | ADR: Europe | 10 | 6 | 60% | recheck |
+| SHEL | ADR: Europe | 10 | 7 | 70% | first |
+| SNY | ADR: Europe | 3 | 2 | 67% | first |
+| TTE | ADR: Europe | 9 | 4 | 44% | recheck |
+| UBS | ADR: Europe | 9 | 9 | 100% | recheck |
+| UL | ADR: Europe | 2 | 1 | 50% | first |
+| HMC | ADR: Japan | 10 | 10 | 100% | first |
+| IX | ADR: Japan | 2 | 2 | 100% | first |
+| MFG | ADR: Japan | 1 | 1 | 100% | first |
+| MUFG | ADR: Japan | 5 | 5 | 100% | recheck |
+| NMR | ADR: Japan | 0 | 0 | n/a | recheck |
+| SMFG | ADR: Japan | 3 | 3 | 100% | first |
+| SONY | ADR: Japan | 7 | 6 | 86% | first |
+| TAK | ADR: Japan | 1 | 1 | 100% | first |
+| BABA | ADR: China and Hong Kong | 10 | 9 | 90% | first |
+| BEKE | ADR: China and Hong Kong | 3 | 3 | 100% | first |
+| BIDU | ADR: China and Hong Kong | 2 | 2 | 100% | first |
+| JD | ADR: China and Hong Kong | 7 | 5 | 71% | first |
+| NTES | ADR: China and Hong Kong | 2 | 2 | 100% | first |
+| PDD | ADR: China and Hong Kong | 2 | 2 | 100% | first |
+| TCOM | ADR: China and Hong Kong | 1 | 1 | 100% | first |
+| ZTO | ADR: China and Hong Kong | — | — | n/a | recheck |
+| IBN | ADR: India | 0 | 0 | n/a | recheck |
+| INFY | ADR: India | 6 | 5 | 83% | first |
+| MMYT | ADR: India | 1 | 1 | 100% | first |
+| RDY | ADR: India | 3 | 3 | 100% | first |
+| WIT | ADR: India | 2 | 2 | 100% | first |
+| ABEV | ADR: Latin America | 7 | 7 | 100% | first |
+| AMX | ADR: Latin America | 1 | 0 | 0% | first |
+| BAP | ADR: Latin America | 2 | 2 | 100% | first |
+| FMX | ADR: Latin America | 1 | 1 | 100% | first |
+| ITUB | ADR: Latin America | 10 | 6 | 60% | recheck |
+| NU | ADR: Latin America | 10 | 10 | 100% | first |
+| PBR | ADR: Latin America | 10 | 10 | 100% | recheck |
+| SQM | ADR: Latin America | 1 | 1 | 100% | recheck |
+| VALE | ADR: Latin America | 10 | 3 | 30% | recheck |
+| CHKP | ADR: Israel | 1 | 0 | 0% | recheck |
+| ICL | ADR: Israel | 1 | 0 | 0% | first |
+| MNDY | ADR: Israel | 2 | 1 | 50% | recheck |
+| NICE | ADR: Israel | 6 | 5 | 83% | recheck |
+| WIX | ADR: Israel | 4 | 4 | 100% | first |
+| KB | ADR: Korea and Taiwan | 6 | 3 | 50% | recheck |
+| PKX | ADR: Korea and Taiwan | 0 | 0 | n/a | first |
+| SHG | ADR: Korea and Taiwan | 0 | 0 | n/a | recheck |
+| TSM | ADR: Korea and Taiwan | 10 | 10 | 100% | first |
+| UMC | ADR: Korea and Taiwan | 9 | 7 | 78% | first |
+| BHP | ADR: Australia | 9 | 5 | 56% | recheck |
 
 ## 2. The race's 80 names (a description only)
 

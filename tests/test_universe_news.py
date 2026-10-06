@@ -42,11 +42,19 @@ def test_the_query_is_company_name_plus_ticker():
     assert su.news_query("SO") == "Southern Company SO stock"   # the owner's example
     assert su.news_query("C") == "Citigroup C stock"
     assert su.news_query("STT") == "State Street STT stock"
-    assert su.news_query("BP") == "BP stock"                    # a name that is its ticker is said once
+    assert su.news_query("BP") == "BP plc BP stock"
+    assert su.news_query("UPS") == "United Parcel Service UPS stock"
     for ticker in su.TICKERS:
         query = su.news_query(ticker)
         assert query.endswith(f"{ticker} stock") and query.count(f" {ticker} stock") <= 1, ticker
         assert query.startswith(su.COMPANIES[ticker][0]), ticker
+
+
+def test_no_search_name_is_the_bare_ticker():
+    """5 Oct 2026: 18 names searched as "<ticker> stock" (production's query); now all by their company name."""
+    assert [t for t in su.TICKERS if su.COMPANIES[t][0] == t] == []
+    for ticker in ("UPS", "SQM", "BHP", "BP", "HSBC", "IBM", "NICE", "SLB"):
+        assert ticker in su.match_names(ticker), "the short form still counts as the company"
 
 
 def test_the_short_tickers_are_kept_and_searched_by_their_company_name():
