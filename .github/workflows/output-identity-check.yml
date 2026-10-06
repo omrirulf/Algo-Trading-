@@ -217,6 +217,24 @@ jobs:
                       else:
                           walk(a[key], b[key], keys + (key,), out)
                   out.extend(("added", keys + (key,), None, short(b[key])) for key in b if key not in a)
+              elif isinstance(a, list) and keys and keys[-1] == "rows" and all(
+                      isinstance(r, dict) for r in a + b):
+                  # A price table's rows, compared as a set: which bars are new, which are gone.
+                  old_rows = {json.dumps(r, sort_keys=True) for r in a}
+                  new_rows = {json.dumps(r, sort_keys=True) for r in b}
+                  gone, came = old_rows - new_rows, new_rows - old_rows
+                  def by(rows):
+                      found = {}
+                      for r in map(json.loads, rows):
+                          found.setdefault(f"{r.get('instance')}/{r.get('ticker')}", 0)
+                          found[f"{r.get('instance')}/{r.get('ticker')}"] += 1
+                      return ", ".join(f"{k} ({v})" for k, v in sorted(found.items()))
+                  if gone:
+                      out.append(("removed", keys, f"{len(gone)} row(s): {by(gone)}"[:400], None))
+                  if came:
+                      out.append(("added", keys + ("(rows)",), None, f"{len(came)} row(s): {by(came)}"[:400]))
+                  if not gone and not came and a != b:
+                      out.append(("changed", keys, "rows in one order", "the same rows in another order"))
               elif isinstance(a, list):
                   if len(a) != len(b):
                       out.append(("changed", keys, f"{len(a)} items", f"{len(b)} items"))
@@ -238,6 +256,11 @@ jobs:
               return json.dumps(doc, separators=(",", ":"), allow_nan=False)
 
 
+          def is_stamp(keys):
+              """A price table's fetch-time stamp: when the fetcher ran, by the wall clock. Not a price."""
+              return bool(keys) and keys[-1] == "fetched_at" and "coverage" in keys
+
+
           def compare(label, name, before_path, after_path, strict):
               before, after = before_path.read_bytes(), after_path.read_bytes()
               if before == after:
@@ -250,25 +273,42 @@ jobs:
               a, b = json.loads(before), json.loads(after)
               diffs = []
               walk(a, b, (), diffs)
+              stamps = [d for d in diffs if d[0] == "changed" and is_stamp(d[1])]
+              diffs = [d for d in diffs if d not in stamps]
               added = [d for d in diffs if d[0] == "added"]
               other = [d for d in diffs if d[0] != "added"]
-              note = ""
-              if not other and added and dumps(a).encode() == before.rstrip(b"\n"):
-                  trimmed = json.loads(after)
-                  for _, keys, _, _ in added:
+              # The rest of the file byte for byte: the added keys taken out, the stamps put back as before.
+              trimmed = json.loads(after)
+              row_changes = any(keys[-1] == "(rows)" for _, keys, _, _ in added)
+              for _, keys, _, _ in added:
+                  if keys[-1] != "(rows)":
                       drop(trimmed, keys)
-                  same = dumps(trimmed).encode() == before.rstrip(b"\n")
-                  note = (" Without the added keys, the rest is **byte-identical** to before." if same
-                          else " Without the added keys the rest is equal in value but not in byte order.")
-              lines.append(f"- `{name}`: **DIFFERENT**: {len(added)} key(s) added, {len(other)} value(s) changed or "
-                           f"removed.{note}")
+              for _, keys, _, _ in stamps:
+                  node_a, node_b = a, trimmed
+                  for key in keys[:-1]:
+                      node_a, node_b = node_a[key], node_b[key]
+                  node_b[keys[-1]] = node_a[keys[-1]]
+              rest_same = (not row_changes and dumps(trimmed).encode() == before.rstrip(b"\n")
+                           and dumps(a).encode() == before.rstrip(b"\n"))
+              parts = []
+              if added:
+                  parts.append(f"{len(added)} key(s) added")
+              if other:
+                  parts.append(f"{len(other)} value(s) changed or removed")
+              if stamps:
+                  parts.append(f"{len(stamps)} fetch-time stamp(s) differ (when each ticker's prices were fetched, "
+                               "by the wall clock: the check fetched them once and answered the later runs from its "
+                               "tape)")
+              taken = ("the added keys" if added else "") + (" and " if added and stamps else "") + (
+                  "the stamps" if stamps else "")
+              note = (f" Without {taken}, the rest is **byte-identical** to before." if rest_same and not other
+                      else "")
+              lines.append(f"- `{name}`: **DIFFERENT**: " + "; ".join(parts) + "." + note)
               for kind, keys, old, new in diffs[:60]:
                   lines.append(f"  - {kind} `{fmt(keys)}`" + (f": {old} -> {new}" if kind == "changed" else
-                                                         f": {old}" if kind == "removed" else f": {new}"))
+                                                              f": {old}" if kind == "removed" else f": {new}"))
               if len(diffs) > 60:
                   lines.append(f"  - ... and {len(diffs) - 60} more")
-              if not diffs:
-                  lines.append("  - the same keys and values, in another byte order")
               if name == "funds.json":
                   cal_a, cal_b = a.get("calibration"), b.get("calibration")
                   if dumps(cal_a) == dumps(cal_b):

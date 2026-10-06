@@ -68,5 +68,9 @@ def test_it_fails_on_any_change_to_calibration_or_to_a_value_the_funds_had():
     assert 'failures.append(f"{label}: the calibration copy\'s output differs")' in text
     assert re.search(r'if keys != \("prices_sha256",\):\n\s+failures\.append', text)
     assert "sys.exit(1 if failures else 0)" in text
-    # Added keys are listed, and the rest checked byte for byte without them.
-    assert "Without the added keys, the rest is **byte-identical** to before." in text
+    # Added keys are listed, and the rest checked byte for byte without them. A price table's fetch-time
+    # stamps (the wall clock when the fetcher ran) are set aside and counted, never a price; its rows are
+    # compared as a set, so a bar that is new or gone is named.
+    assert 'f" Without {taken}, the rest is **byte-identical** to before."' in text
+    assert 'return bool(keys) and keys[-1] == "fetched_at" and "coverage" in keys' in text
+    assert 'keys[-1] == "rows"' in text
