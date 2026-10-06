@@ -20,6 +20,7 @@ one of the ways an example could leak opens:
 from __future__ import annotations
 
 import ast
+import json
 import re
 import subprocess
 import sys
@@ -100,9 +101,17 @@ def test_the_races_real_writers_refuse_an_example_table(monkeypatch):
     from tests.test_verdict import plan_inputs
 
     example, every = examples.race_early_stop(), examples.tables()
+    # Last night's frozen table read look 1 as undecided: tonight's table is not stored, only its words
+    # under ``differs_tonight`` and in the report's note, and those too go through ``table_json``.
+    real = horse_race.race_verdict(_view(plan_inputs()), None, date(2026, 12, 23))
+    previous = {"verdict": json.loads(json.dumps(real.data))}
+    frozen = previous["verdict"]["looks"][0]["table"]
+    frozen["status"], frozen["outcome"] = verdict.NO_DECISION, None
     monkeypatch.setattr(verdict, "race_table", lambda *a, **k: example)
     with pytest.raises(ValueError, match="TEST DATA"):
         horse_race.race_verdict(_view(plan_inputs()), None, date(2026, 12, 23))
+    with pytest.raises(ValueError, match="TEST DATA"):
+        horse_race.race_verdict(_view(plan_inputs()), previous, date(2026, 12, 24))
     for table in every:
         with pytest.raises(ValueError, match="TEST DATA"):
             horse_race.checkpoint_lines(horse_race.RaceVerdict({"text": "x"}, (table,)))
@@ -176,6 +185,96 @@ def test_the_combined_line_refuses_the_examples_dates():
         verdict.combined(race, {"look": 1})
 
 
+# Each printed date on its own: a real-dated input (2026) with exactly one field set to the example's 2099
+# value is refused, so dropping the check on any one date fails a test.
+
+def _real_race_look():
+    from analysis import decision_gate as gate
+    from tests.test_verdict import plan_inputs
+
+    return gate.evaluate({20: plan_inputs()})[0]
+
+
+def _race_with(field):
+    from datetime import date
+
+    from analysis import decision_gate as gate
+    from tests.test_verdict import END, plan_inputs
+
+    look = _real_race_look()
+    if field == "after_tax_window":
+        return verdict.race_table(look, 1, after_tax_window=(examples.FUND_START, END))
+    if field == "after_tax_record_window":
+        record = replace(plan_inputs().after_tax, window=(date(2026, 9, 29), examples.LOOK_DAYS[0]))
+        return verdict.race_table(gate.evaluate({20: plan_inputs(after_tax=record)})[0], 1)
+    if field == "next_look":
+        return verdict.race_table(look, 1, next_look=(2, examples.LOOK_DAYS[1], 2.45))
+    if field == "window_end":
+        return verdict.race_table(look, 1, window_end=examples.LOOK_DAYS[0])
+    assert field is None
+    return verdict.race_table(look, 1, next_look=(2, date(2027, 3, 22), 2.45))
+
+
+@pytest.mark.parametrize("field", ["after_tax_window", "after_tax_record_window", "next_look", "window_end"])
+def test_the_real_race_builder_refuses_each_example_date_on_its_own(field):
+    _race_with(None)                                       # the same input with real dates is built
+    with pytest.raises(ValueError, match="outside the experiment"):
+        _race_with(field)
+
+
+def _fund_with(field):
+    from datetime import date
+
+    from tests.test_verdict import fund_record
+
+    record = fund_record()
+    planned_next = (2, date(2027, 3, 22), 2.41)
+    if field in ("calibration_passed_on", "made_on"):
+        record[field] = (examples.CALIBRATION_PASSED if field == "calibration_passed_on"
+                         else examples.MADE_ON).isoformat()
+    elif field == "window_end":
+        record["window_end"] = examples.LOOK_DAYS[0].isoformat()
+    elif field == "start":
+        record["start"] = examples.FUND_START.isoformat()
+    elif field in ("from", "through"):
+        pair = "model-momentum"
+        record["tests"][pair] = dict(record["tests"][pair], **{
+            field: (examples.FUND_START if field == "from" else examples.LOOK_DAYS[0]).isoformat()})
+    elif field == "planned_next":
+        planned_next = (2, examples.LOOK_DAYS[1], 2.41)
+    else:
+        assert field is None
+    return verdict.fund_test_table(record, planned_next=planned_next)
+
+
+@pytest.mark.parametrize("field", ["calibration_passed_on", "made_on", "window_end", "start", "from", "through",
+                                   "planned_next"])
+def test_the_real_fund_test_builder_refuses_each_example_date_on_its_own(field):
+    _fund_with(None)                                       # the same record with real dates is built
+    with pytest.raises(ValueError, match="outside the experiment"):
+        _fund_with(field)
+
+
+@pytest.mark.parametrize("side,field", [("race", "window_end"), ("race", "next"), ("fund", "window_end"),
+                                        ("fund", "next")])
+def test_the_combined_line_refuses_each_example_date_on_its_own(side, field):
+    def sides(swap=None):
+        race = {"decided_at": 1, "outcome": "momentum", "look": 1, "window_end": "2026-12-22", "next": None}
+        fund = {"decided_at": None, "outcome": None, "look": 1, "window_end": "2026-12-22",
+                "next": {"look": 2, "estimated": "2027-03-22"}}
+        if swap is not None:
+            target = race if swap[0] == "race" else fund
+            if swap[1] == "window_end":
+                target["window_end"] = examples.LOOK_DAYS[0].isoformat()
+            else:
+                target["next"] = {"look": 2, "estimated": examples.LOOK_DAYS[1].isoformat()}
+        return race, fund
+
+    verdict.combined(*sides())                             # real dates: the line is made
+    with pytest.raises(ValueError, match="outside the experiment"):
+        verdict.combined(*sides((side, field)))
+
+
 # --- 4. nothing outside tests/ imports the examples ----------------------------------------------------------
 
 
@@ -186,12 +285,18 @@ def test_no_module_outside_tests_imports_the_examples():
         if any(part in skip for part in path.relative_to(ROOT).parts):
             continue
         tree = ast.parse(path.read_text(encoding="utf-8"))
+        # A string on its own as a statement (a docstring) loads nothing; any other string naming the
+        # examples might (importlib.import_module("tests.verdict_examples"), __import__, runpy).
+        prose = {id(node.value) for node in ast.walk(tree) if isinstance(node, ast.Expr)
+                 and isinstance(node.value, ast.Constant)}
         for node in ast.walk(tree):
             names = []
             if isinstance(node, ast.Import):
                 names = [alias.name for alias in node.names]
             elif isinstance(node, ast.ImportFrom):
                 names = [node.module or ""] + [alias.name for alias in node.names]
+            elif isinstance(node, ast.Constant) and isinstance(node.value, str) and id(node) not in prose:
+                names = [node.value]
             if any("verdict_examples" in name for name in names):
                 bad.append(f"{path.relative_to(ROOT)}:{node.lineno}")
     assert bad == []

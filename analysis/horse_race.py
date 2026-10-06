@@ -1206,8 +1206,10 @@ def race_verdict(view: GateView, previous: Optional[dict], today: date) -> RaceV
             table = old_table
             if tonight.complete and tonight.status != checkpoint.UNREADABLE and (
                     tonight.status, tonight.outcome) != (old_table.status, old_table.outcome):
-                entry["differs_tonight"] = tonight.verdict
-                notes.append(f"Note: tonight's data reads checkpoint {number} differently: {tonight.verdict}")
+                # Through the real writer, as every table word that reaches an output.
+                words = checkpoint.table_json(tonight)["verdict"]
+                entry["differs_tonight"] = words
+                notes.append(f"Note: tonight's data reads checkpoint {number} differently: {words}")
         else:
             entry = {"look": number, "made_on": today.isoformat(), "window_end": end,
                      "table": checkpoint.table_json(tonight)}
