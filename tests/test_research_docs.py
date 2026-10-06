@@ -98,6 +98,30 @@ def test_the_backlog_has_the_owners_three_parts_and_the_index_first_items():
     assert (RESEARCH / "investor-simulator-plan.md").exists()
 
 
+def test_the_two_before_real_money_checklists_have_the_same_items_in_the_same_order():
+    """The backlog's copy and the checklist's home (docs/next-steps.mdx) number the items alike, and in both the
+    paper-only literal is removed last, after the broker and fund-domicile decisions."""
+    def items(text: str) -> list[str]:
+        """Each numbered item with its continuation lines, as one line of text."""
+        found: list[str] = []
+        for line in text.splitlines():
+            if re.match(r"^\d\. \*\*", line):
+                found.append(line)
+            elif found and line.startswith("   ") and line.strip():
+                found[-1] += " " + line.strip()
+        return found
+
+    home = (ROOT / "docs" / "next-steps.mdx").read_text().split("### Before real money: the checklist", 1)[1]
+    copy = (RESEARCH / "backlog.md").read_text().split("The before-real-money checklist, item by item", 1)[1]
+    copy = copy.split("\n## ", 1)[0]
+    subjects = ("notification", "repository private", "personal numbers", "paper-only literal", "broker", "domicile")
+    for listed in (items(home), items(copy)):
+        assert len(listed) == 6, listed
+        for number, (item, subject) in enumerate(zip(listed, subjects), start=1):
+            assert item.startswith(f"{number}. ") and subject in item.split("**")[1], (number, item[:60])
+        assert "last" in listed[3]
+
+
 def test_the_dropped_fifty_day_version_is_kept_and_counted():
     row = next(r for r in trials() if "50-day moving-average veto" in r[1])
     assert row[3] == "dropped before it ran" and "signal counts only" in row[5]

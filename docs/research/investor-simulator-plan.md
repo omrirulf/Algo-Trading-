@@ -24,22 +24,22 @@ repository's own GitHub Actions job runs this repository's tested engine at a pi
 the owner's (while this repository is public; 2.3 says what changes if it is made private), and writes the report as a
 Markdown file in the same private repository, read on github.com or in the GitHub app. Nothing flows back here.
 
-**What the owner decides.** The table below. Every row has a recommendation; "all as recommended" is a complete
-answer, with only the rows the owner wants different named.
+**What the owner decides.** The table below. Every row has a recommendation. The owner can answer "all as recommended"
+and name only the rows they want changed.
 
 | # | Decision | Recommended | Other options |
 | --- | --- | --- | --- |
 | | **Where** | | |
 | D1 | Where the lots live and where the job runs | **A private GitHub repository** (2.3) | A private Supabase project (2.4); the owner's computer only (2.5) |
 | D2 | Where the owner reads the report | **A Markdown file in that private repository** (github.com or the GitHub app, signed in; GitHub Pages stays off) | A private Supabase table, read in the Supabase dashboard (option B). No email: the owner asked for output only to a private page, and an email is kept by a mail provider and can show on the phone's lock screen |
-| D3 | One home for all personal numbers? | **Yes: the coach's later data entry also goes to the private repository.** This changes the coach plan's "private Supabase project", so only if the owner agrees | Two places: lots in the private repository, the coach's numbers in Supabase |
+| D3 | One home for all personal numbers? | **Yes: the coach's later data entry also goes to the private repository.** This changes the coach plan's "private Supabase project", so only if the owner agrees. The coach's own job and any secret it needs are designed when its data entry is built | Two places: lots in the private repository, the coach's numbers in Supabase |
 | | **Rebalancing** (section 5) | | |
 | D4 | New contributions | **Every month: first to classes below their band, then to the other classes below target, the largest gap first, each up to its target. Money stays in its account: a broker account may buy any fund in the fund table, a keren hishtalmut or gemel only its own tracks** | All of it to the class furthest below target |
 | D5 | A target of 4% or less, where "band edge minus 1 point" reaches or passes the target | **Trade to the target itself** | Leave such classes out of the bands |
 | D6 | A sale's tax cost | **This year's extra tax, plus 25% of the loss that the sale uses up (a loss from earlier years, or from earlier this year, that would otherwise be carried forward)** | This year's extra tax only |
 | D7 | "Drift above 10 points" | **Absolute points, measured once at the start of the taxable step (after contributions and tax-free moves, before any sale), as the largest drift among the classes the sale moves towards target** | Measured at the start of the run; the sold class's own drift |
 | D8 | Several classes out at once | **Out-of-band classes go to their "trade to" point; any money still needed comes from classes above target, the cheapest tax first, never taking a class below its target; money never leaves its account** | Equal shares from every class above target |
-| D9 | Which accounts are "tax-free" | **Keren hishtalmut and kupat gemel lehashkaa (no tax on a switch of track); a track that holds several classes (a general track) counts by its published mix; pension left out; shown before any withdrawal tax** | Pension in too; one class per track; model the gemel's lump-sum withdrawal tax (needs the CPI) |
+| D9 | Which accounts are "tax-free" | **Keren hishtalmut and kupat gemel lehashkaa (no tax on a switch of track); a track that holds several classes (a general track) counts by its published mix; pension left out; shown with no withdrawal tax taken off** | Pension in too; one class per track; model the gemel's lump-sum withdrawal tax (needs the CPI) |
 | | **Harvesting** (section 6) | | |
 | D10 | "A lot" under FIFO | **Every lot up to and including the loss lot, net (FIFO sells the earlier ones first); "lot value" = the value of everything sold** | The loss lot's own value |
 | D11 | "A net gain this year" | **This year's taxable gain after the loss carried in from earlier years is above 0** | This year's gains less losses, before the loss carried in |
@@ -124,10 +124,11 @@ The workflow is about 40 lines. It is given to the owner as text to paste, and i
 repository:
 
 1. Runs on the first working day of each month and on every push that changes `data/`.
-2. **Stops unless the repository is private.** Its first step asks GitHub whether the repository is private and fails
-   if it is not, so nothing after it runs. (A step, not an `if:` on the event: a scheduled run carries no event data,
-   so an `if:` would skip every monthly run.) This only stops the job. It cannot stop the files from becoming public:
-   making the repository public publishes every file in `data/` and `reports/`, and all their history, at once.
+2. **Stops unless the repository is private.** Its first step asks GitHub's API, with the job's own token, whether the
+   repository is private, and fails if it is not, so nothing after it runs. (A step, not an `if:` on the event: a
+   scheduled run carries no event data, so an `if:` would skip every monthly run.) This only stops the job. It cannot
+   stop the files from becoming public: making the repository public publishes every file in `data/` and `reports/`,
+   and all their history, at once.
 3. Checks out the private repository, then **this public repository at one pinned commit** (a 40-character SHA, never
    a branch name), and fails unless that commit is on this repository's `main` (a SHA alone can also name an unmerged
    branch or a fork's commit). No later change here reaches the owner's data until the owner moves the pin on purpose.
@@ -137,16 +138,17 @@ repository:
    and model packages, and the packages under them are not pinned.
 5. Runs the engine: `python -m investor.report --data data --out reports`. It fetches public prices and the Bank of
    Israel's rates itself. It gets no token.
-6. Commits the report to `reports/`. Only this last step gets the job's own short-lived token, which works only on the
-   private repository. **No artifact, no upload, no phone push, no secret of the owner's.** The log says only "report
-   written" and how many lines. The engine prints no amount, share, ticker or account name, and an error prints only
-   its kind, never its values.
-7. The private repository's log and artifact retention is set to the minimum (1 day). The actions the workflow uses
-   are pinned by SHA, as in this repository's `ci.yml`.
+6. Commits the report to `reports/`. The job's own short-lived token, which works only on the private repository, goes
+   to the privacy check, the two checkouts (which do not keep it) and this commit step; the install and the engine
+   never get it. The workflow asks for one permission only (`contents: write`), and one run at a time (a `concurrency`
+   group), so a push run and a monthly run cannot both commit at once. **No artifact, no upload, no phone push, no
+   secret of the owner's.** The log says only "report written" and how many lines. The engine prints no amount, share,
+   ticker or account name, and an error prints only its kind, never its values.
+7. The actions the workflow uses are pinned by SHA, as in this repository's `ci.yml`.
 
-**Two rules for the owner:** never make the private repository public, and never turn on GitHub Pages for it (a Pages
-site from a private repository is public on the Pro plan). Upload or paste data only there: before each upload, check
-the repository's name and its "Private" label at the top of the page.
+**Rules for the owner** (also in the setup list of section 10): never make the private repository public, and never
+turn on GitHub Pages for it (a Pages site from a private repository is public on the Pro plan). Upload or paste data
+only there: before each upload, check the repository's name and its "Private" label at the top of the page.
 
 ```
 this public repository (engine, sample data, tests)          the owner's private repository
@@ -167,10 +169,11 @@ nothing. The report uses text and tables only, so it reads well in the GitHub ap
 
 - Anyone with access to the owner's GitHub account, and GitHub itself, can read the private repository. So can any app
   or token that covers all the owner's repositories: a GitHub App installed for "All repositories" (the Claude GitHub
-  App, for example) covers a new repository at once, with no further step. So before any data goes in, the owner sets
-  every such app to "Only select repositories", without this one (section 10, step 3). **This plan never needs the
-  private repository in a Claude session.** The engine is built and tested here with sample data only, and the owner
-  moves the pin.
+  App, for example) covers a new repository at once, with no further step. An OAuth app with access to private
+  repositories reaches every one of them and cannot be limited. So before any data goes in, the owner sets every
+  GitHub App to "Only select repositories", without this one, and revokes every OAuth app and token with access to
+  private repositories that is not needed (section 10, step 3). **This plan never needs the private repository in a
+  Claude session.** The engine is built and tested here with sample data only, and the owner moves the pin.
 - The engine and its locked packages run on the lots with network access (for prices). A bad package could send the
   lots out. The hash lock and the reviewed pin make that unlikely; nothing makes it impossible.
 - Git history keeps every old version of a file, so a file committed by mistake stays in the history unless the
@@ -181,8 +184,8 @@ is made private:
 
 - Its GitHub Pages site (the dashboard) goes offline on the Free plan: Pages is not available for a private repository
   on Free, and on Pro it is public.
-- Its Actions runs then use the account's free minutes for private repositories: 2,000 a month on Free. It used about
-  4,000 minutes of runs in the last 30 days (an estimate from the research, not a billed figure), about twice that.
+- Its Actions runs then use the account's free minutes for private repositories: 2,000 a month on Free. In the last 30
+  days it used about 4,000 minutes of runs (an estimate, not a billed figure): about twice the 2,000 free minutes.
   Above the free amount, GitHub charges for the extra minutes or, with no payment set up, stops the runs (the daily
   cycle and the investor job too) until the next month.
 - The investor job can no longer fetch the engine with its own token. One of these is then needed: GitHub's setting on
@@ -218,10 +221,15 @@ fallback if the owner wants the data on no server at all.
 - **The engine reads only the folder it is given**: `--data` has no default, and there is no environment variable or
   `.env` lookup. It writes only to `--out`. It refuses a `--data` or `--out` folder inside this repository, so real
   numbers never sit one `git add` away from being public, and nothing can land in `logs/`, `dashboard/` or `docs/`,
-  which are published.
+  which are published. Its tests copy the sample folder to a temporary folder outside the repository first. The
+  private repository's template is given as text in a doc, with its header line written inside a sentence, never as a
+  line of its own, so the detector above stays quiet.
 - **It prints nothing personal.** A test runs it on sample files full of distinctive made-up amounts and tickers, and
   checks that none of them appears in what it prints, its log lines or its error messages (the report file is the only
-  place amounts go). The price fetch's own log lines name tickers, so they are switched off in the engine.
+  place amounts go). The price fetch's own log lines name tickers, so they are switched off in the engine, and so are
+  the `yfinance` and `httpx` loggers; the test includes a failing fetch. The engine fetches prices for every fund in
+  the public fund table from one fixed start date, so the requests do not show which funds the owner holds. A fund
+  the owner holds that is not in the table is listed in the private `plan.csv` and fetched on its own.
 - **It cannot trade, ask a model or push.** It imports no broker, model or phone code (the same kind of CI step as
   "The shadow funds cannot trade"); its only network use is the price and rate fetch.
 - **No workflow in this repository runs it on real data**, and none holds a secret for it. CI runs its tests on the
@@ -237,19 +245,22 @@ fallback if the owner wants the data on no server at all.
 | --- | --- | --- |
 | `date` | 2026-03-02 | The trade date (accountant question 4 asks whether it should be the settlement date) |
 | `account` | Broker-1 | One of `accounts.csv` |
-| `kind` | `buy`, `sell`, `dividend`, `deposit`, `withdrawal`, `fee`, `transfer_in` | |
+| `kind` | `buy`, `sell`, `dividend`, `deposit`, `withdrawal`, `fee`, `transfer`, `transfer_in` | |
 | `ticker` | VT | Empty for a deposit |
 | `quantity` | 10 | Shares |
 | `price_usd` | 100.00 | Per share |
 | `fee_usd` | 1.00 | Into the cost of a buy, off the proceeds of a sale |
 | `amount`, `currency` | 37000, ILS | A deposit, a withdrawal, a dividend (gross) or a fee |
-| `withheld_usd` | 12.50 | The US tax the broker actually withheld from a dividend (else the treaty rate: 25% with a W-8BEN on file, 30% without) |
+| `withheld_usd` | 12.50 | The US tax the broker actually withheld from a dividend. Left empty for a US-listed fund: 25% (the treaty rate, with a W-8BEN on file) or 30% (without one). For any other fund it must be filled in (0 if nothing was withheld), or the row is refused |
 | `fx` | (empty) | Empty: the Bank of Israel's rate on `date`. Filled only to override, and the report then says so |
+| `to_account` | Broker-2 | Only for a `transfer`: the owner's other account the shares or the cash go to |
 | `bought_on` | 2024-05-02 | Only for a `transfer_in`: the lot's original purchase day (its price and fee in `price_usd` and `fee_usd`) |
 | `note` | | Free text, never printed |
 
 - A dividend that is reinvested is a `dividend` row plus a `buy` row: a new lot (rule c).
-- A `transfer_in` keeps the lot's own purchase day (`bought_on`), price, and the rate of that day.
+- A `transfer` moves shares (the oldest lots first, keeping their own days, prices and rates) or cash between two of
+  the owner's accounts: no sale, no deposit, no withdrawal. A `transfer_in` brings in a lot from an account outside
+  the records; it keeps the lot's own purchase day (`bought_on`), price, and the rate of that day.
 - **Checks before anything is computed:** a sale larger than the account holds is refused (the tax engine would
   otherwise open a short, which for the owner can only be a typing error); a buy, sell or dividend of a fund not
   quoted in dollars is refused (deposits, withdrawals and fees may be in shekels or dollars); a lot with no price is
@@ -300,8 +311,8 @@ accountant's confirmation (question 1), and the report says so next to every num
 6. **Dividends paid net.** `TaxBook.state` adds the US tax withheld because the experiment's funds credit dividends
    gross (convention 3 of section 5c). A real broker pays them net, so the simulator takes off Israel's tax only and
    shows the US tax on its own line: never taken off twice (test T36).
-7. **The US tax actually withheld** can be entered per dividend (`withheld_usd`); today the engine always assumes the
-   treaty rate (25%, or 30% without a W-8BEN), which would be wrong for an Irish distributing fund.
+7. **The US tax actually withheld** can be entered per dividend (`withheld_usd`); today the engine always assumes 25%
+   (or 30% without a W-8BEN), which would be wrong for an Irish distributing fund.
 8. **A public fund table**: ticker, fund ID, index, domicile, accumulating or distributing, quote currency. An
    accumulating fund (VWRA) has no dividend rows; the report states that it assumes no Israeli tax until the sale
    (accountant question 5).
@@ -333,12 +344,12 @@ any suggestion.
   the largest drift among the classes the sale moves towards target (the class sold and the classes its money buys).
   The override waives only the 0.5% test; the order and the tax cost display stay.
 - **The tax cost of a taxable sale (D6)** = Israel's extra tax this year because of the sale, plus 25% of the loss
-  that the sale uses up: the loss carried out at the year's end without the sale, less the loss carried out with it. A
-  loss carried forward is worth 25% of itself against later gains, so using it now is a cost; this counts losses from
-  earlier years and from earlier this year. It is reckoned with `year_tax` for the whole person: this year's sales so
-  far, the lines already suggested in this run, the dividends and the loss carried in, at the last close and the day's
-  rate, FIFO lots. When the loss would otherwise be set against dividends already covered by the US credit, using it
-  is free, and the cost is 0 (test T19). A negative cost is a saving.
+  that the sale uses up. That is the loss left to carry forward at the year's end without the sale, less the loss left
+  with it. A loss carried forward is worth 25% of itself against later gains, so using it now is a cost. This counts
+  losses from earlier years and from earlier this year. It is reckoned with `year_tax` for the whole person: this
+  year's sales so far, the lines already suggested in this run, the dividends and the loss carried in, at the last
+  close and the day's rate, FIFO lots. When the loss would otherwise be set against dividends already covered by the
+  US credit, using it is free, and the cost is 0 (test T19). A negative cost is a saving.
 - **0.5%** = the tax cost in shekels against the sale's gross proceeds in shekels, per sale line, strictly under. The
   commission and spread are shown beside it, not in it.
 - **Shares** are whole shares: the count that brings the out-of-band class nearest to its "trade to" point (fewer
@@ -408,10 +419,9 @@ Read as: **A** (the loss test) **and B** (the cost test) **and C** (a net gain t
 - **Net gain this year (D11)** = this year's taxable gain of all the owner's taxable accounts so far, after the loss
   carried in, before this harvest. The literal "gains less losses" is shown too.
 - **Expects gains within 3 years** = the owner's dated yes/no in `plan.csv`.
-- **Domicile switch (D12)** = the sold fund is US-listed and the candidate fund is Irish. While VWRA is the first
-  substitute for VT (6.5), condition C always passes for a VT lot through the domicile switch, so D11 and the "gains
-  within 3 years" answer change only the result for a same-domicile fund such as ACWI. The report shows both (T24,
-  T29, T32).
+- **Domicile switch (D12)** = the sold fund is US-listed and the candidate fund is Irish. VWRA is the first fund
+  suggested for VT (6.5). It is a domicile switch, so test C always passes for a VT lot. D11 and the "gains within 3
+  years" answer matter only for a fund with the same domicile, such as ACWI. The report shows both (T24, T29, T32).
 - **Several harvests (D14)** are taken one after another, the largest first, and C is checked again after each.
 - **Warnings on every suggestion:**
   - section 86: accountant question 6 is open, so "do not act before it is answered" (D15);
@@ -430,7 +440,9 @@ of what would be sold. Then try the funds of 6.5 for the sold fund, in table ord
 fund ID and any with no price. For each one, compute its trading cost and test B, and test C with that fund. The group
 is flagged if at least one fund passes A, B and C. The first fund that passes is suggested; the other funds that pass
 are shown beside it with their costs, and a fund that fails says which test it failed. Of the flagged groups of one
-account and fund, the one with the largest net loss is shown. Nothing is sold: the line says "Suggestion only".
+account and fund, the one with the largest net loss is shown. Every harvest line starts with its tax cost this year in
+shekels, as every rebalancing line does: usually a saving, for example "Tax cost: −1,850 ILS (a saving)" (T24).
+Nothing is sold: the line says "Suggestion only".
 
 ### 6.4 Trading cost parameters (D16)
 
@@ -456,7 +468,7 @@ refuses a pair that shares either (for example VWRA and VWRL are one fund; ACWI 
 | Sold | Suggested | Similar because | Not identical because |
 | --- | --- | --- | --- |
 | VT (US-listed, FTSE Global All Cap) | VWRA (Irish, FTSE All-World, accumulating) | World stocks | No small companies; a **domicile switch** |
-| VT | SPYI (Irish, MSCI ACWI IMI, accumulating) | World stocks with small companies | Another provider and index; a **domicile switch** |
+| VT | IMID (Irish, MSCI ACWI IMI, accumulating, in dollars on the LSE) | World stocks with small companies | Another provider and index; a **domicile switch** |
 | VT | ACWI (US-listed, MSCI ACWI) | World stocks | Another provider and index; no domicile switch |
 | VWRA | ISAC (Irish, MSCI ACWI, accumulating, in dollars on the LSE) | World stocks, the same domicile | Another provider and index |
 | ACWI | VT | World stocks | Another provider and index |
@@ -466,7 +478,10 @@ refuses a pair that shares either (for example VWRA and VWRL are one fund; ACWI 
 The report also shows, as a note and not a rule, the owner's US-listed holdings against the $60,000 line above which
 the US estate tax applies to a non-US person (Israel has no estate-tax treaty with the US); a domicile switch lowers
 that amount. Prices: VWRA and ISAC are quoted in dollars on the LSE; the lines quoted in pence (SSAC, VWRL) are not
-used, so no unit can be mixed up. VWRA's prices start on 23 July 2019.
+used, so no unit can be mixed up. A ticker can name different funds on different exchanges (SPYI is this SPDR fund in
+euros on Xetra, but a different, US-listed fund in New York), so the fund table names each fund by its ISIN and
+exchange too: VWRA IE00BK5BQT80, ISAC IE00B6R52259 and IMID IE00B3YLTY66, all on the LSE in dollars, each checked on
+the provider's page when the engine is built. VWRA's prices start on 23 July 2019.
 
 ## 7. The report, scope (d)
 
@@ -486,15 +501,15 @@ The report is one Markdown file with text and tables only. Its sections:
 
 - **Value if sold today** = the market value in shekels (positions at the close × the rate, plus cash) − (this year's
   Israeli tax if every taxable lot were sold today, for the whole person, less this year's advances recorded as paid
-  in `payments.csv`) − any tax of finished years still unpaid (if the owner records payments). If the advances paid
-  are more than this year's tax, the difference comes back through the annual return and is added (T37). No selling
-  cost (as the after-tax gate assumes); the cost of selling is shown beside it. Dividends arrived net, so the US tax
-  is not taken off again (T36).
+  in `payments.csv`; T37) − any tax of finished years still unpaid (if the owner records payments). If the advances
+  paid are more than this year's tax, the difference comes back through the annual return and is added (T37, second
+  case). No selling cost (as the after-tax gate assumes); the cost of selling is shown beside it. Dividends arrived
+  net, so the US tax is not taken off again (T36).
 - **Tax paid so far** = Israel's tax for each finished year + this year's on what has been sold and received so far +
   the US tax withheld, at each dividend's own day's rate (on purpose not at today's rate, as the experiment's
   `TaxBook.state` does). It is what is due on what has happened, computed. If the owner enters `payments.csv`, the
   payments are shown beside it.
-- The tax-free accounts are shown at their value, labelled "before any withdrawal tax" (D9).
+- The tax-free accounts are shown at their value, labelled "no withdrawal tax taken off" (D9).
 
 ### 7.2 Half-year figures
 
@@ -528,8 +543,8 @@ return, T33).
 - **The same shekels on the same days.** Every shekel deposit into a taxable account (a dollar deposit at its day's
   rate) buys VT, and separately VWRA, at that day's close, in whole shares, after the same trading cost; money left
   over waits for the next deposit. A withdrawal sells the same amount, FIFO. Lots held before the records start, and
-  lots transferred in, count as deposits of their cost on their own purchase days. A transfer between the owner's own
-  accounts is not a deposit.
+  lots transferred in, count as deposits of their cost on their own purchase days. A `transfer` between the owner's
+  own accounts is neither a deposit nor a withdrawal (T40).
 - **VT**: each dividend, less the 25% US tax withheld, buys whole shares on its day: a new lot. Israel's extra tax is
   usually 0 (T10).
 - **VWRA**: accumulating, so no dividend rows; no Israeli tax until it is sold (accountant question 5). Money that
@@ -568,20 +583,20 @@ made-up bond fund at $50 (180 ILS at 3.60); "KH" is a keren hishtalmut.
 ### Harvesting
 
 The trading costs below use the parameters of 6.4, except in T31, where the cost is given. The funds bought: VWRA at
-$130 and ACWI at $125 (SPYI has no price in the sample data, so it is skipped), in whole shares with the sale's
+$130 and ACWI at $125 (IMID has no price in the sample data, so it is skipped), in whole shares with the sale's
 dollars after the selling cost.
 
 | Test | Case | Expected |
 | --- | --- | --- |
-| T24 | 100 VT bought at $120 at 3.70 (44,400 ILS); today $100 at 3.70 (37,000 ILS); this year's taxable gain 10,000 ILS, no dividends | Loss 7,400 ≥ max(2,000, 1,850). Trading cost to VWRA 43.96 ILS (5× = 219.78), to ACWI 14.75. Tax value 1,850, all of it worth now. **Flagged**: suggests VWRA (first in 6.5; a domicile switch); ACWI also passes (cost 14.75), shown beside |
-| T25 | What the loss is really worth. 100 VT at $120 at 3.60; today $100 at 3.75; this year's gain 3,000; dividends 1,000 ILS (250 of US tax); switch on | Loss 5,700 (the shekel loss; the dollar loss at the sale rate would be 7,500, and the smaller counts). Tax value 1,425 ≥ 5 × 44.55. **Flagged.** Worth now 750; 1,000 goes against dividends, worth 0 (250 of US credit lost); 1,700 carried forward |
+| T24 | 100 VT bought at $120 at 3.70 (44,400 ILS); today $100 at 3.70 (37,000 ILS); this year's taxable gain 10,000 ILS, no dividends | Loss 7,400 ≥ max(2,000, 1,850). Trading cost to VWRA 43.96 ILS (5× = 219.78), to ACWI 14.75. Tax value 1,850, all of it worth now. **Flagged**: "Tax cost: −1,850 ILS (a saving)"; suggests VWRA (first in 6.5; a domicile switch); ACWI also passes (cost 14.75), shown beside |
+| T25 | What the loss is really worth. 100 VT at $120 at 3.60; today $100 at 3.75; this year's gain 3,000; dividends 1,000 ILS (250 of US tax); switch on | Loss 5,700 (the shekel loss; the dollar loss at the sale rate would be 7,500, and the smaller counts). Tax value 1,425 ≥ 5 × 44.55. **Flagged**: "Tax cost: −750 ILS (a saving)". Worth now 750; 1,000 goes against dividends, worth 0 (250 of US credit lost); 1,700 carried forward |
 | T26 | T5 decides. 300 VT at $100 at 3.70; today $102 at 3.45; this year's gain 10,000 | A dollar gain but a shekel loss of 5,430: allowable 0, **not flagged**. The line says it would be flagged (tax value 1,357.50 against 5 × 121.13) if the accountant rejects T5 |
 | T27 | A small loss. 50 VT at $100 at 4.00; today $92.50 at 4.00 | Loss 1,500 < 2,000: not flagged |
 | T28 | A small share of a large lot. 1,000 VT at $100 at 3.70; today $96 at 3.70 | Loss 14,800 < 5% of 355,200 (17,760): not flagged |
-| T29 | No gain this year, none expected. T24's lot; no gains; dividends 1,200 ILS (300 of US tax) | **Flagged**: suggests VWRA, as a domicile switch (D12); ACWI fails test C. Worth now 0; 1,200 against dividends (300 of US credit lost); 6,200 carried forward |
+| T29 | No gain this year, none expected. T24's lot; no gains; dividends 1,200 ILS (300 of US tax) | **Flagged**: "Tax cost: 0 ILS"; suggests VWRA, as a domicile switch (D12); ACWI fails test C. Worth now 0; 1,200 against dividends (300 of US credit lost); 6,200 carried forward |
 | T30 | A FIFO group (D10). Lot 1: 300 VT at $90 at 3.90; lot 2: 100 VT at $125 at 3.55; today $100 at 3.60; this year's gain 6,000 | Lot 2 alone would be −8,375, but lot 1 is sold first (+2,700): the group's net loss is 5,675 on 144,000 ILS sold, under 5% (7,200): **not flagged**. (With the loss lot's own value it would be.) |
 | T31 | The cost test fails. A loss of 2,400 on a 40,000 ILS lot; trading cost 150 ILS | Tax value 600 < 750: not flagged |
-| T32 | A loss carried in already covers this year's gain (D11). 100 VT at $130 at 3.50; today $100 at 3.50; this year's gain 4,000; loss carried in 5,000; no gains expected | This year's taxable gain is 0, so with ACWI test C fails (under the literal reading it would pass). With VWRA it passes as a domicile switch: **flagged**, suggests VWRA, as in T29. Shown: worth now 0; 10,500 carried forward |
+| T32 | A loss carried in already covers this year's gain (D11). 100 VT at $130 at 3.50; today $100 at 3.50; this year's gain 4,000; loss carried in 5,000; no gains expected | This year's taxable gain is 0, so with ACWI test C fails (under the literal reading it would pass). With VWRA it passes as a domicile switch: **flagged**, "Tax cost: 0 ILS", suggests VWRA, as in T29. Shown: worth now 0; 10,500 carried forward |
 
 ### The outputs
 
@@ -591,10 +606,11 @@ dollars after the selling cost.
 | T34 | Form 1325 rows, T9's sale | Bought 2026-10-01 at 3.50, sold 2026-10-05 at 3.55: cost 3,500, proceeds 4,615, nominal 1,115, inflationary amount 50, real gain 1,065 |
 | T35 | One person, two accounts: +2,000 in one, −2,000 in the other, the same year | Net 0, tax 0 (two separate books would wrongly give 500) |
 | T36 | No tax taken off twice. 100 VT at $100 at 3.70 (Jan 2026); a $50 dividend at 3.65, paid net and kept as cash; 40 sold at $110 at 3.60 (tax 260, paid); today (Mar 2027) $120 at 3.50 | Market value 40,731.25. **Value if sold today 39,981.25** (not 39,677.50, which takes the 2026 tax and the US tax off again). Tax paid so far 305.625 (the US tax at the dividend day's rate) |
-| T37 | An advance already paid. 100 VT at $100 at 3.70 (Jan 2027); 40 sold in March at $110 at 3.60 (gain 1,040; first-half advance of 260 recorded as paid from outside); today (1 Aug 2027) $120 at 3.50, the sale's dollars kept as cash | Market value 40,600. This year's tax if all sold: 1,010. **Value if sold today 39,850** (not 39,590, which takes the paid 260 off again) |
+| T37 | An advance already paid. 100 VT at $100 at 3.70 (Jan 2027); 40 sold in March at $110 at 3.60 (gain 1,040; first-half advance of 260 recorded as paid from outside); today (1 Aug 2027) $120 at 3.50, the sale's dollars kept as cash | Market value 40,600. This year's tax if all sold: 1,010. **Value if sold today 39,850** (not 39,590, which takes the paid 260 off again). Second case, today $95 at 3.50: the open lots lose 1,050, so the year nets −10 and its tax is 0; market value 35,350, **value if sold today 35,610** (the 260 paid comes back) |
 | T38 | VT against VWRA. 37,000 ILS on one day at 3.70 ($10,000; both at $100). VT pays $2 a share; $150 after US tax buys 1 share at $105 at 3.60, $45 stays as cash. Today VT $110, VWRA $112, rate 3.60 | VT: 40,158.00 ILS, Israel's tax if sold 654.50, **after tax 39,503.50**. VWRA: 40,320.00, tax 830.00, **after tax 39,490.00** |
 | T39 | The surtax (D20). Other taxable income 700,000 ILS; a taxable gain of 40,000 ILS this year | On: capital tax 10,000 and surtax 553.20 (3% of the 18,440 above the 721,560 line). Off (the default): surtax 0. The income appears nowhere in what the engine prints |
-| T40 | Privacy | On the sample data, no amount, share, ticker or account name in what it prints, its log or an error (only in the report file); the engine refuses a file without the SAMPLE or PRIVATE line, a missing `--data`, and a `--data` or `--out` folder inside this repository |
+| T40 | A transfer between the owner's accounts. 10 VT bought at $100 at 3.70 in account A; a `transfer` to account B; sold there at $110 at 3.60 | One sale row with the original day and rate: cost 3,700, proceeds 3,960, taxable 260, tax 65. Account A holds nothing after the transfer. In the VT and VWRA books nothing is bought or sold |
+| T41 | Privacy | On the sample data, no amount, share, ticker or account name in what it prints, its log or an error (only in the report file); the engine refuses a file without the SAMPLE or PRIVATE line, a missing `--data`, and a `--data` or `--out` folder inside this repository |
 
 ## 9. Proposed new accountant questions (not added until the owner says so, D19)
 
@@ -611,13 +627,18 @@ dollars after the selling cost.
 
 1. **This repository, sample data only, after PR #140 is merged** (the reused tax engine is in it): the additions of
    section 4.2, the rebalancing and harvest code, the report and the command line, the fund table, the sample folder,
-   tests T11 to T40, and the guardrails of section 2.6. One pull request, reviewed like every other.
+   tests T11 to T41, and the guardrails of section 2.6. One pull request, reviewed like every other.
 2. **The private repository's template:** the workflow and empty data files with their header lines, given to the
    owner as text to paste. Nothing of the owner's passes through Claude.
-3. **The owner**, before any data goes in, sets every GitHub App installed for "All repositories" (the Claude GitHub
-   App included) to "Only select repositories", without the private one, and removes any token that reaches all the
-   owner's repositories and is not needed. Then the owner creates the private repository, pins the engine's commit,
-   fills the files and reads the first report.
+3. **The owner**, before any data goes in:
+   - sets every GitHub App installed for "All repositories" (the Claude GitHub App included) to "Only select
+     repositories", without the private one;
+   - revokes every OAuth app and token with access to private repositories that is not needed (an OAuth app cannot be
+     limited to some repositories);
+   - checks two-factor login on the GitHub account;
+   - creates the private repository, sets its log and artifact retention to 1 day (Settings, Actions, General), and
+     leaves GitHub Pages off;
+   - pins the engine's commit, fills the files and reads the first report.
 
 Nothing changes in the experiment: no rule, no arm, no fund, no slot; no change to `config/israel_tax.py` or to T1 to
 T10.
