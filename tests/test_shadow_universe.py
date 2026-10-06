@@ -942,7 +942,8 @@ def test_the_job_clock_outlasts_the_budget_and_one_slow_name():
 def test_the_verify_run_checks_every_name_without_a_model():
     wf = _workflow()
     assert wf["jobs"]["verify"]["if"] == "${{ github.event_name == 'pull_request' || inputs.verify }}"
-    assert wf["jobs"]["score"]["if"] == "${{ github.event_name != 'pull_request' && !inputs.verify }}"
+    # After the vote's job (the owner's order of 6 Oct 2026), never on a pull request or a verify run.
+    assert wf["jobs"]["score"]["if"] == "${{ !cancelled() && github.event_name != 'pull_request' && !inputs.verify }}"
     assert wf["jobs"]["verify"]["permissions"] == {"contents": "read"}
     run = _step("Does every name resolve?", "verify")["run"]
     assert "from backtest.verify_tickers import check" in run and "TICKERS" in run

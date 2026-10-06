@@ -35,6 +35,17 @@ document (``--previous``) every night after; between looks the document
 carries only their counters, which are counted from the journal and the
 prices without running a fund.
 
+**The voting arm and the thesis check: nothing before their dates**
+(pre-registration sections 13.11 and 13.12, the owner's instruction of
+4 Oct 2026). From 2026-12-22 (``config.model_vote.START``) the document
+carries the vote's counters, and a look's record carries its race arm, its
+fund against the model fund on the same lines (``shadow.vote``) and the
+descriptive IC comparison. From 2027-04-01 (``config.thesis_check.START``)
+it carries the thesis check's counters, and a look's record its
+BROKEN-against-VALID description, which is in no test's family. Before
+those dates neither key exists anywhere in the document, and the vote's and
+the checks' lines are not even read (``--votes``, ``--thesis``).
+
 Two reports that are not fund results are in every document from the fund
 start on, whatever calibration says: ``price_gaps`` (the price source's
 missing ticker-days per calendar month over the watchlist) and
@@ -56,7 +67,7 @@ import statistics
 import sys
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from typing import Final, Iterable, Optional, Sequence
+from typing import Final, Iterable, Mapping, Optional, Sequence
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -64,7 +75,9 @@ from analysis import price_tape  # noqa: E402
 from analysis.baseline_compare import OhlcFetcher  # noqa: E402
 from analysis.reader import JournalEntry, read_journal  # noqa: E402
 from analysis.returns import last_final_session  # noqa: E402
+from config import model_vote as mv  # noqa: E402
 from config import settings as cfg  # noqa: E402
+from config import thesis_check as tc  # noqa: E402
 from config.market_calendar import is_trading_day  # noqa: E402
 from config.watchlist import DEFAULT_WATCHLIST  # noqa: E402
 from shadow import schedule  # noqa: E402
@@ -481,13 +494,16 @@ def _read_lines(path: Path) -> list[str]:
         return []
 
 
-def paired(fund, other) -> dict:
+def paired(fund, other, after: Optional[date] = None) -> dict:
     """``fund`` against ``other`` day by day, on the sessions both have: the test of section 13.
 
     The daily net returns are paired by date (a fund that starts later, like
     B, is paired from its own first session), then judged as the fund test's
     are: mean difference, Newey-West t (lag 5), two-sided p, and the stats
-    the Deflated Sharpe Ratio reads (``analysis.multiple_tests``).
+    the Deflated Sharpe Ratio reads (``analysis.multiple_tests``). With
+    ``after``, only the sessions strictly after that day are paired: the
+    vote's lines begin on the 2026-12-22 cycle, acted on at the next open
+    (section 13.11), so the days before are two books of cash, not a test.
     """
     from analysis.horse_race import newey_west_t
     from analysis.multiple_tests import p_two_sided, series_stats
@@ -497,7 +513,7 @@ def paired(fund, other) -> dict:
         return {d.day: today / before - 1.0 for d, before, today in zip(f.days, equity, equity[1:])}
 
     mine, theirs = by_day(fund), by_day(other)
-    days = sorted(set(mine) & set(theirs))
+    days = sorted(d for d in set(mine) & set(theirs) if after is None or d > after)
     diffs = [mine[d] - theirs[d] for d in days]
     t = newey_west_t(diffs, VS_MODEL_LAG)
     return {"compare_to": other.name, "days": len(diffs), "from": days[0].isoformat() if days else None,
@@ -541,6 +557,23 @@ def new_funds(feed: SimFeed, bars: Bars, long_bars: Bars, final_through: date, s
     ]
 
 
+def vote_funds(feed: SimFeed, bars: Bars, shortable_no, votes: Mapping) -> list[Fund]:
+    """The voting arm as a fund, and its comparator (section 13.11): the model fund with one thing changed.
+
+    ``model_vote`` trades the vote's answer on each line that has one;
+    ``model_vote_comparator`` trades the model's single call on exactly
+    those lines. Same feed, bars, costs, starting cash, refusals and
+    production engine as the model fund. Simulation only, and never in the
+    funds' list: they are compared with each other, never ranked.
+    """
+    from shadow import vote as sv
+
+    return [
+        Fund(mv.ARM, sv.vote_signal(votes), feed, bars, not_shortable=shortable_no),
+        Fund(mv.COMPARATOR_FUND, sv.comparator_signal(votes), feed, bars, not_shortable=shortable_no),
+    ]
+
+
 def price_coverage(cycles: dict, bars: Bars, start: date, final_through: date) -> dict:
     """Each ticker the funds could trade, as ``(first cycle day, last final bar)``, from the funds' own fetch.
 
@@ -572,6 +605,7 @@ def run_funds(
     entries: Sequence[JournalEntry], start: date, final_through: date, fetcher, *,
     random_funds: int, processes: int, shortable_no, first_cycle: Optional[date] = None,
     exploratory: bool = True, long_bars: Optional[Bars] = None, rates=None,
+    votes: Optional[Mapping] = None,
 ) -> tuple[dict, dict]:
     """Every fund from ``start`` through ``final_through``. Called only once calibration has passed (``build``).
 
@@ -583,6 +617,10 @@ def run_funds(
     with it, every fund is also reckoned after Israeli tax (``shadow.after_tax``),
     the four funds' views go under ``after_tax`` and every fund's series under
     ``_after_tax_series``, which ``build`` takes out before anything is printed.
+    ``votes`` is the voting arm's answers by line (``analysis.vote.answers``),
+    given only on a checkpoint night from 2026-12-22 (section 13.11): with
+    it, and with the exploratory funds, the vote's fund and its comparator
+    run too, and their test goes under ``tests``.
     """
     cycles = lines_by_day(entries)
     ran = cycle_days(entries)
@@ -598,13 +636,15 @@ def run_funds(
     ]
     explore = exploratory_funds(feed, bars, shortable_no) if exploratory else []
     tests = new_funds(feed, bars, long_bars, final_through, shortable_no) if exploratory and long_bars else []
+    # Section 13.11: after the others, so the positions of ``tests`` do not move.
+    voting = vote_funds(feed, bars, shortable_no, votes) if exploratory and votes is not None else []
     # One run for all of them: the same sessions, cycles and feed clock.
-    run([*four, *explore, *tests], sessions, cycles, ran, feed, first_cycle)
+    run([*four, *explore, *tests, *voting], sessions, cycles, ran, feed, first_cycle)
     vt = four[-1].days[-1].equity / STARTING_CASH - 1.0 if four[-1].days else None
     curves, coin_check = coin_funds(random_funds, processes, bars, sessions, cycles, ran, shortable_no,
                                     first_cycle)
     # The key keeps its name; the check covers the exploratory funds too.
-    check = integrity([*four, *explore, *tests])
+    check = integrity([*four, *explore, *tests, *voting])
     model = next(f for f in four if f.name == COMPARE_TO)  # the three exploratory funds' comparator
     out = {
         "start": start.isoformat(),
@@ -623,7 +663,7 @@ def run_funds(
     if rates is not None:
         from shadow import after_tax as tax
 
-        series = {f.name: tax.fund_series(f, f.bars, rates.rate) for f in [*four, *explore, *tests]}
+        series = {f.name: tax.fund_series(f, f.bars, rates.rate) for f in [*four, *explore, *tests, *voting]}
         out["after_tax"] = {f.name: tax.view(series[f.name]) for f in four}
         out["_after_tax_series"] = series
         out["_after_tax_coverage"] = price_coverage(cycles, bars, start, final_through)
@@ -634,6 +674,14 @@ def run_funds(
         out["tests"][xp.LIMIT]["orders"] = {k: v for k, v in vars(tests[2].pullback).items()
                                             if k not in ("filled", "considered")}
         out["tests"][xp.LIMIT]["acted"] = xp.pullback_acted(tests[2], by_name["momentum"])
+    if voting:
+        from shadow import vote as sv
+
+        # The vote against the single call on the same lines, from the sessions after its first cycle;
+        # "acting differently" is counted on the lines, exactly as the race arm counts it.
+        vote_fund, comparator = voting
+        out.setdefault("tests", {})[mv.ARM] = paired(vote_fund, comparator, after=mv.START) | {
+            "acted": sv.acted(sv.lines_with_an_answer(entries, votes), votes)}
     return out, {"four": check, "coin": coin_check}
 
 
@@ -678,15 +726,26 @@ def long_history(entries: Sequence[JournalEntry], final_through: date, fetcher) 
 
 
 def checkpoint_race(entries: Sequence[JournalEntry], long_bars: Bars, today: date, final_through: date,
-                    fetchers: Optional[list] = None) -> dict:
-    """A's race arm, the insider arm's test and C's filled against missed, at a checkpoint (section 13)."""
+                    fetchers: Optional[list] = None, votes: Optional[Mapping] = None) -> dict:
+    """A's race arm, the insider arm's test and C's filled against missed, at a checkpoint (section 13).
+
+    With ``votes`` (the voting arm's answers, given only on a checkpoint
+    night from 2026-12-22), also the vote's race arm against the model's
+    single call on the same lines (section 13.11, ``shadow.vote.race``),
+    with the same price sources.
+    """
     from analysis import decision_gate as gate
 
     lines = [e for e in entries if e.timestamp is not None and e.model_answered]
     how = xp.race_settings(today, final_through, lines)
     if fetchers is not None:
         fetchers += [("race_closes", how.source), ("race_ohlc", how.fetcher)]
-    return xp.race_tests(lines, long_bars, how, schedule.FUND_FIRST_CYCLE, gate.DECISION_CUTOFF)
+    out = xp.race_tests(lines, long_bars, how, schedule.FUND_FIRST_CYCLE, gate.DECISION_CUTOFF)
+    if votes is not None:
+        from shadow import vote as sv
+
+        out[mv.ARM] = sv.race(lines, votes, how)
+    return out
 
 
 #: Every test of the family (section 13.5), by where its numbers are in a
@@ -710,12 +769,24 @@ FAMILY: Final[tuple[tuple[str, str, str, Optional[tuple[str, ...]]], ...]] = (
     # "acting" is a day with an IC.
     ("IC, production names", "ic_main", "production", ("ic_main", "production", "days")),
     ("IC, shadow stock universe", "ic_main", "shadow", ("ic_main", "shadow", "days")),
+    # Section 13.11 (prepared 2026-10-04, registered at the 2026-12-22
+    # checkpoint, one trial in N): the voting arm, as a race arm (lag 3) and
+    # as a fund (lag 5), each against the model's single call on the same
+    # lines. "Acting" is a line where the two signals differ. Its look
+    # records carry it only from 2026-12-22; a record without it is left out
+    # of the family, as 13.5 says.
+    ("model_vote, race arm", "race", mv.ARM, ("race", mv.ARM, "acted")),
+    ("model_vote, fund", "tests", mv.ARM, ("tests", mv.ARM, "acted")),
 )
 #: The last planned look, the minimum of "acting differently", and B, whose
 #: purpose (crash protection) the final "zero or below" rule does not judge.
 FINAL_LOOK: Final[int] = 3
 MIN_ACTED: Final[int] = 20
 NO_ZERO_RULE: Final[frozenset[str]] = frozenset({"B, fund"})
+#: Family members that exist only from a date: a look's table made before it
+#: does not list them at all, not even as "no data" (the owner's rule of
+#: 4 Oct 2026: nothing of a new idea is shown before its registration date).
+FAMILY_FROM: Final[dict[str, date]] = {"model_vote, race arm": mv.START, "model_vote, fund": mv.START}
 
 
 def outcome(row: dict, mean: Optional[float], acted: Optional[int], final: bool, zero_rule: bool) -> str:
@@ -735,8 +806,14 @@ def checkpoint_table_for(record: dict) -> dict:
 
     n = graveyard_n()
     final = record.get("look") == FINAL_LOOK
+    try:
+        made = date.fromisoformat(record["made_on"]) if isinstance(record.get("made_on"), str) else None
+    except ValueError:
+        made = None
     tests, extra = [], []
     for label, part, key, where in FAMILY:
+        if made is not None and label in FAMILY_FROM and made < FAMILY_FROM[label]:
+            continue
         found = (record.get(part) or {}).get(key) or {}
         tests.append({"name": label, "t": found.get("t"), "stats": found.get("stats")})
         acted = None
@@ -879,6 +956,70 @@ def ic_record(lines: dict, final_through: date, fetchers: Optional[list]) -> dic
     return made
 
 
+def vote_lines_in(path: Optional[Path]) -> dict:
+    """The voting arm's lines (``logs/model_vote``), by production line; none without a path.
+
+    Read only from 2026-12-22 (``build``): before it, nothing of the vote is
+    read, let alone computed. No path means no lines, as with ``--universe``.
+    """
+    from analysis import vote as model_vote
+
+    return model_vote.read_votes(path) if path is not None else {}
+
+
+def thesis_lines_in(path: Optional[Path]) -> list:
+    """The thesis check's lines (``logs/thesis_check``); none without a path. Read only from 2027-04-01."""
+    from analysis import thesis as thesis_check
+
+    return thesis_check.read_checks(path) if path is not None else []
+
+
+def vote_ic_record(entries: Sequence[JournalEntry], lines: Mapping, final_through: date,
+                   fetchers: Optional[list]) -> dict:
+    """Section 13.11's secondary number, once at a look: the vote score's daily IC minus the single call's.
+
+    Descriptive only (``analysis.vote.ic_comparison``): no ``main``, not in
+    the family. The bars are fetched for the names with a vote answer, from
+    45 days before the first one, with a fetcher of its own, as the IC
+    report fetches its own (``ic_record``).
+    """
+    from analysis import ic
+    from analysis import vote as model_vote
+
+    found = model_vote.answers(lines, start=mv.START, through=final_through)
+    bars: dict = {}
+    if found:
+        fetcher = OhlcFetcher(final_through=final_through)
+        if fetchers is not None:
+            fetchers.append(("ohlc_vote_ic", fetcher))
+        first = min(key[1].date() for key in found)
+        bars = ic.bars_from_fetcher(fetcher, sorted({key[0] for key in found}), first - timedelta(days=45),
+                                    final_through)
+    return model_vote.ic_comparison(entries, lines, bars, final_through)
+
+
+def thesis_record(lines: Sequence, final_through: date, fetchers: Optional[list], final: bool) -> dict:
+    """Section 13.12 at a look, once: what came after the thesis check's BROKEN and VALID verdicts.
+
+    A description only (``analysis.thesis.checkpoint``), never in the
+    family. The bars come through a fetcher of its own, from the first check
+    with a verdict. ``final``: the last planned look, where too few BROKEN
+    checks read "not tested".
+    """
+    from analysis import ic
+    from analysis import thesis as thesis_check
+
+    names = thesis_check.tickers_of(lines, final_through)
+    bars: dict = {}
+    if names:
+        fetcher = OhlcFetcher(final_through=final_through)
+        if fetchers is not None:
+            fetchers.append(("ohlc_thesis", fetcher))
+        first = min(c.day for c in thesis_check.one_per_name_and_week(thesis_check.in_window(lines, final_through)))
+        bars = ic.bars_from_fetcher(fetcher, names, first, final_through)
+    return thesis_check.checkpoint(lines, bars, final_through, final=final)
+
+
 def vt_bars(long_bars: Bars, final_through: date) -> list[tuple[date, float, float, float]]:
     """VT's ``(day, open, close, dividend)`` from the long history: the regime split's market and the race's index."""
     frame = long_bars.history(xp.TIMING_IN, final_through)
@@ -1012,6 +1153,24 @@ def build(args: argparse.Namespace, now: datetime, fetchers: Optional[list] = No
     counters["ic"] = ic.counters(lines_for_ic, final_through)
     # Section 13.10: the regime split shows sessions per market state only, until the checkpoints.
     counters["regimes"] = regime_counters(long_bars, final_through)
+    # Sections 13.11 and 13.12: the vote's counters from 2026-12-22, the thesis
+    # check's from 2027-04-01. Before its date, an idea's lines are not read
+    # and its key is not in the document at all.
+    from analysis import thesis as thesis_check
+    from analysis import vote as model_vote
+
+    today = now.date()
+    vote_lines = vote_lines_in(getattr(args, "votes", None)) if model_vote.active(today) else {}
+    if model_vote.active(today):
+        # The journal too, so an answered line with no vote record is counted ("missing").
+        counters[mv.ARM] = model_vote.counters(vote_lines, final_through, read.entries)
+    thesis_lines = thesis_lines_in(getattr(args, "thesis", None)) if thesis_check.active(today) else []
+    if thesis_check.active(today):
+        counters[tc.EVENT] = thesis_check.counters(thesis_lines, final_through)
+    # The vote's answers, on a checkpoint night from 2026-12-22 only: the race
+    # arm, the fund and its comparator are made from them, once, at the look.
+    votes = (model_vote.answers(vote_lines, start=mv.START, through=final_through)
+             if model_vote.due(bool(new_looks), today) else None)
     rates, fx = load_rates(getattr(args, "fx_table", None))
     if rates is not None and rates.last < final_through:
         # A table one session short would fail every fund's reckoning; no
@@ -1023,7 +1182,7 @@ def build(args: argparse.Namespace, now: datetime, fetchers: Optional[list] = No
         funds, checks = run_funds(read.entries, fund_start, final_through, fetcher,
                                   random_funds=args.random, processes=args.processes,
                                   shortable_no=shortable_no, first_cycle=schedule.FUND_FIRST_CYCLE,
-                                  exploratory=bool(new_looks), long_bars=long_bars, rates=rates)
+                                  exploratory=bool(new_looks), long_bars=long_bars, rates=rates, votes=votes)
         if new_looks:
             rows = [r for r in funds["list"] if r.get("exploratory")]
             records.append({"look": max(new_looks), "made_on": now.date().isoformat(),
@@ -1041,13 +1200,21 @@ def build(args: argparse.Namespace, now: datetime, fetchers: Optional[list] = No
                                            tax_records, fetchers, rates, fx)
     if new_looks:
         # The race side, and the table of section 13.5-13.6 over every test with data.
-        records[-1]["race"] = checkpoint_race(read.entries, long_bars, now.date(), final_through, fetchers)
+        records[-1]["race"] = checkpoint_race(read.entries, long_bars, now.date(), final_through, fetchers,
+                                              votes=votes)
         # Section 13.9: the IC report, made once at the first checkpoint on or
         # after its registration (2026-12-22), and at every one after.
         if ic.due(True, now.date()):
             records[-1]["ic"] = ic_record(lines_for_ic, final_through, fetchers)
             records[-1]["ic_main"] = {u: block.get("main") or {}
                                       for u, block in records[-1]["ic"]["universes"].items()}
+        # Section 13.11: the vote score's IC against the single call's, descriptive only, from 2026-12-22.
+        if votes is not None:
+            records[-1]["vote_ic"] = vote_ic_record(read.entries, vote_lines, final_through, fetchers)
+        # Section 13.12: the thesis check's BROKEN against VALID, a description only, from 2027-04-01.
+        if thesis_check.due(True, today):
+            records[-1][tc.EVENT] = thesis_record(thesis_lines, final_through, fetchers,
+                                                  final=max(new_looks) == FINAL_LOOK)
         records[-1]["table"] = checkpoint_table_for(records[-1])
         # Section 13.10: the regime split, once, kept with the look's record.
         records[-1]["regimes"] = checkpoint_regimes(read.entries, long_bars, now.date(), final_through, funds,
@@ -1056,7 +1223,9 @@ def build(args: argparse.Namespace, now: datetime, fetchers: Optional[list] = No
         if tax_series is not None:
             from shadow import after_tax as tax
 
-            shown = (*EXPLORATORY_FUNDS, *xp.NEW_FUNDS)
+            # The vote's fund and its comparator only on a night they ran (section 13.11).
+            shown = (*EXPLORATORY_FUNDS, *xp.NEW_FUNDS,
+                     *(name for name in (mv.ARM, mv.COMPARATOR_FUND) if name in tax_series))
             records[-1]["after_tax"] = {name: tax.view(tax_series.get(name)) for name in shown}
         elif funds is not None:
             records[-1]["after_tax"] = {"status": f"not available: {fx.get('reason', 'no rate table')}"}
@@ -1123,6 +1292,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--fx-table", type=Path, default=None,
                         help="the night's shekel rate table, as analysis.boi_rates --with-table printed it "
                              "(pre-registration sections 5c and 11.9); without it, no after-tax view")
+    parser.add_argument("--votes", type=Path, default=None,
+                        help="the voting arm's lines (logs/model_vote), read from 2026-12-22 only "
+                             "(pre-registration section 13.11); without it, no vote lines")
+    parser.add_argument("--thesis", type=Path, default=None,
+                        help="the thesis check's lines (logs/thesis_check), read from 2027-04-01 only "
+                             "(pre-registration section 13.12); without it, no checks")
     parser.add_argument("-v", "--verbose", action="store_true")
     return parser
 
