@@ -50,7 +50,7 @@ day), not another meaning of the letters; one more headline would move most of t
 
 **The owner's decision of 2026-10-06: rule (2) pooled over five weekday checks** (Amendment 2026-10-06). The same
 check runs on four more weekdays, five in total, before the list freezes on 2026-12-22, spread over at least two
-different weeks; this day is the first. Each day is kept as one file, `docs/research/news-checks/YYYY-MM-DD.json`
+different weeks if possible; this day is the first. Each day is kept as one file, `docs/research/news-checks/YYYY-MM-DD.json`
 (each name's headlines, relevant and named-by-name counts, or `null` for no answer), made from the run's `RESULT` and
 `FAILED` lines by `python -m analysis.news_pooled --from-log LOG --day DAY --run ID`. After the fifth check,
 `python -m analysis.news_pooled` pools the five for every name: a name is replaced only if its pooled share is under

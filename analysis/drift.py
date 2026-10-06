@@ -266,11 +266,12 @@ def news_fetches(entries: Sequence[JournalEntry]) -> dict[str, Any]:
 
 
 def news_fetches_line(fetches: Optional[dict[str, Any]]) -> Optional[str]:
-    """The week's failed news fetches in one line, with each day's count. None when nothing searched."""
+    """The week's failed news fetches in one line, with each day's count and weekday. None when nothing searched."""
     if not isinstance(fetches, dict) or not fetches.get("lines"):
         return None
     days = fetches.get("by_day") or {}
-    each = ", ".join(f"{failed}" for failed, _ in days.values())
+    each = ", ".join(f"{date.fromisoformat(d):%a} {c[0]}" if d != "unknown" else f"{d} {c[0]}"
+                     for d, c in days.items())
     return (f"production news fetches that failed: {fetches['failed']} of {fetches['lines']} lines"
             + (f" (by day: {each})" if days else ""))
 

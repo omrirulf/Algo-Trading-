@@ -34,6 +34,10 @@ times in all (``TRIES``), a minute apart (``TRY_PAUSE_SECONDS``, outside the
 two-at-a-time limit). One try is one ``fetch``: production's provider, whose
 own one retry after an empty body or a broken connection is unchanged. A
 missing key or zone is not tried again: it is the same every time.
+"Two at a time" is read as the news searches: only they are two at a time;
+the model calls stay four names at a time, because the whole name two at a
+time (251 names x ~196 s / 2) would take about 7 hours, past
+``RUN_BUDGET_SECONDS`` (240 min) and GitHub's 6-hour job limit.
 ``news_step`` asks every name that way and nothing else -- no model, no
 journal -- to see how many get no answer (the owner asked for one full run in
 the week of 14 Dec 2026).
@@ -92,7 +96,8 @@ def fetch(ticker: str) -> list[Headline]:
     return UniverseNewsProvider("", "", unlocker_zone=DEFAULT_ZONE).fetch_items(ticker)
 
 
-#: At most this many universe names search the news at once (the owner, 6 Oct 2026: "two at a time").
+#: At most this many universe names search the news at once: the owner's "two at a time" (6 Oct 2026),
+#: applied to the news searches only (the model calls stay four at a time; see the module docstring).
 NEWS_AT_ONCE: Final[int] = 2
 #: A name's search is asked up to this many times in all (the owner: "up to four tries per name").
 TRIES: Final[int] = 4

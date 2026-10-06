@@ -211,8 +211,8 @@ def test_the_phone_and_the_markdown_count_the_failed_news_fetches(tmp_path):
                                                      "2026-09-30": [1, 80], "2026-10-01": [2, 80],
                                                      "2026-10-02": [0, 80]}}
     folder = logs(tmp_path, drift=record, digest=digest_record())
-    assert "Production news fetches that failed: 10 of 400 lines (by day: 2, 5, 1, 2, 0)" in weekly.phone(WEEK, URL, folder)
-    assert "- production news fetches that failed: 10 of 400 lines (by day: 2, 5, 1, 2, 0)" in weekly.markdown(
+    assert "Production news fetches that failed: 10 of 400 lines (by day: Mon 2, Tue 5, Wed 1, Thu 2, Fri 0)" in weekly.phone(WEEK, URL, folder)
+    assert "- production news fetches that failed: 10 of 400 lines (by day: Mon 2, Tue 5, Wed 1, Thu 2, Fri 0)" in weekly.markdown(
         WEEK, folder)
     old = weekly.phone(WEEK, URL, logs(tmp_path, drift=drift_record(), digest=digest_record()))
     assert "news fetches" not in old

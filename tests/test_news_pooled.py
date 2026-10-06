@@ -100,7 +100,8 @@ def test_no_decision_before_five_checks():
 @pytest.mark.parametrize("dates, problem", [
     ((*FIVE[:4], date(2026, 10, 10)), "2026-10-10 is not a weekday the market traded"),       # a Saturday
     ((*FIVE[:4], date(2026, 11, 26)), "2026-11-26 is not a weekday the market traded"),      # Thanksgiving
-    ((*FIVE[:4], date(2026, 12, 23)), "2026-12-23 is after the list freezes (2026-12-22)"),
+    ((*FIVE[:4], date(2026, 12, 22)), "2026-12-22 is on or after the day the list freezes (2026-12-22)"),
+    ((*FIVE[:4], date(2026, 12, 23)), "2026-12-23 is on or after the day the list freezes (2026-12-22)"),
     ((*FIVE[:4], FIVE[0]), "two checks on the same day"),
 ])
 def test_a_check_that_cannot_count(dates, problem):
@@ -148,8 +149,39 @@ def test_every_day_file_is_a_whole_check_of_the_list():
     for path in files:
         day = npool.load_day(path)
         assert path.stem == day.day.isoformat()
-        assert list(day.names) == list(su.TICKERS)
+        assert list(day.names) == _as_it_stood(day)
         assert npool.day_json(json.loads(path.read_text(encoding="utf-8"))) == path.read_text(encoding="utf-8")
+
+
+def _as_it_stood(day: npool.DayCheck) -> list:
+    """The list in its order, with each name replaced since that day back in its replacement's place."""
+    back = {new: old for old, (new, _) in su.REPLACED.items() if old in day.names}
+    return [back.get(t, t) for t in su.TICKERS]
+
+
+def test_a_replacement_leaves_the_earlier_day_files_readable(monkeypatch, tmp_path):
+    """A name replaced after a check (by this rule, or by rule (1) or (3)) is still in that day's file."""
+    swapped = tuple("ZZZZ" if t == "OKE" else t for t in su.TICKERS)
+    monkeypatch.setattr(su, "TICKERS", swapped)
+    monkeypatch.setitem(su.REPLACED, "OKE", ("ZZZZ", 2))
+    day = npool.load_day(DAY_ONE)
+    assert "OKE" in day.names and "ZZZZ" not in day.names and list(day.names) == _as_it_stood(day)
+    pooled = [p.ticker for p in npool.pool([day])]
+    assert "OKE" in pooled and "ZZZZ" not in pooled
+    # A later day with the new name: on the list for only some of the days, so not decided.
+    later = [npool.DayCheck(day=d, runs=(1,), names={t: (10, 10, 10) for t in swapped}) for d in FIVE[1:]]
+    found = {p.ticker: p for p in npool.pool([day, *later])}
+    assert found["OKE"].days == 1 and found["ZZZZ"].days == 4
+    assert found["OKE"].decision is found["ZZZZ"].decision is None
+    assert found["ZZZZ"].reason == "on the list on 4 of the 5 days"
+    assert found["AAPL"].decision == npool.KEEP
+    # Both the old and the new name in one file is not the list on any day.
+    made = json.loads(DAY_ONE.read_text(encoding="utf-8"))
+    made["names"]["ZZZZ"] = [1, 1, 1]
+    del made["names"]["BKR"]
+    (tmp_path / "both.json").write_text(json.dumps(made), encoding="utf-8")
+    with pytest.raises(ValueError, match="not the list"):
+        npool.load_day(tmp_path / "both.json")
 
 
 def test_a_day_file_with_a_name_missing_or_extra_is_refused(tmp_path):

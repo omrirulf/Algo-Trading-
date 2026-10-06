@@ -91,7 +91,12 @@ class Pooled:
 
 
 def load_day(path: Path | str) -> DayCheck:
-    """A day file, checked: every name of the list once, nothing else, counts that make sense."""
+    """A day file, checked: every name of the list as it stood that day once, nothing else, counts that make sense.
+
+    A name replaced after that day (``su.REPLACED``) is in the file in place
+    of the name that replaced it, so a replacement never makes an earlier
+    day file unreadable.
+    """
     data = json.loads(Path(path).read_text(encoding="utf-8"))
     day = date.fromisoformat(data["day"])
     names: dict[str, Optional[tuple[int, int, int]]] = {}
@@ -105,7 +110,11 @@ def load_day(path: Path | str) -> DayCheck:
         names[ticker] = (headlines, relevant, named)
     missing = sorted(set(su.TICKERS) - set(names))
     extra = sorted(set(names) - set(su.TICKERS))
-    if missing or extra:
+    # The list as it stood that day: a name replaced since may be there, and its replacement not.
+    out_since = {old for old in extra if old in su.REPLACED}
+    in_since = {new for new in missing if new in {n for n, _ in su.REPLACED.values()}}
+    swapped = any(old in names and new in names for old, (new, _) in su.REPLACED.items())
+    if set(missing) - in_since or set(extra) - out_since or len(names) != len(su.TICKERS) or swapped:
         raise ValueError(f"{path}: not the list: missing {missing}, not in the list {extra}")
     return DayCheck(day=day, runs=tuple(int(r) for r in data.get("runs") or ()), names=names)
 
@@ -153,8 +162,8 @@ def problems(days: Sequence[DayCheck]) -> list[str]:
     for d in dates:
         if not is_trading_day(d):
             out.append(f"{d} is not a weekday the market traded")
-        if d > LAST_DAY:
-            out.append(f"{d} is after the list freezes ({LAST_DAY})")
+        if d >= LAST_DAY:
+            out.append(f"{d} is on or after the day the list freezes ({LAST_DAY})")
     if len(set(dates)) < DAYS_NEEDED:
         out.append(f"{len(set(dates))} of {DAYS_NEEDED} checks so far")
     elif len(set(dates)) > DAYS_NEEDED:
@@ -182,20 +191,32 @@ def decide(found: Pooled) -> tuple[str, str]:
     return KEEP, f"{found.relevant} of {found.headlines} pooled headlines relevant, 30% or more"
 
 
-def pool(days: Sequence[DayCheck], tickers: Iterable[str] = su.TICKERS) -> list[Pooled]:
-    """Every name pooled over the checks; decided only when ``problems`` is empty."""
+def held(days: Sequence[DayCheck]) -> list[str]:
+    """The names the day files hold, in the first day's order, then any that came in later."""
+    return list(dict.fromkeys(t for d in days for t in d.names))
+
+
+def pool(days: Sequence[DayCheck], tickers: Optional[Iterable[str]] = None) -> list[Pooled]:
+    """Every name the day files hold, pooled over the checks; decided only when ``problems`` is empty.
+
+    A name pooled over fewer days than the checks (on the list for only some
+    of them: it came in, or went out, by another rule in between) is not
+    decided: the rule is written for five days.
+    """
     ready = not problems(days)
     out = []
-    for ticker in tickers:
-        counts = [d.names.get(ticker) for d in days]
+    for ticker in (held(days) if tickers is None else tickers):
+        counts = [d.names[ticker] for d in days if ticker in d.names]
         answered = [c for c in counts if c is not None]
         found = Pooled(
-            ticker=ticker, days=len(days), answered=len(answered),
+            ticker=ticker, days=len(counts), answered=len(answered),
             headlines=sum(c[0] for c in answered), relevant=sum(c[1] for c in answered),
             named=sum(c[2] for c in answered),
             zero_every_day=all(c is None or c[0] == 0 for c in counts),
         )
-        if ready:
+        if ready and len(counts) < len(days):
+            found = Pooled(**{**found.__dict__, "reason": f"on the list on {len(counts)} of the {len(days)} days"})
+        elif ready:
             decision, reason = decide(found)
             found = Pooled(**{**found.__dict__, "decision": decision, "reason": reason})
         out.append(found)
@@ -221,7 +242,7 @@ def report(days: Sequence[DayCheck], pooled: Sequence[Pooled]) -> str:
         lines += ["", f"**Replace: {len(replaced)} name(s)**" + (": " if replaced else ".")
                   + ", ".join(f"{p.ticker} ({p.reason})" for p in replaced)]
         kept = [p for p in pooled if p.ticker in KEPT]
-        lines += [f"Kept by the owner's decision: " + ", ".join(
+        lines += ["Kept by the owner's decision: " + ", ".join(
             f"{p.ticker} ({p.relevant} of {p.headlines}, {_pct(p.share)})" for p in kept)]
     lines += ["", "| Name | Days answered | Headlines | Relevant | Share | Named | Decision |",
               "| --- | ---: | ---: | ---: | ---: | ---: | --- |"]
