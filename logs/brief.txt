@@ -1,7 +1,8 @@
-🟡 1 warning: 1 of 80 ticker(s) produced no signal
-Equity $101,914 · 20 positions · $92,022 gross · $2,129 at risk · unrealised +$1,847
-Traded: HYG, XLK
+🔴 22 of 80 ticker(s) were judged without news
+Equity $102,699 · 22 positions · $105,916 gross · $3,392 at risk · unrealised +$2,394
+2 directional calls, none traded
 Started by supabase-cron at 14:40 UTC (0 min after 14:40)
-Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-10-01
-Closed: KRE
-Cycle 80 tickers, $0.15 · 2026-10-02
+Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-10-05
+Closed: XLY, RSP, HDB, KRE
+Also: 1 of 80 ticker(s) produced no signal
+Cycle 80 tickers, $0.14 · 2026-10-06
