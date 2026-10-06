@@ -147,6 +147,12 @@ class JournalEntry:
     #: The line's ``model_setup`` record as journalled. Read it through
     #: ``model_setup``.
     model_setup_record: Any = None
+    #: How many news headlines the line's context carried (``context.headlines``).
+    #: ``None`` when the line has no such field, so it cannot say -- never read
+    #: as zero. Read by the weekly drift report's count of names with no
+    #: headlines all week (the owner's request of 3 Oct 2026); nothing else
+    #: reads it.
+    headline_count: Optional[int] = None
 
     @property
     def run(self) -> Optional[dict[str, Any]]:
@@ -423,6 +429,7 @@ def entry_from(payload: Any) -> Optional[JournalEntry]:
         model_setup_record=(
             dict(payload["model_setup"]) if isinstance(payload.get("model_setup"), dict) else None
         ),
+        headline_count=len(context["headlines"]) if isinstance(context.get("headlines"), list) else None,
     )
 
 

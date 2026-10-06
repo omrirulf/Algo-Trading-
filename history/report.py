@@ -8,6 +8,12 @@ as registered). Nothing here decides anything.
 
 Sections of the pre-registration are always named as such ("pre-registration
 section 13.2"); a bare "section 2" is this report's own.
+
+The stress kind (``history.stress``, the owner's instruction of 2 Oct 2026)
+has its own report, ``render_stress``: each period's funds, their total
+return, worst fall and return against VT and SPY, and the regime split's
+volatility cut-offs. Descriptive only: no t and no verdict. ``render`` picks
+it from ``meta.kind``.
 """
 
 from __future__ import annotations
@@ -493,11 +499,216 @@ def _data(results: dict) -> list[str]:
     return lines + [""]
 
 
+# --------------------------------------------------------------------------- #
+# The stress kind
+# --------------------------------------------------------------------------- #
+
+#: The stress kind's funds, in its report's order: momentum, A, B, C, VT, SPY (``history.stress.FUNDS``).
+STRESS_FUNDS = ("momentum", "momentum_200", "vt_timing", "momentum_pullback", "vt", "spy")
+STRESS_KIND = "stress"
+#: The label of a period VT did not exist in (``history.stress.VT_MISSING``).
+VT_MISSING = "VT did not exist; against SPY instead"
+
+
+def _stress_header(results: dict) -> list[str]:
+    meta = results.get("meta", {})
+    run = meta.get("run") or {}
+    where = []
+    if run.get("run_id"):
+        where.append(f"workflow run {run['run_id']}")
+    if run.get("commit"):
+        where.append(f"commit `{run['commit'][:12]}`")
+    names = list((results.get("periods") or {}).keys())
+    listed = (", ".join(names[:-1]) + " and " + names[-1]) if len(names) > 1 else "".join(names)
+    return [
+        f"# History screen: stress periods ({listed or 'none'})",
+        "",
+        f"*Written by `python -m history.screen run --kind stress` ({', '.join(where) or 'a local run'}) on "
+        f"{meta.get('generated_at', 'n/a')}. Prices through {meta.get('final_through', 'n/a')}. Price table SHA-256 "
+        f"`{meta.get('prices_sha256', 'n/a')}`; history journal SHA-256 `{meta.get('journal_sha256', 'n/a')}` "
+        f"({count(meta.get('journal_lines'))} lines).*",
+        "",
+        "**Nothing here changes the locked test, its rules or its decisions.** This is a history screen: it "
+        "replays, on past prices, the rules that need no model, with the real code. It did not read the live "
+        "race.",
+        "",
+        "**Descriptive only.** This report shows how deep each fund fell, and how it did against holding VT (or "
+        "SPY), in four bad stretches of the market. It has no t and no verdict: four periods, each chosen "
+        "because it was bad, cannot show whether a rule is good or bad. The "
+        f"{count(meta.get('watchlist_names'))} names are today's watchlist: many did not exist in 2000 (each "
+        "period below says how many had prices), and funds and companies that closed before 2026 are missing "
+        "(survivorship).",
+        "",
+    ]
+
+
+def _stress_method(results: dict) -> list[str]:
+    meta = results.get("meta", {})
+    periods = results.get("periods") or {}
+    spans = "; ".join(f"{name}: {p.get('first', 'n/a')} to {p.get('last', 'n/a')}" for name, p in periods.items())
+    missing = meta.get("missing_tickers") or []
+    return [
+        "## How it was made",
+        "",
+        f"- **Periods** (fixed in the code, `history/stress.py`): {spans or 'none'}. Each end is a trading day.",
+        f"- **A fresh start in each period:** every fund starts with ${meta.get('starting_cash', 100_000):,.0f} on "
+        "the period's first session. The indicators warm up on the prices before it: each line's technicals "
+        "(momentum's 63-day return and 50-day average) read the two years of final closes before its day, A's "
+        "200-day average reads the 200 closes before it, and B decides at the last month-end before the period "
+        "from VT's 10 month-end closes up to it. The first trades are at the open of the first session, on the "
+        "lines of the session before it (the live funds act on the previous session's lines the same way).",
+        "- **Funds:** momentum, A (the 200-day veto) and C (the pullback limit) through the production engine; "
+        "B (VT or T-bills by the 10-month average); VT and SPY bought and held. The same code as the full "
+        "screen. **No AI arms:** the model has read about these years, so they cannot test it.",
+        "- **As in the full screen:** the previous session's final close stands in for the live price; prices "
+        "are Yahoo's daily bars adjusted for splits (not for dividends); "
+        f"{pct(meta.get('cost_per_side'), 2, False)} per side on every trade; dividends on the ex-date (the held "
+        "funds keep them as cash); no taxes."
+        + (f" No prices at all for: {', '.join(missing)}." if missing else ""),
+        "- **Not possible:** where a fund's prices do not exist, the report says \"not possible\" and why. "
+        "Nothing stands in for a missing fund.",
+        "- **Words:** *total return* is over the fund's own sessions in the period; *worst fall* is the maximum "
+        "drawdown, the deepest fall from the running high within the period (the start counts as a high); "
+        "*minus VT* is the fund's total return minus VT's over the same sessions (when VT starts later in the "
+        "period, over VT's sessions only: VT is then measured from its cash before its purchase at that "
+        "session's open, so its 0.10% cost is inside, and the other fund from its close the session before, so "
+        "one overnight move is inside), and *minus SPY* the same against SPY; *invested* is the book's gross "
+        "exposure as a share of equity.",
+        "",
+    ]
+
+
+def _stress_vs(block: Optional[dict], first: Optional[str]) -> str:
+    """One comparison as "difference (fund vs compared)", with its first session when it starts later."""
+    if not block:
+        return "-"
+    if not block.get("possible"):
+        return f"not possible: {block.get('why') or 'n/a'}"
+    text = f"{pct(block.get('difference'), 1)} ({pct(block.get('fund_return'), 1)} vs " \
+           f"{pct(block.get('compared_return'), 1)})"
+    if block.get("from") and block.get("from") != first:
+        text += f", from {block['from']}"
+    return text
+
+
+def _stress_period(name: str, period: dict) -> list[str]:
+    names = period.get("names") or {}
+    vt = period.get("vt") or {}
+    first = period.get("first_session") or period.get("first")
+    lines = [f"## {name} ({period.get('first', 'n/a')} to {period.get('last', 'n/a')}, "
+             f"{count(period.get('sessions'))} sessions)", "",
+             f"Names with prices: {count(names.get('with_prices'))} of the {count(names.get('watchlist'))} "
+             f"watchlist names ({count(names.get('from_the_first_session'))} from the first session"
+             + ("; the others started during the period)."
+                if (names.get("with_prices") or 0) > (names.get("from_the_first_session") or 0) else ").")
+             + (f" First trades at the open of {first}, on the lines of {period['first_cycle']}."
+                if period.get("first_cycle") else ""), ""]
+    spy_header = "Minus SPY (same sessions)"
+    if vt.get("in_period") == "none":
+        lines += [f"**{VT_MISSING}.** VT's first price is {vt.get('first_price') or 'not in the table'}, so there "
+                  "is no VT fund here, and each fund's return is shown against SPY (bought and held from the same "
+                  "$100,000).", ""]
+        spy_header += f": {VT_MISSING}"
+    elif vt.get("in_period") == "part":
+        lines += [f"VT only from {vt.get('first_price')} (its first price): *minus VT* is over VT's sessions only, "
+                  "from that day; *minus SPY* is over the whole period.", ""]
+    rows = []
+    funds = period.get("funds") or {}
+    for fund in STRESS_FUNDS:
+        row = funds.get(fund) or {}
+        label = FUND_LABELS.get(fund, fund)
+        if not row.get("possible"):
+            rows.append([label, f"not possible: {row.get('why') or 'n/a'}", "-", "-", "-", "-", "-", "-", "-"])
+            continue
+        rows.append([label, row.get("first", "n/a"), row.get("last", "n/a"), count(row.get("sessions")),
+                     pct(row.get("total_return"), 1), pct(row.get("max_drawdown"), 1, False),
+                     pct(row.get("mean_invested"), 0, False),
+                     _stress_vs(row.get("vs_vt"), first) if fund != "vt" else "-",
+                     _stress_vs(row.get("vs_spy"), first) if fund != "spy" else "-"])
+    lines += _table(["Fund", "From", "To", "Sessions", "Total return", "Worst fall", "Invested (mean)",
+                     "Minus VT (same sessions)", spy_header], rows)
+    notes = []
+    traded = [f"{FUND_LABELS[f]} {count(funds[f]['entries'])}" for f in ("momentum", "momentum_200",
+                                                                         "momentum_pullback")
+              if (funds.get(f) or {}).get("possible") and funds[f].get("entries") is not None]
+    if traded:
+        notes.append("Entries: " + ", ".join(traded) + ".")
+    b = funds.get("vt_timing") or {}
+    if b.get("possible"):
+        switches = b.get("switches")
+        notes.append(f"{FUND_LABELS['vt_timing']}: first decision {b.get('first_decision', 'n/a')}, "
+                     f"{count(switches)} switch{'' if switches == 1 else 'es'} in the period.")
+    if notes:
+        lines += ["", " ".join(notes)]
+    return lines + [""]
+
+
+def _stress_cutoffs(results: dict) -> list[str]:
+    block = results.get("regime_cutoffs") or {}
+    lines = ["## VT 21-day realized volatility terciles, from its first 21 returns to 2026-09-30 (the regime "
+             "split's cut-offs, pre-registration section 13.10)", ""]
+    if not block.get("possible"):
+        return lines + [f"Not possible: {block.get('why') or 'no result'}.", ""]
+    c1, c2 = block["cutoffs"]
+    by = block.get("by_tercile") or {}
+    lines += [f"Each session's volatility is the annualised standard deviation (x sqrt(252)) of VT's 21 daily log "
+              f"returns ending at that session's own final close (adjusted for splits, not for dividends, as the "
+              f"race and the funds read it), from the first session with 21 returns "
+              f"({block.get('first_session')}) to {block.get('last_session')}: {count(block.get('sessions'))} "
+              "sessions. The cut-offs are the 1/3 and 2/3 quantiles of that series (numpy's default method, "
+              "'linear'; `analysis.regimes.tercile_cutoffs`). In the regime split itself, a session's state uses "
+              "the volatility up to the previous close.", ""]
+    if not block.get("complete"):
+        lines += [f"**The prices end before {block.get('window_end')}: these are not the registration's "
+                  "cut-offs.**", ""]
+    lines += _table(["Tercile", "21-day volatility (a year)", "Sessions"], [
+        ["low", f"up to {pct(c1, 2, False)}", count(by.get("low"))],
+        ["mid", f"over {pct(c1, 2, False)}, up to {pct(c2, 2, False)}", count(by.get("mid"))],
+        ["high", f"over {pct(c2, 2, False)}", count(by.get("high"))],
+    ])
+    lines += ["", f"At full precision (`results.json`, `regime_cutoffs`): c1 = {c1!r}, c2 = {c2!r}.", ""]
+    return lines
+
+
+def _stress_data(results: dict) -> list[str]:
+    data = results.get("data") or {}
+    first = data.get("first_prices") or {}
+    warm = data.get("warm_up") or {}
+    lines = ["## Data", "",
+             "First prices: " + ", ".join(f"{t} {d or 'none'}" for t, d in first.items()) + ".", "",
+             f"Warm-up: the first period needs prices from {warm.get('needed_from', 'n/a')}; the calendar (SPY) "
+             f"starts {warm.get('calendar_first_bar') or 'n/a'}"
+             + (" (enough)." if warm.get("enough") else " (**not enough**: the first period's indicators start "
+                                                        "late)."), ""]
+    for name, period in (results.get("periods") or {}).items():
+        integrity = period.get("integrity") or {}
+        if not integrity:
+            continue
+        lines.append(f"- {name}: fund integrity "
+                     f"{'no problems' if integrity.get('ok') else integrity.get('problems')}; "
+                     f"{count(integrity.get('data_holes'))} ticker-days with no bar met by the funds.")
+    return lines + [""]
+
+
+def render_stress(results: dict) -> str:
+    """The stress kind's report, from its ``results.json`` alone."""
+    lines: list[str] = []
+    lines += _stress_header(results)
+    lines += _stress_method(results)
+    for name, period in (results.get("periods") or {}).items():
+        lines += _stress_period(name, period)
+    lines += _stress_cutoffs(results)
+    lines += _stress_data(results)
+    return "\n".join(lines).rstrip() + "\n"
+
+
 def render(results: dict) -> str:
+    if (results.get("meta") or {}).get("kind") == STRESS_KIND:
+        return render_stress(results)
     lines: list[str] = []
     for section in (_header, _method, _race, _funds, _b, _c, _context, _data):
         lines += section(results)
     return "\n".join(lines).rstrip() + "\n"
 
 
-__all__ = ["band_ratio", "render", "verdict"]
+__all__ = ["STRESS_FUNDS", "VT_MISSING", "band_ratio", "render", "render_stress", "verdict"]

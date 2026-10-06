@@ -287,7 +287,7 @@ def test_between_checkpoints_there_are_counters_and_no_exploratory_result(monkey
     assert [r["name"] for r in out["funds"]["list"]] == ["model", "momentum", "hybrid", "vt"]
     assert out["exploratory"]["checkpoints"] == []
     assert set(out["exploratory"]["counters"]) == {"momentum_200", "vt_timing", "momentum_pullback",
-                                                   "model_same_day"}
+                                                   "model_same_day", "ic", "regimes"}
     json.dumps(out, allow_nan=False)
 
 
@@ -344,8 +344,9 @@ def test_p_values_and_the_deflated_sharpe_ratio():
 
 
 def test_n_is_the_graveyard_count_and_the_table_leaves_out_tests_with_no_data():
-    # 18 ideas at registration, and the 16 history screens logged on 2026-09-27 and 28: they count in N too.
-    assert mt.graveyard_n() == 34
+    # 18 ideas at registration, the 16 history screens logged on 2026-09-27 and 28 (they count in N too), and
+    # rows 35 to 41 of 2026-10-02 (the IC report's two universes, the stress screens, the regime split).
+    assert mt.graveyard_n() == 41
     table = mt.checkpoint_table([{"name": "a", "t": 3.0, "stats": {"sr": 0.3, "t_days": 100, "skew": 0.0,
                                                                      "kurt": 3.0}},
                                  {"name": "b", "t": None}], 18)
@@ -392,9 +393,11 @@ def test_the_checkpoint_table_reads_every_test_of_the_family():
     record = {"race": {"insiders": {"t": 1.0, "stats": None}, xp.VETO: {"t": None}},
               "tests": {xp.TIMING: {"t": 2.5, "stats": {"sr": 0.2, "t_days": 60, "skew": 0.0, "kurt": 3.0}}}}
     table = shadow_run.checkpoint_table_for(record)
-    assert table["n_trials"] == mt.graveyard_n() == 34
+    assert table["n_trials"] == mt.graveyard_n() == 41
     rows = {r["name"]: r for r in table["rows"]}
-    assert len(rows) == 8 and rows["B, fund"]["dsr"] is not None
+    assert len(rows) == len(shadow_run.FAMILY) == 10 and rows["B, fund"]["dsr"] is not None
+    # The IC report's two tests (section 13.9) are in the family and left out while they have no data.
+    assert rows["IC, production names"]["no_data"] and rows["IC, shadow stock universe"]["no_data"]
     assert rows["A, race arm"]["no_data"] is True and rows["C, fund"]["no_data"] is True
 
 

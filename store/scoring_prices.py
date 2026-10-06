@@ -41,7 +41,10 @@ from analysis.price_tape import ROW_KEYS, SOURCE, TAPE_VERSION, digest
 from config.redaction import credential_shape
 
 #: The consumers a tape may name. Anything else is not one of ours.
-CONSUMERS = ("race-gate", "race-report", "funds")
+#: ``fx-rates`` is the night's shekel rate table (``analysis/boi_rates.py``):
+#: the same tape shape, one close-only row a day (tickers USDILS,
+#: USDILS.ECB and USDILS.CARRIED), so it is checked and stored like prices.
+CONSUMERS = ("race-gate", "race-report", "funds", "fx-rates")
 
 _TICKER = re.compile(r"[A-Z0-9.^=-]{1,15}")
 _DAY = re.compile(r"\d{4}-\d{2}-\d{2}")

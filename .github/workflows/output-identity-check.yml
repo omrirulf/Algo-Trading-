@@ -1,0 +1,345 @@
+name: output identity check
+
+# The owner's condition for merging a pull request while calibration runs
+# (6 Oct 2026, for PR #140): the funds' output and the calibration copy's
+# output must be byte-identical before and after the pull request, on the
+# same prices and journal, like the journal split check
+# (journal-split-check.yml, 26 Sep 2026). If anything differs, the owner is
+# told what and why before the merge.
+#
+# "Before" is the base branch as the pull request would be merged into it
+# (the first parent of GitHub's merge commit). "After" is that merge commit.
+# Both read the same logs/ (checked, byte for byte). Each side runs the race
+# report, the race's gate JSON and the funds' JSON, which carries
+# calibration ("calibration" in logs/funds.json is the calibration copy
+# against the real paper account), with the same command line the nightly
+# funds workflow uses. The after side runs the funds twice: once with the
+# before side's command line, so only the code differs, and once with the
+# command line the merged funds.yml will use.
+#
+# Prices come from yfinance, which a second fetch could answer slightly
+# differently, so every price request is recorded on a tape the first time
+# it is made and answered from that tape afterwards; the clock each tool
+# reads (its own _now) is frozen to the moment the job started; and string
+# hashing is seeded, so a set's order cannot differ between two runs.
+#
+# The job fails if the calibration copy's output differs in any way, or if
+# any value the funds' output already had is changed or gone. Keys the pull
+# request adds are listed, with the rest of the file checked byte for byte
+# without them: that is for the owner to read, not a failure.
+#
+# Runs on a pull request that carries the label "output-identity-check"
+# (add it, or remove and add it to run again), or by hand. No credential of
+# any kind: the journal is in the repo, yfinance and the Bank of Israel's
+# rates are public. Writes only to the runner's temp directory.
+on:
+  workflow_dispatch:
+    inputs:
+      before:
+        description: "The branch to compare against (the after side is the branch this runs on)"
+        default: "main"
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.action == 'labeled' && github.event.label.name == 'output-identity-check') ||
+      (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'output-identity-check'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      PYTHONHASHSEED: "0"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Check out the before side, on the same logs
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE_REF: ${{ inputs.before }}
+        run: |
+          if [ "$EVENT" = "pull_request" ]; then
+            git rev-parse --verify -q HEAD^2 >/dev/null || { echo "::error::not GitHub's merge commit"; exit 1; }
+            before=$(git rev-parse HEAD^1)
+          else
+            before=$(git rev-parse "origin/${BEFORE_REF:-main}")
+          fi
+          echo "before: $before"
+          echo "after:  $(git rev-parse HEAD)"
+          git worktree add "$RUNNER_TEMP/before" "$before"
+          if ! git diff --quiet "$before" HEAD -- logs/; then
+            git diff --stat "$before" HEAD -- logs/
+            echo "::error::the two sides would read different logs/; the comparison needs the same journal"
+            exit 1
+          fi
+          echo "journal (joined months): $(cat logs/journal/*.log | sha256sum | cut -c1-16)..., the same file on both sides"
+          echo "FROZEN_NOW=$(date -u +%Y-%m-%dT%H:%M:%S+00:00)" >> "$GITHUB_ENV"
+
+      - name: Write the price tape and the side runner
+        run: |
+          mkdir -p "$RUNNER_TEMP/out"
+          cat > "$RUNNER_TEMP/tape.py" <<'EOF'
+          """Run a main() with recorded prices and a frozen clock."""
+          import importlib, os, pickle, sys
+          from datetime import datetime
+          from pathlib import Path
+
+          tape_path, module_name, *argv = sys.argv[1:]
+          tape = pickle.loads(Path(tape_path).read_bytes()) if Path(tape_path).exists() else {}
+          known = set(tape)
+          sys.path.insert(0, ".")
+          import yfinance
+
+          original_history = yfinance.Ticker.history
+          original_download = yfinance.download
+
+          def history(self, *args, **kwargs):
+              key = ("history", self.ticker, args, tuple(sorted(kwargs.items())))
+              if key not in tape:
+                  tape[key] = original_history(self, *args, **kwargs)
+              return tape[key].copy()
+
+          def download(*args, **kwargs):
+              key = ("download", repr(args), repr(sorted(kwargs.items())))
+              if key not in tape:
+                  tape[key] = original_download(*args, **kwargs)
+              return tape[key].copy()
+
+          yfinance.Ticker.history = history
+          yfinance.download = download
+          module = importlib.import_module(module_name)
+          frozen = datetime.fromisoformat(os.environ["FROZEN_NOW"])
+          if hasattr(module, "_now"):
+              module._now = lambda: frozen
+          try:
+              code = module.main(argv)
+          finally:
+              Path(tape_path).write_bytes(pickle.dumps(tape))
+              new = len(set(tape) - known)
+              with open(os.environ["TAPE_LOG"], "a", encoding="utf-8") as log:
+                  log.write(f"{module_name} {' '.join(argv)}: {new} price request(s) not on the tape\n")
+          sys.exit(code or 0)
+          EOF
+          cat > "$RUNNER_TEMP/side.sh" <<'EOF'
+          #!/usr/bin/env bash
+          # side.sh <checkout> <label> <same|production>: the race and the funds, as the nightly workflows run them.
+          set -euo pipefail
+          dir=$1 label=$2 mode=$3
+          out="$RUNNER_TEMP/out/$label"
+          mkdir -p "$out"
+          tape="$RUNNER_TEMP/prices.tape"
+          export TAPE_LOG="$out/tape.log"
+          : > "$TAPE_LOG"
+          cd "$dir"
+          python "$RUNNER_TEMP/tape.py" "$tape" analysis.horse_race > "$out/race.txt" || echo "race exit $?"
+          python "$RUNNER_TEMP/tape.py" "$tape" analysis.horse_race --gate-json --with-prices > "$out/gate.out"
+          test "$(wc -l < "$out/gate.out")" = "2"
+          head -n 1 "$out/gate.out" > "$out/gate.json"
+          tail -n 1 "$out/gate.out" > "$out/gate-prices.json"
+          extra=()
+          if [ "$mode" = "production" ]; then
+            # As the merged funds.yml: the night's shekel rates, then the funds with them and the universe's journal.
+            end=$(python -c "import os; from datetime import datetime; from analysis.returns import last_final_session; print(last_final_session(datetime.fromisoformat(os.environ['FROZEN_NOW'])))")
+            if python "$RUNNER_TEMP/tape.py" "$tape" analysis.boi_rates --start 2026-09-10 --end "$end" --with-table > "$out/fx.out" \
+               && test "$(wc -l < "$out/fx.out")" = "2"; then
+              tail -n 1 "$out/fx.out" > "$out/fx-rates.json"
+            else
+              echo "::warning::the shekel rates were not fetched; the production run goes without them, as funds.yml would"
+            fi
+            extra=(--fx-table "$out/fx-rates.json" --universe logs/shadow_universe)
+          fi
+          python "$RUNNER_TEMP/tape.py" "$tape" shadow.run --processes 1 --random 1000 --with-prices \
+            --race-gate "$out/gate.json" --previous logs/funds.json "${extra[@]}" > "$out/funds.out"
+          test "$(wc -l < "$out/funds.out")" = "2"
+          head -n 1 "$out/funds.out" > "$out/funds.json"
+          tail -n 1 "$out/funds.out" > "$out/funds-prices.json"
+          cat "$TAPE_LOG"
+          EOF
+          chmod +x "$RUNNER_TEMP/side.sh"
+
+      - name: Before
+        run: |
+          set -o pipefail
+          "$RUNNER_TEMP/side.sh" "$RUNNER_TEMP/before" before same
+
+      - name: After, with the before side's command line
+        run: |
+          set -o pipefail
+          "$RUNNER_TEMP/side.sh" "$GITHUB_WORKSPACE" after-same same
+
+      - name: After, with the merged funds workflow's command line
+        run: |
+          set -o pipefail
+          "$RUNNER_TEMP/side.sh" "$GITHUB_WORKSPACE" after-production production
+
+      - name: Compare
+        run: |
+          cat > "$RUNNER_TEMP/compare.py" <<'EOF'
+          """Byte for byte first; then, for a JSON file that differs, every path added, removed or changed."""
+          import json, os, sys
+          from pathlib import Path
+
+          OUT = Path(os.environ["RUNNER_TEMP"]) / "out"
+          FUNDS = ("funds.json", "funds-prices.json")
+          INFO = ("race.txt", "gate.json", "gate-prices.json")
+          lines, failures = [], []
+
+
+          def short(value):
+              text = json.dumps(value, separators=(",", ":"), sort_keys=True)
+              return text if len(text) <= 120 else text[:117] + "..."
+
+
+          def fmt(keys):
+              return "".join(f"[{k}]" if isinstance(k, int) else f".{k}" for k in keys) or "(top)"
+
+
+          def walk(a, b, keys, out):
+              if type(a) is not type(b):
+                  out.append(("changed", keys, short(a), short(b)))
+              elif isinstance(a, dict):
+                  for key in a:
+                      if key not in b:
+                          out.append(("removed", keys + (key,), short(a[key]), None))
+                      else:
+                          walk(a[key], b[key], keys + (key,), out)
+                  out.extend(("added", keys + (key,), None, short(b[key])) for key in b if key not in a)
+              elif isinstance(a, list) and keys and keys[-1] == "rows" and all(
+                      isinstance(r, dict) for r in a + b):
+                  # A price table's rows, compared as a set: which bars are new, which are gone.
+                  old_rows = {json.dumps(r, sort_keys=True) for r in a}
+                  new_rows = {json.dumps(r, sort_keys=True) for r in b}
+                  gone, came = old_rows - new_rows, new_rows - old_rows
+                  def by(rows):
+                      found = {}
+                      for r in map(json.loads, rows):
+                          found.setdefault(f"{r.get('instance')}/{r.get('ticker')}", 0)
+                          found[f"{r.get('instance')}/{r.get('ticker')}"] += 1
+                      return ", ".join(f"{k} ({v})" for k, v in sorted(found.items()))
+                  if gone:
+                      out.append(("removed", keys, f"{len(gone)} row(s): {by(gone)}"[:400], None))
+                  if came:
+                      out.append(("added", keys + ("(rows)",), None, f"{len(came)} row(s): {by(came)}"[:400]))
+                  if not gone and not came and a != b:
+                      out.append(("changed", keys, "rows in one order", "the same rows in another order"))
+              elif isinstance(a, list):
+                  if len(a) != len(b):
+                      out.append(("changed", keys, f"{len(a)} items", f"{len(b)} items"))
+                  for i, (x, y) in enumerate(zip(a, b)):
+                      walk(x, y, keys + (i,), out)
+              elif a != b:
+                  out.append(("changed", keys, short(a), short(b)))
+
+
+          def drop(doc, keys):
+              """``doc`` without the key at ``keys`` (an added key is always a dict key)."""
+              node = doc
+              for key in keys[:-1]:
+                  node = node[key]
+              node.pop(keys[-1])
+
+
+          def dumps(doc):
+              return json.dumps(doc, separators=(",", ":"), allow_nan=False)
+
+
+          def is_stamp(keys):
+              """A price table's fetch-time stamp: when the fetcher ran, by the wall clock. Not a price."""
+              return bool(keys) and keys[-1] == "fetched_at" and "coverage" in keys
+
+
+          def compare(label, name, before_path, after_path, strict):
+              before, after = before_path.read_bytes(), after_path.read_bytes()
+              if before == after:
+                  lines.append(f"- `{name}`: **identical** ({len(after):,} bytes)")
+                  return
+              if not name.endswith(".json"):
+                  lines.append(f"- `{name}`: **DIFFERENT** ({len(before):,} -> {len(after):,} bytes); diff in the log")
+                  os.system(f"diff -u '{before_path}' '{after_path}' | head -120")
+                  return
+              a, b = json.loads(before), json.loads(after)
+              diffs = []
+              walk(a, b, (), diffs)
+              stamps = [d for d in diffs if d[0] == "changed" and is_stamp(d[1])]
+              diffs = [d for d in diffs if d not in stamps]
+              added = [d for d in diffs if d[0] == "added"]
+              other = [d for d in diffs if d[0] != "added"]
+              # The rest of the file byte for byte: the added keys taken out, the stamps put back as before.
+              trimmed = json.loads(after)
+              row_changes = any(keys[-1] == "(rows)" for _, keys, _, _ in added)
+              for _, keys, _, _ in added:
+                  if keys[-1] != "(rows)":
+                      drop(trimmed, keys)
+              for _, keys, _, _ in stamps:
+                  node_a, node_b = a, trimmed
+                  for key in keys[:-1]:
+                      node_a, node_b = node_a[key], node_b[key]
+                  node_b[keys[-1]] = node_a[keys[-1]]
+              rest_same = (not row_changes and dumps(trimmed).encode() == before.rstrip(b"\n")
+                           and dumps(a).encode() == before.rstrip(b"\n"))
+              parts = []
+              if added:
+                  parts.append(f"{len(added)} key(s) added")
+              if other:
+                  parts.append(f"{len(other)} value(s) changed or removed")
+              if stamps:
+                  parts.append(f"{len(stamps)} fetch-time stamp(s) differ (when each ticker's prices were fetched, "
+                               "by the wall clock: the check fetched them once and answered the later runs from its "
+                               "tape)")
+              taken = ("the added keys" if added else "") + (" and " if added and stamps else "") + (
+                  "the stamps" if stamps else "")
+              note = (f" Without {taken}, the rest is **byte-identical** to before." if rest_same and not other
+                      else "")
+              lines.append(f"- `{name}`: **DIFFERENT**: " + "; ".join(parts) + "." + note)
+              for kind, keys, old, new in diffs[:60]:
+                  lines.append(f"  - {kind} `{fmt(keys)}`" + (f": {old} -> {new}" if kind == "changed" else
+                                                              f": {old}" if kind == "removed" else f": {new}"))
+              if len(diffs) > 60:
+                  lines.append(f"  - ... and {len(diffs) - 60} more")
+              if name == "funds.json":
+                  cal_a, cal_b = a.get("calibration"), b.get("calibration")
+                  if dumps(cal_a) == dumps(cal_b):
+                      lines.append("  - `calibration` (the calibration copy): **byte-identical**")
+                  else:
+                      failures.append(f"{label}: the calibration copy's output differs")
+                  if strict:
+                      for kind, keys, _, _ in other:
+                          if keys != ("prices_sha256",):
+                              failures.append(f"{label}: {kind} {fmt(keys)}")
+
+
+          for label, title in (("after-same", "After, with the before side's command line (only the code differs)"),
+                               ("after-production", "After, with the merged funds workflow's command line")):
+              lines.append(f"### {title}")
+              for name in FUNDS:
+                  compare(label, name, OUT / "before" / name, OUT / label / name, strict=True)
+              lines.append("For reading only (not the owner's condition):")
+              for name in INFO:
+                  compare(label, name, OUT / "before" / name, OUT / label / name, strict=False)
+              lines.append("")
+          for label in ("before", "after-same", "after-production"):
+              lines.append(f"- tape, {label}: " + "; ".join((OUT / label / "tape.log").read_text().splitlines()))
+          text = "## Output identity check\n\n" + "\n".join(lines) + "\n"
+          if failures:
+              text += "\n**FAILED**: " + "; ".join(failures) + "\n"
+          else:
+              text += "\nThe calibration copy's output is byte-identical, and no value the funds' output had is changed or gone.\n"
+          print(text)
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              summary.write(text)
+          sys.exit(1 if failures else 0)
+          EOF
+          python "$RUNNER_TEMP/compare.py"

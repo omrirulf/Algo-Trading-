@@ -541,10 +541,37 @@ def new_funds(feed: SimFeed, bars: Bars, long_bars: Bars, final_through: date, s
     ]
 
 
+def price_coverage(cycles: dict, bars: Bars, start: date, final_through: date) -> dict:
+    """Each ticker the funds could trade, as ``(first cycle day, last final bar)``, from the funds' own fetch.
+
+    What section 5c's "the funds' prices reach the close of the look's last
+    trades" is checked against (``after_tax_part``): a name with a cycle on
+    or before a look's last close must have a bar on that close. VT counts
+    from the fund start. A name with no bar at all has None for its last bar.
+    """
+    first: dict[str, date] = {}
+    for day in sorted(cycles):
+        for line in cycles[day]:
+            first.setdefault(line.ticker, day)
+    first.setdefault(INDEX_TICKER, start)
+    out = {}
+    for ticker, day in sorted(first.items()):
+        sessions = bars.sessions(ticker, start, final_through)
+        out[ticker] = (day, sessions[-1] if sessions else None)
+    return out
+
+
+def missing_prices(coverage: Optional[dict], end: date) -> Optional[list[str]]:
+    """The names whose prices do not reach ``end`` though a cycle named them by then; None without coverage."""
+    if coverage is None:
+        return None
+    return [t for t, (first, last) in sorted(coverage.items()) if first <= end and (last is None or last < end)]
+
+
 def run_funds(
     entries: Sequence[JournalEntry], start: date, final_through: date, fetcher, *,
     random_funds: int, processes: int, shortable_no, first_cycle: Optional[date] = None,
-    exploratory: bool = True, long_bars: Optional[Bars] = None,
+    exploratory: bool = True, long_bars: Optional[Bars] = None, rates=None,
 ) -> tuple[dict, dict]:
     """Every fund from ``start`` through ``final_through``. Called only once calibration has passed (``build``).
 
@@ -552,7 +579,10 @@ def run_funds(
     (the fund test's 2026-09-28); without one, the first session acts on no
     cycle. ``shortable_no`` is the paper account's refusals, name -> first
     refusal day (``not_shortable``), or a plain set of names refused from
-    the start.
+    the start. ``rates`` is the night's shekel rate table (``analysis.boi_rates``):
+    with it, every fund is also reckoned after Israeli tax (``shadow.after_tax``),
+    the four funds' views go under ``after_tax`` and every fund's series under
+    ``_after_tax_series``, which ``build`` takes out before anything is printed.
     """
     cycles = lines_by_day(entries)
     ran = cycle_days(entries)
@@ -590,6 +620,13 @@ def run_funds(
         sized = next((f for f in explore if f.name == "model_sized"), None)
         if sized is not None:
             out["tests"]["model_sized"]["acted"] = sized_trades_scaled(sized)
+    if rates is not None:
+        from shadow import after_tax as tax
+
+        series = {f.name: tax.fund_series(f, f.bars, rates.rate) for f in [*four, *explore, *tests]}
+        out["after_tax"] = {f.name: tax.view(series[f.name]) for f in four}
+        out["_after_tax_series"] = series
+        out["_after_tax_coverage"] = price_coverage(cycles, bars, start, final_through)
     if tests:
         by_name = {f.name: f for f in four}
         out["tests"] |= {f.name: paired(f, by_name[xp.COMPARED_WITH[f.name]]) for f in tests}
@@ -664,6 +701,15 @@ FAMILY: Final[tuple[tuple[str, str, str, Optional[tuple[str, ...]]], ...]] = (
     ("model_by_conviction", "tests", "model_by_conviction", ("tests", "model_by_conviction", "acted")),
     ("model_sized", "tests", "model_sized", ("tests", "model_sized", "acted")),
     ("model_same_day", "tests", "model_same_day", None),
+    # Section 13.9 (prepared 2026-10-02, registered at the 2026-12-22
+    # checkpoint): the IC report's primary test, one per universe (the
+    # blended score's IC at 1 session, the owner's decision of 3 Oct 2026),
+    # from the checkpoint record it is first made in. These two are the only
+    # IC members of the family; the other IC numbers are descriptive. A
+    # universe with no data yet is left out of the family, as 13.5 says;
+    # "acting" is a day with an IC.
+    ("IC, production names", "ic_main", "production", ("ic_main", "production", "days")),
+    ("IC, shadow stock universe", "ic_main", "shadow", ("ic_main", "shadow", "days")),
 )
 #: The last planned look, the minimum of "acting differently", and B, whose
 #: purpose (crash protection) the final "zero or below" rule does not judge.
@@ -703,6 +749,199 @@ def checkpoint_table_for(record: dict) -> dict:
         row["acted_differently"] = acted
         row["outcome"] = outcome(row, mean, acted, final, zero_rule)
     return {"n_trials": n, "final": final, "rows": rows}
+
+
+def load_rates(path: Optional[Path]) -> tuple[Optional[object], dict]:
+    """The night's shekel rate table (``analysis.boi_rates``'s tape), and what the document says about it.
+
+    Read from the file the workflow's rate step wrote; nothing is fetched
+    here. No file, or one that does not check out, means no after-tax or
+    shekel view tonight, said in so many words -- never a guessed rate.
+    """
+    from analysis import boi_rates
+
+    if path is None:
+        return None, {"available": False, "reason": "no rate table was given"}
+    if not Path(path).is_file():
+        return None, {"available": False, "reason": "tonight's rate step wrote no table; the run's log says why"}
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+        table = boi_rates.load_tape(text)
+        tape = json.loads(text)
+    except (OSError, ValueError, KeyError) as exc:
+        return None, {"available": False, "reason": f"the rate table could not be read: {exc}"}
+    counts = table.counts()
+    return table, {
+        "available": True, "source": tape.get("source"), "first": table.first.isoformat(),
+        "last": table.last.isoformat(), "counts": counts,
+        "fallback_days": [[d.isoformat(), src] for d, src in table.fallback_days()],
+        "rates_sha256": tape.get("prices_sha256"),
+    }
+
+
+def after_tax_part(now: datetime, final_through: date, snapshots, funds: Optional[dict], passed: bool,
+                   race_gate: Optional[dict], records: list, fetchers: Optional[list],
+                   rates, fx: dict) -> tuple[dict, Optional[dict]]:
+    """Everything after Israeli tax and in shekels (pre-registration sections 5c and 11.9).
+
+    * the paper account's view, every night (it is the account, not a fund result);
+    * the four funds' views, once calibration has passed (``funds["after_tax"]``);
+    * each planned look's after-tax test against the VT fund, made once, on
+      the first night from the night the race reaches the look on which the
+      look is readable, and carried unchanged after: with funds when
+      calibration has passed, the rate table is there and the funds' own
+      prices reach the look's last close (every name a cycle named by then,
+      ``missing_prices``); "unavailable" when calibration has not passed; no
+      record (the look waits) otherwise. A ready record cut at another close
+      (a bug fix re-ran the race and moved the look's window) is made again
+      at the new close on the first night the same conditions hold, and the
+      old one is kept inside it under ``superseded``;
+    * the break-even of an actively traded fund against VT held 20 years,
+      for information only.
+    """
+    from analysis import decision_gate as gate
+    from analysis import tax_breakeven
+    from shadow import after_tax as tax
+    from shadow import calibration as calib
+
+    paper, problem = None, None
+    if rates is not None:
+        fetcher = OhlcFetcher(final_through=final_through)
+        if fetchers is not None:
+            fetchers.append(("ohlc_tax", fetcher))
+        tickers = {f.ticker for f in calib._all_fills(snapshots)}
+        try:
+            bars = Bars.fetch(tickers, tax.FX_TABLE_START, final_through, fetcher)
+            paper = tax.view(tax.account_series(snapshots, bars, rates.rate, final_through))
+        except (KeyError, ValueError) as exc:
+            problem = f"the paper account could not be reckoned: {exc}"
+    series = (funds or {}).pop("_after_tax_series", None)
+    coverage = (funds or {}).pop("_after_tax_coverage", None)
+    for look in looks_reached(race_gate):
+        entry = (race_gate.get("looks") or [])[look - 1]
+        if entry.get("readable") is not True:
+            continue                        # the race could not read the look tonight: it waits, and so does this
+        old = next((r for r in records if r.get("look") == look), None)
+        if old is not None and (old.get("status") != gate.AFTER_TAX_READY
+                                or old.get("window_end") in (None, entry.get("window_end"))):
+            continue                        # made once, carried unchanged
+        end = date.fromisoformat(entry["window_end"]) if entry.get("window_end") else None
+        if old is None and not passed:
+            records.append(tax.gate_record(look, now.date(), end, None, reason=(
+                "calibration had not passed when the race reached this look: no fund was run")))
+        elif passed and series is not None and end is not None and all(
+                series.get(name) is not None and series[name].days and series[name].days[-1].day >= end
+                for name in (*tax.GATE_FUNDS, tax.VT_FUND)) and missing_prices(coverage, end) == []:
+            record = tax.gate_record(look, now.date(), end, series)
+            if old is not None:
+                records.remove(old)
+                record["superseded"] = old
+            records.append(record)
+        # Otherwise no record tonight (no rate table, or the funds' prices do
+        # not reach the look's last close yet): the look waits for the first
+        # night that has both, and the test is cut at the same close then.
+    return {
+        "rules": tax.rules_json(),
+        "fx": fx,
+        "paper": paper,
+        "paper_problem": problem,
+        "paper_lots": tax.account_lot_check(snapshots),
+        "funds": (funds or {}).pop("after_tax", None),
+        "looks": records,
+        "breakeven": tax_breakeven.breakeven() | {"note": "for information only; not a gate"},
+    }, series
+
+
+def ic_lines(journal: Path, universe_dir: Optional[Path]) -> dict:
+    """The IC report's answered lines, per universe (section 13.9): the production journal and the shadow universe's."""
+    from analysis import ic
+
+    return {"production": ic.read_universe(journal),
+            "shadow": ic.read_universe(universe_dir) if universe_dir is not None else []}
+
+
+def ic_record(lines: dict, final_through: date, fetchers: Optional[list]) -> dict:
+    """The IC report's checkpoint record, once (``analysis.ic.record``), and the main tests the family reads."""
+    from analysis import ic
+
+    bars = {}
+    for universe, found in lines.items():
+        window = ic.in_window(found, universe, final_through)
+        if not window:
+            continue
+        fetcher = OhlcFetcher(final_through=final_through)
+        if fetchers is not None:
+            fetchers.append((f"ohlc_ic_{universe}", fetcher))
+        first = min(line.day for line in window)
+        bars[universe] = ic.bars_from_fetcher(fetcher, ic.tickers_of(window), first - timedelta(days=45),
+                                              final_through)
+    made = ic.record(lines, bars, final_through)
+    return made
+
+
+def vt_bars(long_bars: Bars, final_through: date) -> list[tuple[date, float, float, float]]:
+    """VT's ``(day, open, close, dividend)`` from the long history: the regime split's market and the race's index."""
+    frame = long_bars.history(xp.TIMING_IN, final_through)
+    out = []
+    for day in (ts.date() for ts in frame.index):
+        bar = long_bars.bar(xp.TIMING_IN, day)
+        if bar is not None:
+            out.append((day, bar[0], bar[3], bar[4]))
+    return out
+
+
+def regime_counters(long_bars: Bars, final_through: date) -> dict:
+    """Pre-registration section 13.10, between checkpoints: sessions per market state since the fund start, nothing else."""
+    from analysis import regimes
+
+    bars = vt_bars(long_bars, final_through)
+    sessions = [d for d, *_ in bars if schedule.FUND_START <= d <= final_through]
+    return regimes.counters(regimes.labels([(d, c) for d, _, c, _ in bars], sessions, regimes.VOL_CUTOFFS))
+
+
+def checkpoint_regimes(entries: Sequence[JournalEntry], long_bars: Bars, today: date, final_through: date,
+                       funds: Optional[dict], fetchers: Optional[list] = None) -> dict:
+    """Section 13.10 at a checkpoint: the race's and the funds' results split by VT's market state, once.
+
+    The race side: each main arm's mean daily net return per entry day over
+    the decision window (``horse_race``'s own scoring), each against VT's own
+    3-session window and against each other. The fund side, once the funds
+    run: each main fund's daily return and each against the VT fund.
+    Descriptive only (``analysis.regimes``).
+    """
+    from analysis import decision_gate as gate
+    from analysis import regimes
+    from analysis.horse_race import daily_net, entries_for_arm, on_grid
+
+    lines = [e for e in entries if e.timestamp is not None and e.model_answered
+             and gate.in_window(e.timestamp.date())]
+    how = xp.race_settings(today, final_through, lines)
+    if fetchers is not None:
+        fetchers += [("race_closes_regimes", how.source), ("race_ohlc_regimes", how.fetcher)]
+    daily = {name: daily_net(xp.arm_trades(name, entries_for_arm(name, lines), how))
+             for name in ("model", "momentum", "hybrid")}
+    grid = sorted(set().union(*(set(d) for d in daily.values())))
+    race = {name: dict(zip(grid, on_grid(values, grid))) for name, values in daily.items()}
+    bars = vt_bars(long_bars, final_through)
+    vt = {day: r for day in grid if (r := gate.index_window_return(bars, day, gate.REGISTERED_HORIZON)) is not None}
+    for name in ("model", "momentum", "hybrid"):
+        race[f"{name} - vt"] = {d: race[name][d] - vt[d] for d in grid if d in vt}
+    race["model - momentum"] = {d: race["model"][d] - race["momentum"][d] for d in grid}
+    race["model - hybrid"] = {d: race["model"][d] - race["hybrid"][d] for d in grid}
+    fund_series: dict = {}
+    sessions: list[date] = []
+    if funds:
+        sessions = [date.fromisoformat(d) for d in funds.get("days") or []]
+        for row in funds.get("list") or []:
+            equity = [STARTING_CASH] + list(row.get("equity") or [])
+            if len(equity) == len(sessions) + 1:
+                fund_series[row["name"]] = {d: (a / b - 1.0 if b else 0.0)
+                                            for d, b, a in zip(sessions, equity, equity[1:])}
+        for name in ("model", "momentum", "hybrid"):
+            if name in fund_series and "vt" in fund_series:
+                fund_series[f"{name} - vt"] = {d: fund_series[name][d] - fund_series["vt"][d] for d in sessions}
+    labels = regimes.labels([(d, c) for d, _, c, _ in bars], sorted(set(grid) | set(sessions)), regimes.VOL_CUTOFFS)
+    return regimes.record(race, fund_series, labels, regimes.VOL_CUTOFFS)
 
 
 def looks_reached(race_gate: Optional[dict]) -> list[int]:
@@ -764,11 +1003,27 @@ def build(args: argparse.Namespace, now: datetime, fetchers: Optional[list] = No
         fetchers.append(("ohlc_long", long_fetcher))
     long_bars = long_history(read.entries, final_through, long_fetcher)
     counters = exploratory_counters(read.entries, long_bars, final_through)
+    # Section 13.9: the IC report shows counters only until the checkpoint at
+    # which it is registered (2026-12-22); never an IC value before it.
+    from analysis import ic
+
+    universe_dir = getattr(args, "universe", None)
+    lines_for_ic = ic_lines(args.journal, universe_dir)
+    counters["ic"] = ic.counters(lines_for_ic, final_through)
+    # Section 13.10: the regime split shows sessions per market state only, until the checkpoints.
+    counters["regimes"] = regime_counters(long_bars, final_through)
+    rates, fx = load_rates(getattr(args, "fx_table", None))
+    if rates is not None and rates.last < final_through:
+        # A table one session short would fail every fund's reckoning; no
+        # shekel view tonight instead, said in so many words.
+        rates, fx = None, {"available": False,
+                           "reason": f"the rate table ends {rates.last.isoformat()}, "
+                                     f"before the last final session {final_through.isoformat()}"}
     if fund_start is not None and passed and fund_start <= final_through:
         funds, checks = run_funds(read.entries, fund_start, final_through, fetcher,
                                   random_funds=args.random, processes=args.processes,
                                   shortable_no=shortable_no, first_cycle=schedule.FUND_FIRST_CYCLE,
-                                  exploratory=bool(new_looks), long_bars=long_bars)
+                                  exploratory=bool(new_looks), long_bars=long_bars, rates=rates)
         if new_looks:
             rows = [r for r in funds["list"] if r.get("exploratory")]
             records.append({"look": max(new_looks), "made_on": now.date().isoformat(),
@@ -779,10 +1034,32 @@ def build(args: argparse.Namespace, now: datetime, fetchers: Optional[list] = No
         records.append({"look": max(new_looks), "made_on": now.date().isoformat(),
                         "through": final_through.isoformat(), "counters": counters,
                         "status": "calibration has not passed: counters only", "tests": {}})
+    race_gate = _read_json(getattr(args, "race_gate", None))
+    previous_tax = (_read_json(getattr(args, "previous", None)) or {}).get("after_tax") or {}
+    tax_records = [r for r in previous_tax.get("looks") or [] if isinstance(r, dict)]
+    after_tax, tax_series = after_tax_part(now, final_through, snapshots, funds, passed, race_gate,
+                                           tax_records, fetchers, rates, fx)
     if new_looks:
         # The race side, and the table of section 13.5-13.6 over every test with data.
         records[-1]["race"] = checkpoint_race(read.entries, long_bars, now.date(), final_through, fetchers)
+        # Section 13.9: the IC report, made once at the first checkpoint on or
+        # after its registration (2026-12-22), and at every one after.
+        if ic.due(True, now.date()):
+            records[-1]["ic"] = ic_record(lines_for_ic, final_through, fetchers)
+            records[-1]["ic_main"] = {u: block.get("main") or {}
+                                      for u, block in records[-1]["ic"]["universes"].items()}
         records[-1]["table"] = checkpoint_table_for(records[-1])
+        # Section 13.10: the regime split, once, kept with the look's record.
+        records[-1]["regimes"] = checkpoint_regimes(read.entries, long_bars, now.date(), final_through, funds,
+                                                    fetchers)
+        # Section 11.9: the exploratory funds after tax, at checkpoints only.
+        if tax_series is not None:
+            from shadow import after_tax as tax
+
+            shown = (*EXPLORATORY_FUNDS, *xp.NEW_FUNDS)
+            records[-1]["after_tax"] = {name: tax.view(tax_series.get(name)) for name in shown}
+        elif funds is not None:
+            records[-1]["after_tax"] = {"status": f"not available: {fx.get('reason', 'no rate table')}"}
     # Not fund results: the price source's gaps and the names no fund could
     # trade, from the fund start on, whatever calibration says. After the
     # funds and calibration, so their bars are fetched as they always were.
@@ -818,6 +1095,9 @@ def build(args: argparse.Namespace, now: datetime, fetchers: Optional[list] = No
         # not a fund result. The calibration fund's is in "calibration" and
         # each fund's in its own row, shown when those are.
         "order_matters": {"real": real_summary(audit_lines)},
+        # Sections 5c and 11.9 (Amendment 2026-10-02): after Israeli tax and
+        # in shekels; each look's after-tax test against the VT fund.
+        "after_tax": after_tax,
     }
 
 
@@ -837,6 +1117,12 @@ def build_parser() -> argparse.ArgumentParser:
                         help="the race's gate record, for the looks reached (section 13.1)")
     parser.add_argument("--previous", type=Path, default=Path(cfg.AUDIT_LOG_PATH).parent / "funds.json",
                         help="the last funds document, whose checkpoint records are carried unchanged")
+    parser.add_argument("--universe", type=Path, default=None,
+                        help="the shadow stock universe's journal (logs/shadow_universe), for the IC report's "
+                             "second universe (pre-registration section 13.9)")
+    parser.add_argument("--fx-table", type=Path, default=None,
+                        help="the night's shekel rate table, as analysis.boi_rates --with-table printed it "
+                             "(pre-registration sections 5c and 11.9); without it, no after-tax view")
     parser.add_argument("-v", "--verbose", action="store_true")
     return parser
 

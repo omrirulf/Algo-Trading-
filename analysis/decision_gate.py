@@ -58,6 +58,28 @@ INDEX_GAP_SETTLE_SESSIONS = 5
 #: every look.
 COIN_FLIP_PERCENTILE = 95.0
 
+#: The after-tax gate (Amendment 2026-10-02, section 5c): the arm that would
+#: win must also beat the VT fund after Israeli tax, "if sold today", at the
+#: same bar. The test is the fund test's own paired test (section 11.4):
+#: the arm's fund minus the VT fund, daily, after-tax returns, Newey-West t
+#: at this lag. The funds run (``shadow.run``) makes it once, on the first
+#: night from the night the race reaches the look on which the look is
+#: readable, the rate table is there and the funds' prices reach the look's
+#: last close, and keeps it unchanged.
+AFTER_TAX_LAG = 5
+#: An after-tax record holding the test, and one made without it because no
+#: fund could be run that night (calibration had not passed): the test is
+#: then not met at that look.
+AFTER_TAX_READY = "ready"
+AFTER_TAX_UNAVAILABLE = "unavailable"
+
+#: The verdict disclosure (Amendment 2026-10-02, section 5d): if VT's largest
+#: fall from its high inside the test window is below this, the verdict is
+#: labelled "not tested in a downturn" and any real-money step starts small.
+#: A label and a policy, never a rule that extends the test.
+DOWNTURN_DRAWDOWN = 0.10
+DOWNTURN_LABEL = "not tested in a downturn"
+
 #: The fourth outcome (Amendment 2026-09-24): no arm trades.
 NO_ARM = "none"
 
@@ -190,6 +212,24 @@ def estimated_readable(
 
 
 @dataclass(frozen=True)
+class AfterTax:
+    """One look's after-tax test (section 5c), as the funds run recorded it.
+
+    ``status`` is ``AFTER_TAX_READY`` with a t for each arm's fund against
+    the VT fund (``t_vs_index``), or ``AFTER_TAX_UNAVAILABLE`` when the funds
+    could not be run on the night the look was reached (``reason`` says why):
+    then no arm can pass the test at that look.
+    """
+
+    status: str
+    t_vs_index: Mapping[str, Optional[float]] = field(default_factory=dict)
+    reason: str = ""
+    #: The close the record's test was cut at; the race checks it against
+    #: the look's own window end and refuses a record made for another window.
+    window_end: Optional[date] = None
+
+
+@dataclass(frozen=True)
 class LookInputs:
     """Everything one look reads, computed on that look's own entry days only."""
 
@@ -215,6 +255,17 @@ class LookInputs:
     #: needs for the look's own days did not arrive. A data outage is never
     #: allowed to read as a result; the look waits for the data instead.
     unreadable: Optional[str] = None
+    #: The after-tax test (section 5c), or ``None`` while the funds run has
+    #: not yet made this look's record: a look that would pick an arm waits
+    #: for it, as it waits for a price.
+    after_tax: Optional[AfterTax] = None
+    #: VT's largest fall from its high inside the test window, final closes,
+    #: from ``DECISION_CUTOFF`` to the close of the look's last trades
+    #: (section 5d). ``None`` if it could not be measured.
+    vt_max_drawdown: Optional[float] = None
+    #: The close of the look's last trades: the end of its window. The funds
+    #: run cuts the look's after-tax test there (section 5c).
+    window_end: Optional[date] = None
 
 
 @dataclass(frozen=True)
@@ -267,7 +318,60 @@ def decide(inputs: LookInputs, bar: float, final: bool) -> tuple[Optional[str], 
     stops -- the candidate beats the index at t > bar (trade it), or trails
     it at t < -bar (hold the index) -- or the look decides nothing and the
     race goes on to the next one.
+
+    The after-tax gate (Amendment 2026-10-02, section 5c) is one more
+    condition on the index step: a candidate that beats the index must also
+    have its fund beat the VT fund after Israeli tax, "if sold today", at
+    the same bar (``inputs.after_tax``). It can only stop an arm from
+    winning; it never decides anything by itself. At the final look an arm
+    that fails it leaves no arm trading; at an earlier look the look then
+    decides nothing. A look whose after-tax record is not made yet waits.
+
+    A look that decides is labelled "not tested in a downturn" when VT's
+    largest fall in the window is under 10% (section 5d): a label on the
+    reason, never a change to the outcome.
     """
+    candidate, outcome, reason = _decide(inputs, bar, final)
+    if outcome is not None:
+        reason += _downturn_note(inputs.vt_max_drawdown)
+    return candidate, outcome, reason
+
+
+def tested_in_a_downturn(vt_max_drawdown: Optional[float]) -> Optional[bool]:
+    """Section 5d: whether VT fell 10% or more from its high inside the window; None if not measured."""
+    if vt_max_drawdown is None:
+        return None
+    return vt_max_drawdown >= DOWNTURN_DRAWDOWN
+
+
+def _downturn_note(vt_max_drawdown: Optional[float]) -> str:
+    tested = tested_in_a_downturn(vt_max_drawdown)
+    if tested is None:
+        return "; VT's largest fall in the window could not be measured (section 5d)"
+    if tested:
+        return f"; VT fell {vt_max_drawdown:.1%} from its high in the window, so the verdict was tested in a downturn"
+    return (f"; label: {DOWNTURN_LABEL.upper()} -- VT's largest fall from its high in the window was "
+            f"{vt_max_drawdown:.1%}, under {DOWNTURN_DRAWDOWN:.0%}, so any real-money step starts small (section 5d)")
+
+
+def _after_tax(inputs: LookInputs, candidate: str, bar: float) -> tuple[Optional[bool], str]:
+    """Section 5c for ``candidate``: (True, note) passed, (False, note) not, (None, note) waiting for its record."""
+    record = inputs.after_tax
+    if record is None:
+        return None, ("its after-tax test against the VT fund (section 5c) is made by the funds run on the "
+                      "first night the look is readable, the rate table is there and the funds' prices reach "
+                      "the look's last close, so this look waits for it")
+    if record.status != AFTER_TAX_READY:
+        why = record.reason or "no fund could be run when the look was reached"
+        return False, f"its after-tax test against the VT fund could not be made ({why})"
+    t = record.t_vs_index.get(candidate)
+    shown = "n/a" if t is None else f"{t:.2f}"
+    if _above(t, bar):
+        return True, f"and its fund beat the VT fund after Israeli tax at t > {bar:.2f} (t = {shown})"
+    return False, f"its fund did not beat the VT fund after Israeli tax at t > {bar:.2f} (t = {shown})"
+
+
+def _decide(inputs: LookInputs, bar: float, final: bool) -> tuple[Optional[str], Optional[str], str]:
     problem = inputs.unreadable
     if problem is None and inputs.index_missing:
         problem = f"{INDEX_TICKER} could not be priced on {inputs.index_missing} of the look's days"
@@ -301,7 +405,15 @@ def decide(inputs: LookInputs, bar: float, final: bool) -> tuple[Optional[str], 
     t_index = inputs.t_vs_index.get(candidate)
     shown = "n/a" if t_index is None else f"{t_index:.2f}"
     if _above(t_index, bar):
-        return candidate, candidate, f"{why}; it also beat {INDEX_TICKER} at t > {bar:.2f} (t = {shown})"
+        beat = f"{why}; it also beat {INDEX_TICKER} at t > {bar:.2f} (t = {shown})"
+        passed, note = _after_tax(inputs, candidate, bar)
+        if passed:
+            return candidate, candidate, f"{beat} {note}"
+        if passed is None:
+            return candidate, None, f"{beat}, but {note}"
+        if final:
+            return candidate, NO_ARM, f"{beat}, but {note}, so no arm trades"
+        return candidate, None, f"{beat}, but {note}, so this look decides nothing"
     if final:
         return candidate, NO_ARM, (
             f"{why}; but it did not beat {INDEX_TICKER} at t > {bar:.2f} (t = {shown}), "
@@ -361,7 +473,27 @@ def status_line(independent: int, looks: Sequence[Look]) -> str:
     if decided is None:
         return f"{head} — NO DECISION YET"
     kind = "FINAL" if decided.final else f"EARLY STOP AT {decided.independent}"
-    return f"{head} — {kind}: {OUTCOME_TEXT[decided.outcome].upper()}"
+    label = ""
+    if decided.inputs is not None and tested_in_a_downturn(decided.inputs.vt_max_drawdown) is False:
+        label = f" — {DOWNTURN_LABEL.upper()}"
+    return f"{head} — {kind}: {OUTCOME_TEXT[decided.outcome].upper()}{label}"
+
+
+def vt_max_drawdown(closes: Iterable[tuple[date, float]], start: date, end: date) -> Optional[float]:
+    """VT's largest fall from its high inside ``[start, end]``, final closes only (section 5d).
+
+    The high is the highest close from ``start`` to each day, so a fall from
+    a high made before the window does not count. ``None`` with no close in
+    the window.
+    """
+    peak, worst, seen = -math.inf, 0.0, False
+    for day, close in sorted(closes):
+        if day < start or day > end or not close > 0:
+            continue
+        seen = True
+        peak = max(peak, close)
+        worst = max(worst, 1.0 - close / peak)
+    return worst if seen else None
 
 
 # --------------------------------------------------------------------------- #
@@ -823,9 +955,15 @@ def known_entry_days(cycle_days: Iterable[date]) -> list[date]:
 
 
 __all__ = [
+    "AFTER_TAX_LAG",
+    "AFTER_TAX_READY",
+    "AFTER_TAX_UNAVAILABLE",
+    "AfterTax",
     "CHECKPOINTS",
     "COIN_FLIP_PERCENTILE",
     "DECISION_CUTOFF",
+    "DOWNTURN_DRAWDOWN",
+    "DOWNTURN_LABEL",
     "DRAWDOWN_START",
     "DrawdownDay",
     "DrawdownWatch",
@@ -868,5 +1006,7 @@ __all__ = [
     "spending_bars",
     "spent_by",
     "status_line",
+    "tested_in_a_downturn",
     "trading_days_after",
+    "vt_max_drawdown",
 ]

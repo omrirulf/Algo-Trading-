@@ -22,11 +22,13 @@ DOWN = {"return_63d": -0.10, "distance_sma50": -0.03, "annualised_volatility": 0
 
 
 def line(day: date, ticker: str, bias: str | None = "NEUTRAL", conviction: float = 0.2, *,
-         technicals=None, error=None, held=False, stage=None, setup=SETUP, run=None, minute=0):
+         technicals=None, error=None, held=False, stage=None, setup=SETUP, run=None, minute=0,
+         headlines=None, gaps=None):
     at = datetime(day.year, day.month, day.day, 15, minute, tzinfo=timezone.utc)
+    news = {} if headlines is None else {"headlines": headlines, "gaps": gaps or []}
     return json.dumps({
         "ts_utc": at.isoformat(), "ticker": ticker,
-        "context": {"ticker": ticker, "technicals": technicals or {}},
+        "context": {"ticker": ticker, "technicals": technicals or {}, **news},
         "signal": None if bias is None else {"ticker": ticker, "bias": bias, "conviction": conviction},
         "error": error, "held": held, "stage": stage, "screening": False, "reasoning_effort": "high",
         "usage": {"model": SETUP["model"]} if bias is not None else None,
@@ -206,3 +208,87 @@ def test_the_health_check_reads_the_record_beside_the_journal(tmp_path):
                for a in alarms)
     alarms = health.check(journal, audit, day + timedelta(days=1), token_expires=None)
     assert not any(a.title.startswith("Drift:") for a in alarms)
+
+
+# --------------------------------------------------------------------------- #
+# Names with no headlines all week (the owner's request of 3 Oct 2026; a report only)
+# --------------------------------------------------------------------------- #
+
+
+def _days(monday: date, n: int = 5) -> list[date]:
+    return [monday + timedelta(days=k) for k in range(n)]
+
+
+def test_a_name_is_listed_only_when_every_line_of_its_week_had_no_headline():
+    monday = MONDAYS[0]
+    lines = [line(d, "EWU", headlines=[]) for d in _days(monday)]                       # silent all week
+    lines += [line(d, "WEAT", headlines=[] if d != monday + timedelta(days=2) else ["one"]) for d in _days(monday)]
+    lines += [line(d, "NVDA", headlines=["a", "b"]) for d in _days(monday)]
+    lines += [line(d, "CANE", None, held=True, headlines=[]) for d in _days(monday)]     # held all week: counted
+    lines += [line(d, "EWT", headlines=[]) for d in _days(monday, 2)]                    # silent when asked...
+    lines.append(line(monday + timedelta(days=4), "EWT", None, held=True, headlines=["held-day news"]))  # ...not held
+    week = build(lines, MONDAYS[1])["weeks"][0]
+    assert week["news"] == {"names": 5, "no_headlines": ["CANE", "EWU"], "search_failed": []}
+
+
+def test_a_failed_search_is_named_apart_and_a_line_failed_before_asking_or_without_the_field_is_not_counted():
+    monday = MONDAYS[0]
+    gap = [f"{health.NEWS_GAP_PREFIX}: Bright Data returned an empty body with its 200; nothing to parse"]
+    lines = [line(monday, "EWN", headlines=[], gaps=gap)] + [line(d, "EWN", headlines=[]) for d in _days(monday)[1:]]
+    lines += [line(d, "OLD", headlines=None) for d in _days(monday)]                      # no field: cannot say
+    lines += [line(d, "CTX", None, error="yfinance fell over", stage="context", headlines=[]) for d in _days(monday)]
+    week = build(lines, MONDAYS[1])["weeks"][0]
+    assert week["news"] == {"names": 1, "no_headlines": ["EWN"], "search_failed": ["EWN"]}
+
+
+def test_a_prompt_that_failed_to_render_still_counts_the_news_it_gathered():
+    """A failed gather journals an empty context; a failed render journals what was gathered, headlines included."""
+    monday = MONDAYS[0]
+    lines = [line(d, "XLE", None, error="template broke", stage="context", headlines=["a", "b", "c"])
+             for d in _days(monday, 4)]
+    lines.append(line(monday + timedelta(days=4), "XLE", headlines=[]))
+    lines += [line(d, "EWU", headlines=[]) for d in _days(monday)]
+    week = build(lines, MONDAYS[1])["weeks"][0]
+    assert week["news"] == {"names": 2, "no_headlines": ["EWU"], "search_failed": []}
+
+
+def test_the_count_has_no_band_and_no_alert_and_the_text_shows_it():
+    """One silent name a week for four weeks, then six two weeks running: a band on the count would alert."""
+    weeks = []
+    for k in range(6):
+        silent = 1 if k < 4 else 6
+        weeks += week_of_lines(MONDAYS[k], neutral=8, longs=2)
+        weeks += [line(MONDAYS[k], f"Q{k}{i}", headlines=[]) for i in range(silent)]
+        weeks.append(line(MONDAYS[k], "NVDA", headlines=["x"]))
+    record = build(weeks, MONDAYS[6])
+    last = record["weeks"][5]
+    assert len(last["news"]["no_headlines"]) == 6 and last["news"]["names"] == 7
+    assert set(last["bands"]) == {key for key, _ in drift.BANDED} == {
+        "neutral_pct", "conviction_mean", "agreement_pct", "long_pct", "setup_error_pct", "model_error_pct",
+        "minutes_late_mean"}
+    assert record["alerts"] == [] and all(w["alerts"] == [] for w in record["weeks"])
+    assert not any("headline" in key for key, _ in drift.NUMBERS) and set(last["values"]) == {
+        key for key, _ in drift.NUMBERS}
+    text = "\n".join(drift.render_week(last))
+    assert "- names with no headlines all week: 6 of 7 (Q50, Q51, Q52, Q53, Q54, Q55)" in text
+    assert "band" not in next(l for l in drift.render_week(last) if "no headlines" in l)
+    assert json.loads(json.dumps(record, allow_nan=False)) == record
+
+
+def test_the_line_caps_the_names_only_when_asked_and_says_nothing_when_nothing_was_counted():
+    news = {"names": 80, "no_headlines": [f"T{i:02d}" for i in range(15)], "search_failed": ["T00"]}
+    full = drift.no_headlines_line(news)
+    assert full.startswith("names with no headlines all week: 15 of 80 (T00, T01,") and "T14" in full
+    assert full.endswith("; the news search failed at least once for 1 of them (T00)")
+    short = drift.no_headlines_line(news, limit=12)
+    assert "T11, …)" in short and "T12" not in short and drift.PHONE_NAMES == 12
+    assert drift.no_headlines_line({"names": 3, "no_headlines": [], "search_failed": []}) == \
+        "names with no headlines all week: 0 of 3"
+    assert drift.no_headlines_line({"names": 0, "no_headlines": [], "search_failed": []}) is None
+    assert drift.no_headlines_line(None) is None
+
+
+def test_the_reader_counts_headlines_and_never_reads_a_missing_field_as_zero():
+    entries = read_lines([line(MONDAYS[0], "A", headlines=["x", "y"]), line(MONDAYS[0], "B", headlines=[]),
+                          line(MONDAYS[0], "C")]).entries
+    assert [e.headline_count for e in entries] == [2, 0, None]
