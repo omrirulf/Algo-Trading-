@@ -582,7 +582,8 @@ def test_the_line_is_what_analysis_vote_reads_and_its_answer_is_the_rule_s(wired
     assert (answer.side, answer.agree, answer.successful) == ("LONG", 3, 5)
     assert answer.conviction == pytest.approx(3 / 5 * (0.6 + 0.5 + 0.7) / 3)
     assert rule.counters(read, A_DAY_ON.date()) == {"lines": 1, "answered": 1, "dropped": 0, "not_voted": 0,
-                                                     "extra_calls": 4, "failed_calls": 0}
+                                                     "not_asked": 0, "missing": 0, "extra_calls": 4,
+                                                     "failed_calls": 0}
 
 
 def test_fewer_than_three_successful_votes_is_no_answer(wired):
@@ -828,8 +829,13 @@ def test_no_name_is_started_after_the_cut_off_so_no_line_is_dated_the_next_day(w
     assert run.ran is True and (run.voted, run.not_asked, run.calls) == (1, 2, 4)
     assert set(wired.endpoint.asked()) == {"XLE"}
     lines = _lines(wired.month)
-    assert [line["ticker"] for line in lines] == ["XLE"]
+    # The names the cut-off stopped are recorded, with no call, and are final (section 13.11: "and is counted").
+    assert [line["ticker"] for line in lines] == ["XLE", "GLD", "TLT"]
+    assert [line["error"] for line in lines] == [None, rule.NOT_ASKED_LATE, rule.NOT_ASKED_LATE]
+    assert [len(line["votes"]) for line in lines] == [5, 1, 1] and [line["asks"] for line in lines] == [4, 0, 0]
     assert all(datetime.fromisoformat(line["ts_utc"]).date() == A_DAY_ON.date() for line in lines)
+    assert run.exit_code == vote.EXIT_OK                    # the cut-off is not the cap: no phone
+    assert rule.counters(rule.read_votes(wired.votes), A_DAY_ON.date())["not_asked"] == 2
 
 
 def test_a_run_that_reaches_the_next_utc_day_starts_no_new_name(wired, monkeypatch):
@@ -862,14 +868,33 @@ def test_the_cap_stops_new_names_and_the_cli_exits_3(wired, monkeypatch, capsys)
     assert summary["cost_usd"] == pytest.approx(1.20, abs=1e-4)
     assert summary["warn_crossed"] is True and summary["warn_usd"] == mv.DAILY_COST_WARN_USD
     assert summary["estimated_usd"] == pytest.approx(len(names) * 4 * mv.ESTIMATED_COST_PER_CALL_USD)
+    assert summary["cap_stopped"] is True
     assert set(summary) == {"date", "ran", "reason", "lines", "already_voted", "voted", "answered", "dropped",
                             "not_voted", "not_asked", "unrecorded", "calls", "asks", "failed_calls", "cost_usd",
-                            "cap_usd", "cap_reached", "warn_usd", "warn_crossed", "estimated_usd", "error"}
-    assert [line["ticker"] for line in _lines(wired.month)] == list(names[:3])
+                            "cap_usd", "cap_reached", "cap_stopped", "warn_usd", "warn_crossed", "estimated_usd",
+                            "error"}
+    lines = _lines(wired.month)
+    assert [line["ticker"] for line in lines] == list(names)
+    assert [line["error"] for line in lines] == [None, None, None, rule.NOT_ASKED_CAP, rule.NOT_ASKED_CAP]
     assert sorted(wired.capture.rglob("*.jsonl"))[0].name.startswith("vote-987-")
-    # The next run today starts nothing, and does not tell the phone again.
+    # The next run today has nothing left to vote, and does not tell the phone again.
     again = _run(wired)
     assert again.cap_reached is True and again.calls == 0 and again.warn_crossed is False
+    assert again.cap_stopped is False and again.exit_code == vote.EXIT_OK
+    # Nor does a run that the cap stops again on a later line of the same day: the cap line is already written.
+    _add_line(wired, "DBA", when=A_DAY_ON.replace(hour=16, minute=0))
+    later = _run(wired)
+    assert later.cap_refused == 1 and later.cap_noted_before is True
+    assert later.cap_stopped is False and later.exit_code == vote.EXIT_OK
+    assert _lines(wired.month)[-1]["ticker"] == "DBA" and _lines(wired.month)[-1]["error"] == rule.NOT_ASKED_CAP
+
+
+def test_a_run_that_reaches_the_cap_but_stops_no_name_does_not_tell_the_phone(wired):
+    wired.endpoint.usage = THIRTY_CENTS                       # $1.20 a name: the only name passes the cap
+    _add_line(wired, "XLE")
+    run = _run(wired, workers=1)
+    assert run.voted == 1 and run.cap_reached is True and run.cap_refused == 0
+    assert run.cap_stopped is False and run.exit_code == vote.EXIT_OK
 
 
 def test_the_cap_counts_what_was_already_spent_today(wired):
@@ -896,9 +921,12 @@ def test_with_four_workers_the_cap_holds_up_to_the_calls_in_flight(wired):
     run = _run(wired, workers=4)
     assert run.cap_reached is True and run.exit_code == vote.EXIT_CAP_REACHED
     assert run.voted + run.not_asked == len(names) and run.not_asked >= 1
-    # A started name always gets its four calls, and is written.
+    # A started name always gets its four calls, and is written; a name the cap stopped gets its final line.
     assert run.calls == 4 * run.voted
-    assert all(len(line["votes"]) == 5 for line in _lines(wired.month))
+    lines = _lines(wired.month)
+    assert all(len(line["votes"]) == 5 for line in lines if line["error"] is None)
+    assert sum(1 for line in lines if line["error"] == rule.NOT_ASKED_CAP) == run.not_asked
+    assert all(len(line["votes"]) == 1 and line["asks"] == 0 for line in lines if line["error"] is not None)
     # Names start only while spent + held is under the cap; at most three calls of
     # other names are unsettled then, so the overshoot is bounded.
     assert run.cost_usd <= mv.DAILY_COST_CAP_USD + 3 * 0.30 + 4 * 0.30 + 1e-6
@@ -996,7 +1024,8 @@ def _step(name: str, job: str = "vote") -> dict:
 
 
 #: The model's key under every spelling the production chain tries; the vote needs nothing else.
-MODEL_KEYS = {"ANTHROPIC_API_KEY", "FULL_MODEL_API_KEY"}
+#: The vote can only re-send an OpenAI-compatible body, so the full model's key is all it may hold.
+MODEL_KEYS = {"FULL_MODEL_API_KEY"}
 
 VOTE_STEPS = [
     "Would it vote today?", "Has the production run finished, and its model calls?", "Vote",
@@ -1009,7 +1038,8 @@ def test_the_vote_job_runs_after_the_universe_and_only_where_the_universe_may():
     jobs = _workflow()["jobs"]
     job = jobs["vote"]
     assert job["needs"] == "score"
-    assert job["if"] == "${{ always() && github.event_name != 'pull_request' && !inputs.verify }}"
+    # After the universe's job whether it passed or failed, never after a cancel: a cancel stops the spending.
+    assert job["if"] == "${{ !cancelled() && github.event_name != 'pull_request' && !inputs.verify }}"
     assert jobs["score"]["if"] == "${{ github.event_name != 'pull_request' && !inputs.verify }}"
     assert job["permissions"] == {"contents": "write", "actions": "read"}
     assert job["runs-on"] == "ubuntu-latest"

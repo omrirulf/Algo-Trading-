@@ -40,7 +40,7 @@ Off until ``START``. ``MODEL_VOTE_ENABLED`` keeps the runner off; a test
 fails if it is on before the date the pre-registration names. Registered at
 the first checkpoint (2026-12-22), as the second new idea of the first
 quarter of 2027 (the IC test is the first). Its results are computed only at
-the checkpoints after that date, never before.
+the checkpoints from that date, never before.
 
 Standard library only and no side effects, so any package may import it --
 the race and the funds included.
@@ -53,7 +53,7 @@ from pathlib import Path
 from typing import Final
 
 #: The runner's on/off switch. False until the pre-registration says the vote
-#: is on; ``tests/test_model_vote.py`` fails if this is True before ``START``.
+#: is on; ``tests/test_model_vote_runner.py`` fails if this is True before ``START``.
 MODEL_VOTE_ENABLED: Final[bool] = False
 
 #: The checkpoint at which the vote is registered: the race's first planned

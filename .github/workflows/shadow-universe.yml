@@ -275,13 +275,14 @@ jobs:
     # dispatcher, no engine and no broker (tests/test_model_vote_runner.py
     # reads it to check).
     #
-    # After the universe's job, whatever became of it (`always()`), so the
+    # After the universe's job, whether it passed or failed (`!cancelled()`:
+    # a cancelled run stops here, so a cancel stops the spending), so the
     # two never ask the model provider at the same time; and only once the
     # day's production run has finished, so the vote never asks beside it.
     # Off until 2026-12-22: "Would it vote today?" asks the voter, and until
     # it says yes every later step is skipped.
     needs: score
-    if: ${{ always() && github.event_name != 'pull_request' && !inputs.verify }}
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && !inputs.verify }}
     runs-on: ubuntu-latest
     # Sized for about 58 answered lines, four calls each, four at a time. The
     # voter starts no new name after RUN_BUDGET_SECONDS (210 minutes); after
@@ -369,11 +370,11 @@ jobs:
       - name: Vote
         id: vote
         if: steps.ready.outputs.ready == 'yes'
-        # The model's key, under every spelling the production cycle tries,
-        # and nothing else: no news key, no data key, no Alpaca key, no
-        # webhook secret, no execution mode. The voter gathers no context.
+        # The full model's key, under every spelling the production cycle
+        # tries, and nothing else: no Anthropic key (the vote can only re-send
+        # an OpenAI-compatible body), no news key, no data key, no Alpaca key,
+        # no webhook secret, no execution mode. The voter gathers no context.
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           FULL_MODEL_API_KEY: ${{ secrets.FULL_MODEL_API_KEY || secrets.DEEPINFRA_API_KEY || secrets.SCREENING_API_KEY || secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY || secrets.GROQ_API_KEY }}
         # Exit 3 is the cost cap: not a failure of the job, so the lines
         # already written are committed below and the phone is told. Any
@@ -501,12 +502,13 @@ jobs:
     # orchestrator/thesis.py, config/thesis_check.py). For each held name,
     # once a week, the same model is asked whether the reason the position
     # was opened still holds. Log only: it never trades, never changes a
-    # stop, and feeds no arm and no fund. After the vote's job, whatever
-    # became of it, so the model provider is never asked by two jobs at once.
+    # stop, and feeds no arm and no fund. After the vote's job, whether it
+    # passed or failed (never after a cancel), so the model provider is never
+    # asked by two jobs at once.
     # Off until 2027-04-01: "Is a thesis check due?" asks the logger, and
     # until it says yes every later step is skipped.
     needs: vote
-    if: ${{ always() && github.event_name != 'pull_request' && !inputs.verify }}
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && !inputs.verify }}
     runs-on: ubuntu-latest
     # The logger starts no new name after RUN_BUDGET_SECONDS (30 minutes);
     # the calls in flight may need 32 minutes more, plus the setup and the
@@ -544,10 +546,10 @@ jobs:
       - name: Check the theses
         id: thesis
         if: steps.check.outputs.run == 'yes'
-        # The model's key, under every spelling the production cycle tries,
-        # and nothing else. The headlines are the ones production gathered.
+        # The full model's key, under every spelling the production cycle
+        # tries, and nothing else (it asks the full model by name). The
+        # headlines are the ones production gathered.
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           FULL_MODEL_API_KEY: ${{ secrets.FULL_MODEL_API_KEY || secrets.DEEPINFRA_API_KEY || secrets.SCREENING_API_KEY || secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY || secrets.GROQ_API_KEY }}
         # Exit 3 is the weekly cost cap: not a failure of the job.
         run: |

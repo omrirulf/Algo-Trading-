@@ -51,6 +51,16 @@ SIGNS: Final[dict[str, int]] = {"long": 1, "short": -1}
 #: An ISO week as the logger writes it: ``2027-W14``.
 _WEEK = re.compile(r"^\d{4}-W\d{2}$")
 
+#: Why a line was written with no call: the audit log has no accepted entry
+#: for the name (no reasoning to check), or the name was not started because
+#: the week's cost cap was reached. One spelling, here: the runner
+#: (``orchestrator/thesis.py``) writes these very strings, and the read side
+#: never imports the runner. Each is final for the name and the ISO week: no
+#: line repeats it on a later day of the week.
+NO_ENTRY: Final[str] = "no entry record for this name"
+NOT_ASKED_PREFIX: Final[str] = "not asked:"
+NOT_ASKED_CAP: Final[str] = "not asked: the week's cost cap was reached"
+
 
 # --------------------------------------------------------------------------- #
 # One check
@@ -192,7 +202,11 @@ def due(new_look_reached: bool, today: date) -> bool:
 # --------------------------------------------------------------------------- #
 
 #: The counters' keys: whole numbers only, never a return or a verdict's share.
-COUNTER_KEYS: Final[tuple[str, ...]] = ("checks", "names", "weeks", "failed")
+COUNTER_KEYS: Final[tuple[str, ...]] = ("checks", "names", "weeks", "failed", "no_entry", "not_asked")
+
+
+def _not_asked(check: Check) -> bool:
+    return (check.error or "").startswith(NOT_ASKED_PREFIX)
 
 
 def counters(lines: Sequence[Check], through: date) -> dict[str, int]:
@@ -200,13 +214,18 @@ def counters(lines: Sequence[Check], through: date) -> dict[str, int]:
 
     From ``START`` to ``through``: ``checks`` with a verdict (one per name
     and week), the distinct ``names`` checked, the ISO ``weeks`` with any
-    line, and the lines that ``failed`` to give a verdict (no entry record,
-    a failed call, an answer that did not parse).
+    line; the lines that ``failed`` to give a verdict (a failed call, an
+    answer that did not parse); the lines with ``no_entry`` record to check
+    against; and the names ``not_asked`` because the week's cost cap was
+    reached. Each line is in one of the last three or has a verdict.
     """
     window = in_window(lines, through)
     done = one_per_name_and_week(window)
     out = {"checks": len(done), "names": len({c.ticker for c in done}),
-           "weeks": len({c.week for c in window}), "failed": sum(1 for c in window if not c.ok)}
+           "weeks": len({c.week for c in window}),
+           "failed": sum(1 for c in window if not c.ok and c.error != NO_ENTRY and not _not_asked(c)),
+           "no_entry": sum(1 for c in window if c.error == NO_ENTRY),
+           "not_asked": sum(1 for c in window if _not_asked(c))}
     assert set(out) == set(COUNTER_KEYS) and all(type(v) is int for v in out.values())
     return out
 
@@ -289,6 +308,9 @@ __all__ = [
     "COUNTER_KEYS",
     "Check",
     "LABEL",
+    "NOT_ASKED_CAP",
+    "NOT_ASKED_PREFIX",
+    "NO_ENTRY",
     "SIGNS",
     "WELCH_NOTE",
     "active",

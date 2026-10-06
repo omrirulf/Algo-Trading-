@@ -25,14 +25,20 @@ When. Once a week. The week's check day is the first UTC day of the ISO
 week, from ``START``, on which the production journal holds a cycle; the
 names are the ones held in that day's cycle. A name whose check failed is
 asked again on a later day of the same week while it is still held, at most
-once a day. A name with a successful check this week is done. The job runs
+once a day. A name with a successful check this week is done, and so is a
+name with no entry record or one the week's cost cap stopped: each gets one
+line saying so, and waits for the next week. The job runs
 in the shadow-universe workflow after the vote, so the model provider is
 never asked by two of them at once, and starts no new name from 23:15 UTC.
 
 The cost cap. At most ``WEEKLY_COST_CAP_USD`` ($0.10) an ISO week, about
 $0.06 expected. Every HTTP ask counts (an ask with no price is charged the
-estimate). At the cap no new name starts and the run ends with exit code 3,
-so the workflow tells the owner's phone.
+estimate). At the cap no new name starts; each name it stops gets its line
+(``analysis.thesis.NOT_ASKED_CAP``). The run that first stops a name at the
+cap this week ends with exit code 3, so the workflow tells the owner's phone
+once a week: a later run that week, which finds a cap line already written,
+ends with 0, and so does a run that reaches the cap with the last name it
+started and stops none.
 
 Off until 2027-04-01. Nothing happens unless ``THESIS_CHECK_ENABLED`` is on,
 today (UTC) is on or after ``START``, today is a trading day, it is before
@@ -57,6 +63,7 @@ from typing import Any, Final, Literal, Mapping, Optional, Sequence
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from analysis import thesis as checks
 from analysis.cycle_day import cycle_ran_on
 from analysis.reader import JournalEntry, entry_from, read_journal
 from config import journal_files
@@ -92,8 +99,11 @@ FAILED: Final[str] = "failed"
 NOT_ASKED: Final[str] = "not asked"
 UNRECORDED: Final[str] = "unrecorded"
 
-#: Why a name was written without a call: the audit log has no accepted entry for it.
-NO_ENTRY: Final[str] = "no entry record for this name"
+#: Why a name was written without a call: the audit log has no accepted entry
+#: for it, or the week's cost cap stopped it. Both final for the week; one
+#: spelling, the read side's (``analysis/thesis.py``).
+NO_ENTRY: Final[str] = checks.NO_ENTRY
+NOT_ASKED_CAP: Final[str] = checks.NOT_ASKED_CAP
 
 #: The audit log's record of a signal the engine decided on.
 ENTRY_EVENT: Final[str] = "signal_processed"
@@ -250,10 +260,12 @@ class WeekLines:
 
     #: Model cost so far this week: the ``cost_usd`` of every line of the week.
     spent_usd: float = 0.0
-    #: Names with a successful check this week: done until next week.
+    #: Names done until next week: a successful check, no entry record, or the cap.
     done: frozenset[str] = frozenset()
     #: Names with any line written today: asked at most once a day.
     tried_today: frozenset[str] = frozenset()
+    #: A line of this week says the week's cost cap stopped it: the phone has been told.
+    cap_noted: bool = False
 
 
 def week_lines(directory: Path | str, week: str, day: date) -> WeekLines:
@@ -264,6 +276,7 @@ def week_lines(directory: Path | str, week: str, day: date) -> WeekLines:
     spent = 0.0
     done: set[str] = set()
     tried: set[str] = set()
+    cap_noted = False
     for raw in journal_files.iter_lines(path):
         try:
             payload = json.loads(raw)
@@ -276,11 +289,13 @@ def week_lines(directory: Path | str, week: str, day: date) -> WeekLines:
         if not isinstance(ticker, str):
             continue
         name = ticker.strip().upper()
-        if payload.get("error") is None and payload.get("verdict") in tc.VERDICTS:
+        error = payload.get("error")
+        if (error is None and payload.get("verdict") in tc.VERDICTS) or error in (NO_ENTRY, NOT_ASKED_CAP):
             done.add(name)
+        cap_noted = cap_noted or error == NOT_ASKED_CAP
         if _written_day(payload) == day:
             tried.add(name)
-    return WeekLines(spent, frozenset(done), frozenset(tried))
+    return WeekLines(spent, frozenset(done), frozenset(tried), cap_noted)
 
 
 @dataclass(frozen=True)
@@ -542,6 +557,12 @@ def _check(ticker: str, entry: Entry, headlines: tuple[str, ...], shared: _Share
         return NOT_ASKED, 0
     if not shared.guard.reserve():
         log.warning("%s: the week's cost cap is reached; not checked", ticker)
+        try:
+            shared.writer.write(thesis_line(ticker, now, shared.week, entry=entry, headline_count=len(headlines),
+                                            setup=shared.setup, effort=shared.effort, error=NOT_ASKED_CAP), now)
+        except Exception:  # noqa: BLE001 - one line must not end the run
+            log.exception("%s: could not write its line", ticker)
+            return UNRECORDED, 0
         return NOT_ASKED, 0
     label = f"{ticker} thesis"
     answer: "Completion | BaseException"
@@ -603,8 +624,18 @@ class ThesisRun:
     #: The week's total so far, as the cap counts it.
     cost_usd: float = 0.0
     cap_usd: float = tc.WEEKLY_COST_CAP_USD
+    #: The state: the week's total, with the estimates held, is at the cap.
     cap_reached: bool = False
+    #: Names the cap stopped in this run, and whether a line of this week
+    #: already said the cap stopped one, so ``cap_stopped`` fires once a week.
+    cap_refused: int = 0
+    cap_noted_before: bool = False
     error: Optional[str] = None
+
+    @property
+    def cap_stopped(self) -> bool:
+        """The cap stopped a name in this run, and in no earlier run this week: the phone is told once a week."""
+        return self.cap_refused > 0 and not self.cap_noted_before
 
     @property
     def estimated_usd(self) -> float:
@@ -613,10 +644,10 @@ class ThesisRun:
 
     @property
     def exit_code(self) -> int:
-        """3 when the cap stopped the run; 1 when nothing could be asked, or every asked name failed."""
+        """3 when the cap first stopped a name this week; 1 when nothing could be asked, or every asked name failed."""
         if self.error is not None:
             return EXIT_FAILED
-        if self.cap_reached:
+        if self.cap_stopped:
             return EXIT_CAP_REACHED
         if self.checked == 0 and self.failed > 0:
             return EXIT_FAILED
@@ -639,6 +670,7 @@ class ThesisRun:
             "cost_usd": round(self.cost_usd, 6),
             "cap_usd": self.cap_usd,
             "cap_reached": self.cap_reached,
+            "cap_stopped": self.cap_stopped,
             "estimated_usd": self.estimated_usd,
             "error": self.error,
         }
@@ -674,9 +706,10 @@ def check_theses(
     seen = week_lines(directory, week, day)
     due = due_names(day, seen)
     guard = CostGuard(cap, seen.spent_usd, per_call_usd=tc.ESTIMATED_COST_PER_CALL_USD)
-    base = dict(day=day, ran=True, week=week, check_day=due.check_day, names=len(due.names), cap_usd=cap)
+    base = dict(day=day, ran=True, week=week, check_day=due.check_day, names=len(due.names), cap_usd=cap,
+                cap_noted_before=seen.cap_noted)
     if not due.names:
-        return ThesisRun(**base, cost_usd=guard.spent_usd)
+        return ThesisRun(**base, cost_usd=guard.spent_usd, cap_reached=guard.cap_reached)
     try:
         provider = heartbeat.full_model_provider()
         ask_effort = heartbeat.full_model_effort()
@@ -730,6 +763,7 @@ def check_theses(
         asks=asks,
         cost_usd=guard.spent_usd,
         cap_reached=guard.cap_reached,
+        cap_refused=guard.refused,
     )
     log.info("thesis check: %s", json.dumps(run.summary(), sort_keys=True))
     return run
@@ -782,6 +816,7 @@ __all__ = [
     "FAILED",
     "NONE_RECORDED",
     "NOT_ASKED",
+    "NOT_ASKED_CAP",
     "NO_ENTRY",
     "NO_HEADLINES",
     "NO_NEW_NAME_AFTER_UTC",

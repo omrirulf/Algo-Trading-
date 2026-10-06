@@ -52,7 +52,7 @@ possible (uses the AI)". Every one below is shadow-only: none trades.
 | Thesis check: once a week, does the reason each held name was bought still hold? (VALID, WEAKENED or BROKEN) | **Built, switched off until 2027-04-01** (`THESIS_CHECK_ENABLED`), registered at the 2027-03-22 checkpoint as an idea of the second quarter of 2027 (section 13.12). Log only; BROKEN against VALID names described at the checkpoints after that. | About $0.06 a week; cap $0.10 a week. | 43 | [card](cards/thesis-check.md) |
 | A 1-to-5 ranking arm: the model ranks names instead of calling each one | **Deferred**: built only if the IC report shows the scores are too coarse (the owner's decision of 2026-10-02). Not registered. | Not estimated. | None (no card, no row) | |
 | A cross-model vote: different models vote on each line | **A later idea, not registered.** The wisdom-of-the-crowd result (12 different models) is about different models; `model_vote` (one model, five calls) does not test it. It would need its own card, row and registration. | Not estimated. | None (no card, no row) | |
-| Event tags and annual-report flags | **Dropped: too few events** to judge. Dropped before a card was written. | | None (no card, no row) | |
+| Event tags and annual-report flags | **Dropped: too few events** to judge. Dropped before a card was written. | None: dropped before it was built (not estimated). | None (no card, no row) | |
 
 ## Trading rules
 

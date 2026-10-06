@@ -5,10 +5,10 @@
 **Source:** None: the owner's fixed choice of 2026-10-04.
 
 **Exact rule and settings:** Every number is in `config/thesis_check.py`.
-- *When:* once a week, on the first trading day of each ISO week on which the production cycle is journalled, after the vote (the same workflow run, never at the same time as production, the shadow universe or the vote). A name not checked that day (time, the cost cap, a failed call) is tried again on the next trading day of the same week, while it is still held.
+- *When:* once a week, on the first trading day of each ISO week on which the production cycle is journalled, after the vote (the same workflow run, never at the same time as production, the shadow universe or the vote). A name not checked that day because of time or a failed call is tried again on the next trading day of the same week, while it is still held; a name the weekly cost cap stopped, or with no entry record, waits for the next week, with one line saying so.
 - *Which names:* every name the paper account holds that day: the tickers with a held line in that day's production cycle.
 - *The question:* one call per name to the same model, with production's settings (`openai/gpt-oss-120b`, reasoning level high): given the entry reasoning archived with the entry (the rationale and key factors of the signal that opened the position: the latest accepted `signal_processed` record for the name in the execution audit log, the rule `analysis/book.py` uses) and today's headlines for the name (the ones production gathered on its held line that day; none is said as none), is the thesis VALID, WEAKENED or BROKEN? With one sentence of reason (at most 300 characters). The prompt's words are fixed in `orchestrator/thesis.py`.
-- *Log only:* one line per name per week in `logs/thesis_check/`. It never trades, never changes a stop, never feeds any arm or fund, and nothing in the cycle reads it.
+- *Log only:* at most one check with a verdict per name per week in `logs/thesis_check/`; every attempt is its own line. It never trades, never changes a stop, never feeds any arm or fund, and nothing in the cycle reads it.
 - *Cost:* a hard cap of $0.10 a week (about $0.06 expected: about 20 held names at about $0.003 a call); every HTTP ask counted. No news search is paid.
 
 **Data used:** The production journal's held lines (their headlines), the execution audit log (the entry's signal), the logger's own lines (`logs/thesis_check/`), and, at the checkpoints, final daily bars (open and close) from the race's price source.
@@ -21,7 +21,7 @@
 
 **History screen:** Not possible (uses the AI).
 
-**Read on:** At each checkpoint after its registration: the estimated 2027-06-16 look (the race's final one). Between checkpoints, from 2027-04-01, only counters (checks made, names, weeks, failed checks). Nothing at all before 2027-04-01.
+**Read on:** At each checkpoint after its registration: the estimated 2027-06-16 look (the race's final one). Between checkpoints, from 2027-04-01, only counters (checks with a verdict, names, weeks, failed calls, names with no entry record, names the cap stopped). Nothing at all before 2027-04-01.
 
 **Acting differently:** Not a test, so nothing acts differently in section 13.7's sense. Its count is the BROKEN checks: fewer than 20 by the final checkpoint and the comparison is "not tested".
 

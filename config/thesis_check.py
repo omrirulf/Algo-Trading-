@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Final
 
 #: The logger's on/off switch. False until the pre-registration says it is
-#: on; ``tests/test_thesis_check.py`` fails if this is True before ``START``.
+#: on; ``tests/test_thesis_check_runner.py`` fails if this is True before ``START``.
 THESIS_CHECK_ENABLED: Final[bool] = False
 
 #: The checkpoint at which it is registered: the race's second planned look

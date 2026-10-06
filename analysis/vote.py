@@ -48,6 +48,16 @@ NO_TRADE: Final[str] = "no trade"
 #: The label every descriptive block of this module carries.
 IC_LABEL: Final[str] = "vote score minus single-call score: descriptive only"
 
+#: Why a line was written with no call although its archived input was
+#: there: the runner would not start it (pre-registration section 13.11, "and
+#: is counted"). Each is final, like a line with no archived input: the
+#: production line is never voted again. One spelling, here; the runner
+#: (``orchestrator/vote.py``) writes these very strings, and the counters
+#: below tell them from the other reasons by the prefix.
+NOT_ASKED_PREFIX: Final[str] = "not asked:"
+NOT_ASKED_CAP: Final[str] = "not asked: the day's cost cap was reached"
+NOT_ASKED_LATE: Final[str] = "not asked: it was 23:15 UTC or later"
+
 
 # --------------------------------------------------------------------------- #
 # One vote, one line, one answer
@@ -145,7 +155,8 @@ class VoteLine:
     #: The production line's UTC day (the day the race and the funds give it).
     day: date
     votes: tuple[Vote, ...]
-    #: Why the line was not voted, when it was not (no archived input, an input that differs).
+    #: Why the line was not voted, when it was not: no archived input, an input
+    #: that differs, or not started (``NOT_ASKED_PREFIX``: the cap, the cut-off).
     error: Optional[str] = None
     #: HTTP asks the four calls made, and what they cost (every ask counted).
     asks: int = 0
@@ -297,17 +308,26 @@ def acted_differently(entries: Sequence[JournalEntry], found: Mapping[Key, Answe
 
 
 #: The counters' keys: whole numbers only, never a return, a signal or a difference.
-COUNTER_KEYS: Final[tuple[str, ...]] = ("lines", "answered", "dropped", "not_voted", "extra_calls", "failed_calls")
+COUNTER_KEYS: Final[tuple[str, ...]] = ("lines", "answered", "dropped", "not_voted", "not_asked", "missing",
+                                        "extra_calls", "failed_calls")
 
 
-def counters(lines: Mapping[Key, VoteLine], through: date) -> dict[str, int]:
+def counters(lines: Mapping[Key, VoteLine], through: date, entries: Sequence[JournalEntry] = ()) -> dict[str, int]:
     """What is shown about the vote between checkpoints (section 13.1): counts, nothing else.
 
-    ``lines``: production lines with a vote record from ``START`` to
-    ``through``; ``answered``: with at least 3 successful votes;
-    ``dropped``: voted, with fewer; ``not_voted``: a record that says why no
-    call was made; ``extra_calls`` and ``failed_calls``: the four calls a
-    line, and the ones that gave no vote.
+    From ``START`` to ``through`` (the production line's UTC day):
+    ``lines``: production lines with a vote record; ``answered``: with at
+    least 3 successful votes; ``dropped``: voted, with fewer; ``not_voted``:
+    a record that says why no call was made (no archived input, an input
+    that differs); ``not_asked``: a record that says the line was not
+    started (the day's cost cap, the 23:15 cut-off); ``extra_calls`` and
+    ``failed_calls``: the four calls a line, and the ones that gave no vote.
+
+    ``missing``: the answered, not held lines of the production journal
+    (``entries``) that the runner would offer -- an exact UTC time -- and
+    that have no vote record at all: a download that failed, a run out of
+    time, a run that never came. So every answered line is in one count or
+    another (section 13.11: "and is counted"). With no ``entries``, 0.
     """
     out = {name: 0 for name in COUNTER_KEYS}
     for line in lines.values():
@@ -315,13 +335,22 @@ def counters(lines: Mapping[Key, VoteLine], through: date) -> dict[str, int]:
             continue
         out["lines"] += 1
         if line.error is not None:
-            out["not_voted"] += 1
+            out["not_asked" if line.error.startswith(NOT_ASKED_PREFIX) else "not_voted"] += 1
         elif line.answer is not None:
             out["answered"] += 1
         else:
             out["dropped"] += 1
         out["extra_calls"] += line.extra_calls
         out["failed_calls"] += line.failed_calls
+    missing: set[Key] = set()
+    for entry in entries:
+        key = key_of(entry)
+        if (key is None or not entry.timestamp_is_exact or entry.held or not entry.model_answered
+                or not mv.START <= key[1].date() <= through):
+            continue
+        if key not in lines:
+            missing.add(key)
+    out["missing"] = len(missing)
     assert set(out) == set(COUNTER_KEYS) and all(type(v) is int for v in out.values())
     return out
 
@@ -411,6 +440,9 @@ __all__ = [
     "COUNTER_KEYS",
     "IC_LABEL",
     "Key",
+    "NOT_ASKED_CAP",
+    "NOT_ASKED_LATE",
+    "NOT_ASKED_PREFIX",
     "NO_TRADE",
     "Vote",
     "VoteLine",

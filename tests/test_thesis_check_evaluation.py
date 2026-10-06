@@ -102,13 +102,16 @@ def test_the_counters_are_whole_numbers_from_the_start_only():
         check_json("XLE", date(2027, 3, 30)),                                     # before START: never counted
         check_json("XLE", APR1, "VALID"),
         check_json("XLE", APR1, "VALID", hour=21),                                # the same name and week: once
-        check_json("GLD", APR1, error="no entry record for this name"),
+        check_json("GLD", APR1, error=thesis_check.NO_ENTRY),
+        check_json("SLV", APR1, error="model call failed: timeout"),
         check_json("TLT", date(2027, 4, 6), "BROKEN", "short"),
+        check_json("XHB", date(2027, 4, 6), error=thesis_check.NOT_ASKED_CAP),
     ])
     counts = thesis_check.counters(lines, date(2027, 4, 9))
-    assert counts == {"checks": 2, "names": 2, "weeks": 2, "failed": 1}
+    assert counts == {"checks": 2, "names": 2, "weeks": 2, "failed": 1, "no_entry": 1, "not_asked": 1}
     assert set(counts) == set(thesis_check.COUNTER_KEYS) and all(type(v) is int for v in counts.values())
-    assert thesis_check.counters(lines, date(2027, 4, 5)) == {"checks": 1, "names": 1, "weeks": 1, "failed": 1}
+    assert thesis_check.counters(lines, date(2027, 4, 5)) == {"checks": 1, "names": 1, "weeks": 1, "failed": 1,
+                                                              "no_entry": 1, "not_asked": 0}
 
 
 def test_a_document_before_the_start_has_no_key_of_the_thesis_check(monkeypatch, tmp_path):
@@ -130,7 +133,8 @@ def test_from_the_start_the_counters_and_a_looks_description_are_there(monkeypat
     args = build_args(tmp_path, LOOK_TWO)
     args.thesis = write_checks(tmp_path / "thesis_check", [check_json("XLE", APR1, "BROKEN")])
     out = shadow_run.build(args, THE_FIRST_NIGHT)
-    assert out["exploratory"]["counters"][tc.EVENT] == {"checks": 1, "names": 1, "weeks": 1, "failed": 0}
+    assert out["exploratory"]["counters"][tc.EVENT] == {"checks": 1, "names": 1, "weeks": 1, "failed": 0,
+                                                         "no_entry": 0, "not_asked": 0}
     (record,) = out["exploratory"]["checkpoints"]
     block = record[tc.EVENT]
     assert block["descriptive"] is True and block["in_family"] is False and block["checks"] == 1

@@ -29,6 +29,7 @@ import httpx
 import pytest
 import yaml
 
+from analysis import thesis as checks
 from config import settings as cfg
 from config import thesis_check as tc
 from config.journal_files import month_file
@@ -432,9 +433,10 @@ def test_failed_names_are_asked_again_later_in_the_week_while_still_held(monkeyp
     _at(monkeypatch, MONDAY + timedelta(days=7))
     fourth = _run(wired)
     assert (fourth.week, fourth.check_day, fourth.checked) == ("2027-W15", monday + timedelta(days=7), 2)
-    weeks = [(line["ticker"], line["week"], line["error"] is None) for line in _lines(wired)]
-    assert weeks == [("AAA", "2027-W14", True), ("BBB", "2027-W14", False), ("EEE", "2027-W14", False),
-                     ("BBB", "2027-W14", True), ("AAA", "2027-W15", True), ("DDD", "2027-W15", True)]
+    # Names are checked four at a time, so lines of one run are written in the order the calls end: compare sorted.
+    weeks = sorted((line["week"], line["ticker"], line["error"] is None) for line in _lines(wired))
+    assert weeks == [("2027-W14", "AAA", True), ("2027-W14", "BBB", False), ("2027-W14", "BBB", True),
+                     ("2027-W14", "EEE", False), ("2027-W15", "AAA", True), ("2027-W15", "DDD", True)]
 
 
 def test_the_first_week_s_check_day_is_not_before_the_start(monkeypatch, wired):
@@ -571,13 +573,34 @@ def test_the_weekly_cap_stops_new_names_and_the_cli_exits_3(monkeypatch, capsys,
     assert thesis.main(["--run-id", "555"]) == thesis.EXIT_CAP_REACHED
     summary = json.loads(capsys.readouterr().out)
     assert (summary["checked"], summary["not_asked"], summary["cap_reached"]) == (1, 2, True)
+    assert summary["cap_stopped"] is True
     assert summary["cap_usd"] == tc.WEEKLY_COST_CAP_USD and summary["cost_usd"] == pytest.approx(0.10, abs=1e-4)
     assert sorted(wired.capture.rglob("*.jsonl"))[0].name.startswith("thesis-555-")
-    # Tuesday, the same week: the cap still holds, nobody is asked.
+    # The names the cap stopped get one line each, saying so, with no call.
+    lines = [json.loads(raw) for raw in month_file(wired.lines, MONDAY).read_text().splitlines()]
+    stopped = [line for line in lines if line["error"] == thesis.NOT_ASKED_CAP]
+    assert sorted(line["ticker"] for line in stopped) == ["BBB", "CCC"]
+    assert all(line["asks"] == 0 and line["verdict"] is None for line in stopped)
+    # Tuesday, the same week: those names wait for next week, nobody is asked, and the phone is not told again.
     _cycle(wired, (MONDAY + timedelta(days=1)).date(), {"AAA": ["h"], "BBB": ["h"], "CCC": ["h"]})
     _at(monkeypatch, MONDAY + timedelta(days=1))
     tuesday = _run(wired)
-    assert tuesday.cap_reached is True and tuesday.asks == 0 and len(wired.endpoint.sent) == 1
+    assert tuesday.names == 0 and tuesday.asks == 0 and len(wired.endpoint.sent) == 1
+    assert tuesday.cap_stopped is False and tuesday.exit_code == thesis.EXIT_OK
+    assert len(month_file(wired.lines, MONDAY).read_text().splitlines()) == len(lines)   # no line repeated
+
+
+def test_a_name_with_no_entry_record_gets_one_line_a_week(monkeypatch, wired):
+    _cycle(wired, MONDAY.date(), {"AAA": ["h"]})
+    run = _run(wired)
+    assert (run.no_entry, run.asks) == (1, 0) and wired.endpoint.sent == []
+    _cycle(wired, (MONDAY + timedelta(days=1)).date(), {"AAA": ["h"]})
+    _at(monkeypatch, MONDAY + timedelta(days=1))
+    tuesday = _run(wired)
+    assert tuesday.names == 0 and tuesday.no_entry == 0
+    lines = [json.loads(raw) for raw in month_file(wired.lines, MONDAY).read_text().splitlines()]
+    assert [(line["ticker"], line["error"]) for line in lines] == [("AAA", thesis.NO_ENTRY)]
+    assert thesis.NO_ENTRY == checks.NO_ENTRY and thesis.NOT_ASKED_CAP == checks.NOT_ASKED_CAP   # one spelling
 
 
 def test_the_cap_counts_this_week_s_lines_only(wired):
@@ -616,7 +639,8 @@ def test_the_thesis_job_runs_after_the_vote():
     jobs = _workflow()["jobs"]
     job = jobs["thesis"]
     assert job["needs"] == "vote"
-    assert job["if"] == "${{ always() && github.event_name != 'pull_request' && !inputs.verify }}"
+    # After the vote's job whether it passed or failed, never after a cancel: a cancel stops the spending.
+    assert job["if"] == "${{ !cancelled() && github.event_name != 'pull_request' && !inputs.verify }}"
     assert job["permissions"] == {"contents": "write"}
     assert [s.get("name") for s in job["steps"] if s.get("name")] == ["Install dependencies", *THESIS_STEPS]
     assert [s.get("uses") for s in job["steps"][:2]] == [s.get("uses") for s in jobs["score"]["steps"][:2]]
@@ -631,7 +655,7 @@ def test_the_thesis_step_gets_exactly_the_model_key():
     step = _step("Check the theses")
     score = next(s for s in _workflow()["jobs"]["score"]["steps"] if s.get("name") == "Score the universe")
     assert step["if"] == "steps.check.outputs.run == 'yes'"
-    assert set(step["env"]) == {"ANTHROPIC_API_KEY", "FULL_MODEL_API_KEY"}
+    assert set(step["env"]) == {"FULL_MODEL_API_KEY"}         # it asks the full model by name: no other key
     for key in step["env"]:
         assert step["env"][key] == score["env"][key], key
     assert 'python -m orchestrator.thesis --run-id "$GITHUB_RUN_ID"' in step["run"]

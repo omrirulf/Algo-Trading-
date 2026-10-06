@@ -85,6 +85,7 @@ def test_the_backlog_is_in_three_sections_and_lists_every_ai_idea():
         if line.startswith("| ") and len(cells) == 5 and cells[0] not in ("Idea", "---"):
             rows[cells[0]] = cells
     assert len(rows) == 7
+    assert all(cells[1] and cells[2] and cells[3] for cells in rows.values())     # status, cost and trial on every row
     by_word = {word: next(c for name, c in rows.items() if word in name)
                for word in ("IC report", "Shadow stock universe", "model_vote", "Thesis check", "1-to-5 ranking arm",
                             "cross-model vote", "Event tags and annual-report flags")}

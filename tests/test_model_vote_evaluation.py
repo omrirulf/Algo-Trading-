@@ -459,3 +459,69 @@ def test_the_vote_lines_are_read_as_the_runner_writes_them(tmp_path):
     assert list(found) == [("XLE", entry.timestamp)] and found[("XLE", entry.timestamp)].side == "LONG"
     counts = model_vote.counters(lines, DEC22)
     assert counts["not_voted"] == 1 and counts["answered"] == 1
+
+
+# --------------------------------------------------------------------------- #
+# The rule itself: the side needs 3 of the 5 votes; the vote score counts vote 1
+# --------------------------------------------------------------------------- #
+
+
+def _votes(*said) -> list[model_vote.Vote]:
+    """Votes 1 to 5 from ``(bias, conviction)``; None is a failed vote."""
+    return [model_vote.Vote(n, *pair) if pair is not None else model_vote.Vote(n, error="timeout")
+            for n, pair in enumerate(said, start=1)]
+
+
+def test_a_side_with_only_two_votes_is_neutral_even_when_it_leads():
+    """The owner, 4 Oct 2026: the plurality needs at least 3 of the 5 votes, otherwise NEUTRAL."""
+    votes = _votes(("BULLISH", 1.0), ("BULLISH", 1.0), ("BEARISH", 0.5), ("NEUTRAL", 0.5), None)
+    assert model_vote.aggregate(votes) == Answer("NEUTRAL", 0.0, 0, 4)
+    assert model_vote.tradeable("NEUTRAL", 0.0, cfg.MIN_CONVICTION) == model_vote.NO_TRADE
+
+
+def test_three_of_four_successful_votes_is_an_answer_whose_share_is_out_of_five():
+    votes = _votes(("BULLISH", 0.6), ("BULLISH", 0.5), ("BULLISH", 0.7), ("BEARISH", 0.4), None)
+    answer = model_vote.aggregate(votes)
+    assert (answer.side, answer.agree, answer.successful) == ("LONG", 3, 4)
+    assert answer.conviction == pytest.approx(3 / 5 * (0.6 + 0.5 + 0.7) / 3)
+    assert model_vote.aggregate(_votes(("BULLISH", 0.6), ("BULLISH", 0.5), None, None, None)) is None
+
+
+def _entry_with_blend(composite: float | None, applied: dict | None) -> JournalEntry:
+    blend = {"composite": composite} | ({"applied": applied} if applied is not None else {})
+    return JournalEntry(ticker="XLE", timestamp=datetime(2026, 12, 22, 15, tzinfo=timezone.utc), bias="BULLISH",
+                        conviction=0.6, blend=blend)
+
+
+def _line_of(votes: list[model_vote.Vote]) -> model_vote.VoteLine:
+    stamp = datetime(2026, 12, 22, 15, tzinfo=timezone.utc)
+    return model_vote.VoteLine(key=("XLE", stamp), ticker="XLE", day=stamp.date(), votes=tuple(votes))
+
+
+def test_the_vote_score_is_the_mean_of_the_successful_votes_with_vote_one_included():
+    """The owner, 4 Oct 2026: the vote score is the mean of the five blended scores. Vote 1 is the line's own."""
+    weights = {"technical_score": 1.0}
+    flat = {"news_score": None, "technical_score": 0.0, "fundamental_score": None, "analyst_score": None,
+            "insider_score": None}
+    four = [model_vote.Vote(n, "NEUTRAL", 0.0, dict(flat)) for n in range(2, 6)]
+    entry = _entry_with_blend(0.5, weights)
+    first = model_vote.Vote(1, "BULLISH", 0.6, dict(flat))
+    assert model_vote.vote_score(entry, _line_of([first, *four])) == pytest.approx(0.5 / 5)
+    failed = [*four[:3], model_vote.Vote(5, error="timeout")]
+    assert model_vote.vote_score(entry, _line_of([first, *failed])) == pytest.approx(0.5 / 4)
+    # A line that recorded no weights has no vote score: its other votes could not be blended alike.
+    assert model_vote.vote_score(_entry_with_blend(0.5, None), _line_of([first, *four])) is None
+
+
+def test_an_answered_line_with_no_vote_record_is_counted_as_missing():
+    """Section 13.11: "a line not voted that day ... is counted", whatever kept it from being voted."""
+    stamp = datetime(2026, 12, 22, 15, tzinfo=timezone.utc)
+    voted = JournalEntry(ticker="XLE", timestamp=stamp, timestamp_is_exact=True, bias="BULLISH", conviction=0.6)
+    lost = JournalEntry(ticker="GLD", timestamp=stamp, timestamp_is_exact=True, bias="NEUTRAL", conviction=0.0)
+    held = JournalEntry(ticker="TLT", timestamp=stamp, timestamp_is_exact=True, held=True)
+    early = JournalEntry(ticker="SLV", timestamp=stamp - timedelta(days=1), timestamp_is_exact=True,
+                         bias="BULLISH", conviction=0.6)
+    lines = {("XLE", stamp): _line_of(_votes(("BULLISH", 0.6), ("BULLISH", 0.6), ("BULLISH", 0.6), None, None))}
+    counts = model_vote.counters(lines, stamp.date(), [voted, lost, held, early])
+    assert counts["missing"] == 1 and counts["lines"] == 1 and counts["answered"] == 1
+    assert model_vote.counters(lines, stamp.date())["missing"] == 0          # no journal given: none counted

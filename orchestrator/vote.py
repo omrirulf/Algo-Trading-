@@ -37,14 +37,26 @@ never runs at the same time as either of them, and the model provider is
 never asked by two of them at once. No new name is started from 23:15 UTC,
 so no line is dated the next day. A name, once started, gets its four calls.
 
+Every answered line is recorded or counted (pre-registration section 13.11).
+A name the cut-off stops gets its line all the same, with vote 1 only, no
+call, and the reason (``analysis.vote.NOT_ASKED_LATE``); so does a name the
+day's cost cap stops (``NOT_ASKED_CAP``). Both are final, like a line with
+no archived input. A name the run's time budget stops, or one the clock
+reaches after midnight, gets no line: a later run today may still vote the
+first, and the second would be dated the next day. A line with no vote line
+at all is counted by the nightly counters as ``missing``.
+
 The cost cap. At most ``DAILY_COST_CAP_USD`` ($1.00) a UTC day; about $0.70
 is expected. The day's total starts from the lines already written today.
 Every HTTP ask is charged as the capture recorded it: retries, re-asks and
 timeouts too (an ask with no price is charged the estimate). Before a name
 starts, its four calls are held at the estimate; at the cap no new name
-starts, and the run ends with exit code 3, so the workflow tells the owner's
-phone. When a run takes the day past ``DAILY_COST_WARN_USD`` ($0.80), the
-summary says ``warn_crossed`` and the phone is told once. The run goes on.
+starts. The run that first stops a name at the cap today ends with exit
+code 3, so the workflow tells the owner's phone, once a day: a later run
+that day, which finds a cap line already written, ends with 0, and so does
+a run that reaches the cap with the last name it started and stops none.
+When a run takes the day past ``DAILY_COST_WARN_USD`` ($0.80), the summary
+says ``warn_crossed`` and the phone is told once. The run goes on.
 
 Off until 2026-12-22. Nothing happens unless ``MODEL_VOTE_ENABLED`` is on,
 today (UTC) is on or after ``START``, and today is a trading day. Two more
@@ -117,6 +129,14 @@ ARCHIVE_DIFFERS: Final[str] = (
 #: Why a run asked nothing and wrote nothing: the production run's model
 #: calls were not downloaded. A later run of the same day tries again.
 NO_DOWNLOAD: Final[str] = "no archived input was downloaded"
+
+#: Why a name was not started, when no line is written for it: the run's
+#: time budget is spent (a later run today may still vote the line), or the
+#: clock has left the run's UTC day (a line written now would be dated the
+#: next day). The two final reasons, the cut-off and the day's cost cap, are
+#: ``analysis.vote.NOT_ASKED_LATE`` and ``NOT_ASKED_CAP``: their line says so.
+OUT_OF_TIME: Final[str] = "the run's time budget is spent"
+DAY_OVER: Final[str] = "the clock has left the run's UTC day"
 
 #: What became of one production line in a run.
 VOTED: Final[str] = "voted"
@@ -312,6 +332,8 @@ class DayVotes:
     spent_usd: float = 0.0
     #: Production lines with a vote line: final, never voted again.
     voted: frozenset = frozenset()
+    #: A line written today says the day's cost cap stopped it: the phone has been told.
+    cap_noted: bool = False
 
 
 def _written_day(payload: Mapping[str, Any]) -> Optional[date]:
@@ -337,6 +359,7 @@ def day_votes(directory: Path | str, day: date) -> DayVotes:
         return DayVotes()
     spent = 0.0
     voted: set = set()
+    cap_noted = False
     for raw in journal_files.iter_lines(path):
         try:
             payload = json.loads(raw)
@@ -346,10 +369,11 @@ def day_votes(directory: Path | str, day: date) -> DayVotes:
             continue
         if _written_day(payload) == day:
             spent += _usd(payload.get("cost_usd"))
+            cap_noted = cap_noted or payload.get("error") == rule.NOT_ASKED_CAP
         line = rule.line_from(payload)
         if line is not None and line.day == day:
             voted.add(line.key)
-    return DayVotes(spent, frozenset(voted))
+    return DayVotes(spent, frozenset(voted), cap_noted)
 
 
 def due_lines(day: date, directory: Path | str) -> list[ProductionLine]:
@@ -472,7 +496,8 @@ class CostGuard:
     reached the cap, and otherwise holds one estimate for each of the name's
     calls. ``settle`` swaps one call's estimate for what it really cost. A
     call in flight always finishes, so the real total can end slightly above
-    the cap; the summary reports it.
+    the cap; the summary reports it. ``refused`` counts the refusals: the
+    names the cap stopped in this run.
     """
 
     def __init__(self, cap_usd: float, spent_usd: float = 0.0,
@@ -482,6 +507,7 @@ class CostGuard:
         self._spent = max(0.0, spent_usd)
         self._held = 0.0
         self._calls = 0
+        self._refused = 0
         self._stopped = False
         self._lock = threading.Lock()
 
@@ -499,6 +525,7 @@ class CostGuard:
         """Check, and hold room for ``calls`` calls; False once the cap is reached."""
         with self._lock:
             if self._full():
+                self._refused += 1
                 return False
             self._held += calls * self._per_call
             self._calls += calls
@@ -520,6 +547,12 @@ class CostGuard:
         """Calls reserved in this run."""
         with self._lock:
             return self._calls
+
+    @property
+    def refused(self) -> int:
+        """``reserve`` calls refused in this run: one a name the cap stopped."""
+        with self._lock:
+            return self._refused
 
     @property
     def cap_reached(self) -> bool:
@@ -700,10 +733,19 @@ class _Name:
         self._lock = threading.Lock()
 
     def start(self, shared: _Shared) -> bool:
-        """Whether this name's calls are asked. Decided once, by the first of its calls to run."""
+        """Whether this name's calls are asked. Decided once, by the first of its calls to run.
+
+        A name the cut-off or the day's cost cap stops gets its final line
+        here, under the name's lock, so it is written once however many of
+        its calls ask.
+        """
         with self._lock:
             if self._started is None:
-                self._started = _may_start(self.line.ticker, shared)
+                now = _utc(utc_now())
+                why = _may_start(self.line.ticker, shared, now)
+                self._started = why is None
+                if why in (rule.NOT_ASKED_LATE, rule.NOT_ASKED_CAP):
+                    _write_not_asked(self, why, now, shared)
             return self._started
 
     def label(self, number: int) -> str:
@@ -718,16 +760,34 @@ class _Name:
             return len(self.votes) == mv.EXTRA_CALLS
 
 
-def _may_start(ticker: str, shared: _Shared) -> bool:
+def _may_start(ticker: str, shared: _Shared, now: datetime) -> Optional[str]:
+    """Why ``ticker``'s name may not start at ``now``; None when it may, and its four calls are held.
+
+    In this order: the run's time budget and the clock leaving the run's UTC
+    day (``OUT_OF_TIME``, ``DAY_OVER``: nothing is written), then the 23:15
+    cut-off and the day's cost cap (``rule.NOT_ASKED_LATE``,
+    ``rule.NOT_ASKED_CAP``: final, the line says so).
+    """
     if time.monotonic() >= shared.deadline:
-        return False
-    now = _utc(utc_now())
-    if now.date() != shared.day or too_late(now) is not None:
-        return False
+        return OUT_OF_TIME
+    if now.date() != shared.day:
+        return DAY_OVER
+    if too_late(now) is not None:
+        log.warning("%s: it is past the cut-off; not voted", ticker)
+        return rule.NOT_ASKED_LATE
     if not shared.guard.reserve(mv.EXTRA_CALLS):
         log.warning("%s: the day's cost cap is reached; not voted", ticker)
-        return False
-    return True
+        return rule.NOT_ASKED_CAP
+    return None
+
+
+def _write_not_asked(name: _Name, reason: str, now: datetime, shared: _Shared) -> None:
+    """The final line of a name that was not started: vote 1 only, no call, the reason. Never raises."""
+    try:
+        shared.writer.write(vote_line(name.line, now, error=reason, setup=shared.setup, effort=shared.effort), now)
+    except Exception:  # noqa: BLE001 - one line must not end the run
+        log.exception("%s: could not write its vote line", name.line.ticker)
+        name.outcome = UNRECORDED
 
 
 def _short(text: str) -> str:
@@ -822,7 +882,8 @@ class VoteRun:
     dropped: int = 0
     #: Lines written without a call: no archived input, or an input that differs.
     not_voted: int = 0
-    #: Lines not started: the cap, the time budget or the cut-off.
+    #: Lines not started: the cap or the cut-off (each written, final), the
+    #: time budget or the clock leaving the day (not written).
     not_asked: int = 0
     unrecorded: int = 0
     calls: int = 0
@@ -831,7 +892,12 @@ class VoteRun:
     #: The day's total so far, as the cap counts it.
     cost_usd: float = 0.0
     cap_usd: float = mv.DAILY_COST_CAP_USD
+    #: The state: the day's total, with the estimates held, is at the cap.
     cap_reached: bool = False
+    #: Names the cap stopped in this run, and whether a line written earlier
+    #: today already said the cap stopped one, so ``cap_stopped`` fires once a day.
+    cap_refused: int = 0
+    cap_noted_before: bool = False
     #: The day's total before this run, so ``warn_crossed`` fires once a day.
     spent_before_usd: float = 0.0
     warn_usd: float = mv.DAILY_COST_WARN_USD
@@ -843,16 +909,21 @@ class VoteRun:
         return self.spent_before_usd < self.warn_usd <= self.cost_usd
 
     @property
+    def cap_stopped(self) -> bool:
+        """The cap stopped a name in this run, and in no earlier run today: the phone is told once a day."""
+        return self.cap_refused > 0 and not self.cap_noted_before
+
+    @property
     def estimated_usd(self) -> float:
         """The expected cost of the lines this run was given: four calls each, at the estimate."""
         return round(self.lines * mv.EXTRA_CALLS * mv.ESTIMATED_COST_PER_CALL_USD, 4)
 
     @property
     def exit_code(self) -> int:
-        """3 when the cap stopped the run; 1 when nothing could be asked, or every call failed."""
+        """3 when the cap first stopped a name today; 1 when nothing could be asked, or every call failed."""
         if self.error is not None:
             return EXIT_FAILED
-        if self.cap_reached:
+        if self.cap_stopped:
             return EXIT_CAP_REACHED
         if self.calls > 0 and self.failed_calls == self.calls:
             return EXIT_FAILED
@@ -877,6 +948,7 @@ class VoteRun:
             "cost_usd": round(self.cost_usd, 6),
             "cap_usd": self.cap_usd,
             "cap_reached": self.cap_reached,
+            "cap_stopped": self.cap_stopped,
             "warn_usd": self.warn_usd,
             "warn_crossed": self.warn_crossed,
             "estimated_usd": self.estimated_usd,
@@ -919,21 +991,23 @@ def vote_today(
     due = [line for line in candidates if line.key not in today.voted]
     guard = CostGuard(cap, today.spent_usd)
     base = dict(day=day, ran=True, lines=len(due), already_voted=len(candidates) - len(due), cap_usd=cap,
-                spent_before_usd=today.spent_usd)
+                spent_before_usd=today.spent_usd, cap_noted_before=today.cap_noted)
     if not due:
-        return VoteRun(**base, cost_usd=guard.spent_usd)
+        return VoteRun(**base, cost_usd=guard.spent_usd, cap_reached=guard.cap_reached)
 
     calls = archived_calls(model_io_dir)
     if calls is None:
         log.error("model_vote: %s; nothing is voted, and a later run today tries again", NO_DOWNLOAD)
-        return VoteRun(**base, not_asked=len(due), cost_usd=guard.spent_usd, error=NO_DOWNLOAD)
+        return VoteRun(**base, not_asked=len(due), cost_usd=guard.spent_usd, cap_reached=guard.cap_reached,
+                       error=NO_DOWNLOAD)
     # Checked once, before any line is judged: with no model to ask, no body
     # can be rebuilt, and a line written "differs" would be final for nothing.
     try:
         provider = heartbeat.full_model_provider()
     except LLMError as exc:
         log.error("no full model to ask: %s", exc)
-        return VoteRun(**base, not_asked=len(due), cost_usd=guard.spent_usd, error=f"no full model to ask: {exc}")
+        return VoteRun(**base, not_asked=len(due), cost_usd=guard.spent_usd, cap_reached=guard.cap_reached,
+                       error=f"no full model to ask: {exc}")
 
     writer = LineWriter(directory)
     setup = heartbeat.model_setup()
@@ -988,6 +1062,7 @@ def vote_today(
         failed_calls=sum(1 for vote in every_vote if vote["error"] is not None),
         cost_usd=guard.spent_usd,
         cap_reached=guard.cap_reached,
+        cap_refused=guard.refused,
     )
     log.info("model_vote: %s", json.dumps(run.summary(), sort_keys=True))
     return run
@@ -1033,6 +1108,7 @@ __all__ = [
     "ARCHIVE_DIFFERS",
     "CaptureLedger",
     "CostGuard",
+    "DAY_OVER",
     "DayVotes",
     "ERROR_MAX_CHARS",
     "EXIT_CAP_REACHED",
@@ -1044,6 +1120,7 @@ __all__ = [
     "NOT_VOTED",
     "NO_ARCHIVE",
     "NO_DOWNLOAD",
+    "OUT_OF_TIME",
     "ProductionLine",
     "Prompt",
     "RUN_BUDGET_SECONDS",

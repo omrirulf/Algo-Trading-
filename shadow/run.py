@@ -1162,7 +1162,8 @@ def build(args: argparse.Namespace, now: datetime, fetchers: Optional[list] = No
     today = now.date()
     vote_lines = vote_lines_in(getattr(args, "votes", None)) if model_vote.active(today) else {}
     if model_vote.active(today):
-        counters[mv.ARM] = model_vote.counters(vote_lines, final_through)
+        # The journal too, so an answered line with no vote record is counted ("missing").
+        counters[mv.ARM] = model_vote.counters(vote_lines, final_through, read.entries)
     thesis_lines = thesis_lines_in(getattr(args, "thesis", None)) if thesis_check.active(today) else []
     if thesis_check.active(today):
         counters[tc.EVENT] = thesis_check.counters(thesis_lines, final_through)
