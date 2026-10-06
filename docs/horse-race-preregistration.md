@@ -264,12 +264,11 @@ first night the same conditions hold, with the old one kept inside it; a
 record that says the test could not be met (calibration had not passed) is
 never made again. A look that would pick an arm waits for its record, as it
 waits for a price. If calibration has not passed
-on the night the race reaches the look, no fund is run, and the test cannot
+on the first night the look is readable, no fund is run, and the test cannot
 be met at that look: an early look then decides nothing for an arm, and at
-the final look no arm trades. Calibration is judged for a look on the first
-night the look is readable, for both the fund test's skip (sections 11.3
-and 11.7) and this record's "could not be met", so the two can never
-disagree. (Amendment 2026-10-06)
+the final look no arm trades. This holds for both the fund test's skip
+(sections 11.3 and 11.7) and this record's "could not be met", so the two
+can never disagree. (Amendment 2026-10-06)
 
 **It only stops an arm from winning.** It never decides anything by itself.
 At an early look, "no arm trades" still comes only from the index test
