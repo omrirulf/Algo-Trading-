@@ -10,8 +10,34 @@ checkpoint (pre-registration, section 13.6; `analysis/multiple_tests.py`
 counts them). A new idea gets its row (and its card in `cards/`) before it
 runs, and a history screen gets its row before it runs.
 
-**N = 41** (2026-10-02: 18 ideas and 16 history screens by 2026-09-28, then the IC report's two universes, the
-four stress-period screens and the regime split, added on 2026-10-02).
+**N = 43** (2026-10-04: 18 ideas and 16 history screens by 2026-09-28, then the IC report's two universes, the
+four stress-period screens and the regime split, added on 2026-10-02, then the voting arm and the thesis check,
+added on 2026-10-04).
+
+### The bar N sets (the Deflated Sharpe Ratio)
+
+A result survives the number of ideas tried when its Deflated Sharpe Ratio
+is above 0.95 (pre-registration, section 13.6). Written as a t (the daily
+Sharpe ratio × √T, over T sessions), this is the t a result needs, computed
+exactly with `analysis/multiple_tests.py` (`dsr_t_bar`), for daily returns
+with no skew and normal tails (the owner's request of 2026-10-06):
+
+| The look (sessions T from 2026-09-28) | N = 18 (when A, B and C were registered) | N = 41 (2026-10-02) | N = 43 (now) |
+| --- | --- | --- | --- |
+| 2026-12-22 (T = 61) | t 3.60 | t 3.96 | t 3.98 |
+| 2027-03-22 (T = 121) | t 3.55 | t 3.90 | t 3.92 |
+| 2027-06-16 (T = 181) | t 3.53 | t 3.88 | t 3.90 |
+| A very long series | t 3.50 | t 3.84 | t 3.86 |
+
+From 18 to 43 trials the bar rises by about 0.37 in t; at 43, each trial
+added raises it by about 0.01. A test that starts later has fewer sessions
+at the same look, so a slightly higher bar (on 2027-03-22 the vote has
+T = 61, t 3.98 at N = 43; the shadow universe, from 2027-01-01, T = 54,
+t 4.00). Fat tails (kurtosis above 3) raise it further.
+In other units: over 121 sessions, about half a year, t 3.92 is an
+annualised Sharpe ratio of about 5.7 (t 3.55, N = 18: about 5.1). This table
+is a reading aid; the bar used at each checkpoint is computed from each
+test's own series and the N of that day.
 
 | Trial | Idea | Kind | Status | Dates | Why it is here / what happened | Card |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -86,7 +112,9 @@ items 4 to 7). The IC report's two rows are two trials in N and one idea against
 owner's decision of 2026-10-03 (pre-registration section 13.9); the test is registered at the 2026-12-22
 checkpoint. The stress-period screens are one row per rule over the four periods, as one
 screen (workflow run 37013435615, `history/2026-10-stress-periods/`); they are descriptive, with no t and no
-verdict. VT and SPY in it are benchmarks, not counted.
+verdict. VT and SPY in it are benchmarks, not counted. Rows 42 and 43 are the owner's instructions of 2026-10-04: the
+voting arm (pre-registration section 13.11) and the thesis-check logger (13.12), each built with its flag off
+and each one trial in N.
 
 | Trial | Idea | Kind | Status | Dates | Why it is here / what happened | Card |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -97,6 +125,8 @@ verdict. VT and SPY in it are benchmarks, not counted.
 | 39 | Stress periods: B (10-month timing on VT) | history screen (real code) | descriptive: no t, no verdict | 2026-10-02 | Not possible in 2000-2002 and 2008 (VT's prices start 2008-06-26; BIL's 2007-05-30). 2020 +13.0% (worst fall 11.1%) against VT +15.5% (34.2%); 2022 -8.8% (9.9%) against VT -18.4% (26.0%): much smaller falls, as its purpose says. Same screen as row 37. | [report](history/2026-10-stress-periods/report.md) |
 | 40 | Stress periods: C (pullback limit entry), fund, 80 names | history screen (real code) | descriptive: no t, no verdict | 2026-10-02 | 2000-2002 -23.4% (27.1%); 2008 -5.5% (20.3%); 2020 +0.5% (23.5%); 2022 -14.2% (18.3%). Same screen as row 37. | [report](history/2026-10-stress-periods/report.md) |
 | 41 | The race's and the funds' results split by market state (VT's 200-day average; VT's 21-day volatility terciles) | exploratory report | registered | from 2026-10-02 | Pre-registration section 13.10. Descriptive; hidden until the checkpoints; like rows 7 and 8. |  |
+| 42 | `model_vote`: the production answer and four more calls of the same model on the same archived input; the side with at least 3 of 5 votes, conviction = share agreeing × their mean conviction, the 0.30 floor | exploratory arm and fund (prepared) | built, switched off until 2026-12-22; registers at the 2026-12-22 checkpoint | lines from 2026-12-22 | Pre-registration section 13.11; an idea of the fourth quarter of 2026, when it starts producing data (section 13.8's rule of 2026-10-06; first written as the second new idea of the first quarter of 2027). Race arm (lag 3) and fund (lag 5) against the model, one call, on the same lines; both in the Benjamini-Hochberg family and the Deflated Sharpe table from registration; the vote score's IC minus the single call's is descriptive only. Fewer than 3 successful votes: the line is dropped for both. Cost cap $1.00 a day. Off by a flag; a test fails if it is on before 2026-12-22. History screen: not possible (uses the AI). | [card](cards/model_vote.md) |
+| 43 | The thesis check: once a week, for each held name, the same model says whether the entry reasoning still holds given today's headlines (VALID, WEAKENED or BROKEN) | exploratory report (prepared) | built, switched off until 2027-04-01; registers at the 2027-03-22 checkpoint | checks from 2027-04-01 | Pre-registration section 13.12; an idea of the second quarter of 2027. Log only: it never trades, never changes a stop, never feeds any arm. At the checkpoints after its registration, the forward returns of BROKEN against VALID names, as a description only (not in the family). Cost cap $0.10 a week. Off by a flag; a test fails if it is on before 2027-04-01. History screen: not possible (uses the AI). | [card](cards/thesis-check.md) |
 
 ## Not counted, and why
 

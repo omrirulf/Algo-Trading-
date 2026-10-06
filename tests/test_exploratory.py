@@ -282,7 +282,9 @@ NOW = datetime(2026, 12, 22, 23, 0, tzinfo=timezone.utc)
 def test_between_checkpoints_there_are_counters_and_no_exploratory_result(monkeypatch, tmp_path):
     calls = []
     passed_calibration(monkeypatch, calls)
-    out = shadow_run.build(build_args(tmp_path), NOW)
+    # The night before the voting arm's start (2026-12-22): its counters are not there yet
+    # (tests/test_model_vote_evaluation.py checks they are from that day).
+    out = shadow_run.build(build_args(tmp_path), NOW - timedelta(days=1))
     assert calls[-1]["exploratory"] is False
     assert [r["name"] for r in out["funds"]["list"]] == ["model", "momentum", "hybrid", "vt"]
     assert out["exploratory"]["checkpoints"] == []
@@ -343,10 +345,27 @@ def test_p_values_and_the_deflated_sharpe_ratio():
     assert mt.series_stats([0.0, 0.0, 0.0]) is None
 
 
+def test_the_t_bar_is_where_the_dsr_crosses_its_level():
+    for n, t_days in ((18, 61), (43, 121), (43, 54), (2, 30)):
+        bar = mt.dsr_t_bar(n, t_days)
+        sr = bar / t_days ** 0.5
+        at = {"sr": sr * 1.0001, "t_days": t_days, "skew": 0.0, "kurt": 3.0}
+        below = {"sr": sr * 0.9999, "t_days": t_days, "skew": 0.0, "kurt": 3.0}
+        assert mt.deflated_sharpe(at, n) > mt.DSR_LEVEL > mt.deflated_sharpe(below, n)
+    # A long series: the 95% normal quantile plus the expected best of N null trials, in t (the owner's 3.5 and 3.9).
+    for n in (18, 43):
+        assert mt.dsr_t_bar(n, 10**8) == pytest.approx(1.6449 + mt.expected_max_sr(n, 10**8) * 10**4, abs=1e-3)
+    assert round(mt.dsr_t_bar(18, 10**8), 1) == 3.5 and round(mt.dsr_t_bar(43, 10**8), 1) == 3.9
+    # More trials, a higher bar; fat tails, a higher bar still.
+    assert mt.dsr_t_bar(44, 121) > mt.dsr_t_bar(43, 121) > mt.dsr_t_bar(18, 121)
+    assert mt.dsr_t_bar(43, 121, kurt=6.0) > mt.dsr_t_bar(43, 121)
+
+
 def test_n_is_the_graveyard_count_and_the_table_leaves_out_tests_with_no_data():
-    # 18 ideas at registration, the 16 history screens logged on 2026-09-27 and 28 (they count in N too), and
-    # rows 35 to 41 of 2026-10-02 (the IC report's two universes, the stress screens, the regime split).
-    assert mt.graveyard_n() == 41
+    # 18 ideas at registration, the 16 history screens logged on 2026-09-27 and 28 (they count in N too),
+    # rows 35 to 41 of 2026-10-02 (the IC report's two universes, the stress screens, the regime split), and
+    # rows 42 and 43 of 2026-10-04 (the voting arm, the thesis-check logger).
+    assert mt.graveyard_n() == 43
     table = mt.checkpoint_table([{"name": "a", "t": 3.0, "stats": {"sr": 0.3, "t_days": 100, "skew": 0.0,
                                                                      "kurt": 3.0}},
                                  {"name": "b", "t": None}], 18)
@@ -393,9 +412,9 @@ def test_the_checkpoint_table_reads_every_test_of_the_family():
     record = {"race": {"insiders": {"t": 1.0, "stats": None}, xp.VETO: {"t": None}},
               "tests": {xp.TIMING: {"t": 2.5, "stats": {"sr": 0.2, "t_days": 60, "skew": 0.0, "kurt": 3.0}}}}
     table = shadow_run.checkpoint_table_for(record)
-    assert table["n_trials"] == mt.graveyard_n() == 41
+    assert table["n_trials"] == mt.graveyard_n() == 43
     rows = {r["name"]: r for r in table["rows"]}
-    assert len(rows) == len(shadow_run.FAMILY) == 10 and rows["B, fund"]["dsr"] is not None
+    assert len(rows) == len(shadow_run.FAMILY) == 12 and rows["B, fund"]["dsr"] is not None
     # The IC report's two tests (section 13.9) are in the family and left out while they have no data.
     assert rows["IC, production names"]["no_data"] and rows["IC, shadow stock universe"]["no_data"]
     assert rows["A, race arm"]["no_data"] is True and rows["C, fund"]["no_data"] is True

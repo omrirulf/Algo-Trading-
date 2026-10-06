@@ -1123,6 +1123,26 @@ class OpenAICompatibleProvider:
             body["reasoning_effort"] = effort
         return body
 
+    def request_body(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        json_schema: dict,
+        *,
+        model: Optional[str] = None,
+        effort: Optional[str] = None,
+        reasoning: bool = True,
+    ) -> dict:
+        """The body ``complete_detailed`` sends on its first ask, with the same arguments; sent nowhere.
+
+        Read-only: it asks nothing and records nothing. The voting arm
+        (``orchestrator/vote.py``, the owner's instruction of 4 Oct 2026)
+        rebuilds a production call's body with it and compares its SHA-256
+        with the archived one, so a vote is asked only when the model, its
+        settings and the prompt are exactly the production call's.
+        """
+        return self._body(system_prompt, user_prompt, json_schema, model or self._model, effort, reasoning)
+
     @staticmethod
     def _insist(body: dict, complaint: str = OFF_SCHEMA_INSTRUCTION) -> dict:
         """The same question, with the complaint said out loud."""

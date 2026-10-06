@@ -47,19 +47,57 @@ def test_both_sides_read_the_same_journal_prices_and_clock():
 
 def test_the_funds_run_as_the_nightly_workflow_runs_them_both_ways():
     text = _text()
-    assert "side.sh\" \"$RUNNER_TEMP/before\" before same" in text
-    assert "side.sh\" \"$GITHUB_WORKSPACE\" after-same same" in text
-    assert "side.sh\" \"$GITHUB_WORKSPACE\" after-production production" in text
-    # The before side's command line is the nightly one without the new arguments; the production
-    # side adds exactly what funds.yml adds.
+    # Before and after-same with the before side's funds.yml, so only the code differs; after-production
+    # with the after side's own funds.yml (6 Oct 2026, PR #142: each command line is read from its funds.yml).
+    assert 'side.sh" "$RUNNER_TEMP/before" before "$RUNNER_TEMP/before/.github/workflows/funds.yml"' in text
+    assert 'side.sh" "$GITHUB_WORKSPACE" after-same "$RUNNER_TEMP/before/.github/workflows/funds.yml"' in text
+    assert 'side.sh" "$GITHUB_WORKSPACE" after-production "$GITHUB_WORKSPACE/.github/workflows/funds.yml"' in text
     assert ("shadow.run --processes 1 --random 1000 --with-prices \\\n"
             '            --race-gate "$out/gate.json" --previous logs/funds.json "${extra[@]}"') in text
-    assert 'extra=(--fx-table "$out/fx-rates.json" --universe logs/shadow_universe)' in text
     funds = FUNDS.read_text(encoding="utf-8")
     for argument in ("--with-prices", "--race-gate", "--previous logs/funds.json", "--fx-table",
-                     "--universe logs/shadow_universe"):
+                     "--universe logs/shadow_universe", "--votes logs/model_vote", "--thesis logs/thesis_check"):
         assert argument in funds, argument
+    for argument in ("--universe logs/shadow_universe", "--votes logs/model_vote", "--thesis logs/thesis_check"):
+        assert f"extra+=({argument})" in text, argument
     assert "analysis.boi_rates --start 2026-09-10" in text and "analysis.boi_rates --start 2026-09-10" in funds
+    # One rate table, fetched once, given to every side.
+    assert 'fx="$RUNNER_TEMP/out/fx-rates.json"' in text and 'extra+=(--fx-table "$fx")' in text
+
+
+def _flags(tmp_path: Path, workflow: Path) -> "subprocess.CompletedProcess[str]":
+    """Run side.sh's own flag reading, as the job writes it, on ``workflow``."""
+    import os
+    import subprocess
+    import sys
+
+    step = next(s for s in _workflow()["jobs"]["compare"]["steps"]
+                if s.get("name") == "Write the price tape and the side runner")
+    env = dict(os.environ, RUNNER_TEMP=str(tmp_path),
+               PATH=f"{Path(sys.executable).parent}{os.pathsep}{os.environ.get('PATH', '')}")
+    subprocess.run(["bash", "-e", "-c", step["run"]], env=env, check=True, capture_output=True, text=True)
+    side = (tmp_path / "side.sh").read_text(encoding="utf-8")
+    block = side[side.index("# The flags of funds.yml"):side.index("has() {")]
+    script = f"set -euo pipefail\nlabel=test workflow={str(workflow)!r}\n{block}echo \"FLAGS: $flags\"\n"
+    return subprocess.run(["bash", "-c", script], env=env, capture_output=True, text=True)
+
+
+def test_the_command_line_is_read_from_funds_yml_and_an_unknown_flag_fails_the_job(tmp_path):
+    import re as _re
+
+    seen = _flags(tmp_path, FUNDS)
+    assert seen.returncode == 0, seen.stderr
+    flags = seen.stdout.split("FLAGS: ", 1)[1].split()
+    # The command itself (the file's header names it too, in a comment, before it).
+    command = FUNDS.read_text(encoding="utf-8").rsplit("python -m shadow.run", 1)[1].split(">", 1)[0]
+    assert flags == _re.findall(r"(?<!\S)--[a-z][a-z-]*", command)
+    assert flags == ["--processes", "--random", "--with-prices", "--race-gate", "--previous", "--fx-table",
+                     "--universe", "--votes", "--thesis"]
+    odd = tmp_path / "odd.yml"
+    odd.write_text("x:\n  run: |\n    python -m shadow.run --random 1 \\\n      --a-new-flag x\n", encoding="utf-8")
+    (tmp_path / "again").mkdir()
+    refused = _flags(tmp_path / "again", odd)
+    assert refused.returncode == 1 and "--a-new-flag" in refused.stdout and "FLAGS:" not in refused.stdout
 
 
 def test_it_fails_on_any_change_to_calibration_or_to_a_value_the_funds_had():

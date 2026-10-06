@@ -120,10 +120,15 @@ jobs:
           # The night's shekel rates, when the step above fetched them
           # (sections 5c and 11.9); without them the funds say so. The shadow
           # stock universe's journal (section 13.9) is empty until 2027-01-01.
+          # The voting arm's lines (section 13.11) are read from 2026-12-22 and
+          # the thesis check's (section 13.12) from 2027-04-01; before those
+          # dates the program does not read them, and the funds file says
+          # nothing of either. Both are committed by shadow-universe.yml.
           python -m shadow.run --processes "$(nproc)" --random "$RANDOM_FUNDS" --with-prices \
             --race-gate "$RUNNER_TEMP/race_gate.json" --previous logs/funds.json \
             --fx-table "$RUNNER_TEMP/scoring-prices/fx-rates.json" \
-            --universe logs/shadow_universe > "$RUNNER_TEMP/funds.out"
+            --universe logs/shadow_universe \
+            --votes logs/model_vote --thesis logs/thesis_check > "$RUNNER_TEMP/funds.out"
           mkdir -p "$RUNNER_TEMP/scoring-prices"
           head -n 1 "$RUNNER_TEMP/funds.out" > "$RUNNER_TEMP/funds.json"
           tail -n 1 "$RUNNER_TEMP/funds.out" > "$RUNNER_TEMP/scoring-prices/funds.json"
