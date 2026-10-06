@@ -127,9 +127,31 @@
                                  (no fund result is calculated or shown until
                                  then), "the first session" after it, or null
                                  while running; missing in older files
-    fund_test.independent        count of independent days, or null
-    fund_test.next_checkpoint    null today; the race's next is used instead
-                                 (same shape as race_gate.json next)
+    fund_test.independent        count of independent days, or null (no longer
+                                 shown: the banner counts fund sessions)
+    fund_test.sessions           fund sessions so far (count)
+    The checkpoint verdict (docs/research/checkpoint-verdict-plan.md, the
+    owner's approval of 6 Oct 2026); an older record lacks all of these and
+    the page then draws no verdict card, and the banner falls back to the
+    race's next look:
+    fund_test.planned_sessions   the planned final sessions (count, 180)
+    fund_test.next_checkpoint    null once every look has a record, else {look
+                                 1|2|3, estimated ISO date (the planned look
+                                 day), bar t-statistic by the spending rule of
+                                 11.7 from the looks read so far (or null),
+                                 planned_bar the registered bar}: the fund
+                                 test's own next look, never the race's
+    fund_test.looks[]            one frozen record per look: {look 1|2|3,
+                                 made_on ISO date, window_end ISO date, status
+                                 read | skipped | owner, bar and planned_bar
+                                 t-statistics and bar_differs true|false (read
+                                 looks only), table Table}
+    fund_test.verdict            {text, decided_at 1|2|3 or null, outcome arm,
+                                 "none" or null}: the first deciding look's
+    fund_test.note               text or null: why no record was made tonight
+    verdict                      the combined line (section 11.8): {text} before
+                                 any look, then {text, race, fund_test, line,
+                                 note}, all text
     integrity                    null, or {four:{ok, problems[], data_holes,
                                  data_hole_examples[]}, coin:{...the same}};
                                  problems shown when ok is false; data_holes
@@ -245,8 +267,20 @@
                                  "0.30-0.40", "0.40-0.50", "0.50-0.60", "0.60+"
     sides                        {arm: {long: Split, short: Split}}, per arm
                                  model, momentum, hybrid, random
+    verdict                      the race's checkpoint verdict; missing in older
+                                 files (then nothing is drawn for it): {text}
+                                 before any look, then {text, decided_at 1|2|3
+                                 or null, looks[] {look, made_on ISO date,
+                                 window_end ISO date, table Table,
+                                 differs_tonight text when tonight's data
+                                 reads a frozen look differently}}
 
-  Not read here: funds.json fund_test.sessions, metrics.timing, not_shortable,
+  A Table (analysis/verdict.py, table_json) is {kind race | fund_test, look,
+  title text, rows[] {n "1".."9" or "→", rule, measured, value, bar, result:
+  all text, shown as written}, verdict text, complete true|false, status,
+  outcome}. A table with no rows (a skipped look) is its title and verdict.
+
+  Not read here: funds.json metrics.timing, not_shortable,
   not_shortable_since, calibration.fund_test_plan.sessions, .exact and
   .registered_sessions; race_gate.json registered,
   outcome, next.entry_days.
@@ -449,6 +483,16 @@ table.mini th,table.mini td{padding:3px 6px}
 table.mini td.few{text-align:center;color:var(--ink-3);font-family:var(--sans)}
 /* A month of price gaps above the owner's 2%. */
 table.mini tr.over td{background:var(--warn-bg)}
+/* The checkpoint verdict: the record's own words in the plan's six columns.
+   The long cells wrap; on a phone the table scrolls inside its own box, so
+   the page never scrolls sideways. The verdict row is bold, as in the plan. */
+.verdict{overflow-wrap:anywhere}
+.verdict .vtitle{font-size:.93rem;margin-top:8px}
+.verdict .vline{font-family:var(--mono);font-size:.86rem;margin-top:8px;overflow-wrap:anywhere}
+table.vt{min-width:640px;margin-top:6px}
+table.vt th,table.vt td{text-align:left;white-space:normal;vertical-align:top;font-family:var(--sans)}
+table.vt td.v{font-family:var(--mono);white-space:nowrap}
+table.vt tr.to td{font-weight:700;border-bottom:0}
 </style>
 
 <header>
@@ -467,6 +511,7 @@ table.mini tr.over td{background:var(--warn-bg)}
 
 <section id="banners" aria-label="Where the tests stand"></section>
 <section id="problems" aria-label="Problems in the record"></section>
+<section id="verdict" aria-label="Checkpoint verdict"></section>
 <section id="race-reports" aria-label="The race's trades by conviction, and longs against shorts"></section>
 
 <h2>Calibration</h2>
@@ -688,8 +733,21 @@ table.mini tr.over td{background:var(--warn-bg)}
     return `<div class="banner"><b>Race:</b> ${esc(R.independent)} of ${esc(of)} independent days (= ${esc(td)} trading days), <b>NO DECISION YET</b>. ${nextText(R.next)}${written}${looks}</div>`;
   }
 
+  // The fund test's own next look (owner reading 5 of 6 Oct 2026): its
+  // number, the planned day, and its own bar by the spending rule of 11.7,
+  // with the registered bar beside it when the two differ.
+  function fundNextText(nx){
+    nx = asObj(nx);
+    if(!nx) return "No checkpoint left to read.";
+    const which = Number.isInteger(nx.look) ? ` ${esc(nx.look)} of 3` : "";
+    const when = nx.estimated ? `, about ${esc(day(nx.estimated, true))}` : "";
+    const bar = isNum(nx.bar) ? `the fund test's own bar t &gt; ${bar2(nx.bar)}` : "the fund test's own bar, set by the spending rule at the look";
+    const planned = isNum(nx.planned_bar) && nx.planned_bar !== nx.bar ? ` (planned ${bar2(nx.planned_bar)})` : "";
+    return `Next checkpoint${which}${when}: ${bar}${planned}`;
+  }
+
   function fundTestBanner(ft, R){
-    ft = ft || {}; R = R || {};
+    ft = asObj(ft) || {}; R = asObj(R) || {};
     // The start is fixed (the owner's decision of 26 Sep 2026); what waits
     // is the reading: no fund result exists until calibration passes.
     if(ft.status !== "running"){
@@ -697,17 +755,83 @@ table.mini tr.over td{background:var(--warn-bg)}
       const cycle = typeof ft.first_cycle === "string" && ft.first_cycle ? ft.first_cycle : "2026-09-28";
       return `<div class="banner idle"><b>Fund test:</b> starts ${esc(day(from, true))} (on the ${esc(day(cycle, true))} cycle), and counts only after calibration passes. ${doc("shadow-funds#the-fund-tests-start-and-the-gate", "The start and the gate")}</div>`;
     }
-    const of = R.of || 60, td = R.trading_days || 180;
-    // The fund test has no looks of its own: it is read at the race's
-    // looks. So while the record carries no checkpoint of its own (today it
-    // never does), the race's next look is the fund test's next checkpoint,
-    // and "none left" is said only when the race has none left either.
+    // Owner reading 5 (6 Oct 2026): the fund test counts its own fund
+    // sessions of the planned 180, and names its own next look and bar. A
+    // record from before the checkpoint verdict (no planned_sessions) has no
+    // look of its own, so the race's next look stands in for it, and "none
+    // left" is said only when the race has none left either.
+    const sessions = isNum(ft.sessions) ? ft.sessions : 0;
+    const planned = isNum(ft.planned_sessions) ? ft.planned_sessions : 180;
     let next;
-    if(ft.next_checkpoint) next = nextText(ft.next_checkpoint);
+    if(asObj(ft.next_checkpoint)) next = fundNextText(ft.next_checkpoint);
+    else if("planned_sessions" in ft) next = fundNextText(null);
     else if(R.next) next = `${nextText(R.next)} <span class="faint">(the race's next look)</span>`;
     else if(!isNum(R.independent)) next = "Next checkpoint: not known until the decision gate writes its record.";
     else next = nextText(null);
-    return `<div class="banner"><b>Fund test:</b> ${esc(isNum(ft.independent) ? ft.independent : 0)} of ${esc(of)} independent days (= ${esc(td)} trading days), <b>NO DECISION YET</b>. ${next}<div class="sub">${ft.start ? `Started ${esc(day(ft.start, true))} ` : ""}${doc("shadow-funds#the-fund-tests-start-and-the-gate", "The fund test")}</div></div>`;
+    const sub = `<div class="sub">${ft.start ? `Started ${esc(day(ft.start, true))} ` : ""}${doc("shadow-funds#the-fund-tests-start-and-the-gate", "The fund test")}</div>`;
+    const decided = asObj(ft.verdict);
+    if(decided && Number.isInteger(decided.decided_at)){
+      return `<div class="banner decided"><b>Fund test:</b> ${esc(sessions)} of ${esc(planned)} fund sessions, decided at checkpoint ${esc(decided.decided_at)}: <b>${esc(decided.text)}</b>${sub}</div>`;
+    }
+    return `<div class="banner"><b>Fund test:</b> ${esc(sessions)} of ${esc(planned)} fund sessions, <b>NO DECISION YET</b>. ${next}${sub}</div>`;
+  }
+
+  // ------------------------------------------------------ checkpoint verdict
+  // The checkpoint verdict (docs/research/checkpoint-verdict-plan.md, the
+  // layout the owner approved on 6 Oct 2026): the race's table, the fund
+  // test's table and the one combined line (section 11.8), every word as the
+  // record wrote it; the page decides nothing. Each test shows its deciding
+  // look's frozen table, else its latest look's. Before any look, one card:
+  // "Checkpoint verdict: no decision yet". An older record without the keys
+  // draws nothing.
+  const VT_COLUMNS = ["#", "Rule (section)", "What is measured", "Value", "Bar", "Result"];
+
+  function verdictTable(t){
+    t = asObj(t);
+    if(!t) return "";
+    const rows = (Array.isArray(t.rows) ? t.rows : []).map(asObj).filter(Boolean);
+    const title = `<p class="vtitle"><b>${esc(t.title)}</b></p>`;
+    if(!rows.length) return title + `<p class="small">${esc(t.verdict)}</p>`;
+    const cell = (r)=> r.n === "→"
+      ? `<tr class="to"><td>→</td><td colspan="4">${esc(r.rule)}</td><td>${esc(r.result)}</td></tr>`
+      : `<tr><td>${esc(r.n)}</td><td>${esc(r.rule)}</td><td>${esc(r.measured)}</td><td class="v">${esc(r.value)}</td><td>${esc(r.bar)}</td><td>${esc(r.result)}</td></tr>`;
+    return title + `<div class="scroll"><table class="vt"><thead><tr>${VT_COLUMNS.map(c=>`<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${rows.map(cell).join("")}</tbody></table></div>`;
+  }
+
+  function verdictHtml(F, R){
+    F = asObj(F) || {}; R = asObj(R) || {};
+    const race = asObj(R.verdict), ft = asObj(F.fund_test) || {}, fund = asObj(ft.verdict), both = asObj(F.verdict);
+    if(!race && !fund && !both) return "";
+    // A look's entry with its table; the deciding look's, else the latest.
+    const entries = (list)=> (Array.isArray(list) ? list : []).map(asObj).filter(e=> e && Number.isInteger(e.look) && asObj(e.table));
+    const pick = (list, at)=> list.find(e=> e.look === at) || list.slice().sort((a, b)=> a.look - b.look).pop() || null;
+    const raceEntry = pick(entries(race && race.looks), race && race.decided_at);
+    const fundEntry = pick(entries(ft.looks), fund && fund.decided_at);
+    const link = doc("shadow-funds#the-checkpoint-verdict", "The checkpoint verdict");
+    if(!raceEntry && !fundEntry){
+      return `<div class="card verdict" style="margin-top:10px"><h3>Checkpoint verdict: no decision yet</h3>`
+        + (typeof ft.note === "string" && ft.note ? `<p class="small muted">${esc(ft.note)}</p>` : "")
+        + `<p class="small">${link}</p></div>`;
+    }
+    let html = `<div class="card verdict" style="margin-top:10px"><h3>Checkpoint verdict</h3>`;
+    if(both && typeof both.text === "string"){
+      html += `<p class="vline">${esc(typeof both.line === "string" && both.line ? both.line : both.text)}</p>`;
+      if(typeof both.note === "string" && both.note) html += `<p class="small muted">${esc(both.note)}</p>`;
+    }
+    if(raceEntry){
+      html += `<h4>The race</h4>` + verdictTable(raceEntry.table);
+      if(typeof raceEntry.differs_tonight === "string" && raceEntry.differs_tonight){
+        html += `<p class="amber">Tonight's data reads checkpoint ${esc(raceEntry.look)} differently: ${esc(raceEntry.differs_tonight)}. The frozen table stays.</p>`;
+      }
+    }
+    if(fundEntry){
+      html += `<h4>The fund test</h4>` + verdictTable(fundEntry.table);
+      if(fundEntry.bar_differs === true && isNum(fundEntry.bar) && isNum(fundEntry.planned_bar)){
+        html += `<p class="amber">Bar ${bar2(fundEntry.bar)} (planned ${bar2(fundEntry.planned_bar)}): the fund test's bar by the spending rule of section 11.7 differs from the planned bar: log it in the Amendments table.</p>`;
+      }
+    }
+    if(typeof ft.note === "string" && ft.note) html += `<p class="small muted">${esc(ft.note)}</p>`;
+    return html + `<p class="small">${link}</p></div>`;
   }
 
   // ------------------------------------------------------------ race reports
@@ -1346,6 +1470,7 @@ table.mini tr.over td{background:var(--warn-bg)}
       : "No funds record yet.";
     safely("banners", ()=>{ $("banners").innerHTML = raceBanner(R, source.race) + fundTestBanner(F.fund_test, R); return []; });
     safely("problems", ()=>{ $("problems").innerHTML = problemsHtml(F); return []; });
+    safely("verdict", ()=>{ $("verdict").innerHTML = verdictHtml(F, R); return []; });
     safely("race-reports", ()=>{ $("race-reports").innerHTML = raceReportsHtml(R); return []; });
     const todo = safely("calibration", ()=>renderCalibration(F)).concat(safely("funds", ()=>renderFunds(F)));
     safely("explore", ()=>{ $("explore").innerHTML = exploratoryHtml(F); return []; });

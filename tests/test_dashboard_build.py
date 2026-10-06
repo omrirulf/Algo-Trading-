@@ -456,22 +456,54 @@ def test_the_pass_rule_is_not_numbered_twice(tmp_path, built_funds_page):
 
 
 @needs_node
-def test_the_fund_test_is_read_at_the_races_next_look(tmp_path, built_funds_page):
+def test_an_older_fund_test_record_is_read_at_the_races_next_look(tmp_path, built_funds_page):
+    """A record from before the checkpoint verdict (no ``planned_sessions``): the race's next look stands in."""
     ft = {"status": "running", "start": "2027-01-04", "sessions": 7, "independent": 2, "next_checkpoint": None}
-    own = dict(ft, next_checkpoint={"independent": 30, "entry_days": 90, "estimated": "2027-03-01", "bar": 2.5})
     decided = dict(RACE_SAMPLE, decided=True, next=None, outcome_text="The model beat both rules.")
-    source = _page_functions(built_funds_page, "nextText", "fundTestBanner")
+    source = _page_functions(built_funds_page, "nextText", "fundNextText", "fundTestBanner")
     out = _run_js(tmp_path, source, "CASES.map(([ft, R])=>fundTestBanner(ft, R))",
-                  [[ft, RACE_SAMPLE], [own, RACE_SAMPLE], [ft, {}], [ft, decided],
+                  [[ft, RACE_SAMPLE], [ft, {}], [ft, decided],
                    [{"status": "not_started", "next_checkpoint": None}, RACE_SAMPLE]])
+    assert "Fund test:</b> 7 of 180 fund sessions, <b>NO DECISION YET</b>" in out[0]   # sessions, not independent days
+    assert "independent days" not in out[0]
     assert "Next checkpoint: 12 Nov 2026, bar t &gt; 2.96" in out[0] and "the race's next look" in out[0]
     assert "No checkpoint left to reach" not in out[0]
-    assert "Next checkpoint: 1 Mar 2027, bar t &gt; 2.50" in out[1]                    # its own, when it has one
-    assert "No checkpoint left to reach" not in out[2] and "decision gate writes its record" in out[2]
-    assert "No checkpoint left to reach" in out[3]                                     # the race has no look left
+    assert "No checkpoint left to reach" not in out[1] and "decision gate writes its record" in out[1]
+    assert "No checkpoint left to reach" in out[2]                                     # the race has no look left
     # Not running: the fixed start, and the reading waits for calibration.
-    assert "starts 29 Sept 2026 (on the 28 Sept 2026 cycle)" in out[4]
-    assert "counts only after calibration passes" in out[4]
+    assert "starts 29 Sept 2026 (on the 28 Sept 2026 cycle)" in out[3]
+    assert "counts only after calibration passes" in out[3]
+
+
+@needs_node
+def test_the_fund_test_banner_counts_fund_sessions_and_names_its_own_next_bar(tmp_path, built_funds_page):
+    """Owner reading 5 (6 Oct 2026): fund sessions of 180 and the fund test's own next bar, never the race's."""
+    base = {"status": "running", "start": "2026-09-29", "sessions": 12, "independent": 4, "planned_sessions": 180,
+            "looks": [], "verdict": {"text": "no decision yet", "decided_at": None, "outcome": None}}
+    planned = dict(base, next_checkpoint={"look": 1, "estimated": "2026-12-22", "bar": 3.4, "planned_bar": 3.4})
+    moved = dict(base, sessions=70, next_checkpoint={"look": 2, "estimated": "2027-03-22", "bar": 2.43,
+                                                    "planned_bar": 2.41})
+    none_left = dict(base, sessions=181, next_checkpoint=None)
+    no_bar = dict(base, next_checkpoint={"look": 2, "estimated": "2027-03-22", "bar": None, "planned_bar": 2.41})
+    decided = dict(base, sessions=61, next_checkpoint=None, verdict={
+        "text": "EARLY STOP AT CHECKPOINT 1: REPLACE THE MODEL FUND WITH THE MOMENTUM FUND", "decided_at": 1,
+        "outcome": "momentum"})
+    other_planned = dict(planned, planned_sessions=150)
+    source = _page_functions(built_funds_page, "nextText", "fundNextText", "fundTestBanner")
+    out = _run_js(tmp_path, source, "CASES.map(([ft, R])=>fundTestBanner(ft, R))",
+                  [[planned, RACE_SAMPLE], [moved, RACE_SAMPLE], [none_left, RACE_SAMPLE], [no_bar, {}],
+                   [decided, RACE_SAMPLE], [other_planned, RACE_SAMPLE], ["junk", 5]])
+    assert "Fund test:</b> 12 of 180 fund sessions, <b>NO DECISION YET</b>" in out[0]
+    assert "Next checkpoint 1 of 3, about 22 Dec 2026: the fund test's own bar t &gt; 3.40" in out[0]
+    assert "planned" not in out[0] and "2.96" not in out[0] and "race's next look" not in out[0]
+    assert "Next checkpoint 2 of 3, about 22 Mar 2027: the fund test's own bar t &gt; 2.43 (planned 2.41)" in out[1]
+    assert "70 of 180 fund sessions" in out[1]
+    assert "No checkpoint left to read." in out[2] and "race's next look" not in out[2]   # its own: none left
+    assert "set by the spending rule at the look (planned 2.41)" in out[3]
+    assert 'class="banner decided"' in out[4] and "decided at checkpoint 1" in out[4]
+    assert "REPLACE THE MODEL FUND WITH THE MOMENTUM FUND" in out[4] and "NO DECISION YET" not in out[4]
+    assert "12 of 150 fund sessions" in out[5]
+    assert "starts 29 Sept 2026" in out[6]                                        # a damaged record: not running
 
 
 def test_a_seed_holding_script_markup_cannot_break_out_of_its_block(tmp_path):
@@ -1309,6 +1341,141 @@ def test_the_after_tax_view_shows_the_paper_account_now_and_the_funds_once_calib
     assert "Model t 1.23 · Momentum t -0.50 · Hybrid t 3.60" in both
     assert "No rate table tonight (no rate table was given)" in _text(out[2])
     assert out[3:] == ["", "", ""]
+
+
+def _verdict_records():
+    """A race gate and a funds record at checkpoint 1, their tables made by ``analysis.verdict`` itself.
+
+    The plan's examples (i) and (ii): the race stops early for momentum, the
+    fund test decides nothing, and the combined line waits for the fund test.
+    Real dates inside the experiment, so ``table_json`` writes them as a real
+    output would.
+    """
+    from datetime import date
+
+    from analysis import verdict
+    from tests.test_verdict import fund_record, plan_inputs, race
+
+    race_table = verdict.table_json(race(plan_inputs()))
+    record = fund_record()
+    record["table"] = verdict.table_json(verdict.fund_test_table(record, planned_next=(2, date(2027, 3, 22), 2.41)))
+    side = {"final_read": False, "skipped_all": False, "look": 1, "window_end": "2026-12-22"}
+    line = verdict.combined(dict(side, decided_at=1, outcome="momentum", next=None),
+                            dict(side, decided_at=None, outcome=None, next={"look": 2, "estimated": "2027-03-22"}))
+    R = dict(RACE_SAMPLE, verdict={"text": race_table["verdict"], "decided_at": 1, "looks": [
+        {"look": 1, "made_on": "2026-12-23", "window_end": "2026-12-22", "table": race_table}]})
+    F = dict(FUNDS_SAMPLE, verdict=line, fund_test=dict(
+        FUNDS_SAMPLE["fund_test"], looks=[record], note=None,
+        verdict={"text": "no decision yet", "decided_at": None, "outcome": None}))
+    return F, R
+
+
+@needs_node
+def test_the_verdict_card_draws_nothing_for_an_older_record_or_a_damaged_one(tmp_path, built_funds_page):
+    source = _page_functions(built_funds_page, "VT_COLUMNS", "verdictTable", "verdictHtml")
+    out = _run_js(tmp_path, source, "CASES.map(([F, R])=>verdictHtml(F, R))",
+                  [[{}, {}], [None, None], [FUNDS_SAMPLE, RACE_SAMPLE], [5, "x"], [[1], [2]],
+                   [{"verdict": 5, "fund_test": "x"}, {"verdict": [1]}],
+                   [{"fund_test": {"verdict": "no", "looks": 3}}, {"verdict": None}]])
+    assert out == [""] * 7
+
+
+@needs_node
+def test_the_verdict_card_says_no_decision_yet_before_the_first_look(tmp_path, built_funds_page):
+    """The plan's (iv): one card, "Checkpoint verdict: no decision yet", and no table."""
+    F = dict(FUNDS_SAMPLE, verdict={"text": "no decision yet"}, fund_test=dict(
+        FUNDS_SAMPLE["fund_test"], looks=[], note=None,
+        verdict={"text": "no decision yet", "decided_at": None, "outcome": None}))
+    R = dict(RACE_SAMPLE, verdict={"text": "no decision yet"})
+    note = dict(F, fund_test=dict(F["fund_test"], note="checkpoint 1: this run had 40 coin-flip funds, not 1,000"))
+    source = _page_functions(built_funds_page, "VT_COLUMNS", "verdictTable", "verdictHtml")
+    out = _run_js(tmp_path, source, "CASES.map(([F, R])=>verdictHtml(F, R))",
+                  [[F, R], [F, RACE_SAMPLE], [FUNDS_SAMPLE, R], [note, R]])
+    for html in out:
+        assert "<h3>Checkpoint verdict: no decision yet</h3>" in html and "<table" not in html
+        assert html.count('class="card verdict"') == 1 and "shadow-funds#the-checkpoint-verdict" in html
+    assert "this run had 40 coin-flip funds" in _text(out[3])
+
+
+@needs_node
+def test_the_verdict_card_draws_both_tables_and_the_combined_line(tmp_path, built_funds_page):
+    F, R = _verdict_records()
+    source = _page_functions(built_funds_page, "VT_COLUMNS", "verdictTable", "verdictHtml")
+    out = _run_js(tmp_path, source, "CASES.map(([F, R])=>verdictHtml(F, R))", [[F, R]])
+    html, text = out[0], _text(out[0])
+    assert html.count('<table class="vt">') == 2 and html.count('<tr class="to">') == 2
+    assert "# Rule (section) What is measured Value Bar Result" in text
+    # The race: the plan's (i), word for word from the record.
+    assert ("Race, checkpoint 1 of 3: 20 independent days (60 entry days), window 2026-09-23 to 2026-12-22, "
+            "bar t &gt; 3.47.") in html
+    assert "Keep (a), 5 and 5a model − momentum, mean daily net return, Newey-West t, lag 3 t = −3.62 &gt; 3.47 FAIL" in text
+    assert "EARLY STOP AT 20: REPLACE THE MODEL WITH MOMENTUM — NOT TESTED IN A DOWNTURN" in text
+    # The fund test: the plan's (ii).
+    assert "Fund test, checkpoint 1 of 3, read on the race's look day" in text
+    assert "NO DECISION AT THIS LOOK — read again at checkpoint 2 (about 2027-03-22; planned bar 2.41)" in text
+    # The combined line and its note, then the tables.
+    assert "CHECKPOINT 1 (2026-12-22) — race: REPLACE THE MODEL WITH MOMENTUM (early stop)" in text
+    assert "NO DECISION YET — waiting for the fund test (checkpoint 2, about 2027-03-22)" in text
+    assert "No real money before the June 2027 verdict (section 9)." in text
+    assert text.index("CHECKPOINT 1 (2026-12-22)") < text.index("The race") < text.index("The fund test")
+    assert "amber" not in html                                              # nothing differs
+
+
+@needs_node
+def test_the_verdict_card_shows_each_tests_deciding_look_else_its_latest(tmp_path, built_funds_page):
+    F, R = _verdict_records()
+    race_one = R["verdict"]["looks"][0]
+    later = dict(race_one, look=2, table=dict(race_one["table"], look=2, title="Race, checkpoint 2 of 3: LATER",
+                                              verdict="FOR READING ONLY"))
+    decided = dict(R, verdict=dict(R["verdict"], looks=[later, race_one]))            # decided at 1: look 1 shown
+    undecided = dict(R, verdict=dict(R["verdict"], decided_at=None, looks=[race_one, later]))  # else the latest
+    record = F["fund_test"]["looks"][0]
+    skipped = {"look": 2, "made_on": "2027-03-23", "window_end": "2027-03-22", "status": "skipped",
+               "table": {"kind": "fund_test", "look": 2, "title": "Fund test, checkpoint 2 of 3: SKIPPED.", "rows": [],
+                         "verdict": "SKIPPED. Calibration had not passed on the night the race's look was readable.",
+                         "complete": True, "status": "skipped", "outcome": None}}
+    with_skip = dict(F, fund_test=dict(F["fund_test"], looks=[record, skipped]))
+    differs = dict(R, verdict=dict(R["verdict"], looks=[dict(race_one, differs_tonight="NO DECISION AT THIS LOOK")]))
+    moved = dict(F, fund_test=dict(F["fund_test"], looks=[dict(record, bar=3.37, planned_bar=3.40, bar_differs=True)]))
+    source = _page_functions(built_funds_page, "VT_COLUMNS", "verdictTable", "verdictHtml")
+    out = _run_js(tmp_path, source, "CASES.map(([F, R])=>verdictHtml(F, R))",
+                  [[F, decided], [F, undecided], [with_skip, R], [F, differs], [moved, R]])
+    assert "Race, checkpoint 1 of 3" in out[0] and "LATER" not in out[0]
+    assert "LATER" in out[1] and "Race, checkpoint 1 of 3" not in out[1]
+    skip = _text(out[2])
+    assert "Fund test, checkpoint 2 of 3: SKIPPED." in skip and "Calibration had not passed" in skip
+    assert out[2].count('<table class="vt">') == 1                          # the skipped block has no rows
+    assert "Tonight's data reads checkpoint 1 differently: NO DECISION AT THIS LOOK. The frozen table stays." in _text(out[3])
+    assert "Bar 3.37 (planned 3.40)" in _text(out[4]) and "log it in the Amendments table" in out[4]
+
+
+@needs_node
+def test_the_verdict_card_escapes_every_string_it_draws(tmp_path, built_funds_page):
+    F, R = _verdict_records()
+    nasty = '<img src=x onerror="alert(1)">'
+    table = R["verdict"]["looks"][0]["table"]
+    crafted_table = dict(table, title=nasty, rows=[dict(r, value=nasty, result=nasty) for r in table["rows"]])
+    crafted_R = dict(R, verdict=dict(R["verdict"], looks=[dict(R["verdict"]["looks"][0], table=crafted_table,
+                                                               differs_tonight=nasty)]))
+    crafted_F = dict(F, verdict=dict(F["verdict"], line=nasty, note=nasty),
+                     fund_test=dict(F["fund_test"], note=nasty))
+    source = _page_functions(built_funds_page, "VT_COLUMNS", "verdictTable", "verdictHtml")
+    out = _run_js(tmp_path, source, "CASES.map(([F, R])=>verdictHtml(F, R))", [[crafted_F, crafted_R]])
+    assert "<img" not in out[0] and "&lt;img src=x onerror=&quot;alert(1)&quot;&gt;" in out[0]
+
+
+def test_the_contract_names_the_checkpoint_verdict_fields():
+    text = (ROOT / "dashboard" / "funds.html").read_text()
+    comment = text[text.index("<!--") + 4:text.index("-->")]
+    for field in ("fund_test.sessions", "fund_test.planned_sessions", "fund_test.next_checkpoint", "planned_bar",
+                  "fund_test.looks[]", "bar_differs", "fund_test.verdict", "fund_test.note", "decided_at",
+                  "differs_tonight", "A Table", "table_json"):
+        assert field in comment, field
+    assert "fund_test.sessions" not in comment.split("Not read here:")[1]
+    page = (ROOT / "dashboard" / "funds.html").read_text()
+    assert '<section id="verdict" aria-label="Checkpoint verdict"></section>' in page
+    assert page.index('<section id="problems"') < page.index('<section id="verdict"') < page.index('<section id="race-reports"')
+    assert 'safely("verdict", ()=>{ $("verdict").innerHTML = verdictHtml(F, R); return []; });' in page
 
 
 @needs_node
