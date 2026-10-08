@@ -1,8 +1,7 @@
-🔴 8 of 80 ticker(s) were judged without news
-Equity $101,725 · 20 positions · $99,525 gross · $2,471 at risk · unrealised +$1,385
+🔴 12 of 80 ticker(s) were judged without news
+Equity $101,378 · 20 positions · $99,517 gross · $2,416 at risk · unrealised +$1,379
 7 directional calls, none traded
 Started by supabase-cron at 14:40 UTC (0 min after 14:40)
-Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-10-06
+Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-10-07
 Closed: EMB, CAT, XLY, RSP, HDB, KRE
-Also: 2 of 80 ticker(s) produced no signal
-Cycle 80 tickers, $0.14 · 2026-10-07
+Cycle 80 tickers, $0.15 · 2026-10-08
