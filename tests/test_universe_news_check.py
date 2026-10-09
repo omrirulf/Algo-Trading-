@@ -22,8 +22,8 @@ def _script() -> str:
 def test_it_asks_every_name_with_the_universe_query_and_counts_by_code():
     """All 251 names (the replacements included), the universe's own search, the code-only rule."""
     script = _script()
-    assert "from config.shadow_universe import REPLACED, TICKERS, news_query" in script
-    assert "pool.map(ask, names)" in script and "names = [t for t in TICKERS if not only or t in only]" in script
+    assert "from config.shadow_universe import CANDIDATES, REPLACED, TICKERS, news_query" in script
+    assert "pool.map(ask, names)" in script and "if only else list(TICKERS)" in script
     assert "from orchestrator.universe_news import fetch" in script
     assert "fetch_news" not in script and "heartbeat" not in script   # not production's search
     assert "from analysis.news_relevance import FAIL_BELOW, report, universe_share" in script
@@ -62,5 +62,34 @@ def test_a_failed_search_is_asked_again_and_never_counted_as_irrelevant():
     assert "max_workers=2" in script and "for _round in range(3):" in script and "time.sleep(60)" in script
     assert "shares = [universe_share(t, found[t][0]) for t in names if t not in broken]" in script
     assert 'print("FAILED " + json.dumps(broken))' in script
-    # ONLY_NAMES lists names of the list only; an unknown ticker stops the check.
+    # ONLY_NAMES lists names of the list only; an unknown ticker stops the check. By hand it comes from the
+    # run's input (a same-day recheck), through the environment, never pasted into the script.
     assert 'sys.exit(f"not in the list:' in script
+    env = _workflow()["jobs"]["check"]["steps"][-1]["env"]
+    assert env["ONLY_NAMES"] == "${{ inputs.only || '' }}" and "inputs.only" not in script
+
+
+def test_by_hand_it_can_run_the_universes_own_news_step_instead():
+    """The owner, 6 Oct 2026: once in the week of 14 Dec, every name's search as the universe makes it."""
+    wf = _workflow()
+    triggers = wf.get("on") or wf[True]
+    assert triggers["workflow_dispatch"]["inputs"]["mode"]["options"] == ["relevance", "news-step"]
+    steps = {s.get("name"): s for s in wf["jobs"]["check"]["steps"]}
+    step = steps["The universe's own news step, every name"]
+    assert step["if"] == "${{ inputs.mode == 'news-step' }}"
+    assert steps["How relevant is each name's news?"]["if"] == "${{ inputs.mode != 'news-step' }}"
+    script = step["run"]
+    assert "news_step(TICKERS, WORKERS)" in script and "from orchestrator.universe import WORKERS" in script
+    assert "if not is_trading_day(today):" in script and 'print("NEWS_STEP " + json.dumps(found))' in script
+    for word in ("llm", "anthropic", "call_llm", "journal"):
+        assert word not in script.lower(), word
+    assert step["env"] == {"BRIGHTDATA_API_KEY": "${{ secrets.BRIGHTDATA_API_TOKEN }}",
+                           "BRIGHTDATA_UNLOCKER_ZONE": "${{ vars.BRIGHTDATA_SERP_ZONE || 'cli_unlocker' }}"}
+
+
+def test_a_candidate_replacement_is_asked_only_by_name_and_has_time_to_finish():
+    """Card rule (2), Amendment 2026-10-06: a replacement passes the news check on a weekday before it joins."""
+    script = _script()
+    assert "unknown = sorted(set(only) - set(TICKERS) - set(CANDIDATES))" in script
+    assert "names = [t for t in (*TICKERS, *CANDIDATES) if t in only] if only else list(TICKERS)" in script
+    assert _workflow()["jobs"]["check"]["timeout-minutes"] == 180
