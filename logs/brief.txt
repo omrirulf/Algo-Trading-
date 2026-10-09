@@ -1,7 +1,8 @@
-🔴 12 of 80 ticker(s) were judged without news
-Equity $101,378 · 20 positions · $99,517 gross · $2,416 at risk · unrealised +$1,379
-7 directional calls, none traded
+🟡 2 warnings: 1 of 80 ticker(s) produced no signal
+Equity $102,145 · 19 positions · $97,058 gross · $3,030 at risk · unrealised +$1,595
+Traded: NVDA, ASML, GOOGL
 Started by supabase-cron at 14:40 UTC (0 min after 14:40)
-Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-10-07
-Closed: EMB, CAT, XLY, RSP, HDB, KRE
-Cycle 80 tickers, $0.15 · 2026-10-08
+Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-10-08
+Closed: EWT, XLK, EMB, CAT, XLY, RSP
+Also: 6 of 80 ticker(s) were judged without news
+Cycle 80 tickers, $0.16 · 2026-10-09
