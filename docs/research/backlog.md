@@ -112,7 +112,51 @@ Not to be proposed again without a new reason, written down here first.
 
 ## Index-first reports
 
-The owner's next message fills this section.
+Reports and tools for the owner as an index investor: what the money would
+do after Israeli tax and in shekels, and what to check before any real money
+(the owner's instructions of 4 Oct 2026). They are **tools, not tests**: they
+use no experiment slot, get no card and no graveyard row, and do not count in
+N. They are **shadow-only and never trade**. The owner's personal numbers
+(lots, holdings, income, savings) never go into this repository, a log, an
+artifact or a phone push.
+
+| Item | Status | Where | Notes |
+| --- | --- | --- | --- |
+| After-tax gate and report | **Built** (PR #140, merged 6 Oct 2026) | Pre-registration section 5c; `config/israel_tax.py`, `analysis/israel_tax.py`, `shadow/after_tax.py`; `docs/after-tax.mdx` | The owner's tax cases T1 to T10 are unit tests; T5 still needs the accountant's confirmation (question 1). The gate can only stop an arm from winning. |
+| ILS report | **Built** (PR #140, merged 6 Oct 2026) | Pre-registration section 11.9; `analysis/boi_rates.py`; the 4 Funds page and `logs/after_tax.md` | Every result also in shekels at the Bank of Israel's rate, and how much of it came from the dollar's move. |
+| Monthly coach | **Checklist built; data entry not built** | `coach/checklist.py`, `.github/workflows/coach.yml` (PR #140); plan in `monthly-coach-plan.md` | Fixed questions on the first working day of each month, from Sunday 1 Nov 2026. No model, no personal number, nothing collected. The data entry waits until the owner confirms that they want to enter numbers. |
+| Investor simulator | **Plan, waiting for the owner's approval.** Nothing built. | [`investor-simulator-plan.md`](investor-simulator-plan.md) | The owner's lots, FIFO per account, Israeli tax, rebalancing and harvest suggestions, the annual report pack, and buy-and-hold VT and VWRA after tax in shekels. A tool, not a test: no experiment slot. Never trades. The plan recommends keeping the lots in a private GitHub repository of the owner's own, where a job with no key of the owner's (while this repository is public) runs this repository's engine and writes the report as a Markdown file there. 20 decisions wait for the owner (each with a recommendation), and 3 new accountant questions are proposed, not added. Built and tested with sample data only, after the owner approves the plan and the private-data design. |
+| Accountant questions | **Open: 12 questions, none answered yet** | [`cpa-questions.md`](cpa-questions.md) | The owner's 10 of 3 Oct 2026 and the 2 added on 2 Oct. An answer changes a setting only through a dated row in the pre-registration's Amendments table. |
+| Before-real-money checklist | **Open: every item** | `docs/next-steps.mdx`, "Before real money: the checklist" | The items are listed below. No real money goes in before the June 2027 verdict (pre-registration, section 9). |
+
+The before-real-money checklist, item by item (all open; the same numbers as
+in `docs/next-steps.mdx`):
+
+1. **A private notification channel.** The phone push goes through the
+   public ntfy.sh server, so nothing personal is pushed until it moves.
+2. **Make the repository private.** The journal, the account snapshots and
+   the model-call artifacts are public today. Worth knowing first (the
+   simulator plan, section 2.3): on GitHub's free plan this takes the
+   dashboard's Pages site offline; the repository's Actions runs (about
+   4,000 minutes a month, an estimate) are about twice the 2,000 free
+   minutes a month for private repositories, so the extra would cost money
+   or the runs would stop until the next month; and the simulator's private
+   job would need a GitHub access setting or a read-only token to fetch the
+   engine.
+3. **Where personal numbers live.** The coach's approved plan says a private
+   Supabase project; the simulator's plan proposes a private GitHub
+   repository for the lots, and asks whether the coach's numbers should go
+   there too (decisions D1 to D3). No app or token that reaches all the
+   owner's repositories may reach that place. The owner decides; nothing
+   personal is collected before that.
+4. **The paper-only literal** in `app/broker_client.py` is removed last, by
+   an explicit, reviewed code change, after every other item here.
+5. **The broker decision** (stay with Alpaca or move, for example to
+   Interactive Brokers: `docs/broker-evaluation.mdx`). Waits for the June 2027
+   verdict.
+6. **The fund-domicile decision** (a US-listed fund such as VT, or an Irish
+   one such as VWRA: tax on dividends, US estate tax, accountant question 5).
+   Waits for the June 2027 verdict.
 
 ## Monthly updates
 
@@ -124,3 +168,4 @@ The owner's next message fills this section.
 | 2026-10 | 2 Oct: the owner's instructions. Graveyard rows 35 to 41 (N from 34 to 41): the IC report of the model's scores on two universes (prepared; registered at the 2026-12-22 checkpoint; one idea against the quarterly limit, if the owner confirms), the stress-period history screens of momentum, A, B and C (descriptive; they use no live slot), and the regime split (descriptive). Not built, by the owner's decision: a 1-to-5 ranking arm (only if the IC report shows the scores are too coarse), an ILS fund, and any change of model, provider or broker. |
 | 2026-10 | 4 Oct: the owner's instructions. The backlog is now in three sections (AI ideas, trading rules, index-first reports); the AI ideas are listed with their status, cost and trial. Graveyard rows 42 and 43 (N from 41 to 43): the voting arm `model_vote` (built, switched off until 2026-12-22; registered at that checkpoint as the second idea of the first quarter of 2027) and the thesis check (built, switched off until 2027-04-01; an idea of the second quarter of 2027). A cross-model vote is a later idea, not registered; event tags and annual-report flags are dropped (too few events). |
 | 2026-10 | 6 Oct: the owner's decisions. The rule that an idea counts in the quarter it starts producing data (pre-registration section 13.8): the IC test counts in the first quarter of 2027 and the thesis check in the second, as before; the vote, which starts on 2026-12-22, counts in the fourth quarter of 2026 (its dates are unchanged). The daily order is now production, the vote, the universe, the thesis check. The graveyard page shows the bar N sets (t 3.92 at N = 43 against t 3.55 at N = 18, at the 2027-03-22 look). No idea added, dropped or changed. |
+| 2026-10 | 4 Oct, the owner's index-first instructions (merged 9 Oct): the Index-first reports section filled with its six items and their status. The after-tax gate and report and the ILS report are built, the coach's checklist is built and its data entry is not, the investor simulator is a plan waiting for the owner's approval (`investor-simulator-plan.md`), 12 accountant questions are open, and every item of the before-real-money checklist is open (the broker and fund-domicile decisions added to it). The simulator is a tool, not a test: no slot, no card, no graveyard row; N unchanged at 43. |

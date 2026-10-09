@@ -140,6 +140,54 @@ def test_the_backlog_is_in_three_sections_and_lists_every_ai_idea():
     assert "Dropped: too few events" in by_word["Event tags and annual-report flags"][1]
 
 
+def test_the_index_first_reports_list_each_item_with_its_status():
+    """The owner's instructions of 4 Oct 2026: each index-first item with its status. Tools, not tests."""
+    backlog = (RESEARCH / "backlog.md").read_text()
+    index_first = backlog.split("\n## Index-first reports\n", 1)[1].split("\n## ", 1)[0]
+    rows = {cells[0]: cells[1] for cells in ([c.strip() for c in line.strip("|").split("|")]
+                                             for line in index_first.splitlines() if line.startswith("| "))}
+    assert rows["After-tax gate and report"].startswith("**Built**")
+    assert rows["ILS report"].startswith("**Built**")
+    assert rows["Monthly coach"] == "**Checklist built; data entry not built**"
+    assert rows["Investor simulator"].startswith("**Plan, waiting for the owner's approval.** Nothing built.")
+    assert rows["Before-real-money checklist"].startswith("**Open")
+    # The count of accountant questions is the file's own, and none is answered while its Answers table is empty.
+    cpa = (RESEARCH / "cpa-questions.md").read_text()
+    asked = len(re.findall(r"^\d+\. \*\*", cpa, re.M))
+    assert "*(none yet)*" in cpa.split("## Answers", 1)[1]
+    assert rows["Accountant questions"] == f"**Open: {asked} questions, none answered yet**"
+    flat = " ".join(index_first.split())
+    for item in ("A private notification channel", "Make the repository private", "Where personal numbers live",
+                 "The broker decision", "The fund-domicile decision"):
+        assert f"**{item}" in flat, item
+    assert flat.count("Waits for the June 2027 verdict") == 2
+    assert "use no experiment slot" in flat and "never trade" in flat
+    assert (RESEARCH / "investor-simulator-plan.md").exists()
+
+
+def test_the_two_before_real_money_checklists_have_the_same_items_in_the_same_order():
+    """The backlog's copy and the checklist's home (docs/next-steps.mdx) number the items alike, and in both the
+    paper-only literal is removed last, after the broker and fund-domicile decisions."""
+    def items(text: str) -> list[str]:
+        """Each numbered item with its continuation lines, as one line of text."""
+        found: list[str] = []
+        for line in text.splitlines():
+            if re.match(r"^\d\. \*\*", line):
+                found.append(line)
+            elif found and line.startswith("   ") and line.strip():
+                found[-1] += " " + line.strip()
+        return found
+
+    home = (ROOT / "docs" / "next-steps.mdx").read_text().split("### Before real money: the checklist", 1)[1]
+    copy = (RESEARCH / "backlog.md").read_text().split("The before-real-money checklist, item by item", 1)[1]
+    copy = copy.split("\n## ", 1)[0]
+    subjects = ("notification", "repository private", "personal numbers", "paper-only literal", "broker", "domicile")
+    for listed in (items(home), items(copy)):
+        assert len(listed) == 6, listed
+        for number, (item, subject) in enumerate(zip(listed, subjects), start=1):
+            assert item.startswith(f"{number}. ") and subject in item.split("**")[1], (number, item[:60])
+        assert "last" in listed[3]
+
 def test_the_dropped_fifty_day_version_is_kept_and_counted():
     row = next(r for r in trials() if "50-day moving-average veto" in r[1])
     assert row[3] == "dropped before it ran" and "signal counts only" in row[5]
