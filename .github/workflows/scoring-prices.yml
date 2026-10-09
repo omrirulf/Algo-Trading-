@@ -184,6 +184,83 @@ jobs:
             *)  echo "::warning::phone not notified (HTTP $code)";;
           esac
 
+      - name: Tell the owner's phone the fund test's bar differs from the plan
+        # The owner's Addition 1 to the checkpoint verdict (6 Oct 2026; section
+        # 11.7): when the bar used at a fund-test look differs from the planned
+        # bar, the owner logs it in the Amendments table the day it is used.
+        # The funds run holds no secret, so the alert is sent from here, after a
+        # green shadow funds run on main. It reads the funds record that run
+        # committed: main is fetched fresh here (this job's own checkout may be
+        # older than the funds commit), and nothing is taken from the artifact,
+        # whose every *.json is pushed as prices. Once: only for a look record
+        # made by this funds run (its made_at is the document's generated_at,
+        # the full stamp, so a second run the same day sends nothing), read,
+        # with bar_differs true. Only the look's number and its two bars are
+        # sent, both public. The race's bars are fixed (3.47, 2.45, 2.00), so
+        # the race has no such alert. Not on a by-hand retry of an old night's
+        # push, nor on a re-run of this job ("Re-run jobs" keeps the
+        # workflow_run event): that night's alert was sent, or tried, then.
+        if: always() && github.event_name == 'workflow_run' && github.event.workflow_run.name == 'shadow funds' && github.run_attempt == '1'
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          record="$RUNNER_TEMP/funds-record.json"
+          rm -f "$record"
+          if git fetch --no-tags --depth=1 origin main; then
+            git show FETCH_HEAD:logs/funds.json > "$record" 2>/dev/null || rm -f "$record"
+          else
+            echo "::warning::main could not be fetched; the fund test's bar was not checked tonight"
+          fi
+          message=$(python - "$record" <<'EOF'
+          import json, sys
+          try:
+              with open(sys.argv[1], encoding="utf-8") as handle:
+                  document = json.load(handle)
+              tonight = document["generated_at"]
+              looks = document["fund_test"]["looks"]
+          except (OSError, ValueError, KeyError, TypeError, AttributeError):
+              raise SystemExit   # no record, or one from before the checkpoint verdict: nothing to say
+          def number(value):
+              return isinstance(value, (int, float)) and not isinstance(value, bool)
+          lines = []
+          for look in looks if isinstance(looks, list) else []:
+              if not isinstance(look, dict) or look.get("look") not in (1, 2, 3):
+                  continue
+              if not isinstance(tonight, str) or look.get("made_at") != tonight or look.get("status") != "read":
+                  continue
+              if look.get("bar_differs") is not True or not (number(look.get("bar")) and number(look.get("planned_bar"))):
+                  continue
+              lines.append(f"Checkpoint {look['look']} used bar {look['bar']:.2f} (planned {look['planned_bar']:.2f}), "
+                           "by the spending rule of section 11.7. Log it in the Amendments table.")
+          print(" ".join(lines))
+          EOF
+          )
+          rm -f "$record"
+          if [ -z "$message" ]; then
+            echo "fund test bar tonight: no look read tonight, or its bar is the planned one"
+            exit 0
+          fi
+          echo "fund test bar tonight: $message"
+          if [ -z "${NTFY_TOPIC:-}" ]; then
+            echo "no phone configured (NTFY_TOPIC secret unset); nothing sent"
+            exit 0
+          fi
+          MESSAGE="$message" python - <<'EOF' > "$RUNNER_TEMP/phone.json"
+          import json, os
+          print(json.dumps({"topic": os.environ["NTFY_TOPIC"],
+                            "title": "⚠️ Fund test bar differs from the plan",
+                            "message": os.environ["MESSAGE"],
+                            "priority": 4, "tags": ["warning"], "click": os.environ["RUN_URL"]}))
+          EOF
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' \
+                 --data-binary @"$RUNNER_TEMP/phone.json" https://ntfy.sh/ || echo "000")
+          rm -f "$RUNNER_TEMP/phone.json"
+          case "$code" in
+            2*) echo "phone notified (HTTP $code)";;
+            *)  echo "::warning::phone not notified (HTTP $code)";;
+          esac
+
   funds-failed:
     # A shadow funds run that ends red sends nothing itself (it holds no
     # secret), and the push job above runs only after a green one -- so a

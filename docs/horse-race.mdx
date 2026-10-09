@@ -83,6 +83,51 @@ Next checkpoint: 20 independent days (= 60 trading days), estimated 2026-12-22, 
 A run with any setting other than the registered ones (horizon, cost,
 floor, seeds, sizing) says **SENSITIVITY RUN** and evaluates no look.
 
+## The checkpoint verdict
+
+Right after the gate, and before the model watch, the report prints a
+**CHECKPOINT VERDICT** block: the layout the owner approved on 6 Oct 2026
+(`docs/research/checkpoint-verdict-plan.md`; pre-registration, Amendment
+2026-10-06). It turns each reached look into a table of the same six
+columns (# · Rule (section) · What is measured · Value · Bar · Result):
+rows 1 to 9 are the keep rule's three conditions, the keep rule, the
+replacement, the early stop, index first, the after-tax gate and the
+downturn label, and the last row is the race's verdict. A result is PASS,
+FAIL, WAITING (its record is not made yet), CANNOT PASS (calibration had not
+passed), NOT APPLIED (no arm reached that step), n/a (a row that does not
+apply at this look) or LABEL. Every row is recomputed with the gate's own
+code (`analysis/verdict.py` calls `analysis/decision_gate.py`; a test checks
+on every branch that the table says what the gate decides), so the table
+changes no rule and no word of the gate.
+
+```
+CHECKPOINT VERDICT
+
+no decision yet
+```
+
+- **Before the first look**, the block is only that, and
+  `logs/race_gate.json` has `"verdict": {"text": "no decision yet"}`, its
+  last key before `prices_sha256`.
+- **A look's table is made once**, on the first night the look is reached,
+  readable and complete (no WAITING row), and is carried unchanged from the
+  previous night's `logs/race_gate.json` every night after (the
+  `--previous-gate` option; nothing is recomputed between looks). It is made
+  again only if a bug fix moves the look's window, the old one kept inside
+  it under `superseded`, as for the after-tax record. A look that waits or
+  cannot be read is recomputed and shown every night, never frozen. If
+  tonight's data reads a frozen look differently, the frozen table stays,
+  its entry says `differs_tonight`, and the report prints one "Note:" line.
+- **The block prints** a look's table on the night it is made and every
+  night while a reached look is incomplete; once the race is decided, the
+  deciding look's frozen table and verdict every night (an early answer is
+  final; later looks go into the JSON for reading only); otherwise, between
+  looks after a look that decided nothing, only "no decision yet".
+- The race's bars are the fixed 3.47, 2.45 and 2.00, so its bar never
+  differs from the plan and it has no bar alert; the fund test's bar can,
+  and it has one ([The checkpoint verdict](/shadow-funds#the-checkpoint-verdict)
+  on the funds page, with the combined line of the race and the fund test).
+
 ## Exploratory reports: conviction groups, longs and shorts
 
 From 23 Sep 2026 the race also prints the trades split two ways, report

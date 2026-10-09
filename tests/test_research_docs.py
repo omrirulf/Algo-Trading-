@@ -354,3 +354,21 @@ def test_only_the_two_primary_ic_tests_are_in_the_family():
     assert [row[1:3] for row in ic_rows] == [("ic_main", "production"), ("ic_main", "shadow")]
     text = " ".join((ROOT / "docs" / "horse-race-preregistration.md").read_text().split())
     assert "these two primary tests are the only IC members of the Benjamini-Hochberg family" in text
+
+
+def test_the_checkpoint_verdict_is_logged_in_the_amendments_table_in_date_order():
+    """The owner's approval of 6 Oct 2026: one Amendments row, the dates still in order, and each section
+    the five readings touch says so (sections 5c, 5d, 11.6, 11.7, 11.8)."""
+    text = (ROOT / "docs" / "horse-race-preregistration.md").read_text()
+    table = text.split("## Amendments", 1)[1]
+    dates = re.findall(r"^\| (\d{4}-\d{2}-\d{2}) \|", table, re.M)
+    assert dates == sorted(dates) and dates[-1] == "2026-10-06"
+    row = next(line for line in table.splitlines() if line.startswith("| 2026-10-06 | **Checkpoint verdict"))
+    for words in ("yes to all five, as you proposed", "Addition 1", "Addition 2", "TEST DATA",
+                  "the race's bars are the fixed 3.47, 2.45 and 2.00", "Made before any checkpoint result existed",
+                  "estimated for 2026-12-22"):
+        assert words in row, words
+    sections = re.split(r"^#{2,3} ", text, flags=re.M)
+    for number in ("5c.", "5d.", "11.6", "11.7", "11.8"):
+        body = next(part for part in sections if part.startswith(number))
+        assert "(Amendment 2026-10-06)" in body, number
