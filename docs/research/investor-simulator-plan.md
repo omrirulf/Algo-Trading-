@@ -3,7 +3,7 @@
 **Status: plan only, for the owner's approval (4 Oct 2026). Nothing is built.** The owner's instruction of 4 Oct 2026:
 "Investor simulator: plan first, don't build yet. … Show me the plan and the private-data design before you build."
 
-- **A tool, not a test.** It uses no experiment slot, gets no card and no graveyard row, and N stays at 41.
+- **A tool, not a test.** It uses no experiment slot, gets no card and no graveyard row, and N does not change.
 - **Shadow-only.** It never trades, holds no broker key and sends no order. It only suggests; the owner decides and
   trades by hand.
 - **The owner's personal numbers** (lots, holdings, income, savings, targets) **never go into this public repository,
@@ -625,7 +625,7 @@ dollars after the selling cost.
 
 ## 10. After the owner approves: the build, in order
 
-1. **This repository, sample data only, after PR #140 is merged** (the reused tax engine is in it): the additions of
+1. **This repository, sample data only, on top of PR #140** (merged on 6 Oct 2026; the reused tax engine is in it): the additions of
    section 4.2, the rebalancing and harvest code, the report and the command line, the fund table, the sample folder,
    tests T11 to T41, and the guardrails of section 2.6. One pull request, reviewed like every other.
 2. **The private repository's template:** the workflow and empty data files with their header lines, given to the

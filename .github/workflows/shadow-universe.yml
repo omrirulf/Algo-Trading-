@@ -28,6 +28,22 @@ name: shadow universe
 # ("Southern Company SO stock", orchestrator/universe_news.py), on the owner's
 # decision of 3 Oct 2026; production's query is unchanged.
 #
+# The run's three jobs, one after the other (the owner's order of 6 Oct
+# 2026: production, then the vote, then the universe):
+#   1. `vote`: the voting arm model_vote, four more calls of the production
+#      model on each answered production line (orchestrator/vote.py; off
+#      until 2026-12-22; cap $1.00 a UTC day, phone alert at $0.80). First,
+#      because it is a registered arm and the universe is descriptive: a late
+#      day reaches the 23:15 UTC cut-off in the universe, not in the vote.
+#   2. `score`: the shadow universe, this file's first purpose (above).
+#   3. `thesis`: the weekly thesis check (orchestrator/thesis.py; log only;
+#      off until 2027-04-01; cap $0.10 an ISO week).
+# Each starts when the one before it has ended, passed or failed, never after
+# a cancel; so the model provider is never asked by two of them at once, and
+# the workflow's one concurrency group below serialises every run, so two
+# runs never overlap either. All three are shadow only: nothing is traded,
+# and no job holds a broker key or a webhook secret.
+#
 # A by-hand run with `verify` only checks that every name resolves on Yahoo
 # (backtest/verify_tickers.py's check), with no model and no key -- the check
 # the list needs before it is frozen on 2026-12-22. The same check runs on
@@ -75,8 +91,241 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  score:
+  vote:
+    # The voting arm model_vote (the owner's instruction of 4 Oct 2026, item 1;
+    # orchestrator/vote.py, config/model_vote.py). Each answered production
+    # line of today gets four more calls of the same model, with the same
+    # settings, re-sending the archived input of the production call, and the
+    # five answers vote. Shadow only: nothing is traded, and the voter has no
+    # dispatcher, no engine and no broker (tests/test_model_vote_runner.py
+    # reads it to check).
+    #
+    # The run's first job (the owner's order of 6 Oct 2026), and only once
+    # the day's production run has finished, so the vote never asks beside
+    # it; the universe's job waits for this one. Off until 2026-12-22:
+    # "Would it vote today?" asks the voter, and until it says yes every
+    # later step is skipped.
     if: ${{ github.event_name != 'pull_request' && !inputs.verify }}
+    runs-on: ubuntu-latest
+    # Sized for about 58 answered lines, four calls each, four at a time. The
+    # voter starts no new name after RUN_BUDGET_SECONDS (210 minutes); after
+    # that, the calls in flight and the rest of the last name started may each
+    # need a 480-second ask and its 480-second retry, twice when the answer has
+    # to be asked again (32 minutes, two rounds), plus the setup and the
+    # commit. tests/test_model_vote_runner.py keeps this number and those
+    # constants in step.
+    timeout-minutes: 290
+    permissions:
+      contents: write   # only to commit logs/model_vote/
+      actions: read     # only to see that the production run finished, and download its model calls
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        # The branch as it is now, so a second run on the same day sees the
+        # lines the first one committed and does not vote on them again.
+        with:
+          ref: ${{ github.ref }}
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Would it vote today?
+        id: check
+        # Asks nothing and needs no key. Every later step runs only on "yes".
+        # `runs` are the production runs whose model calls the vote needs.
+        run: |
+          answer=$(python -m orchestrator.vote --check)
+          echo "$answer"
+          run=$(python -c 'import json,sys; print("yes" if json.loads(sys.argv[1])["run"] else "no")' "$answer")
+          runs=$(python -c 'import json,sys; print(" ".join(r for r in json.loads(sys.argv[1])["runs"] if r.isdigit()))' "$answer")
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+          echo "runs=$runs" >> "$GITHUB_OUTPUT"
+          if [ "$run" != "yes" ]; then
+            echo "Not today: $(python -c 'import json,sys; print(json.loads(sys.argv[1])["reason"])' "$answer")"
+          fi
+
+      - name: Has the production run finished, and its model calls?
+        id: ready
+        # Each production run behind today's lines must have finished, and
+        # its model calls (heartbeat.yml's artifact model-io-<run>-<attempt>)
+        # are downloaded beside the checkout, never into logs/model_io/, where
+        # the vote captures its own calls. Anything missing: no vote now, and
+        # a later run today tries again. Never fails the job.
+        if: steps.check.outputs.run == 'yes'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUNS: ${{ steps.check.outputs.runs }}
+        run: |
+          ready=yes
+          reason=""
+          if [ -z "$RUNS" ]; then
+            ready=no
+            reason="no answered production line of today waits for a vote"
+          fi
+          mkdir -p "$RUNNER_TEMP/model_io"
+          for id in $RUNS; do
+            case "$id" in (*[!0-9]*) ready=no; reason="a production run id that is not a number"; break;; esac
+            status=$(gh run view "$id" --repo "$GITHUB_REPOSITORY" --json status --jq .status 2>/dev/null || echo "unknown")
+            if [ "$status" != "completed" ]; then
+              ready=no
+              reason="production run $id is $status, not completed"
+              break
+            fi
+            if ! gh run download "$id" --repo "$GITHUB_REPOSITORY" --pattern "model-io-$id-*" --dir "$RUNNER_TEMP/model_io"; then
+              ready=no
+              reason="the model calls of production run $id could not be downloaded"
+              break
+            fi
+          done
+          echo "ready=$ready" >> "$GITHUB_OUTPUT"
+          if [ "$ready" = "yes" ]; then
+            echo "Ready: the model calls of production run(s) $RUNS are downloaded"
+          else
+            echo "Not now: $reason. A later run today tries again."
+          fi
+
+      - name: Vote
+        id: vote
+        if: steps.ready.outputs.ready == 'yes'
+        # The full model's key, under every spelling the production cycle
+        # tries, and nothing else: no Anthropic key (the vote can only re-send
+        # an OpenAI-compatible body), no news key, no data key, no Alpaca key,
+        # no webhook secret, no execution mode. The voter gathers no context.
+        env:
+          FULL_MODEL_API_KEY: ${{ secrets.FULL_MODEL_API_KEY || secrets.DEEPINFRA_API_KEY || secrets.SCREENING_API_KEY || secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY || secrets.GROQ_API_KEY }}
+        # Exit 3 is the cost cap: not a failure of the job, so the lines
+        # already written are committed below and the phone is told. Any
+        # other non-zero code fails the step.
+        run: |
+          set +e
+          python -m orchestrator.vote --model-io "$RUNNER_TEMP/model_io" --run-id "$GITHUB_RUN_ID" > "$RUNNER_TEMP/vote.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/vote.json"
+          {
+            echo '## Voting arm (model_vote)'
+            echo
+            echo '```json'
+            cat "$RUNNER_TEMP/vote.json"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          warn=$(python -c 'import json,sys; print("yes" if json.load(open(sys.argv[1])).get("warn_crossed") else "no")' \
+                 "$RUNNER_TEMP/vote.json" 2>/dev/null || echo "no")
+          echo "warn=$warn" >> "$GITHUB_OUTPUT"
+          if [ "$status" = "3" ]; then
+            echo "cap=yes" >> "$GITHUB_OUTPUT"
+            echo "::warning::the daily cost cap stopped the vote; the lines not voted have no vote today"
+            exit 0
+          fi
+          exit "$status"
+
+      - name: Keep the vote's model calls as an artifact
+        # Every call the vote made, in full (orchestrator/model_io.py), as
+        # heartbeat.yml keeps the cycle's. Never committed. Never fails the job.
+        if: always() && steps.ready.outputs.ready == 'yes'
+        continue-on-error: true
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: model-io-vote-${{ github.run_id }}-${{ github.run_attempt }}
+          path: logs/model_io/
+          retention-days: 90
+          if-no-files-found: ignore
+
+      - name: Commit the vote lines
+        # Also after a failed run: every line already written is kept. Only
+        # this job writes logs/model_vote/.
+        if: always() && steps.check.outputs.run == 'yes'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f logs/model_vote/ 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "no new lines"
+            exit 0
+          fi
+          git commit -m "Voting arm: votes at $(date -u +'%Y-%m-%dT%H:%MZ')"
+          for attempt in 1 2 3; do
+            if git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}"; then
+              exit 0
+            fi
+            git rebase --abort 2>/dev/null || true
+            echo "::warning::the vote lines did not go through (try $attempt of 3)"
+            sleep 5
+          done
+          echo "::error::the vote lines were not committed"
+          exit 1
+
+      - name: Tell the owner's phone the vote passed $0.80 today
+        # The owner's instruction of 4 Oct 2026, like the universe's alert.
+        # Once a day at most: only the run that takes the day's total past the
+        # line says so. Not when the cap stopped the same run.
+        if: always() && steps.vote.outputs.warn == 'yes' && steps.vote.outputs.cap != 'yes'
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "${NTFY_TOPIC:-}" ]; then
+            echo "no phone configured (NTFY_TOPIC secret unset); nothing sent"
+            exit 0
+          fi
+          python - <<'EOF' > "$RUNNER_TEMP/phone.json"
+          import json, os
+          print(json.dumps({"topic": os.environ["NTFY_TOPIC"],
+                            "title": "💸 Voting arm passed $0.80 today",
+                            "message": ("Today's voting arm cost (four more calls of the model on each answered "
+                                        "line) passed $0.80, above the expected level. The run goes on; it stops "
+                                        "at the $1.00 daily cap. Nothing is traded."),
+                            "priority": 3, "tags": ["warning"], "click": os.environ["RUN_URL"]}))
+          EOF
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' \
+                 --data-binary @"$RUNNER_TEMP/phone.json" https://ntfy.sh/ || echo "000")
+          rm -f "$RUNNER_TEMP/phone.json"
+          case "$code" in
+            2*) echo "phone notified (HTTP $code)";;
+            *)  echo "::warning::phone not notified (HTTP $code)";;
+          esac
+
+      - name: Tell the owner's phone the cost cap stopped the vote
+        # Fixed words and the run's link, no number but the cap itself. The
+        # topic goes in the JSON body, never a URL or a log.
+        if: always() && steps.vote.outputs.cap == 'yes'
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "${NTFY_TOPIC:-}" ]; then
+            echo "no phone configured (NTFY_TOPIC secret unset); nothing sent"
+            exit 0
+          fi
+          python - <<'EOF' > "$RUNNER_TEMP/phone.json"
+          import json, os
+          print(json.dumps({"topic": os.environ["NTFY_TOPIC"],
+                            "title": "⚠️ Voting arm stopped at its cost cap",
+                            "message": ("Today's voting arm run reached its $1.00 daily cost cap and stopped. "
+                                        "Nothing is traded. The lines not voted today have no vote, and tomorrow "
+                                        "starts again from zero."),
+                            "priority": 3, "tags": ["warning"], "click": os.environ["RUN_URL"]}))
+          EOF
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' \
+                 --data-binary @"$RUNNER_TEMP/phone.json" https://ntfy.sh/ || echo "000")
+          rm -f "$RUNNER_TEMP/phone.json"
+          case "$code" in
+            2*) echo "phone notified (HTTP $code)";;
+            *)  echo "::warning::phone not notified (HTTP $code)";;
+          esac
+
+  score:
+    # After the vote's job, whether it passed or failed (`!cancelled()`: a
+    # cancelled run stops here, so a cancel stops the spending), so the two
+    # never ask the model provider at the same time.
+    needs: vote
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && !inputs.verify }}
     runs-on: ubuntu-latest
     # Sized for 251 names asked four at a time (production's full-model
     # setting) with the 480-second model timeout. The scorer starts no new
@@ -245,6 +494,142 @@ jobs:
                                         "and the news searches together) and stopped. Nothing is traded. The "
                                         "names not asked today have no score for today, and tomorrow starts "
                                         "again from zero."),
+                            "priority": 3, "tags": ["warning"], "click": os.environ["RUN_URL"]}))
+          EOF
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' \
+                 --data-binary @"$RUNNER_TEMP/phone.json" https://ntfy.sh/ || echo "000")
+          rm -f "$RUNNER_TEMP/phone.json"
+          case "$code" in
+            2*) echo "phone notified (HTTP $code)";;
+            *)  echo "::warning::phone not notified (HTTP $code)";;
+          esac
+
+  thesis:
+    # The weekly thesis check (the owner's instruction of 4 Oct 2026, item 2;
+    # orchestrator/thesis.py, config/thesis_check.py). For each held name,
+    # once a week, the same model is asked whether the reason the position
+    # was opened still holds. Log only: it never trades, never changes a
+    # stop, and feeds no arm and no fund. After the universe's job, the
+    # run's last (the owner's order of 6 Oct 2026), whether it passed or
+    # failed (never after a cancel), so the model provider is never asked by
+    # two jobs at once.
+    # Off until 2027-04-01: "Is a thesis check due?" asks the logger, and
+    # until it says yes every later step is skipped.
+    needs: score
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && !inputs.verify }}
+    runs-on: ubuntu-latest
+    # The logger starts no new name after RUN_BUDGET_SECONDS (30 minutes);
+    # the calls in flight may need 32 minutes more, plus the setup and the
+    # commit. tests/test_thesis_check_runner.py keeps this number in step.
+    timeout-minutes: 75
+    permissions:
+      contents: write   # only to commit logs/thesis_check/
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.ref }}
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Is a thesis check due?
+        id: check
+        # Asks nothing and needs no key. Every later step runs only on "yes".
+        run: |
+          answer=$(python -m orchestrator.thesis --check)
+          echo "$answer"
+          run=$(python -c 'import json,sys; print("yes" if json.loads(sys.argv[1])["run"] else "no")' "$answer")
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+          if [ "$run" != "yes" ]; then
+            echo "Not today: $(python -c 'import json,sys; print(json.loads(sys.argv[1])["reason"])' "$answer")"
+          fi
+
+      - name: Check the theses
+        id: thesis
+        if: steps.check.outputs.run == 'yes'
+        # The full model's key, under every spelling the production cycle
+        # tries, and nothing else (it asks the full model by name). The
+        # headlines are the ones production gathered.
+        env:
+          FULL_MODEL_API_KEY: ${{ secrets.FULL_MODEL_API_KEY || secrets.DEEPINFRA_API_KEY || secrets.SCREENING_API_KEY || secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY || secrets.GROQ_API_KEY }}
+        # Exit 3 is the weekly cost cap: not a failure of the job.
+        run: |
+          set +e
+          python -m orchestrator.thesis --run-id "$GITHUB_RUN_ID" > "$RUNNER_TEMP/thesis.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/thesis.json"
+          {
+            echo '## Thesis check'
+            echo
+            echo '```json'
+            cat "$RUNNER_TEMP/thesis.json"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$status" = "3" ]; then
+            echo "cap=yes" >> "$GITHUB_OUTPUT"
+            echo "::warning::the weekly cost cap stopped the thesis check; the names not checked wait for next week"
+            exit 0
+          fi
+          exit "$status"
+
+      - name: Keep the thesis check's model calls as an artifact
+        if: always() && steps.check.outputs.run == 'yes'
+        continue-on-error: true
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: model-io-thesis-${{ github.run_id }}-${{ github.run_attempt }}
+          path: logs/model_io/
+          retention-days: 90
+          if-no-files-found: ignore
+
+      - name: Commit the thesis check lines
+        # Only this job writes logs/thesis_check/.
+        if: always() && steps.check.outputs.run == 'yes'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f logs/thesis_check/ 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "no new lines"
+            exit 0
+          fi
+          git commit -m "Thesis check: lines at $(date -u +'%Y-%m-%dT%H:%MZ')"
+          for attempt in 1 2 3; do
+            if git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}"; then
+              exit 0
+            fi
+            git rebase --abort 2>/dev/null || true
+            echo "::warning::the thesis check lines did not go through (try $attempt of 3)"
+            sleep 5
+          done
+          echo "::error::the thesis check lines were not committed"
+          exit 1
+
+      - name: Tell the owner's phone the cost cap stopped the thesis check
+        if: always() && steps.thesis.outputs.cap == 'yes'
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "${NTFY_TOPIC:-}" ]; then
+            echo "no phone configured (NTFY_TOPIC secret unset); nothing sent"
+            exit 0
+          fi
+          python - <<'EOF' > "$RUNNER_TEMP/phone.json"
+          import json, os
+          print(json.dumps({"topic": os.environ["NTFY_TOPIC"],
+                            "title": "⚠️ Thesis check stopped at its weekly cost cap",
+                            "message": ("This week's thesis check reached its $0.10 weekly cost cap and stopped. "
+                                        "It is log only: nothing is traded and no stop is changed. The names not "
+                                        "checked are asked again next week."),
                             "priority": 3, "tags": ["warning"], "click": os.environ["RUN_URL"]}))
           EOF
           code=$(curl -sS -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' \

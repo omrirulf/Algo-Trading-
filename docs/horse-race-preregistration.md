@@ -26,7 +26,7 @@ rule; a bug fix re-runs the race over the whole journal.
 | Exploratory tests | A (momentum with a 200-day average veto), B (10-month average timing on VT), C (pullback limit entry), and the three exploratory funds: results only at the race's looks, with Benjamini-Hochberg and the Deflated Sharpe Ratio. They cannot change the decision. See section 13. |
 | After-tax gate | **from 2026-10-02**: the arm that would win must also beat the VT fund after Israeli tax, "if sold today", at the same bar, with the fund test's Newey-West test (lag 5). Every tax number is in `config/israel_tax.py`. See section 5c. |
 | Verdict disclosure | **from 2026-10-02**: if VT never fell 10% from its high inside the test window, the verdict is labelled "not tested in a downturn" and any real-money step starts small. A label and a policy, not a rule. See section 5d. |
-| Prepared, not registered | the IC report of the model's scores: **registered at the 2026-12-22 checkpoint**, counters only until then. Shadow stock universe (`SHADOW_UNIVERSE_ENABLED`): **off** until **2027-01-01**; `tests/test_shadow_universe.py` fails if it is turned on before that date. See section 13.9. |
+| Prepared, not registered | the IC report of the model's scores: **registered at the 2026-12-22 checkpoint**, counters only until then. Shadow stock universe (`SHADOW_UNIVERSE_ENABLED`): **off** until **2027-01-01**; `tests/test_shadow_universe.py` fails if it is turned on before that date. See section 13.9. Voting arm `model_vote` (`MODEL_VOTE_ENABLED`): **off** until **2026-12-22**, registered at that checkpoint; `tests/test_model_vote_runner.py` fails if it is turned on before that date. See section 13.11. Thesis-check logger (`THESIS_CHECK_ENABLED`): **off** until **2027-04-01**, registered at the 2027-03-22 checkpoint; `tests/test_thesis_check_runner.py` fails if it is turned on before that date. See section 13.12. |
 
 ## 1. The question
 
@@ -993,6 +993,15 @@ changed after seeing them. No live result of A, B or C existed.
   the first checkpoint (2026-12-22).**
 - **From 2027-01-01: at most 2 new ideas per quarter, registered only at
   checkpoints.**
+- **An idea counts in the quarter it starts producing data** (the owner's
+  rule, Amendment 2026-10-06), not in the quarter of the checkpoint that
+  registers it. The IC test follows the same rule: registered at the
+  2026-12-22 checkpoint, it counts in the first quarter of 2027, when its
+  second universe starts producing data (2027-01-01; 13.9). The thesis
+  check (13.12) is registered at the 2027-03-22 checkpoint and counts in
+  the second quarter of 2027, when it starts producing data (2027-04-01).
+  The voting arm (13.11) starts producing data on 2026-12-22, so it counts
+  in the fourth quarter of 2026.
 - Every idea gets a card in `docs/research/cards/` and a row in
   `docs/research/graveyard.md` before it runs, and stays in the graveyard
   after it is dropped. The graveyard's count is N in 13.6.
@@ -1049,9 +1058,10 @@ checkpoint (2026-12-22).** Nothing here is in force as a test until then.
   card on the registration date and never changed afterwards. From
   2027-01-01 the model scores each name daily with production's model,
   settings and prompt, one call per name. It runs only once the day's
-  production cycle is journalled, so the two never ask the model provider
-  at the same time (a day with no production cycle has no universe lines),
-  and it starts no name from 23:15 UTC, so no line is dated the next day.
+  production cycle is journalled and the day's vote (13.11) has ended, so
+  no two of them ask the model provider at the same time (a day with no
+  production cycle has no universe lines), and it starts no name from
+  23:15 UTC, so no line is dated the next day (section 13.13).
   No trading. The existing insider,
   analyst and earnings sources are used where they exist; the news comes
   from production's provider with the universe's own query, company name
@@ -1113,6 +1123,212 @@ is not in the Benjamini-Hochberg family, and changes no rule.
   metric, so section 13.8's "no other new exploratory test before the first
   checkpoint" is not touched by it.
 
+### 13.11 Prepared for the first checkpoint: the voting arm `model_vote` (Amendment 2026-10-04; not yet registered)
+
+Asked by the owner on 2026-10-04. **Built now, switched off, registered at
+the first checkpoint (2026-12-22)**. It starts producing data that day,
+so by section 13.8's rule (an idea counts in the quarter it starts
+producing data; Amendment 2026-10-06) it counts in the fourth quarter of
+2026, not as the second new idea of the first quarter of 2027, as first
+written on 2026-10-04. Nothing
+here is in force as a test until then, and no result of it is computed,
+written or shown before that date. Card
+`docs/research/cards/model_vote.md`; graveyard row 42 (one trial in N).
+Code: `config/model_vote.py` (every number of the rule),
+`orchestrator/vote.py` (the calls), `analysis/vote.py` and `shadow/vote.py`
+(the answers, the race arm and the fund).
+
+- **Votes.** For every production line the model answered (the race's
+  rule: a signal about this ticker, not held), journalled on or after
+  2026-12-22 (UTC): vote 1 is the production answer, as journalled. Votes 2
+  to 5 are four more calls to the same model with the same settings, each
+  re-sending the archived request body of that line's first ask (the
+  heartbeat's model-call capture, `orchestrator/model_io.py`, kept as the
+  run's artifact) through production's own call path, so its retries and
+  re-asks are production's. Before any call, the body that path would send
+  is rebuilt, and its SHA-256 must equal the one the production line
+  carries (`model_calls`); if it does not (the model, a setting or the
+  prompt changed since) or the archive has no copy, the line is not voted,
+  and it is counted. Each answer is read as production reads one
+  (`parse_signal`, a score with no source set to null); a failed call, an
+  answer that cannot be read and an answer about another ticker are failed
+  votes. The first ask's body, because when production had to ask again
+  (3 lines in 122 on 1-2 Oct 2026) the second body carries a complaint
+  about an answer the other votes never gave; each vote call is asked again
+  the same way if it needs it.
+- **Answer.** Each vote's side is its own bias as answered (BULLISH is
+  LONG, BEARISH is SHORT, NEUTRAL), before any floor. With at least 3
+  successful votes (vote 1 counted): the side with the most votes, if it
+  has at least 3 of the 5; otherwise NEUTRAL, and a tie for the most is
+  NEUTRAL. Conviction = (votes for that side ÷ 5) × (their mean
+  conviction): a failed vote counts as a vote that does not agree. The
+  conviction floor is production's, 0.30 (section 2). With fewer than 3
+  successful votes the line has **no answer, and it is dropped for the vote
+  and for its comparator alike**: the rule production applies to a line
+  with no answer (section 3). The registered arms and funds are not
+  touched.
+- **Timing.** Once a trading day, after the day's production run has
+  finished and before the shadow universe (the owner's order of
+  2026-10-06; section 13.13), and never at the same time as either: the
+  vote is the first job of the shadow universe's workflow run, the
+  universe's scoring job waits for it, the workflow's one concurrency
+  group never runs two of its runs at once, and the job first checks that
+  the production run has completed. No new line is started from 23:15
+  UTC. A line not voted that day has no answer (dropped as above), and is
+  counted: a line the cost cap or the cut-off stopped gets a record
+  saying so, and every answered line with no vote record at all (a failed
+  download, a run that never came) is counted from the journal.
+- **Cost.** About $0.70 a day expected; a hard cap of **$1.00 a day**, with
+  an alert to the owner's phone when the day's cost passes **$0.80** and
+  another when the cap stops a run, like the shadow universe's. Every HTTP
+  ask is counted, retries and re-asks included; an ask with no price is
+  charged at an estimate.
+- **Race arm.** Scored exactly like the model arm (3 sessions, the next
+  open, the same stop, cost and floor), on the lines with a vote answer.
+  **Compared with:** the model, one call, on the same lines. **Main
+  metric:** mean daily net return, vote minus model, Newey-West t (lag 3),
+  as section 3.
+- **Fund.** The model fund's machinery with the vote's signals
+  (`model_vote`), against a fund that runs the model's own answers on
+  exactly the same lines (`model_vote_comparator`): the same start, costs
+  and rules. The four funds of 11.1 are unchanged. **Main metric:** mean
+  daily net return, vote fund minus comparator, paired over the sessions
+  after 2026-12-22, Newey-West t (lag 5), as section 11.4.
+- **The family.** From the checkpoint at which it is registered, the race
+  arm and the fund are two members of the Benjamini-Hochberg family (13.5),
+  each with its Deflated Sharpe Ratio (13.6). One trial in N (graveyard row
+  42), as A's race arm and fund are one.
+- **Secondary, descriptive only.** The daily IC of the vote score (the mean
+  blended score of the successful votes, each blended with the weights the
+  production line itself applied) minus the daily IC of the single call's
+  blended score, on the same lines, by the IC report's rule (13.9) at 1 and
+  3 sessions, with a Newey-West t (lag = horizon). Not in the family, no
+  Deflated Sharpe Ratio.
+- **Acting differently** (13.7): a line where the vote's signal differs
+  from the single call's: after the 0.30 floor, one trades and the other
+  does not, or they take opposite sides. Fewer than 20 such lines by the
+  final checkpoint is "not tested".
+- **Hidden until the checkpoints** (13.1). Between them, from 2026-12-22,
+  only counters: lines voted, lines with an answer, lines dropped, lines
+  not voted (no archived input, an input that differs), lines not asked
+  (the cost cap, the cut-off), answered lines with no vote record, calls
+  and failed calls. The 2026-12-22 checkpoint can carry at most that day's
+  own lines: counts only, since no trade on them has finished, so no t. Its
+  first results are at the 2027-03-22 checkpoint.
+- **What it can and cannot show.** Repeating the same model only reduces
+  sampling noise, not the bias all its calls share. The wisdom-of-the-crowd
+  study (Schoenegger et al., *Science Advances*, 2024) used 12 different
+  models on forecasting questions, not stock returns. A vote across
+  different models would be a separate, later idea, with its own card, row
+  and registration.
+- **History screen:** not possible (it uses the AI).
+- **The flag** `MODEL_VOTE_ENABLED` keeps the calls off;
+  `tests/test_model_vote_runner.py` fails if it is on before 2026-12-22,
+  the date in the header table.
+
+### 13.12 Prepared for the second quarter of 2027: the thesis-check logger (Amendment 2026-10-04; not yet registered)
+
+Asked by the owner on 2026-10-04 ("register it in Q2 2027"). **Built now,
+switched off, registered at the race's second planned look (estimated
+2027-03-22) as an idea of the second quarter of 2027, and on from
+2027-04-01**: the same pattern as the IC test, registered at the 2026-12-22
+checkpoint, counted in the first quarter of 2027, its second universe on
+from 2027-01-01. Card `docs/research/cards/thesis-check.md`; graveyard row
+43 (one trial in N). Code: `config/thesis_check.py`,
+`orchestrator/thesis.py`, `analysis/thesis.py`.
+
+- **The check.** Once a week, on the first trading day of each ISO week
+  with a production cycle, for each name the paper account holds that day
+  (the cycle's held lines): one call to the same model, with production's
+  settings. Given the entry reasoning archived with the entry (the
+  rationale and key factors of the signal that opened the position, from
+  the execution audit log) and today's headlines for the name (the ones
+  production gathered on its held line that day, so no news search is
+  paid), is the thesis VALID, WEAKENED or BROKEN? With one sentence of
+  reason. A name not checked that day because of time or a failed call is
+  tried again on the next trading day of the same week, while it is still
+  held; a name the weekly cost cap stopped, or with no entry record, waits
+  for the next week, with one line saying so.
+- **Log only.** At most one check with a verdict per name per week in
+  `logs/thesis_check/`; every attempt is its own line. It never trades,
+  never changes a stop, never feeds any arm or fund, and nothing in the
+  cycle reads it.
+- **Cost.** A hard cap of **$0.10 a week** (about $0.06 expected); every
+  ask counted. It runs in the same workflow run as the vote and the
+  universe, last, after both (section 13.13).
+- **At the checkpoints after its registration: a description only.** For
+  every check from 2027-04-01: the forward return from the open of the
+  first session after the check's day to the close of the 5th session (one
+  week, the time to the next check), price only, signed by the position's
+  side. The number, mean and hit rate of the BROKEN, WEAKENED and VALID
+  checks, and BROKEN minus VALID with a Welch t, for reading only (checks
+  on the same day are not independent). It is not a test: not in the
+  Benjamini-Hochberg family, no Deflated Sharpe Ratio. Fewer than 20 BROKEN
+  checks by the final checkpoint: "not tested". A clear difference would
+  only be a candidate for a later registration (for example as an exit
+  rule), with its own card, row and registration.
+- **Hidden until the checkpoints**, like 13.1: between them, from
+  2027-04-01, only counters (checks with a verdict, names, weeks, failed
+  calls, names with no entry record, names the cap stopped).
+- **History screen:** not possible (it uses the AI).
+- **The flag** `THESIS_CHECK_ENABLED` keeps it off;
+  `tests/test_thesis_check_runner.py` fails if it is on before 2027-04-01,
+  the date in the header table.
+
+### 13.13 The daily order of the shadow model calls (Amendment 2026-10-06; operational)
+
+The owner's order of 2026-10-06: **production, then the vote (13.11), then
+the shadow universe (13.9), then the weekly thesis check (13.12)**, one
+after the other, never two at once. The owner's reason: the vote is a
+registered arm and the universe is descriptive, so a late day should reach
+the 23:15 UTC cut-off in the universe, not in the vote. (The universe's
+1-session IC is also one of the IC test's two primary tests, 13.9; a name
+the cut-off stops is one name fewer in that day's cross-section, not a
+line lost to a trading arm.) In `.github/workflows/shadow-universe.yml` the
+jobs are `vote`, then `score` (it needs `vote`), then `thesis` (it needs
+`score`); each starts when the one before it has ended, passed or failed,
+never after a cancel. No rule and no number of any test changes.
+
+**Estimated timeline** (UTC; written 2026-10-06, before any of the three
+runs). Production starts at 14:40. Its run ended between 15:38 and 16:10 on
+the seven cycles of 28 Sep to 6 Oct 2026, with 57 to 61 answered lines a
+day. Four calls at a time throughout (production's setting); about 4% of
+calls are asked once more after an answer off the schema; a universe name
+also needs its context (about 50 seconds).
+
+| Step | Normal day: production ends 15:43 (the median), 146 seconds a call (production's median at high effort) | Slow day: production ends 16:10 (the slowest), 160 seconds a call |
+| --- | --- | --- |
+| Production | 14:40 to 15:43 | 14:40 to 16:10 |
+| Vote: 58 lines (61 on the slow day), 4 calls each | 15:45 to 18:12 | 16:12 to 19:02 |
+| Universe: 251 names, one call each | 18:13 to 21:39 | 19:03 to 22:50 |
+| Thesis check, one day a week (from 2027-04-01): about 20 held names (22) | 21:40 to 21:54 | 22:51 to 23:09 (its last names start at 23:05) |
+
+So on both days every step ends before 23:15 (the slow day by about 25
+minutes). The universe starts losing names to the cut-off when production
+ends after about 17:19 on a normal day or 16:35 on a slow one; the vote
+only when production ends after about 20:45 (20:20 on a slow day).
+
+**What the 23:15 UTC cut-off does to the lines it cuts** (no name is
+started from 23:15; a name already started is finished):
+
+- **Vote.** Every answered production line not yet started gets its vote
+  line all the same, with vote 1 only, no call and the reason ("not asked:
+  it was 23:15 UTC or later"). It is final: with fewer than 3 votes the
+  line has no answer, so it is dropped for the vote arm and for its
+  comparator alike (13.11), and it is counted under `not_asked`. A vote
+  run that starts at or after 23:15 asks nothing and writes nothing: its
+  lines have no vote record, are counted under `missing`, and are dropped
+  the same way.
+- **Universe.** A name not started gets no line that day and is not asked
+  later: a score belongs to its day (a run that starts at or after 23:15
+  asks nothing). That day's cross-section in the IC
+  report simply has fewer names; a day with fewer than 10 names with a
+  score and a forward return is left out (13.9). Nothing is filled in.
+- **Thesis check.** A name not started gets no line that day and is asked
+  again on the next trading day of the same ISO week on which a production
+  cycle is journalled, while it is still held (13.12). A name not checked
+  by the end of the week has no check that week.
+
 ## Amendments
 
 | Date | Kind | Reason |
@@ -1158,4 +1374,10 @@ is not in the Benjamini-Hochberg family, and changes no rule.
 | 2026-10-03 | **Shadow stock universe: the $1.50 cap approved, a $1.20 alert, and its own news query** (operational; no rule of the race or of the IC test changes) | Decided by the owner on 2026-10-03, after reading the row above. (a) The cost cap of $1.50 a day for the model and the news searches together is **approved** (expected about $1.05 a day). (b) A phone alert when the day's cost passes $1.20 (`DAILY_COST_WARN_USD`): only an alert, the run goes on to the cap; at most once a day, and not from a run whose cap alert is sent. (c) The universe's news searches use their own query, company name plus ticker (for example "Southern Company SO stock"; `config/shadow_universe.py`, `orchestrator/universe_news.py`), because a news check the same day found that "<ticker> stock" finds other things for short tickers (SO, C, D and MET: none of ten headlines named the company; EW: none of two; T, ED, NOW, V, ICE, O and F: one to three of ten). Production's query and code are unchanged, because they feed the main race. Those names are kept. (d) A code-only relevance check, with no model: a headline is relevant if the company name, or the ticker as a whole word, is in its title or first sentence (`analysis/news_relevance.py`), run once on a weekday over all 251 names (`.github/workflows/universe-news-check.yml`). Replacement rule (2) of the card and of section 13.9 now reads: "the news search for it finds something else: with the universe's query, under 30% of its headlines are relevant by the code-only check (the company name, or the ticker as a whole word, in the title or the first sentence), on a weekday check of every name". A name is replaced by it only for that reason, never for its returns, and each replacement is recorded with its reason. (e) The same check, once and as a description only, on the news the race used for its 80 names (`docs/research/news-relevance.md`); nothing in production changes because of it. The universe is still off until 2027-01-01 and has no line yet. |
 | 2026-10-03 | **Reporting only: the IC report's split of the production names into single names and funds** (descriptive; no test and no rule changes) | Asked by the owner on 2026-10-03, after the news audit (`docs/research/news-relevance.md`) found the race's news relevant for 76% of single-name headlines but 23% of fund headlines on every journalled line (74% and 23% on the lines the model answered, held lines left out). Section 13.9 and the card `docs/research/cards/ic-model-scores.md`: at each checkpoint the IC record also carries, for the production names, the same numbers made the same way for the 16 single names and for the 64 funds separately (`config.instruments.is_fund`; `analysis/ic.py`, `groups_record`), each group on its own lines and names, with the same minimum of 10 names a day. Descriptive only: not a test, not in the Benjamini-Hochberg family, no Deflated Sharpe Ratio, no trial in N (the graveyard's N is unchanged), and hidden until the checkpoints exactly like every other IC value (only the checkpoint record carries it; the nightly counters are unchanged). On the lines so far only 4 to 7 single names a day were answered (the others were held), so on such days the single names have fewer than 10 names and no IC; the minimum is not changed for the split. No IC value has been computed. |
 | 2026-10-04 | **Reporting only: a pooled number for the single names in the IC report's split, "descriptive, very noisy"** (no test and no rule changes) | Decided by the owner on 2026-10-04, after the row above showed that only 4 to 7 single names a day are answered, so their daily IC (at least 10 names a day) will often be missing. The owner kept the registered minimum of 10 names a day. Section 13.9 and the card `docs/research/cards/ic-model-scores.md`: for the single names only, the checkpoint record also shows a pooled number (`analysis/ic.py`, `pooled`): the rank correlation of each score with the return across all the single names' answered lines pooled, after each entry day's average return across the lines with that score is taken out (a day with fewer than two such lines is left out), with the number of lines used and a t with errors clustered by entry day (CR1), for each score and horizon. Labelled "descriptive, very noisy". Not a test: not in the Benjamini-Hochberg family, no Deflated Sharpe Ratio, no trial in N (the graveyard's N is unchanged), and hidden until the checkpoints like the rest of the IC record (only the checkpoint record carries it; the nightly counters are unchanged). At 3 sessions the windows of nearby days overlap, which clustering by day does not cover, so that its t is too far from zero, in either direction. No IC value has been computed. |
+| 2026-10-04 | **Prepared, not registered: the voting arm `model_vote`** (registered at the 2026-12-22 checkpoint; exploratory, shadow only) | Asked by the owner on 2026-10-04. Section 13.11, the card `docs/research/cards/model_vote.md` and graveyard row 42 (N from 41 to 43 with row 43 below): four more calls of the same model on each answered line, re-sending the archived first-ask body (checked by its SHA-256 before any call), with the production answer five votes; the side with at least 3 of 5 (a tie or no such side is NEUTRAL), conviction = share agreeing × their mean conviction, the 0.30 floor; fewer than 3 successful votes: no answer, the line dropped for the vote and its comparator alike. A race arm (lag 3) and a fund (lag 5) against the model on the same lines, both in the Benjamini-Hochberg family and the Deflated Sharpe table from registration; the IC of the vote score minus the single call's, descriptive only; fewer than 20 lines acting differently by the final checkpoint is "not tested". Cost cap $1.00 a day, phone alert at $0.80; the cap alert reaches the phone at most once a day. A line the cap or the 23:15 cut-off stops gets a record saying so, and every answered line with no vote record is counted. Operational: two jobs added to the shadow universe's workflow (the vote, then the weekly thesis check of the row below), after its scoring job, so the three never ask the model provider at the same time (a cancelled run stops them; each holds the full model's key only); and one read-only helper in `orchestrator/llm.py` (`request_body`, the body a call would send), production's calls unchanged. Built with its flag off (`MODEL_VOTE_ENABLED`, off until 2026-12-22; a test fails if it is on before that date). **Made before any vote exists**: no call has been made and nothing has been computed. |
+| 2026-10-04 | **Prepared, not registered: the thesis-check logger** (registered at the 2027-03-22 checkpoint as an idea of the second quarter of 2027, on from 2027-04-01; log only) | Asked by the owner on 2026-10-04. Section 13.12, the card `docs/research/cards/thesis-check.md` and graveyard row 43: once a week, for each held name, the same model is asked whether the entry reasoning still holds given today's headlines (VALID, WEAKENED or BROKEN, with one sentence); it never trades, never changes a stop and never feeds any arm. At the checkpoints after its registration, the forward returns of BROKEN against VALID names, as a description only (not in the family). Cost cap $0.10 a week; its alert reaches the phone at most once a week, and a name the cap stops waits for the next week. The owner's "register it in Q2 2027" is read as the IC test was: registered at the checkpoint before the quarter, counted in it, on from its first day. Built with its flag off (`THESIS_CHECK_ENABLED`, off until 2027-04-01; a test fails if it is on before that date). **Made before any check exists.** |
+| 2026-10-04 | **The research backlog in three sections** (documentation only; no rule changes) | Asked by the owner on 2026-10-04. `docs/research/backlog.md` is now in three sections, AI ideas, trading rules and index-first reports; the AI ideas section lists each idea with its status, cost and trial number (the IC report and the shadow universe, the vote and the thesis check: built and switched off, with their dates; a 1-to-5 ranking arm: deferred, only if the IC report shows the scores are too coarse; a cross-model vote: a later idea, not registered; event tags and annual-report flags: dropped, too few events). The other two sections are filled by the owner's next message. Nothing moved out of the backlog's rules. |
 | 2026-10-05 | **Shadow stock universe: the first weekday news check, and the search name of 18 names** (operational; no rule changes, no name replaced) | The check decided by the owner on 2026-10-03 ran on Monday 2026-10-05 (runs 37345386044 and 37351217326; `docs/research/news-relevance.md`). Bright Data throttled the requests all through the first run (an empty body with its 200, or "auto-throttled"), and 29 names had no answer; they were asked again the same day. The run also showed that 18 names had their ticker as their search name, so they were searched as "<ticker> stock", not as company name plus ticker as decided on 2026-10-03; their company names now lead (`config/shadow_universe.py`, for example "United Parcel Service UPS stock"), and they were checked again the same day. Result: 250 of 251 names answered (ZTO did not, after four asks); 75% of 1,537 headlines are relevant; 19 names are under 30% or had no headline (OKE, APD, ECL, GD, BKNG, ORLY, HSY, INTU, FOXA, PEG, SO, GSK, NMR, IBN, AMX, CHKP, ICL, PKX, SHG), most on 0 to 7 headlines. STT: 80% (4 of 5), kept. IRM: 1 of 1, kept. No name is replaced on this one day: rule (2) allows a replacement and does not require one, and with a median of 6 headlines a name, one day's share is not yet evidence that the search finds something else; the owner decides. The check now asks two names at a time, asks a failed search up to four times, and lists a name it could not ask apart, with no share. |
+| 2026-10-06 | **The quarter an idea counts in** (the owner's rule; section 13.8) and **the owner's approval of the vote's and the thesis check's choices** (no number, date or code path changes) | Decided by the owner on 2026-10-06, before any result of either idea exists (both are switched off). Section 13.8 gains the rule: **an idea counts in the quarter it starts producing data**, not in the quarter of the checkpoint that registers it. The IC test follows the same rule: registered at the 2026-12-22 checkpoint, it counts in the first quarter of 2027, when its second universe starts (2027-01-01), as section 13.9 already said. The thesis check (13.12) is registered at the 2027-03-22 checkpoint and counts in the second quarter of 2027, when it starts (2027-04-01). The voting arm (13.11) starts producing data on 2026-12-22, so by this rule it counts in the fourth quarter of 2026, not as the second new idea of the first quarter of 2027 as written on 2026-10-04: section 13.11, its card, graveyard row 42, the backlog and `config/model_vote.py` (`QUARTER`, a label nothing reads to decide anything) say so now. Its dates are unchanged: registered at the 2026-12-22 checkpoint, on from that day. Approved by the owner the same day, unchanged: a failed vote counts as not agreeing, with the share out of 5 (13.11); votes 2 to 5 re-send the input of the line's first call, not a retry's (13.11); no graveyard row for event tags and annual-report flags, dropped before a card was written; the backlog's trading-rules and index-first sections stay empty until the owner's messages; at the 2026-12-22 checkpoint the vote shows counters only, and its first results come on 2027-03-22. |
+| 2026-10-06 | **The daily order of the shadow model calls: production, the vote, the universe, the thesis check** (operational; section 13.13; no rule and no number of any test changes) | The owner's order of 2026-10-06. The vote is a registered arm and the universe is descriptive, so a late day must reach the 23:15 UTC cut-off in the universe, not in the vote (the universe's 1-session IC is also one of the IC test's two primary tests, 13.9: a name the cut-off stops is one name fewer in that day's cross-section). `.github/workflows/shadow-universe.yml`: the `vote` job runs first, once the day's production run has finished; `score` (the universe) needs `vote`; `thesis` needs `score`; each starts when the one before it has ended, passed or failed, never after a cancel. Before, the order was the universe, the vote, the thesis check (Amendment 2026-10-04); none of them has run yet. Section 13.13 gives the estimated timeline for a normal day (the vote 15:45 to 18:12 UTC, the universe 18:13 to 21:39, the weekly thesis check 21:40 to 21:54) and a slow day (160 seconds a call: 16:12 to 19:02, 19:03 to 22:50, 22:51 to 23:09), and what the 23:15 cut-off does to the lines it cuts in each job. The cut-off itself is unchanged. |
+| 2026-10-06 | **The bar N sets, on the graveyard page; production's model request pinned by a test** (documentation and tests only; no rule changes) | Asked by the owner on 2026-10-06. `docs/research/graveyard.md` shows the t a result needs for its Deflated Sharpe Ratio to pass 0.95 (section 13.6), computed exactly (`analysis/multiple_tests.py`, `dsr_t_bar`) for N = 18, 41 and 43 at the three looks: at 2027-03-22 (121 sessions), t 3.55 for N = 18 and t 3.92 for N = 43. `tests/test_production_request_identity.py` shows that the request production sends to the model is byte-identical before and after the voting arm's pull request, for a fixed input: the SHA-256 of every request body (the key is in a header, never in the body), the prompt fingerprint (6c59e07de87e) and production's parsing of fixed answers equal the values computed on main before it (commit 1ac931f). The output identity check (`.github/workflows/output-identity-check.yml`) now reads each side's command line from that side's own `funds.yml`: it had kept PR #140's two command lines, so after #140 was merged it compared main without the shekel rate table against main with it, and it did not pass the vote's and the thesis check's journals; the rate table is fetched once and given to every side. |
