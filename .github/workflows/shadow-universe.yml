@@ -333,11 +333,17 @@ jobs:
     # name after RUN_BUDGET_SECONDS (240 minutes); a name started just before
     # that may need a 480-second ask and its 480-second retry, three times when
     # the answer has to be asked again (48 minutes; the second re-ask is the
-    # owner's decision of 9 Oct 2026), plus its context, the setup and the
-    # commit. tests/test_shadow_universe.py keeps this number and those
-    # constants in step. Expected: about 190 to 205 minutes (measured on
-    # production's cycles of 23 Sep to 2 Oct 2026; 222 on the slowest).
-    timeout-minutes: 305
+    # owner's decision of 9 Oct 2026), plus its context -- its news
+    # search up to four tries a minute apart, each up to three 60-second posts
+    # and each waiting for one of the two news slots (about 28 minutes) --,
+    # the setup and the commit. Only the news searches are two at a time; the
+    # model calls stay four names at a time, because the whole name two at a
+    # time (251 names x ~196 s / 2) would take about 7 hours, past
+    # RUN_BUDGET_SECONDS (240 min) and GitHub's 6-hour job limit.
+    # tests/test_shadow_universe.py keeps this number and those constants in
+    # step. Expected: about 190 to 205 minutes (measured on production's
+    # cycles of 23 Sep to 2 Oct 2026; 222 on the slowest).
+    timeout-minutes: 330
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         # The branch as it is now, so a second run on the same day sees the
@@ -675,7 +681,7 @@ jobs:
           python - <<'EOF'
           import sys, time
           from backtest.verify_tickers import check
-          from config.shadow_universe import REPLACED, SECTORS, TICKERS
+          from config.shadow_universe import CANDIDATES, REPLACED, SECTORS, TICKERS
           results = {ticker: check(ticker) for ticker in TICKERS}
           for attempt in (1, 2):
               broken = [t for t, r in results.items() if not r.resolved]
@@ -693,6 +699,11 @@ jobs:
               if rule == 3:
                   print(f"for the record: {old} (replaced by {new}, rule 3) "
                         f"{'resolves now' if check(old).resolved else 'still does not resolve'}")
+          # A candidate replacement must resolve before it can join the list (card rule (2)); a candidate
+          # that does not is not used, and the list itself does not fail because of it.
+          for ticker, (block, _names) in CANDIDATES.items():
+              r = check(ticker)
+              print(f"candidate {ticker:<6} {'ok' if r.resolved else 'NO':<3} {block:<28} {r.note}")
           if broken:
               print("Does not resolve: " + ", ".join(broken))
               sys.exit(1)

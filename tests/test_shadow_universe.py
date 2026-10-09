@@ -32,7 +32,7 @@ from config.instruments import FUNDS, is_fund
 from config.journal_files import month_file
 from config.market_calendar import is_trading_day
 from config.watchlist import DEFAULT_WATCHLIST
-from orchestrator import context, heartbeat, journal, llm, sources, universe, universe_news
+from orchestrator import context, heartbeat, journal, llm, news, sources, universe, universe_news
 from orchestrator.llm import Completion, LLMError
 from orchestrator.pricing import Usage
 from rules import ARMS
@@ -928,7 +928,12 @@ def test_the_job_clock_outlasts_the_budget_and_one_slow_name():
     instead of killing a run before its lines are committed."""
     clock = _workflow()["jobs"]["score"]["timeout-minutes"]
     worst_call = llm.FULL_MODEL_TIMEOUT_SECONDS + llm.TRANSPORT_RETRY_TIMEOUT_SECONDS
-    slowest_name = llm.SCHEMA_ATTEMPTS * worst_call / 60 + 5   # plus its context
+    # Its context: the news search's tries (each up to three posts and two
+    # pauses, times two for the wait for a news slot) and the pauses between them.
+    one_try = 3 * news.REQUEST_TIMEOUT_SECONDS + 2 * news.RETRY_PAUSE_SECONDS
+    context_s = (universe_news.TRIES * one_try * 2
+                 + (universe_news.TRIES - 1) * universe_news.TRY_PAUSE_SECONDS)
+    slowest_name = (llm.SCHEMA_ATTEMPTS * worst_call + context_s) / 60
     setup_and_commit = 10
     assert clock >= universe.RUN_BUDGET_SECONDS / 60 + slowest_name + setup_and_commit
     assert clock <= 360  # GitHub's own ceiling for a job
@@ -943,3 +948,18 @@ def test_the_verify_run_checks_every_name_without_a_model():
     run = _step("Does every name resolve?", "verify")["run"]
     assert "from backtest.verify_tickers import check" in run and "TICKERS" in run
     assert "orchestrator" not in run
+
+
+def test_the_candidates_are_never_in_the_list_or_production_and_are_searched_like_the_list(monkeypatch):
+    """Card rule (2), Amendment 2026-10-06: a candidate is news-checked and verified before it can join."""
+    from config.watchlist import DEFAULT_WATCHLIST
+
+    for ticker, (block, names) in su.CANDIDATES.items():
+        assert ticker not in su.TICKERS and ticker not in DEFAULT_WATCHLIST, ticker
+        assert block in su.BLOCKS and names and all(n.strip() == n and n for n in names), ticker
+    monkeypatch.setitem(su.CANDIDATES, "XYZW", ("Utilities", ("Example Power", "Example")))
+    assert su.news_query("XYZW") == "Example Power XYZW stock"
+    assert su.match_names("XYZW") == ("Example Power", "Example")
+    assert su.news_query("SO") == "Southern Company SO stock"          # the list as before
+    verify = (ROOT / ".github" / "workflows" / "shadow-universe.yml").read_text(encoding="utf-8")
+    assert "for ticker, (block, _names) in CANDIDATES.items():" in verify

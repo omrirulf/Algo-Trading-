@@ -141,6 +141,7 @@ def test_fetch_without_a_key_is_a_news_error_not_a_crash(monkeypatch):
 
 def test_build_context_turns_a_failed_search_into_a_news_gap(monkeypatch):
     calls = []
+    monkeypatch.setattr(universe_news.time, "sleep", lambda _s: None)
 
     def gather(ticker, headlines, **kwargs):
         calls.append((ticker, headlines, kwargs))
@@ -165,3 +166,81 @@ def test_the_module_reads_no_credential():
     """The CI guardrail "Market context carries no credentials", run here on this file."""
     credential = re.compile(r"(get_settings|os\.environ|getenv|\bsettings\.|\.[A-Za-z_]*(secret|api_key|_token|password)\b)")
     assert not [line for line in SOURCE.read_text(encoding="utf-8").splitlines() if credential.search(line)]
+
+
+# --------------------------------------------------------------------------- #
+# Two at a time, four tries (the owner's decision of 6 Oct 2026)
+
+
+def test_the_owners_numbers():
+    assert (universe_news.NEWS_AT_ONCE, universe_news.TRIES, universe_news.TRY_PAUSE_SECONDS) == (2, 4, 60.0)
+
+
+def test_a_failed_search_is_tried_four_times_a_minute_apart_then_is_a_news_error(monkeypatch):
+    asked, slept = [], []
+
+    def broken(ticker):
+        asked.append(ticker)
+        raise news.NewsFetchError("Bright Data returned an empty body with its 200; nothing to parse")
+
+    monkeypatch.setattr(universe_news, "fetch", broken)
+    with pytest.raises(news.NewsFetchError, match="^asked 4 times: Bright Data returned an empty body"):
+        universe_news.fetch_with_tries("SO", sleep=slept.append)
+    assert asked == ["SO"] * 4 and slept == [60.0] * 3
+
+
+def test_a_search_that_answers_on_a_later_try_is_kept(monkeypatch):
+    answers = iter([news.NewsFetchError("Bright Data HTTP 502: x"), [news.Headline(title="Southern Company up")]])
+
+    def flaky(_ticker):
+        answer = next(answers)
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+    monkeypatch.setattr(universe_news, "fetch", flaky)
+    slept = []
+    assert [h.title for h in universe_news.fetch_with_tries("SO", sleep=slept.append)] == ["Southern Company up"]
+    assert slept == [60.0]
+
+
+def test_a_missing_key_or_zone_is_not_tried_again(monkeypatch):
+    asked = []
+
+    def no_key(ticker):
+        asked.append(ticker)
+        raise news.NewsFetchError("No Bright Data credentials found: set BRIGHTDATA_API_TOKEN")
+
+    monkeypatch.setattr(universe_news, "fetch", no_key)
+    with pytest.raises(news.NewsFetchError, match="^No Bright Data credentials"):
+        universe_news.fetch_with_tries("SO", sleep=lambda _s: pytest.fail("no pause for a missing key"))
+    assert asked == ["SO"]
+
+
+def test_at_most_two_names_search_at_once_and_the_pause_is_outside_the_limit(monkeypatch):
+    import threading
+    import time as real_time
+
+    lock, now, most = threading.Lock(), [0], [0]
+
+    def slow(ticker):
+        with lock:
+            now[0] += 1
+            most[0] = max(most[0], now[0])
+        real_time.sleep(0.02)
+        with lock:
+            now[0] -= 1
+        if ticker.endswith("!"):
+            raise news.NewsFetchError("Bright Data HTTP 503: busy")
+        return []
+
+    monkeypatch.setattr(universe_news, "fetch", slow)
+    found = universe_news.news_step([f"N{i}" for i in range(12)] + ["X!"], workers=4, sleep=lambda _s: None)
+    assert most[0] == 2
+    assert (found["names"], found["answered"], found["no_answer"]) == (13, 12, ["X!"])
+    assert found["no_headline"] == 12 and found["with_headlines"] == 0 and found["tries"] == 4
+    assert found["errors"]["X!"].startswith("asked 4 times: Bright Data HTTP 503")
+
+
+def test_the_universe_searches_through_the_limit():
+    assert "headlines = fetch_with_tries(ticker)" in SOURCE.read_text(encoding="utf-8")

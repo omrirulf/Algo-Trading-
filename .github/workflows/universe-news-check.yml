@@ -14,10 +14,22 @@ name: universe news check
 # share, plus the first headlines of every name under 30% (by the rule, or by
 # the company name alone; public news), to the log and the job summary. Nothing is kept: no commit, no artifact.
 #
+# Since the owner's decision of 6 Oct 2026, rule (2) is pooled over five
+# weekday checks (analysis/news_pooled.py): one run here, with its rechecks
+# the same day, is one check. Its RESULT and FAILED lines become that day's
+# file in docs/research/news-checks/ (python -m analysis.news_pooled
+# --from-log); the rule decides nothing before the fifth.
+#
 # On a trading day only (a weekend's news is thin), by hand or by putting
 # the label "universe-news-check" on a pull request. It holds the Bright Data
 # key and zone the cycle uses, under Bright Data's own names, and nothing
 # else: no broker key, no model key. About 255 requests, about $0.40.
+#
+# By hand, mode "news-step" runs the universe's own news step instead
+# (orchestrator/universe_news.py, news_step): every name searched as the
+# universe searches it, four names at a time and at most two at once, a
+# failed search asked up to four times; it counts the names with no answer.
+# No relevance, no model, no journal.
 #
 # Bright Data sometimes answers 200 with an empty body (on 5 Oct 2026 about
 # one first request in two, all through the run). So names are asked two at
@@ -28,6 +40,15 @@ name: universe news check
 # recheck of the names that failed, or whose search name changed).
 on:
   workflow_dispatch:
+    inputs:
+      only:
+        description: "Only these names, comma-separated (a same-day recheck of the names whose search failed); empty for all"
+        default: ""
+      mode:
+        description: "relevance: the relevance check (rule (2)); news-step: the universe's own news step over every name, counting the names with no answer (no relevance, no model)"
+        type: choice
+        options: [relevance, news-step]
+        default: relevance
   pull_request:
     types: [labeled]
 
@@ -38,7 +59,8 @@ jobs:
   check:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.label.name == 'universe-news-check' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # Two names at a time and up to three rounds: about 80 minutes for every name.
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
@@ -49,11 +71,49 @@ jobs:
 
       - run: pip install -r requirements.txt
 
-      - name: How relevant is each name's news?
+      - name: The universe's own news step, every name
+        # The owner's request of 6 Oct 2026: once, in the week of 14 Dec 2026,
+        # every name's news search exactly as the universe makes it -- its four
+        # names at a time, of which at most two search at once, a failed search
+        # asked up to four times a minute apart (orchestrator/universe_news.py)
+        # -- and how many names got no answer. No relevance, no model, no
+        # journal, nothing kept.
+        if: ${{ inputs.mode == 'news-step' }}
         env:
           BRIGHTDATA_API_KEY: ${{ secrets.BRIGHTDATA_API_TOKEN }}
           BRIGHTDATA_UNLOCKER_ZONE: ${{ vars.BRIGHTDATA_SERP_ZONE || 'cli_unlocker' }}
-          ONLY_NAMES: ""
+        run: |
+          python - <<'EOF'
+          import json, os, sys
+          from datetime import datetime, timezone
+          from config.market_calendar import is_trading_day
+          from config.shadow_universe import TICKERS
+          from orchestrator.universe import WORKERS
+          from orchestrator.universe_news import news_step
+
+          today = datetime.now(timezone.utc).date()
+          if not is_trading_day(today):
+              print(f"{today} is not a trading day: nothing asked (the news step runs on a weekday)")
+              sys.exit(0)
+          found = news_step(TICKERS, WORKERS)
+          text = (f"## The universe's news step on {today}\n\n"
+                  f"{found['names']} names, {found['workers']} at a time, at most {found['news_at_once']} searching at once, "
+                  f"up to {found['tries']} tries each; {found['minutes']} minutes.\n\n"
+                  f"- answered: {found['answered']} ({found['with_headlines']} with headlines, {found['no_headline']} with none)\n"
+                  f"- **no answer after {found['tries']} tries: {len(found['no_answer'])}**"
+                  + (f": {', '.join(found['no_answer'])}" if found['no_answer'] else "") + "\n")
+          print(text)
+          print("NEWS_STEP " + json.dumps(found))
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              summary.write(text)
+          EOF
+
+      - name: How relevant is each name's news?
+        if: ${{ inputs.mode != 'news-step' }}
+        env:
+          BRIGHTDATA_API_KEY: ${{ secrets.BRIGHTDATA_API_TOKEN }}
+          BRIGHTDATA_UNLOCKER_ZONE: ${{ vars.BRIGHTDATA_SERP_ZONE || 'cli_unlocker' }}
+          ONLY_NAMES: ${{ inputs.only || '' }}
         run: |
           python - <<'EOF'
           import json, os, sys, time
@@ -61,7 +121,7 @@ jobs:
           from datetime import datetime, timezone
           from analysis.news_relevance import FAIL_BELOW, report, universe_share
           from config.market_calendar import is_trading_day
-          from config.shadow_universe import REPLACED, TICKERS, news_query
+          from config.shadow_universe import CANDIDATES, REPLACED, TICKERS, news_query
           from orchestrator.news import NewsFetchError
           from orchestrator.universe_news import fetch
 
@@ -71,10 +131,11 @@ jobs:
               sys.exit(0)
 
           only = [t.strip().upper() for t in os.environ.get("ONLY_NAMES", "").split(",") if t.strip()]
-          unknown = sorted(set(only) - set(TICKERS))
+          # A candidate replacement (config/shadow_universe.py, CANDIDATES) is asked only by name.
+          unknown = sorted(set(only) - set(TICKERS) - set(CANDIDATES))
           if unknown:
               sys.exit(f"not in the list: {', '.join(unknown)}")
-          names = [t for t in TICKERS if not only or t in only]
+          names = [t for t in (*TICKERS, *CANDIDATES) if t in only] if only else list(TICKERS)
 
           def ask(ticker):
               try:
