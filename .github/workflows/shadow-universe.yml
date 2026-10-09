@@ -110,11 +110,12 @@ jobs:
     # Sized for about 58 answered lines, four calls each, four at a time. The
     # voter starts no new name after RUN_BUDGET_SECONDS (210 minutes); after
     # that, the calls in flight and the rest of the last name started may each
-    # need a 480-second ask and its 480-second retry, twice when the answer has
-    # to be asked again (32 minutes, two rounds), plus the setup and the
-    # commit. tests/test_model_vote_runner.py keeps this number and those
-    # constants in step.
-    timeout-minutes: 290
+    # need a 480-second ask and its 480-second retry, three times when the
+    # answer has to be asked again (48 minutes, two rounds; the second re-ask
+    # is the owner's decision of 9 Oct 2026), plus the setup and the commit.
+    # tests/test_model_vote_runner.py keeps this number and those constants
+    # in step.
+    timeout-minutes: 320
     permissions:
       contents: write   # only to commit logs/model_vote/
       actions: read     # only to see that the production run finished, and download its model calls
@@ -330,12 +331,13 @@ jobs:
     # Sized for 251 names asked four at a time (production's full-model
     # setting) with the 480-second model timeout. The scorer starts no new
     # name after RUN_BUDGET_SECONDS (240 minutes); a name started just before
-    # that may need a 480-second ask and its 480-second retry, twice when the
-    # answer has to be asked again (32 minutes), plus its context, the setup
-    # and the commit. tests/test_shadow_universe.py keeps this number and
-    # those constants in step. Expected: about 190 to 205 minutes (measured
-    # on production's cycles of 23 Sep to 2 Oct 2026; 222 on the slowest).
-    timeout-minutes: 300
+    # that may need a 480-second ask and its 480-second retry, three times when
+    # the answer has to be asked again (48 minutes; the second re-ask is the
+    # owner's decision of 9 Oct 2026), plus its context, the setup and the
+    # commit. tests/test_shadow_universe.py keeps this number and those
+    # constants in step. Expected: about 190 to 205 minutes (measured on
+    # production's cycles of 23 Sep to 2 Oct 2026; 222 on the slowest).
+    timeout-minutes: 305
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         # The branch as it is now, so a second run on the same day sees the

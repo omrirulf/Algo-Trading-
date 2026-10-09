@@ -151,14 +151,18 @@ def test_prose_is_asked_again_with_the_complaint_stated():
     assert first["messages"][1] == second["messages"][1]
 
 
-def test_a_second_bad_answer_is_the_real_answer():
+def test_the_last_bad_answer_is_the_real_answer():
+    """Three bad parses in a row -- the question, the complaint, the complaint
+    again -- and only then is the day's answer "no answer". Before 9 Oct 2026
+    it was so after two."""
     server = _Server(
         httpx.Response(200, json={"choices": [{"message": {"content": "nope"}}]}),
         httpx.Response(200, json={"choices": [{"message": {"content": "still nope"}}]}),
+        httpx.Response(200, json={"choices": [{"message": {"content": "and again"}}]}),
     )
     with pytest.raises(LLMError, match="non-JSON"):
         _provider(server).complete_detailed("s", "u", SCHEMA)
-    assert len(server.sent) == llm.SCHEMA_ATTEMPTS
+    assert len(server.sent) == llm.SCHEMA_ATTEMPTS == 3
 
 
 def test_the_re_ask_does_not_mutate_the_caller_s_prompt():
@@ -191,24 +195,69 @@ def test_a_value_outside_the_schema_is_asked_again_with_the_problem_stated():
     assert first["messages"][1] == second["messages"][1]
 
 
-def test_a_second_bad_value_is_returned_for_the_cycle_to_reject_as_before():
-    """The code never mends a value: after the one re-ask the answer goes back
-    as it came, and ``parse_signal`` rejects it where it always did."""
-    server = _Server(httpx.Response(200, json=_body(BAD_VALUE)), httpx.Response(200, json=_body(BAD_VALUE)))
+def test_the_last_bad_value_is_returned_for_the_cycle_to_reject_as_before():
+    """The code never mends a value: once the re-asks are spent the answer goes
+    back as it came, and ``parse_signal`` rejects it where it always did."""
+    server = _Server(*[httpx.Response(200, json=_body(BAD_VALUE)) for _ in range(3)])
     out = _provider(server).complete_detailed("s", "u", SCHEMA, check=hb.parse_signal)
     assert json.loads(out.text)["conviction"] == -0.35
-    assert len(server.sent) == llm.SCHEMA_ATTEMPTS
+    assert len(server.sent) == llm.SCHEMA_ATTEMPTS == 3
     with pytest.raises(ValueError):
         hb.parse_signal(out.text)
 
 
-def test_the_two_kinds_of_bad_answer_share_the_one_re_ask():
+def test_the_two_kinds_of_bad_answer_share_the_attempts():
+    """Prose, then a value outside the schema, then a good answer: the third
+    ask is the one the cycle uses, and its prompt names both problems."""
     server = _Server(
         httpx.Response(200, json={"choices": [{"message": {"content": "prose"}}]}),
         httpx.Response(200, json=_body(BAD_VALUE)),
+        httpx.Response(200, json=_body()),
     )
     out = _provider(server).complete_detailed("s", "u", SCHEMA, check=hb.parse_signal)
-    assert json.loads(out.text)["conviction"] == -0.35 and len(server.sent) == 2
+    assert json.loads(out.text)["conviction"] == 0.2 and len(server.sent) == 3
+    third = server.sent[2]["messages"][0]["content"]
+    assert llm.OFF_SCHEMA_INSTRUCTION in third and llm.INVALID_VALUES_INSTRUCTION in third
+    assert server.sent[0]["messages"][1] == server.sent[2]["messages"][1]
+
+
+# --- the second re-ask (the owner's decision, 9 Oct) ------------------------
+
+EMPTY_RATIONALE = dict(ANSWER, rationale="")
+
+
+def test_ita_7_oct_an_empty_rationale_after_an_off_schema_answer_is_asked_once_more():
+    """ITA on 7 Oct 2026: the first answer ran to the token limit, the re-ask
+    parsed but said nothing in its rationale, and the one re-ask had no
+    answer to that. Now the problem is stated and the model asked once more."""
+    server = _Server(
+        httpx.Response(200, json={"choices": [{"message": {"content": "reasoning, no JSON"}}]}),
+        httpx.Response(200, json=_body(EMPTY_RATIONALE)),
+        httpx.Response(200, json=_body()),
+    )
+    out = _provider(server).complete_detailed("s", "u", SCHEMA, check=hb.parse_signal)
+    assert json.loads(out.text)["rationale"] == "r" and len(server.sent) == 3
+    assert "rationale: String should have at least 1 character" in server.sent[2]["messages"][0]["content"]
+
+
+def test_ung_9_oct_an_empty_message_after_invalid_values_is_asked_once_more():
+    """UNG on 9 Oct 2026: a conviction below 0, then a re-ask that hit the
+    token limit and answered with an empty message. The empty message is an
+    off-schema answer like any other, and gets the second re-ask."""
+    server = _Server(
+        httpx.Response(200, json=_body(BAD_VALUE)),
+        httpx.Response(200, json={"choices": [{"message": {"content": ""}}]}),
+        httpx.Response(200, json=_body()),
+    )
+    out = _provider(server).complete_detailed("s", "u", SCHEMA, check=hb.parse_signal)
+    assert json.loads(out.text)["conviction"] == 0.2 and len(server.sent) == 3
+    third = server.sent[2]["messages"][0]["content"]
+    assert llm.INVALID_VALUES_INSTRUCTION in third and llm.OFF_SCHEMA_INSTRUCTION in third
+
+
+def test_the_later_re_ask_is_numbered_in_the_call_record():
+    assert llm._re_ask_kind(0, "invalid values") == "re-ask after invalid values"
+    assert llm._re_ask_kind(1, "an off-schema answer") == "re-ask 2 after an off-schema answer"
 
 
 def test_a_good_answer_is_asked_once_and_no_check_changes_nothing():
