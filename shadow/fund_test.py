@@ -16,6 +16,14 @@ and uses no bar; the next look's bar comes from the same rule with the bars
 actually used before it. This works that out from calibration's estimated
 end, so the 4 Funds page can say whether the planned bars still hold.
 
+A forecast only (the owner's reading 3, 6 Oct 2026). Whether a look is
+really skipped is judged by ``shadow.run`` on the first night the race's look
+is readable: calibration has passed that night or it has not, for both the
+fund test's skip and the race's "unavailable" after-tax record, so the two
+can never disagree. That record is the fund test's look record
+(``fund_test.looks`` in the funds document), made once and frozen; nothing
+here decides it.
+
 Arithmetic on dates only: nothing is read, fetched or written.
 """
 
@@ -49,7 +57,11 @@ def sessions_through(first: date, last: date) -> int:
 
 
 def skipped_look(look: date, calibration_end: Optional[date]) -> bool:
-    """Whether a look comes before calibration has passed, and so is skipped.
+    """Whether a look is forecast to come before calibration has passed, and so to be skipped.
+
+    A forecast from calibration's *estimated* end (owner reading 3): the
+    skip itself is judged by ``shadow.run`` on the first night the race's
+    look is readable, and only that judgment goes into a look record.
 
     Calibration can pass only on its last day's close, judged that night,
     so a look on or before that day is skipped: the fund test has no

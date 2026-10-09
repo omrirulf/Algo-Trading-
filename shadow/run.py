@@ -46,6 +46,16 @@ BROKEN-against-VALID description, which is in no test's family. Before
 those dates neither key exists anywhere in the document, and the vote's and
 the checks' lines are not even read (``--votes``, ``--thesis``).
 
+**The fund test's verdict** (sections 11.5-11.8; the layout the owner
+approved on 2026-10-06, ``docs/research/checkpoint-verdict-plan.md``): on the
+night the race's look is readable, each look gets one record under
+``fund_test.looks`` -- skipped if calibration has not passed that night, else
+read at the fund test's own bar by the spending rule of 11.7 and decided by
+``decision_gate.decide`` -- and keeps it unchanged every night after
+(``fund_test_part``). ``fund_test.verdict`` is the first deciding look's
+verdict, and the document's last key, ``verdict``, combines it with the
+race's (section 11.8).
+
 Two reports that are not fund results are in every document from the fund
 start on, whatever calibration says: ``price_gaps`` (the price source's
 missing ticker-days per calendar month over the watchlist) and
@@ -494,7 +504,7 @@ def _read_lines(path: Path) -> list[str]:
         return []
 
 
-def paired(fund, other, after: Optional[date] = None) -> dict:
+def paired(fund, other, after: Optional[date] = None, through: Optional[date] = None) -> dict:
     """``fund`` against ``other`` day by day, on the sessions both have: the test of section 13.
 
     The daily net returns are paired by date (a fund that starts later, like
@@ -504,6 +514,11 @@ def paired(fund, other, after: Optional[date] = None) -> dict:
     ``after``, only the sessions strictly after that day are paired: the
     vote's lines begin on the 2026-12-22 cycle, acted on at the next open
     (section 13.11), so the days before are two books of cash, not a test.
+
+    ``through`` cuts the paired days at that session (the fund test's look,
+    section 11.6: "read on the same days as the race's looks"), and adds
+    ``through``, the last paired day; the totals and drawdowns stay the
+    whole run's. Without it (the exploratory tests and the vote) nothing changes.
     """
     from analysis.horse_race import newey_west_t
     from analysis.multiple_tests import p_two_sided, series_stats
@@ -514,14 +529,19 @@ def paired(fund, other, after: Optional[date] = None) -> dict:
 
     mine, theirs = by_day(fund), by_day(other)
     days = sorted(d for d in set(mine) & set(theirs) if after is None or d > after)
+    if through is not None:
+        days = [d for d in days if d <= through]
     diffs = [mine[d] - theirs[d] for d in days]
     t = newey_west_t(diffs, VS_MODEL_LAG)
-    return {"compare_to": other.name, "days": len(diffs), "from": days[0].isoformat() if days else None,
-            "mean_daily_diff": statistics.fmean(diffs) if diffs else None, "t": t, "p": p_two_sided(t),
-            "stats": series_stats(diffs),
-            "total_return": total_return(fund), "compare_total_return": total_return(other),
-            "max_drawdown": max_drawdown([d.equity for d in fund.days]),
-            "compare_max_drawdown": max_drawdown([d.equity for d in other.days])}
+    out = {"compare_to": other.name, "days": len(diffs), "from": days[0].isoformat() if days else None,
+           "mean_daily_diff": statistics.fmean(diffs) if diffs else None, "t": t, "p": p_two_sided(t),
+           "stats": series_stats(diffs),
+           "total_return": total_return(fund), "compare_total_return": total_return(other),
+           "max_drawdown": max_drawdown([d.equity for d in fund.days]),
+           "compare_max_drawdown": max_drawdown([d.equity for d in other.days])}
+    if through is not None:
+        out["through"] = days[-1].isoformat() if days else None
+    return out
 
 
 def order_changed_days(fund, model) -> int:
@@ -605,7 +625,7 @@ def run_funds(
     entries: Sequence[JournalEntry], start: date, final_through: date, fetcher, *,
     random_funds: int, processes: int, shortable_no, first_cycle: Optional[date] = None,
     exploratory: bool = True, long_bars: Optional[Bars] = None, rates=None,
-    votes: Optional[Mapping] = None,
+    votes: Optional[Mapping] = None, fund_test: bool = False,
 ) -> tuple[dict, dict]:
     """Every fund from ``start`` through ``final_through``. Called only once calibration has passed (``build``).
 
@@ -621,6 +641,9 @@ def run_funds(
     given only on a checkpoint night from 2026-12-22 (section 13.11): with
     it, and with the exploratory funds, the vote's fund and its comparator
     run too, and their test goes under ``tests``.
+    With ``fund_test``, the output also carries ``_fund_test``: the four funds and the
+    coin-flip funds' raw equity, which the fund test reads at a look
+    (``fund_test_part``). Neither changes anything else in the output.
     """
     cycles = lines_by_day(entries)
     ran = cycle_days(entries)
@@ -682,6 +705,13 @@ def run_funds(
         vote_fund, comparator = voting
         out.setdefault("tests", {})[mv.ARM] = paired(vote_fund, comparator, after=mv.START) | {
             "acted": sv.acted(sv.lines_with_an_answer(entries, votes), votes)}
+    # The fund test's own numbers at a look (section 11.6, ``fund_test_part``):
+    # the four funds, to pair cut at the look's close, and the coin-flip funds'
+    # raw equity, session by session, for the 95th percentile of their total
+    # returns (not the band, which is rounded to cents). ``build`` takes this
+    # out before anything is printed.
+    if fund_test:
+        out["_fund_test"] = {"funds": {f.name: f for f in four}, "coin": curves}
     return out, {"four": check, "coin": coin_check}
 
 
@@ -929,6 +959,371 @@ def after_tax_part(now: datetime, final_through: date, snapshots, funds: Optiona
     }, series
 
 
+# --------------------------------------------------------------------------- #
+# The fund test's verdict at each look (sections 11.5-11.8; the owner's
+# approval of the checkpoint verdict, 6 Oct 2026)
+# --------------------------------------------------------------------------- #
+
+
+def _after_tax_for(look: int, end: str, tax_records: Sequence[dict]) -> Optional[dict]:
+    """Look ``look``'s after-tax record tonight, as the fund test reads it; None while there is none.
+
+    A ready record counts only if it was cut at the look's own close (the
+    race's rule, section 5c); an unavailable one counts as it is (it is
+    never made again).
+    """
+    from analysis import decision_gate as gate
+
+    record = next((r for r in tax_records if r.get("look") == look), None)
+    if record is None:
+        return None
+    if record.get("status") == gate.AFTER_TAX_READY:
+        if record.get("window_end") != end:
+            return None
+        tests = record.get("tests") or {}
+        return {"status": gate.AFTER_TAX_READY,
+                "t": {arm: (tests.get(arm) or {}).get("t") for arm in ("model", "momentum", "hybrid")}}
+    return {"status": gate.AFTER_TAX_UNAVAILABLE, "t": {}, "reason": record.get("reason") or "no fund was run"}
+
+
+def _read_looks(records: Sequence[dict], before: int) -> list[tuple[float, float]]:
+    """``(share, bar used)`` of every look read before checkpoint ``before``, in order: the spending rule's past."""
+    return [(r["share"], r["bar"]) for r in sorted(records, key=lambda r: r["look"])
+            if r.get("status") == "read" and r["look"] < before]
+
+
+def _first_decision(records: Sequence[dict], before: int = 4) -> Optional[int]:
+    """The first checkpoint before ``before`` whose fund-test record decided; None if none did.
+
+    Read from the record's table, as ``fund_test_verdict`` reads it, so the
+    two can never name different deciding looks.
+    """
+    from analysis import verdict
+
+    for record in sorted(records, key=lambda r: r["look"]):
+        if record["look"] >= before:
+            break
+        if record.get("status") == "read" and (record.get("table") or {}).get("status") == verdict.DECIDED:
+            return record["look"]
+    return None
+
+
+def _planned_next(look: int, read: Sequence[tuple[float, float]]) -> Optional[tuple[int, date, float]]:
+    """``(checkpoint, planned day, planned bar)`` of the fund test's look after ``look``, by the spending rule."""
+    from analysis import verdict
+
+    later = verdict.planned_fund_bars(read, after_look=look)
+    if not later or later[0][0] != look + 1:
+        return None
+    return look + 1, schedule.FUND_TEST_LOOK_ESTIMATES[look], later[0][1]
+
+
+def fund_test_record(look: int, made_on: date, end: date, days: Sequence[str], raw: dict, after_tax: dict,
+                     downturn: Optional[float], records: Sequence[dict],
+                     calibration_passed_on: Optional[str], made_at: Optional[datetime] = None) -> dict:
+    """One look of the fund test, read (section 11.6), as the record ``fund_test.looks`` keeps.
+
+    Everything through the race look's last close ``end`` only (5c, 11.7):
+    the funds' own sessions from the fixed start (``schedule.FUND_START``)
+    through ``end``; the bar by the spending rule of 11.7 from the looks
+    actually read (``spending_bars`` with the bars already used kept as
+    they were, ``used=``; a skipped look spends nothing), rounded up; the
+    six paired before-tax tests of the four funds, Newey-West lag 5, cut at
+    ``end`` (``paired(..., through=end)``); the coin flip (11.5): the model
+    fund's total return since the start against the 95th percentile of the
+    coin-flip funds' total returns, both from the raw equity; the race's
+    after-tax record for the look (5c), at the fund test's own bar; the
+    race's downturn number (5d, owner reading 4). The decision is
+    ``decision_gate.decide`` at that bar ("exactly as section 5a").
+
+    A look before the final one with 180 or more fund sessions is not
+    decided: its share would reach 1 before the final look, and the
+    spending rule has no bar for it; the record says the owner decides.
+    Raises ``ValueError`` for a date outside the experiment (owner
+    Addition 2: the 2099 examples can never become a real record).
+    ``made_at`` is the making run's full stamp (the document's
+    ``generated_at`` that night): the bar alert speaks only for the run
+    whose stamp it is, so a second run the same day sends nothing.
+    """
+    from analysis import decision_gate as gate
+    from analysis import verdict
+    from shadow.fund_test import sessions_through
+
+    verdict.check_dates(made_on, end, calibration_passed_on, schedule.FUND_START)
+    sessions = sum(1 for d in days if date.fromisoformat(d) <= end)
+    final = look == verdict.LOOKS
+    base = {"look": look, "made_on": made_on.isoformat(), "made_at": made_at.isoformat() if made_at else None,
+            "window_end": end.isoformat(), "start": schedule.FUND_START.isoformat()}
+    read = _read_looks(records, look)
+    share = 1.0 if final else min(1.0, sessions / verdict.FUND_PLANNED_SESSIONS)
+    owner = None
+    if not final and sessions >= verdict.FUND_PLANNED_SESSIONS:
+        owner = verdict.FUND_OWNER_REASON
+    else:
+        try:
+            exact = gate.spending_bars([s for s, _ in read] + [share], used=[b for _, b in read])[-1]
+        except ValueError as error:
+            owner = f"the spending rule of 11.7 gives no bar here ({error}): the owner decides"
+    if owner is not None:
+        record = base | {"status": verdict.FUND_OWNER, "reason": owner, "sessions": sessions,
+                         "sessions_calendar": sessions_through(schedule.FUND_START, end)}
+        record["table"] = verdict.table_json(verdict.fund_test_table(record))
+        return record
+    bar = gate.rounded_bar(exact)
+    planned_bar = schedule.FUND_TEST_BARS[look - 1]
+    funds = raw["funds"]
+    tests = {}
+    for first, second in verdict.FUND_TEST_PAIRS:
+        test = paired(funds[first], funds[second], through=end)
+        tests[verdict.fund_pair(first, second)] = {
+            "days": test["days"], "from": test["from"], "through": test["through"], "t": test["t"],
+            "mean_daily_diff": test["mean_daily_diff"], "lag": VS_MODEL_LAG}
+    at = days.index(end.isoformat())
+    model_equity = {d.day: d.equity for d in funds["model"].days}[end]
+    coin = [curve[at] / STARTING_CASH - 1.0 for curve in raw["coin"] if len(curve) > at]
+    coin_flip = {"model_total": model_equity / STARTING_CASH - 1.0, "p95_total": percentile(coin, 95.0),
+                 "funds": len(raw["coin"])}
+    t = {arm: tests[verdict.fund_pair(arm, "vt")]["t"] for arm in ("model", "momentum", "hybrid")}
+    tax = after_tax.get("t") or {}
+    inputs = gate.LookInputs(
+        entry_days=sessions,
+        t_model_momentum=tests["model-momentum"]["t"], t_model_hybrid=tests["model-hybrid"]["t"],
+        t_hybrid_momentum=tests["hybrid-momentum"]["t"],
+        model_mean=coin_flip["model_total"], model_band_high=coin_flip["p95_total"], t_vs_index=t,
+        after_tax=gate.AfterTax(after_tax["status"], dict(tax), after_tax.get("reason") or ""),
+        vt_max_drawdown=downturn, window_end=end,
+    )
+    candidate, outcome, reason = gate.decide(inputs, bar, final)
+    record = base | {
+        "status": verdict.FUND_READ, "sessions": sessions,
+        "sessions_calendar": sessions_through(schedule.FUND_START, end), "share": share, "bar": bar,
+        "bar_exact": round(exact, 4), "planned_bar": planned_bar, "bar_differs": bar != planned_bar,
+        "calibration_passed_on": calibration_passed_on, "tests": tests, "coin_flip": coin_flip,
+        "after_tax": after_tax, "downturn": downturn,
+        "decision": {"candidate": candidate, "outcome": outcome, "reason": reason},
+    }
+    record["table"] = verdict.table_json(verdict.fund_test_table(
+        record, planned_next=None if final else _planned_next(look, [*read, (share, bar)]),
+        decided_at=_first_decision(records, look)))
+    return record
+
+
+def fund_test_part(now: datetime, race_gate: Optional[dict], records: list, passed: bool,
+                   funds: Optional[dict], raw: Optional[dict], tax_records: Sequence[dict],
+                   calibration: dict) -> Optional[str]:
+    """Each planned look's fund-test record, made once and frozen (sections 11.6-11.7; owner readings 2 and 3).
+
+    ``records`` is last night's ``fund_test.looks``, carried unchanged; this
+    adds tonight's. A look's record is made on a night the race's look is
+    reached and readable and no record for it exists (or the one there was
+    cut at another close: a bug fix moved the window; it is made again and
+    the old one kept inside it under ``superseded``):
+
+    * **skipped** when calibration has not passed that night (owner reading
+      3: judged on the first night the look is readable, as the race's
+      "unavailable" after-tax record is): not read, nothing spent, no bar.
+      Never made again;
+    * **read** (``fund_test_record``) when calibration has passed, the funds
+      reach the look's last close, and the race's after-tax record for the
+      look exists tonight (ready, cut at that close, or unavailable);
+    * otherwise no record tonight: the look waits, and is cut at the same
+      close on the first night all that holds. A later look waits for an
+      earlier one (the spending rule reads the looks in order).
+
+    A run with fewer coin-flip funds than the registered 1,000 (a run by
+    hand; 11.1, 11.5) makes no read record and returns why, for
+    ``fund_test.note``; so does a look whose close or making night is
+    outside the experiment (``verdict.EXPERIMENT_END``; owner Addition 2),
+    so the funds run still prints. Otherwise returns None.
+    """
+    from analysis import verdict
+
+    looks = race_gate.get("looks") if isinstance(race_gate, dict) else None
+    days = (funds or {}).get("days") or []
+    note = None
+    for look in looks_reached(race_gate):
+        entry = looks[look - 1]
+        end_text = entry.get("window_end")
+        old = next((r for r in records if r.get("look") == look), None)
+        if old is not None and (old.get("status") == verdict.FUND_SKIPPED
+                                or old.get("window_end") in (None, end_text)):
+            continue                        # made once, carried unchanged
+        if entry.get("readable") is not True or not end_text:
+            break                           # the race cannot read the look tonight: it waits, and so does this
+        end = date.fromisoformat(end_text)
+        try:
+            verdict.check_dates(now.date(), end)
+        except ValueError as error:         # refused (owner Addition 2), and the document still prints
+            note = f"checkpoint {look}: no fund-test record was made: {error}"
+            break
+        if not passed:
+            if old is not None:
+                break
+            record = {"look": look, "made_on": now.date().isoformat(), "window_end": end_text,
+                      "status": verdict.FUND_SKIPPED, "reason": verdict.FUND_SKIP_REASON}
+            record["table"] = verdict.table_json(verdict.fund_test_table(record, read_before=_read_looks(records,
+                                                                                                    look)))
+            records.append(record)
+            continue
+        after_tax = _after_tax_for(look, end_text, tax_records)
+        if (raw is None or end_text not in days or after_tax is None
+                or not all(any(d.day == end for d in fund.days) for fund in raw["funds"].values())):
+            break                           # the funds do not reach the close yet, or the after-tax record waits
+        if len(raw["coin"]) < schedule.RANDOM_FUNDS:
+            note = (f"checkpoint {look}: this run had {len(raw['coin']):,} coin-flip funds, not the registered "
+                    f"{schedule.RANDOM_FUNDS:,} (sections 11.1 and 11.5), so no fund-test record was made")
+            break
+        passed_on = calibration.get("end_estimate") if isinstance(calibration.get("end_estimate"), str) else None
+        record = fund_test_record(look, now.date(), end, days, raw, after_tax, entry.get("vt_max_drawdown"),
+                                  [r for r in records if r is not old], passed_on, made_at=now)
+        if old is not None:
+            records.remove(old)
+            record["superseded"] = old
+        records.append(record)
+    records.sort(key=lambda r: r["look"])
+    return note
+
+
+def carried_fund_looks(previous: Optional[dict]) -> list[dict]:
+    """Last night's ``fund_test.looks``, carried unchanged (owner reading 2); a damaged record is left out.
+
+    A record is kept only if it is a dict with a checkpoint number 1 to 3, a
+    known status, a table that reads back (``verdict.table_from_json``, a
+    fund-test table of the same checkpoint, as the race's ``frozen_looks``
+    asks), and -- for a read look -- the share and bar the spending rule
+    reads back and a table that says it decided exactly when its decision
+    has an outcome (a later look's "for reading only" table excepted). A
+    record left out is made again, as if it never was.
+    """
+    from analysis import verdict
+
+    part = (previous or {}).get("fund_test")
+    looks = part.get("looks") if isinstance(part, dict) else None
+    out, seen = [], set()
+    for record in looks if isinstance(looks, list) else []:
+        if not isinstance(record, dict):
+            continue
+        look = record.get("look")
+        if not isinstance(look, int) or isinstance(look, bool) or not 1 <= look <= verdict.LOOKS or look in seen:
+            continue
+        status = record.get("status")
+        if status not in (verdict.FUND_READ, verdict.FUND_SKIPPED, verdict.FUND_OWNER):
+            continue
+        if status == verdict.FUND_READ and not all(
+                isinstance(record.get(k), (int, float)) and not isinstance(record.get(k), bool)
+                for k in ("share", "bar")):
+            continue
+        try:
+            table = verdict.table_from_json(record.get("table"))
+        except ValueError:
+            continue
+        if table.kind != verdict.FUND_TEST or table.look != look:
+            continue
+        decision = record.get("decision")
+        outcome = decision.get("outcome") if isinstance(decision, dict) else None
+        if status == verdict.FUND_READ and table.status != verdict.READING_ONLY and (
+                table.decided != (outcome is not None) or (table.decided and table.outcome != outcome)):
+            continue
+        seen.add(look)
+        out.append(record)
+    return sorted(out, key=lambda r: r["look"])
+
+
+def fund_test_verdict(records: Sequence[dict]) -> dict:
+    """``fund_test.verdict``: the first deciding look's verdict, frozen with it; else "no decision yet"."""
+    from analysis import verdict
+
+    for record in sorted(records, key=lambda r: r["look"]):
+        table = record.get("table") or {}
+        if table.get("status") == verdict.DECIDED:
+            return {"text": table["verdict"], "decided_at": record["look"], "outcome": table.get("outcome")}
+    return {"text": verdict.NO_DECISION_YET, "decided_at": None, "outcome": None}
+
+
+def fund_test_next(records: Sequence[dict]) -> Optional[dict]:
+    """``fund_test.next_look``: the next look with no record, its planned day and its bar.
+
+    The bar by the spending rule of 11.7 from the looks read so far and the
+    planned sessions (60, 120, 180); ``planned_bar`` is the registered one
+    (``schedule.FUND_TEST_BARS``). None once every look has a record.
+    """
+    from analysis import verdict
+
+    done = {r["look"] for r in records}
+    upcoming = next((k for k in range(1, verdict.LOOKS + 1) if k not in done), None)
+    if upcoming is None:
+        return None
+    later = verdict.planned_fund_bars(_read_looks(records, upcoming), after_look=upcoming - 1)
+    bar = later[0][1] if later and later[0][0] == upcoming else None
+    return {"look": upcoming, "estimated": schedule.FUND_TEST_LOOK_ESTIMATES[upcoming - 1].isoformat(),
+            "bar": bar, "planned_bar": schedule.FUND_TEST_BARS[upcoming - 1]}
+
+
+def combined_verdict(race_gate: Optional[dict], records: Sequence[dict], fund_verdict: dict,
+                     next_checkpoint: Optional[dict]) -> dict:
+    """The document's top-level ``verdict``: the race's and the fund test's verdicts combined (section 11.8).
+
+    Owner reading 1: each test is frozen at its own first deciding look, an
+    early answer is final, and section 9 only delays the money. The race's
+    side is tonight's race gate (its ``verdict``); the fund test's is its
+    records. Before any look of either: ``{"text": "no decision yet"}``.
+    While the race waits on a look it has reached but could not complete
+    tonight, the line names no later checkpoint: that look is read again
+    the next night.
+    """
+    from analysis import decision_gate as gate
+    from analysis import verdict
+
+    def inside(day) -> Optional[str]:
+        try:
+            value = verdict.as_date(day)
+        except ValueError:
+            return None
+        return day if verdict.inside_experiment(value) else None
+
+    looks = race_gate.get("looks") if isinstance(race_gate, dict) else None
+    reached = looks_reached(race_gate)
+    race_part = race_gate.get("verdict") if isinstance(race_gate, dict) else None
+    race_part = race_part if isinstance(race_part, dict) else {}
+    decided_at = race_part.get("decided_at")
+    decided_at = decided_at if isinstance(decided_at, int) and not isinstance(decided_at, bool) else None
+    outcome, final_read = None, False
+    for entry in race_part.get("looks") or []:
+        table = entry.get("table") if isinstance(entry, dict) else None
+        if not isinstance(table, dict):
+            continue
+        if entry.get("look") == decided_at:
+            outcome = table.get("outcome")
+        if entry.get("look") == verdict.LOOKS and table.get("complete") is True:
+            final_read = True
+    upcoming = race_gate.get("next") if isinstance(race_gate, dict) else None
+    race_next = None
+    if isinstance(upcoming, dict) and upcoming.get("independent") in [d for d, _ in gate.CHECKPOINTS]:
+        race_next = {"look": [d for d, _ in gate.CHECKPOINTS].index(upcoming["independent"]) + 1,
+                     "estimated": inside(upcoming.get("estimated"))}
+    # A look reached but not complete (its after-tax record waits, or it cannot be read tonight) is
+    # read again the next night: the race waits for that checkpoint, not for the next one not reached.
+    pending = next((entry.get("look") for entry in race_part.get("looks") or []
+                    if isinstance(entry, dict) and isinstance(entry.get("table"), dict)
+                    and entry["table"].get("complete") is False), None)
+    if outcome is None and pending is not None:
+        race_next = {"look": pending, "estimated": None}
+    race_look = max(reached) if reached else None
+    race = {"decided_at": decided_at if outcome is not None else None, "outcome": outcome,
+            "final_read": final_read, "skipped_all": False, "look": race_look,
+            "window_end": inside((looks[race_look - 1] or {}).get("window_end")) if race_look else None,
+            "next": race_next}
+    latest = max(records, key=lambda r: r["look"]) if records else None
+    fund = {"decided_at": fund_verdict.get("decided_at"), "outcome": fund_verdict.get("outcome"),
+            "final_read": any(r["look"] == verdict.LOOKS for r in records),
+            "skipped_all": bool(records) and all(r.get("status") == verdict.FUND_SKIPPED for r in records),
+            "look": latest["look"] if latest else None,
+            "window_end": inside(latest.get("window_end")) if latest else None,
+            "next": ({"look": next_checkpoint["look"], "estimated": next_checkpoint["estimated"]}
+                     if next_checkpoint else None)}
+    return verdict.combined(race, fund)
+
+
 def ic_lines(journal: Path, universe_dir: Optional[Path]) -> dict:
     """The IC report's answered lines, per universe (section 13.9): the production journal and the shadow universe's."""
     from analysis import ic
@@ -1129,7 +1524,7 @@ def build(args: argparse.Namespace, now: datetime, fetchers: Optional[list] = No
     # fixed, but nothing about a fund is computed until calibration's
     # verdict is a pass. Then every fund runs from the fixed start, with the
     # code as merged.
-    funds, checks = None, None
+    funds, checks, fund_test_raw = None, None, None
     fund_start = schedule.FUND_START
     passed = calibration.get("status") == "passed"
     # Section 13.1: the exploratory funds and tests A, B and C only on the
@@ -1182,7 +1577,9 @@ def build(args: argparse.Namespace, now: datetime, fetchers: Optional[list] = No
         funds, checks = run_funds(read.entries, fund_start, final_through, fetcher,
                                   random_funds=args.random, processes=args.processes,
                                   shortable_no=shortable_no, first_cycle=schedule.FUND_FIRST_CYCLE,
-                                  exploratory=bool(new_looks), long_bars=long_bars, rates=rates, votes=votes)
+                                  exploratory=bool(new_looks), long_bars=long_bars, rates=rates, votes=votes,
+                                  fund_test=True)
+        fund_test_raw = funds.pop("_fund_test", None)
         if new_looks:
             rows = [r for r in funds["list"] if r.get("exploratory")]
             records.append({"look": max(new_looks), "made_on": now.date().isoformat(),
@@ -1198,6 +1595,16 @@ def build(args: argparse.Namespace, now: datetime, fetchers: Optional[list] = No
     tax_records = [r for r in previous_tax.get("looks") or [] if isinstance(r, dict)]
     after_tax, tax_series = after_tax_part(now, final_through, snapshots, funds, passed, race_gate,
                                            tax_records, fetchers, rates, fx)
+    # The fund test's verdict (sections 11.6-11.8; the owner's approval of
+    # 6 Oct 2026): each look's record made once, on the night the race's look
+    # is readable, after the same night's after-tax record, and carried
+    # unchanged after. Read from the funds and records above; nothing above
+    # reads it.
+    fund_looks = carried_fund_looks(_read_json(getattr(args, "previous", None)))
+    fund_note = fund_test_part(now, race_gate, fund_looks, passed, funds, fund_test_raw, tax_records,
+                               calibration)
+    fund_verdict = fund_test_verdict(fund_looks)
+    fund_next = fund_test_next(fund_looks)
     if new_looks:
         # The race side, and the table of section 13.5-13.6 over every test with data.
         records[-1]["race"] = checkpoint_race(read.entries, long_bars, now.date(), final_through, fetchers,
@@ -1249,6 +1656,17 @@ def build(args: argparse.Namespace, now: datetime, fetchers: Optional[list] = No
             "first_cycle": schedule.FUND_FIRST_CYCLE.isoformat(),
             # Why nothing is shown yet, when nothing is: the gate, not the date.
             "waiting_for": None if funds else ("calibration" if not passed else "the first session"),
+            # The checkpoint verdict (owner readings 2, 3 and 5): the planned
+            # final sample, each look's frozen record and table, and the
+            # verdict of the first look that decided.
+            "planned_sessions": schedule.FUND_TEST_PLANNED_SESSIONS[-1],
+            # The fund test's own next look and bar (owner reading 5), not the
+            # race's. A new key: next_checkpoint above stays null, as it always
+            # was (the owner's identity condition: only keys are added).
+            "next_look": fund_next,
+            "looks": fund_looks,
+            "verdict": fund_verdict,
+            "note": fund_note,
         },
         "integrity": checks,
         "not_shortable": sorted(shortable_no),
@@ -1267,6 +1685,10 @@ def build(args: argparse.Namespace, now: datetime, fetchers: Optional[list] = No
         # Sections 5c and 11.9 (Amendment 2026-10-02): after Israeli tax and
         # in shekels; each look's after-tax test against the VT fund.
         "after_tax": after_tax,
+        # Section 11.8 (owner reading 1): the race's verdict and the fund
+        # test's, combined; "no decision yet" before any look. The last key,
+        # so it lands just before prices_sha256.
+        "verdict": combined_verdict(race_gate, fund_looks, fund_verdict, fund_next),
     }
 
 

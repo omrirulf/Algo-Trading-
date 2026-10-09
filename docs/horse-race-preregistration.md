@@ -264,9 +264,11 @@ first night the same conditions hold, with the old one kept inside it; a
 record that says the test could not be met (calibration had not passed) is
 never made again. A look that would pick an arm waits for its record, as it
 waits for a price. If calibration has not passed
-on the night the race reaches the look, no fund is run, and the test cannot
+on the first night the look is readable, no fund is run, and the test cannot
 be met at that look: an early look then decides nothing for an arm, and at
-the final look no arm trades.
+the final look no arm trades. This holds for both the fund test's skip
+(sections 11.3 and 11.7) and this record's "could not be met", so the two
+can never disagree. (Amendment 2026-10-06)
 
 **It only stops an arm from winning.** It never decides anything by itself.
 At an early look, "no arm trades" still comes only from the index test
@@ -351,6 +353,10 @@ verdict "not tested in a downturn", and any real-money step starts small.**
   adds the label to the verdict and to the status line.
 - This is a label and a policy. It does not extend the test, move a look,
   or change an outcome.
+- One downturn number: the race's VT figure, for the race, the fund test
+  and the combined answer of section 11.8. If it cannot be measured, the
+  verdict says "downturn not measured" and the owner decides.
+  (Amendment 2026-10-06)
 
 ## 6. What is exploratory and cannot change the decision
 
@@ -633,6 +639,10 @@ The same shape as the race (sections 5, 5a):
 4. Early stops at looks 1 and 2 only, in either direction, only with the bar
    met in the direction the look stops — exactly as section 5a.
 
+The fund test's record at a look is made once and frozen, like the after-tax
+record of section 5c, and made again only if a bug fix moves the look's
+window (the old one kept inside it). (Amendment 2026-10-06)
+
 ### 11.7 Looks: the race's days, the fund test's own bars
 
 The fund test is read **on the same days as the race's looks** — the day
@@ -678,7 +688,10 @@ is skipped because calibration has not passed (11.3), nobody chooses new
 bars: at each look the bar is computed by
 the rule above from the fund sessions actually there, and the number is
 logged in the Amendments table the day it is used. Bars already used at
-earlier looks stay as they were. The planned numbers are pinned in the code
+earlier looks stay as they were. When the bar used differs from the planned
+bar, the verdict prints "bar X (planned Y): log it in the Amendments table",
+and a phone alert tells the owner to log it; the race's bars are fixed, so
+it has no such alert. (Amendment 2026-10-06) The planned numbers are pinned in the code
 (`shadow/schedule.py`, and a test that recomputes them).
 
 ### 11.8 What decides real money (the owner's default)
@@ -689,6 +702,13 @@ its fund beats the VT fund at that look's bar, before and after Israeli tax
 test disagree — different winners, or one of them decides "no arm trades" —
 the answer is the index. And section 9 still holds: no real money in this
 system before the June 2027 verdict, whatever an earlier look says.
+
+When the two decide at different looks: each test stops at its own first
+deciding look and is then frozen. The answer is the index as soon as either
+test says "no arm trades", or the two pick different arms; it is the arm
+when both pick the same one; otherwise "no decision yet". An early answer is
+final; section 9 only delays the money to June 2027. Later looks are still
+shown, for reading only. (Amendment 2026-10-06)
 
 ### 11.9 After-tax and shekel reports (Amendment 2026-10-02; reporting only)
 
@@ -1389,3 +1409,4 @@ started from 23:15; a name already started is finished):
 | 2026-10-06 | **The daily order of the shadow model calls: production, the vote, the universe, the thesis check** (operational; section 13.13; no rule and no number of any test changes) | The owner's order of 2026-10-06. The vote is a registered arm and the universe is descriptive, so a late day must reach the 23:15 UTC cut-off in the universe, not in the vote (the universe's 1-session IC is also one of the IC test's two primary tests, 13.9: a name the cut-off stops is one name fewer in that day's cross-section). `.github/workflows/shadow-universe.yml`: the `vote` job runs first, once the day's production run has finished; `score` (the universe) needs `vote`; `thesis` needs `score`; each starts when the one before it has ended, passed or failed, never after a cancel. Before, the order was the universe, the vote, the thesis check (Amendment 2026-10-04); none of them has run yet. Section 13.13 gives the estimated timeline for a normal day (the vote 15:45 to 18:12 UTC, the universe 18:13 to 21:39, the weekly thesis check 21:40 to 21:54) and a slow day (160 seconds a call: 16:12 to 19:02, 19:03 to 22:50, 22:51 to 23:09), and what the 23:15 cut-off does to the lines it cuts in each job. The cut-off itself is unchanged. |
 | 2026-10-06 | **The bar N sets, on the graveyard page; production's model request pinned by a test** (documentation and tests only; no rule changes) | Asked by the owner on 2026-10-06. `docs/research/graveyard.md` shows the t a result needs for its Deflated Sharpe Ratio to pass 0.95 (section 13.6), computed exactly (`analysis/multiple_tests.py`, `dsr_t_bar`) for N = 18, 41 and 43 at the three looks: at 2027-03-22 (121 sessions), t 3.55 for N = 18 and t 3.92 for N = 43. `tests/test_production_request_identity.py` shows that the request production sends to the model is byte-identical before and after the voting arm's pull request, for a fixed input: the SHA-256 of every request body (the key is in a header, never in the body), the prompt fingerprint (6c59e07de87e) and production's parsing of fixed answers equal the values computed on main before it (commit 1ac931f). The output identity check (`.github/workflows/output-identity-check.yml`) now reads each side's command line from that side's own `funds.yml`: it had kept PR #140's two command lines, so after #140 was merged it compared main without the shekel rate table against main with it, and it did not pass the vote's and the thesis check's journals; the rate table is fetched once and given to every side. |
 | 2026-10-06 | **Shadow stock universe: rule (2) pooled over five weekday checks** (changes a rule written only for the list; no rule of the race or of the IC test changes) | Decided by the owner on 2026-10-06, after the first check (the 2026-10-05 row) left 19 names under 30%, most on 0 to 7 headlines. Rule (2) on the card and in section 13.9 now reads "pooled over five weekday checks": the same check (`.github/workflows/universe-news-check.yml`) on four more weekdays, five in total, before the list freezes on 2026-12-22, spread over at least two different weeks where possible, with 2026-10-05 the first; the five are pooled for each name (`analysis/news_pooled.py`; one file a day in `docs/research/news-checks/`). A name is replaced only if its pooled share of relevant headlines is under 30% with at least 10 pooled headlines, or if it had zero headlines on all five days (a day with no answer counts as zero: this includes ZTO if it never answers); a name with fewer than 10 pooled headlines is kept unless it had zero on all five days. The rule decides nothing before the fifth check. A replacement comes from the same sector or ADR region, is not a production name, passes the verify check, and passes the news check (at least 30% relevant) on at least one weekday. STT and IRM are kept. Every replacement and its reason is recorded on the card. It changes a rule written only for the list, and it is made before any score of these names exists: the universe is off until 2027-01-01, and no price, return or score of any name was looked at. |
+| 2026-10-06 | **Checkpoint verdict: the layout approved, the five readings decided, built** (no rule of the race or the fund test changes; the readings settle what the text did not say) | The owner approved the layout of `docs/research/checkpoint-verdict-plan.md` on 2026-10-06: "Verdict layout (Document 2): approved. My answers to the five open readings: yes to all five, as you proposed." The five readings, as decided: (1) each test stops at its own first deciding look and is then frozen; the answer is the index as soon as either test says "no arm trades", or the two pick different arms, the arm when both pick the same one, otherwise "no decision yet"; an early answer is final, and section 9 only delays the money to June 2027 (section 11.8); (2) the fund-test record is made once and frozen, like the after-tax record, and made again only if a bug fix moves the look's window, the old one kept inside it (section 11.6); (3) calibration is judged on the first night the look is readable, for both the fund-test skip and the race's "unavailable" after-tax record, so the two can never disagree, and `skipped_look` in `shadow/fund_test.py` stays a forecast only (section 5c); (4) one downturn number, the race's VT figure, for both tests and the combined line, and if it cannot be measured the verdict says "downturn not measured" and the owner decides (section 5d); (5) the 4 Funds page's fund-test banner shows fund sessions of 180 and the fund test's own next bar, not the race's (a display fix). Addition 1: when the bar used at a fund-test look differs from the planned bar, a phone alert tells the owner to log it in this table (section 11.7); the fund test only, since the race's bars are the fixed 3.47, 2.45 and 2.00. Addition 2: one printed example of each table made from test data (`tests/verdict_examples.py`), every line marked "TEST DATA" and every date in 2099, shown to the owner before the build is merged, with tests that fail if any example value can appear in a real output. Built in `analysis/verdict.py`, `analysis/horse_race.py`, `shadow/run.py`, the 4 Funds page and `.github/workflows/scoring-prices.yml`; the race's decision code and its words are unchanged. **Made before any checkpoint result existed**: the first look is estimated for 2026-12-22, no look has been reached, and no fund result has been computed (calibration is still running). |
