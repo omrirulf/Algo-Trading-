@@ -241,6 +241,36 @@ def test_a_failed_search_is_named_apart_and_a_line_failed_before_asking_or_witho
     assert week["news"] == {"names": 1, "no_headlines": ["EWN"], "search_failed": ["EWN"]}
 
 
+def test_the_failed_news_fetches_of_the_week_are_counted_per_line_and_per_day():
+    """The owner, 6 Oct 2026: once a week, how many of production's own news fetches failed. A report only."""
+    monday = MONDAYS[0]
+    gap = [f"{health.NEWS_GAP_PREFIX}: Bright Data returned an empty body with its 200; nothing to parse"]
+    other_gap = ["fundamentals unavailable: yfinance said no"]
+    lines = [line(d, "XLB", headlines=["a"]) for d in _days(monday)]
+    lines += [line(monday, "DBC", headlines=[], gaps=gap), line(monday, "TLT", headlines=[], gaps=gap)]
+    lines += [line(monday + timedelta(days=2), "DBC", None, held=True, headlines=[], gaps=gap)]   # held: counted
+    lines += [line(monday + timedelta(days=1), "EWU", headlines=[], gaps=other_gap)]           # not a news gap
+    lines += [line(monday, "CTX", None, error="yfinance fell over", stage="context", headlines=[])]  # never searched
+    lines += [line(monday, "OLD", headlines=None)]                                              # cannot say
+    week = build(lines, MONDAYS[1])["weeks"][0]
+    days = [d.isoformat() for d in _days(monday)]
+    assert week["news_fetches"] == {
+        "lines": 9, "failed": 3, "names": ["DBC", "TLT"],
+        "by_day": {days[0]: [2, 3], days[1]: [0, 2], days[2]: [1, 2], days[3]: [0, 1], days[4]: [0, 1]}}
+    assert drift.news_fetches_line(week["news_fetches"]) == (
+        "production news fetches that failed: 3 of 9 lines (by day: Mon 2, Tue 0, Wed 1, Thu 0, Fri 0)")
+    assert "- production news fetches that failed: 3 of 9 lines (by day: Mon 2, Tue 0, Wed 1, Thu 0, Fri 0)" in drift.render_week(week)
+    # A week with a day missing (Thanksgiving 2026) still says which day each count is.
+    holiday = {"lines": 320, "failed": 3, "names": ["A"], "by_day": {
+        "2026-11-23": [1, 80], "2026-11-24": [0, 80], "2026-11-25": [2, 80], "2026-11-27": [0, 80]}}
+    assert drift.news_fetches_line(holiday) == (
+        "production news fetches that failed: 3 of 320 lines (by day: Mon 1, Tue 0, Wed 2, Fri 0)")
+    # Not a number with a band: it can never alert.
+    assert "news_fetches" not in week["values"] and not any("fetch" in key for key in drift.NUMBERS)
+    assert drift.news_fetches_line({"lines": 0, "failed": 0, "names": [], "by_day": {}}) is None
+    assert drift.news_fetches_line(None) is None
+
+
 def test_a_prompt_that_failed_to_render_still_counts_the_news_it_gathered():
     """A failed gather journals an empty context; a failed render journals what was gathered, headlines included."""
     monday = MONDAYS[0]

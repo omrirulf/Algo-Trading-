@@ -38,6 +38,14 @@ Each week, from the journal alone:
   once (then the empty news may be the vendor's fault). A report only: no
   band, no alert, and nothing in the cycle reads it. The phone lists at most
   12 names; the Markdown report lists them all.
+- **production news fetches that failed** (the owner's request of 6 Oct
+  2026): how many of the week's lines had a failed news search (the search
+  still failed after production's own retry, so the name was judged without
+  news), of how many lines searched, with each day's count. Held lines count;
+  a line that failed before the model was asked with no headline does not
+  (it never searched). For scale: since 2026-09-23 it was 4, 12, 4, 2, 5, 1,
+  2, 0 and 5 names a day out of 80. A report only: no band, no alert, and
+  nothing changes in production.
 
 Held lines and lines that failed before the model was asked are left out of
 the answer numbers: the question is what the model did with the calls it

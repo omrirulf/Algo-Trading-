@@ -44,7 +44,9 @@ and adds each call's measured ``usage.cost_usd`` and each news request at
 ``NEWS_USD_PER_REQUEST`` (counted by ``orchestrator.news.requests_sent`` and
 written on the line as ``news_requests``). Before each name and each new call
 the total is checked; at the cap no new name starts and the run ends with
-``cap_reached`` (exit code 3, so the workflow can alert the owner's phone). Calls run four at a time, so the check-and-reserve is done
+``cap_reached`` (exit code 3, so the workflow can alert the owner's phone). Calls run four names at a time
+(of those, at most two search the news at once, and a failed search is asked up to four times:
+``orchestrator.universe_news``, the owner's decision of 6 Oct 2026), so the check-and-reserve is done
 under a lock, and calls already in flight may finish slightly above the cap:
 the summary reports the real total. An answer with no known price is charged
 at the estimate, and so is a call that failed with no usage (it is billed for

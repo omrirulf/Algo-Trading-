@@ -201,3 +201,18 @@ def test_a_long_list_is_capped_on_the_phone_and_an_old_record_shows_no_line(tmp_
     assert "40 of 80 (T00," in text and "T11, …)" in text and "T12" not in text
     old = weekly.phone(WEEK, URL, logs(tmp_path, drift=drift_record(), digest=digest_record()))
     assert "no headlines" not in old
+
+
+def test_the_phone_and_the_markdown_count_the_failed_news_fetches(tmp_path):
+    """The owner, 6 Oct 2026: production's failed news fetches once a week, report only (5 of 80 on 2026-10-05)."""
+    record = drift_record()
+    record["weeks"][0]["news_fetches"] = {"lines": 400, "failed": 10, "names": ["DBC", "TLT"],
+                                          "by_day": {"2026-09-28": [2, 80], "2026-09-29": [5, 80],
+                                                     "2026-09-30": [1, 80], "2026-10-01": [2, 80],
+                                                     "2026-10-02": [0, 80]}}
+    folder = logs(tmp_path, drift=record, digest=digest_record())
+    assert "Production news fetches that failed: 10 of 400 lines (by day: Mon 2, Tue 5, Wed 1, Thu 2, Fri 0)" in weekly.phone(WEEK, URL, folder)
+    assert "- production news fetches that failed: 10 of 400 lines (by day: Mon 2, Tue 5, Wed 1, Thu 2, Fri 0)" in weekly.markdown(
+        WEEK, folder)
+    old = weekly.phone(WEEK, URL, logs(tmp_path, drift=drift_record(), digest=digest_record()))
+    assert "news fetches" not in old
