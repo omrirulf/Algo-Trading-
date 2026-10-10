@@ -1,0 +1,1560 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#8a5a1e" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#15171c" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="The four-fund experiment: simulated funds that run the real execution engine and position manager against a simulated broker. Simulated, not real money.">
+<title>Algo Trading 4 Funds</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<!--
+  THE CONTRACT: every field this page reads, and its unit.
+  Units throughout: returns, gaps and shares are FRACTIONS (0.012 is 1.2%),
+  money is DOLLARS, days are ISO dates (2026-10-20), times are ISO date-times
+  (UTC unless they carry an offset), counts are plain integers.
+
+  logs/funds.json, written nightly by shadow/run.py (shadow/calibration.py
+  writes the calibration part):
+    generated_at                 ISO date-time the record was written
+    final_through                ISO date of the last final close it covers
+    simulated                    must be true, or the page refuses the file
+    calibration.status           not_started | running | passed | failed |
+                                 stopped (more late-run days than the owner's
+                                 limit: neither a pass nor a fail)
+    calibration.start            ISO date, or null before it starts
+    calibration.days_done        closes compared so far (count)
+    calibration.days_needed      closes the rule needs (count: 15, or the last
+                                 fix + 5 days when that is later, so it can
+                                 exceed 15)
+    The owner's fail rule (25 Sep 2026); an older record lacks all of these
+    and the page then says nothing about fixes:
+    calibration.days_passed      calibration days passed so far (count), from
+                                 the first, while every day-by-day check held
+    calibration.fixes[]          {day ISO date, what text}: every fix merged
+                                 after a fail
+    calibration.last_fix         ISO date of the latest fix, or null
+    calibration.days_since_fix   calibration days dated after the last fix
+                                 (count), or null with no fix
+    calibration.days_after_fix_needed  days needed after the last fix (count, 5)
+    calibration.end_estimate     ISO date calibration can end if nothing more
+                                 fails, or null before it starts or once it
+                                 is stopped
+    calibration.fund_test_plan   null, or {start ISO date of the fund test's
+                                 first session (fixed: 2026-09-29), first_cycle
+                                 ISO date of the cycle it acts on first,
+                                 skipped[] true|false per look (a look on or
+                                 before calibration's end is skipped: not read,
+                                 no alpha spent), bars[] the three t-statistic
+                                 bars by the spending rule (null for a skipped
+                                 look), registered[] the planned bars,
+                                 registered_start ISO date, matches_registered
+                                 true|false}; an amber note when false
+    calibration.pass_rule.text[]      the rule: a heading line, then
+                                      conditions already numbered "1." to "5."
+    calibration.pass_rule.approved    true once the owner approved it
+    calibration.pass_rule.verdicts[]  optional: header and "Note:" lines, then
+                                      "N. condition: PASS|FAIL|PENDING (detail)"
+    calibration.series[]         {day ISO date, sim dollars, real dollars or null,
+                                  diff_pct fraction or null}
+    calibration.differences[]    {day ISO date, ticker, real text, sim text, reason text}
+    calibration.metrics          max_abs_gap_pct fraction, tracking_error_pct
+                                 fraction a day, matched_share fraction,
+                                 unexplained count
+    calibration.holding_days     median, min, max, open_median in trading days;
+                                 closed a count of positions
+    calibration.problems[]       optional: text lines, shown in the warning card
+    Late runs (the owner's decision of 25 Sep 2026); an older record lacks
+    all of these and the page then says nothing about late runs:
+    calibration.mirrored[]       {day ISO date the real run met a closed market,
+                                  ticker text, or null for a ladder pass (a
+                                  pass over the whole book), at ISO date-time,
+                                  what "entry" | "ladder pass", reason text}:
+                                  what the calibration copy did not do because
+                                  the real account could not; never a
+                                  difference, since neither book traded
+    calibration.mirrored_days[]  ISO dates those fell on
+    calibration.mirrored_day_count  count of those days
+    calibration.mirror_limit     the owner's limit (count, 2): more days than
+                                 this stop calibration
+    calibration.stop_reason      text while status is stopped, else null;
+                                 shown on the card and in the warning card
+    funds                        null, or {start ISO date, days[] ISO dates,
+                                 list[], band}; drawn only when calibration passed
+    funds.list[]                 {name model|momentum|hybrid|vt|
+                                  model_by_conviction|model_sized|
+                                  model_same_day, label,
+                                  equity[] dollars per day, total_return fraction,
+                                  vs_vt fraction (difference of total returns,
+                                  null for vt), max_drawdown fraction (positive),
+                                  trades count, win_rate fraction or null,
+                                  open_positions count, cash dollars}
+    funds.list[].exploratory     true for the three exploratory funds
+                                 (model_by_conviction, model_sized,
+                                 model_same_day): they are
+                                 kept out of the chart, the table and the fund
+                                 cards, and shown only against the model fund;
+                                 missing in older files (then false)
+    funds.list[].compare_to      exploratory only: the fund it is compared with
+                                 ("model")
+    funds.list[].vs_model        exploratory only: {total_return_diff fraction
+                                 (its total return minus the model's),
+                                 max_drawdown fraction (positive),
+                                 model_max_drawdown fraction (positive),
+                                 mean_daily_diff fraction a day or null,
+                                 t Newey-West t-statistic or null, days count}
+    funds.list[].not_entered     model_same_day only: {no_price, outside_hours,
+                                 other_day, total} counts of the model's
+                                 directional lines it did not enter: no usable
+                                 recorded price, recorded outside regular New
+                                 York hours, recorded on another day
+    funds.list[].sides          null for vt, else {long: Side, short: Side},
+                                 a Side {n count of closed trades, mean_return
+                                 fraction or null, hit_rate fraction or null,
+                                 too_few true below 20 trades: then "too few
+                                 (n=...)" is shown instead of the numbers}
+    funds.band                   {p5[] dollars, p95[] dollars, funds count of
+                                  coin-flip funds}
+    fund_test.status             not_started | running
+    fund_test.start              ISO date of the first fund session (fixed,
+                                 2026-09-29), or null in older files
+    fund_test.first_cycle        ISO date of the cycle the funds act on first
+                                 (2026-09-28); missing in older files
+    fund_test.waiting_for        "calibration" while calibration has not passed
+                                 (no fund result is calculated or shown until
+                                 then), "the first session" after it, or null
+                                 while running; missing in older files
+    fund_test.independent        count of independent days, or null (no longer
+                                 shown: the banner counts fund sessions)
+    fund_test.sessions           fund sessions so far (count)
+    fund_test.next_checkpoint    always null (kept as it was; the fund test's
+                                 own next look is fund_test.next_look below)
+    The checkpoint verdict (docs/research/checkpoint-verdict-plan.md, the
+    owner's approval of 6 Oct 2026); an older record lacks all of these and
+    the page then draws no verdict card, and the banner falls back to the
+    race's next look:
+    fund_test.planned_sessions   the planned final sessions (count, 180)
+    fund_test.next_look          null once every look has a record, else {look
+                                 1|2|3, estimated ISO date (the planned look
+                                 day), bar t-statistic by the spending rule of
+                                 11.7 from the looks read so far (or null),
+                                 planned_bar the registered bar}: the fund
+                                 test's own next look, never the race's
+    fund_test.looks[]            one frozen record per look: {look 1|2|3,
+                                 made_on ISO date, made_at ISO date-time (the
+                                 making run's generated_at; read and owner
+                                 looks), window_end ISO date, status
+                                 read | skipped | owner, bar and planned_bar
+                                 t-statistics and bar_differs true|false (read
+                                 looks only), table Table}
+    fund_test.verdict            {text, decided_at 1|2|3 or null, outcome arm,
+                                 "none" or null}: the first deciding look's
+    fund_test.note               text or null: why no record was made tonight
+    verdict                      the combined line (section 11.8): {text} before
+                                 any look, then {text, race, fund_test, line,
+                                 note}, all text
+    integrity                    null, or {four:{ok, problems[], data_holes,
+                                 data_hole_examples[]}, coin:{...the same}};
+                                 problems shown when ok is false; data_holes
+                                 (a count of ticker-days with no price bar)
+                                 shown as a note when above 0
+    integrity.four               covers the four funds and the three exploratory
+                                 ones (model_by_conviction, model_sized,
+                                 model_same_day): the key keeps its name, and
+                                 each problem names its fund
+    integrity.coin.order_days    optional: {median, p5, p95} days (counts, or null)
+                                 on which a coin-flip fund ran out of room before
+                                 the end of its signal list; shown with the fund
+                                 lines, only once calibration passed
+
+  Two reports that are not fund results, shown whether or not calibration
+  has passed (the owner's decisions of 26 Sep 2026); missing in older files
+  (then the card is not drawn):
+    price_gaps                   null, or {from ISO date, through ISO date,
+                                 tickers count of watchlist tickers, limit
+                                 fraction (0.02), months[]}
+    price_gaps.months[]          {month "YYYY-MM", sessions count, missing count
+                                  of ticker-days with no price bar, share
+                                  fraction = missing / (tickers x sessions),
+                                  over true above the limit, by_day {ISO date:
+                                  count}}; a month over the limit is marked
+    held_names                   {from ISO date, days[]}
+    held_names.days[]            {day ISO date (a UTC cycle day), names count
+                                  of names the paper account held so no fund
+                                  could trade them, lines count of held lines,
+                                  of count of names journalled that day}
+
+  "How often the buying order mattered" (a report only; nothing changes the
+  order). An OrderSummary is:
+    {cycle_days  count of days a cycle ran,
+     days        count of those days the book ran out of room (cash, gross
+                 exposure, sleeve budget, an exposure group, the stock-market
+                 limit, the position count) before the end of the signal list,
+     skipped     count of signals skipped for lack of room,
+     outranked_days  count of days a skipped signal had a higher conviction
+                 than one that was bought,
+     by_kind     {kind text: count of skipped signals},
+     list[]      chronological {day ISO date,
+                   bought[]  {ticker, conviction},
+                   skipped[] {ticker, conviction, kind text, outranks[] tickers
+                              bought that day with a lower conviction}}}
+    conviction is the signal's score from 0 to 1 (shown to 2 decimals, not a
+    percent), or null.
+  Where the page reads it:
+    order_matters.real           OrderSummary for the real paper account; may be
+                                 missing in older files (then the card is not drawn)
+    calibration.order_matters    OrderSummary for the calibration copy; present
+                                 once calibration has started
+    funds.list[].order_matters   OrderSummary per fund; null for vt; shown only
+                                 once calibration passed
+
+  After Israeli tax and in shekels (pre-registration sections 5c and 11.9,
+  the owner's decisions of 2 Oct 2026); an older record lacks all of these
+  and the page then draws nothing for them. Money in SHEKELS is marked _ils:
+    after_tax                    null, or the part below
+    after_tax.paper              null, or a TaxView for the real paper account
+    after_tax.funds              null until calibration passed, then {model,
+                                 momentum, hybrid, vt: TaxView}
+    after_tax.fx                 {available true|false, reason text when false,
+                                  source text, first/last ISO dates, counts
+                                  {boi, ecb, carried}, fallback_days[] [ISO
+                                  date, source], rates_sha256 text}
+    after_tax.paper_lots         {checked true|false, mismatches[] tickers
+                                  whose rebuilt lots differ from the positions}
+    after_tax.looks[]            {look 1|2|3, made_on ISO date, status ready |
+                                  unavailable, reason text, tests {model,
+                                  momentum, hybrid: {t, days, mean_daily_diff}}}
+    after_tax.breakeven          {years, growth fraction, dividend_yield
+                                  fraction, extra_per_year fraction}: for
+                                  information only
+  Counters until the checkpoints (pre-registration sections 13.9 and 13.10;
+  never a result before a checkpoint); an older record lacks them:
+    exploratory.counters.ic      {production, shadow: {answered_lines count,
+                                  lines_with_score {score: count}, line_days
+                                  count}}
+    exploratory.counters.regimes {sessions count, first/last ISO dates, trend
+                                  {above, below, unknown: count}, vol {low,
+                                  mid, high, unknown: count} or the text
+                                  "cut-offs not fixed yet"}
+  A TaxView is {from, through ISO dates, days count,
+                usd {start, equity, after_tax DOLLARS, return,
+                     after_tax_return fractions},
+                ils {start, equity, after_tax SHEKELS, return,
+                     after_tax_return, from_usd_ils, after_tax_from_usd_ils
+                     fractions},
+                tax_ils {paid_so_far, if_sold_today SHEKELS},
+                usd_ils {start, end rates, change fraction}, unpriced[]}.
+
+  logs/race_gate.json, written nightly by analysis/horse_race.py (its gate-json
+  option):
+    generated_at                 ISO date-time the record was written
+    status_line                  text, shown once the race has decided
+    independent, of              independent days so far, and needed (count, 60)
+    trading_days                 trading days the "of" stands for (count, 180)
+    decided                      true once a look has decided
+    outcome_text                 text, or null
+    next                         null, or {independent count, estimated ISO date
+                                 or null, bar t-statistic}
+    looks[]                      {independent count, bar t-statistic, reached,
+                                  outcome text or null, reason text}
+    The owner's two race reports (25 Sep 2026), exploratory and report only;
+    missing in older files (then the card is not drawn). A Split is
+    {n count of trades, mean_net fraction after costs or null, hit_rate
+    fraction or null, too_few true below 20 trades: then "too few (n=...)"
+    is shown instead of the numbers}.
+    report_since                 ISO date both reports count trades from
+    conviction_groups            {arm: [Split + group text]}, per arm model,
+                                 momentum, hybrid, the groups in the order
+                                 "0.30-0.40", "0.40-0.50", "0.50-0.60", "0.60+"
+    sides                        {arm: {long: Split, short: Split}}, per arm
+                                 model, momentum, hybrid, random
+    verdict                      the race's checkpoint verdict; missing in older
+                                 files (then nothing is drawn for it): {text}
+                                 before any look, then {text, decided_at 1|2|3
+                                 or null, looks[] {look, made_on ISO date,
+                                 window_end ISO date, table Table,
+                                 differs_tonight text when tonight's data
+                                 reads a frozen look differently}}
+
+  A Table (analysis/verdict.py, table_json) is {kind race | fund_test, look,
+  title text, rows[] {n "1".."9" or "→", rule, measured, value, bar, result:
+  all text, shown as written}, verdict text, complete true|false, status,
+  outcome}. A table with no rows (a skipped look) is its title and verdict.
+
+  Not read here: funds.json metrics.timing, not_shortable,
+  not_shortable_since, calibration.fund_test_plan.sessions, .exact and
+  .registered_sessions; race_gate.json registered,
+  outcome, next.entry_days.
+-->
+<style>
+/* The tokens and both dark-mode blocks are the desk's (template.html), copied
+   so the two pages of the site read as one app. The chart colours are added
+   on top: three fund hues checked for colour-blind separation on these
+   surfaces, VT in the secondary ink so the index reads as the yardstick
+   rather than a fourth contender, and a band fill one step off the card. */
+:root{
+  --bg:#f5f4f0;--surface:#ffffff;--surface-2:#eeece6;--line:#d9d6cd;--ink:#1d1f24;--ink-2:#5b5f6b;--ink-3:#676b77;
+  --accent:#8a5a1e;--accent-ink:#ffffff;
+  --good:#276f45;--good-bg:#e3f1e8;--warn:#8f5d00;--warn-bg:#f7edd3;--bad:#b3352b;--bad-bg:#f8e2df;
+  --bar:#cfcbc0;--bar-fill:#8a5a1e;
+  --sans:"Source Sans 3",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --s-model:#2a78d6;--s-momentum:#eb6834;--s-hybrid:#15996c;--s-vt:var(--ink-2);--s-real:#b9b6ad;
+  --band:#e9e6dd;--grid:#ecebe6;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#15171c;--surface:#1d2027;--surface-2:#252932;--line:#343945;--ink:#ecebe6;--ink-2:#aab0bd;--ink-3:#8b919e;
+    --accent:#d9a45b;--accent-ink:#15171c;
+    --good:#6fc48f;--good-bg:#1e3327;--warn:#e0b25a;--warn-bg:#3a2f15;--bad:#f08a7e;--bad-bg:#3d211e;
+    --bar:#343945;--bar-fill:#d9a45b;
+    --s-model:#3987e5;--s-momentum:#d95926;--s-hybrid:#199e70;--s-real:#5d6370;
+    --band:#2b3039;--grid:#282c35;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#15171c;--surface:#1d2027;--surface-2:#252932;--line:#343945;--ink:#ecebe6;--ink-2:#aab0bd;--ink-3:#8b919e;
+  --accent:#d9a45b;--accent-ink:#15171c;
+  --good:#6fc48f;--good-bg:#1e3327;--warn:#e0b25a;--warn-bg:#3a2f15;--bad:#f08a7e;--bad-bg:#3d211e;
+  --bar:#343945;--bar-fill:#d9a45b;
+  --s-model:#3987e5;--s-momentum:#d95926;--s-hybrid:#199e70;--s-real:#5d6370;
+  --band:#2b3039;--grid:#282c35;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.45;padding-inline:16px;padding-block:12px 40px;max-width:1080px;margin-inline:auto;overflow-wrap:break-word}
+h1,h2,h3{text-wrap:balance;margin:0}
+h1{font-size:1.35rem;font-weight:700;letter-spacing:-.01em}
+h2{font-size:1.02rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-2);margin-block:28px 10px}
+h3{font-size:.95rem;font-weight:700}
+p{margin:6px 0 0}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--ink-2)}.faint{color:var(--ink-3)}.small{font-size:.88rem}
+header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 16px;padding-block:6px 14px;border-bottom:1px solid var(--line)}
+#fresh{font-size:.9rem}
+.nav{font-size:.88rem;margin-bottom:2px}
+.nav a{display:inline-block;padding-block:8px;color:var(--accent);font-weight:600}
+.nav a[aria-current="page"]{color:var(--ink);font-weight:700;text-decoration:none}
+.title{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
+/* The label the owner asked to be unmissable: a boxed badge beside the
+   title, in the caution colours, on every state of the page. */
+.sim{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--warn);background:var(--warn-bg);color:var(--ink);border-radius:8px;padding:2px 10px;font-weight:700;font-size:.95rem}
+.sim svg{flex:none;color:var(--warn)}
+/* A link to the docs page that explains a part: a small pill with the
+   arrow every link that leaves the app carries, and a hidden note for
+   screen readers. Tall enough to tap (WCAG 2.5.8: 24px), with room
+   between pills. */
+a.doc{display:inline-flex;align-items:center;gap:5px;min-height:28px;font-size:.8rem;font-weight:600;color:var(--accent);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:3px 11px;text-decoration:none;white-space:nowrap;vertical-align:middle}
+a.doc:hover{border-color:var(--accent)}
+a.doc svg,.nav a.ext svg{flex:none;margin-left:1px}
+.nav a.ext{display:inline-flex;align-items:center;gap:3px}
+.docs{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+header + .docs{margin-top:12px}
+.banner{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:8px;padding:10px 12px;margin-top:10px;font-size:.95rem;overflow-wrap:anywhere}
+.banner.idle{border-left-color:var(--ink-3)}
+.banner.decided{border-left-color:var(--good)}
+.banner .sub{font-size:.84rem;color:var(--ink-3);margin-top:2px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.card + .card,.chart + .card,.card + .chart,.tiles + .card,.card + .tiles{margin-top:10px}
+.placeholder{border-style:dashed;text-align:center;padding:22px 16px}
+.placeholder strong{display:block;font-size:1.05rem}
+.st{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
+.chip{display:inline-block;border-radius:999px;padding:1px 8px;font-size:.75rem;font-weight:600;letter-spacing:.02em;vertical-align:middle}
+.chip.idle{background:var(--surface-2);color:var(--ink-2)}
+.chip.run{background:var(--warn-bg);color:var(--warn)}
+.chip.good{background:var(--good-bg);color:var(--good)}
+.chip.bad{background:var(--bad-bg);color:var(--bad)}
+.bar{height:8px;background:var(--bar);border-radius:4px;overflow:hidden;margin-top:8px}
+.bar > i{display:block;height:100%;background:var(--bar-fill);border-radius:4px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:10px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.tile .label{font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-2)}
+.tile .value{font-size:1.2rem;font-weight:600;margin-top:2px;overflow-wrap:anywhere}
+.tile .sub{font-size:.82rem;color:var(--ink-3);margin-top:2px}
+/* The rule's lines carry their own numbers ("1." to "5."), so the list adds
+   none; the number sits in its own column so a long condition wraps under
+   its text, not under the number. */
+.rule-head{font-size:.93rem;margin-top:8px}
+.rule{list-style:none;margin:8px 0 0;padding:0;font-size:.93rem}
+.rule li{display:flex;gap:6px}
+.rule li > .n{flex:none;min-width:1.3em}
+.rule li + li{margin-top:4px}
+.verdicts{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:5px;font-size:.92rem}
+.verdicts li{display:flex;align-items:baseline;gap:8px}
+.verdicts .chip{flex:none;min-width:5.4em;text-align:center}
+/* Problems the record reports: boxed in the caution colours like the
+   "Simulated" badge, and in the alarm colours when a check failed. */
+.alert{background:var(--warn-bg);border:2px solid var(--warn);border-radius:10px;padding:10px 14px;margin-top:10px;color:var(--ink);overflow-wrap:anywhere}
+.alert.bad{background:var(--bad-bg);border-color:var(--bad)}
+.alert h3{display:flex;align-items:center;gap:8px}
+.alert h3 svg{flex:none;color:var(--warn)}
+.alert.bad h3 svg{color:var(--bad)}
+.alert ul{margin:6px 0 0;padding-left:1.2em;font-size:.92rem}
+.alert li + li{margin-top:3px}
+.alert .where{font-weight:600}
+.alert details.data summary{color:var(--ink)}
+.chart{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 12px 8px;margin-top:10px}
+.chart .cap{font-size:.86rem;color:var(--ink-2);margin-top:2px}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:.86rem;margin:8px 0 2px;padding:0;list-style:none}
+.legend li{display:inline-flex;align-items:center;gap:6px}
+.legend svg,.tip svg,.fund .head svg{flex:none}
+.plot{position:relative;touch-action:pan-y;margin-top:4px;border-radius:6px}
+.plot:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.plot > svg{display:block;width:100%;height:auto}
+.plot text{font-family:var(--sans);font-size:12px;fill:var(--ink-3)}
+.plot text.end{fill:var(--ink-2);font-weight:600}
+.plot .grid{stroke:var(--grid);stroke-width:1}
+.plot .axis{stroke:var(--line);stroke-width:1}
+.plot .lead{stroke:var(--ink-3);stroke-width:1}
+.plot .cross{stroke:var(--ink-3);stroke-width:1}
+.tip{position:absolute;top:0;left:0;pointer-events:none;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:.8rem;box-shadow:0 2px 10px rgba(0,0,0,.14);z-index:2;max-width:220px}
+.tip[hidden]{display:none}
+.tip .d{color:var(--ink-2);font-weight:600;margin-bottom:2px}
+.tip .r{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.tip .r b{font-family:var(--mono);font-weight:600;font-variant-numeric:tabular-nums}
+.tip .r span{color:var(--ink-2)}
+details.data{margin-top:8px;font-size:.88rem}
+details.data summary{cursor:pointer;color:var(--ink-2);font-weight:600;padding-block:6px}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
+table{border-collapse:collapse;width:100%;font-size:.84rem}
+th,td{padding:4px 8px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--ink-2);font-weight:600}
+td{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.looks{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:4px}
+.diffs{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px;margin-top:8px}
+.diff{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:.92rem}
+.diff .head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:2px 10px}
+.diff .kv{margin-top:4px}
+.diff .why{color:var(--ink-2);font-size:.86rem;margin-top:4px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin:8px 0 0;font-size:.9rem}
+.kv dt{color:var(--ink-2)}
+.kv dd{margin:0;text-align:right;overflow-wrap:anywhere}
+.diff .kv dd{text-align:left}
+.funds{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:10px}
+.funds > .card{margin:0}
+.fund .head{display:flex;align-items:center;gap:8px;font-weight:700}
+.fund .big{font-size:1.45rem;font-weight:600;margin-top:4px}
+.fund .big + .faint{font-size:.82rem}
+.up{color:var(--good)}.down{color:var(--bad)}
+footer{margin-top:36px;padding-top:12px;border-top:1px solid var(--line);font-size:.84rem;color:var(--ink-3);display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
+button{font:inherit;font-size:.88rem;font-weight:600;color:var(--accent-ink);background:var(--accent);border:0;border-radius:8px;padding:8px 16px;min-height:40px;cursor:pointer}
+button:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button[disabled]{opacity:.55;cursor:default}
+#note{font-size:.84rem;color:var(--ink-3)}
+/* How often the buying order mattered: plain lines, chips per kind, and the
+   days in a list whose ticker runs wrap between tickers on a phone. */
+.order{overflow-wrap:anywhere}
+.order .kinds{display:flex;flex-wrap:wrap;gap:4px 6px;margin-top:8px}
+.order .lines{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:3px;font-size:.93rem}
+.odays{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:8px}
+.odays > li{border-top:1px solid var(--line);padding-top:6px}
+.odays .d{font-weight:600}
+.odays .row{display:flex;gap:6px;margin-top:2px}
+.odays .row > .k{flex:none;color:var(--ink-2);min-width:4.6em}
+.odays .row > .v{min-width:0}
+.odays .t{white-space:nowrap}
+.odays .t .num{color:var(--ink-2);font-size:.86em}
+.odays .kind{color:var(--ink-3)}
+.odays mark{background:var(--warn-bg);color:var(--ink);border-radius:4px;padding:0 4px;font-weight:600;white-space:normal}
+/* The fail rule's facts, one per line under the progress bar, and the amber
+   note when the fund test's plan has moved off what was registered. A fix's
+   text is free text from the record and may hold one long word (a code path,
+   a link); a grid column is as wide as its widest word unless the word may
+   break, so it breaks anywhere here rather than push the page sideways. */
+.facts{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:2px;font-size:.93rem;overflow-wrap:anywhere}
+.amber{background:var(--warn-bg);border-left:4px solid var(--warn);border-radius:6px;padding:6px 10px;margin-top:6px;font-size:.9rem;color:var(--ink);overflow-wrap:anywhere}
+/* Longs against shorts: one quiet line at the foot of a fund's card. */
+.sides{font-size:.84rem;color:var(--ink-2);margin-top:8px;padding-top:6px;border-top:1px solid var(--line)}
+/* The exploratory funds and the race's two reports sit side by side where
+   there is room and stack on a phone; min() keeps a column from ever being
+   wider than the card, so the page never scrolls sideways. */
+.xfunds{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));gap:12px;margin-top:8px}
+.xfund{border-top:1px solid var(--line);padding-top:8px;min-width:0}
+.xfund .head{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-weight:700}
+.xfund .kv{margin-top:6px}
+/* The label and each "vs the model's" part wrap as whole lines on a phone,
+   rather than breaking mid-phrase or into a two-line pill. */
+.xfund .chip{border-radius:6px}
+.xfund .vs{display:block;font-size:.86em;font-family:var(--sans);white-space:nowrap}
+h4{font-size:.9rem;font-weight:700;margin:14px 0 0}
+.minis{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(250px,100%),1fr));gap:4px 20px;margin-top:2px}
+table.mini caption{text-align:left;font-weight:700;font-size:.9rem;padding:8px 0 2px;color:var(--ink)}
+table.mini th,table.mini td{padding:3px 6px}
+table.mini td.few{text-align:center;color:var(--ink-3);font-family:var(--sans)}
+/* A month of price gaps above the owner's 2%. */
+table.mini tr.over td{background:var(--warn-bg)}
+/* The checkpoint verdict: the record's own words in the plan's six columns.
+   The long cells wrap; on a phone the table scrolls inside its own box, so
+   the page never scrolls sideways. The verdict row is bold, as in the plan. */
+.verdict{overflow-wrap:anywhere}
+.verdict .vtitle{font-size:.93rem;margin-top:8px}
+.verdict .vline{font-family:var(--mono);font-size:.86rem;margin-top:8px;overflow-wrap:anywhere}
+table.vt{min-width:640px;margin-top:6px}
+table.vt th,table.vt td{text-align:left;white-space:normal;vertical-align:top;font-family:var(--sans)}
+table.vt td.v{font-family:var(--mono);white-space:nowrap}
+table.vt tr.to td{font-weight:700;border-bottom:0}
+</style>
+
+<header>
+  <div>
+    <nav class="nav" aria-label="Pages"><a href="index.html">Desk</a> <span class="faint">|</span> <a href="funds.html" aria-current="page">4 Funds</a> <span class="faint">|</span> <a class="ext" href="https://algotrade.mintlify.site/shadow-funds" target="_blank" rel="noopener">Docs<svg width="10" height="10" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 12 12 4M6 4h6v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="sr-only">(opens in a new tab)</span></a></nav>
+    <div class="title">
+      <h1>4 Funds</h1>
+      <span class="sim" role="note"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 15 14H1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8 6v3.6M8 11.4v.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Simulated, not real money</span>
+    </div>
+    <div id="fresh" class="muted">Loading the record…</div>
+    <div id="live" class="faint" style="font-size:.84rem">Live updates: starting…</div>
+  </div>
+</header>
+
+<div class="docs" aria-label="Docs"><a class="doc" href="https://algotrade.mintlify.site/shadow-funds#what-is-real-and-what-is-simulated" target="_blank" rel="noopener">What is simulated<svg width="10" height="10" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 12 12 4M6 4h6v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="sr-only">(opens in a new tab)</span></a> <a class="doc" href="https://algotrade.mintlify.site/shadow-funds#calibration-first" target="_blank" rel="noopener">Calibration<svg width="10" height="10" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 12 12 4M6 4h6v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="sr-only">(opens in a new tab)</span></a> <a class="doc" href="https://algotrade.mintlify.site/shadow-funds#the-fund-tests-start-and-the-gate" target="_blank" rel="noopener">The fund test<svg width="10" height="10" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 12 12 4M6 4h6v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="sr-only">(opens in a new tab)</span></a> <a class="doc" href="https://algotrade.mintlify.site/horse-race" target="_blank" rel="noopener">The race<svg width="10" height="10" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 12 12 4M6 4h6v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="sr-only">(opens in a new tab)</span></a></div>
+
+<section id="banners" aria-label="Where the tests stand"></section>
+<section id="problems" aria-label="Problems in the record"></section>
+<section id="verdict" aria-label="Checkpoint verdict"></section>
+<section id="race-reports" aria-label="The race's trades by conviction, and longs against shorts"></section>
+
+<h2>Calibration</h2>
+<div id="calibration"></div>
+
+<h2>The four funds</h2>
+<div id="funds"></div>
+<section id="explore" aria-label="The exploratory funds against the model fund"></section>
+<section id="data" aria-label="Price gaps by month, and the names the paper account held"></section>
+<section id="after-tax" aria-label="After Israeli tax and in shekels"></section>
+<section id="counters" aria-label="Counters until the checkpoints"></section>
+
+<section id="order" aria-label="How often the buying order mattered"></section>
+
+<footer>
+  <span id="note" class="docs"><a class="doc" href="https://algotrade.mintlify.site/shadow-funds#where-to-read-it" target="_blank" rel="noopener">Where this is read from<svg width="10" height="10" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 12 12 4M6 4h6v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="sr-only">(opens in a new tab)</span></a> <a class="doc" href="https://algotrade.mintlify.site/shadow-funds" target="_blank" rel="noopener">The four funds, explained<svg width="10" height="10" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 12 12 4M6 4h6v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="sr-only">(opens in a new tab)</span></a></span>
+  <button id="refresh" type="button">Refresh</button>
+</footer>
+
+<script type="application/json" id="seed-funds">/*__FUNDS__*/{"generated_at":"2026-10-10T01:58:37.255432+00:00","final_through":"2026-10-09","simulated":true,"calibration":{"status":"running","start":"2026-09-28","days_done":8,"days_needed":15,"days_passed":8,"fixes":[],"last_fix":null,"days_since_fix":null,"days_after_fix_needed":5,"end_estimate":"2026-10-19","fund_test_plan":{"start":"2026-09-29","first_cycle":"2026-09-28","sessions":[60,120,180],"skipped":[false,false,false],"bars":[3.4,2.41,2.02],"exact":[3.395,2.407,2.015],"registered":[3.4,2.41,2.02],"registered_sessions":[60,120,180],"registered_start":"2026-09-29","matches_registered":true},"pass_rule":{"text":["Calibration passes only if all six hold over 15 trading days:","1. On every one of the 15 closes, the simulated equity is within 1.0% of the real account's equity.","2. The tracking error of daily returns (the spread of sim minus real, day by day) is at most 0.20% a day.","3. At least 90% of the real account's trades (entries, ladder/trim closes, stop exits) are matched by the same trade in the sim within one session.","4. No 'unexplained' difference: every trade that differs names a reason from the fixed list.","5. Integrity: no unexpected engine error, no position-manager error, every sim position's stops cover it, and no line reached the live audit log.","6. The other way round: at least 90% of the sim's trades are also made by the real account within one session.","If calibration fails: the cause is fixed and logged in the Amendments table. Then the fixed simulation is re-run on every calibration day recorded so far, from the same starting snapshot, and every day must pass all the conditions again. At least 5 calibration days must come after the last fix, so calibration ends at day 15 or at the last fix + 5 days, whichever is later. If a re-run fails on an earlier day, that is a new fail: fix, log and re-run again. A difference whose stated reason turns out to be a bug still counts as a fail. If the end date moves, the fund test's start does not (it is fixed: the 2026-09-28 cycle, from the 2026-09-29 open); a look that comes before calibration has passed is skipped, and the bars are computed by the fund test's rule.","Late runs: on a day the real account's run fell outside market hours, the sim does not make the entries the real broker refused as 'market is closed', nor a profit-ladder pass that could not run; each is counted and shown. If more than 2 calibration days need this, calibration stops and the owner is told."],"approved":true,"verdicts":["Approved rule: 8 of 15 closes compared (day 15 or the last fix + 5 days, whichever is later; no fix so far).","1. every close within 1.00%: PENDING (worst 0.46% on 2026-10-06)","2. tracking error at most 0.20% a day: PENDING (0.18% a day so far)","3. at least 90% of real trades matched: PENDING (17 of 27, 63.0%; 5 a session apart)","4. no unexplained difference: PENDING (0 of 18 difference(s) unexplained)","5. integrity: PENDING (clean so far)","6. at least 90% of the sim's trades matched in the real account: PENDING (17 of 22, 77.3%)"]},"series":[{"day":"2026-09-29","sim":101679.31,"real":101679.33,"diff_pct":-0.0},{"day":"2026-09-30","sim":101611.41,"real":101611.52,"diff_pct":-1e-06},{"day":"2026-10-01","sim":101715.37,"real":101776.46,"diff_pct":-0.0006},{"day":"2026-10-02","sim":101831.21,"real":101911.13,"diff_pct":-0.000784},{"day":"2026-10-05","sim":102049.27,"real":102241.75,"diff_pct":-0.001883},{"day":"2026-10-06","sim":101992.14,"real":102463.25,"diff_pct":-0.004598},{"day":"2026-10-07","sim":101612.52,"real":101662.09,"diff_pct":-0.000488},{"day":"2026-10-08","sim":101223.47,"real":101314.08,"diff_pct":-0.000894}],"differences":[{"day":"2026-09-29","ticker":"TIP","real":"bought to cover 3 @ 104.00","sim":"none","reason":"ladder/trim differs"},{"day":"2026-10-01","ticker":"IEF","real":"none","sim":"bought to cover 40 @ 88.79","reason":"ladder/trim differs"},{"day":"2026-10-01","ticker":"KRE","real":"bought to cover 17 @ 68.42 on 2026-10-01","sim":"bought to cover 53 @ 71.34 (stop) on 2026-10-02","reason":"stop: filled on a different day or not at all on daily bars"},{"day":"2026-10-01","ticker":"RSP","real":"bought to cover 4 @ 207.88","sim":"none","reason":"ladder/trim differs"},{"day":"2026-10-01","ticker":"TIP","real":"none","sim":"bought to cover 3 @ 103.83","reason":"ladder/trim differs"},{"day":"2026-10-01","ticker":"TLT","real":"none","sim":"bought to cover 45 @ 76.94","reason":"ladder/trim differs"},{"day":"2026-10-02","ticker":"KRE","real":"bought to cover 36 @ 71.08 (stop)","sim":"none","reason":"stop: filled on a different day or not at all on daily bars"},{"day":"2026-10-05","ticker":"ARGT","real":"bought 80 @ 88.68","sim":"none","reason":"sim rejected: no room for focused fund ARGT under its 7% cap or the gross exposure limit: equity 102172.52, price 89.43, existing exposure 0.00, headroom 40.88"},{"day":"2026-10-05","ticker":"EPOL","real":"bought 164 @ 43.50","sim":"none","reason":"sim rejected: no room for focused fund EPOL under its 7% cap or the gross exposure limit: equity 102172.52, price 44.50, existing exposure 0.00, headroom 40.88"},{"day":"2026-10-05","ticker":"EWZ","real":"bought 165 @ 43.15 on 2026-10-05","sim":"bought 36 @ 43.55 on 2026-10-06","reason":"size differs: equity differed"},{"day":"2026-10-05","ticker":"IEF","real":"bought to cover 40 @ 88.88","sim":"none","reason":"ladder/trim differs"},{"day":"2026-10-05","ticker":"TLT","real":"bought to cover 45 @ 77.01","sim":"none","reason":"ladder/trim differs"},{"day":"2026-10-05","ticker":"UUP","real":"sold 140 @ 29.03","sim":"none","reason":"ladder/trim differs"},{"day":"2026-10-06","ticker":"EMB","real":"bought to cover 44 @ 91.07 (stop)","sim":"none","reason":"stop: filled on a different day or not at all on daily bars"},{"day":"2026-10-06","ticker":"RSP","real":"bought to cover 10 @ 212.04 (stop)","sim":"bought to cover 14 @ 211.81 (stop)","reason":"size differs: equity differed"},{"day":"2026-10-06","ticker":"XLY","real":"bought to cover 63 @ 111.36 (stop)","sim":"none","reason":"stop: filled on a different day or not at all on daily bars"},{"day":"2026-10-07","ticker":"UUP","real":"none","sim":"sold 140 @ 29.08","reason":"ladder/trim differs"},{"day":"2026-10-08","ticker":"TIP","real":"none","sim":"bought to cover 4 @ 104.61 (stop)","reason":"stop: filled on a different day or not at all on daily bars"}],"metrics":{"max_abs_gap_pct":0.004598,"tracking_error_pct":0.001799,"matched_share":0.62963,"sim_matched_share":0.772727,"unexplained":0,"timing":5},"holding_days":{"median":7.5,"min":4,"max":14,"closed":12,"open_median":14.0},"mirrored":[],"mirrored_days":[],"mirrored_day_count":0,"mirror_limit":2,"stop_reason":null,"order_matters":{"cycle_days":7,"days":7,"skipped":29,"outranked_days":2,"by_kind":{"gross exposure":2,"sleeve budget":27},"list":[{"day":"2026-09-29","bought":[],"skipped":[{"ticker":"GOOGL","conviction":0.6,"kind":"sleeve budget","outranks":[]},{"ticker":"TM","conviction":0.55,"kind":"sleeve budget","outranks":[]},{"ticker":"MELI","conviction":0.6,"kind":"sleeve budget","outranks":[]}]},{"day":"2026-09-30","bought":[],"skipped":[{"ticker":"GOOGL","conviction":0.45,"kind":"sleeve budget","outranks":[]},{"ticker":"MELI","conviction":0.65,"kind":"sleeve budget","outranks":[]}]},{"day":"2026-10-01","bought":[],"skipped":[{"ticker":"GOOGL","conviction":0.6,"kind":"sleeve budget","outranks":[]},{"ticker":"JPM","conviction":0.45,"kind":"sleeve budget","outranks":[]},{"ticker":"RY","conviction":0.55,"kind":"sleeve budget","outranks":[]},{"ticker":"TM","conviction":0.55,"kind":"sleeve budget","outranks":[]},{"ticker":"MELI","conviction":0.62,"kind":"sleeve budget","outranks":[]}]},{"day":"2026-10-02","bought":[{"ticker":"HYG","conviction":0.3},{"ticker":"XLK","conviction":0.4}],"skipped":[{"ticker":"GOOGL","conviction":0.55,"kind":"sleeve budget","outranks":["HYG","XLK"]},{"ticker":"JPM","conviction":0.55,"kind":"sleeve budget","outranks":["HYG","XLK"]},{"ticker":"TM","conviction":0.5,"kind":"sleeve budget","outranks":["HYG","XLK"]},{"ticker":"MELI","conviction":0.58,"kind":"sleeve budget","outranks":["HYG","XLK"]}]},{"day":"2026-10-05","bought":[{"ticker":"GDX","conviction":0.45},{"ticker":"EWU","conviction":0.3},{"ticker":"EWZ","conviction":0.6}],"skipped":[{"ticker":"JPM","conviction":0.55,"kind":"sleeve budget","outranks":["GDX","EWU"]},{"ticker":"RY","conviction":0.55,"kind":"sleeve budget","outranks":["GDX","EWU"]},{"ticker":"HDB","conviction":0.45,"kind":"sleeve budget","outranks":["EWU"]},{"ticker":"TM","conviction":0.6,"kind":"sleeve budget","outranks":["GDX","EWU"]},{"ticker":"MELI","conviction":0.55,"kind":"sleeve budget","outranks":["GDX","EWU"]},{"ticker":"EPOL","conviction":0.35,"kind":"gross exposure","outranks":["EWU"]},{"ticker":"ARGT","conviction":0.42,"kind":"gross exposure","outranks":["EWU"]}]},{"day":"2026-10-06","bought":[],"skipped":[{"ticker":"ESLT","conviction":0.7,"kind":"sleeve budget","outranks":[]},{"ticker":"TM","conviction":0.68,"kind":"sleeve budget","outranks":[]}]},{"day":"2026-10-07","bought":[],"skipped":[{"ticker":"JPM","conviction":0.6,"kind":"sleeve budget","outranks":[]},{"ticker":"RY","conviction":0.62,"kind":"sleeve budget","outranks":[]},{"ticker":"CAT","conviction":0.55,"kind":"sleeve budget","outranks":[]},{"ticker":"TM","conviction":0.45,"kind":"sleeve budget","outranks":[]},{"ticker":"MELI","conviction":0.4,"kind":"sleeve budget","outranks":[]},{"ticker":"PG","conviction":0.6,"kind":"sleeve budget","outranks":[]}]}]}},"funds":null,"fund_test":{"status":"not_started","start":"2026-09-29","sessions":0,"independent":null,"next_checkpoint":null,"first_cycle":"2026-09-28","waiting_for":"calibration","planned_sessions":180,"next_look":{"look":1,"estimated":"2026-12-22","bar":3.4,"planned_bar":3.4},"looks":[],"verdict":{"text":"no decision yet","decided_at":null,"outcome":null},"note":null},"integrity":null,"not_shortable":["EWA","HYG","LQD","TUR","USO","XHB"],"not_shortable_since":{"EWA":"2026-09-16","HYG":"2026-09-16","LQD":"2026-09-16","TUR":"2026-09-16","USO":"2026-09-22","XHB":"2026-09-16"},"price_gaps":{"from":"2026-09-29","through":"2026-10-09","tickers":80,"limit":0.02,"months":[{"month":"2026-09","sessions":2,"missing":0,"share":0.0,"over":false,"by_day":{}},{"month":"2026-10","sessions":7,"missing":0,"share":0.0,"over":false,"by_day":{}}]},"held_names":{"from":"2026-09-28","days":[{"day":"2026-09-28","names":22,"lines":22,"of":80},{"day":"2026-09-29","names":22,"lines":22,"of":80},{"day":"2026-09-30","names":22,"lines":22,"of":80},{"day":"2026-10-01","names":19,"lines":19,"of":80},{"day":"2026-10-02","names":18,"lines":18,"of":80},{"day":"2026-10-05","names":19,"lines":19,"of":80},{"day":"2026-10-06","names":22,"lines":22,"of":80},{"day":"2026-10-07","names":20,"lines":20,"of":80},{"day":"2026-10-08","names":20,"lines":20,"of":80},{"day":"2026-10-09","names":16,"lines":16,"of":80}]},"exploratory":{"counters":{"momentum_200":{"from":"2026-09-28","signals":260,"vetoed":21,"vetoed_share":0.08076923076923077,"under_ten_percent":true,"no_live_price":0,"no_average":0},"vt_timing":{"signals":1,"switches":0,"state":"VT","days_out_of_vt":0,"last_signal":"2026-09-30","month_ends_fallen_back":0},"momentum_pullback":{"from":"2026-09-28","filled":161,"missed":55,"still_open":44,"fill_rate":0.7453703703703703,"no_limit":0,"technicals_price":0},"model_same_day":{"lines_without_usable_price":{"no_price":0,"outside_hours":0,"other_day":0}},"ic":{"production":{"answered_lines":590,"lines_with_score":{"blend":590,"news":590,"technical":590,"fundamental":590,"analyst":485,"insider":587,"momentum":590},"line_days":10},"shadow":{"answered_lines":0,"lines_with_score":{"blend":0,"news":0,"technical":0,"fundamental":0,"analyst":0,"insider":0,"momentum":0},"line_days":0}},"regimes":{"sessions":9,"first":"2026-09-29","last":"2026-10-09","trend":{"above":9,"below":0,"unknown":0},"vol":{"low":0,"mid":9,"high":0,"unknown":0}}},"checkpoints":[]},"order_matters":{"real":{"cycle_days":18,"days":15,"skipped":50,"outranked_days":5,"by_kind":{"gross exposure":18,"sleeve budget":32},"list":[{"day":"2026-09-18","bought":[{"ticker":"TEVA","conviction":0.52},{"ticker":"RSP","conviction":0.4}],"skipped":[{"ticker":"LQD","conviction":0.35,"kind":"sleeve budget","outranks":[]},{"ticker":"HYG","conviction":0.3,"kind":"sleeve budget","outranks":[]},{"ticker":"XLU","conviction":0.35,"kind":"sleeve budget","outranks":[]},{"ticker":"XHB","conviction":0.4,"kind":"sleeve budget","outranks":[]}]},{"day":"2026-09-21","bought":[{"ticker":"MSFT","conviction":0.55},{"ticker":"NVO","conviction":0.55}],"skipped":[{"ticker":"XHB","conviction":0.35,"kind":"sleeve budget","outranks":[]},{"ticker":"EIS","conviction":0.3,"kind":"sleeve budget","outranks":[]},{"ticker":"EWT","conviction":0.35,"kind":"sleeve budget","outranks":[]}]},{"day":"2026-09-22","bought":[{"ticker":"KRE","conviction":0.32},{"ticker":"EWT","conviction":0.35}],"skipped":[{"ticker":"ASML","conviction":0.55,"kind":"sleeve budget","outranks":["KRE","EWT"]}]},{"day":"2026-09-23","bought":[{"ticker":"ASML","conviction":0.6},{"ticker":"JPM","conviction":0.55},{"ticker":"RY","conviction":0.55},{"ticker":"HDB","conviction":0.55},{"ticker":"CAT","conviction":0.55},{"ticker":"PG","conviction":0.55},{"ticker":"XOM","conviction":0.68}],"skipped":[{"ticker":"IGV","conviction":0.45,"kind":"gross exposure","outranks":[]},{"ticker":"ARGT","conviction":0.6,"kind":"gross exposure","outranks":["JPM","RY","HDB","CAT","PG"]}]},{"day":"2026-09-25","bought":[],"skipped":[{"ticker":"GOOGL","conviction":0.6,"kind":"sleeve budget","outranks":[]}]},{"day":"2026-09-28","bought":[],"skipped":[{"ticker":"GOOGL","conviction":0.55,"kind":"sleeve budget","outranks":[]},{"ticker":"MELI","conviction":0.55,"kind":"sleeve budget","outranks":[]}]},{"day":"2026-09-29","bought":[],"skipped":[{"ticker":"GOOGL","conviction":0.6,"kind":"sleeve budget","outranks":[]},{"ticker":"TM","conviction":0.55,"kind":"sleeve budget","outranks":[]},{"ticker":"MELI","conviction":0.6,"kind":"sleeve budget","outranks":[]}]},{"day":"2026-09-30","bought":[],"skipped":[{"ticker":"GOOGL","conviction":0.45,"kind":"sleeve budget","outranks":[]},{"ticker":"MELI","conviction":0.65,"kind":"sleeve budget","outranks":[]}]},{"day":"2026-10-01","bought":[],"skipped":[{"ticker":"GOOGL","conviction":0.6,"kind":"sleeve budget","outranks":[]},{"ticker":"JPM","conviction":0.45,"kind":"sleeve budget","outranks":[]},{"ticker":"RY","conviction":0.55,"kind":"sleeve budget","outranks":[]},{"ticker":"TM","conviction":0.55,"kind":"sleeve budget","outranks":[]},{"ticker":"MELI","conviction":0.62,"kind":"sleeve budget","outranks":[]}]},{"day":"2026-10-02","bought":[{"ticker":"HYG","conviction":0.3},{"ticker":"XLK","conviction":0.4}],"skipped":[{"ticker":"GOOGL","conviction":0.55,"kind":"sleeve budget","outranks":["HYG","XLK"]},{"ticker":"JPM","conviction":0.55,"kind":"sleeve budget","outranks":["HYG","XLK"]},{"ticker":"TM","conviction":0.5,"kind":"sleeve budget","outranks":["HYG","XLK"]},{"ticker":"MELI","conviction":0.58,"kind":"sleeve budget","outranks":["HYG","XLK"]}]},{"day":"2026-10-05","bought":[{"ticker":"GDX","conviction":0.45},{"ticker":"EWU","conviction":0.3},{"ticker":"EWZ","conviction":0.6},{"ticker":"EPOL","conviction":0.35},{"ticker":"ARGT","conviction":0.42}],"skipped":[{"ticker":"JPM","conviction":0.55,"kind":"sleeve budget","outranks":["GDX","EWU","EPOL","ARGT"]},{"ticker":"RY","conviction":0.55,"kind":"sleeve budget","outranks":["GDX","EWU","EPOL","ARGT"]},{"ticker":"HDB","conviction":0.45,"kind":"sleeve budget","outranks":["EWU","EPOL","ARGT"]},{"ticker":"TM","conviction":0.6,"kind":"sleeve budget","outranks":["GDX","EWU","EPOL","ARGT"]},{"ticker":"MELI","conviction":0.55,"kind":"sleeve budget","outranks":["GDX","EWU","EPOL","ARGT"]}]},{"day":"2026-10-06","bought":[],"skipped":[{"ticker":"ESLT","conviction":0.7,"kind":"gross exposure","outranks":[]},{"ticker":"TM","conviction":0.68,"kind":"gross exposure","outranks":[]}]},{"day":"2026-10-07","bought":[],"skipped":[{"ticker":"JPM","conviction":0.6,"kind":"gross exposure","outranks":[]},{"ticker":"RY","conviction":0.62,"kind":"gross exposure","outranks":[]},{"ticker":"CAT","conviction":0.55,"kind":"gross exposure","outranks":[]},{"ticker":"TM","conviction":0.45,"kind":"gross exposure","outranks":[]},{"ticker":"MELI","conviction":0.4,"kind":"gross exposure","outranks":[]},{"ticker":"PG","conviction":0.6,"kind":"gross exposure","outranks":[]},{"ticker":"EMB","conviction":0.4,"kind":"gross exposure","outranks":[]}]},{"day":"2026-10-08","bought":[],"skipped":[{"ticker":"GOOGL","conviction":0.55,"kind":"gross exposure","outranks":[]},{"ticker":"JPM","conviction":0.55,"kind":"gross exposure","outranks":[]},{"ticker":"RY","conviction":0.55,"kind":"gross exposure","outranks":[]},{"ticker":"ESLT","conviction":0.35,"kind":"gross exposure","outranks":[]},{"ticker":"PG","conviction":0.58,"kind":"gross exposure","outranks":[]},{"ticker":"EWA","conviction":0.5,"kind":"gross exposure","outranks":[]},{"ticker":"USO","conviction":0.4,"kind":"gross exposure","outranks":[]}]},{"day":"2026-10-09","bought":[{"ticker":"NVDA","conviction":0.65},{"ticker":"ASML","conviction":0.55},{"ticker":"GOOGL","conviction":0.85}],"skipped":[{"ticker":"RY","conviction":0.65,"kind":"sleeve budget","outranks":["ASML"]},{"ticker":"PG","conviction":0.45,"kind":"sleeve budget","outranks":[]}]}]}},"after_tax":{"rules":{"capital_rate":0.25,"dividend_rate":0.25,"w8ben":true,"us_withholding":0.25,"offset_losses_vs_dividends":true,"surtax_enabled":false},"fx":{"available":true,"source":"bank-of-israel","first":"2026-09-10","last":"2026-10-09","counts":{"boi":20,"ecb":2,"carried":0},"fallback_days":[["2026-09-11","ecb"],["2026-09-21","ecb"]],"rates_sha256":"d244923e4392b950d15042e748bfc5df1cd0f40ddfce0d9dead249c5c337cdca"},"paper":{"from":"2026-09-10","through":"2026-10-08","days":21,"usd":{"start":100000.0,"equity":101314.08,"after_tax":101009.35,"return":0.013140799999999953,"after_tax_return":0.010093500977855108,"paid_so_far":101179.37,"paid_so_far_return":0.01179372079280161},"ils":{"start":302300.0,"equity":312452.62,"after_tax":311512.84,"return":0.03358459384717172,"after_tax_return":0.030475804504037418,"paid_so_far":312037.18,"paid_so_far_return":0.03221033242639759,"from_usd_ils":0.020443793847171765,"after_tax_from_usd_ils":0.02038230352618231},"tax_ils":{"paid_so_far":415.44,"if_sold_today":939.79},"usd_ils":{"start":3.023,"end":3.084,"change":0.020178630499503747},"unpriced":[]},"paper_problem":null,"paper_lots":{"checked":true,"at":"2026-10-09T19:15:32+00:00","mismatches":[]},"funds":null,"looks":[],"breakeven":{"years":20,"growth":0.06,"dividend_yield":0.02,"offset_losses_vs_dividends":true,"w8ben":true,"vt_after_tax":3.5982808801912944,"active_after_tax_at_zero":3.207135472212847,"extra_per_year":0.00815562186762691,"note":"for information only; not a gate"}},"verdict":{"text":"no decision yet"},"prices_sha256":"7cb15bd5dc6a47f1a5fd2139e6a4155b92ca478b2cc3bb457d5fa66381ccfadf"}</script>
+<script type="application/json" id="seed-race">/*__RACE__*/{"generated_at":"2026-10-10T01:56:52.701864+00:00","status_line":"independent days since 2026-09-23: 3 of 60 (= 180 trading days) \u2014 NO DECISION YET","registered":true,"independent":3,"of":60,"trading_days":180,"decided":false,"outcome":null,"outcome_text":null,"next":{"independent":20,"entry_days":60,"estimated":"2026-12-22","bar":3.47},"looks":[{"independent":20,"bar":3.47,"reached":false,"outcome":null,"reason":"","after_tax":null,"vt_max_drawdown":null,"window_end":null,"readable":null},{"independent":40,"bar":2.45,"reached":false,"outcome":null,"reason":"","after_tax":null,"vt_max_drawdown":null,"window_end":null,"readable":null},{"independent":60,"bar":2.0,"reached":false,"outcome":null,"reason":"","after_tax":null,"vt_max_drawdown":null,"window_end":null,"readable":null}],"downturn":null,"report_since":"2026-09-23","conviction_groups":{"model":[{"group":"0.30-0.40","n":3,"mean_net":-0.011493420472818284,"hit_rate":0.3333333333333333,"too_few":true},{"group":"0.40-0.50","n":7,"mean_net":-0.012473153641644863,"hit_rate":0.14285714285714285,"too_few":true},{"group":"0.50-0.60","n":17,"mean_net":-0.0022910822445264367,"hit_rate":0.47058823529411764,"too_few":true},{"group":"0.60+","n":13,"mean_net":0.007190419767551833,"hit_rate":0.5384615384615384,"too_few":true}],"momentum":[{"group":"0.30-0.40","n":44,"mean_net":0.0049489849813531064,"hit_rate":0.4318181818181818,"too_few":false},{"group":"0.40-0.50","n":35,"mean_net":-0.00035827597855953974,"hit_rate":0.5428571428571428,"too_few":false},{"group":"0.50-0.60","n":35,"mean_net":-0.00025312655665558816,"hit_rate":0.5714285714285714,"too_few":false},{"group":"0.60+","n":103,"mean_net":-0.00028917902365314826,"hit_rate":0.44660194174757284,"too_few":false}],"hybrid":[{"group":"0.30-0.40","n":48,"mean_net":-0.00029530551273956326,"hit_rate":0.4583333333333333,"too_few":false},{"group":"0.40-0.50","n":41,"mean_net":4.847984504787926e-05,"hit_rate":0.4634146341463415,"too_few":false},{"group":"0.50-0.60","n":17,"mean_net":-0.004896666295180766,"hit_rate":0.29411764705882354,"too_few":true},{"group":"0.60+","n":0,"mean_net":null,"hit_rate":null,"too_few":true}]},"sides":{"model":{"long":{"n":37,"mean_net":-0.0013773981508739042,"hit_rate":0.40540540540540543,"too_few":false},"short":{"n":3,"mean_net":-0.005433848835470013,"hit_rate":0.6666666666666666,"too_few":true}},"momentum":{"long":{"n":83,"mean_net":0.0027953101554738036,"hit_rate":0.43373493975903615,"too_few":false},"short":{"n":134,"mean_net":-0.0004883577006984534,"hit_rate":0.5074626865671642,"too_few":false}},"hybrid":{"long":{"n":55,"mean_net":0.001225942773488741,"hit_rate":0.41818181818181815,"too_few":false},"short":{"n":51,"mean_net":-0.0031932778534213683,"hit_rate":0.45098039215686275,"too_few":false}},"random":{"long":{"n":246,"mean_net":-0.0035787010166015917,"hit_rate":0.3902439024390244,"too_few":false},"short":{"n":267,"mean_net":2.7227594270675457e-05,"hit_rate":0.5243445692883895,"too_few":false}}},"run_timing":{"entry_rule":"Entry is always the open of the next session after the signal's day, so a late run changes when a signal is made, never the price it is entered at.","late_after_minutes":30,"cutoff":"2026-09-23","late_days":9,"cycle_days":19,"unscheduled_days":0,"lines_before_open":0,"lines_after_close":0,"lines_no_session":0,"window_late_days":3,"window_cycle_days":13,"days":[{"day":"2026-09-15","part":"before","lines":105,"first_utc":"2026-09-15T16:54:47.801618+00:00","last_utc":"2026-09-15T19:10:21.923471+00:00","first_new_york":"12:54","last_new_york":"15:10","phase":"session","phases":{"pre_open":0,"session":105,"after_close":0,"no_session":0},"scheduled_for":"2026-09-15T15:05:00+00:00","started_at":"2026-09-15T16:54:47.801618+00:00","minutes_late":109,"late":true,"started_by":"unknown","source":"inferred from the first line","run_source":"unknown","runs":0},{"day":"2026-09-16","part":"before","lines":156,"first_utc":"2026-09-16T15:54:01.164851+00:00","last_utc":"2026-09-16T19:31:46.261217+00:00","first_new_york":"11:54","last_new_york":"15:31","phase":"session","phases":{"pre_open":0,"session":156,"after_close":0,"no_session":0},"scheduled_for":"2026-09-16T15:05:00+00:00","started_at":"2026-09-16T15:54:01.164851+00:00","minutes_late":49,"late":true,"started_by":"unknown","source":"inferred from the first line","run_source":"unknown","runs":0},{"day":"2026-09-17","part":"before","lines":131,"first_utc":"2026-09-17T15:49:15.415938+00:00","last_utc":"2026-09-17T19:23:57.732892+00:00","first_new_york":"11:49","last_new_york":"15:23","phase":"session","phases":{"pre_open":0,"session":131,"after_close":0,"no_session":0},"scheduled_for":"2026-09-17T15:05:00+00:00","started_at":"2026-09-17T15:49:15.415938+00:00","minutes_late":44,"late":true,"started_by":"unknown","source":"inferred from the first line","run_source":"unknown","runs":0},{"day":"2026-09-18","part":"before","lines":80,"first_utc":"2026-09-18T16:18:07.007679+00:00","last_utc":"2026-09-18T17:02:56.412493+00:00","first_new_york":"12:18","last_new_york":"13:02","phase":"session","phases":{"pre_open":0,"session":80,"after_close":0,"no_session":0},"scheduled_for":"2026-09-18T15:05:00+00:00","started_at":"2026-09-18T16:18:07.007679+00:00","minutes_late":73,"late":true,"started_by":"unknown","source":"inferred from the first line","run_source":"unknown","runs":0},{"day":"2026-09-21","part":"before","lines":80,"first_utc":"2026-09-21T15:08:08.040099+00:00","last_utc":"2026-09-21T15:34:05.359748+00:00","first_new_york":"11:08","last_new_york":"11:34","phase":"session","phases":{"pre_open":0,"session":80,"after_close":0,"no_session":0},"scheduled_for":"2026-09-21T12:35:00+00:00","started_at":"2026-09-21T15:08:08.040099+00:00","minutes_late":153,"late":true,"started_by":"unknown","source":"inferred from the first line","run_source":"unknown","runs":0},{"day":"2026-09-22","part":"before","lines":80,"first_utc":"2026-09-22T15:07:29.293644+00:00","last_utc":"2026-09-22T15:45:13.806871+00:00","first_new_york":"11:07","last_new_york":"11:45","phase":"session","phases":{"pre_open":0,"session":80,"after_close":0,"no_session":0},"scheduled_for":"2026-09-22T12:35:00+00:00","started_at":"2026-09-22T15:07:29.293644+00:00","minutes_late":152,"late":true,"started_by":"unknown","source":"inferred from the first line","run_source":"unknown","runs":0},{"day":"2026-09-23","part":"window","lines":80,"first_utc":"2026-09-23T15:06:50.177746+00:00","last_utc":"2026-09-23T16:20:36.231274+00:00","first_new_york":"11:06","last_new_york":"12:20","phase":"session","phases":{"pre_open":0,"session":80,"after_close":0,"no_session":0},"scheduled_for":"2026-09-23T12:35:00+00:00","started_at":"2026-09-23T15:06:50.177746+00:00","minutes_late":151,"late":true,"started_by":"unknown","source":"inferred from the first line","run_source":"unknown","runs":0},{"day":"2026-09-24","part":"window","lines":80,"first_utc":"2026-09-24T15:08:10.752383+00:00","last_utc":"2026-09-24T15:36:19.634072+00:00","first_new_york":"11:08","last_new_york":"11:36","phase":"session","phases":{"pre_open":0,"session":80,"after_close":0,"no_session":0},"scheduled_for":"2026-09-24T12:35:00+00:00","started_at":"2026-09-24T15:08:10.752383+00:00","minutes_late":153,"late":true,"started_by":"unknown","source":"inferred from the first line","run_source":"unknown","runs":0},{"day":"2026-09-25","part":"window","lines":80,"first_utc":"2026-09-25T15:09:04.878728+00:00","last_utc":"2026-09-25T16:21:20.002573+00:00","first_new_york":"11:09","last_new_york":"12:21","phase":"session","phases":{"pre_open":0,"session":80,"after_close":0,"no_session":0},"scheduled_for":"2026-09-25T12:35:00+00:00","started_at":"2026-09-25T15:09:04.878728+00:00","minutes_late":154,"late":true,"started_by":"unknown","source":"inferred from the first line","run_source":"unknown","runs":0},{"day":"2026-09-28","part":"window","lines":80,"first_utc":"2026-09-28T14:40:56.760558+00:00","last_utc":"2026-09-28T15:39:41.851898+00:00","first_new_york":"10:40","last_new_york":"11:39","phase":"session","phases":{"pre_open":0,"session":80,"after_close":0,"no_session":0},"scheduled_for":"2026-09-28T14:40:00+00:00","started_at":"2026-09-28T14:40:39+00:00","minutes_late":0,"late":false,"started_by":"scheduler","source":"journal run block","run_source":"supabase-cron","runs":1},{"day":"2026-09-29","part":"window","lines":80,"first_utc":"2026-09-29T14:40:51.824208+00:00","last_utc":"2026-09-29T16:08:04.943717+00:00","first_new_york":"10:40","last_new_york":"12:08","phase":"session","phases":{"pre_open":0,"session":80,"after_close":0,"no_session":0},"scheduled_for":"2026-09-29T14:40:00+00:00","started_at":"2026-09-29T14:40:35+00:00","minutes_late":0,"late":false,"started_by":"scheduler","source":"journal run block","run_source":"supabase-cron","runs":1},{"day":"2026-09-30","part":"window","lines":80,"first_utc":"2026-09-30T14:40:43.488062+00:00","last_utc":"2026-09-30T16:02:48.843622+00:00","first_new_york":"10:40","last_new_york":"12:02","phase":"session","phases":{"pre_open":0,"session":80,"after_close":0,"no_session":0},"scheduled_for":"2026-09-30T14:40:00+00:00","started_at":"2026-09-30T14:40:30+00:00","minutes_late":0,"late":false,"started_by":"scheduler","source":"journal run block","run_source":"supabase-cron","runs":1},{"day":"2026-10-01","part":"window","lines":80,"first_utc":"2026-10-01T14:42:31.245138+00:00","last_utc":"2026-10-01T16:09:20.447786+00:00","first_new_york":"10:42","last_new_york":"12:09","phase":"session","phases":{"pre_open":0,"session":80,"after_close":0,"no_session":0},"scheduled_for":"2026-10-01T14:40:00+00:00","started_at":"2026-10-01T14:40:33+00:00","minutes_late":0,"late":false,"started_by":"scheduler","source":"journal run block","run_source":"supabase-cron","runs":1},{"day":"2026-10-02","part":"window","lines":80,"first_utc":"2026-10-02T14:40:44.331199+00:00","last_utc":"2026-10-02T15:38:56.070187+00:00","first_new_york":"10:40","last_new_york":"11:38","phase":"session","phases":{"pre_open":0,"session":80,"after_close":0,"no_session":0},"scheduled_for":"2026-10-02T14:40:00+00:00","started_at":"2026-10-02T14:40:28+00:00","minutes_late":0,"late":false,"started_by":"scheduler","source":"journal run block","run_source":"supabase-cron","runs":1},{"day":"2026-10-05","part":"window","lines":80,"first_utc":"2026-10-05T14:40:56.436092+00:00","last_utc":"2026-10-05T15:42:28.423201+00:00","first_new_york":"10:40","last_new_york":"11:42","phase":"session","phases":{"pre_open":0,"session":80,"after_close":0,"no_session":0},"scheduled_for":"2026-10-05T14:40:00+00:00","started_at":"2026-10-05T14:40:25+00:00","minutes_late":0,"late":false,"started_by":"scheduler","source":"journal run block","run_source":"supabase-cron","runs":1},{"day":"2026-10-06","part":"window","lines":80,"first_utc":"2026-10-06T14:40:52.497018+00:00","last_utc":"2026-10-06T15:39:19.668988+00:00","first_new_york":"10:40","last_new_york":"11:39","phase":"session","phases":{"pre_open":0,"session":80,"after_close":0,"no_session":0},"scheduled_for":"2026-10-06T14:40:00+00:00","started_at":"2026-10-06T14:40:28+00:00","minutes_late":0,"late":false,"started_by":"scheduler","source":"journal run block","run_source":"supabase-cron","runs":1},{"day":"2026-10-07","part":"window","lines":80,"first_utc":"2026-10-07T14:40:47.182499+00:00","last_utc":"2026-10-07T15:55:35.920364+00:00","first_new_york":"10:40","last_new_york":"11:55","phase":"session","phases":{"pre_open":0,"session":80,"after_close":0,"no_session":0},"scheduled_for":"2026-10-07T14:40:00+00:00","started_at":"2026-10-07T14:40:29+00:00","minutes_late":0,"late":false,"started_by":"scheduler","source":"journal run block","run_source":"supabase-cron","runs":1},{"day":"2026-10-08","part":"window","lines":80,"first_utc":"2026-10-08T14:40:52.031225+00:00","last_utc":"2026-10-08T15:50:12.328932+00:00","first_new_york":"10:40","last_new_york":"11:50","phase":"session","phases":{"pre_open":0,"session":80,"after_close":0,"no_session":0},"scheduled_for":"2026-10-08T14:40:00+00:00","started_at":"2026-10-08T14:40:39+00:00","minutes_late":0,"late":false,"started_by":"scheduler","source":"journal run block","run_source":"supabase-cron","runs":1},{"day":"2026-10-09","part":"window","lines":80,"first_utc":"2026-10-09T14:40:49.295263+00:00","last_utc":"2026-10-09T15:40:57.388880+00:00","first_new_york":"10:40","last_new_york":"11:40","phase":"session","phases":{"pre_open":0,"session":80,"after_close":0,"no_session":0},"scheduled_for":"2026-10-09T14:40:00+00:00","started_at":"2026-10-09T14:40:32+00:00","minutes_late":0,"late":false,"started_by":"scheduler","source":"journal run block","run_source":"supabase-cron","runs":1}]},"watch":{"d":{"rule":"the paper account: more than 8% below its peak since 2026-09-23, or more than 5 points behind VT","start":"2026-09-23","max_drawdown":0.08,"max_behind_vt":0.05,"judged":true,"not_judged":null,"vt_not_judged":null,"tripped":false,"trips":[],"latest":{"day":"2026-10-08","equity":101314.08,"intraday":false,"peak":102463.25,"peak_day":"2026-10-06","drawdown":-0.011215,"account_return":0.009146,"vt_return":-0.003766,"gap":0.012912},"latest_vt":{"day":"2026-10-08","equity":101314.08,"intraday":false,"peak":102463.25,"peak_day":"2026-10-06","drawdown":-0.011215,"account_return":0.009146,"vt_return":-0.003766,"gap":0.012912},"midday":{"day":"2026-10-09","equity":102011.31,"intraday":true,"peak":102463.25,"peak_day":"2026-10-06","drawdown":-0.004411,"account_return":0.016091,"vt_return":0.003138,"gap":0.012953},"midday_warning":null,"record_at":"2026-10-09T19:15:32+00:00"}},"verdict":{"text":"no decision yet"},"prices_sha256":"b61ba44129cc6c30556a9300df189da0035cb8f966a8fdc3dbf01b70ec7248ee"}</script>
+<script>
+(function(){
+  "use strict";
+  const REPO = {owner:"omrirulf", repo:"Algo-Trading-", ref:"main"};
+  const $ = (id)=>document.getElementById(id);
+  const isNum = (v)=> typeof v === "number" && isFinite(v);
+  const esc = (s)=> String(s??"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  // The docs explain; the page shows. Each part links to its page.
+  const DOCS = "https://algotrade.mintlify.site/";
+  const DOC_ICON = `<svg width="10" height="10" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 12 12 4M6 4h6v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const doc = (path, label)=> `<a class="doc" href="${DOCS}${path}" target="_blank" rel="noopener">${label}${DOC_ICON}<span class="sr-only">(opens in a new tab)</span></a>`;
+  const money = (v)=> !isNum(v) ? "n/a" : (v<0?"−":"") + "$" + Math.abs(v).toLocaleString("en-US",{maximumFractionDigits:0});
+  const kMoney = (v)=> !isNum(v) ? "n/a" : Math.abs(v) < 1000 ? money(v) : (v<0?"−":"") + "$" + (Math.abs(v)/1000).toLocaleString("en-US",{maximumFractionDigits:2}) + "k";
+  // Every return and share in both files is a fraction: 0.012 is 1.2%.
+  const signed = (v, d)=> !isNum(v) ? "n/a" : (v>0?"+":v<0?"−":"") + Math.abs(v*100).toFixed(d) + "%";
+  const plain = (v, d)=> !isNum(v) ? "n/a" : (v*100).toFixed(d) + "%";
+  const pts = (v)=> !isNum(v) ? "n/a" : (v>0?"+":v<0?"−":"") + Math.abs(v*100).toFixed(2) + " pts";
+  const tone = (v)=> !isNum(v) || v === 0 ? "" : v > 0 ? "up" : "down";
+  const bar2 = (v)=> isNum(v) ? v.toFixed(2) : "n/a";
+  // A plain object, or null: older records lack the newer parts, and a part
+  // in an unexpected shape is treated as missing rather than read.
+  const asObj = (v)=> v && typeof v === "object" && !Array.isArray(v) ? v : null;
+  const day = (iso, year)=>{ if(!iso) return "n/a"; const d = new Date(String(iso).slice(0,10) + "T00:00:00Z"); if(isNaN(d)) return String(iso); return d.toLocaleDateString("en-GB", year ? {timeZone:"UTC",day:"numeric",month:"short",year:"numeric"} : {timeZone:"UTC",day:"numeric",month:"short"}); };
+  const israel = (iso)=>{ if(!iso) return "n/a"; const d=new Date(iso.endsWith("Z")||iso.includes("+")?iso:iso+"Z"); if(isNaN(d)) return iso; return d.toLocaleString("en-GB",{timeZone:"Asia/Jerusalem",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}) + " Israel time"; };
+
+  // Colour follows the fund, never its rank, so a fund keeps its hue on every
+  // chart and card. VT is dashed as well as grey: it is the index held, the
+  // line the other three are measured against.
+  const HUE = {model:"var(--s-model)", momentum:"var(--s-momentum)", hybrid:"var(--s-hybrid)", vt:"var(--s-vt)"};
+  const SHORT = {model:"Model", momentum:"Momentum", hybrid:"Hybrid", vt:"VT"};
+  const DASH = {vt:"6 4"};
+  const key = (color, dash, width)=> `<svg width="18" height="10" viewBox="0 0 18 10" aria-hidden="true"><path d="M1 5H17" style="stroke:${color};stroke-width:${width||2.5};stroke-linecap:round${dash ? ";stroke-dasharray:" + dash : ""}"/></svg>`;
+  const bandKey = `<svg width="18" height="12" viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="1" width="18" height="10" rx="2" style="fill:var(--band)"/></svg>`;
+
+  // ------------------------------------------------------------------ charts
+  // Inline SVG, drawn at the width it is shown at so a 12px label stays 12px
+  // on a phone instead of shrinking with a fixed viewBox. Redrawn on resize.
+  let charts = [];
+  // Margins are measured in the font the labels are drawn in, so a long
+  // name like "Momentum" is never clipped at the right edge on a phone.
+  const measure = document.createElement("canvas").getContext("2d");
+  const textWidth = (text, weight)=>{
+    if(!measure) return text.length * 7.5;
+    measure.font = `${weight} 12px ${getComputedStyle(document.body).fontFamily}`;
+    return measure.measureText(text).width;
+  };
+
+  function niceTicks(lo, hi, count){
+    const raw = (hi - lo) / count;
+    const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    const n = raw / mag;
+    const step = (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * mag;
+    const t0 = Math.floor(lo / step) * step, t1 = Math.ceil(hi / step) * step;
+    const ticks = [];
+    for(let v = t0; v <= t1 + step * 1e-6; v += step) ticks.push(Math.round(v * 1e6) / 1e6);
+    return {lo:t0, hi:t1, ticks};
+  }
+
+  function chart(host, spec){ host.__spec = spec; charts.push(host); draw(host); }
+
+  function draw(host){
+    const s = host.__spec;
+    const n = s.days.length;
+    const W = Math.max(260, Math.floor(host.clientWidth || 320));
+    const narrow = W < 520;
+    const H = narrow ? 210 : 260;
+    const vals = [];
+    s.series.forEach(se=>se.values.forEach(v=>{ if(isNum(v)) vals.push(v); }));
+    if(s.band){ s.band.lo.forEach(v=>{ if(isNum(v)) vals.push(v); }); s.band.hi.forEach(v=>{ if(isNum(v)) vals.push(v); }); }
+    if(!n || !vals.length){ host.innerHTML = `<p class="muted small">Nothing to draw yet.</p>`; return; }
+    let lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+    const pad = Math.max(1, Math.abs(hi) * 0.002);
+    if(hi - lo < pad){ lo -= pad; hi += pad; }
+    const T = niceTicks(lo, hi, narrow ? 3 : 4);
+    const yText = T.ticks.map(kMoney);
+    const ends = s.series.filter(se=>se.end);
+    const left = Math.ceil(Math.max.apply(null, yText.map(t=>textWidth(t, 400)))) + 10;
+    const right = ends.length ? Math.ceil(Math.max.apply(null, ends.map(se=>textWidth(se.end, 600)))) + 16 : 12;
+    const top = 8, bottom = 26;
+    const pw = W - left - right, ph = H - top - bottom;
+    const X = (i)=> left + (n <= 1 ? pw / 2 : i * pw / (n - 1));
+    const Y = (v)=> top + ph - (v - T.lo) / (T.hi - T.lo) * ph;
+    const f1 = (v)=> v.toFixed(1);
+    let svg = "";
+    T.ticks.forEach((t, k)=>{
+      const y = f1(Y(t));
+      svg += `<line class="${k ? "grid" : "axis"}" x1="${left}" x2="${left + pw}" y1="${y}" y2="${y}"/><text x="${left - 6}" y="${y}" dy=".32em" text-anchor="end">${esc(yText[k])}</text>`;
+    });
+    const xCount = Math.min(n, narrow ? 3 : 5);
+    const xIdx = [...new Set(Array.from({length:xCount}, (_, k)=> xCount === 1 ? 0 : Math.round(k * (n - 1) / (xCount - 1))))];
+    xIdx.forEach((i, k)=>{
+      const anchor = n === 1 ? "middle" : k === 0 ? "start" : k === xIdx.length - 1 ? "end" : "middle";
+      svg += `<text x="${f1(X(i))}" y="${H - 8}" text-anchor="${anchor}">${esc(day(s.days[i]))}</text>`;
+    });
+    if(s.band){
+      // The band is drawn run by run, so a missing day leaves a gap rather
+      // than a straight edge across it.
+      let run = [];
+      const flush = ()=>{ if(run.length > 1){ svg += `<path d="M${run.map(i=>f1(X(i)) + " " + f1(Y(s.band.hi[i]))).join("L")}L${run.slice().reverse().map(i=>f1(X(i)) + " " + f1(Y(s.band.lo[i]))).join("L")}Z" style="fill:var(--band)"/>`; } run = []; };
+      for(let i = 0; i < n; i++){ if(isNum(s.band.lo[i]) && isNum(s.band.hi[i])) run.push(i); else flush(); }
+      flush();
+    }
+    s.series.forEach(se=>{
+      let d = "", pen = false;
+      se.values.forEach((v, i)=>{
+        if(i >= n || !isNum(v)){ pen = false; return; }
+        d += (pen ? "L" : "M") + f1(X(i)) + " " + f1(Y(v)); pen = true;
+        if(!isNum(se.values[i-1]) && !isNum(se.values[i+1])) svg += `<circle cx="${f1(X(i))}" cy="${f1(Y(v))}" r="${se.width > 2 ? 3.5 : 2.5}" style="fill:${se.color}"/>`;
+      });
+      if(d) svg += `<path d="${d}" fill="none" style="stroke:${se.color};stroke-width:${se.width || 2};stroke-linejoin:round;stroke-linecap:round${se.dash ? ";stroke-dasharray:" + se.dash : ""}"/>`;
+    });
+    // End labels: one per series at its last value, spread apart when the
+    // lines finish close together, with a thin leader back to the line.
+    const marks = ends.map(se=>{
+      let li = -1; for(let i = Math.min(n, se.values.length) - 1; i >= 0; i--){ if(isNum(se.values[i])){ li = i; break; } }
+      return li < 0 ? null : {se, li, y:Y(se.values[li]), ly:Y(se.values[li])};
+    }).filter(Boolean).sort((a, b)=> a.y - b.y);
+    const gap = 14;
+    marks.forEach((m, k)=>{ if(k) m.ly = Math.max(m.ly, marks[k-1].ly + gap); });
+    for(let k = marks.length - 1; k >= 0; k--){
+      const cap = k === marks.length - 1 ? top + ph : marks[k+1].ly - gap;
+      marks[k].ly = Math.max(top + 4, Math.min(marks[k].ly, cap));
+    }
+    marks.forEach(m=>{
+      const x0 = X(m.li), lx = left + pw + 8;
+      svg += `<circle cx="${f1(x0)}" cy="${f1(m.y)}" r="4" style="fill:${m.se.color};stroke:var(--surface);stroke-width:2"/>`;
+      if(Math.abs(m.ly - m.y) > 1.5 || x0 < left + pw - 1) svg += `<path class="lead" d="M${f1(x0 + 5)} ${f1(m.y)}L${f1(lx - 3)} ${f1(m.ly)}" fill="none"/>`;
+      svg += `<text class="end" x="${lx}" y="${f1(m.ly)}" dy=".32em">${esc(m.se.end)}</text>`;
+    });
+    svg += `<g class="hover" style="display:none"><line class="cross" x1="0" x2="0" y1="${top}" y2="${top + ph}"/>${s.series.map(se=>`<circle r="4" cx="0" cy="0" style="fill:${se.color};stroke:var(--surface);stroke-width:2"/>`).join("")}</g>`;
+    svg += `<rect x="${left}" y="${top}" width="${pw}" height="${ph}" fill="transparent"/>`;
+    host.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(s.aria)}">${svg}</svg><div class="tip" hidden></div>`;
+
+    // Hover, touch and arrow keys all land on the nearest day; the tooltip
+    // only repeats numbers the table below the chart also holds.
+    const el = host.querySelector("svg"), g = el.querySelector(".hover"), tip = host.querySelector(".tip");
+    const dots = g.querySelectorAll("circle"), cross = g.querySelector("line");
+    let current = -1;
+    const at = (i)=>{
+      i = Math.max(0, Math.min(n - 1, i)); current = i;
+      const x = X(i);
+      cross.setAttribute("x1", f1(x)); cross.setAttribute("x2", f1(x));
+      s.series.forEach((se, k)=>{ const v = se.values[i]; dots[k].style.display = isNum(v) ? "" : "none"; if(isNum(v)){ dots[k].setAttribute("cx", f1(x)); dots[k].setAttribute("cy", f1(Y(v))); } });
+      g.style.display = "";
+      let rows = s.series.map(se=>`<div class="r">${key(se.color, se.dash, se.width)}<b>${esc(money(se.values[i]))}</b><span>${esc(se.label)}</span></div>`).join("");
+      if(s.band && isNum(s.band.lo[i])) rows += `<div class="r">${bandKey}<b>${esc(kMoney(s.band.lo[i]))}–${esc(kMoney(s.band.hi[i]))}</b><span>${esc(s.band.short)}</span></div>`;
+      if(s.extra) rows += s.extra(i);
+      tip.innerHTML = `<div class="d">${esc(day(s.days[i], true))}</div>` + rows;
+      tip.hidden = false;
+      const scale = el.getBoundingClientRect().width / W || 1;
+      const px = x * scale, tw = tip.offsetWidth, hostW = host.clientWidth;
+      let lx = px + 12;
+      if(lx + tw > hostW) lx = px - 12 - tw;
+      tip.style.left = Math.max(0, Math.min(hostW - tw, lx)) + "px";
+    };
+    const hide = ()=>{ g.style.display = "none"; tip.hidden = true; };
+    const pick = (e)=>{ const r = el.getBoundingClientRect(); const xv = (e.clientX - r.left) * W / r.width; at(n <= 1 ? 0 : Math.round((xv - left) / pw * (n - 1))); };
+    el.addEventListener("pointermove", pick);
+    el.addEventListener("pointerdown", pick);
+    el.addEventListener("pointerleave", (e)=>{ if(e.pointerType === "mouse") hide(); });
+    host.onkeydown = (e)=>{
+      const step = {ArrowLeft:-1, ArrowRight:1}[e.key];
+      if(step){ at(current < 0 ? n - 1 : current + step); e.preventDefault(); }
+      else if(e.key === "Home"){ at(0); e.preventDefault(); }
+      else if(e.key === "End"){ at(n - 1); e.preventDefault(); }
+      else if(e.key === "Escape") hide();
+    };
+    host.onblur = hide;
+  }
+
+  let lastWidth = window.innerWidth, pending = 0;
+  window.addEventListener("resize", ()=>{
+    if(window.innerWidth === lastWidth) return;
+    lastWidth = window.innerWidth;
+    cancelAnimationFrame(pending);
+    pending = requestAnimationFrame(()=>charts.forEach(draw));
+  });
+  if(document.fonts && document.fonts.ready) document.fonts.ready.then(()=>charts.forEach(draw)).catch(()=>{});
+  document.addEventListener("pointerdown", (e)=>{ charts.forEach(h=>{ if(!h.contains(e.target)){ const g = h.querySelector(".hover"), t = h.querySelector(".tip"); if(g) g.style.display = "none"; if(t) t.hidden = true; } }); });
+
+  const plotHost = (label)=> `<div class="plot" role="group" tabindex="0" aria-label="${esc(label)}. Left and right arrows step through the days."></div>`;
+
+  // ----------------------------------------------------------------- banners
+  function nextText(nx){
+    if(!nx) return "No checkpoint left to reach.";
+    const when = nx.estimated ? esc(day(nx.estimated, true)) : `at ${esc(nx.independent)} independent days (no date estimate yet)`;
+    return `Next checkpoint: ${when}, bar t &gt; ${bar2(nx.bar)}`;
+  }
+
+  function raceBanner(R, from){
+    if(!isNum(R.independent)) return `<div class="banner idle"><b>Race:</b> no decision-gate record yet. ${doc("horse-race#the-decision-gate-comes-first", "The gate")}</div>`;
+    const of = R.of || 60, td = R.trading_days || 180;
+    const looks = Array.isArray(R.looks) && R.looks.length ? `<details class="data"><summary>All ${R.looks.length} checkpoints</summary><ul class="looks">${R.looks.map(l=>`<li><span class="num">${esc(l.independent)}</span> independent days · bar t &gt; <span class="num">${bar2(l.bar)}</span> · ${l.reached ? (l.outcome ? "decided: " + esc(l.outcome) : "reached, no decision") : "not reached yet"}${l.reason ? ` <span class="faint">${esc(l.reason)}</span>` : ""}</li>`).join("")}</ul></details>` : "";
+    const written = `<div class="sub">Decision gate written ${esc(israel(R.generated_at))}${from ? " · " + esc(from) : ""} ${doc("horse-race#the-decision-gate-comes-first", "The gate")}</div>`;
+    if(R.decided){
+      return `<div class="banner decided"><b>Race:</b> ${esc(R.status_line)}${R.outcome_text ? `<div><b>${esc(R.outcome_text)}</b></div>` : ""}${written}${looks}</div>`;
+    }
+    return `<div class="banner"><b>Race:</b> ${esc(R.independent)} of ${esc(of)} independent days (= ${esc(td)} trading days), <b>NO DECISION YET</b>. ${nextText(R.next)}${written}${looks}</div>`;
+  }
+
+  // The fund test's own next look (owner reading 5 of 6 Oct 2026): its
+  // number, the planned day, and its own bar by the spending rule of 11.7,
+  // with the registered bar beside it when the two differ.
+  function fundNextText(nx){
+    nx = asObj(nx);
+    if(!nx) return "No checkpoint left to read.";
+    const which = Number.isInteger(nx.look) ? ` ${esc(nx.look)} of 3` : "";
+    const when = nx.estimated ? `, about ${esc(day(nx.estimated, true))}` : "";
+    const bar = isNum(nx.bar) ? `the fund test's own bar t &gt; ${bar2(nx.bar)}` : "the fund test's own bar, set by the spending rule at the look";
+    const planned = isNum(nx.planned_bar) && nx.planned_bar !== nx.bar ? ` (planned ${bar2(nx.planned_bar)})` : "";
+    return `Next checkpoint${which}${when}: ${bar}${planned}`;
+  }
+
+  function fundTestBanner(ft, R){
+    ft = asObj(ft) || {}; R = asObj(R) || {};
+    // The start is fixed (the owner's decision of 26 Sep 2026); what waits
+    // is the reading: no fund result exists until calibration passes.
+    if(ft.status !== "running"){
+      const from = typeof ft.start === "string" && ft.start ? ft.start : "2026-09-29";
+      const cycle = typeof ft.first_cycle === "string" && ft.first_cycle ? ft.first_cycle : "2026-09-28";
+      return `<div class="banner idle"><b>Fund test:</b> starts ${esc(day(from, true))} (on the ${esc(day(cycle, true))} cycle), and counts only after calibration passes. ${doc("shadow-funds#the-fund-tests-start-and-the-gate", "The start and the gate")}</div>`;
+    }
+    // Owner reading 5 (6 Oct 2026): the fund test counts its own fund
+    // sessions of the planned 180, and names its own next look and bar. A
+    // record from before the checkpoint verdict (no planned_sessions) has no
+    // look of its own, so the race's next look stands in for it, and "none
+    // left" is said only when the race has none left either.
+    const sessions = isNum(ft.sessions) ? ft.sessions : 0;
+    const planned = isNum(ft.planned_sessions) ? ft.planned_sessions : 180;
+    let next;
+    if(asObj(ft.next_look) || asObj(ft.next_checkpoint)) next = fundNextText(asObj(ft.next_look) || ft.next_checkpoint);
+    else if("planned_sessions" in ft) next = fundNextText(null);
+    else if(R.next) next = `${nextText(R.next)} <span class="faint">(the race's next look)</span>`;
+    else if(!isNum(R.independent)) next = "Next checkpoint: not known until the decision gate writes its record.";
+    else next = nextText(null);
+    const sub = `<div class="sub">${ft.start ? `Started ${esc(day(ft.start, true))} ` : ""}${doc("shadow-funds#the-fund-tests-start-and-the-gate", "The fund test")}</div>`;
+    const decided = asObj(ft.verdict);
+    if(decided && Number.isInteger(decided.decided_at)){
+      return `<div class="banner decided"><b>Fund test:</b> ${esc(sessions)} of ${esc(planned)} fund sessions, decided at checkpoint ${esc(decided.decided_at)}: <b>${esc(decided.text)}</b>${sub}</div>`;
+    }
+    return `<div class="banner"><b>Fund test:</b> ${esc(sessions)} of ${esc(planned)} fund sessions, <b>NO DECISION YET</b>. ${next}${sub}</div>`;
+  }
+
+  // ------------------------------------------------------ checkpoint verdict
+  // The checkpoint verdict (docs/research/checkpoint-verdict-plan.md, the
+  // layout the owner approved on 6 Oct 2026): the race's table, the fund
+  // test's table and the one combined line (section 11.8), every word as the
+  // record wrote it; the page decides nothing. Each test shows its deciding
+  // look's frozen table, else its latest look's. Before any look, one card:
+  // "Checkpoint verdict: no decision yet". An older record without the keys
+  // draws nothing.
+  const VT_COLUMNS = ["#", "Rule (section)", "What is measured", "Value", "Bar", "Result"];
+
+  function verdictTable(t){
+    t = asObj(t);
+    if(!t) return "";
+    const rows = (Array.isArray(t.rows) ? t.rows : []).map(asObj).filter(Boolean);
+    const title = `<p class="vtitle"><b>${esc(t.title)}</b></p>`;
+    if(!rows.length) return title + `<p class="small">${esc(t.verdict)}</p>`;
+    const cell = (r)=> r.n === "→"
+      ? `<tr class="to"><td>→</td><td colspan="4">${esc(r.rule)}</td><td>${esc(r.result)}</td></tr>`
+      : `<tr><td>${esc(r.n)}</td><td>${esc(r.rule)}</td><td>${esc(r.measured)}</td><td class="v">${esc(r.value)}</td><td>${esc(r.bar)}</td><td>${esc(r.result)}</td></tr>`;
+    return title + `<div class="scroll"><table class="vt"><thead><tr>${VT_COLUMNS.map(c=>`<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${rows.map(cell).join("")}</tbody></table></div>`;
+  }
+
+  function verdictHtml(F, R){
+    F = asObj(F) || {}; R = asObj(R) || {};
+    const race = asObj(R.verdict), ft = asObj(F.fund_test) || {}, fund = asObj(ft.verdict), both = asObj(F.verdict);
+    if(!race && !fund && !both) return "";
+    // A look's entry with its table; the deciding look's, else the latest.
+    const entries = (list)=> (Array.isArray(list) ? list : []).map(asObj).filter(e=> e && Number.isInteger(e.look) && asObj(e.table));
+    const pick = (list, at)=> list.find(e=> e.look === at) || list.slice().sort((a, b)=> a.look - b.look).pop() || null;
+    const raceEntry = pick(entries(race && race.looks), race && race.decided_at);
+    const fundEntry = pick(entries(ft.looks), fund && fund.decided_at);
+    const link = doc("shadow-funds#the-checkpoint-verdict", "The checkpoint verdict");
+    if(!raceEntry && !fundEntry){
+      return `<div class="card verdict" style="margin-top:10px"><h3>Checkpoint verdict: no decision yet</h3>`
+        + (typeof ft.note === "string" && ft.note ? `<p class="small muted">${esc(ft.note)}</p>` : "")
+        + `<p class="small">${link}</p></div>`;
+    }
+    let html = `<div class="card verdict" style="margin-top:10px"><h3>Checkpoint verdict</h3>`;
+    if(both && typeof both.text === "string"){
+      html += `<p class="vline">${esc(typeof both.line === "string" && both.line ? both.line : both.text)}</p>`;
+      if(typeof both.note === "string" && both.note) html += `<p class="small muted">${esc(both.note)}</p>`;
+    }
+    if(raceEntry){
+      html += `<h4>The race</h4>` + verdictTable(raceEntry.table);
+      if(typeof raceEntry.differs_tonight === "string" && raceEntry.differs_tonight){
+        html += `<p class="amber">Tonight's data reads checkpoint ${esc(raceEntry.look)} differently: ${esc(raceEntry.differs_tonight)}. The frozen table stays.</p>`;
+      }
+    }
+    if(fundEntry){
+      html += `<h4>The fund test</h4>` + verdictTable(fundEntry.table);
+      if(fundEntry.bar_differs === true && isNum(fundEntry.bar) && isNum(fundEntry.planned_bar)){
+        html += `<p class="amber">Bar ${bar2(fundEntry.bar)} (planned ${bar2(fundEntry.planned_bar)}): the fund test's bar by the spending rule of section 11.7 differs from the planned bar: log it in the Amendments table.</p>`;
+      }
+    }
+    if(typeof ft.note === "string" && ft.note) html += `<p class="small muted">${esc(ft.note)}</p>`;
+    return html + `<p class="small">${link}</p></div>`;
+  }
+
+  // ------------------------------------------------------------ race reports
+  // The owner's two reports on the race's trades (25 Sep 2026): does a
+  // higher conviction mean a better trade, and how the longs did against the
+  // shorts. Report only: nothing here moves a look, a bar or the verdict. It
+  // is race data, not fund data, so it is drawn whether or not calibration
+  // has passed. A group or a side shows "too few" in place of its numbers
+  // until it has 20 trades, so a handful of trades is never read as a finding.
+  const ARM = {model:"Model", momentum:"Momentum", hybrid:"Hybrid", random:"Random (coin flip)"};
+
+  function raceReportsHtml(R){
+    R = asObj(R);
+    if(!R) return "";
+    const groups = asObj(R.conviction_groups) || {}, sides = asObj(R.sides) || {};
+    // The arms in the race's report order, then any other the record names.
+    const own = (o, k)=> Object.prototype.hasOwnProperty.call(o, k);
+    const arms = (o)=> Object.keys(ARM).filter(k=>own(o, k)).concat(Object.keys(o).filter(k=>!own(ARM, k)));
+    const count = (s)=> Number.isFinite(s.n) ? s.n : null;
+    // The record's own too_few when it gives one, else the owner's 20
+    // trades; and without a count there is nothing to show but "too few".
+    const few = (s)=> count(s) === null || (typeof s.too_few === "boolean" ? s.too_few : count(s) < 20);
+    const cells = (s)=> few(s)
+      ? `<td colspan="3" class="few">too few (n=${esc(count(s) ?? "n/a")})</td>`
+      : `<td>${esc(count(s))}</td><td class="${tone(s.mean_net)}">${esc(signed(s.mean_net, 2))}</td><td>${esc(plain(s.hit_rate, 0))}</td>`;
+    const table = (arm, first, rows)=> `<div class="scroll"><table class="mini"><caption>${esc(own(ARM, arm) ? ARM[arm] : arm)}</caption>`
+      + `<thead><tr><th>${first}</th><th>n</th><th>Mean net</th><th>Hit rate</th></tr></thead>`
+      + `<tbody>${rows.map(([label, s])=>`<tr><td>${esc(label)}</td>${cells(s)}</tr>`).join("")}</tbody></table></div>`;
+    const byConviction = arms(groups).map(arm=>{
+      const rows = (Array.isArray(groups[arm]) ? groups[arm] : []).map(asObj).filter(Boolean).map(s=>[s.group ?? "n/a", s]);
+      return rows.length ? table(arm, "Conviction", rows) : "";
+    }).filter(Boolean);
+    const bySide = arms(sides).map(arm=>{
+      const s = asObj(sides[arm]) || {};
+      const rows = [["Longs", asObj(s.long)], ["Shorts", asObj(s.short)]].filter(([, v])=>v);
+      return rows.length ? table(arm, "Side", rows) : "";
+    }).filter(Boolean);
+    if(!byConviction.length && !bySide.length) return "";
+    const since = typeof R.report_since === "string" && R.report_since ? ` since ${esc(day(R.report_since, true))}` : "";
+    return `<div class="card" style="margin-top:10px"><h3>Race: by conviction, and longs vs shorts <span class="faint" style="font-weight:400">(exploratory, report only)</span></h3>`
+      + `<p class="small muted">Trades${since}, after costs · "too few" below 20 trades · ${doc("horse-race#exploratory-reports-conviction-groups-longs-and-shorts", "About these reports")}</p>`
+      + (byConviction.length ? `<h4>Does higher conviction mean better trades?</h4><div class="minis">${byConviction.join("")}</div>` : "")
+      + (bySide.length ? `<h4>Longs vs shorts</h4><div class="minis">${bySide.join("")}</div>` : "")
+      + `</div>`;
+  }
+
+  // ---------------------------------------------------------------- problems
+  // Everything the record says went wrong, gathered into one card so it
+  // reaches the owner instead of sitting unread in the file: a stopped
+  // calibration and why, calibration's own problems, a failed integrity
+  // check of the funds (the four and the three exploratory) or of the
+  // coin-flip funds, and any pass-rule condition that already reads FAIL.
+  const VERDICT = /^\s*(\d+)\.\s*(.*?):\s*(PASS|FAIL|PENDING)\b\s*(?:\((.*)\))?\s*$/;
+  const warnIcon = `<svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 15 14H1z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8 6v3.6M8 11.4v.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>`;
+
+  function verdictRow(line){
+    const text = String(line ?? "");
+    const m = VERDICT.exec(text);
+    return m ? {n:m[1], what:m[2], state:m[3], detail:m[4] || ""} : {text};
+  }
+
+  function problemList(data){
+    data = data && typeof data === "object" ? data : {};
+    const c = data.calibration && typeof data.calibration === "object" ? data.calibration : {};
+    const out = [];
+    // A stopped calibration waits for the owner, so it heads the card.
+    if(c.status === "stopped"){
+      const why = typeof c.stop_reason === "string" && c.stop_reason ? c.stop_reason : "the record gives no reason";
+      out.push({where:"Calibration stopped", text:why, bad:true});
+    }
+    (Array.isArray(c.problems) ? c.problems : []).forEach(p=>out.push({where:"Calibration", text:String(p), bad:false}));
+    const integrity = data.integrity && typeof data.integrity === "object" ? data.integrity : {};
+    // "four" keeps its name in the record but checks the three exploratory
+    // funds as well, so its label names all seven.
+    [["four", "The funds' integrity check (the four and the three exploratory)"], ["coin", "The coin-flip funds' integrity check"]].forEach(([k, label])=>{
+      const i = integrity[k];
+      if(!i || typeof i !== "object") return;
+      const holes = Number(i.data_holes);
+      if(Number.isFinite(holes) && holes > 0){
+        const ex = Array.isArray(i.data_hole_examples) && i.data_hole_examples.length ? ` (for example ${String(i.data_hole_examples[0])})` : "";
+        out.push({where:label, text:`${holes} ticker-day(s) had no price bar in the data: that day the position was left as it was and no entry was made${ex}`, bad:false});
+      }
+      const listed = Array.isArray(i.problems) ? i.problems : [];
+      if(i.ok !== false && !listed.length) return;
+      (listed.length ? listed : ["failed, and the record names no problem"]).forEach(p=>out.push({where:label, text:String(p), bad:true}));
+    });
+    if(["running", "passed", "failed", "stopped"].includes(c.status)){
+      const verdicts = c.pass_rule && Array.isArray(c.pass_rule.verdicts) ? c.pass_rule.verdicts : [];
+      verdicts.map(verdictRow).filter(v=>v.state === "FAIL").forEach(v=>
+        out.push({where:"Pass rule", text:`${v.n}. ${v.what}: FAIL${v.detail ? " (" + v.detail + ")" : ""}`, bad:true}));
+    }
+    return out;
+  }
+
+  function problemsHtml(data){
+    const items = problemList(data);
+    if(!items.length) return "";
+    const SHOW = 6;
+    const li = (p)=> `<li><span class="where">${esc(p.where)}:</span> ${esc(p.text)}</li>`;
+    const more = items.length > SHOW ? `<details class="data"><summary>${items.length - SHOW} more</summary><ul>${items.slice(SHOW).map(li).join("")}</ul></details>` : "";
+    return `<div class="alert${items.some(p=>p.bad) ? " bad" : ""}"><h3>${warnIcon}${items.length === 1 ? "1 problem" : esc(items.length) + " problems"} in the record</h3><ul>${items.slice(0, SHOW).map(li).join("")}</ul>${more}</div>`;
+  }
+
+  // The pass rule's own lines: a heading line, then conditions that already
+  // carry their numbers, so the list numbers nothing itself.
+  function ruleHtml(lines){
+    lines = (Array.isArray(lines) ? lines : []).map(t=>String(t ?? ""));
+    const numbered = (t)=> /^\s*\d+\.\s/.test(t);
+    let k = 0;
+    while(k < lines.length && !numbered(lines[k])) k++;
+    if(k === lines.length) k = 0;
+    const head = lines.slice(0, k).map(t=>`<p class="rule-head"><strong>${esc(t)}</strong></p>`).join("");
+    const items = lines.slice(k).map(t=>{
+      const m = /^\s*(\d+\.)\s+(.*)$/.exec(t);
+      return m ? `<li><span class="n num">${esc(m[1])}</span><span>${esc(m[2])}</span></li>` : `<li><span>${esc(t)}</span></li>`;
+    }).join("");
+    return head + (items ? `<ul class="rule">${items}</ul>` : "");
+  }
+
+  // Where each condition of the rule stands, as the evaluator wrote it.
+  function verdictsHtml(lines){
+    const rows = (Array.isArray(lines) ? lines : []).map(verdictRow);
+    if(!rows.length) return "";
+    const chipOf = {PASS:"good", FAIL:"bad", PENDING:"run"};
+    const notes = rows.filter(r=>!r.state), conds = rows.filter(r=>r.state);
+    return `<h3 style="margin-top:14px">Where each condition stands</h3>`
+      + notes.map(r=>`<p class="small muted">${esc(r.text)}</p>`).join("")
+      + (conds.length ? `<ul class="verdicts">${conds.map(r=>`<li><span class="chip ${chipOf[r.state]}">${r.state}</span><span>${esc(r.n)}. ${esc(r.what)}${r.detail ? ` <span class="faint">(${esc(r.detail)})</span>` : ""}</span></li>`).join("")}</ul>` : "");
+  }
+
+  // -------------------------------------------------------------- calibration
+  const tiles = (rows)=> `<div class="tiles">${rows.map(([l, v, sub])=>`<div class="tile"><div class="label">${l}</div><div class="value num">${v}</div><div class="sub">${sub}</div></div>`).join("")}</div>`;
+
+  // The owner's fail rule (25 Sep 2026): a fail is fixed rather than started
+  // over, and calibration runs on to day 15 or to 5 days after the last fix,
+  // whichever is later. So once it has started the card says how many days
+  // have passed, which fix came last and how many days have passed since it,
+  // and where the fund test would start, with which bars, if nothing more
+  // fails. A plan that no longer matches what was registered is said in
+  // amber: it must be re-registered before the fund test starts.
+  function calibrationFixHtml(c){
+    c = asObj(c);
+    if(!c || !["running", "passed", "failed", "stopped"].includes(c.status)) return "";
+    // An older record carries none of these and says nothing about fixes.
+    if(!["days_passed", "fixes", "last_fix", "days_since_fix", "fund_test_plan"].some(k=>k in c)) return "";
+    const need = Number.isFinite(c.days_needed) ? c.days_needed : 15;
+    const after = Number.isFinite(c.days_after_fix_needed) ? c.days_after_fix_needed : 5;
+    const fixes = (Array.isArray(c.fixes) ? c.fixes : []).map(asObj).filter(f=>f && typeof f.day === "string" && f.day);
+    const last = typeof c.last_fix === "string" && c.last_fix ? c.last_fix : (fixes.map(f=>f.day).sort().pop() || null);
+    const facts = [];
+    if(Number.isFinite(c.days_passed)) facts.push(`Days passed: <b class="num">${esc(c.days_passed)}</b> of <span class="num">${esc(need)}</span>`);
+    if(last){
+      const what = fixes.filter(f=>f.day === last && f.what != null && f.what !== "").map(f=>f.what).pop();
+      facts.push(`Last fix: ${esc(day(last, true))}${what != null ? ` (${esc(what)})` : ""}`);
+      if(Number.isFinite(c.days_since_fix)) facts.push(`Days since the last fix: <b class="num">${esc(c.days_since_fix)}</b> of <span class="num">${esc(after)}</span>`);
+    } else {
+      facts.push("No fix yet");
+    }
+    let html = `<ul class="facts">${facts.map(f=>`<li>${f}</li>`).join("")}</ul>`;
+    // A stopped calibration has no end date, and the fund test's start is
+    // not worked out from it, so the record gives neither and none is shown.
+    const end = c.status !== "stopped" && typeof c.end_estimate === "string" && c.end_estimate ? `If nothing more fails, it ends ${esc(day(c.end_estimate, true))}. ` : "";
+    html += c.status === "stopped"
+      ? `<p class="small muted">Calibration is stopped, so it has no end date. ${doc("shadow-funds#calibration-first", "The fail rule")}</p>`
+      : `<p class="small muted">${end}${doc("shadow-funds#calibration-first", "The fail rule")}</p>`;
+    if(fixes.length > 1){
+      html += `<details class="data"><summary>All ${esc(fixes.length)} fixes</summary><ul class="facts">${fixes.map(f=>`<li>${esc(day(f.day, true))}${f.what != null && f.what !== "" ? `: ${esc(f.what)}` : ""}</li>`).join("")}</ul></details>`;
+    }
+    const plan = c.status === "stopped" ? null : asObj(c.fund_test_plan);
+    if(plan && typeof plan.start === "string" && plan.start){
+      // The start is fixed; a look on or before calibration's end is
+      // skipped by the fund test: it has no bar, and the record gives null.
+      const bars = (v)=>{ const list = (Array.isArray(v) ? v : []).map(b=>Number.isFinite(b) ? b.toFixed(2) : "none"); return list.length ? list.join(", ") : "n/a"; };
+      const skipped = (Array.isArray(plan.skipped) ? plan.skipped : []).map((s, k)=>s === true ? k + 1 : 0).filter(Boolean);
+      html += `<p>Fund test starts ${esc(day(plan.start, true))} (fixed); bars ${esc(bars(plan.bars))}${skipped.length ? `; look ${esc(skipped.join(" and "))} skipped` : ""}</p>`;
+      if(plan.matches_registered === false){
+        html += `<div class="amber" role="note"><b>Differs from the planned bars${Array.isArray(plan.registered) ? ` (${esc(bars(plan.registered))})` : ""}: computed at each look by the spending rule, logged in the Amendments table.</b> ${doc("shadow-funds#the-fund-tests-start-and-the-gate", "Why the bars moved")}</div>`;
+      } else if(plan.matches_registered === true){
+        html += `<p class="small faint">The same start and bars as planned.</p>`;
+      }
+    }
+    return html;
+  }
+
+  function renderCalibration(data){
+    // Late runs (the owner's decision of 25 Sep 2026): what the copy did not
+    // do because the real account's run met a closed market. Always shown
+    // once there is any, never folded into the differences, since neither
+    // book traded; the count is set against the owner's limit of days.
+    // Defined in here so this function stays whole on its own.
+    function lateRunsHtml(c){
+      const items = (Array.isArray(c.mirrored) ? c.mirrored : []).map(asObj).filter(Boolean);
+      const count = Number.isFinite(c.mirrored_day_count) ? c.mirrored_day_count : null;
+      if(!items.length && !count) return "";
+      const limit = Number.isFinite(c.mirror_limit) ? c.mirror_limit : 2;
+      const entries = items.filter(m=>m.what === "entry").length, passes = items.filter(m=>m.what === "ladder pass").length;
+      const n = (k, one, many)=> `<b class="num">${esc(k)}</b> ${k === 1 ? one : many}`;
+      const days = count ?? new Set(items.map(m=>m.day)).size;
+      const over = days > limit;
+      const rows = items.map(m=>`<li>${esc(day(m.day, true))}: ${m.what === "ladder pass" ? "ladder pass (the whole book)" : `entry ${esc(m.ticker ?? "n/a")}`}${m.at ? ` <span class="faint">at ${esc(israel(m.at))}</span>` : ""}${m.reason ? ` <span class="faint">(${esc(m.reason)})</span>` : ""}</li>`).join("");
+      return `<div class="${over ? "alert bad" : "amber"}" role="note"><b>Late runs:</b> ${n(entries, "entry", "entries")} and ${n(passes, "ladder pass", "ladder passes")} mirrored on ${n(days, "day", "days")} (limit ${esc(limit)}). ${doc("shadow-funds#late-runs", "Late runs")}`
+        + (rows ? `<details class="data"><summary>What was mirrored</summary><ul class="facts">${rows}</ul></details>` : "") + `</div>`;
+    }
+
+    const el = $("calibration");
+    const c = data.calibration;
+    if(!c || typeof c !== "object"){
+      el.innerHTML = `<div class="card muted">No calibration record yet. ${doc("shadow-funds#calibration-first", "Calibration")}</div>`;
+      return [];
+    }
+    const status = c.status || "not_started";
+    const need = isNum(c.days_needed) ? c.days_needed : 15, done = isNum(c.days_done) ? c.days_done : 0;
+    const chip = {not_started:["idle", "not started"], running:["run", "running"], passed:["good", "passed"], failed:["bad", "failed"], stopped:["bad", "stopped"]}[status] || ["idle", status];
+    const todo = [];
+    let html = "";
+    if(status === "not_started"){
+      html += `<div class="card"><div class="st"><span class="chip ${chip[0]}">${esc(chip[1])}</span><span>waiting for the pass rule below to be approved · <span class="num">${esc(need)}</span> trading days once it starts</span></div><div class="docs">${doc("shadow-funds#calibration-first", "Calibration")} ${doc("shadow-funds#what-is-real-and-what-is-simulated", "What is simulated")}</div></div>`;
+    } else {
+      const say = {
+        failed: "Failed under the approved rule: the four funds stay hidden.",
+        stopped: "Stopped: neither a pass nor a fail until the owner decides; the four funds stay hidden.",
+      }[status] || "";
+      const why = status === "stopped" && typeof c.stop_reason === "string" && c.stop_reason
+        ? `<p class="small"><b>Why:</b> ${esc(c.stop_reason)}</p>` : "";
+      // "Closes compared" rather than "Day": after a fail the days passed
+      // (the fail rule's count, below) stop short of the days compared, and
+      // two different numbers both called days would read as a contradiction.
+      html += `<div class="card"><div class="st"><span class="chip ${chip[0]}">${esc(chip[1])}</span><span><b class="num">${esc(done)}</b> of <span class="num">${esc(need)}</span> closes compared${c.start ? ` · started ${esc(day(c.start, true))}` : ""}</span></div><div class="bar" role="img" aria-label="${esc(done)} of ${esc(need)} calibration closes compared"><i style="width:${Math.max(0, Math.min(100, need ? done / need * 100 : 0))}%"></i></div>${calibrationFixHtml(c)}${say ? `<p class="small muted">${say}</p>` : ""}${why}${lateRunsHtml(c)}<div class="docs">${doc("shadow-funds#calibration-first", "Calibration")} ${doc("shadow-funds#what-is-real-and-what-is-simulated", "What is simulated")}</div></div>`;
+      const series = Array.isArray(c.series) ? c.series : [];
+      const problems = (Array.isArray(c.problems) ? c.problems : []).map(p=>String(p ?? ""));
+      if(series.length){
+        const days = series.map(r=>r.day), sim = series.map(r=>r.sim), real = series.map(r=>r.real);
+        const last = series[series.length - 1];
+        const m = c.metrics || {};
+        const aria = `Calibration fund against the real paper account, ${day(days[0], true)} to ${day(days[days.length-1], true)}. On the last day the simulation was ${money(last.sim)} and the real account ${money(last.real)}; the largest daily gap was ${plain(m.max_abs_gap_pct, 2)}.`;
+        html += `<div class="chart"><h3>The calibration fund against the real account</h3><div class="cap">Equity at each close.</div>
+          <ul class="legend"><li>${key("var(--s-real)", false, 5)}Real paper account</li><li>${key("var(--s-model)")}Calibration fund (simulated)</li></ul>
+          ${plotHost("Calibration chart")}
+          <details class="data"><summary>The numbers by day</summary><div class="scroll"><table><thead><tr><th>Day</th><th>Simulated</th><th>Real</th><th>Gap</th></tr></thead><tbody>${series.map(r=>`<tr><td>${esc(day(r.day, true))}</td><td>${esc(money(r.sim))}</td><td>${esc(money(r.real))}</td><td>${esc(signed(r.diff_pct, 2))}</td></tr>`).join("")}</tbody></table></div></details></div>`;
+        todo.push(["calibration", ()=> chart(el.querySelector(".plot"), {
+          days, aria,
+          // The real account is drawn wide and pale underneath, the
+          // simulation thin on top: where they agree it reads as one line
+          // with a halo, where they part both are plain to see.
+          series: [
+            {label:"Real", values:real, color:"var(--s-real)", width:5, end:"Real"},
+            {label:"Simulated", values:sim, color:"var(--s-model)", width:2, end:"Sim"},
+          ],
+          extra: (i)=> isNum(series[i].diff_pct) ? `<div class="r"><span style="width:18px"></span><b>${esc(signed(series[i].diff_pct, 2))}</b><span>gap</span></div>` : "",
+        })]);
+      } else if(problems.length){
+        // No day to show, and the record says why: say it here, where the
+        // first day would have been, not only in the card above.
+        html += `<div class="alert"><h3>${warnIcon}No calibration day recorded yet</h3><p class="small">The record gives ${problems.length === 1 ? "this reason" : "these reasons"}:</p><ul>${problems.map(p=>`<li>${esc(p)}</li>`).join("")}</ul></div>`;
+      } else {
+        html += `<div class="card muted small">No calibration day recorded yet.</div>`;
+      }
+      const m = c.metrics || {};
+      html += tiles([
+        ["Largest daily gap", plain(m.max_abs_gap_pct, 2), "simulated against real equity"],
+        ["Tracking error", plain(m.tracking_error_pct, 2), "st. dev. of daily return gaps"],
+        ["Trades matched", plain(m.matched_share, 0), "real trades the simulation also made"],
+        ["Unexplained", isNum(m.unexplained) ? String(m.unexplained) : "n/a", "differences with no reason found"],
+      ]);
+      const diffs = Array.isArray(c.differences) ? c.differences : [];
+      html += `<h3 style="margin-top:16px">Trades that differ <span class="faint" style="font-weight:400">(${diffs.length})</span></h3>`;
+      html += diffs.length ? `<div class="diffs">${diffs.map(d=>`<div class="diff"><div class="head"><b>${esc(d.ticker)}</b><span class="faint">${esc(day(d.day, true))}</span></div><dl class="kv"><dt>Real</dt><dd>${esc(d.real)}</dd><dt>Simulated</dt><dd>${esc(d.sim)}</dd></dl>${d.reason ? `<div class="why">${esc(d.reason)}</div>` : ""}</div>`).join("")}</div>` : `<p class="muted small">No trade differs so far.</p>`;
+    }
+    const rule = c.pass_rule || {};
+    const lines = Array.isArray(rule.text) ? rule.text : [];
+    // The verdicts are the evaluator's, written only once calibration runs.
+    const verdicts = ["running", "passed", "failed", "stopped"].includes(status) && Array.isArray(rule.verdicts) ? rule.verdicts : [];
+    html += `<div class="card" style="margin-top:12px"><h3>Pass rule ${rule.approved ? `<span class="chip good">approved</span>` : `<span class="chip run">not in force yet</span>`}</h3>${lines.length ? ruleHtml(lines) : `<p class="muted small">No pass rule written yet.</p>`}${verdictsHtml(verdicts)}</div>`;
+    const h = c.holding_days || {};
+    const dd = (v)=> isNum(v) ? (Number.isInteger(v) ? String(v) : v.toFixed(1)) : "n/a";
+    html += `<h3 style="margin-top:16px">The real account's holding period, in trading days</h3>` + tiles([
+      ["Median, closed", isNum(h.median) ? dd(h.median) + " days" : "n/a", `over ${esc(isNum(h.closed) ? h.closed : 0)} closed position${h.closed === 1 ? "" : "s"}`],
+      ["Range, closed", isNum(h.min) && isNum(h.max) ? `${dd(h.min)}–${dd(h.max)} days` : "n/a", "shortest to longest"],
+      ["Median, still open", isNum(h.open_median) ? dd(h.open_median) + " days" : "n/a", "days held so far"],
+    ]);
+    el.innerHTML = html;
+    return todo;
+  }
+
+  // -------------------------------------------------------------- the funds
+  // The funds stay hidden until calibration has passed, whatever the file
+  // holds: no fund number is drawn while the simulation is still being
+  // checked against the real account.
+  function fundsVisible(data){
+    return !!(data && data.funds && data.calibration && data.calibration.status === "passed");
+  }
+
+  // The fund card's own line of the order report: "3 of 15 days" on which
+  // the fund ran out of room before the end of its list. None for VT.
+  function orderCell(x){
+    const o = x && x.name !== "vt" && x.order_matters && typeof x.order_matters === "object" ? x.order_matters : null;
+    if(!o || !Number.isFinite(o.cycle_days)) return "";
+    return `<dt>Order mattered</dt><dd class="num">${o.cycle_days === 0 ? "no cycle yet" : `${esc(Number.isFinite(o.days) ? o.days : "n/a")} of ${esc(o.cycle_days)} days`}</dd>`;
+  }
+
+  // Longs against shorts, for one fund (the owner's report of 25 Sep 2026):
+  // "Longs: 24 trades, mean +0.9%, hit 58% | Shorts: too few (n=7)". A side
+  // shows "too few" in place of its numbers until it has 20 closed trades.
+  function sidesLine(sides){
+    sides = asObj(sides);
+    if(!sides) return "";
+    const one = (label, s)=>{
+      s = asObj(s);
+      if(!s) return "";
+      const n = Number.isFinite(s.n) ? s.n : null;
+      const few = n === null || (typeof s.too_few === "boolean" ? s.too_few : n < 20);
+      if(few) return `${label}: too few (n=${esc(n ?? "n/a")})`;
+      return `${label}: ${esc(n)} trade${n === 1 ? "" : "s"}, mean ${esc(signed(s.mean_return, 1))}, hit ${esc(plain(s.hit_rate, 0))}`;
+    };
+    return [one("Longs", sides.long), one("Shorts", sides.short)].filter(Boolean).join(" | ");
+  }
+
+  // Exploratory funds: the list rows marked exploratory, never one of the
+  // four. Older records carry no flag and no such row.
+  const isExploratory = (x)=> !!(x && x.exploratory === true);
+
+  // The owner's three exploratory funds (25 and 26 Sep 2026): the model's
+  // own signals with one thing changed, the buying order (highest conviction
+  // first), the size (by conviction) or the entry (the signal's own day, at
+  // the price recorded when it was made). Each is set against the model
+  // fund only, never ranked with the four: it cannot change the decision.
+  // Shown, like every fund, only once calibration has passed.
+  function exploratoryHtml(data){
+    if(!fundsVisible(data)) return "";
+    const list = (Array.isArray(data.funds.list) ? data.funds.list : []).map(asObj).filter(Boolean);
+    const rows = list.filter(isExploratory);
+    if(!rows.length) return "";
+    const drawdown = (v)=> Number.isFinite(v) ? signed(-Math.abs(v), 1) : "n/a";
+    const items = rows.map(x=>{
+      const to = typeof x.compare_to === "string" && x.compare_to ? x.compare_to : "model";
+      const base = list.find(m=>m.name === to && !isExploratory(m)) || {};
+      const whose = `the ${Object.prototype.hasOwnProperty.call(SHORT, to) ? SHORT[to].toLowerCase() : to}'s`;
+      const v = asObj(x.vs_model) || {};
+      const daily = Number.isFinite(v.mean_daily_diff) ? signed(v.mean_daily_diff, 3) + " a day" : "n/a";
+      const t = Number.isFinite(v.t) ? v.t.toFixed(2) : "n/a";
+      const over = Number.isFinite(v.days) ? ` <span class="faint vs">over ${esc(v.days)} day${v.days === 1 ? "" : "s"}</span>` : "";
+      // Sizing by conviction is the change that can deepen a loss, so that
+      // fund's drawdown is shown against the model's.
+      const dd = x.name === "model_sized"
+        ? `<dt>Max drawdown</dt><dd class="num">${esc(drawdown(v.max_drawdown))} <span class="faint vs">vs ${esc(whose)} ${esc(drawdown(v.model_max_drawdown))}</span></dd>` : "";
+      // Entering on the signal's own day: the lines it could not enter, and why.
+      const ne = asObj(x.not_entered);
+      const count = (k)=> ne && Number.isFinite(ne[k]) ? ne[k] : 0;
+      const notEntered = ne
+        ? `<dt>Lines not entered</dt><dd class="num">${esc(Number.isFinite(ne.total) ? ne.total : count("no_price") + count("outside_hours") + count("other_day"))} <span class="faint vs">${esc(count("no_price"))} no recorded price, ${esc(count("outside_hours"))} outside regular hours${count("other_day") ? `, ${esc(count("other_day"))} on another day` : ""}</span></dd>` : "";
+      const sides = sidesLine(x.sides);
+      return `<div class="xfund"><div class="head"><span>${esc(x.label || x.name)}</span><span class="chip idle">exploratory; cannot change the decision</span></div>
+        <dl class="kv">
+          <dt>Total return</dt><dd class="num"><span class="${tone(x.total_return)}">${esc(signed(x.total_return, 2))}</span> <span class="faint vs">vs ${esc(whose)} ${esc(signed(base.total_return, 2))}</span></dd>
+          <dt>Difference</dt><dd class="num ${tone(v.total_return_diff)}">${esc(pts(v.total_return_diff))}</dd>
+          <dt>Mean daily difference</dt><dd class="num">${esc(daily)}</dd>
+          <dt>t</dt><dd class="num">${esc(t)}${over}</dd>
+          ${dd}${notEntered}
+        </dl>${sides ? `<p class="sides">${sides}</p>` : ""}</div>`;
+    });
+    return `<div class="card" style="margin-top:10px"><h3>Exploratory: does the order, the size or the entry day matter?</h3>`
+      + `<p class="small muted">The model's signals with one thing changed, against the model fund day by day · ${doc("shadow-funds#three-exploratory-funds", "The three funds")}</p>`
+      + `<div class="xfunds">${items.join("")}</div></div>`;
+  }
+
+  // The fund card's longs-against-shorts line. None for VT: it holds the
+  // index, which is not a signal's trade.
+  function sidesCell(x){
+    const line = x && x.name !== "vt" ? sidesLine(x.sides) : "";
+    return line ? `<p class="sides">${line}</p>` : "";
+  }
+
+  function renderFunds(data){
+    const el = $("funds");
+    if(!fundsVisible(data)){
+      const passed = !!(data.calibration && data.calibration.status === "passed");
+      el.innerHTML = passed
+        ? `<div class="card placeholder"><strong>Waiting for the funds' record</strong><p class="muted small">Calibration passed · the funds run from 29 Sep 2026 · ${doc("shadow-funds#the-funds", "The funds")}</p></div>`
+        : `<div class="card placeholder"><strong>Hidden until calibration passes</strong><p class="muted small">Run from 29 Sep 2026 once it does · ${doc("shadow-funds#calibration-first", "Why hidden")}</p></div>`;
+      return [];
+    }
+    const f = data.funds;
+    // The four only: the exploratory funds have their own card, below, and
+    // the chart, its table and the cards stay exactly the four.
+    const list = (Array.isArray(f.list) ? f.list : []).filter(x=>x && !isExploratory(x));
+    const days = Array.isArray(f.days) ? f.days : [];
+    const b = f.band && Array.isArray(f.band.p5) && f.band.p5.length ? f.band : null;
+    const nf = b && isNum(b.funds) ? b.funds.toLocaleString("en-US") : "the";
+    const hue = (x)=> HUE[x.name] || "var(--ink-3)";
+    const legend = list.map(x=>`<li>${key(hue(x), DASH[x.name])}${esc(x.label || SHORT[x.name] || x.name)} <span class="num muted">${esc(signed(x.total_return, 2))}</span></li>`).join("")
+      + (b ? `<li>${bandKey}Coin-flip funds, 5th to 95th percentile</li>` : "");
+    const summary = list.map(x=>`${x.label || x.name} ${signed(x.total_return, 2)}`).join(", ");
+    const lastBand = b ? b.p5.length - 1 : -1;
+    const aria = `Equity of the four simulated funds from ${day(f.start || days[0], true)} to ${day(days[days.length-1], true)}. Total return: ${summary}.` + (b && lastBand >= 0 ? ` Shaded band: ${nf} coin-flip funds between the 5th and 95th percentile, ${money(b.p5[lastBand])} to ${money(b.p95[lastBand])} on the last day.` : "");
+    const head = ["Day"].concat(list.map(x=>SHORT[x.name] || x.label || x.name)).concat(b ? ["Band 5th", "Band 95th"] : []);
+    const table = days.map((d, i)=>`<tr><td>${esc(day(d, true))}</td>${list.map(x=>`<td>${esc(money((x.equity || [])[i]))}</td>`).join("")}${b ? `<td>${esc(money(b.p5[i]))}</td><td>${esc(money(b.p95[i]))}</td>` : ""}</tr>`).join("");
+    let html = `<div class="chart"><h3>Equity since ${esc(day(f.start || days[0], true))}</h3><div class="cap">Equity at every close${b ? ` · band: the middle 90% of ${esc(nf)} coin-flip funds` : ""} ${doc("horse-race#the-coin-flip-a-thousand-times", "The coin flip")}</div>
+      <ul class="legend">${legend}</ul>
+      ${plotHost("Chart of the four funds")}
+      <details class="data"><summary>The numbers by day</summary><div class="scroll"><table><thead><tr>${head.map(t=>`<th>${esc(t)}</th>`).join("")}</tr></thead><tbody>${table}</tbody></table></div></details></div>`;
+    html += `<div class="funds">${list.map(x=>`<article class="card fund">
+      <div class="head">${key(hue(x), DASH[x.name])}<span>${esc(x.label || x.name)}</span></div>
+      <div class="big num ${tone(x.total_return)}">${esc(signed(x.total_return, 2))}</div><div class="faint">total return</div>
+      <dl class="kv">
+        <dt>vs VT</dt>${x.name === "vt" ? `<dd class="muted">the index itself</dd>` : `<dd class="num ${tone(x.vs_vt)}">${esc(pts(x.vs_vt))}</dd>`}
+        <dt>Max drawdown</dt><dd class="num">${isNum(x.max_drawdown) ? esc(signed(-Math.abs(x.max_drawdown), 1)) : "n/a"}</dd>
+        <dt>Trades</dt><dd class="num">${esc(isNum(x.trades) ? x.trades : "n/a")}</dd>
+        <dt>Win rate</dt>${isNum(x.win_rate) ? `<dd class="num">${esc(plain(x.win_rate, 0))}</dd>` : `<dd class="muted">no closed trade</dd>`}
+        <dt>Open positions</dt><dd class="num">${esc(isNum(x.open_positions) ? x.open_positions : "n/a")}</dd>
+        <dt>Cash</dt><dd class="num">${esc(money(x.cash))}</dd>
+        ${orderCell(x)}
+      </dl>${sidesCell(x)}</article>`).join("")}</div>`;
+    html += `<div class="docs">${doc("shadow-funds#the-funds", "The four funds")} ${doc("horse-race#what-the-numbers-mean", "What the numbers mean")}</div>`;
+    el.innerHTML = html;
+    // VT is drawn first and the model last, so the fund the race is about
+    // sits on top where the lines cross.
+    const order = ["vt", "hybrid", "momentum", "model"];
+    const drawn = list.slice().sort((a, c)=> order.indexOf(a.name) - order.indexOf(c.name));
+    return [["funds", ()=> chart(el.querySelector(".plot"), {
+      days, aria,
+      band: b ? {lo:b.p5, hi:b.p95, short:"coin-flip 5th–95th"} : null,
+      series: drawn.map(x=>({label:SHORT[x.name] || x.label || x.name, values:x.equity || [], color:hue(x), dash:DASH[x.name], width:2, end:SHORT[x.name] || x.name})),
+    })]];
+  }
+
+  // ------------------------------------------------ how often the order mattered
+  // A report only: on how many cycle days the book ran out of room before it
+  // reached the end of the day's signal list, so the watchlist order decided
+  // which signals got in. The real paper account is always shown; the
+  // calibration copy once calibration runs; the funds only once it passed.
+  // ------------------------------------------- price gaps and held names
+  // Two reports that are not fund results (the owner's decisions of 26 Sep
+  // 2026), so they are drawn whether or not calibration has passed: how
+  // often the price source had no bar for a watchlist ticker on a trading
+  // day, per calendar month against the owner's 2%, and how many names the
+  // paper account held each cycle day, which no fund could trade that day.
+  function dataHtml(data){
+    data = asObj(data) || {};
+    const gaps = asObj(data.price_gaps), held = asObj(data.held_names);
+    const months = (gaps && Array.isArray(gaps.months) ? gaps.months : []).map(asObj).filter(m=>m && typeof m.month === "string");
+    const days = (held && Array.isArray(held.days) ? held.days : []).map(asObj).filter(d=>d && typeof d.day === "string");
+    if(!months.length && !days.length) return "";
+    const limit = gaps && isNum(gaps.limit) ? gaps.limit : 0.02;
+    const n = (v)=> isNum(v) ? String(v) : "n/a";
+    let html = `<div class="card" style="margin-top:10px"><h3>Price gaps and held names <span class="faint" style="font-weight:400">(report only; not a fund result)</span></h3>`;
+    if(months.length){
+      const rows = months.map(m=>{
+        const over = m.over === true || (isNum(m.share) && m.share > limit);
+        return `<tr${over ? ' class="over"' : ""}><td>${esc(m.month)}</td><td>${esc(n(m.sessions))}</td><td>${esc(n(m.missing))}</td><td>${esc(plain(m.share, 2))}${over ? ` <span class="chip bad">above ${esc(plain(limit, 0))}</span>` : ""}</td></tr>`;
+      }).join("");
+      html += `<h4>Missing price bars, by month</h4><p class="small muted">Over ${esc(n(gaps.tickers))} watchlist tickers${gaps.from ? ` from ${esc(day(gaps.from, true))}` : ""} · limit ${esc(plain(limit, 0))} a month · ${doc("shadow-funds#the-day", "Price gaps")}</p>`
+        + `<div class="scroll"><table class="mini"><thead><tr><th>Month</th><th>Sessions</th><th>Missing</th><th>Share</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    }
+    if(days.length){
+      const SHOW = 10;
+      const li = (d)=> `<li>${esc(day(d.day, true))}: <b class="num">${esc(n(d.names))}</b> ${d.names === 1 ? "name" : "names"} held${isNum(d.of) ? ` of <span class="num">${esc(d.of)}</span>` : ""}</li>`;
+      const recent = days.slice(-SHOW).reverse();
+      const older = days.slice(0, -SHOW).reverse();
+      html += `<h4>Names the paper account held, by cycle day</h4><p class="small muted">Names no fund could trade that day · ${doc("shadow-funds#the-day", "Held names")}</p>`
+        + `<ul class="facts">${recent.map(li).join("")}</ul>`
+        + (older.length ? `<details class="data"><summary>${esc(older.length)} earlier ${older.length === 1 ? "day" : "days"}</summary><ul class="facts">${older.map(li).join("")}</ul></details>` : "");
+    }
+    return html + `</div>`;
+  }
+
+  // ------------------------------------------- after Israeli tax and in shekels
+  // Pre-registration sections 5c and 11.9 (the owner's decisions of 2 Oct
+  // 2026): before and after tax side by side, in dollars and in shekels, the
+  // dollar's part of the shekel result, and the two tax numbers. The paper
+  // account is shown every night (it is the account, not a fund result); the
+  // funds only once calibration has passed, like every fund result.
+  function afterTaxHtml(data){
+    data = asObj(data) || {};
+    const at = asObj(data.after_tax);
+    if(!at) return "";
+    const fx = asObj(at.fx) || {};
+    const ils = (v)=> !isNum(v) ? "n/a" : (v<0?"−":"") + "₪" + Math.abs(v).toLocaleString("en-US",{maximumFractionDigits:0});
+    const both = (amount, change)=> `${esc(amount)} <span class="${tone(change)}">${esc(signed(change, 2))}</span>`;
+    const row = (label, view)=>{
+      view = asObj(view);
+      if(!view) return "";
+      const u = asObj(view.usd) || {}, s = asObj(view.ils) || {}, t = asObj(view.tax_ils) || {};
+      return `<tr><td>${esc(label)}</td><td class="num">${both(money(u.equity), u.return)}</td>`
+        + `<td class="num">${both(money(u.after_tax), u.after_tax_return)}</td>`
+        + `<td class="num">${both(money(u.paid_so_far), u.paid_so_far_return)}</td>`
+        + `<td class="num">${both(ils(s.equity), s.return)}</td><td class="num">${both(ils(s.after_tax), s.after_tax_return)}</td>`
+        + `<td class="num">${both(ils(s.paid_so_far), s.paid_so_far_return)}</td>`
+        + `<td class="num">${esc(pts(s.from_usd_ils))}</td><td class="num">${esc(pts(s.after_tax_from_usd_ils))}</td>`
+        + `<td class="num">${esc(ils(t.paid_so_far))}</td><td class="num">${esc(ils(t.if_sold_today))}</td></tr>`;
+    };
+    const funds = asObj(at.funds);
+    const rows = row("Paper account (real)", at.paper)
+      + (funds ? ["model", "momentum", "hybrid", "vt"].map(n=> row(SHORT[n] + " fund", funds[n])).join("") : "");
+    let html = `<div class="card" style="margin-top:10px"><h3>After Israeli tax and in shekels <span class="faint" style="font-weight:400">(since each book's start)</span></h3>`;
+    if(fx.available === false){
+      html += `<p class="small muted">No rate table tonight (${esc(fx.reason)}): nothing is shown rather than a guessed rate.</p>`;
+    }
+    if(rows){
+      html += `<div class="scroll"><table class="mini"><thead><tr><th></th><th>Before tax ($)</th><th>After tax, if sold today ($)</th>`
+        + `<th>After tax, tax paid so far ($)</th><th>Before tax (₪)</th><th>After tax, if sold today (₪)</th>`
+        + `<th>After tax, tax paid so far (₪)</th><th>From the $/₪ move, before tax</th><th>From the $/₪ move, after tax</th>`
+        + `<th>Tax paid so far (₪)</th><th>Tax if sold today (₪)</th></tr></thead>`
+        + `<tbody>${rows}</tbody></table></div>`;
+    }
+    if(!funds && (asObj(data.calibration) || {}).status !== "passed") html += `<p class="small muted">The funds are shown after tax once calibration has passed, like every fund result.</p>`;
+    const lots = asObj(at.paper_lots);
+    if(lots && Array.isArray(lots.mismatches) && lots.mismatches.length){
+      html += `<p class="small"><span class="chip bad">check</span> The lots rebuilt from the paper account's fills differ from its positions for ${esc(lots.mismatches.join(", "))}.</p>`;
+    }
+    const looks = (Array.isArray(at.looks) ? at.looks : []).map(asObj).filter(Boolean);
+    if(looks.length){
+      const line = (r)=>{
+        const tests = asObj(r.tests) || {};
+        const ts = ["model", "momentum", "hybrid"].filter(n=> asObj(tests[n])).map(n=> `${SHORT[n]} t ${bar2(tests[n].t)}`).join(" · ");
+        return `<li>Look ${esc(r.look)} (made ${esc(day(r.made_on, true))}): ${r.status === "ready" ? esc(ts || "no fund") : esc("not available: " + (r.reason || ""))}</li>`;
+      };
+      html += `<h4>The after-tax gate: each fund against the VT fund, after tax</h4><ul class="facts">${looks.map(line).join("")}</ul>`;
+    }
+    const counts = asObj(fx.counts);
+    if(fx.available === true && counts){
+      const other = (isNum(counts.ecb) ? counts.ecb : 0) + (isNum(counts.carried) ? counts.carried : 0);
+      html += `<p class="small muted">Rates: the Bank of Israel's representative rate${fx.first ? ` from ${esc(day(fx.first, true))}` : ""}; `
+        + `${esc(other)} ${other === 1 ? "day" : "days"} from another source, counted.</p>`;
+    }
+    const be = asObj(at.breakeven);
+    if(be && isNum(be.extra_per_year)){
+      html += `<p class="small muted">For information only, not a gate: an actively traded fund needs about `
+        + `${esc((be.extra_per_year * 100).toFixed(2))} points a year more before tax to tie with VT held ${esc(be.years)} years `
+        + `(${esc(plain(be.growth, 0))} growth, ${esc(plain(be.dividend_yield, 0))} dividend yield).</p>`;
+    }
+    return html + `<p class="small">${doc("after-tax", "After tax and in shekels")}</p></div>`;
+  }
+
+  // ------------------------------------------- counters until the checkpoints
+  // The IC report (section 13.9, registered at the 22 Dec 2026 checkpoint)
+  // and the regime split (section 13.10) show counts only between
+  // checkpoints: lines with scores, days, and sessions per market state.
+  function countersHtml(data){
+    data = asObj(data) || {};
+    const counters = asObj(asObj(data.exploratory) && data.exploratory.counters);
+    const ic = asObj(counters && counters.ic), regimes = asObj(counters && counters.regimes);
+    if(!ic && !regimes) return "";
+    const n = (v)=> isNum(v) ? String(v) : "n/a";
+    let html = `<div class="card" style="margin-top:10px"><h3>Counters until the checkpoints <span class="faint" style="font-weight:400">(no result is shown before a checkpoint)</span></h3><ul class="facts">`;
+    const universe = (label, u)=>{
+      u = asObj(u);
+      if(!u) return "";
+      const scores = asObj(u.lines_with_score) || {};
+      const parts = Object.keys(scores).map(k=> `${esc(k)} ${esc(n(scores[k]))}`).join(" · ");
+      return `<li>IC report, ${esc(label)}: <b class="num">${esc(n(u.answered_lines))}</b> answered lines on <span class="num">${esc(n(u.line_days))}</span> days${parts ? ` <span class="faint">(lines with each score: ${parts})</span>` : ""}</li>`;
+    };
+    if(ic){
+      html += universe("production names", ic.production) + universe("shadow stock universe (off until 1 Jan 2027)", ic.shadow);
+    }
+    if(regimes){
+      const trend = asObj(regimes.trend) || {}, vol = regimes.vol;
+      const volText = typeof vol === "string" ? vol : ["low", "mid", "high", "unknown"].map(k=> `${k} ${n((asObj(vol) || {})[k])}`).join(" · ");
+      html += `<li>Market state since ${esc(day(regimes.first, true))}: VT above its 200-day average on <span class="num">${esc(n(trend.above))}</span> sessions, not above on <span class="num">${esc(n(trend.below))}</span>${isNum(trend.unknown) && trend.unknown ? `, unknown on ${esc(trend.unknown)}` : ""}; volatility terciles: ${esc(volText)}</li>`;
+    }
+    return html + `</ul></div>`;
+  }
+
+  function orderHtml(data){
+    data = data && typeof data === "object" ? data : {};
+    const obj = (v)=> v && typeof v === "object" && !Array.isArray(v) ? v : null;
+    const real = obj(obj(data.order_matters) && data.order_matters.real);
+    if(!real) return "";
+    const count = (v)=> Number.isFinite(v) ? String(v) : "n/a";
+    const conv = (v)=> Number.isFinite(v) ? v.toFixed(2) : "—";
+    const daysNum = (v)=> Number.isFinite(v) ? (Number.isInteger(v) ? String(v) : v.toFixed(1)) : "n/a";
+    const b = (v)=> `<b class="num">${esc(count(v))}</b>`;
+    // One short line for a copy or a fund: "X of Y days (Z with ...)".
+    const short = (o, unit)=> o.cycle_days === 0
+      ? "no cycle yet."
+      : `${b(o.days)} of ${b(o.cycle_days)} ${unit} (${b(o.outranked_days)} with a higher-conviction signal skipped).`;
+
+    let head;
+    if(real.cycle_days === 0) head = "No cycle yet.";
+    else {
+      head = `ran out of room before the end of the list on ${b(real.days)} of ${b(real.cycle_days)} cycle days.`;
+      if(real.days !== 0) head += ` On ${b(real.outranked_days)} of those days, a skipped signal had a higher conviction than one that was bought.`;
+    }
+    const kinds = Object.entries(obj(real.by_kind) || {}).filter(([, n])=> Number.isFinite(n) && n > 0)
+      .map(([k, n])=> `<span class="chip idle">${esc(k)}: <span class="num">${esc(n)}</span></span>`).join("");
+
+    const tick = (t)=> `<span class="t">${esc(t && t.ticker)} <span class="num">${esc(conv(t && t.conviction))}</span></span>`;
+    const days = (Array.isArray(real.list) ? real.list : []).filter(obj).slice().reverse().map(d=>{
+      const bought = (Array.isArray(d.bought) ? d.bought : []).filter(obj);
+      const skipped = (Array.isArray(d.skipped) ? d.skipped : []).filter(obj);
+      const skip = skipped.map(s=>{
+        const over = (Array.isArray(s.outranks) ? s.outranks : []).map(String);
+        return `<span class="t">${esc(s.ticker)} <span class="num">${esc(conv(s.conviction))}</span></span> <span class="kind">(${esc(s.kind || "no room")})</span>`
+          + (over.length ? ` <mark>higher than ${esc(over.join(", "))}</mark>` : "");
+      }).join("; ");
+      return `<li><div class="d">${esc(day(d.day, true))}</div>`
+        + `<div class="row"><span class="k">Bought:</span><span class="v">${bought.length ? bought.map(tick).join(", ") : "nothing"}</span></div>`
+        + `<div class="row"><span class="k">Skipped:</span><span class="v">${skip || "nothing"}</span></div></li>`;
+    });
+
+    const lines = [];
+    const c = obj(data.calibration) || {};
+    const cal = obj(c.order_matters);
+    if(cal && ["running", "passed", "failed", "stopped"].includes(c.status)) lines.push(`<b>Calibration copy:</b> ${short(cal, "cycle days")}`);
+    if(fundsVisible(data)){
+      (Array.isArray(data.funds.list) ? data.funds.list : []).filter(obj).forEach(x=>{
+        const o = obj(x.order_matters);
+        // The four funds, as in their cards; the exploratory funds are
+        // compared with the model fund in their own card, not here.
+        if(x.name === "vt" || x.exploratory === true || !o) return;
+        lines.push(`<b>${esc(SHORT[x.name] || x.label || x.name)} fund:</b> ${short(o, "days")}`);
+      });
+      const coin = obj(obj(data.integrity) && obj(data.integrity.coin) && data.integrity.coin.order_days);
+      if(coin && Number.isFinite(coin.median)){
+        const range = Number.isFinite(coin.p5) && Number.isFinite(coin.p95)
+          ? ` (5th–95th: <span class="num">${esc(daysNum(coin.p5))}–${esc(daysNum(coin.p95))}</span>)` : "";
+        lines.push(`<b>Coin-flip funds:</b> median <b class="num">${esc(daysNum(coin.median))}</b> days${range}.`);
+      }
+    }
+
+    return `<h2>How often the buying order mattered</h2><div class="card order">`
+      + `<p style="margin:0"><b>Real paper account:</b> ${head}</p>`
+      + (kinds ? `<div class="kinds" aria-label="Skipped signals by what ran out">${kinds}</div>` : "")
+      + (days.length ? `<details class="data"><summary>${days.length === 1 ? "The one day" : "The " + esc(days.length) + " days, most recent first"}</summary><ul class="odays">${days.join("")}</ul></details>` : "")
+      + (lines.length ? `<ul class="lines">${lines.map(l=>`<li>${l}</li>`).join("")}</ul>` : "")
+      + `<p class="small muted">Report only; the order is not changed. ${doc("shadow-funds#how-often-the-buying-order-matters-report-only", "About this report")}</p></div>`;
+  }
+
+  // ------------------------------------------------------------------ render
+  const shown = {funds:null, race:null}, source = {funds:"", race:""};
+
+  function render(){
+    const F = shown.funds || {}, R = shown.race || {};
+    charts = [];
+    $("fresh").textContent = F.final_through
+      ? `Record through ${day(F.final_through, true)} · written ${israel(F.generated_at)}${source.funds ? " · " + source.funds : ""}`
+      : "No funds record yet.";
+    safely("banners", ()=>{ $("banners").innerHTML = raceBanner(R, source.race) + fundTestBanner(F.fund_test, R); return []; });
+    safely("problems", ()=>{ $("problems").innerHTML = problemsHtml(F); return []; });
+    safely("verdict", ()=>{ $("verdict").innerHTML = verdictHtml(F, R); return []; });
+    safely("race-reports", ()=>{ $("race-reports").innerHTML = raceReportsHtml(R); return []; });
+    const todo = safely("calibration", ()=>renderCalibration(F)).concat(safely("funds", ()=>renderFunds(F)));
+    safely("explore", ()=>{ $("explore").innerHTML = exploratoryHtml(F); return []; });
+    safely("data", ()=>{ $("data").innerHTML = dataHtml(F); return []; });
+    safely("after-tax", ()=>{ $("after-tax").innerHTML = afterTaxHtml(F); return []; });
+    safely("counters", ()=>{ $("counters").innerHTML = countersHtml(F); return []; });
+    safely("order", ()=>{ $("order").innerHTML = orderHtml(F); return []; });
+    todo.forEach(([id, fn])=>safely(id, fn));
+  }
+
+  // A record in a shape this page does not expect breaks one section, says
+  // so there, and leaves the rest of the page and the live updates running.
+  function safely(id, fn){
+    try { return fn() || []; }
+    catch(e){ $(id).innerHTML = `<div class="card muted small">This part of the record could not be drawn (${esc(e && e.message || "unknown error")}).</div>`; return []; }
+  }
+
+  // The page opens on the newest copy it has of each file -- the one saved on
+  // this phone, else the one embedded at build time -- then reads the live
+  // files from GitHub, exactly as the desk does with the book. Nothing here
+  // needs a key: the repository is public and both files are committed nightly.
+  const RAW = "https://raw.githubusercontent.com/" + REPO.owner + "/" + REPO.repo + "/" + REPO.ref + "/";
+  const FILES = {
+    funds: {path:"logs/funds.json", saved:"algo-desk:funds", seed:"seed-funds", mark:/^\s*\/\*__FUNDS__\*\//, what:"funds record",
+            ok:(d)=> !!(d && typeof d === "object" && d.simulated === true && d.calibration && typeof d.calibration === "object")},
+    race:  {path:"logs/race_gate.json", saved:"algo-desk:race", seed:"seed-race", mark:/^\s*\/\*__RACE__\*\//, what:"decision gate",
+            ok:(d)=> !!(d && typeof d === "object" && isNum(d.independent))},
+  };
+  const KINDS = ["funds", "race"];
+  const stamp = (d)=> String(d.final_through || "") + "|" + String(d.generated_at || "");
+  const newer = (a, b)=> !b || stamp(a) > stamp(b);
+  const take = (kind, data, from)=>{
+    if(!FILES[kind].ok(data) || !newer(data, shown[kind])) return false;
+    shown[kind] = data; source[kind] = from; return true;
+  };
+  const live = (text)=>{ $("live").textContent = "Live updates: " + text; };
+  const clock = ()=> new Date().toLocaleTimeString("en-GB",{timeZone:"Asia/Jerusalem",hour:"2-digit",minute:"2-digit"});
+
+  KINDS.forEach(kind=>{
+    const f = FILES[kind];
+    let seed = {}, saved = null;
+    try { seed = JSON.parse($(f.seed).textContent.replace(f.mark, "")) || {}; } catch(_) {}
+    try { saved = JSON.parse(localStorage.getItem(f.saved) || "null"); } catch(_) {}
+    take(kind, seed, "built-in copy");
+    take(kind, saved, "copy saved on this phone");
+  });
+  render();
+
+  async function pullOne(kind){
+    const f = FILES[kind];
+    const r = await fetch(RAW + f.path + "?t=" + Date.now(), {cache:"no-store"});
+    if(r.status === 404) throw new Error("no file on GitHub yet");
+    if(!r.ok) throw new Error("HTTP " + r.status);
+    const data = await r.json();
+    if(!f.ok(data)) throw new Error("not a " + f.what);
+    try { localStorage.setItem(f.saved, JSON.stringify(data)); } catch(_) {}
+    return take(kind, data, "read from GitHub at " + clock());
+  }
+
+  const refresh = $("refresh");
+  async function pull(reason){
+    refresh.disabled = true;
+    live(reason + "…");
+    try {
+      const results = await Promise.allSettled(KINDS.map(pullOne));
+      const changed = results.some(r=>r.status === "fulfilled" && r.value);
+      if(changed) render();
+      const failed = results.map((r, i)=> r.status === "rejected" ? FILES[KINDS[i]].what + ": " + (r.reason && r.reason.message || "unknown") : null).filter(Boolean);
+      if(!failed.length) live("on · " + (changed ? "read from GitHub " : "same records on GitHub · checked ") + clock() + " Israel time · next check in 5 min");
+      else if(navigator.onLine === false) live("offline · showing the copies on this phone");
+      else live((failed.length < KINDS.length ? "partly on · " : "") + failed.join("; ") + " · showing the last copy of each · checked " + clock() + " Israel time");
+    } finally { refresh.disabled = false; }
+  }
+  pull("reading the records from GitHub");
+  setInterval(()=>pull("checking GitHub"), 5*60*1000);
+  document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState === "visible") pull("checking GitHub"); });
+  window.addEventListener("online", ()=>pull("back online; checking GitHub"));
+  refresh.addEventListener("click", ()=>pull("checking GitHub"));
+
+  // Installable: the same service worker as the desk keeps this page openable offline.
+  if("serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js").catch(()=>{}); }
+})();
+</script>
