@@ -152,7 +152,9 @@ def test_the_worst_case_of_a_full_week_is_far_under_the_cap():
         asks = digest.batches(held, items)
         assert len(asks) <= 12
         worst = sum(digest.worst_case_usd(MODEL, digest.SYSTEM_PROMPT, user) for _, user in asks)
-        assert worst < 0.25 * digest.WEEKLY_CAP_USD
+        # A third of the cap since 9 Oct 2026, when a call became three asks at
+        # worst (llm.SCHEMA_ATTEMPTS); it was a quarter at two.
+        assert worst < digest.WEEKLY_CAP_USD / 3
 
 
 def test_nothing_to_read_asks_nobody_and_a_failed_call_says_so():

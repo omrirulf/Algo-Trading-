@@ -814,9 +814,15 @@ TRANSPORT_ATTEMPTS = 2
 #: path (asked at REQUEST_TIMEOUT_SECONDS) keeps its shorter ceiling.
 TRANSPORT_RETRY_TIMEOUT_SECONDS = FULL_MODEL_TIMEOUT_SECONDS
 
-#: Asks per call when the answer parsed as the wrong shape. Two: the first is
-#: the question, the second is the question with the complaint stated.
-SCHEMA_ATTEMPTS = 2
+#: Asks per call when the answer came back the wrong shape, or with a value
+#: outside the schema. Three: the question, the question with the complaint
+#: stated, and -- the owner's decision of 9 Oct 2026 -- once more when the
+#: re-ask's own answer was bad too. Twice in eight cycles the re-ask failed
+#: in a new way and the one re-ask had no answer to it: ITA on 7 Oct parsed
+#: but with an empty rationale after an off-schema first answer, UNG on 9 Oct
+#: ran to the token limit and said nothing after an invalid conviction. Each
+#: cost its name the day.
+SCHEMA_ATTEMPTS = 3
 
 #: Which ticker the current thread is asking about, for the call log below.
 #: Set by the cycle around each live call (``call_label``); thread-local
@@ -1198,19 +1204,26 @@ class OpenAICompatibleProvider:
         than a fluke. Four percent of an eighty-name watchlist is three
         tickers a day with no signal at all.
 
-        So a bad parse is re-asked with the complaint stated, and only a
-        second bad parse raises. The re-ask is a second billed call, which is
-        the point: it is cheaper than the trade it would otherwise skip.
+        So a bad parse is re-asked with the complaint stated, once more if
+        that answer is bad too (the owner's decision of 9 Oct 2026), and only
+        the last bad parse raises: ``SCHEMA_ATTEMPTS`` asks in all. A re-ask
+        is another billed call, which is the point: it is cheaper than the
+        trade it would otherwise skip.
 
         ``check`` (the owner's decision of 28 Sep 2026) is the caller's own
         test of an answer that parsed: it raises ``ValueError`` (a pydantic
         ``ValidationError`` is one) when a value breaks the schema's limits,
         such as XBI's conviction of -0.35 that day. Such an answer gets the
-        same one re-ask, with the problem stated. The two kinds share the one
-        re-ask. The last answer is returned even when it fails the check, so
-        the caller rejects and journals it exactly as before; the code never
-        mends a value itself. Every attempt stays in the call record, the bad
-        one marked ``invalid_values``.
+        same re-ask, with the problem stated. The two kinds share the
+        attempts: whichever way an answer is bad, it is asked once more until
+        they are spent, and each complaint is added to the ones before it, so
+        the last ask names every problem seen (ITA on 7 Oct 2026 was
+        off-schema and then parsed with an empty rationale; UNG on 9 Oct gave
+        an invalid conviction and then no answer at all). The last answer is
+        returned even when it fails the check, so the caller rejects and
+        journals it exactly as before; the code never mends a value itself.
+        Every attempt stays in the call record, the bad ones marked
+        ``off_schema`` or ``invalid_values``.
         """
         name = model or self._model
         body = self._body(system_prompt, user_prompt, json_schema, name, effort, reasoning)
@@ -1230,7 +1243,7 @@ class OpenAICompatibleProvider:
                     name,
                 )
                 body = self._insist(body)
-                kind = "re-ask after an off-schema answer"
+                kind = _re_ask_kind(attempt, "an off-schema answer")
                 continue
             problem = _check_problem(check, completion.text) if check is not None else None
             if problem is not None and not last:
@@ -1241,13 +1254,24 @@ class OpenAICompatibleProvider:
                     "with the problem stated", name, problem,
                 )
                 body = self._insist(body, INVALID_VALUES_INSTRUCTION + problem)
-                kind = "re-ask after invalid values"
+                kind = _re_ask_kind(attempt, "invalid values")
                 continue
             model_io.finish_attempt(ask, outcome="invalid_values" if problem else "answer", status=200,
                                     response=raw, usage=_plain_usage(payload),
                                     **({"error": problem[:300]} if problem else {}))
             return completion
         raise LLMError("unreachable")   # pragma: no cover - the loop always returns or raises
+
+
+def _re_ask_kind(attempt: int, problem: str) -> str:
+    """The call record's label for the ask after attempt ``attempt`` went wrong.
+
+    The first re-ask keeps the name it has had since 26 Sep 2026; a later one
+    is numbered, so a record reads "re-ask 2 after invalid values" and nobody
+    has to count.
+    """
+    ordinal = "" if attempt == 0 else f" {attempt + 1}"
+    return f"re-ask{ordinal} after {problem}"
 
 
 def _check_problem(check: Callable[[str], Any], text: str) -> Optional[str]:

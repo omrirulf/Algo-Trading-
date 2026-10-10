@@ -362,7 +362,8 @@ def test_the_checkpoint_verdict_is_logged_in_the_amendments_table_in_date_order(
     text = (ROOT / "docs" / "horse-race-preregistration.md").read_text()
     table = text.split("## Amendments", 1)[1]
     dates = re.findall(r"^\| (\d{4}-\d{2}-\d{2}) \|", table, re.M)
-    assert dates == sorted(dates) and dates[-1] == "2026-10-06"
+    # In date order, with the row present; later rows (the 9 Oct re-ask fix) may follow it.
+    assert dates == sorted(dates) and "2026-10-06" in dates
     row = next(line for line in table.splitlines() if line.startswith("| 2026-10-06 | **Checkpoint verdict"))
     for words in ("yes to all five, as you proposed", "Addition 1", "Addition 2", "TEST DATA",
                   "the race's bars are the fixed 3.47, 2.45 and 2.00", "Made before any checkpoint result existed",

@@ -509,14 +509,17 @@ def test_a_verdict_outside_the_three_is_asked_once_more_then_a_failed_check(wire
     _cycle(wired, MONDAY.date(), {"AAA": ["h"], "BBB": ["h"], "CCC": ["h"]})
     for ticker in ("AAA", "BBB", "CCC"):
         _entry(wired, ticker, MONDAY - timedelta(days=3))
-    wired.endpoint.script["AAA"] = [_answer("AAA", "MAYBE"), _answer("AAA", "MAYBE")]
+    # AAA answers outside the three every time: the question and both re-asks
+    # (llm.SCHEMA_ATTEMPTS, three since 9 Oct 2026), then the check fails.
+    wired.endpoint.script["AAA"] = [_answer("AAA", "MAYBE")] * llm.SCHEMA_ATTEMPTS
     wired.endpoint.script["BBB"] = [_answer("BBB", "UNSURE"), _answer("BBB", "BROKEN", "The guidance cut undid it.")]
     wired.endpoint.script["CCC"] = [_answer("XLE", "VALID")]
     run = _run(wired)
-    assert (run.checked, run.failed, run.asks) == (1, 2, 5)
+    assert (run.checked, run.failed, run.asks) == (1, 2, llm.SCHEMA_ATTEMPTS + 2 + 1)
     lines = {line["ticker"]: line for line in _lines(wired)}
     assert lines["AAA"]["verdict"] is None and lines["AAA"]["error"].startswith("invalid model output")
-    assert lines["AAA"]["asks"] == 2 and lines["AAA"]["cost_usd"] == pytest.approx(2 * CHEAP_USD, abs=1e-6)
+    assert lines["AAA"]["asks"] == llm.SCHEMA_ATTEMPTS
+    assert lines["AAA"]["cost_usd"] == pytest.approx(llm.SCHEMA_ATTEMPTS * CHEAP_USD, abs=1e-6)
     assert (lines["BBB"]["verdict"], lines["BBB"]["reason"], lines["BBB"]["asks"]) == (
         "BROKEN", "The guidance cut undid it.", 2)
     assert lines["CCC"]["error"] == "answered for XLE" and lines["CCC"]["verdict"] is None

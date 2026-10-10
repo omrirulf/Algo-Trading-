@@ -611,17 +611,18 @@ def test_fewer_than_three_successful_votes_is_no_answer(wired):
 
 def test_a_vote_for_another_ticker_or_out_of_bounds_fails(wired):
     _add_line(wired, "XLE")
-    wired.endpoint.script["XLE"] = [_signal("GLD"), "this is not JSON", "still not JSON",
-                                    {**_signal("XLE"), "conviction": 1.5}, {**_signal("XLE"), "conviction": 2.0}]
+    wired.endpoint.script["XLE"] = [_signal("GLD"), "this is not JSON", "still not JSON", "and still not",
+                                    {**_signal("XLE"), "conviction": 1.5}, {**_signal("XLE"), "conviction": 2.0},
+                                    {**_signal("XLE"), "conviction": 2.5}]
     run = _run(wired, workers=1)
     (line,) = _lines(wired.month)
     errors = [v["error"] for v in line["votes"][1:]]
     assert errors[0] == "answered for GLD"
-    assert errors[1].startswith("model returned non-JSON output")     # asked twice, prose both times
-    assert errors[2].startswith("invalid LLM output")                 # asked twice, out of bounds both times
+    assert errors[1].startswith("model returned non-JSON output")     # asked three times, prose each time
+    assert errors[2].startswith("invalid LLM output")                 # asked three times, out of bounds each time
     assert errors[3] is None
     assert run.failed_calls == 3 and line["answer"] is None           # 2 of 5 succeeded
-    assert line["asks"] == 6
+    assert line["asks"] == 1 + llm.SCHEMA_ATTEMPTS + llm.SCHEMA_ATTEMPTS + 1
 
 
 def test_every_ask_is_charged_a_re_ask_and_a_timeout_included(wired):
