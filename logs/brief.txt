@@ -1,8 +1,8 @@
-🟡 2 warnings: 1 of 80 ticker(s) produced no signal
-Equity $102,145 · 19 positions · $97,058 gross · $3,030 at risk · unrealised +$1,595
-Traded: NVDA, ASML, GOOGL
+🔴 34 of 61 model calls failed today (0 setup, 34 model)
+Equity $102,165 · 19 positions · $97,155 gross · $2,944 at risk · unrealised +$1,705
+2 directional calls, none traded
 Started by supabase-cron at 14:40 UTC (0 min after 14:40)
-Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-10-08
+Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-10-09
 Closed: EWT, XLK, EMB, CAT, XLY, RSP
-Also: 6 of 80 ticker(s) were judged without news
-Cycle 80 tickers, $0.16 · 2026-10-09
+Also: 34 of 80 ticker(s) produced no signal; 8 of 80 ticker(s) were judged without news
+Cycle 80 tickers, $0.06 · 2026-10-12
