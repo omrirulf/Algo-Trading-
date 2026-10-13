@@ -10,20 +10,30 @@ from __future__ import annotations
 import json
 import sys
 import types
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 
 from orchestrator import context, flows, fred
 from tests.test_analysts import HOLDERS, INFO as ANALYST_INFO, RECOMMENDATIONS, UPGRADES
 from tests.test_fundamentals import INFO as FUNDAMENTAL_INFO
-from tests.test_insiders import PURCHASES, TRANSACTIONS
+from tests.test_insiders import PURCHASES, TODAY as INSIDERS_TODAY
+from tests.test_insiders import TRANSACTIONS as INSIDERS_TRANSACTIONS
 from tests.test_technicals import make_frame
 
 HEADLINES = ["Chipmaker raises guidance — revenue seen up 20% (Reuters, 2h ago)"]
 
 #: yfinance returns one ``info`` dict carrying both kinds of field.
 INFO = {**FUNDAMENTAL_INFO, **ANALYST_INFO}
+
+#: The insider transactions, moved so that each trade is exactly as old today
+#: as it is on the day tests/test_insiders.py dates them for. That file passes
+#: its day in; ``gather`` judges the six-month window against today, so the
+#: fixed dates would fall out of it as the calendar moved past them.
+TRANSACTIONS = INSIDERS_TRANSACTIONS.assign(**{
+    "Start Date": INSIDERS_TRANSACTIONS["Start Date"]
+    + timedelta(days=(date.today() - INSIDERS_TODAY).days),
+})
 
 
 class FakeProvider:
@@ -289,9 +299,12 @@ FUND_PAYLOADS = {
     "top_holdings": {"XOM": 0.229, "CVX": 0.171},
 }
 
+#: Weekly reports dated back from today, the way tests/test_positioning.py's
+#: weekly() builds them: a series whose newest report is over a month old is
+#: dropped as dead, so fixed dates would start failing as the calendar moved.
 COT_ROWS = [
     {
-        "report_date_as_yyyy_mm_dd": f"2026-09-{15 - i:02d}",
+        "report_date_as_yyyy_mm_dd": (date.today() - timedelta(days=7 * i)).isoformat(),
         "open_interest_all": "500000",
         "m_money_positions_long_all": str(300000 - i * 1000),
         "m_money_positions_short_all": "100000",
