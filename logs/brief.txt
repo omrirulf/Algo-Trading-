@@ -1,8 +1,8 @@
-🔴 34 of 61 model calls failed today (0 setup, 34 model)
-Equity $102,165 · 19 positions · $97,155 gross · $2,944 at risk · unrealised +$1,705
-2 directional calls, none traded
+🔴 14 of 62 model calls failed today (0 setup, 14 model)
+Equity $101,836 · 18 positions · $93,464 gross · $2,576 at risk · unrealised +$1,338
+5 directional calls, none traded
 Started by supabase-cron at 14:40 UTC (0 min after 14:40)
-Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-10-09
-Closed: EWT, XLK, EMB, CAT, XLY, RSP
-Also: 34 of 80 ticker(s) produced no signal; 8 of 80 ticker(s) were judged without news
-Cycle 80 tickers, $0.06 · 2026-10-12
+Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-10-12
+Closed: TLT, EWT, XLK, EMB, CAT, XLY
+Also: 14 of 80 ticker(s) produced no signal; 4 of 80 ticker(s) were judged without news
+Cycle 80 tickers, $0.12 · 2026-10-13
