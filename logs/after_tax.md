@@ -1,14 +1,14 @@
 # After Israeli tax and in shekels
 
-Record through 2026-10-12, written 2026-10-13T03:15:30.121100+00:00. Rules: pre-registration section 5c, every number in `config/israel_tax.py` (tax 25%; losses also against dividends: on; W-8BEN: yes; surtax: off).
+Record through 2026-10-13, written 2026-10-14T01:28:52.802930+00:00. Rules: pre-registration section 5c, every number in `config/israel_tax.py` (tax 25%; losses also against dividends: on; W-8BEN: yes; surtax: off).
 
-Rates: the Bank of Israel's representative rate, 2026-09-10 to 2026-10-12; 21 day(s) from the Bank of Israel, 2 day(s) from another source: 2026-09-11 (ecb), 2026-09-21 (ecb). Table SHA-256 `537933f806969dfae6a68c21766c7581f100c758f0b664eec01a43a190cfbcd1`.
+Rates: the Bank of Israel's representative rate, 2026-09-10 to 2026-10-13; 22 day(s) from the Bank of Israel, 2 day(s) from another source: 2026-09-11 (ecb), 2026-09-21 (ecb). Table SHA-256 `20375e24cb186326a61796143e21e0d88c403bfe00539124d5ae4abe2f3bfb82`.
 
 Returns since each book's start. "Tax paid so far" is the tax due on everything sold or received so far; "if sold today" adds every open position sold at the close. "From the $/₪ move" is the shekel return minus the dollar return, before tax and after tax (if sold today).
 
 | | Before tax ($) | After tax, if sold today ($) | After tax, tax paid so far ($) | Before tax (₪) | After tax, if sold today (₪) | After tax, tax paid so far (₪) | From the $/₪ move, before tax | From the $/₪ move, after tax | Tax paid so far (₪) | Tax if sold today (₪) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Paper account (real) | $102,035 (+2.04%) | $101,567 (+1.57%) | $101,891 (+1.89%) | ₪311,718 (+3.12%) | ₪310,287 (+2.64%) | ₪311,277 (+2.97%) | +1.08 points | +1.08 points | ₪441 | ₪1,431 |
+| Paper account (real) | $102,105 (+2.10%) | $101,620 (+1.62%) | $101,962 (+1.96%) | ₪314,279 (+3.96%) | ₪312,786 (+3.47%) | ₪313,838 (+3.82%) | +1.86 points | +1.85 points | ₪441 | ₪1,493 |
 
 The funds are shown after tax once calibration has passed, like every fund result.
 
