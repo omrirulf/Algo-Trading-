@@ -30,7 +30,7 @@ Two runs on the same day, both with the universe's query and the code-only rule:
 - **First run, all 251 names** (run 37345386044, 17:02-17:42 UTC). Bright Data throttled the requests all
   through the run: about one first request in two came back as an empty body with its 200, and 29 names had no
   answer even when asked twice. It also showed that 18 names had their ticker as their search name, so they were
-  searched as "<ticker> stock" (production's query: "SQM stock" found square-metre property news), not as
+  searched as "`<ticker>` stock" (production's query: "SQM stock" found square-metre property news), not as
   company name plus ticker. Their company names now lead (`"United Parcel Service UPS stock"`).
 - **Recheck, 44 names** (run 37351217326, 17:49-17:59 UTC): the 29 with no answer and the 18 renamed (3 were
   both). Asked two at a time, a failed search up to four times. 43 answered; ZTO did not.
@@ -42,7 +42,7 @@ median name had 6 headlines.
 
 **The replacements of 2026-10-02 and 2026-10-03, and the short tickers kept on 2026-10-03:** STT 80% (4 of 5),
 IRM 100% (1 of 1), EW 62%, IDXX 100% (1 of 1), MET 71%, MLM 71%, UMC 78%; SO 25%, C 78%, D 75%, T 60%, ED
-75%, NOW 44%, V 78%, ICE 70%, O 60%, F 60% (with "<ticker> stock" on 2026-10-03: SO, C, D and MET 0 of 10).
+75%, NOW 44%, V 78%, ICE 70%, O 60%, F 60% (with "`<ticker>` stock" on 2026-10-03: SO, C, D and MET 0 of 10).
 
 **No name is replaced on this day.** Rule (2) allows a replacement; it does not require one. Most names under
 30% had 0 to 7 headlines, and their misses are mostly sector pages and market wraps (Google News filling a quiet
@@ -322,7 +322,7 @@ Run once on 2026-10-03 over the race's journal from 2026-09-23 (the full model's
 (`python -m analysis.news_relevance`, with `--answered-only` for the first view). **Nothing in production changes
 because of it.** A fund's "company name" is its brand as headlines write it (for example "Energy Select Sector"
 for XLE, "SPDR Gold" for GLD); a headline about the fund's asset or sector that does not name the fund does not
-count. Production asks for "<ticker> ETF" for a fund and "<ticker> stock" for a single name.
+count. Production asks for "`<ticker>` ETF" for a fund and "`<ticker>` stock" for a single name.
 
 **On the lines the model answered** (the news it read; the race's rule: answered and not held):
 
