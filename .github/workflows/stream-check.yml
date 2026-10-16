@@ -1,0 +1,96 @@
+name: stream check
+
+# Does streaming get past DeepInfra's ~270-second cut? The asks a production
+# run lost to "Server disconnected without sending a response" (15 Oct 2026:
+# 25 of 88, every one at 262-273 seconds), re-sent from the run's archived
+# model calls with `stream: true`, timed, and one of them sent the production
+# way as a control. The owner's decision of 16 Oct 2026: test it before
+# building it. See replay/stream_check.py.
+#
+# It costs about ten model asks (a few cents) and reads one artifact. It
+# never trades, writes no journal and holds no broker key.
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "The production run whose model calls to re-send (blank: the latest with model calls)"
+        default: ""
+      count:
+        description: "How many archived asks to re-send with streaming"
+        default: "10"
+      control:
+        description: "How many of them to also send the production way, without streaming"
+        default: "1"
+  # workflow_dispatch does not exist until this file is on main, so -- like
+  # unlocker-check.yml -- it also runs on its own pull request, and only when
+  # it changes.
+  pull_request:
+    paths:
+      - replay/stream_check.py
+      - .github/workflows/stream-check.yml
+
+permissions:
+  contents: read
+  actions: read   # only to download a production run's model calls
+
+jobs:
+  check:
+    # A pull request from a fork gets no secrets, so there is nothing to ask with.
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    # Ten asks four at a time, each up to the 480-second ceiling, plus one control.
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Download the production run's model calls
+        id: archive
+        # heartbeat.yml keeps each run's model calls as the artifact
+        # model-io-<run>-<attempt>. Without a run id, the latest heartbeat run
+        # that has one (a protection pass has none).
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.run_id }}
+        run: |
+          id="$RUN_ID"
+          if [ -z "$id" ]; then
+            for candidate in $(gh run list --repo "$GITHUB_REPOSITORY" --workflow heartbeat.yml --status completed --limit 12 --json databaseId --jq '.[].databaseId'); do
+              if gh api "repos/$GITHUB_REPOSITORY/actions/runs/$candidate/artifacts" --jq '.artifacts[].name' | grep -q "^model-io-$candidate-"; then
+                id="$candidate"
+                break
+              fi
+            done
+          fi
+          case "$id" in (*[!0-9]*|"") echo "no production run with model calls found"; exit 1;; esac
+          echo "production run $id"
+          mkdir -p "$RUNNER_TEMP/model_io"
+          gh run download "$id" --repo "$GITHUB_REPOSITORY" --pattern "model-io-$id-*" --dir "$RUNNER_TEMP/model_io"
+          echo "run_id=$id" >> "$GITHUB_OUTPUT"
+
+      - name: Re-send the cut asks with streaming
+        # The full model's key, under every spelling the production cycle
+        # tries, and nothing else. The inputs reach the script as variables,
+        # never as shell text.
+        env:
+          FULL_MODEL_API_KEY: ${{ secrets.FULL_MODEL_API_KEY || secrets.DEEPINFRA_API_KEY || secrets.SCREENING_API_KEY || secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY || secrets.GROQ_API_KEY }}
+          COUNT: ${{ inputs.count }}
+          CONTROL: ${{ inputs.control }}
+          RUN_ID: ${{ steps.archive.outputs.run_id }}
+        run: |
+          status=0
+          python replay/stream_check.py --model-io "$RUNNER_TEMP/model_io" \
+            --count "${COUNT:-10}" --control "${CONTROL:-1}" > "$RUNNER_TEMP/check.txt" || status=$?
+          cat "$RUNNER_TEMP/check.txt"
+          {
+            echo "## Stream check (production run $RUN_ID)"
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/check.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $status
