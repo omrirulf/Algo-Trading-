@@ -15,6 +15,7 @@ query in the fetch -- so neither can quietly revert.
 from __future__ import annotations
 
 import re
+from datetime import date, timedelta
 from urllib.parse import unquote
 
 import httpx
@@ -105,10 +106,13 @@ def test_the_map_keeps_the_spacing_the_dataset_uses():
 
 def test_the_printed_contract_is_the_market_that_was_read():
     """The prompt names the market, so a wrong mapping is visible in the output."""
+    # Dated from today, newest first: a fixed date ages past MAX_REPORT_AGE_DAYS and the
+    # snapshot is then (rightly) dropped as a dead series, which is not what this test is about.
     rows = [
-        {"report_date_as_yyyy_mm_dd": f"2026-09-{day:02d}", "open_interest_all": "1000",
+        {"report_date_as_yyyy_mm_dd": (date.today() - timedelta(days=age)).isoformat(),
+         "open_interest_all": "1000",
          "m_money_positions_long_all": "600", "m_money_positions_short_all": "400"}
-        for day in range(8, 0, -1)
+        for age in range(8)
     ]
     snapshot = pos.build_snapshot("GLD", rows)
     assert snapshot is not None

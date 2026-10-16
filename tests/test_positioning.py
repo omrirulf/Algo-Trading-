@@ -22,13 +22,19 @@ import pytest
 from orchestrator import positioning as pos
 
 
-def rows(nets, open_interest=500_000, start_day=15):
-    """Weekly rows, newest first, with a given sequence of net shares."""
+def rows(nets, open_interest=500_000, end=None):
+    """Weekly rows, newest first, with a given sequence of net shares.
+
+    Dated back from today (or ``end``), like ``weekly()`` below: a fixed
+    calendar date ages past ``MAX_REPORT_AGE_DAYS`` and the staleness guard
+    then drops the series these tests are about.
+    """
+    end = end or date.today()
     out = []
     for i, net in enumerate(nets):
         long_ = (open_interest * net + open_interest) / 2
         out.append({
-            "report_date_as_yyyy_mm_dd": f"2026-09-{start_day - i:02d}T00:00:00.000",
+            "report_date_as_yyyy_mm_dd": f"{(end - timedelta(days=7 * i)).isoformat()}T00:00:00.000",
             "open_interest_all": str(open_interest),
             "m_money_positions_long_all": str(long_),
             "m_money_positions_short_all": str(open_interest - long_),
@@ -131,9 +137,11 @@ def test_an_ordinary_reading_says_so():
 
 def test_the_prompt_states_the_staleness_the_dataset_has():
     """Tuesday's positions, published Friday. The model must not read it as live."""
-    text = "\n".join(pos.build_snapshot("GLD", rows([0.2] * 30)).as_lines())
+    # A past date, not today, so the date printed must come from the row.
+    as_of = date.today() - timedelta(days=28)
+    text = "\n".join(pos.build_snapshot("GLD", rows([0.2] * 30, end=as_of)).as_lines())
     assert "published the following Friday" in text
-    assert "2026-09-15" in text
+    assert as_of.isoformat() in text
 
 
 def test_the_contract_is_named_so_a_person_can_check_it():
@@ -153,13 +161,13 @@ def test_no_rows_produce_no_snapshot():
 
 
 def test_rows_with_no_usable_position_produce_no_snapshot():
-    assert pos.build_snapshot("GLD", [{"report_date_as_yyyy_mm_dd": "2026-09-15"}]) is None
+    assert pos.build_snapshot("GLD", [{"report_date_as_yyyy_mm_dd": date.today().isoformat()}]) is None
 
 
 def test_an_alternative_field_spelling_is_still_read():
     """The financial dataset names the same idea "leveraged funds"."""
     row = {
-        "report_date": "2026-09-15",
+        "report_date": date.today().isoformat(),
         "open_interest": "1000",
         "lev_money_positions_long": "600",
         "lev_money_positions_short": "100",
