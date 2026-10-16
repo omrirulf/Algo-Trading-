@@ -134,6 +134,18 @@ non-2xx response, a transport error, or a missing token/zone at
 construction time — raises `NewsFetchError`. `heartbeat.py` catches this per
 ticker and logs it; one ticker's bad response never stops the cycle.
 
+Two of those get one more try. A transport error (a timed-out read, a
+dropped connection) is asked again after 2 seconds
+(`RETRY_PAUSE_SECONDS`). A 200 whose body the parser refuses — most often an
+empty body, which Bright Data sends in bursts (60 of 80 first answers on
+15 Oct 2026) — is asked again after 10 seconds (`EMPTY_RETRY_PAUSE_SECONDS`;
+the owner's decision of 16 Oct 2026, up from 2), and when the second answer
+is refused too, the error carries Bright Data's own status headers
+(`x-brd-status-code`, `x-brd-err-msg` and their kin, `BRD_HEADERS`) so the
+journal says what the vendor said: `Bright Data returned an empty body with
+its 200; nothing to parse (Bright Data said: x-brd-status-code 502)`. An HTTP
+error is never retried.
+
 <Warning>
   **A news failure skips that ticker entirely** — no context is assembled, no
   signal is produced. This is the opposite of how the yfinance enrichment
