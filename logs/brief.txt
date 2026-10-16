@@ -1,8 +1,8 @@
-🔴 14 of 62 model calls failed today (0 setup, 14 model)
-Equity $101,836 · 18 positions · $93,464 gross · $2,576 at risk · unrealised +$1,338
-5 directional calls, none traded
+🟡 2 warnings: 4 of 80 ticker(s) produced no signal
+Equity $100,978 · 17 positions · $84,755 gross · $2,358 at risk · unrealised +$1,230
+Traded: ITA, XLB
 Started by supabase-cron at 14:40 UTC (0 min after 14:40)
-Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-10-12
-Closed: TLT, EWT, XLK, EMB, CAT, XLY
-Also: 14 of 80 ticker(s) produced no signal; 4 of 80 ticker(s) were judged without news
-Cycle 80 tickers, $0.12 · 2026-10-13
+Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-10-15
+Closed: UUP, EWZ, IEF, TIP, NVO, GDX
+Also: 1 of 80 ticker(s) were judged without news
+Cycle 80 tickers, $0.16 · 2026-10-16
