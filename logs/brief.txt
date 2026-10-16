@@ -1,8 +1,8 @@
-🔴 55 of 80 ticker(s) were judged without news
-Equity $101,317 · 17 positions · $83,920 gross · $2,239 at risk · unrealised +$1,168
-Traded: NVDA, ASML, RY, HDB, XLC
+🟡 2 warnings: 4 of 80 ticker(s) produced no signal
+Equity $100,978 · 17 positions · $84,755 gross · $2,358 at risk · unrealised +$1,230
+Traded: ITA, XLB
 Started by supabase-cron at 14:40 UTC (0 min after 14:40)
-Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-10-14
-Closed: IEF, TIP, NVO, GDX, TLT, EWT
-Also: 5 of 80 ticker(s) produced no signal
-Cycle 80 tickers, $0.15 · 2026-10-15
+Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-10-15
+Closed: UUP, EWZ, IEF, TIP, NVO, GDX
+Also: 1 of 80 ticker(s) were judged without news
+Cycle 80 tickers, $0.16 · 2026-10-16
