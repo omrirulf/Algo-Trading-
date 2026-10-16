@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Does streaming get past the provider's ~270-second cut? Archived production asks, re-sent with ``stream``.
 
-    python replay/stream_check.py --model-io "$RUNNER_TEMP/model_io" [--count 10] [--control 1] [--workers 4]
+    python replay/stream_check.py --model-io "$RUNNER_TEMP/model_io" [--count 10] [--control 1] [--workers 4] [--via raw|provider]
 
 Since 12 Oct 2026 DeepInfra has ended long answers without a response
 ("Server disconnected without sending a response") at about 260-280
@@ -322,6 +322,35 @@ def _plain_once(client: httpx.Client, url: str, headers: dict[str, str], candida
     return result
 
 
+def provider_ask(provider: Any, candidate: Candidate) -> Result:
+    """The archived prompts through production's own call path: ``complete_detailed``, retries and all.
+
+    What the cycle will do with this body on the next run, streaming
+    included once it is built in: the answer is a ``Completion`` or an
+    ``LLMError`` after the provider's own retries, timed as a whole.
+    """
+    result = Result(candidate.ticker, "provider", candidate.archived, model=str(candidate.body.get("model") or ""))
+    messages = candidate.body.get("messages") or []
+    try:
+        system, user = messages[0]["content"], messages[1]["content"]
+    except (IndexError, KeyError, TypeError):
+        result.error = "the archived body has no system and user message"
+        return result
+    clock = time.monotonic()
+    try:
+        completion = provider.complete_detailed(system, user, heartbeat.SIGNAL_JSON_SCHEMA,
+                                                model=llm.MODEL, effort=heartbeat.full_model_effort())
+        result.status = 200
+        result.content = completion.text
+        result.finish = "stop"
+        result.usage = {"prompt_tokens": completion.usage.input_tokens,
+                        "completion_tokens": completion.usage.output_tokens}
+    except llm.LLMError as exc:
+        result.error = f"LLMError: {str(exc)[:160]}"
+    result.first_byte = result.seconds = time.monotonic() - clock
+    return result
+
+
 # --------------------------------------------------------------------------- #
 # The report
 # --------------------------------------------------------------------------- #
@@ -338,7 +367,7 @@ def line_for(result: Result) -> str:
 
 
 def report(results: list[Result]) -> str:
-    streaming = [r for r in results if r.mode == "streaming"]
+    streaming = [r for r in results if r.mode in ("streaming", "provider")]
     plain = [r for r in results if r.mode == "plain"]
     lines = [line_for(r) for r in results]
     keys = sorted(set().union(*(r.delta_keys for r in streaming))) if streaming else []
@@ -367,6 +396,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("--count", type=int, default=10, help="archived asks to re-send with streaming")
     parser.add_argument("--control", type=int, default=1, help="of those, also sent the production way")
     parser.add_argument("--workers", type=int, default=4, help="asks in flight at once (production asks 4)")
+    parser.add_argument("--via", choices=("raw", "provider"), default="raw",
+                        help="raw: the archived body with stream flags, read here; provider: production's own call path")
     args = parser.parse_args(argv)
 
     records = read_records(args.model_io)
@@ -385,6 +416,12 @@ def main(argv: Optional[list[str]] = None) -> int:
     print(f"{len(chosen)} archived asks ({cuts} cut by the transport, {len(chosen) - cuts} slow answers), "
           f"{args.workers} at a time, streaming, against {llm._hostname(url)}")
     timeout = httpx.Timeout(connect=CONNECT_SECONDS, read=READ_SECONDS, write=CONNECT_SECONDS, pool=CONNECT_SECONDS)
+    if args.via == "provider":
+        print("via production's own call path (OpenAICompatibleProvider.complete_detailed)")
+        with ThreadPoolExecutor(max_workers=max(1, args.workers)) as pool:
+            results = list(pool.map(lambda c: provider_ask(provider, c), chosen))
+        print(report(results))
+        return 0
     with httpx.Client(timeout=timeout) as client:
         with ThreadPoolExecutor(max_workers=max(1, args.workers)) as pool:
             results = list(pool.map(lambda c: stream_ask(client, url, headers, c), chosen))
