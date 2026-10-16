@@ -1,7 +1,12 @@
 # The investor simulator: plan and private-data design
 
-**Status: plan only, for the owner's approval (4 Oct 2026). Nothing is built.** The owner's instruction of 4 Oct 2026:
-"Investor simulator: plan first, don't build yet. … Show me the plan and the private-data design before you build."
+**Status: approved by the owner on 16 Oct 2026 ("yes to all": the plan, the private-data design, every decision
+D1 to D20 as recommended, and the three accountant questions added). Built with sample data only, as section 10
+step 1 says: the `investor/` package, the sample folder `tests/data/investor_sample/`, tests T11 to T41 in
+`tests/test_investor.py`, the guardrails of section 2.6 in CI, and the private repository's template in
+[`investor-private-template.md`](investor-private-template.md). Steps 2 and 3 of section 10 are the owner's.**
+The owner's instruction of 4 Oct 2026: "Investor simulator: plan first, don't build yet. … Show me the plan and
+the private-data design before you build."
 
 - **A tool, not a test.** It uses no experiment slot, gets no card and no graveyard row, and N does not change.
 - **Shadow-only.** It never trades, holds no broker key and sends no order. It only suggests; the owner decides and
@@ -51,7 +56,7 @@ and name only the rows they want changed.
 | D17 | Similar but not identical funds | **The table in 6.5** | The owner's own list |
 | | **Other** | | |
 | D18 | When it runs | **The first working day of each month (Sunday to Thursday, with the coach), and when a file changes** | Only by hand |
-| D19 | Three new accountant questions (section 9) | **Add them to `cpa-questions.md` now** | Wait |
+| D19 | Three new accountant questions (section 9) | **Add them to `cpa-questions.md` now** (added 16 Oct 2026 as questions 13 to 15) | Wait |
 | D20 | The surtax (scope a) | **Off, as in rule b, until the owner turns it on in `plan.csv` with the year's other taxable income (salary and the like), when that income is near the 721,560 ILS line** | On from the start |
 
 ## 1. What it does
@@ -612,7 +617,7 @@ dollars after the selling cost.
 | T40 | A transfer between the owner's accounts. 10 VT bought at $100 at 3.70 in account A; a `transfer` to account B; sold there at $110 at 3.60 | One sale row with the original day and rate: cost 3,700, proceeds 3,960, taxable 260, tax 65. Account A holds nothing after the transfer. In the VT and VWRA books nothing is bought or sold |
 | T41 | Privacy | On the sample data, no amount, share, ticker or account name in what it prints, its log or an error (only in the report file); the engine refuses a file without the SAMPLE or PRIVATE line, a missing `--data`, and a `--data` or `--out` folder inside this repository |
 
-## 9. Proposed new accountant questions (not added until the owner says so, D19)
+## 9. The three accountant questions added on 16 Oct 2026 (D19; questions 13 to 15 of `cpa-questions.md`)
 
 13. **Forms 1325 and 1322.** For sales of foreign-listed ETFs at a foreign broker: is one 1325 row per FIFO lot (or
     part of a lot) what the form expects, with reinvested-dividend lots as their own rows? Which columns take a sale
@@ -624,6 +629,8 @@ dollars after the selling cost.
     (question 7 asks about the half's own losses)?
 
 ## 10. After the owner approves: the build, in order
+
+Step 1 was built on 16 Oct 2026 (the first pull request after the approval); steps 2 and 3 are the owner's.
 
 1. **This repository, sample data only, on top of PR #140** (merged on 6 Oct 2026; the reused tax engine is in it): the additions of
    section 4.2, the rebalancing and harvest code, the report and the command line, the fund table, the sample folder,

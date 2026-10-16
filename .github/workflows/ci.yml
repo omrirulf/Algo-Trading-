@@ -1054,6 +1054,84 @@ jobs:
           print("OK: no step can mask a failing script behind tee")
           PY
 
+      - name: The investor simulator cannot trade, ask a model or push, and personal files stay out
+        # Section 2.6 of the investor simulator's plan (approved 16 Oct 2026).
+        # The engine (investor/) reads one folder the owner points it at and
+        # writes one report: it may import only the tax arithmetic, the rate
+        # table and its own modules; it holds no key and reaches no broker,
+        # model or phone. Nothing can stop a file from being pushed to a
+        # public repository, so a data file anywhere but the sample folder,
+        # or a line that is exactly the private marker, fails the build: the
+        # numbers are then treated as already public.
+        run: |
+          files=$(git ls-files | grep -E '\.(csv|tsv|xlsx|xls|ods)$' | grep -v '^tests/data/investor_sample/' || true)
+          if [ -n "$files" ]; then
+            echo "$files"
+            echo "::error::a data file outside tests/data/investor_sample/: delete it, rewrite the history, purge GitHub's cache"
+            exit 1
+          fi
+          marked=$(git grep -n -E '^# PRIVATE$' -- . ':!.github/workflows/ci.yml' || true)
+          if [ -n "$marked" ]; then
+            echo "$marked"
+            echo "::error::a tracked file carries the private marker line: treat its numbers as public"
+            exit 1
+          fi
+          hits=$(grep -rnE '(AlpacaPaperBroker|TradingClient|^[[:space:]]*(from|import)[[:space:]]+(alpaca|anthropic|openai|app|orchestrator|shadow|store|coach|learn|dashboard)\b|ExecutionEngine|post_signal|DirectDispatcher|build_dispatcher|get_settings|os\.environ|getenv|dotenv|api_key|secret|ntfy)' \
+                   investor --include='*.py' || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::investor/ must not reach a broker, a model, a phone, a key or the trading code"
+            exit 1
+          fi
+          python3 - <<'PY'
+          import ast, pathlib, sys
+          allowed = ("investor", "analysis.israel_tax", "analysis.boi_rates", "config.israel_tax")
+          bad = []
+          for path in sorted(pathlib.Path("investor").rglob("*.py")):
+              for node in ast.walk(ast.parse(path.read_text())):
+                  names = ([a.name for a in node.names] if isinstance(node, ast.Import)
+                           else [node.module or ""] if isinstance(node, ast.ImportFrom) else [])
+                  for name in names:
+                      if name.startswith(allowed) or (name == "yfinance" and path.name == "market.py"):
+                          continue
+                      if name.split(".")[0] in sys.stdlib_module_names:
+                          continue
+                      bad.append(f"{path}:{node.lineno} imports {name}")
+          if bad:
+              print("\n".join(bad))
+              sys.exit("::error::investor/ imports only the standard library, the tax arithmetic, the rate table and itself")
+          print("OK: the investor simulator imports nothing that trades, asks or pushes")
+          PY
+          runners=$(grep -lE 'investor\.report|python -m investor' .github/workflows/*.yml | grep -v '/ci.yml$' || true)
+          if [ -n "$runners" ]; then
+            echo "$runners"
+            echo "::error::no workflow in this repository runs the investor simulator; it runs only in the owner's private repository"
+            exit 1
+          fi
+          if grep -nE 'investor' .github/workflows/*.yml | grep -v '/ci.yml:' | grep -iE 'secrets\.'; then
+            echo "::error::no workflow holds a secret for the investor simulator"
+            exit 1
+          fi
+          salary=$(grep -rnE 'salary_ils[[:space:]]*=[[:space:]]*[1-9]' --include='*.py' . | grep -v '^./tests/' || true)
+          if [ -n "$salary" ]; then
+            echo "$salary"
+            echo "::error::the salary is an input, never a number in code"
+            exit 1
+          fi
+          echo "OK: personal files stay out, and the investor simulator cannot trade, ask a model or push"
+
+      - name: The investor simulator's locked packages install on their own
+        # Section 2.3, step 4: the owner's private job installs only the
+        # engine's own packages from this hash-locked list, never
+        # requirements.txt (which brings the broker and model packages). The
+        # list is made here and changed only by a reviewed pull request, so
+        # CI proves it is complete: a clean environment, hashes required, and
+        # the engine imports.
+        run: |
+          python3 -m venv "$RUNNER_TEMP/investor-venv"
+          "$RUNNER_TEMP/investor-venv/bin/pip" install --quiet --require-hashes -r investor/requirements-lock.txt
+          "$RUNNER_TEMP/investor-venv/bin/python" -c "import investor.report, investor.market; print('OK: the engine imports from its locked packages')"
+
       - name: No committed .env
         run: |
           if git ls-files --error-unmatch .env >/dev/null 2>&1; then

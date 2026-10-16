@@ -49,6 +49,11 @@ Until the owner has entered numbers, the message is a short checklist of questio
 
 ## 3. Where the owner's numbers live (the private-data design)
 
+**Superseded on 16 Oct 2026 by the investor simulator's decision D3:** the owner chose one home for every personal
+number, a private GitHub repository of their own (`investor-simulator-plan.md`, section 2.3), so the coach's
+later data entry goes there too, not to a private Supabase project. The coach's own job and any secret it needs
+are designed when its data entry is built. The design below is kept as the record of what was proposed on 3 Oct.
+
 The owner's personal numbers must never go into the public repository, a log, an artifact or the phone push
 text. Today **the repository, its GitHub Actions logs, its workflow artifacts and the GitHub Pages site are all
 public** (`docs/next-steps.mdx`, "decide whether to make the repository private"). So the coach cannot live in
@@ -115,7 +120,8 @@ Decided on 3 Oct 2026: the plan is approved with the conditions in section 0; th
 Supabase project; the model sees percentages only; the cap is $0.10 a month; the checklist runs on the first
 working day of each month, Sunday to Thursday (the first push on Sunday 1 November 2026). Still open, for when the owner confirms that they want to enter numbers:
 
-1. Where the private job runs: a small private repository, or a Supabase scheduled Edge Function (section 3).
+1. Where the private job runs: decided on 16 Oct 2026 (the investor simulator's D3): the owner's private GitHub
+   repository, the same one that holds the lots (section 3, superseded).
 2. The asset classes, the targets and the rebalancing band (they go in `coach_targets`, never in the repository).
 3. Where to read the full message: the Supabase dashboard, or an email.
 
