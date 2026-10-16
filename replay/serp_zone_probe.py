@@ -1,31 +1,39 @@
 #!/usr/bin/env python3
-"""Would a SERP API zone give the news fetch fewer empty answers than the Web Unlocker zone? Two zones, the same asks.
+"""Would a SERP API zone, or a US exit, give the news fetch fewer empty answers? The same asks, several ways.
 
-    python replay/serp_zone_probe.py [--zone-b serp_news_probe] [--create] [--count 20]
+    python replay/serp_zone_probe.py [--zone-b serp_news_probe] [--create] [--country us] [--count 20]
+    python replay/serp_zone_probe.py --delete-zone serp_news_probe
 
 Production's news fetch (``orchestrator/news.py``) sends its Google News
 searches through the Web Unlocker zone ``cli_unlocker``, and since 23 Sep
 2026 a share of the answers have been a 200 with an empty body (6 Oct: 44 of
 80 first answers; 15 Oct: 60, and 53 of the second asks were empty again).
-Bright Data serves the same searches through a SERP API zone too, opened
-free of charge and billed per request. The owner (16 Oct 2026) allowed one
-to be opened through the account API and expects no difference; this
-measures instead of assuming.
+The first probe (16 Oct 2026) read Bright Data's own headers on those: every
+empty 200 said ``x-brd-status-code 502; x-brd-error redirect location was
+rejected`` -- Google answered the search with a redirect and the Unlocker
+refused to follow it. A SERP API zone, opened the same day, showed the same
+(6 of 20 empty against 4 of 20), so the zone is not the lever; the exit
+country may be, since the redirect is likely Google's consent or regional
+page for a non-US exit.
 
-For each of the first ``count`` watchlist names it sends production's exact
-request -- the same URL with ``brd_json=1``, the same ``format: raw`` --
-once through each zone, back to back, and prints for every ask the status,
+For each of the first ``count`` watchlist names this sends production's
+exact request -- the same URL with ``brd_json=1``, the same ``format:
+raw`` -- once through each arm, back to back: production's zone as it is,
+production's zone with ``country`` set when ``--country`` is given, and
+the same for zone B when it exists. It prints for every ask the status,
 the bytes, whether the parser found news and how many items, Bright Data's
-own headers and the seconds; then each zone's share of empty answers.
-``--create`` opens zone B through the account API when it does not exist
-yet (``POST /zone``) and prints the API's status and words, so a refused
-shape is corrected from what the API said rather than guessed.
+own headers and the seconds; then each arm's share of empty answers.
 
-The token goes only to api.brightdata.com and never into the output.
-Read-only beyond the asks it pays for (about forty, a few cents): it
-prints, writes nothing, trades nothing, holds no broker key. Production's
-zone does not change here; that is the owner's decision, made by setting
-the repository variable ``BRIGHTDATA_SERP_ZONE``.
+``--create`` opens zone B through the account API when it does not exist
+(``POST /zone``, free to open, billed per request); ``--delete-zone``
+removes a zone (``DELETE /zone``) and does nothing else. The account API's
+answers are printed as their status and a few named fields only, never
+whole: the create answer carries the zone's password. The token goes only
+to api.brightdata.com and never into the output. Read-only beyond the
+asks it pays for (a few cents): it prints, writes nothing, trades nothing,
+holds no broker key. Production changes only by the owner's decision: the
+repository variable ``BRIGHTDATA_SERP_ZONE`` for the zone, a code change
+for the exit country.
 """
 
 from __future__ import annotations
@@ -35,7 +43,7 @@ import os
 import statistics
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Optional
 
@@ -51,6 +59,9 @@ ACTIVE_ZONES_API = "https://api.brightdata.com/zone/get_active_zones"
 DEFAULT_ZONE_B = "serp_news_probe"
 DEFAULT_ZONE_A = "cli_unlocker"
 REQUEST_TIMEOUT_SECONDS = news.REQUEST_TIMEOUT_SECONDS
+#: The only fields of an account API answer that are printed. A zone's
+#: answer also carries its password; that is never shown.
+SHOWN_FIELDS = ("created", "type", "product", "serp", "ips_type", "vips_type")
 
 #: ``(method, url, headers, json body or None) -> response``: the one seam a test replaces.
 Fetch = Callable[[str, str, dict, Optional[dict]], Any]
@@ -86,6 +97,38 @@ def zone_body(name: str) -> dict[str, Any]:
     return {"zone": {"name": name, "type": "unblocker"}, "plan": {"type": "unblocker", "serp": True}}
 
 
+def shown(payload: Any) -> str:
+    """The few named fields of an account API answer, as ``name=value``; nothing else of it."""
+    found: list[str] = []
+
+    def walk(node: Any, depth: int = 0) -> None:
+        if not isinstance(node, dict) or depth > 3:
+            return
+        for key, value in node.items():
+            if key in SHOWN_FIELDS and isinstance(value, (str, int, float, bool)):
+                pair = f"{key}={value}"
+                if pair not in found:
+                    found.append(pair)
+            elif isinstance(value, dict):
+                walk(value, depth + 1)
+    walk(payload)
+    return ", ".join(found)
+
+
+def api_words(response: Any) -> str:
+    """``HTTP <status>`` and the shown fields of the answer, or its first words when it is not JSON."""
+    status = getattr(response, "status_code", None)
+    try:
+        payload = response.json()
+    except (ValueError, AttributeError):
+        payload = None
+    if isinstance(payload, dict):
+        fields = shown(payload)
+        return f"HTTP {status}" + (f": {fields}" if fields else "")
+    text = str(getattr(response, "text", "") or "")[:120]
+    return f"HTTP {status}: {text}" if text else f"HTTP {status}"
+
+
 def zone_exists(fetch: Fetch, token: str, name: str) -> Optional[bool]:
     """True or False from the account's active zones; None when the list could not be read."""
     response = fetch("GET", ACTIVE_ZONES_API, _auth(token), None)
@@ -100,12 +143,14 @@ def zone_exists(fetch: Fetch, token: str, name: str) -> Optional[bool]:
     return name in {z.get("name") for z in zones if isinstance(z, dict)}
 
 
-def create_zone(fetch: Fetch, token: str, name: str) -> tuple[Optional[int], str]:
-    """Open zone ``name``; the API's status and its first words (never the token)."""
-    response = fetch("POST", ZONE_API, _auth(token), zone_body(name))
-    status = getattr(response, "status_code", None)
-    text = getattr(response, "text", "") or ""
-    return status, text[:300].replace(token, "***") if token else text[:300]
+def create_zone(fetch: Fetch, token: str, name: str) -> str:
+    """Open zone ``name``; the API's status and its shown fields (never the password, never the token)."""
+    return api_words(fetch("POST", ZONE_API, _auth(token), zone_body(name)))
+
+
+def delete_zone(fetch: Fetch, token: str, name: str) -> str:
+    """Remove zone ``name``; the API's status and words."""
+    return api_words(fetch("DELETE", ZONE_API, _auth(token), {"zone": name}))
 
 
 # --------------------------------------------------------------------------- #
@@ -114,10 +159,31 @@ def create_zone(fetch: Fetch, token: str, name: str) -> tuple[Optional[int], str
 
 
 @dataclass
-class Ask:
-    """One search through one zone."""
+class Arm:
+    """One way of asking: a zone, and what is added to production's body."""
 
+    label: str
     zone: str
+    extra: dict[str, Any] = field(default_factory=dict)
+
+
+def arms_for(zone_a: str, zone_b: Optional[str], country: str) -> list[Arm]:
+    """Production's zone first, each zone plain and then with the exit country when one is given."""
+    out = [Arm(zone_a, zone_a)]
+    if country:
+        out.append(Arm(f"{zone_a}, {country} exit", zone_a, {"country": country}))
+    if zone_b:
+        out.append(Arm(zone_b, zone_b))
+        if country:
+            out.append(Arm(f"{zone_b}, {country} exit", zone_b, {"country": country}))
+    return out
+
+
+@dataclass
+class Ask:
+    """One search through one arm."""
+
+    arm: str
     ticker: str
     status: Optional[int] = None
     size: int = 0
@@ -141,11 +207,11 @@ class Ask:
         return "news" if self.items else "no items"
 
 
-def ask(fetch: Fetch, token: str, zone: str, ticker: str) -> Ask:
-    """Production's request for ``ticker`` through ``zone``, judged the way production judges it."""
+def ask(fetch: Fetch, token: str, arm: Arm, ticker: str) -> Ask:
+    """Production's request for ``ticker`` through ``arm``, judged the way production judges it."""
     url = news.build_news_search_url(ticker)
-    body = {"zone": zone, "url": url, "format": "raw"}
-    result = Ask(zone, ticker)
+    body = {"zone": arm.zone, "url": url, "format": "raw", **arm.extra}
+    result = Ask(arm.label, ticker)
     clock = time.monotonic()
     try:
         response = fetch("POST", news.BRIGHTDATA_REQUEST_URL, _auth(token), body)
@@ -167,12 +233,12 @@ def ask(fetch: Fetch, token: str, zone: str, ticker: str) -> Ask:
     return result
 
 
-def probe(fetch: Fetch, token: str, zones: list[str], tickers: list[str]) -> list[Ask]:
-    """Every ticker through every zone, back to back, in production's order."""
+def probe(fetch: Fetch, token: str, arms: list[Arm], tickers: list[str]) -> list[Ask]:
+    """Every ticker through every arm, back to back, in production's order."""
     out: list[Ask] = []
     for ticker in tickers:
-        for zone in zones:
-            out.append(ask(fetch, token, zone, ticker))
+        for arm in arms:
+            out.append(ask(fetch, token, arm, ticker))
     return out
 
 
@@ -183,14 +249,14 @@ def probe(fetch: Fetch, token: str, zones: list[str], tickers: list[str]) -> lis
 
 def line_for(a: Ask) -> str:
     extra = a.error or (f"[{a.headers}]" if a.headers else "")
-    return (f"{a.ticker:<6} {a.zone:<18} {a.outcome:<10} status {a.status if a.status is not None else '-':>4} "
+    return (f"{a.ticker:<6} {a.arm:<24} {a.outcome:<10} status {a.status if a.status is not None else '-':>4} "
             f"{a.size:7d} bytes {a.items:3d} items {a.seconds:6.1f}s {a.refused} {extra}".rstrip())
 
 
-def summary(asks: list[Ask], zones: list[str]) -> str:
+def summary(asks: list[Ask], arms: list[Arm]) -> str:
     lines = []
-    for zone in zones:
-        mine = [a for a in asks if a.zone == zone]
+    for arm in arms:
+        mine = [a for a in asks if a.arm == arm.label]
         if not mine:
             continue
         n = len(mine)
@@ -199,7 +265,7 @@ def summary(asks: list[Ask], zones: list[str]) -> str:
         refused = sum(1 for a in mine if a.outcome == "refused")
         errors = sum(1 for a in mine if a.outcome.startswith("HTTP") or a.outcome == "error")
         median = statistics.median(a.seconds for a in mine)
-        lines.append(f"{zone}: {n} asks, news for {with_news} ({with_news / n:.0%}), empty body {empty} "
+        lines.append(f"{arm.label}: {n} asks, news for {with_news} ({with_news / n:.0%}), empty body {empty} "
                      f"({empty / n:.0%}), refused {refused}, HTTP/transport errors {errors}, median {median:.1f}s")
     return "\n".join(lines)
 
@@ -207,36 +273,46 @@ def summary(asks: list[Ask], zones: list[str]) -> str:
 def main(argv: Optional[list[str]] = None, fetch: Fetch = http_fetch) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--zone-a", default="", help="production's zone (default: from the environment, else cli_unlocker)")
-    parser.add_argument("--zone-b", default=DEFAULT_ZONE_B, help="the SERP API zone to compare")
+    parser.add_argument("--zone-b", default=DEFAULT_ZONE_B, help="the SERP API zone to compare; blank for none")
     parser.add_argument("--create", action="store_true", help="open zone B through the account API if it does not exist")
+    parser.add_argument("--country", default="", help="also ask each zone from this exit country, e.g. us")
     parser.add_argument("--count", type=int, default=20, help="watchlist names to ask, from the front of the list")
+    parser.add_argument("--delete-zone", default="", metavar="NAME", help="remove this zone and do nothing else")
     args = parser.parse_args(argv)
 
     token = news.resolve_token(os.environ.get("BRIGHTDATA_API_TOKEN", ""))
     if not token:
         print("no Bright Data token: set BRIGHTDATA_API_TOKEN")
         return 1
+    if args.delete_zone:
+        print(f"DELETE /zone {args.delete_zone} -> {delete_zone(fetch, token, args.delete_zone)}")
+        gone = zone_exists(fetch, token, args.delete_zone)
+        print(f"zone {args.delete_zone} now {'gone' if gone is False else 'still listed' if gone else 'unknown'}")
+        return 0 if gone is False else 1
     zone_a = zone_a_from_env(args.zone_a)
-    zones = [zone_a]
-    exists = zone_exists(fetch, token, args.zone_b)
-    print(f"zone A (production): {zone_a}; zone B: {args.zone_b} "
-          f"{'exists' if exists else 'does not exist' if exists is False else 'unknown (the zone list could not be read)'}")
-    if exists is False and args.create:
-        status, words = create_zone(fetch, token, args.zone_b)
-        print(f"POST /zone -> HTTP {status}: {words}")
-        exists = zone_exists(fetch, token, args.zone_b)
-        print(f"zone B now {'exists' if exists else 'still missing' if exists is False else 'unknown'}")
-    if exists:
-        zones.append(args.zone_b)
+    zone_b: Optional[str] = args.zone_b.strip() or None
+    if zone_b:
+        exists = zone_exists(fetch, token, zone_b)
+        print(f"zone A (production): {zone_a}; zone B: {zone_b} "
+              f"{'exists' if exists else 'does not exist' if exists is False else 'unknown (the zone list could not be read)'}")
+        if exists is False and args.create:
+            print(f"POST /zone -> {create_zone(fetch, token, zone_b)}")
+            exists = zone_exists(fetch, token, zone_b)
+            print(f"zone B now {'exists' if exists else 'still missing' if exists is False else 'unknown'}")
+        if not exists:
+            print("zone B is not asked; only production's zone is measured")
+            zone_b = None
     else:
-        print("zone B is not asked; only production's zone is measured")
+        print(f"zone A (production): {zone_a}; no zone B")
+    arms = arms_for(zone_a, zone_b, args.country.strip())
     tickers = list(DEFAULT_WATCHLIST[:max(0, args.count)])
-    print(f"{len(tickers)} names x {len(zones)} zone(s), back to back, production's request each time")
-    asks = probe(fetch, token, zones, tickers)
+    print(f"{len(tickers)} names x {len(arms)} arm(s), back to back, production's request each time: "
+          + "; ".join(a.label for a in arms))
+    asks = probe(fetch, token, arms, tickers)
     for a in asks:
         print(line_for(a))
     print()
-    print(summary(asks, zones))
+    print(summary(asks, arms))
     return 0
 
 

@@ -55,6 +55,14 @@ CONNECT_SECONDS = 30.0
 #: Between two chunks of a stream, or for the whole of a plain answer: the
 #: production ceiling, so the comparison is on the same terms.
 READ_SECONDS = llm.FULL_MODEL_TIMEOUT_SECONDS
+#: "Model busy, retry later" (HTTP 429) is waited out, as production waits
+#: it out: the first run of this check (16 Oct 2026, 19:52 UTC) got it on
+#: all eleven asks within eight seconds and measured nothing. The server's
+#: own Retry-After wins when it gives one and it is sane; otherwise the
+#: ladder below, and at most BUSY_ASKS asks of one body.
+BUSY_ASKS = 4
+BUSY_WAITS = (30.0, 60.0, 120.0)
+RETRY_AFTER_CAP_SECONDS = 120.0
 REQUIRED_KEYS = tuple(heartbeat.SIGNAL_JSON_SCHEMA.get("required") or ("ticker", "bias", "conviction", "rationale"))
 
 
@@ -92,6 +100,10 @@ class Result:
     usage: Optional[dict[str, Any]] = None
     error: Optional[str] = None
     model: str = ""
+    #: "Model busy" answers waited out before this one.
+    busy: int = 0
+    #: The HTTP response of this ask, for its Retry-After; never printed.
+    response: Any = None
 
     @property
     def parses(self) -> bool:
@@ -191,14 +203,40 @@ def streamed_body(body: dict[str, Any]) -> dict[str, Any]:
     return asked
 
 
-def stream_ask(client: httpx.Client, url: str, headers: dict[str, str], candidate: Candidate) -> Result:
-    """One ask with ``stream: true``: the answer gathered chunk by chunk, timed."""
+def busy_wait(response: Any, attempt: int) -> float:
+    """How long to wait after the ``attempt``-th busy answer: Retry-After when sane, else the ladder."""
+    raw = (getattr(response, "headers", None) or {}).get("Retry-After")
+    try:
+        seconds = float(str(raw).strip()) if raw else None
+    except ValueError:
+        seconds = None
+    if seconds is not None and 0 <= seconds <= RETRY_AFTER_CAP_SECONDS:
+        return seconds
+    return BUSY_WAITS[min(attempt, len(BUSY_WAITS) - 1)]
+
+
+def stream_ask(client: httpx.Client, url: str, headers: dict[str, str], candidate: Candidate,
+               sleep: Any = time.sleep) -> Result:
+    """One ask with ``stream: true``, busy answers waited out: the answer gathered chunk by chunk, timed."""
+    busy = 0
+    for attempt in range(BUSY_ASKS):
+        result = _stream_once(client, url, headers, candidate)
+        result.busy = busy
+        if result.status != 429 or attempt == BUSY_ASKS - 1:
+            return result
+        busy += 1
+        sleep(busy_wait(result.response, attempt))
+    return result  # pragma: no cover - the loop always returns
+
+
+def _stream_once(client: httpx.Client, url: str, headers: dict[str, str], candidate: Candidate) -> Result:
     body = streamed_body(candidate.body)
     result = Result(candidate.ticker, "streaming", candidate.archived, model=str(body.get("model") or ""))
     clock = time.monotonic()
     try:
         with client.stream("POST", url, json=body, headers=headers) as response:
             result.status = response.status_code
+            result.response = response
             if response.status_code != 200:
                 result.error = f"HTTP {response.status_code}: {response.read()[:300]!r}"
             else:
@@ -244,13 +282,27 @@ def _take_chunk(result: Result, chunk: Any) -> None:
             result.finish = finish
 
 
-def plain_ask(client: httpx.Client, url: str, headers: dict[str, str], candidate: Candidate) -> Result:
-    """The same body the production way: one POST, one answer, the production ceiling."""
+def plain_ask(client: httpx.Client, url: str, headers: dict[str, str], candidate: Candidate,
+              sleep: Any = time.sleep) -> Result:
+    """The same body the production way, busy answers waited out: one POST, one answer, the production ceiling."""
+    busy = 0
+    for attempt in range(BUSY_ASKS):
+        result = _plain_once(client, url, headers, candidate)
+        result.busy = busy
+        if result.status != 429 or attempt == BUSY_ASKS - 1:
+            return result
+        busy += 1
+        sleep(busy_wait(result.response, attempt))
+    return result  # pragma: no cover - the loop always returns
+
+
+def _plain_once(client: httpx.Client, url: str, headers: dict[str, str], candidate: Candidate) -> Result:
     result = Result(candidate.ticker, "plain", candidate.archived, model=str(candidate.body.get("model") or ""))
     clock = time.monotonic()
     try:
         response = client.post(url, json=candidate.body, headers=headers)
         result.status = response.status_code
+        result.response = response
         result.first_byte = result.seconds = time.monotonic() - clock
         if response.status_code != 200:
             result.error = f"HTTP {response.status_code}: {response.text[:300]!r}"
@@ -280,8 +332,9 @@ def line_for(result: Result) -> str:
     tokens = f"{result.output_tokens:6d}" if result.output_tokens is not None else "     -"
     cost = f"${result.cost_usd:.4f}" if result.cost_usd is not None else "$-"
     tail = result.error or f"finish {result.finish or '-'}, {len(result.content)} chars, parses {'yes' if result.parses else 'no'}"
+    waited = f" after {result.busy} busy" if result.busy else ""
     return (f"{result.ticker:<6} {result.mode:<9} archived {result.archived:<24} -> {result.verdict:<22} "
-            f"first byte {first} end {result.seconds:7.1f}s chunks {result.chunks:5d} out tokens {tokens} {cost} | {tail}")
+            f"first byte {first} end {result.seconds:7.1f}s chunks {result.chunks:5d} out tokens {tokens} {cost}{waited} | {tail}")
 
 
 def report(results: list[Result]) -> str:
@@ -303,7 +356,8 @@ def report(results: list[Result]) -> str:
     for r in plain:
         lines.append(f"control (plain): {r.verdict} after {r.seconds:.0f}s"
                      + (f" ({r.error})" if r.error else ""))
-    lines.append(f"spent about ${spent:.3f} on {len(results)} asks")
+    waited = sum(r.busy for r in results)
+    lines.append(f"spent about ${spent:.3f} on {len(results)} asks; {waited} busy answer(s) waited out")
     return "\n".join(lines)
 
 
