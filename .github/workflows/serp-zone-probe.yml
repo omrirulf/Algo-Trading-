@@ -22,6 +22,12 @@ on:
       count:
         description: "How many watchlist names to ask, from the front of the list"
         default: "20"
+      country:
+        description: "Also ask each zone from this exit country (blank: no such arm)"
+        default: "us"
+      delete_zone:
+        description: "Remove this zone through the account API and do nothing else (blank: probe)"
+        default: ""
   # workflow_dispatch does not exist until this file is on main, so -- like
   # unlocker-check.yml -- it also runs on its own pull request, and only when
   # it changes.
@@ -58,9 +64,17 @@ jobs:
           ZONE_B: ${{ inputs.zone_b }}
           CREATE: ${{ inputs.create }}
           COUNT: ${{ inputs.count }}
+          COUNTRY: ${{ inputs.country }}
+          DELETE_ZONE: ${{ inputs.delete_zone }}
         run: |
-          args=(--zone-b "${ZONE_B:-serp_news_probe}" --count "${COUNT:-20}")
-          [ "${CREATE:-yes}" = "yes" ] && args+=(--create)
+          if [ -n "$DELETE_ZONE" ]; then
+            args=(--delete-zone "$DELETE_ZONE")
+          else
+            # On a pull request every input is blank: the zone and the
+            # country below are the defaults the dispatch form shows.
+            args=(--zone-b "${ZONE_B:-serp_news_probe}" --count "${COUNT:-20}" --country "${COUNTRY:-us}")
+            [ "${CREATE:-yes}" = "yes" ] && args+=(--create)
+          fi
           status=0
           python replay/serp_zone_probe.py "${args[@]}" > "$RUNNER_TEMP/probe.txt" || status=$?
           cat "$RUNNER_TEMP/probe.txt"

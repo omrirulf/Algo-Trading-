@@ -168,3 +168,55 @@ def test_the_workflow_asks_with_the_production_key_and_reads_only_the_artifact()
     assert not any(k.startswith("ALPACA") or k.startswith("ANTHROPIC") or k.startswith("BRIGHTDATA") for k in env)
     triggers = wf.get("on") or wf.get(True)      # yaml reads a bare `on` as the boolean
     assert "replay/stream_check.py" in triggers["pull_request"]["paths"]
+
+
+# --------------------------------------------------------------------------- #
+# "Model busy" is waited out (the first run, 16 Oct 2026, measured nothing)
+# --------------------------------------------------------------------------- #
+
+
+BUSY = {"error": {"message": "Model busy, retry later", "type": "invalid_request_error", "code": "engine_overloaded"}}
+
+
+def test_a_busy_stream_is_asked_again_after_the_ladder_and_then_counts():
+    answer = json.dumps({"ticker": "EWY", "bias": "NEUTRAL", "conviction": 0.0, "rationale": "r"})
+    calls = []
+    slept = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(1)
+        if len(calls) <= 2:
+            return httpx.Response(429, json=BUSY)
+        return httpx.Response(200, content=sse({"choices": [{"delta": {"content": answer}, "finish_reason": "stop"}],
+                                                "usage": {"prompt_tokens": 1, "completion_tokens": 2}}))
+
+    candidate = stream_check.Candidate("EWY", "first", "transport_error", 278_000, "e", BODY)
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        result = stream_check.stream_ask(client, "https://example.test/v1/openai/chat/completions", {}, candidate,
+                                         sleep=slept.append)
+    assert len(calls) == 3 and result.busy == 2 and result.verdict == "complete"
+    assert slept == [30.0, 60.0]
+    assert "after 2 busy" in stream_check.line_for(result)
+
+
+def test_retry_after_wins_over_the_ladder_when_sane():
+    assert stream_check.busy_wait(httpx.Response(429, headers={"Retry-After": "7"}), 0) == 7.0
+    assert stream_check.busy_wait(httpx.Response(429, headers={"Retry-After": "9999"}), 1) == 60.0
+    assert stream_check.busy_wait(httpx.Response(429, headers={"Retry-After": "soon"}), 2) == 120.0
+    assert stream_check.busy_wait(httpx.Response(429), 5) == 120.0
+
+
+def test_four_busy_answers_are_the_real_answer():
+    calls = []
+    handler = lambda request: (calls.append(1), httpx.Response(429, json=BUSY))[1]  # noqa: E731
+    candidate = stream_check.Candidate("IWM", "first", "transport_error", 278_000, "i", BODY)
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        streamed = stream_check.stream_ask(client, "https://example.test/v1/openai/chat/completions", {}, candidate,
+                                           sleep=lambda s: None)
+        plain = stream_check.plain_ask(client, "https://example.test/v1/openai/chat/completions", {}, candidate,
+                                       sleep=lambda s: None)
+    assert len(calls) == 8 and streamed.busy == 3 and plain.busy == 3
+    assert streamed.verdict == "error" and "HTTP 429" in streamed.error
+    assert plain.verdict == "error" and "HTTP 429" in plain.error
+    text = stream_check.report([streamed, plain])
+    assert "6 busy answer(s) waited out" in text
