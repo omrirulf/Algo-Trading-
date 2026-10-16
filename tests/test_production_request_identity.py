@@ -21,6 +21,13 @@ results.
 (main before PR #142), computed there and copied here. A failure means that
 production's request or parsing changed: change ``GOLDEN`` only with the
 owner's knowledge, and write the change down.
+
+Changed once, on 16 Oct 2026 (the owner's decision to stream the answer,
+``llm.STREAMING``; the Amendments table of ``docs/horse-race-preregistration.md``):
+the ten ``*.body`` hashes, because every request body now carries
+``"stream": true`` and ``"stream_options": {"include_usage": true}``. Every
+other value -- the prompts, the targets, what production parsed out of the
+fixed answers -- is what main had before PR #142.
 """
 
 from __future__ import annotations
@@ -42,11 +49,11 @@ FINGERPRINT = "6c59e07de87e"
 #: ``observe()`` on the base commit 1ac931f.
 GOLDEN: dict[str, str] = {
     "MSFT.invalid_values_then_valid.1.body":
-        "a65cdd28b9f4bb1388b9cdf7d258b997982904b25a216b5e61b6c0072b6d6345",
+        "61fe92f579bdcea89ee500cdb4d75759577d5cc67fdc0b47e858c3402d1e5278",
     "MSFT.invalid_values_then_valid.1.target":
         "3e612970d3ab84c8d20c3803059368908d778c4b266198a6cd84dcda112b1ec9",
     "MSFT.invalid_values_then_valid.2.body":
-        "c8f53afed54f36c3e71da3546975f25a5ef2cd637ed4611aba8305d93a7f6300",
+        "d1d8cacf258edc58f204c4b592cbe5307a07ebd211efe00950b761e14abf3935",
     "MSFT.invalid_values_then_valid.2.target":
         "3e612970d3ab84c8d20c3803059368908d778c4b266198a6cd84dcda112b1ec9",
     "MSFT.invalid_values_then_valid.completion":
@@ -55,11 +62,11 @@ GOLDEN: dict[str, str] = {
         "be5cba4370e5835e106852d3120949f208b5dabb7d9ceebec880541df6efca30",
     "MSFT.invalid_values_then_valid.requests": "2",
     "MSFT.off_schema_then_valid.1.body":
-        "a65cdd28b9f4bb1388b9cdf7d258b997982904b25a216b5e61b6c0072b6d6345",
+        "61fe92f579bdcea89ee500cdb4d75759577d5cc67fdc0b47e858c3402d1e5278",
     "MSFT.off_schema_then_valid.1.target":
         "3e612970d3ab84c8d20c3803059368908d778c4b266198a6cd84dcda112b1ec9",
     "MSFT.off_schema_then_valid.2.body":
-        "f21710fb747df459cc34874a9b5e9cc8078ad0f13c146c48c254e6cddbda4812",
+        "6e90ddd0319fe73eef06bbbf827bfc144320c886f55bd2aacdc93dc97eafd08d",
     "MSFT.off_schema_then_valid.2.target":
         "3e612970d3ab84c8d20c3803059368908d778c4b266198a6cd84dcda112b1ec9",
     "MSFT.off_schema_then_valid.completion":
@@ -73,7 +80,7 @@ GOLDEN: dict[str, str] = {
         "1f15d7ba43cefc850eb7d703d3ffe6b8484addf6dbfb128dbda78665bf90772c",
     "MSFT.user_prompt": "b64a21870bc85a44362cd4494c032ffa25f2dcd7a6922465f4887fffc15478cc",
     "MSFT.valid.1.body":
-        "a65cdd28b9f4bb1388b9cdf7d258b997982904b25a216b5e61b6c0072b6d6345",
+        "61fe92f579bdcea89ee500cdb4d75759577d5cc67fdc0b47e858c3402d1e5278",
     "MSFT.valid.1.target":
         "3e612970d3ab84c8d20c3803059368908d778c4b266198a6cd84dcda112b1ec9",
     "MSFT.valid.completion":
@@ -82,11 +89,11 @@ GOLDEN: dict[str, str] = {
         "be5cba4370e5835e106852d3120949f208b5dabb7d9ceebec880541df6efca30",
     "MSFT.valid.requests": "1",
     "TLT.invalid_values_then_valid.1.body":
-        "744f8215abf4acf065f8eb9bf40441be92432a63db7820a5fc72979485ecc8a4",
+        "0d09996fef49ebf93f4e667c817c16d7fdff574a4b97e6d10619a9292e1ce1f5",
     "TLT.invalid_values_then_valid.1.target":
         "3e612970d3ab84c8d20c3803059368908d778c4b266198a6cd84dcda112b1ec9",
     "TLT.invalid_values_then_valid.2.body":
-        "5a3ed931785de8b73d5aae6a4951aecc8dee14b21956858052ea3e4491beb81f",
+        "4759f8828af1ce00be713f751b91fedf80500ab0ef6464100c24f679ebc3abc6",
     "TLT.invalid_values_then_valid.2.target":
         "3e612970d3ab84c8d20c3803059368908d778c4b266198a6cd84dcda112b1ec9",
     "TLT.invalid_values_then_valid.completion":
@@ -95,11 +102,11 @@ GOLDEN: dict[str, str] = {
         "0368d09691c6f24742248005b5b3d8838942d251f7b7bb6dbb20f5c24ab45187",
     "TLT.invalid_values_then_valid.requests": "2",
     "TLT.off_schema_then_valid.1.body":
-        "744f8215abf4acf065f8eb9bf40441be92432a63db7820a5fc72979485ecc8a4",
+        "0d09996fef49ebf93f4e667c817c16d7fdff574a4b97e6d10619a9292e1ce1f5",
     "TLT.off_schema_then_valid.1.target":
         "3e612970d3ab84c8d20c3803059368908d778c4b266198a6cd84dcda112b1ec9",
     "TLT.off_schema_then_valid.2.body":
-        "2b19c032499985bd1812a4d8da9506672e22d8db3bf76ec97806bb2ee3c33ceb",
+        "f4bba2763c29bf203a33b06ee14d05ff8284192c275ea51f52938621f4aaa14b",
     "TLT.off_schema_then_valid.2.target":
         "3e612970d3ab84c8d20c3803059368908d778c4b266198a6cd84dcda112b1ec9",
     "TLT.off_schema_then_valid.completion":
@@ -112,7 +119,7 @@ GOLDEN: dict[str, str] = {
     "TLT.system_prompt":
         "01c4402c78d5b42db7cc6a3b19ebe66d57fb25805a028e00222b64abb813713c",
     "TLT.user_prompt": "f4f925b949c97f456c95e030c912fcddfe9bcc963b21a12316dda8cedb282467",
-    "TLT.valid.1.body": "744f8215abf4acf065f8eb9bf40441be92432a63db7820a5fc72979485ecc8a4",
+    "TLT.valid.1.body": "0d09996fef49ebf93f4e667c817c16d7fdff574a4b97e6d10619a9292e1ce1f5",
     "TLT.valid.1.target":
         "3e612970d3ab84c8d20c3803059368908d778c4b266198a6cd84dcda112b1ec9",
     "TLT.valid.completion":

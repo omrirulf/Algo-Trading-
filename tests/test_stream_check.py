@@ -220,3 +220,37 @@ def test_four_busy_answers_are_the_real_answer():
     assert plain.verdict == "error" and "HTTP 429" in plain.error
     text = stream_check.report([streamed, plain])
     assert "6 busy answer(s) waited out" in text
+
+
+# --------------------------------------------------------------------------- #
+# Production's own call path (--via provider)
+# --------------------------------------------------------------------------- #
+
+
+def test_the_provider_arm_asks_productions_call_path_with_the_archived_prompts():
+    class Provider:
+        def __init__(self):
+            self.asked = []
+
+        def complete_detailed(self, system, user, schema, model=None, effort=None):
+            self.asked.append((system, user, model, effort))
+            return stream_check.llm.Completion(text=json.dumps({"ticker": "AAA", "bias": "NEUTRAL", "conviction": 0.0,
+                                                                "rationale": "r"}),
+                                               usage=stream_check.llm.Usage(model="m", input_tokens=10, output_tokens=5))
+
+    provider = Provider()
+    candidate = stream_check.Candidate("AAA", "first", "transport_error", 270_000, "a", BODY)
+    result = stream_check.provider_ask(provider, candidate)
+    assert provider.asked == [("s", "u", stream_check.llm.MODEL, stream_check.heartbeat.full_model_effort())]
+    assert result.mode == "provider" and result.verdict == "complete" and result.output_tokens == 5
+
+
+def test_the_provider_arm_reports_an_llm_error_as_an_error():
+    class Provider:
+        def complete_detailed(self, *a, **k):
+            raise stream_check.llm.LLMError("unreachable: Server disconnected (gave up after 2 attempt(s))")
+
+    candidate = stream_check.Candidate("AAA", "first", "transport_error", 270_000, "a", BODY)
+    result = stream_check.provider_ask(Provider(), candidate)
+    assert result.verdict == "error" and result.error.startswith("LLMError: unreachable")
+    assert "streaming: 0 of 1 complete" in stream_check.report([result])

@@ -21,6 +21,9 @@ on:
       control:
         description: "How many of them to also send the production way, without streaming"
         default: "1"
+      via:
+        description: "raw: the archived body with stream flags, read by the check; provider: production's own call path"
+        default: "raw"
   # workflow_dispatch does not exist until this file is on main, so -- like
   # unlocker-check.yml -- it also runs on its own pull request, and only when
   # it changes.
@@ -81,11 +84,12 @@ jobs:
           FULL_MODEL_API_KEY: ${{ secrets.FULL_MODEL_API_KEY || secrets.DEEPINFRA_API_KEY || secrets.SCREENING_API_KEY || secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY || secrets.GROQ_API_KEY }}
           COUNT: ${{ inputs.count }}
           CONTROL: ${{ inputs.control }}
+          VIA: ${{ inputs.via }}
           RUN_ID: ${{ steps.archive.outputs.run_id }}
         run: |
           status=0
           python replay/stream_check.py --model-io "$RUNNER_TEMP/model_io" \
-            --count "${COUNT:-10}" --control "${CONTROL:-1}" > "$RUNNER_TEMP/check.txt" || status=$?
+            --count "${COUNT:-10}" --control "${CONTROL:-1}" --via "${VIA:-raw}" > "$RUNNER_TEMP/check.txt" || status=$?
           cat "$RUNNER_TEMP/check.txt"
           {
             echo "## Stream check (production run $RUN_ID)"
