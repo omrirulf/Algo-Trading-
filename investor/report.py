@@ -25,7 +25,6 @@ lookup, and both folders are refused inside this repository.
 from __future__ import annotations
 
 import argparse
-import logging
 import sys
 from datetime import date, timedelta
 from pathlib import Path
@@ -392,7 +391,6 @@ def main(argv: Optional[Sequence[str]] = None, market_factory=None) -> int:
     from investor.market import FIXED_START, fetch_market, quiet
 
     quiet()
-    logging.getLogger().setLevel(logging.CRITICAL + 1)
     args = build_parser().parse_args(argv)
     try:
         if inside_repository(args.data) or inside_repository(args.out):

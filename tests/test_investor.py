@@ -20,6 +20,22 @@ from config import israel_tax as cfg
 from investor import PRIVATE_MARKER, REPOSITORY, SAMPLE_MARKER, benchmark as bm, files, forms, funds, report
 from investor import harvest as hv, ledger, market as mk, rebalance as rb
 
+@pytest.fixture(autouse=True)
+def _loggers_left_as_found():
+    """``investor.market.quiet`` silences the price library's loggers for the process; put them back after each test."""
+    names = ("yfinance", "peewee", "httpx", "httpcore", "urllib3", "requests")
+    before = {name: (logging.getLogger(name).level, logging.getLogger(name).propagate,
+                     logging.getLogger(name).disabled) for name in names}
+    root = logging.getLogger().level
+    yield
+    for name, (level, propagate, disabled) in before.items():
+        logger = logging.getLogger(name)
+        logger.setLevel(level)
+        logger.propagate = propagate
+        logger.disabled = disabled
+    logging.getLogger().setLevel(root)
+
+
 #: Weekdays: a Thursday, and three Mondays.
 D = date(2026, 10, 1)
 D1, D2, D3 = date(2026, 1, 5), date(2026, 2, 2), date(2026, 3, 2)
