@@ -2,8 +2,9 @@
 
 Request shape (from Bright Data's own SDK and MCP server): POST
 ``https://api.brightdata.com/request`` with a Bearer token and a JSON body of
-``{zone, url, format: "raw"}``. Appending ``brd_json=1`` to a Google URL makes
-Bright Data return the parsed result set as JSON instead of HTML.
+``{zone, url, format: "raw", country: "us"}``. Appending ``brd_json=1`` to a
+Google URL makes Bright Data return the parsed result set as JSON instead of
+HTML; ``country`` is the exit the request leaves from (``BRD_COUNTRY``).
 
 The token can come from ``BRIGHTDATA_API_TOKEN``, from the ``BRIGHTDATA_API_KEY``
 env var the official CLI reads, or from the key ``brightdata login`` stores
@@ -65,6 +66,16 @@ EMPTY_RETRY_PAUSE_SECONDS = 10.0
 #: the vendor said and not only that the body was empty (the owner's
 #: decision of 16 Oct 2026). Never a credential: these are status headers.
 BRD_HEADERS = ("x-brd-status-code", "x-brd-err-code", "x-brd-err-msg", "x-brd-error", "x-luminati-error")
+#: The exit country of the request (``"country": "us"`` in the body). Google
+#: answers a search from a non-US exit with a redirect (its consent or
+#: regional page) that the Unlocker refuses: ``x-brd-status-code 502;
+#: x-brd-error redirect location was rejected`` was every empty 200 the
+#: probe of 16 Oct 2026 read (``replay/serp_zone_probe.py``), and those
+#: empties cost 22 names their news on 6 Oct and 55 on 15 Oct. The same
+#: request from a US exit came back empty 2 times of 20 against 5 of 20
+#: without it. The owner's decision of 17 Oct 2026; the search URL, the
+#: zone and the parser are unchanged.
+BRD_COUNTRY = "us"
 
 #: Keys under which Bright Data's Google parser may put result items. ``news``
 #: is the news-tab list; ``organic`` is the fallback if the zone returns a
@@ -463,7 +474,7 @@ class BrightDataNewsProvider:
         return [h.as_line() for h in self._fetch_items(build_news_search_url(ticker, on=day))]
 
     def _fetch_items(self, url: str) -> list[Headline]:
-        body = {"zone": self._zone, "url": url, "format": "raw"}
+        body = {"zone": self._zone, "url": url, "format": "raw", "country": BRD_COUNTRY}
         try:
             resp = self._post_with_one_retry(body)
         except httpx.HTTPError as exc:
