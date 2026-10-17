@@ -105,7 +105,8 @@ def test_provider_posts_expected_request_and_returns_headlines():
     assert captured["body"]["zone"] == "my_zone"
     assert captured["body"]["format"] == "raw"
     assert captured["body"]["url"] == news.build_news_search_url("AAPL")
-    assert set(captured["body"]) == {"zone", "url", "format"}
+    assert captured["body"]["country"] == news.BRD_COUNTRY == "us"
+    assert set(captured["body"]) == {"zone", "url", "format", "country"}
     assert len(lines) == 2 and lines[0].startswith("Apple beats on earnings")
 
 
@@ -655,3 +656,42 @@ def test_brd_headers_reads_only_the_vendors_headers():
     assert news.brd_headers(response) == "x-brd-status-code 429; x-brd-error auto-throttled"
     assert news.brd_headers(httpx.Response(200, text="")) == ""
     assert news.brd_headers(object()) == ""
+
+
+# --------------------------------------------------------------------------- #
+# The owner's decision of 17 Oct 2026: the request exits from the US
+# --------------------------------------------------------------------------- #
+
+
+def test_every_ask_exits_from_the_us_the_second_one_too(monkeypatch):
+    """16 Oct 2026: every empty 200 was the Unlocker refusing Google's redirect for a non-US exit, and
+    the same request from a US exit was empty 2 times of 20 against 5 of 20. Both asks carry it."""
+    monkeypatch.setattr(news.time, "sleep", lambda s: None)
+    bodies = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        bodies.append(json.loads(request.content))
+        return httpx.Response(200, text="" if len(bodies) == 1 else json.dumps(PARSED_NEWS))
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        lines = news.BrightDataNewsProvider("tok", "zone", client=client).fetch("XLB")
+    assert len(bodies) == 2 and len(lines) == 2
+    assert [b["country"] for b in bodies] == ["us", "us"]
+    assert bodies[0] == bodies[1]                          # the second ask is the same request
+    assert news.BRD_COUNTRY == "us"
+
+
+def test_the_historical_replay_exits_from_the_us_as_the_live_path_does():
+    """Same request, same exit: a past day's news is fetched the way today's is."""
+    from datetime import date
+
+    bodies = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        bodies.append(json.loads(request.content))
+        return httpx.Response(200, text=json.dumps(PARSED_NEWS))
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        news.BrightDataNewsProvider("tok", "zone", client=client).fetch_on("XLB", date(2026, 10, 1))
+    assert bodies[0]["country"] == "us"
+    assert bodies[0]["url"] == news.build_news_search_url("XLB", on=date(2026, 10, 1))

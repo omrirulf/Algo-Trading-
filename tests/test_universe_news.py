@@ -122,7 +122,8 @@ def test_fetch_uses_the_key_and_zone_from_bright_data_s_own_variables(monkeypatc
     items = universe_news.fetch("SO")
     assert [h.title for h in items] == ["Apple beats on earnings", "iPhone demand cools"]
     assert captured["auth"] == "Bearer tok-universe"
-    assert captured["bodies"] == [{"zone": "the_cycle_zone", "url": universe_news.search_url("SO"), "format": "raw"}]
+    assert captured["bodies"] == [{"zone": "the_cycle_zone", "url": universe_news.search_url("SO"), "format": "raw",
+                                   "country": news.BRD_COUNTRY}]   # the US exit, as for production's search
     assert news.requests_sent() - before == 1   # the cap's count, as for production's search
 
 
