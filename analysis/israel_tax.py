@@ -298,7 +298,13 @@ class Lot:
 
 @dataclass(frozen=True)
 class Realised:
-    """A lot (or part of one) closed, or a short's dividend charge: one line of the year's capital account."""
+    """A lot (or part of one) closed, or a short's dividend charge: one line of the year's capital account.
+
+    The five fields after ``amount`` (16 Oct 2026, the investor simulator's
+    form rows) are what the lot was opened with: its day, the rate and the
+    dollars on that day, and the dollars it was closed for. None on a charge.
+    They are read by nothing that decides; every earlier number is unchanged.
+    """
 
     day: date
     ticker: str
@@ -306,6 +312,14 @@ class Realised:
     kind: str
     gain: Optional[LotGain]
     amount: float
+    #: The day the lot was opened (bought, or sold short).
+    opened: Optional[date] = None
+    #: The rate on that day, and on the day it was closed.
+    fx_open: Optional[float] = None
+    fx_close: Optional[float] = None
+    #: The dollars the closed part was opened with (fees in), and closed for (fees out).
+    usd_open: Optional[float] = None
+    usd_close: Optional[float] = None
 
 
 @dataclass(frozen=True)
@@ -403,10 +417,14 @@ class TaxBook:
             if buying:     # a short covered: the purchase is the cost, the short sale the proceeds
                 gain = lot_gain(take * price + fee_part, fx, basis, lot.fx)
                 kind = "cover"
+                closed_usd = take * price + fee_part
             else:          # a long sold
                 gain = lot_gain(basis, lot.fx, take * price - fee_part, fx)
                 kind = "sale"
-            self.realised.append(Realised(day, ticker, take, kind, gain, gain.amount))
+                closed_usd = take * price - fee_part
+            self.realised.append(Realised(day, ticker, take, kind, gain, gain.amount,
+                                          opened=lot.day, fx_open=lot.fx, fx_close=fx,
+                                          usd_open=basis, usd_close=closed_usd))
             lot.usd -= basis
             lot.qty = lot.qty - take if lot.qty > 0 else lot.qty + take
             left -= take
@@ -418,13 +436,20 @@ class TaxBook:
             lots.append(Lot(ticker, left if buying else -left, day, max(usd, 0.0), fx))
 
     def dividend(self, day: date, ticker: str, gross_usd: float, fx: float,
-                 reinvest: Optional[tuple[float, float]] = None) -> None:
-        """A dividend credited, gross. ``reinvest=(qty, price_usd)`` buys a new lot with it (rule c)."""
+                 reinvest: Optional[tuple[float, float]] = None, withheld_usd: Optional[float] = None) -> None:
+        """A dividend credited, gross. ``reinvest=(qty, price_usd)`` buys a new lot with it (rule c).
+
+        ``withheld_usd`` is the US tax actually withheld, when it is known (the
+        investor simulator's records, 16 Oct 2026); by default the share the
+        rules assume (25% with a W-8BEN), as every earlier caller gets.
+        """
         self._seen(day, fx)
         if gross_usd < 0:
             raise ValueError("a dividend received is >= 0; a short's charge is ``charge``")
+        if withheld_usd is not None and not 0 <= withheld_usd <= gross_usd:
+            raise ValueError("the US tax withheld is between 0 and the gross dividend")
         gross_ils = gross_usd * fx
-        withheld_usd = gross_usd * self.rules.us_withholding
+        withheld_usd = gross_usd * self.rules.us_withholding if withheld_usd is None else float(withheld_usd)
         self.received.append(Received(day, ticker, gross_usd, fx, gross_ils, withheld_usd * fx, withheld_usd))
         if reinvest is not None:
             qty, price = reinvest

@@ -8,7 +8,8 @@ pre-registration's Amendments table first.
 
 **Where these come from.** Questions 1 to 10 are the owner's own list of 3 Oct 2026, in the owner's words. They
 replace the eight questions written on 2 Oct 2026, which had been rebuilt without the owner's tax research.
-Questions 11 and 12 are the two the owner added on 2 Oct 2026.
+Questions 11 and 12 are the two the owner added on 2 Oct 2026. Questions 13 to 15 come from the investor
+simulator's plan (section 9), added on 16 Oct 2026 when the owner approved it (D19).
 
 ## The owner's questions (3 Oct 2026)
 
@@ -77,6 +78,27 @@ Questions 11 and 12 are the two the owner added on 2 Oct 2026.
 12. **The annuity exemption in an investment provident fund (kupat gemel lehashkaa).** Is the tax exemption on
     an annuity taken after age 60 from a kupat gemel lehashkaa still in force? The Arbitrage Committee was
     reported to recommend narrowing it. If it changes, from when, and does it touch money already deposited?
+
+## Three questions added on 16 Oct 2026 (the investor simulator's plan, D19)
+
+13. **Forms 1325 and 1322.** For sales of foreign-listed ETFs at a foreign broker: is one 1325 row per FIFO lot (or
+    part of a lot) what the form expects, with reinvested-dividend lots as their own rows? Which columns take a sale
+    after the dollar fell (the index ratio below 1)? Are separate 1325 forms filed per half-year?
+    *Code today:* `investor/forms.py` writes one row per closed lot or part of one, FIFO, with the rate ratio and the
+    adjusted cost (never below the cost for a gain, T1); the mapping to the form's fields is not final until this is
+    answered. *Would change:* the pack's rows and columns.
+
+14. **A harvest that is also a domicile switch.** Selling a US-listed world fund (VT) at a loss and buying an Irish
+    one on a different index (VWRA) on the same day: is the loss allowed, given question 6 (section 86)?
+    *Code today:* every harvest suggestion says "do not act before question 6 is answered" (D15); a domicile switch
+    passes test C on its own (D12). *Would change:* D12 and D15 in `investor/harvest.py`.
+
+15. **The half-year advance: how, and with which losses.** Which form or channel is used today (a notice to the
+    assessing office, form 1399, or form 1325 per half)? May a loss carried in from earlier years reduce the advance
+    (question 7 asks about the half's own losses)?
+    *Code today:* the pack shows three readings of each half's advance: on the gains alone, on the half's own net,
+    and on the year's net so far less what the first half paid (`investor/ledger.py`, `half_years`). *Would change:*
+    which reading the pack keeps.
 
 ## Not on the list
 

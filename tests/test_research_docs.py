@@ -149,7 +149,7 @@ def test_the_index_first_reports_list_each_item_with_its_status():
     assert rows["After-tax gate and report"].startswith("**Built**")
     assert rows["ILS report"].startswith("**Built**")
     assert rows["Monthly coach"] == "**Checklist built; data entry not built**"
-    assert rows["Investor simulator"].startswith("**Plan, waiting for the owner's approval.** Nothing built.")
+    assert rows["Investor simulator"].startswith("**Built with sample data only** (the plan approved 16 Oct 2026")
     assert rows["Before-real-money checklist"].startswith("**Open")
     # The count of accountant questions is the file's own, and none is answered while its Answers table is empty.
     cpa = (RESEARCH / "cpa-questions.md").read_text()
@@ -252,10 +252,10 @@ def test_the_vote_card_says_what_the_owner_asked_it_to_say():
         assert words.lower() in card.lower(), words
 
 
-def test_the_accountant_questions_are_the_owners_ten_then_the_two_added_earlier():
+def test_the_accountant_questions_are_the_owners_ten_then_the_two_added_earlier_then_the_simulators_three():
     text = (RESEARCH / "cpa-questions.md").read_text()
     numbered = re.findall(r"^(\d+)\. \*\*", text, re.M)
-    assert numbered == [str(n) for n in range(1, 13)]
+    assert numbered == [str(n) for n in range(1, 16)]
     # The owner's list of 3 Oct 2026, in order, in the owner's words.
     owners = [
         "is the allowable loss zero under Circular 10/2025?",
@@ -273,6 +273,12 @@ def test_the_accountant_questions_are_the_owners_ten_then_the_two_added_earlier(
     places = [flat.index(" ".join(q.split())) for q in owners]
     assert places == sorted(places)
     assert flat.index("ILS-hedged fund") > places[-1] and "kupat gemel lehashkaa" in text
+    # The investor simulator's three (D19, 16 Oct 2026), after the two of 2 Oct, each with what the code does today.
+    added = flat.index("Three questions added on 16 Oct 2026")
+    assert added > flat.index("kupat gemel lehashkaa")
+    for words in ("Forms 1325 and 1322", "A harvest that is also a domicile switch", "The half-year advance: how, and with which losses"):
+        assert flat.index(words) > added, words
+    assert flat.count("*Code today:*") >= 13
     assert "Arbitrage Committee" in text
     # T5 is question 1 and stays unconfirmed; the switch it does not decide is question 2.
     first = flat[places[0] - 200:places[1]]
