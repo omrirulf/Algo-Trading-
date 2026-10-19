@@ -4,28 +4,28 @@ horizon 3 session(s) | entry rule 'auto' | conviction floor 0.30
 
 Coverage
 --------
-journal lines read        2072
-entries                   2072
-  produced a signal       1567
-  directional             161  (NEUTRAL: 1406)
-  scored                  141
-  unscored, pending         20  (too recent — no outcome yet)
+journal lines read        2152
+entries                   2152
+  produced a signal       1624
+  directional             168  (NEUTRAL: 1456)
+  scored                  147
+  unscored, pending         21  (too recent — no outcome yet)
 
 Does conviction predict the outcome?
 ------------------------------------
-rank correlation, conviction vs signed return: +0.22 (n=141)
+rank correlation, conviction vs signed return: +0.26 (n=147)
 
 conviction        n   hit rate      mean    median
 0.00-0.30         1       0.0%     -0.7%     -0.7%  (thin)
 0.30-0.45        59      28.8%     -0.9%     -0.5%
-0.45-0.60        57      56.1%     +0.3%     +0.7%
-0.60-0.75        23      60.9%     +0.4%     +0.8%
-0.75-1.00         1       0.0%     -1.1%     -1.1%  (thin)
+0.45-0.60        59      55.9%     +0.2%     +0.5%
+0.60-0.75        26      65.4%     +0.7%     +0.9%
+0.75-1.00         2      50.0%     +0.2%     +0.2%  (thin)
 
 Floor at 0.30 — did it filter the right signals?
-  acted on (>= floor)  n=140   hit 45.0%  mean -0.2%
+  acted on (>= floor)  n=146   hit 46.6%  mean -0.1%
   filtered (< floor)   n=1     hit 0.0%  mean -0.7%
-  edge +0.5% — the floor is keeping the better signals
+  edge +0.6% — the floor is keeping the better signals
   too few to conclude anything (n=1, want 20+)
 
 Which dimension actually carried information?
@@ -33,11 +33,11 @@ Which dimension actually carried information?
 Each score against the ticker's raw forward return.
 
 dimension         n     rank corr
-news            141         -0.08
-technical       141         -0.11
-fundamental     141         -0.06
-analyst         102         +0.03
-insider          98         -0.15
+news            147         -0.05
+technical       147         -0.11
+fundamental     147         -0.05
+analyst         108         +0.04
+insider         104         -0.15
 
 Does the learned blend carry information?
 -----------------------------------------
@@ -48,12 +48,12 @@ was journalled, with whatever weights that cycle had -- the walk-forward
 record, never a refit that has seen the return it is judged on.
 
 policy                n  called     rank corr  hit rate
-model conviction   1380     140         -0.02     45.0%
-equal weights      1380    1315         -0.04     47.2%
-learned blend       989     947         -0.05     47.7%
-  learned composites from fitted weights: 661; from the equal-weight fallback: 328
+model conviction   1443     146         -0.01     46.6%
+equal weights      1443    1374         -0.03     48.0%
+learned blend      1052    1007         -0.04     48.4%
+  learned composites from fitted weights: 724; from the equal-weight fallback: 328
 
-  model and blend called opposite directions  n=25    model hit 44.0%  blend hit 56.0%
+  model and blend called opposite directions  n=26    model hit 46.2%  blend hit 53.8%
 
   the model's conviction still carries more information than the learned blend; keep it in shadow
 
@@ -62,14 +62,14 @@ Does conviction fall when the dimensions disagree?
 The prompt requires it. This needs no price data, so it is answerable
 from the first cycle onward.
 
-  all dimensions agree   n=571   mean conviction 0.106
-  at least one dissents  n=996   mean conviction 0.179
-  gap -0.073 — conviction is HIGHER when dimensions conflict — the opposite of the instruction
-  rank corr, score spread vs conviction: +0.26 (n=1567) (negative is correct)
-    ...but spread vs loudest single score: +0.82 (n=1567) — the two are nearly the same series,
+  all dimensions agree   n=600   mean conviction 0.106
+  at least one dissents  n=1024  mean conviction 0.175
+  gap -0.070 — conviction is HIGHER when dimensions conflict — the opposite of the instruction
+  rank corr, score spread vs conviction: +0.26 (n=1624) (negative is correct)
+    ...but spread vs loudest single score: +0.83 (n=1624) — the two are nearly the same series,
     so the raw number above mostly asks 'is something shouting?', and charges
     the model for being confident about a strong signal -- which the prompt asks for.
-  holding magnitude fixed:               +0.13 (n=1567) <- THE FINER MEASURE
+  holding magnitude fixed:               +0.13 (n=1624) <- THE FINER MEASURE
   The instruction is directional ('bullish news on a technically broken,
   richly valued name'), so what counts is conviction falling when the
   dimensions CONFLICT, not when one of them is merely large.
@@ -78,20 +78,20 @@ Is conviction drifting?
 -----------------------
 A model that creeps toward always-confident makes the floor a no-op.
 
-  first half   n=783   mean 0.233  above floor 27.3%
-  second half  n=784   mean 0.071  above floor 14.5%
-  change -0.162
+  first half   n=812   mean 0.225  above floor 26.4%
+  second half  n=812   mean 0.074  above floor 15.0%
+  change -0.151
 
 Input health
 ------------
-  cycles with a context gap  152/2072 (7.3%)
-    news unavailable                         152
+  cycles with a context gap  159/2152 (7.4%)
+    news unavailable                         159
 
-  bias distribution (1567 signals)
-    BULLISH      108  6.9%
-    BEARISH       53  3.4%
-    NEUTRAL     1406  89.7%
-  cycles that produced no signal: 138
+  bias distribution (1624 signals)
+    BULLISH      114  7.0%
+    BEARISH       54  3.3%
+    NEUTRAL     1456  89.7%
+  cycles that produced no signal: 145
 
 How to read this
 ----------------
