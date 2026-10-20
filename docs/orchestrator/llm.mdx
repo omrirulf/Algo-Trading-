@@ -113,6 +113,32 @@ response = self._client.beta.messages.create(
 Model and effort are module constants, not `.env` settings — see
 [Configuration](/configuration) for why.
 
+### The OpenAI-compatible path streams its answer
+
+On the OpenAI-compatible path (`MODEL_BASE_URL` set, the production path
+since 23 September 2026) the body carries `"stream": true` and
+`"stream_options": {"include_usage": true}` (`STREAMING`, the owner's
+decision of 16 October 2026). From 12 October DeepInfra ended a request
+that had carried nothing for about 270 seconds — "Server disconnected
+without sending a response", 25 of 88 asks on 15 October, every one between
+262 and 278 seconds — and no plain answer ever took longer. Streamed, the
+server sends the answer as it is generated, the connection is never silent,
+and the same asks completed at 252 to 409 seconds
+(`replay/stream_check.py`, the stream-check workflow).
+
+Nothing downstream sees the stream. `_send` puts the chunks back together
+into the plain answer's shape — `choices[0].message.content`, the
+`reasoning_content`, `finish_reason` and the `usage` the last chunk
+carries — before the answer is parsed, so the re-asks, the schema check and
+the journal are unchanged. The call record keeps that assembled document
+as the answer, not the thousands of event lines. The 480-second ceiling
+still bounds the whole answer, measured from the request: a streamed answer
+that runs on is cut where a plain one was, and counts as the same timeout
+with the same one retry. A server that answers plainly is read plainly, so
+the fake servers in the test suite and a provider without streaming need
+nothing else. The flags are part of the request body, so they are in the
+call record and in the body the voting arm rebuilds.
+
 ## Two stages: a cheap screen, then the full model
 
 The request above is the *second* call a ticker can get. Before it, the same

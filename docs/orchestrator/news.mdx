@@ -85,16 +85,32 @@ def build_news_search_url(ticker: str) -> str:
 ```
 
 `brd_json=1` is what tells Bright Data to return parsed JSON instead of raw
-HTML. The request body sent to Bright Data itself is deliberately minimal:
+HTML. The request body sent to Bright Data itself is deliberately small:
 
 ```python
-body = {"zone": self._zone, "url": build_news_search_url(ticker), "format": "raw"}
+body = {"zone": self._zone, "url": build_news_search_url(ticker), "format": "raw", "country": BRD_COUNTRY}
 headers = {"Authorization": f"Bearer {self._token}", "Content-Type": "application/json"}
 ```
 
 This shape — `POST /request` with `{zone, url, format}` and a Bearer token —
 comes from Bright Data's own Python SDK and MCP server, since their public
 docs site wasn't reachable from the environment this was built in.
+
+## The request exits from the US
+
+`"country": "us"` (`BRD_COUNTRY`) asks Bright Data to send the search from a
+US exit. Without it, a share of the answers since late September 2026 were a
+200 with an empty body (6 Oct: 22 names without news; 15 Oct: 55), and Bright
+Data's own headers on every one of them said `x-brd-status-code 502;
+x-brd-error redirect location was rejected`: Google answered the search with a
+redirect, most likely its consent or regional page for a non-US exit, and the
+Unlocker refused to follow it. A SERP API zone showed the same (6 of 20 empty
+against 4 of 20), so the zone was not the lever; the same request from a US
+exit came back empty 2 times of 20 against 5 of 20 without it
+(`replay/serp_zone_probe.py`, 16 Oct 2026). The owner's decision of 17 Oct
+2026. The search URL, the zone, the parser and the prompt are unchanged; the
+shadow universe's search (`orchestrator/universe_news.py`) shares the request,
+and the article-text fetch (`orchestrator/article_text.py`) sets no exit.
 
 ## Parsing: tolerant on purpose
 
@@ -133,6 +149,18 @@ isn't a SERP API zone, or `brd_json=1` didn't take), a non-JSON body, a
 non-2xx response, a transport error, or a missing token/zone at
 construction time — raises `NewsFetchError`. `heartbeat.py` catches this per
 ticker and logs it; one ticker's bad response never stops the cycle.
+
+Two of those get one more try. A transport error (a timed-out read, a
+dropped connection) is asked again after 2 seconds
+(`RETRY_PAUSE_SECONDS`). A 200 whose body the parser refuses — most often an
+empty body, which Bright Data sends in bursts (60 of 80 first answers on
+15 Oct 2026) — is asked again after 10 seconds (`EMPTY_RETRY_PAUSE_SECONDS`;
+the owner's decision of 16 Oct 2026, up from 2), and when the second answer
+is refused too, the error carries Bright Data's own status headers
+(`x-brd-status-code`, `x-brd-err-msg` and their kin, `BRD_HEADERS`) so the
+journal says what the vendor said: `Bright Data returned an empty body with
+its 200; nothing to parse (Bright Data said: x-brd-status-code 502)`. An HTTP
+error is never retried.
 
 <Warning>
   **A news failure skips that ticker entirely** — no context is assembled, no

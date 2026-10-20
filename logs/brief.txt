@@ -1,8 +1,8 @@
-🟡 2 warnings: 4 of 80 ticker(s) produced no signal
-Equity $100,978 · 17 positions · $84,755 gross · $2,358 at risk · unrealised +$1,230
-Traded: ITA, XLB
+🟡 2 warnings: Price gaps: 7.7% of ticker-days missing in 2026-10
+Equity $100,791 · 15 positions · $75,764 gross · $2,028 at risk · unrealised +$774
+5 directional calls, none traded
 Started by supabase-cron at 14:40 UTC (0 min after 14:40)
-Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-10-15
-Closed: UUP, EWZ, IEF, TIP, NVO, GDX
-Also: 1 of 80 ticker(s) were judged without news
-Cycle 80 tickers, $0.16 · 2026-10-16
+Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-10-19
+Closed: EPOL, MSFT, UUP, EWZ, IEF, TIP
+Also: 6 of 80 ticker(s) were judged without news
+Cycle 80 tickers, $0.17 · 2026-10-20

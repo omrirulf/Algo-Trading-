@@ -1,0 +1,6 @@
+# The investor simulator engine, and nothing else (plan section 2.3, step 4).
+# Pinned to the versions requirements.txt pins; the lock beside this file carries every hash.
+yfinance==1.7.0
+pandas==2.2.3
+numpy==1.26.4
+httpx==0.27.2

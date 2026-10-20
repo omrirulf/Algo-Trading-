@@ -169,9 +169,11 @@ any real money goes in — which in any case is not before the June 2027 verdict
    stays long and random (checked without being printed; see [Phone notifications](/phone)).
 2. **Make the repository private** (the decision above): the journal, the account snapshots and the model-call
    artifacts are public today.
-3. **Decide where personal numbers live.** The monthly coach's approved plan puts them in a private Supabase project
-   of its own, never in this repository, its logs, its artifacts or a push, with the model seeing percentages only
-   (`docs/research/monthly-coach-plan.md`). Nothing personal is collected until the owner confirms it.
+3. **Decide where personal numbers live.** Decided on 16 Oct 2026 (the investor simulator's D1 to D3): one home,
+   a private GitHub repository of the owner's own, for the lots now and for the coach's numbers when its data
+   entry is built; never this repository, its logs, its artifacts or a push, with the model seeing percentages
+   only (`docs/research/investor-simulator-plan.md`, section 2.3; the coach plan's Supabase design is superseded).
+   The repository is still the owner's to create and fill; nothing personal is collected until they do.
 4. **The paper-only literal.** `paper=True` in `app/broker_client.py` is removed only by an explicit, reviewed code
    change, last: after every other item on this list, items 5 and 6 below included.
 

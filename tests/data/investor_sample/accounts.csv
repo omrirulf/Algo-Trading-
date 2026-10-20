@@ -1,0 +1,5 @@
+# SAMPLE
+name,kind,currency
+Sample-Broker-A,taxable,USD
+Sample-Broker-B,taxable,USD
+Sample-Keren,tax_free,ILS

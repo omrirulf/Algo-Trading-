@@ -1,0 +1,19 @@
+# SAMPLE
+item,name,class,value,as_of
+target,,stocks,60,
+target,,bonds,40,
+fund,VT,stocks,,
+fund,VXUS,stocks,,
+fund,VWRA,stocks,,
+fund,QQXY,bonds,,
+track,Sample-Keren:general,stocks,40,
+track,Sample-Keren:general,bonds,60,
+track,Sample-Keren:bonds,bonds,100,
+buy_first,,stocks,VT,
+buy_first,,bonds,QQXY,
+contribution,Sample-Broker-A,,2700 ILS,
+contribution,Sample-Keren,,1500 ILS,
+carry_in,,,-2140,2024
+surtax,,,off,
+expect_gains_within_3_years,,,yes,2026-01-04
+w8ben_filed,,,yes,2024-11-02

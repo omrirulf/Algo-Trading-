@@ -19,7 +19,7 @@ import threading
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Callable, Optional, Protocol
+from typing import Any, Callable, Iterable, Optional, Protocol
 
 import anthropic
 import httpx
@@ -824,6 +824,24 @@ TRANSPORT_RETRY_TIMEOUT_SECONDS = FULL_MODEL_TIMEOUT_SECONDS
 #: cost its name the day.
 SCHEMA_ATTEMPTS = 3
 
+#: The answer is streamed (the owner's decision of 16 Oct 2026, after a test
+#: the same day). From 12 Oct DeepInfra ended a request that had carried
+#: nothing for about 270 seconds, "Server disconnected without sending a
+#: response": 25 of 88 asks on 15 Oct and 13 of 74 on 16 Oct, every one
+#: between 262 and 278 seconds, and no plain answer ever took longer. With
+#: ``stream: true`` the server sends the answer as it is generated, so the
+#: connection is never silent, and the asks of 16 Oct that the cut had ended
+#: completed at 252 to 409 seconds (``replay/stream_check.py``). The chunks
+#: are put back together into the shape of a plain answer before anything
+#: reads them, so the parsing, the re-asks and the record are unchanged;
+#: ``stream_options.include_usage`` asks for the token counts in the last
+#: chunk. The ceiling still bounds the whole answer, measured from the
+#: request, not the silence between two chunks. The flags are part of the
+#: request body, so they are in the call record and in the body the voting
+#: arm rebuilds (``request_body``).
+STREAMING = True
+STREAM_OPTIONS: dict[str, Any] = {"include_usage": True}
+
 #: Which ticker the current thread is asking about, for the call log below.
 #: Set by the cycle around each live call (``call_label``); thread-local
 #: because the full model is asked four tickers at a time.
@@ -1020,9 +1038,9 @@ class OpenAICompatibleProvider:
             try:
                 if self._client is None:
                     with new_http_client(timeout) as client:
-                        response = client.post(self._url, json=body, headers=headers)
+                        reply = _send(client, self._url, body, headers, timeout)
                 else:
-                    response = self._client.post(self._url, json=body, headers=headers)
+                    reply = _send(self._client, self._url, body, headers, timeout)
             except httpx.HTTPError as exc:
                 _log_call(asks, kind, started, time.monotonic() - clock,
                           f"{type(exc).__name__} after a {timeout:.0f}s limit", None)
@@ -1057,29 +1075,28 @@ class OpenAICompatibleProvider:
                 kind = "retry after a timeout"
                 continue
             seconds = time.monotonic() - clock
-            if response.status_code == 200:
-                try:
-                    payload = response.json()
-                except ValueError as exc:
+            if reply.status == 200:
+                payload = reply.payload
+                if reply.problem:
                     _log_call(asks, kind, started, seconds, "HTTP 200, body not JSON", None)
-                    model_io.finish_attempt(ask, outcome="not_json", status=200, response=_body_text(response),
+                    model_io.finish_attempt(ask, outcome="not_json", status=200, response=reply.text,
                                             error="body not JSON")
-                    raise LLMError(f"{self._url} returned a non-JSON body: {exc}") from exc
+                    raise LLMError(f"{self._url} returned a non-JSON body: {reply.problem}")
                 usage = payload.get("usage") if isinstance(payload, dict) else None
                 tokens = usage.get("completion_tokens") if isinstance(usage, dict) else None
-                _log_call(asks, kind, started, seconds, "HTTP 200",
+                _log_call(asks, kind, started, seconds, "HTTP 200" + (", streamed" if reply.streamed else ""),
                           tokens if isinstance(tokens, int) else None)
                 # Left open: whether this answer was usable is decided by the
                 # caller, and the record should say so.
-                return payload, ask, _body_text(response)
-            _log_call(asks, kind, started, seconds, f"HTTP {response.status_code}", None)
-            model_io.finish_attempt(ask, outcome="http_error", status=response.status_code,
-                                    response=_body_text(response), error=f"HTTP {response.status_code}")
-            last = f"{self._url} returned HTTP {response.status_code}: {response.text[:300]}"
-            if response.status_code not in RETRY_STATUSES:
+                return payload, ask, reply.text
+            _log_call(asks, kind, started, seconds, f"HTTP {reply.status}", None)
+            model_io.finish_attempt(ask, outcome="http_error", status=reply.status,
+                                    response=reply.text, error=f"HTTP {reply.status}")
+            last = f"{self._url} returned HTTP {reply.status}: {reply.text[:300]}"
+            if reply.status not in RETRY_STATUSES:
                 break              # 400, 401, 404: asking again changes nothing
-            kind = f"retry after HTTP {response.status_code}"
-            told = self._retry_after(response)
+            kind = f"retry after HTTP {reply.status}"
+            told = self._retry_after(reply)
             if told is not None:
                 delay = told
         raise LLMError(f"{last} (gave up after {asks} attempt(s))")
@@ -1127,6 +1144,9 @@ class OpenAICompatibleProvider:
             body["reasoning_effort"] = "low"
         elif effort:
             body["reasoning_effort"] = effort
+        if STREAMING:
+            body["stream"] = True
+            body["stream_options"] = dict(STREAM_OPTIONS)
         return body
 
     def request_body(
@@ -1299,13 +1319,119 @@ def _check_problem(check: Callable[[str], Any], text: str) -> Optional[str]:
     return None
 
 
-def _body_text(response: Any) -> Optional[str]:
-    """A response body as received, for the call record. Never raises."""
+class _Reply:
+    """What one HTTP ask came back with, a streamed answer already put back together.
+
+    ``text`` is what the call record keeps: the body as received, or for a
+    streamed answer the assembled answer as one JSON document (the raw
+    event stream would be thousands of lines saying the same thing).
+    ``payload`` is that text parsed; ``problem`` says why it did not parse.
+    ``headers`` are the response's, for ``Retry-After``.
+    """
+
+    def __init__(self, status: int, headers: Any, text: str, payload: Any,
+                 problem: str = "", streamed: bool = False) -> None:
+        self.status = status
+        self.headers = headers
+        self.text = text
+        self.payload = payload
+        self.problem = problem
+        self.streamed = streamed
+
+
+def _send(client: httpx.Client, url: str, body: dict, headers: dict, timeout: float) -> _Reply:
+    """POST ``body`` and read the whole answer, streamed or not.
+
+    The server streams when the body asks for it and it can (``text/event-
+    stream``); a server that answers plainly is read plainly, so the same
+    code serves a fake server in a test and a provider without streaming.
+    Raises ``httpx.HTTPError`` as ``client.post`` would, and
+    ``httpx.ReadTimeout`` when the whole answer has not arrived ``timeout``
+    seconds after the request: the ceiling is on the answer, not on the
+    silence between two chunks, so a streamed answer that runs on is cut
+    where a plain one was.
+    """
+    clock = time.monotonic()
+    with client.stream("POST", url, json=body, headers=headers) as response:
+        kind = str(response.headers.get("content-type", "") or "")
+        if response.status_code == 200 and "text/event-stream" in kind:
+            payload = _assemble_stream(response.iter_lines(), clock + timeout, timeout)
+            text = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+            return _Reply(200, response.headers, text, payload, streamed=True)
+        raw = response.read()
+        status = response.status_code
+        response_headers = response.headers
+    text = raw.decode("utf-8", errors="replace")
+    if status == 200 and text.lstrip().startswith("data:"):
+        # An event stream that arrived without its content type (a proxy
+        # that dropped the header): still the stream that was asked for.
+        payload = _assemble_stream(text.splitlines(), clock + timeout, timeout)
+        return _Reply(200, response_headers, json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
+                      payload, streamed=True)
     try:
-        text = response.text
-    except Exception:  # noqa: BLE001
-        return None
-    return text if isinstance(text, str) else None
+        return _Reply(status, response_headers, text, json.loads(text))
+    except ValueError as exc:
+        return _Reply(status, response_headers, text, None, problem=str(exc))
+
+
+def _assemble_stream(lines: Iterable[str], deadline: float, timeout: float) -> dict[str, Any]:
+    """The chunks of a chat-completions event stream, as the plain answer they add up to.
+
+    Each ``data:`` line is one chunk; its ``choices[0].delta`` carries a
+    piece of the answer (``content``) or of the reasoning
+    (``reasoning_content``), the last chunks carry ``finish_reason`` and,
+    when asked for, ``usage``. Comment lines and chunks that do not parse
+    are skipped; ``[DONE]`` ends it. The result has the plain answer's
+    shape -- ``choices[0].message.content`` and ``usage`` -- which is all
+    ``_answer`` reads. A stream still running at ``deadline`` is a timeout.
+    """
+    content: list[str] = []
+    reasoning: list[str] = []
+    finish: Optional[str] = None
+    usage: Optional[dict[str, Any]] = None
+    head: dict[str, Any] = {}
+    for line in lines:
+        if time.monotonic() > deadline:
+            raise httpx.ReadTimeout(f"the streamed answer ran past the {timeout:.0f}s ceiling")
+        if not line.startswith("data:"):
+            continue
+        data = line[5:].strip()
+        if data == "[DONE]":
+            break
+        try:
+            chunk = json.loads(data)
+        except ValueError:
+            continue
+        if not isinstance(chunk, dict):
+            continue
+        for key in ("id", "object", "created", "model"):
+            if key in chunk and key not in head:
+                head[key] = chunk[key]
+        if isinstance(chunk.get("usage"), dict):
+            usage = chunk["usage"]
+        for choice in chunk.get("choices") or []:
+            if not isinstance(choice, dict):
+                continue
+            delta = choice.get("delta") if isinstance(choice.get("delta"), dict) else {}
+            piece = delta.get("content")
+            if isinstance(piece, str):
+                content.append(piece)
+            for key in ("reasoning_content", "reasoning"):
+                thought = delta.get(key)
+                if isinstance(thought, str):
+                    reasoning.append(thought)
+            ended = choice.get("finish_reason")
+            if isinstance(ended, str) and ended:
+                finish = ended
+    message: dict[str, Any] = {"role": "assistant", "content": "".join(content)}
+    if reasoning:
+        message["reasoning_content"] = "".join(reasoning)
+    payload: dict[str, Any] = dict(head)
+    payload["object"] = "chat.completion"
+    payload["choices"] = [{"index": 0, "message": message, "finish_reason": finish}]
+    if usage is not None:
+        payload["usage"] = usage
+    return payload
 
 
 def _plain_usage(payload: Any) -> Optional[dict]:

@@ -672,3 +672,80 @@ def test_a_weekend_or_holiday_with_no_cycle_is_not_an_alarm(logs):
     assert health.check(journal, audit, date(2026, 11, 26), token_expires=None) == []   # Thanksgiving
     assert health.check(journal, audit, date(2026, 9, 27), token_expires=None) == []    # a Sunday
     assert [a.title for a in health.check(journal, audit, SEP28, token_expires=None)] == ["No cycle ran today"]
+
+
+# --------------------------------------------------------------------------- #
+# The information line: how often the model took a side (16 Oct 2026)
+# --------------------------------------------------------------------------- #
+
+
+def side_line(ticker, bias="BULLISH", status="ACCEPTED", reason=None, held=False, when="2026-09-17T15:48:00+00:00"):
+    """A line the model answered with a side; ``held`` is a name the cycle did not ask about."""
+    return json.dumps({
+        "ticker": ticker, "ts_utc": when, "held": held,
+        "context": {"ticker": ticker, "gaps": []},
+        "signal": {"ticker": ticker, "bias": bias, "conviction": 0.7},
+        "outcome": None if held else {"status": status, "reason": reason},
+        "error": None, "ts": "2026-09-17 15:48:00,000", "level": "INFO", "event": "signal_journal",
+    })
+
+
+def test_the_sides_line_counts_sides_trades_and_what_stopped_them(logs):
+    journal, audit = logs
+    write(journal,
+          *[journal_line(t) for t in "ABC"],                                    # NEUTRAL
+          side_line("D"), side_line("E", bias="BEARISH"),                       # traded
+          side_line("F", status="REJECTED", reason="no room under the sleeve budget limit"),
+          side_line("G", status="REJECTED", reason="no room under the sleeve budget limit"),
+          side_line("H", status="REJECTED", reason="no room under the gross exposure limit"),
+          side_line("I", status="REJECTED", reason="no room for equity NVDA under its 5% cap or the sleeve budget"),
+          side_line("J", status="REJECTED", reason="conviction 0.35 below minimum 0.60"),
+          side_line("K", status="REJECTED", reason="duplicate order suppressed: K buy was already submitted today"),
+          side_line("L", held=True),                                            # held: not asked
+          journal_line("M", error="context: TimeoutError"))                     # failed: answered nothing
+    sides = health.model_sides(health.journal_lines_on(health._read_lines(journal), DAY))
+    assert (sides.answered, sides.directional, sides.neutral, sides.traded) == (11, 8, 3, 2)
+    assert sides.limits == {"sleeve budget": 2, "gross exposure": 1, "a cap": 1} and sides.limited == 4
+    assert sides.floor == 1 and sides.other == {"duplicate order suppressed": 1}
+    line = health.sides_line(sides)
+    assert line.startswith("**The model's sides today:** it took a side on 8 of the 11 name(s) it answered (3 NEUTRAL)")
+    assert "2 became trade(s)" in line
+    assert "4 stopped by a position limit (sleeve budget 2, gross exposure 1, a cap 1)" in line
+    assert "1 under the conviction floor" in line
+    assert line.endswith("1 stopped for another reason (duplicate order suppressed 1).")
+
+
+def test_the_sides_line_is_information_not_an_alarm(logs, capsys):
+    journal, audit = logs
+    write(journal, journal_line("AAPL"),
+          side_line("MSFT", status="REJECTED", reason="no room under the sleeve budget limit"))
+    assert health.check(journal, audit, DAY) == []                              # a clean day stays clean
+    code = health.main(["--journal", str(journal), "--audit", str(audit), "--day", "2026-09-17"])
+    out = capsys.readouterr().out
+    assert code == 0 and out.startswith("## Health of the record for 2026-09-17\n\nClean.")
+    assert ("**The model's sides today:** it took a side on 1 of the 2 name(s) it answered (1 NEUTRAL); "
+            "0 became trade(s); 1 stopped by a position limit (sleeve budget 1).") in out
+
+
+def test_the_sides_line_comes_under_the_alarms(logs, capsys):
+    journal, audit = logs
+    write(journal, side_line("AAPL"))
+    write(audit, audit_line("XLY", "unmanaged"))
+    code = health.main(["--journal", str(journal), "--audit", str(audit), "--day", "2026-09-17"])
+    out = capsys.readouterr().out
+    assert code == 2                                                            # the alarm's code, not the line's
+    assert out.index("without a working stop") < out.index("**The model's sides today:**")
+    assert "it took a side on 1 of the 1 name(s) it answered (0 NEUTRAL); 1 became trade(s)." in out
+
+
+def test_a_day_the_model_answered_nothing_has_no_sides_line(logs):
+    journal, audit = logs
+    write(journal, journal_line("AAPL", error="e"), side_line("MSFT", held=True))
+    assert health.model_sides(health.journal_lines_on(health._read_lines(journal), DAY)) is None
+    assert health.sides_line(None) == ""
+    assert health.render([], DAY) == health.render([], DAY, None)
+
+
+def test_an_all_neutral_day_says_so_and_nothing_more():
+    assert health.sides_line(health.Sides(5, 0, 0, {}, 0, {})) == (
+        "**The model's sides today:** it took a side on 0 of the 5 name(s) it answered (5 NEUTRAL).")

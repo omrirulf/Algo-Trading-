@@ -44,6 +44,16 @@ day of a week, a warning when a number about the model's answers stayed
 outside its normal band 2 weeks in a row (the mean plus or minus 2 standard
 deviations of every week before; none until 4 weeks have it); and on any
 day, a warning when the model, its host, a setting or the prompt changed.
+
+One line, from 16 Oct 2026, is information and not an alarm, and never
+moves the exit code: how often the model took a side today (BULLISH or
+BEARISH rather than NEUTRAL), how many of those sides became trades, and
+how many the engine stopped -- at a position limit (the sleeve budget, the
+gross exposure limit, a cap), under the conviction floor, or for another
+reason. The owner asked for it on 16 Oct 2026, when the model was NEUTRAL
+on about nine names in ten and several of its few real calls were blocked
+by the sleeve budget: the race partly measures the limits, not only the
+judgement, and this line says how much.
 """
 
 from __future__ import annotations
@@ -131,6 +141,13 @@ _SAFE_SOURCE = re.compile(r"[a-z0-9-]{1,40}")
 #: The few shapes ``store/push_remote.py`` writes as a push's error. Only
 #: these are repeated in an alarm; anything else is "an unrecognised error".
 _ARCHIVE_ERRORS = re.compile(r"not configured|project paused or unreachable|HTTP [0-9]{3}|push crashed \([A-Za-z]+\)")
+
+#: The engine's reasons for refusing a side, as ``app.execution_engine``
+#: words them: a position limit ("no room under the sleeve budget limit",
+#: "no room under the gross exposure limit", "no room for equity X under its
+#: 5% cap or the sleeve budget"), and the conviction floor.
+_LIMIT_REASON = re.compile(r"^no room\b")
+_FLOOR_REASON = re.compile(r"^conviction [0-9.]+ below minimum\b")
 
 
 @dataclass(frozen=True)
@@ -782,20 +799,113 @@ def check(journal: Path, audit: Path, day: date, funds: Optional[Path] = None,
     return sorted(alarms, key=lambda a: 0 if a.is_critical else 1)
 
 
-def render(alarms: list[Alarm], day: date) -> str:
-    """The alarms as Markdown for a job summary or an issue. Plain words."""
+# --------------------------------------------------------------------------- #
+# Information, not an alarm
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True)
+class Sides:
+    """How often the model took a side today, and what became of those sides."""
+
+    #: Names the model answered about (held names are not asked; failed calls answered nothing).
+    answered: int
+    #: Of those, BULLISH or BEARISH.
+    directional: int
+    #: Of those, accepted by the engine: an order went out.
+    traded: int
+    #: Stopped at a position limit, by the limit's name ("sleeve budget", "gross exposure", "a cap").
+    limits: dict[str, int]
+    #: Stopped under the conviction floor.
+    floor: int
+    #: Stopped for any other reason, by the engine's own first words.
+    other: dict[str, int]
+
+    @property
+    def neutral(self) -> int:
+        return self.answered - self.directional
+
+    @property
+    def limited(self) -> int:
+        return sum(self.limits.values())
+
+
+def _limit_name(reason: str) -> str:
+    if "sleeve budget limit" in reason:
+        return "sleeve budget"
+    if "gross exposure" in reason:
+        return "gross exposure"
+    return "a cap"
+
+
+def model_sides(today: list[dict]) -> Optional[Sides]:
+    """The day's sides, or None when the model answered nothing today (no cycle, or every call failed)."""
+    from analysis.reader import entry_from
+
+    answered = [e for e in (entry_from(line) for line in today)
+                if e is not None and not e.held and e.stage != "context" and e.model_answered]
+    if not answered:
+        return None
+    sides = [e for e in answered if e.is_directional]
+    traded = 0
+    limits: Counter = Counter()
+    floor = 0
+    other: Counter = Counter()
+    for entry in sides:
+        if entry.outcome_status == "ACCEPTED":
+            traded += 1
+            continue
+        reason = entry.outcome_reason or ""
+        if entry.outcome_status == "REJECTED" and _LIMIT_REASON.match(reason):
+            limits[_limit_name(reason)] += 1
+        elif entry.outcome_status == "REJECTED" and _FLOOR_REASON.match(reason):
+            floor += 1
+        else:
+            words = reason.split(";")[0].split(":")[0].strip() or str(entry.outcome_status or "no outcome")
+            other[words[:40]] += 1
+    return Sides(len(answered), len(sides), traded, dict(limits), floor, dict(other))
+
+
+def sides_line(sides: Optional[Sides]) -> str:
+    """One sentence, plain words. Empty when there is nothing to say."""
+    if sides is None:
+        return ""
+    parts = [f"it took a side on {sides.directional} of the {sides.answered} name(s) it answered "
+             f"({sides.neutral} NEUTRAL)"]
+    if sides.directional:
+        parts.append(f"{sides.traded} became trade(s)")
+        if sides.limits:
+            named = ", ".join(f"{name} {n}" for name, n in sorted(sides.limits.items(), key=lambda x: -x[1]))
+            parts.append(f"{sides.limited} stopped by a position limit ({named})")
+        if sides.floor:
+            parts.append(f"{sides.floor} under the conviction floor")
+        if sides.other:
+            named = ", ".join(f"{name} {n}" for name, n in sorted(sides.other.items(), key=lambda x: -x[1]))
+            parts.append(f"{sum(sides.other.values())} stopped for another reason ({named})")
+    return "**The model's sides today:** " + "; ".join(parts) + "."
+
+
+def render(alarms: list[Alarm], day: date, sides: Optional[Sides] = None) -> str:
+    """The alarms as Markdown for a job summary or an issue. Plain words.
+
+    ``sides`` adds the information line (``sides_line``) under the alarms;
+    it is not an alarm and changes no exit code.
+    """
     out = [f"## Health of the record for {day.isoformat()}", ""]
     if not alarms:
         out += ["Clean. Every position has a stop for the shares it holds, every ticker "
                 "was judged once, every mapped source answered.", ""]
-        return "\n".join(out)
-    critical = [a for a in alarms if a.is_critical]
-    out.append(f"**{len(critical)} critical, {len(alarms) - len(critical)} warning(s).**")
-    out.append("")
-    for alarm in alarms:
-        mark = "🔴" if alarm.is_critical else "🟡"
-        out.append(f"- {mark} **{alarm.title}.** {alarm.detail}")
-    out.append("")
+    else:
+        critical = [a for a in alarms if a.is_critical]
+        out.append(f"**{len(critical)} critical, {len(alarms) - len(critical)} warning(s).**")
+        out.append("")
+        for alarm in alarms:
+            mark = "🔴" if alarm.is_critical else "🟡"
+            out.append(f"- {mark} **{alarm.title}.** {alarm.detail}")
+        out.append("")
+    line = sides_line(sides)
+    if line:
+        out += [line, ""]
     return "\n".join(out)
 
 
@@ -817,7 +927,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     args = parser.parse_args(argv)
     day = date.fromisoformat(args.day) if args.day else datetime.now(timezone.utc).date()
     alarms = check(args.journal, args.audit, day, args.funds, args.race)
-    print(render(alarms, day), end="")
+    sides = model_sides(journal_lines_on(_read_lines(args.journal), day))
+    print(render(alarms, day, sides), end="")
     return exit_code(alarms)
 
 

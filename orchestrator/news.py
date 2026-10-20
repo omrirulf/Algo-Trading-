@@ -2,8 +2,9 @@
 
 Request shape (from Bright Data's own SDK and MCP server): POST
 ``https://api.brightdata.com/request`` with a Bearer token and a JSON body of
-``{zone, url, format: "raw"}``. Appending ``brd_json=1`` to a Google URL makes
-Bright Data return the parsed result set as JSON instead of HTML.
+``{zone, url, format: "raw", country: "us"}``. Appending ``brd_json=1`` to a
+Google URL makes Bright Data return the parsed result set as JSON instead of
+HTML; ``country`` is the exit the request leaves from (``BRD_COUNTRY``).
 
 The token can come from ``BRIGHTDATA_API_TOKEN``, from the ``BRIGHTDATA_API_KEY``
 env var the official CLI reads, or from the key ``brightdata login`` stores
@@ -53,6 +54,28 @@ REQUEST_TIMEOUT_SECONDS = 60.0
 #: single timed-out read. An HTTP error is never retried: a 401 or a 429
 #: says the same thing twice.
 RETRY_PAUSE_SECONDS = 2.0
+#: One more try after a 200 the parser refused (an empty body, a block page),
+#: after this longer pause. The empty 200s come from the vendor's side in
+#: bursts (6 Oct 2026: 44 of 80 first answers; 15 Oct: 60, and 53 of the
+#: second asks two seconds later were empty again), so the second ask waits
+#: long enough for a burst to pass. The owner's decision of 16 Oct 2026.
+EMPTY_RETRY_PAUSE_SECONDS = 10.0
+#: Bright Data's own headers on an answer: the target's status code and the
+#: reason it gives when it refuses. Written into the warning and into the
+#: error a second refused 200 leaves in the journal, so the record says what
+#: the vendor said and not only that the body was empty (the owner's
+#: decision of 16 Oct 2026). Never a credential: these are status headers.
+BRD_HEADERS = ("x-brd-status-code", "x-brd-err-code", "x-brd-err-msg", "x-brd-error", "x-luminati-error")
+#: The exit country of the request (``"country": "us"`` in the body). Google
+#: answers a search from a non-US exit with a redirect (its consent or
+#: regional page) that the Unlocker refuses: ``x-brd-status-code 502;
+#: x-brd-error redirect location was rejected`` was every empty 200 the
+#: probe of 16 Oct 2026 read (``replay/serp_zone_probe.py``), and those
+#: empties cost 22 names their news on 6 Oct and 55 on 15 Oct. The same
+#: request from a US exit came back empty 2 times of 20 against 5 of 20
+#: without it. The owner's decision of 17 Oct 2026; the search URL, the
+#: zone and the parser are unchanged.
+BRD_COUNTRY = "us"
 
 #: Keys under which Bright Data's Google parser may put result items. ``news``
 #: is the news-tab list; ``organic`` is the fallback if the zone returns a
@@ -136,6 +159,18 @@ def _first(item: dict[str, Any], *keys: str) -> str:
         if isinstance(value, str) and value.strip():
             return value.strip()
     return ""
+
+
+def brd_headers(response: Any) -> str:
+    """Bright Data's own headers on ``response``, as one string; empty when it sent none.
+
+    ``x-brd-status-code 502; x-brd-err-msg ...`` -- the vendor's account of a
+    200 that carried nothing, read from the HTTP answer itself (with
+    ``format: raw`` the body is the target's, the headers are Bright Data's).
+    """
+    headers = getattr(response, "headers", None) or {}
+    said = [f"{name} {headers.get(name)}" for name in BRD_HEADERS if headers.get(name)]
+    return "; ".join(said)
 
 
 def _unwrap(payload: Any) -> dict[str, Any]:
@@ -439,7 +474,7 @@ class BrightDataNewsProvider:
         return [h.as_line() for h in self._fetch_items(build_news_search_url(ticker, on=day))]
 
     def _fetch_items(self, url: str) -> list[Headline]:
-        body = {"zone": self._zone, "url": url, "format": "raw"}
+        body = {"zone": self._zone, "url": url, "format": "raw", "country": BRD_COUNTRY}
         try:
             resp = self._post_with_one_retry(body)
         except httpx.HTTPError as exc:
@@ -452,14 +487,23 @@ class BrightDataNewsProvider:
             first_refusal = exc
         # A 200 the parser refuses is an interstitial, a block page or an
         # upstream error wrapped in a 200, and on 18 Sep one cost TM its
-        # day. Once more, after the same pause; a second one is real.
-        log.warning("Bright Data answered 200 with something the parser refused (%s); retrying once",
-                    str(first_refusal)[:80])
-        time.sleep(RETRY_PAUSE_SECONDS)
+        # day. Once more, after the longer pause; a second one is real, and
+        # it carries whatever Bright Data's own headers said about it.
+        said = brd_headers(resp)
+        log.warning("Bright Data answered 200 with something the parser refused (%s)%s; "
+                    "retrying once after %.0f s",
+                    str(first_refusal)[:80], f" [{said}]" if said else "", EMPTY_RETRY_PAUSE_SECONDS)
+        time.sleep(EMPTY_RETRY_PAUSE_SECONDS)
         try:
             resp = self._post(body)
         except httpx.HTTPError as exc:
             raise NewsFetchError(f"Bright Data unreachable: {exc}") from exc
         if resp.status_code != 200:
             raise NewsFetchError(f"Bright Data HTTP {resp.status_code}: {resp.text[:300]}")
-        return parse_news_items(resp.text)
+        try:
+            return parse_news_items(resp.text)
+        except NewsFetchError as exc:
+            said = brd_headers(resp)
+            if not said:
+                raise
+            raise NewsFetchError(f"{exc} (Bright Data said: {said})") from exc
