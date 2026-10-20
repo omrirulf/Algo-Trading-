@@ -370,7 +370,13 @@ SEARCH_NAME_NOT_MATCHED: Final[frozenset[str]] = frozenset({"TGT", "PGR"})
 #: in ``.github/workflows/universe-news-check.yml``) and by the verify job before it can join the list,
 #: and it is never part of the list: the scorer asks ``TICKERS`` only. Empty until a name needs
 #: replacing; chosen as the card says, never by price, return or score.
-CANDIDATES: Final[dict[str, tuple[str, tuple[str, ...]]]] = {}
+CANDIDATES: Final[dict[str, tuple[str, tuple[str, ...]]]] = {
+    # For PEG (the pooled checks of 2026-10-05 to 2026-10-20: 10 of 34 headlines relevant). PEG's own GICS
+    # sub-industry, Multi-Utilities, not on the list and not production; CMS and NI left out (their tickers
+    # are the usual names of bigger things in market news); no merger, buy-out or separation announced. Order
+    # fixed before any check, by how plain the ticker is: AEE, then CNP, WEC, DTE.
+    "AEE": ("Utilities", ("Ameren",)),
+}
 
 
 def company_names(ticker: str) -> tuple[str, ...]:
