@@ -316,6 +316,32 @@ Per name (the recheck's result for the 44 names it asked, the first run's for th
 | UMC | ADR: Korea and Taiwan | 9 | 7 | 78% | first |
 | BHP | ADR: Australia | 9 | 5 | 56% | recheck |
 
+### The pooled decision of 2026-10-20
+
+The five checks: Monday 2026-10-05, Thursday 2026-10-08, Tuesday 2026-10-13, Thursday 2026-10-15 and Tuesday
+2026-10-20, in three different weeks (W41, W42, W43); one file each in `docs/research/news-checks/`. Days 3 to 5
+answered all 251 names (day 5, run 39462577383: 1,644 of 1,901 headlines relevant, 86%, no name failed, so no
+recheck). Day 5 ran after the owner's change of 2026-10-17 (the news request exits from the US); the query and the
+rule were the same.
+
+`python -m analysis.news_pooled`: **7,373 of 8,997 headlines relevant over the five days (82%).**
+
+- **Replaced: PEG** (Public Service Enterprise Group): 10 of 34 pooled headlines relevant (29%); by day 1 of 6, 1 of
+  9, 2 of 6, 5 of 9 and 1 of 4. After four days it stood at exactly 30% (9 of 30), so the fifth day decided it.
+- **No name had zero headlines on all five days.** ZTO, which had no answer on 2026-10-05, answered on the other
+  four days: 8 of 15 headlines relevant (53%), kept.
+- **Kept by the owner's decision of 2026-10-06:** STT (29 of 35, 83%) and IRM (11 of 15, 73%).
+- Closest to the line and kept: AIG (9 of 23, 39%). Kept with fewer than 10 pooled headlines: IX (4), NMR (5),
+  MMYT (6), BAP (8), FMX (3), PKX (9).
+
+**The replacement: Ameren (AEE).** The candidates were fixed before any check: PEG's own GICS sub-industry
+(Multi-Utilities), not on the list and not a production name, with no merger, buy-out, spin-off or split-off
+announced for 2026-2027 (searched in company filings and the news up to 2026-10-20); CMS Energy and NiSource were
+left out because "CMS" and "NI" are the usual names of bigger things in market news. The order was fixed by how
+plain the ticker is: AEE, then CNP, WEC and DTE. Ameren passed the verify check (run 39473265131) and the news check
+the same day (run 39473293596, `inputs.only` AEE: 6 of 6 headlines relevant), so the others were not checked. It is
+recorded on the card (`docs/research/cards/ic-model-scores.md`) and in the Amendments table (2026-10-20).
+
 ## 2. The race's 80 names (a description only)
 
 Run once on 2026-10-03 over the race's journal from 2026-09-23 (the full model's first day) to 2026-10-02

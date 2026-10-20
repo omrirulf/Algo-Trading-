@@ -294,7 +294,8 @@ def test_the_card_states_the_replacement_rule_and_the_five_replaced_names():
     assert "Replacement rule (written 2026-10-03, before the list freezes)" in card
     assert "never because of its price, its returns or its scores" in card
     assert {old: new for old, (new, _) in shadow_universe.REPLACED.items()} == {
-        "JNJ": "EW", "MDT": "IDXX", "SPGI": "MET", "DOW": "MLM", "ASX": "UMC", "BK": "STT", "AVB": "IRM"}
+        "JNJ": "EW", "MDT": "IDXX", "SPGI": "MET", "DOW": "MLM", "ASX": "UMC", "BK": "STT", "AVB": "IRM",
+        "PEG": "AEE"}
     for old, (new, rule) in shadow_universe.REPLACED.items():
         assert f"({old}" in card and f"({new})" in card and f"by rule ({rule})" in card
         assert old not in shadow_universe.TICKERS and new in shadow_universe.TICKERS
