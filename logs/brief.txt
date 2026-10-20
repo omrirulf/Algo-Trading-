@@ -1,8 +1,8 @@
-🟡 3 warnings: Price gaps: 8.3% of ticker-days missing in 2026-10
-Equity $100,535 · 16 positions · $80,319 gross · $1,803 at risk · unrealised +$460
-7 directional calls, none traded
+🟡 2 warnings: Price gaps: 7.7% of ticker-days missing in 2026-10
+Equity $100,791 · 15 positions · $75,764 gross · $2,028 at risk · unrealised +$774
+5 directional calls, none traded
 Started by supabase-cron at 14:40 UTC (0 min after 14:40)
-Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-10-16
-Closed: MSFT, UUP, EWZ, IEF, TIP, NVO
-Also: 7 of 80 ticker(s) produced no signal; 7 of 80 ticker(s) were judged without news
-Cycle 80 tickers, $0.14 · 2026-10-19
+Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-10-19
+Closed: EPOL, MSFT, UUP, EWZ, IEF, TIP
+Also: 6 of 80 ticker(s) were judged without news
+Cycle 80 tickers, $0.17 · 2026-10-20
