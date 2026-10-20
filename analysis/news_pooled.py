@@ -114,8 +114,11 @@ def load_day(path: Path | str) -> DayCheck:
     out_since = {old for old in extra if old in su.REPLACED}
     in_since = {new for new in missing if new in {n for n, _ in su.REPLACED.values()}}
     swapped = any(old in names and new in names for old, (new, _) in su.REPLACED.items())
-    if set(missing) - in_since or set(extra) - out_since or len(names) != len(su.TICKERS) or swapped:
-        raise ValueError(f"{path}: not the list: missing {missing}, not in the list {extra}")
+    # Only what no replacement explains is reported: a name replaced since is not "not in the list".
+    missing, extra = sorted(set(missing) - in_since), sorted(set(extra) - out_since)
+    if missing or extra or len(names) != len(su.TICKERS) or swapped:
+        both = " (a name and its replacement both)" if swapped else ""
+        raise ValueError(f"{path}: not the list{both}: missing {missing}, not in the list {extra}")
     return DayCheck(day=day, runs=tuple(int(r) for r in data.get("runs") or ()), names=names)
 
 
