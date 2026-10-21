@@ -1,8 +1,8 @@
-🟡 2 warnings: Price gaps: 7.7% of ticker-days missing in 2026-10
-Equity $100,791 · 15 positions · $75,764 gross · $2,028 at risk · unrealised +$774
-5 directional calls, none traded
+🔴 9 of 80 ticker(s) were judged without news
+Equity $100,341 · 15 positions · $78,738 gross · $2,087 at risk · unrealised +$565
+Traded: MSFT, JPM, HDB, EIS
 Started by supabase-cron at 14:40 UTC (0 min after 14:40)
-Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-10-19
-Closed: EPOL, MSFT, UUP, EWZ, IEF, TIP
-Also: 6 of 80 ticker(s) were judged without news
-Cycle 80 tickers, $0.17 · 2026-10-20
+Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-10-20
+Closed: TEVA, GOOGL, XLC, EPOL, UUP, EWZ
+Also: Price gaps: 7.1% of ticker-days missing in 2026-10
+Cycle 80 tickers, $0.17 · 2026-10-21
