@@ -1,8 +1,8 @@
-🟡 2 warnings: Price gaps: 6.7% of ticker-days missing in 2026-10
-Equity $100,565 · 14 positions · $69,993 gross · $1,773 at risk · unrealised +$669
-4 directional calls, none traded
+🟡 2 warnings: Price gaps: 6.2% of ticker-days missing in 2026-10
+Equity $100,399 · 13 positions · $62,956 gross · $1,523 at risk · unrealised +$835
+5 directional calls, none traded
 Started by supabase-cron at 14:40 UTC (0 min after 14:40)
-Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-10-21
-Closed: ARGT, TEVA, GOOGL, XLC, EPOL, UUP
-Also: 3 of 80 ticker(s) were judged without news
-Cycle 80 tickers, $0.16 · 2026-10-22
+Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-10-22
+Closed: ITA, ARGT, TEVA, GOOGL, XLC, EPOL
+Also: 2 of 80 ticker(s) were judged without news
+Cycle 80 tickers, $0.17 · 2026-10-23
