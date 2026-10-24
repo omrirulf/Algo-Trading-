@@ -1,14 +1,14 @@
 # After Israeli tax and in shekels
 
-Record through 2026-10-22, written 2026-10-23T01:04:12.909932+00:00. Rules: pre-registration section 5c, every number in `config/israel_tax.py` (tax 25%; losses also against dividends: on; W-8BEN: yes; surtax: off).
+Record through 2026-10-23, written 2026-10-24T01:14:13.808280+00:00. Rules: pre-registration section 5c, every number in `config/israel_tax.py` (tax 25%; losses also against dividends: on; W-8BEN: yes; surtax: off).
 
-Rates: the Bank of Israel's representative rate, 2026-09-10 to 2026-10-22; 29 day(s) from the Bank of Israel, 2 day(s) from another source: 2026-09-11 (ecb), 2026-09-21 (ecb). Table SHA-256 `0bfb876070b927beb097018cdc0b8d7cf37efd675968b7a8a4b3eccfcb77d918`.
+Rates: the Bank of Israel's representative rate, 2026-09-10 to 2026-10-23; 30 day(s) from the Bank of Israel, 2 day(s) from another source: 2026-09-11 (ecb), 2026-09-21 (ecb). Table SHA-256 `d7535e9244da1d47d9b7252f22935644edc6a8e01a3d608ddca0fdb7f4da5e31`.
 
 Returns since each book's start. "Tax paid so far" is the tax due on everything sold or received so far; "if sold today" adds every open position sold at the close. "From the $/₪ move" is the shekel return minus the dollar return, before tax and after tax (if sold today).
 
 | | Before tax ($) | After tax, if sold today ($) | After tax, tax paid so far ($) | Before tax (₪) | After tax, if sold today (₪) | After tax, tax paid so far (₪) | From the $/₪ move, before tax | From the $/₪ move, after tax | Tax paid so far (₪) | Tax if sold today (₪) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Paper account (real) | $100,341 (+0.34%) | $100,188 (+0.19%) | $100,323 (+0.32%) | ₪310,155 (+2.60%) | ₪309,681 (+2.44%) | ₪310,100 (+2.58%) | +2.26 points | +2.25 points | ₪55 | ₪474 |
+| Paper account (real) | $100,814 (+0.81%) | $100,527 (+0.53%) | $100,814 (+0.81%) | ₪313,228 (+3.61%) | ₪312,336 (+3.32%) | ₪313,228 (+3.61%) | +2.80 points | +2.79 points | ₪0 | ₪891 |
 
 The funds are shown after tax once calibration has passed, like every fund result.
 
