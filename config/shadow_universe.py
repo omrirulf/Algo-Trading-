@@ -43,7 +43,12 @@ of large foreign companies that trade in New York. Rules:
   used by ``orchestrator/universe_news.py``); production's query is
   unchanged. Those names were kept. A name whose headlines are still under
   30% relevant with the new query (``analysis/news_relevance.py``) may be
-  replaced by the card's rule (2), never for its returns.
+  replaced by the card's rule (2), never for its returns. Pooled over five
+  weekday checks (2026-10-05 to 2026-10-20, the owner's decision of 6 Oct
+  2026), Public Service Enterprise Group had 10 of 34 headlines relevant and
+  was replaced on 20 Oct 2026 by Ameren, from PEG's own sub-industry
+  (Multi-Utilities), after Ameren passed the verify check and the news check
+  that day.
 * A name that does not resolve in the verify check is replaced. On 3 Oct 2026
   BNY Mellon (BK: no prices returned) and AvalonBay (AVB: fewer than two
   closes in three months) failed it in three runs while the other 249 names
@@ -209,7 +214,7 @@ BLOCKS: Final[dict[str, tuple[str, ...]]] = {
         "OMC", "SPOT", "T", "TMUS", "TTWO", "VZ",
     ),
     "Utilities": (
-        "AEP", "CEG", "D", "DUK", "ED", "EXC", "NEE", "PEG", "SO", "SRE", "VST", "XEL",
+        "AEE", "AEP", "CEG", "D", "DUK", "ED", "EXC", "NEE", "SO", "SRE", "VST", "XEL",
     ),
     "Real estate": (
         "AMT", "CBRE", "CCI", "DLR", "EQIX", "IRM", "O", "PLD", "PSA", "SPG", "VICI", "WELL",
@@ -235,6 +240,7 @@ REPLACED: Final[dict[str, tuple[str, int]]] = {
     "JNJ": ("EW", 1), "MDT": ("IDXX", 1), "SPGI": ("MET", 1),
     "DOW": ("MLM", 2), "ASX": ("UMC", 2),
     "BK": ("STT", 3), "AVB": ("IRM", 3),
+    "PEG": ("AEE", 2),
 }
 
 #: Each name's company name, for the universe's own news search and the
@@ -321,7 +327,7 @@ COMPANIES: Final[dict[str, tuple[str, ...]]] = {
     "AEP": ("American Electric Power", "AEP"), "CEG": ("Constellation Energy",),
     "D": ("Dominion Energy",), "DUK": ("Duke Energy",), "ED": ("Consolidated Edison", "Con Edison", "ConEd"),
     "EXC": ("Exelon",), "NEE": ("NextEra Energy", "NextEra"),
-    "PEG": ("Public Service Enterprise Group", "PSEG"), "SO": ("Southern Company", "Southern Co"),
+    "AEE": ("Ameren",), "SO": ("Southern Company", "Southern Co"),
     "SRE": ("Sempra",), "VST": ("Vistra",), "XEL": ("Xcel Energy", "Xcel"),
     # Real estate
     "AMT": ("American Tower",), "CBRE": ("CBRE Group", "CBRE"), "CCI": ("Crown Castle",),

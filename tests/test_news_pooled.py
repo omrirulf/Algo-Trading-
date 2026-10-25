@@ -154,9 +154,9 @@ def test_every_day_file_is_a_whole_check_of_the_list():
 
 
 def _as_it_stood(day: npool.DayCheck) -> list:
-    """The list in its order, with each name replaced since that day back in its replacement's place."""
+    """The list in its order that day (block order, then alphabetical), each name replaced since back in its block."""
     back = {new: old for old, (new, _) in su.REPLACED.items() if old in day.names}
-    return [back.get(t, t) for t in su.TICKERS]
+    return [t for names in su.BLOCKS.values() for t in sorted(back.get(n, n) for n in names)]
 
 
 def test_a_replacement_leaves_the_earlier_day_files_readable(monkeypatch, tmp_path):
@@ -182,6 +182,16 @@ def test_a_replacement_leaves_the_earlier_day_files_readable(monkeypatch, tmp_pa
     (tmp_path / "both.json").write_text(json.dumps(made), encoding="utf-8")
     with pytest.raises(ValueError, match="not the list"):
         npool.load_day(tmp_path / "both.json")
+
+
+def test_the_five_checks_replace_peg_alone_and_ameren_took_its_place():
+    """2026-10-20: pooled over the five day files the rule replaces PEG only; the list records Ameren in its place."""
+    days = npool.load_days()
+    assert [d.day.isoformat() for d in days] == ["2026-10-05", "2026-10-08", "2026-10-13", "2026-10-15", "2026-10-20"]
+    assert not npool.problems(days)
+    replaced = {p.ticker: p for p in npool.pool(days) if p.decision == npool.REPLACE}
+    assert list(replaced) == ["PEG"] and (replaced["PEG"].relevant, replaced["PEG"].headlines) == (10, 34)
+    assert su.REPLACED["PEG"] == ("AEE", 2) and "PEG" not in su.TICKERS and su.SECTORS["AEE"] == "Utilities"
 
 
 def test_a_day_file_with_a_name_missing_or_extra_is_refused(tmp_path):
