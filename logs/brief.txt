@@ -1,8 +1,8 @@
-🟡 2 warnings: Price gaps: 6.2% of ticker-days missing in 2026-10
-Equity $100,399 · 13 positions · $62,956 gross · $1,523 at risk · unrealised +$835
-5 directional calls, none traded
+🟡 3 warnings: Price gaps: 5.9% of ticker-days missing in 2026-10
+Equity $100,488 · 14 positions · $70,533 gross · $2,471 at risk · unrealised +$1,169
+Traded: EWZ
 Started by supabase-cron at 14:40 UTC (0 min after 14:40)
-Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-10-22
+Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-10-23
 Closed: ITA, ARGT, TEVA, GOOGL, XLC, EPOL
-Also: 2 of 80 ticker(s) were judged without news
-Cycle 80 tickers, $0.17 · 2026-10-23
+Also: 1 of 80 ticker(s) produced no signal; CFTC positioning is silent for 1 mapped contract(s)
+Cycle 80 tickers, $0.16 · 2026-10-26
