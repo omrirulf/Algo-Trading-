@@ -1,7 +1,8 @@
-🟡 1 warning: 5 of 80 ticker(s) were judged without news
-Equity $100,273 · 15 positions · $81,788 gross · $2,955 at risk · unrealised +$936
-Traded: XLV, GDX, CORN
+🟡 2 warnings: 3 of 80 ticker(s) produced no signal
+Equity $100,167 · 14 positions · $74,672 gross · $2,723 at risk · unrealised +$979
+6 directional calls, none traded
 Started by supabase-cron at 14:40 UTC (0 min after 14:40)
-Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-10-26
-Closed: HDB, EWU, ITA, ARGT, TEVA, GOOGL
-Cycle 80 tickers, $0.18 · 2026-10-27
+Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-10-27
+Closed: EIS, HDB, EWU, ITA, ARGT, TEVA
+Also: 5 of 80 ticker(s) were judged without news
+Cycle 80 tickers, $0.15 · 2026-10-28
