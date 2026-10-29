@@ -1,8 +1,8 @@
-🟡 2 warnings: 3 of 80 ticker(s) produced no signal
-Equity $100,167 · 14 positions · $74,672 gross · $2,723 at risk · unrealised +$979
-6 directional calls, none traded
+🟡 2 warnings: 2 of 80 ticker(s) produced no signal
+Equity $100,704 · 19 positions · $97,065 gross · $3,544 at risk · unrealised +$1,391
+Traded: GOOGL, NVO, TEVA, XLU, EWD
 Started by supabase-cron at 14:40 UTC (0 min after 14:40)
-Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-10-27
-Closed: EIS, HDB, EWU, ITA, ARGT, TEVA
+Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-10-28
+Closed: EIS, HDB, EWU, ITA, ARGT, XLC
 Also: 5 of 80 ticker(s) were judged without news
-Cycle 80 tickers, $0.15 · 2026-10-28
+Cycle 80 tickers, $0.16 · 2026-10-29
