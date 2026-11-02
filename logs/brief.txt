@@ -1,8 +1,7 @@
-🟡 2 warnings: 1 of 80 ticker(s) produced no signal
-Equity $100,886 · 18 positions · $88,863 gross · $3,008 at risk · unrealised +$1,936
-Traded: XLC
+🔴 8 of 80 ticker(s) were judged without news
+Equity $100,788 · 18 positions · $86,502 gross · $2,568 at risk · unrealised +$1,726
+2 directional calls, none traded
 Started by supabase-cron at 14:40 UTC (0 min after 14:40)
-Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-10-29
-Closed: ASML, GDX, EIS, HDB, EWU, ITA
-Also: 4 of 80 ticker(s) were judged without news
-Cycle 80 tickers, $0.15 · 2026-10-30
+Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-10-30
+Also: 3 of 80 ticker(s) produced no signal
+Cycle 80 tickers, $0.14 · 2026-11-02
