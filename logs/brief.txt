@@ -1,7 +1,8 @@
-🔴 8 of 80 ticker(s) were judged without news
-Equity $100,788 · 18 positions · $86,502 gross · $2,568 at risk · unrealised +$1,726
-2 directional calls, none traded
+🔴 80 of 80 ticker(s) were judged without news
+Equity $101,090 · 21 positions · $83,307 gross · $3,779 at risk · unrealised +$2,263
+Traded: ASML, HDB, CAT, TM, PG, EWY
 Started by supabase-cron at 14:40 UTC (0 min after 14:40)
-Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-10-30
-Also: 3 of 80 ticker(s) produced no signal
-Cycle 80 tickers, $0.14 · 2026-11-02
+Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-11-02
+Closed: MSFT, NVO, HYG
+Also: 4 of 80 ticker(s) produced no signal
+Cycle 80 tickers, $0.15 · 2026-11-03
