@@ -30,14 +30,15 @@ vendor's own headers on a refusal; then each arm's share of names with news,
 and how many of Google's headlines Bing also carried. Read-only beyond the
 asks it pays for (two Bright Data requests a name, a few cents in all): it
 prints, writes nothing, trades nothing, holds no broker key, asks no model.
-The token goes only to api.brightdata.com and never into the output.
-Production changes only by the owner's decision.
+The token goes only to api.brightdata.com and never into the output. The
+token and the zone are read the way production reads them (the settings:
+the SERP zone variable when set, else the unlocker zone ``brightdata login``
+created). Production changes only by the owner's decision.
 """
 
 from __future__ import annotations
 
 import argparse
-import os
 import re
 import statistics
 import sys
@@ -344,8 +345,14 @@ def main(argv: Optional[list[str]] = None, fetch: Fetch = http_fetch) -> int:
                         help="ask only Bing directly: no token needed, nothing billed")
     args = parser.parse_args(argv)
 
-    token = "" if args.no_bright_data else news.resolve_token(os.environ.get("BRIGHTDATA_API_TOKEN", ""))
-    zone = news.resolve_zone(os.environ.get("BRIGHTDATA_SERP_ZONE", "")) or ""
+    # The token and the zone the way production reads them (orchestrator/heartbeat.py):
+    # the SERP zone variable when set, else the Web Unlocker zone `brightdata login`
+    # created (cli_unlocker), which is what the live cycle sends while the variable
+    # is blank. The run of 4 Nov 2026 read the variable alone and asked only Bing.
+    from config.settings import get_settings  # read here, not at import, like the other probes
+    settings = get_settings()
+    token = "" if args.no_bright_data else (news.resolve_token(settings.brightdata_api_token) or "")
+    zone = news.resolve_zone(settings.brightdata_serp_zone, settings.brightdata_unlocker_zone)
     bright_data = bool(token and zone)
     if not args.no_bright_data and not bright_data:
         print("no Bright Data token or zone: only Bing's feed is asked, directly")

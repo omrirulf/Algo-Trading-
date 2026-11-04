@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 import httpx
 import yaml
@@ -155,6 +156,29 @@ def test_without_a_token_only_bings_feed_is_asked_and_nothing_is_billed(monkeypa
     out = capsys.readouterr().out
     assert all("bing.com" in url for url in sent) and len(sent) == 4
     assert "2 names x 2 arm(s)" in out and "secret" not in out and news.BRIGHTDATA_REQUEST_URL not in out
+
+
+def test_with_a_token_and_no_zone_variable_google_is_asked_through_productions_default_zone(monkeypatch, capsys):
+    """The run of 4 Nov 2026 asked only Bing: the zone variable is blank in the repository, and the
+    probe read it alone instead of falling back to the unlocker zone production falls back to."""
+    import config.settings as settings_module
+    monkeypatch.delenv(news.CLI_UNLOCKER_ENV_VAR, raising=False)
+    monkeypatch.setattr(settings_module, "get_settings", lambda: SimpleNamespace(
+        brightdata_api_token="secret-token-xyz", brightdata_serp_zone="", brightdata_unlocker_zone="cli_unlocker"))
+    monkeypatch.setattr(news, "resolve_token", lambda explicit="": explicit)
+    sent = []
+
+    def fetch(method, url, headers, body):
+        sent.append((url, headers, body))
+        if url == news.BRIGHTDATA_REQUEST_URL:
+            return Response(200, payload=GOOGLE) if "google.com" in body["url"] else Response(200, text=RSS)
+        return Response(200, text=RSS)
+
+    assert probe.main(["--count", "1"], fetch=fetch) == 0
+    out = capsys.readouterr().out
+    assert "1 names x 4 arm(s)" in out and "production's zone cli_unlocker" in out and "only Bing" not in out
+    assert sent[0][2]["zone"] == "cli_unlocker" and sent[3][2]["zone"] == "cli_unlocker"
+    assert sent[0][1]["Authorization"] == "Bearer secret-token-xyz" and "secret-token-xyz" not in out
 
 
 def test_the_workflow_holds_only_the_news_fetchs_credentials_and_changes_nothing():
