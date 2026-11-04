@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Would Bing News answer where Google refuses? Production's request against Bing's RSS feed, for the same names.
 
-    python replay/bing_news_probe.py [--count 20] [--no-bright-data]
+    python replay/bing_news_probe.py [--count 20] [--no-bright-data] [--titles 5]
 
 Production's news fetch (``orchestrator/news.py``) asks Google News through
 Bright Data from a US exit, once more after 10 seconds when the answer is an
@@ -343,6 +343,8 @@ def main(argv: Optional[list[str]] = None, fetch: Fetch = http_fetch) -> int:
     parser.add_argument("--count", type=int, default=20, help="watchlist names to ask, from the front of the list")
     parser.add_argument("--no-bright-data", action="store_true",
                         help="ask only Bing directly: no token needed, nothing billed")
+    parser.add_argument("--titles", type=int, default=0, metavar="N",
+                        help="print each arm's first N headlines under its line: what the model would read")
     args = parser.parse_args(argv)
 
     # The token and the zone the way production reads them (orchestrator/heartbeat.py):
@@ -363,6 +365,8 @@ def main(argv: Optional[list[str]] = None, fetch: Fetch = http_fetch) -> int:
     asks = probe(fetch, token, zone, arms, tickers)
     for a in asks:
         print(line_for(a))
+        for title in a.titles[:max(0, args.titles)]:
+            print(f"    {title}")
     print()
     print(summary(asks, arms))
     return 0
