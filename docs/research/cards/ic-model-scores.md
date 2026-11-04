@@ -40,6 +40,8 @@ The list as prepared on 2026-10-02 (`config/shadow_universe.py`). It is checked 
 
 **Replaced on 2026-10-03, by rule (3):** BNY Mellon (BK: Yahoo answered "quote not found" and returned no prices) and AvalonBay Communities (AVB: fewer than two closes in three months) failed the verify check in three runs that day (18:14, 18:15 and 18:16 UTC), while the other 249 names resolved in the same runs, and were replaced with State Street (STT) and Iron Mountain (IRM). Again no price, return or score was looked at beyond whether prices exist.
 
+**Replaced on 2026-10-20, by rule (2), pooled over five weekday checks** (no price, return or score was looked at): Public Service Enterprise Group (PEG: 10 of 34 headlines relevant over the checks of 2026-10-05, 2026-10-08, 2026-10-13, 2026-10-15 and 2026-10-20, 29%; `docs/research/news-checks/`, `analysis/news_pooled.py`) was replaced with Ameren (AEE). The candidates were fixed before any check: PEG's own GICS sub-industry (Multi-Utilities), not on the list and not a production name, with no merger, buy-out, spin-off or split-off announced for 2026-2027; CMS Energy and NiSource were left out because "CMS" and "NI" are the usual names of bigger things in market news (the Medicare agency; Northern Ireland and National Insurance). The order was fixed by how plain the ticker is: Ameren (AEE), then CenterPoint Energy (CNP), WEC Energy Group (WEC) and DTE Energy (DTE). Ameren passed the verify check (run 39473265131) and the news check on Tuesday 2026-10-20 (run 39473293596: 6 of 6 headlines relevant), so the others were not checked. No other name met the rule: none had zero headlines on all five days, and STT and IRM are kept by the owner's decision of 2026-10-06.
+
 Shadow stock universe: 251 names, chosen on 2026-10-02, frozen on 2026-12-22.
 
 | Sector | Names | Tickers |
@@ -53,7 +55,7 @@ Shadow stock universe: 251 names, chosen on 2026-10-02, frozen on 2026-12-22.
 | Financials | 24 | AIG, AXP, BAC, BLK, BX, C, CB, CME, COF, GS, ICE, MA, MCO, MET, MS, PGR, PNC, PYPL, SCHW, STT, TRV, USB, V, WFC |
 | Information technology | 23 | AAPL, ACN, ADBE, ADI, AMAT, AMD, ANET, AVGO, CDNS, CRM, CSCO, IBM, INTC, INTU, KLAC, LRCX, MU, NOW, ORCL, PANW, QCOM, SNPS, TXN |
 | Communication services | 13 | CHTR, CMCSA, DIS, FOXA, LYV, META, NFLX, OMC, SPOT, T, TMUS, TTWO, VZ |
-| Utilities | 12 | AEP, CEG, D, DUK, ED, EXC, NEE, PEG, SO, SRE, VST, XEL |
+| Utilities | 12 | AEE, AEP, CEG, D, DUK, ED, EXC, NEE, SO, SRE, VST, XEL |
 | Real estate | 12 | AMT, CBRE, CCI, DLR, EQIX, IRM, O, PLD, PSA, SPG, VICI, WELL |
 | ADR: Europe | 17 | AZN, BBVA, BP, BTI, DEO, GSK, HSBC, ING, NVS, RIO, SAN, SAP, SHEL, SNY, TTE, UBS, UL |
 | ADR: Japan | 8 | HMC, IX, MFG, MUFG, NMR, SMFG, SONY, TAK |
