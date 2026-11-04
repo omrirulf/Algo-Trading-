@@ -181,6 +181,22 @@ def test_with_a_token_and_no_zone_variable_google_is_asked_through_productions_d
     assert sent[0][1]["Authorization"] == "Bearer secret-token-xyz" and "secret-token-xyz" not in out
 
 
+def test_the_headlines_are_printed_under_each_ask_only_when_asked_for(monkeypatch, capsys):
+    """What the model would read, for a human to judge; off by default so the run stays one line an ask."""
+    monkeypatch.setattr(news, "resolve_token", lambda explicit="": "")
+
+    def fetch(method, url, headers, body):
+        return Response(200, text=RSS)
+
+    assert probe.main(["--count", "1", "--no-bright-data", "--titles", "1"], fetch=fetch) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert lines.count("    Teva raises its outlook after a strong quarter") == 2   # one under each Bing arm
+    assert not any("Generic drug prices" in line for line in lines)                # only the first title
+    assert probe.main(["--count", "1", "--no-bright-data"], fetch=fetch) == 0
+    assert not any(line.startswith("    ") for line in capsys.readouterr().out.splitlines())
+    assert "inputs.titles" in (ROOT / ".github" / "workflows" / "bing-news-probe.yml").read_text()
+
+
 def test_the_workflow_holds_only_the_news_fetchs_credentials_and_changes_nothing():
     text = (ROOT / ".github" / "workflows" / "bing-news-probe.yml").read_text()
     flow = yaml.safe_load(text)

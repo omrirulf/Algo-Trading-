@@ -13,6 +13,9 @@ on:
       no_bright_data:
         description: "Ask only Bing directly: no token used, nothing billed (yes/no)"
         default: "no"
+      titles:
+        description: "Print each arm's first N headlines under its line (0 prints none)"
+        default: "0"
   pull_request:
     paths:
       - replay/bing_news_probe.py
@@ -40,9 +43,10 @@ jobs:
           BRIGHTDATA_SERP_ZONE: ${{ vars.BRIGHTDATA_SERP_ZONE }}
           COUNT: ${{ inputs.count }}
           NO_BRIGHT_DATA: ${{ inputs.no_bright_data }}
+          TITLES: ${{ inputs.titles }}
         run: |
           # On a pull request every input is blank: a few names, Bing only, nothing billed.
-          args=(--count "${COUNT:-5}")
+          args=(--count "${COUNT:-5}" --titles "${TITLES:-0}")
           if [ "${NO_BRIGHT_DATA:-yes}" = "yes" ]; then args+=(--no-bright-data); fi
           status=0
           python replay/bing_news_probe.py "${args[@]}" > "$RUNNER_TEMP/probe.txt" || status=$?
