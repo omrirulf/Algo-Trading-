@@ -78,7 +78,7 @@ from orchestrator.llm import (  # noqa: E402
 from app.broker_client import BrokerError  # noqa: E402
 from config.market_calendar import is_trading_day  # noqa: E402
 from orchestrator.dispatch import Dispatcher, build_dispatcher  # noqa: E402
-from orchestrator.news import BrightDataNewsProvider, NewsFetchError  # noqa: E402
+from orchestrator.news import BrightDataNewsProvider, NewsAnswer, NewsFetchError  # noqa: E402
 
 #: US/Eastern, because the NYSE holiday calendar is defined in that timezone
 #: and a UTC "today" would occasionally name the wrong side of midnight.
@@ -412,15 +412,19 @@ def system_prompt_for(ticker: str, context: TickerContext | None = None) -> str:
 # --------------------------------------------------------------------------- #
 
 
-def fetch_news(ticker: str) -> list:
-    """Return recent headlines / snippets for ``ticker`` from Bright Data."""
+def fetch_news(ticker: str) -> NewsAnswer:
+    """Recent headlines for ``ticker``: Google's through Bright Data, else Bing's feed kept to the name.
+
+    The answer carries the headlines and, when they are Bing's, the note the
+    journal keeps (``news.NewsAnswer``).
+    """
     settings = get_settings()
     provider = BrightDataNewsProvider(
         settings.brightdata_api_token,
         settings.brightdata_serp_zone,
         unlocker_zone=settings.brightdata_unlocker_zone,
     )
-    return provider.fetch_items(ticker)
+    return provider.fetch_answer(ticker)
 
 
 def screening_provider() -> tuple[SignalProvider, str]:
@@ -1080,13 +1084,17 @@ def build_context(ticker: str) -> TickerContext:
     governs outright failures.
     """
     try:
-        headlines = fetch_news(ticker)
+        answer = fetch_news(ticker)
     except NewsFetchError as exc:
         log.warning("%s: news unavailable, continuing on the other sections (%s)", ticker, exc)
         return context.gather(
             ticker, [], news_gap=f"{context.NEWS_GAP_PREFIX}: {exc}",
         )
-    return context.gather(ticker, headlines)
+    # The live path answers with ``news.NewsAnswer``: the headlines and, when
+    # they are Bing's, the note the journal keeps. The harnesses and the
+    # tests hand plain lines, which carry no note.
+    headlines = getattr(answer, "headlines", answer)
+    return context.gather(ticker, headlines, news_note=getattr(answer, "fallback", ""))
 
 
 @dataclass(frozen=True)

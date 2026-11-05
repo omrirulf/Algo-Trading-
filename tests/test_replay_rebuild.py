@@ -385,6 +385,16 @@ def test_every_journalled_section_is_rebuilt():
     assert journalled_keys - handled == set()
 
 
+def test_the_news_note_is_carried_through_and_an_older_line_without_it_renders_the_same():
+    """Bing's headlines (5 Nov 2026) leave a note beside them; the prompt they render is the same either way."""
+    recorded = full_fund_context().as_dict()
+    noted = dict(recorded, news_note="news from Bing's feed (direct) after Google: empty body; 2 of 9 headline(s) name XLE")
+    older = {k: v for k, v in recorded.items() if k != "news_note"}
+    assert context_from_dict(noted).news_note.startswith("news from Bing's feed")
+    assert context_from_dict(older).news_note == ""
+    assert prompt_from_dict(noted) == prompt_from_dict(older) == prompt_from_dict(recorded)
+
+
 def test_the_derived_section_list_matches_the_dataclass():
     """Every ``Optional[Snapshot]`` field on the context, and only those."""
     hints = get_type_hints(TickerContext)

@@ -48,7 +48,7 @@ from orchestrator.context import TickerContext
 #: ``context_from_dict`` itself. Listed so the test that guards against a new
 #: section being dropped can tell "not a snapshot" from "not yet handled".
 PASSTHROUGH_KEYS: Final[frozenset[str]] = frozenset(
-    {"ticker", "headlines", "sources", "gaps"}
+    {"ticker", "headlines", "sources", "gaps", "news_note"}
 )
 
 
@@ -198,6 +198,9 @@ def context_from_dict(payload: dict) -> TickerContext:
         # replayed signal against the article it was drawn from.
         sources=list(payload.get("sources") or []),
         gaps=list(payload.get("gaps") or []),
+        # Where the headlines came from when not from Google (since 5 Nov
+        # 2026); absent from older lines, and never part of the prompt.
+        news_note=str(payload.get("news_note") or ""),
         **snapshots,
     )
 

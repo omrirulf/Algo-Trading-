@@ -12,6 +12,17 @@ after its OAuth flow -- in that order. Reading the CLI's file is best-effort:
 its format is not documented, so the lookup tries several field names and
 treats anything it cannot make sense of as "not configured this way".
 
+When Google's answer is unusable after the retries below (a second refused
+200, an HTTP error, a transport failure after its retry), the live path asks
+Bing News for the same name: its RSS feed of the past 24 hours, directly
+first (no token, a fraction of a second) and through Bright Data if the
+direct ask fails, kept to the headlines that name the ticker or the company
+(``relevant_headlines``). The owner's decision of 4 Nov 2026 after the probe
+of the same day (``replay/bing_news_probe.py``), logged in the
+pre-registration's Amendments table; the Google request, its parser and the
+model's prompt are unchanged, and the journal says when a name's headlines
+came this way (``NewsAnswer.fallback``).
+
 This module has no credentials other than the Bright Data token and never
 talks to the broker or the execution engine.
 """
@@ -21,16 +32,19 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import sys
 import threading
 import time
 from dataclasses import dataclass
+from email.utils import parsedate_to_datetime
 from pathlib import Path
-from typing import Any, Optional
-from datetime import date, timedelta
+from typing import Any, Iterable, Optional
+from datetime import date, datetime, timedelta, timezone
 from urllib.parse import urlencode
+from xml.etree import ElementTree
 
-from config.instruments import is_fund
+from config.instruments import DISPLAY_NAMES, is_fund
 
 import httpx
 
@@ -81,6 +95,39 @@ BRD_COUNTRY = "us"
 #: is the news-tab list; ``organic`` is the fallback if the zone returns a
 #: regular SERP for the same query.
 _RESULT_KEYS = ("news", "top_stories", "organic")
+
+#: Bing News publishes the same search as an RSS feed, with no consent page.
+#: The fallback when Google's answer is unusable after the retries above: the
+#: owner's decision of 4 Nov 2026, after the probe of the same day
+#: (``replay/bing_news_probe.py``, 30 names, two runs). Production's request
+#: answered 24 of 30 names each run (4 "redirect location was rejected", 2
+#: empty, different names each run); the feed answered all 30, directly from
+#: the runner in 0.2 s and through Bright Data in 1.8 s, against 5 s for the
+#: Google request. The feed is asked directly first and through Bright Data
+#: only if that fails (one connection error in 60 direct asks that day).
+BING_NEWS_URL = "https://www.bing.com/news/search"
+#: Bing's own "past 24 hours" filter, as its news page sends it: Google's
+#: ``qdr:d`` window. Without it the feed's newest story was a day old at the
+#: median and its oldest more than a year.
+BING_LAST_24H = 'interval="7"'
+#: A browser's name: Bing answers an empty client name with a block page.
+BING_USER_AGENT = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
+                   "Chrome/129.0 Safari/537.36")
+#: The direct ask's budget. The one direct ask that failed on 4 Nov hung
+#: for 29 s before its connection error; the Bright Data route waits behind.
+BING_DIRECT_TIMEOUT_SECONDS = 20.0
+#: The guard on the feed. With the filter on, its answer for a thin fund was
+#: mostly about other things (for DBA on 4 Nov: a country music festival, a
+#: town's pool bond, a Senate race; one title in five named the fund across
+#: the 14 funds, against three in four for the 16 companies), so a headline
+#: is kept only when its title or snippet names the ticker or, for a
+#: company, a word of its display name. Words shorter than this, and these
+#: generic ones, name no company on their own.
+NAME_WORD_MIN_LENGTH = 4
+GENERIC_NAME_WORDS = frozenset({
+    "bank", "systems", "canada", "pharmaceutical", "pharmaceuticals", "royal", "company", "group",
+    "holdings", "corp", "corporation", "inc", "the", "and", "of",
+})
 
 
 #: Env var the official Bright Data CLI reads as an override. Ours is
@@ -320,6 +367,139 @@ def parse_news_results(payload: Any, limit: int = MAX_HEADLINES) -> list[str]:
 # --------------------------------------------------------------------------- #
 
 
+# --------------------------------------------------------------------------- #
+# Bing's feed: the fallback (the owner's decision of 4 Nov 2026)
+# --------------------------------------------------------------------------- #
+
+
+def build_bing_news_url(ticker: str, last_24h: bool = True) -> str:
+    """Bing News RSS for ``ticker``, with the Google search's qualifier ("stock", or "ETF" for a fund).
+
+    The live path always asks with the past-24-hours filter; the probe can
+    ask without it, to measure the difference.
+    """
+    qualifier = "ETF" if is_fund(ticker) else "stock"
+    params: dict[str, Any] = {"q": f"{ticker} {qualifier}", "format": "rss", "setlang": "en-US", "cc": "US"}
+    if last_24h:
+        params["qft"] = BING_LAST_24H
+    return f"{BING_NEWS_URL}?{urlencode(params)}"
+
+
+def _feed_text(element: Optional[ElementTree.Element]) -> str:
+    return (element.text or "").strip() if element is not None else ""
+
+
+def _feed_child(item: ElementTree.Element, local: str) -> Optional[ElementTree.Element]:
+    """A child by its local name, whatever namespace the feed put it in (Bing's carries the query)."""
+    for child in item:
+        if child.tag.rsplit("}", 1)[-1] == local:
+            return child
+    return None
+
+
+def _age_hours(published: str, now: Optional[datetime] = None) -> Optional[float]:
+    try:
+        stamp = parsedate_to_datetime(published)
+    except (TypeError, ValueError, IndexError):
+        return None
+    if stamp.tzinfo is None:
+        stamp = stamp.replace(tzinfo=timezone.utc)
+    return max(0.0, ((now or datetime.now(timezone.utc)) - stamp).total_seconds() / 3600.0)
+
+
+@dataclass(frozen=True)
+class BingStory:
+    """One feed item as a ``Headline``, with the story's age for whoever measures the feed."""
+
+    headline: Headline
+    age_hours: Optional[float]
+
+
+def parse_bing_rss(text: str, limit: int = MAX_HEADLINES, now: Optional[datetime] = None) -> list[BingStory]:
+    """The feed's items as ``Headline`` records (title, snippet, source, when, url), newest first.
+
+    Deduplicated by title, as ``parse_news_items`` is. Raises
+    ``NewsFetchError`` on anything that is not an RSS document (a block page,
+    an empty body), so the fallback judges it the way the Google path judges
+    its answers.
+    """
+    stripped = (text or "").strip()
+    if not stripped:
+        raise NewsFetchError("Bing returned an empty body")
+    if not stripped.startswith("<"):
+        raise NewsFetchError(f"Bing returned something that is not XML (starts {stripped[:30]!r})")
+    try:
+        root = ElementTree.fromstring(stripped)
+    except ElementTree.ParseError as exc:
+        raise NewsFetchError(f"Bing returned XML the parser refused: {exc}") from exc
+    items = root.findall(".//item")
+    if root.tag.lower() != "rss" and not items:
+        raise NewsFetchError(f"Bing returned <{root.tag}>, not an RSS feed")
+    out: list[BingStory] = []
+    seen: set[str] = set()
+    for item in items:
+        title = _feed_text(_feed_child(item, "title"))
+        if not title or title.lower() in seen:
+            continue
+        seen.add(title.lower())
+        published = _feed_text(_feed_child(item, "pubDate"))
+        age = _age_hours(published, now)
+        when = f"{age:.0f}h ago" if age is not None else published
+        snippet = re.sub(r"\s+", " ", _feed_text(_feed_child(item, "description")))
+        out.append(BingStory(Headline(title=title, snippet=snippet, source=_feed_text(_feed_child(item, "Source")),
+                                      when=when, url=_feed_text(_feed_child(item, "link"))), age))
+        if len(out) >= limit:
+            break
+    return out
+
+
+def name_words(ticker: str) -> tuple[str, ...]:
+    """The words a headline about the name would carry: the ticker, and for a company its name's distinctive words.
+
+    A fund's display name describes it ("Commodities basket") and names
+    nothing a headline would say, so a fund is known by its ticker alone.
+    """
+    words: list[str] = [ticker]
+    if not is_fund(ticker):
+        name = DISPLAY_NAMES.get(ticker, "")
+        for word in re.findall(r"[A-Za-z][A-Za-z'-]*", name):
+            clean = word.strip("'-")
+            if len(clean) >= NAME_WORD_MIN_LENGTH and clean.lower() not in GENERIC_NAME_WORDS:
+                words.append(clean)
+        if len(name.split()) > 1:
+            words.append(name)
+    return tuple(dict.fromkeys(words))
+
+
+def _names(text: str, word: str, exact: bool) -> bool:
+    """Whether ``text`` carries ``word`` as a whole word: the ticker as written (and not as the start of PG&E), a name in any case."""
+    tail = r"(?![A-Za-z0-9&])" if exact else r"(?![A-Za-z0-9])"
+    pattern = rf"(?<![A-Za-z0-9]){re.escape(word)}{tail}"
+    return re.search(pattern, text, 0 if exact else re.IGNORECASE) is not None
+
+
+def relevant_headlines(ticker: str, headlines: Iterable[Headline]) -> list[Headline]:
+    """The headlines whose title or snippet name the ticker or, for a company, a word of its name."""
+    words = name_words(ticker)
+    kept: list[Headline] = []
+    for headline in headlines:
+        text = f"{headline.title} {headline.snippet}"
+        if _names(text, ticker, True) or any(_names(text, word, False) for word in words[1:]):
+            kept.append(headline)
+    return kept
+
+
+@dataclass(frozen=True)
+class NewsAnswer:
+    """What the live path hands the cycle: the headlines, and a note when they are not Google's."""
+
+    headlines: list[Headline]
+    #: Empty when Google answered. Otherwise why Bing's feed was asked, which
+    #: route answered and how many of its headlines named the name: the
+    #: journal's record of the fallback (``context.news_note``).
+    fallback: str = ""
+
+
 def cli_credential_paths() -> list[Path]:
     """Where the Bright Data CLI may have stored its key, per platform."""
     home = Path.home()
@@ -455,13 +635,80 @@ class BrightDataNewsProvider:
             time.sleep(RETRY_PAUSE_SECONDS)
             return self._post(body)
 
+    def fetch_answer(self, ticker: str) -> NewsAnswer:
+        """Headlines from the past 24 hours, with their links -- the live path.
+
+        Google's, through Bright Data, with the retries of ``_fetch_items``;
+        when its answer is unusable even so, Bing's feed kept to the
+        headlines that name the name (``_bing_fallback``), and the answer
+        says so. Raises ``NewsFetchError`` when neither gives the name a
+        headline, with both reasons, so the cycle records a gap as before.
+        """
+        try:
+            return NewsAnswer(self._fetch_items(build_news_search_url(ticker)))
+        except NewsFetchError as google:
+            return self._bing_fallback(ticker, google)
+
     def fetch_items(self, ticker: str) -> list[Headline]:
-        """Headlines from the past 24 hours, with their links -- the live path."""
-        return self._fetch_items(build_news_search_url(ticker))
+        """The live path's headlines, with their links, for callers that keep no note."""
+        return self.fetch_answer(ticker).headlines
 
     def fetch(self, ticker: str) -> list[str]:
         """The same headlines as prompt lines, for callers that want only text."""
         return [h.as_line() for h in self.fetch_items(ticker)]
+
+    def _get(self, url: str) -> httpx.Response:
+        """A plain GET, not through Bright Data: nothing billed, nothing counted, no token sent."""
+        headers = {"User-Agent": BING_USER_AGENT, "Accept": "application/rss+xml, text/xml"}
+        if self._client is not None:
+            return self._client.get(url, headers=headers)
+        with httpx.Client(timeout=BING_DIRECT_TIMEOUT_SECONDS, follow_redirects=True) as client:
+            return client.get(url, headers=headers)
+
+    def _bing_stories(self, route: str, url: str) -> list[BingStory]:
+        """The feed by one route. Raises ``NewsFetchError`` (with Bright Data's headers on its route) or ``httpx.HTTPError``."""
+        if route == "direct":
+            resp = self._get(url)
+        else:
+            resp = self._post_with_one_retry({"zone": self._zone, "url": url, "format": "raw", "country": BRD_COUNTRY})
+        said = brd_headers(resp) if route != "direct" else ""
+        if resp.status_code != 200:
+            raise NewsFetchError(f"HTTP {resp.status_code}" + (f" (Bright Data said: {said})" if said else ""))
+        try:
+            return parse_bing_rss(resp.text)
+        except NewsFetchError as exc:
+            if said:
+                raise NewsFetchError(f"{exc} (Bright Data said: {said})") from exc
+            raise
+
+    def _bing_fallback(self, ticker: str, google: NewsFetchError) -> NewsAnswer:
+        """Bing's past-24-hours feed for ``ticker``, directly then through Bright Data, kept to the name.
+
+        A name with at least one headline left is judged on those, and the
+        answer's note says so. A name with none left raises, like before the
+        fallback: the prompt says "unavailable this cycle" and the journal
+        keeps a gap naming Google's reason and the feed's count.
+        """
+        url = build_bing_news_url(ticker)
+        failures: list[str] = []
+        for route in ("direct", "Bright Data"):
+            try:
+                stories = self._bing_stories(route, url)
+            except httpx.HTTPError as exc:
+                failures.append(f"{route}: {type(exc).__name__}")
+                continue
+            except NewsFetchError as exc:
+                failures.append(f"{route}: {exc}")
+                continue
+            kept = relevant_headlines(ticker, [story.headline for story in stories])
+            if not kept:
+                raise NewsFetchError(f"{google} (Bing's feed, {route}: {len(stories)} headline(s), "
+                                     f"none naming {ticker})") from google
+            note = (f"news from Bing's feed ({route}) after Google: {google}; "
+                    f"{len(kept)} of {len(stories)} headline(s) name {ticker}")
+            log.warning("%s: %s", ticker, note)
+            return NewsAnswer(kept, note)
+        raise NewsFetchError(f"{google} (Bing's feed also failed: {'; '.join(failures)})") from google
 
     def fetch_on(self, ticker: str, day: date) -> list[str]:
         """Headlines as of a past date -- the historical replay's path.
@@ -469,7 +716,8 @@ class BrightDataNewsProvider:
         Same request, same parser, same zone; only the date window differs.
         What comes back is what Google still indexes for that day, which is
         sparser than the day's real coverage and biased towards stories that
-        lasted. The caller counts empty results rather than hiding them.
+        lasted. The caller counts empty results rather than hiding them. No
+        Bing fallback here: the feed has no window for a past day.
         """
         return [h.as_line() for h in self._fetch_items(build_news_search_url(ticker, on=day))]
 
