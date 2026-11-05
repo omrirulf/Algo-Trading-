@@ -596,6 +596,12 @@ class TickerContext:
     #: reads, and one reading is not a series.
     share_reading: tuple = ()
     gaps: list[str] = field(default_factory=list)
+    #: Where the headlines came from when not from Google: Bing's feed, kept
+    #: to the name, because Google's answer was unusable (``news.NewsAnswer``
+    #: ``.fallback``; the owner's decision of 4 Nov 2026). Not in the prompt,
+    #: which is unchanged in shape; the journal's record of the fallback,
+    #: which ``analysis.health.news_fallbacks`` counts.
+    news_note: str = ""
 
     def as_dict(self) -> dict:
         """Plain JSON-serialisable form, for the signal journal."""
@@ -618,6 +624,7 @@ class TickerContext:
             "crops": self.crops.as_dict() if self.crops else None,
             "carry": self.carry.as_dict() if self.carry else None,
             "gaps": list(self.gaps),
+            "news_note": self.news_note,
         }
 
     def as_prompt(self) -> str:
@@ -686,6 +693,7 @@ def gather(
     headlines: Sequence[Any],
     provider: Optional[YFinanceContextProvider] = None,
     news_gap: Optional[str] = None,
+    news_note: str = "",
 ) -> TickerContext:
     """Build the full context for ``ticker``. Never raises.
 
@@ -699,6 +707,10 @@ def gather(
     ``NEWS_GAP_PREFIX``: that prefix is what makes ``_news_section`` say
     "unavailable" instead of "none found", and what ``analysis.health``
     counts to notice a vendor outage.
+
+    ``news_note`` is how the caller says the headlines are Bing's, kept to
+    the name, because Google's answer was unusable. It goes into the journal
+    beside the headlines and never into the prompt.
     """
     lines, sources = _split_headlines(headlines)
     raw = (provider or get_provider()).fetch(ticker)
@@ -855,6 +867,7 @@ def gather(
         carry=carry_snapshot,
         share_reading=raw.share_reading,
         gaps=gaps,
+        news_note=news_note,
     )
 
 

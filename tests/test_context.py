@@ -1021,3 +1021,14 @@ def test_the_other_four_dimensions_survive_a_news_failure():
     assert ctx.fundamentals is not None
     assert ctx.analysts is not None
     assert ctx.insiders is not None
+
+
+def test_the_fallback_note_is_journaled_beside_the_headlines_and_never_in_the_prompt():
+    """Bing's headlines (the owner's decision of 4 Nov 2026) change nothing the model sees but the lines themselves."""
+    note = "news from Bing's feed (direct) after Google: empty body; 1 of 2 headline(s) name TM"
+    with_note = context.gather("TM", ["Toyota raises its outlook (Reuters, 2h ago)"], provider=full_provider(), news_note=note)
+    without = context.gather("TM", ["Toyota raises its outlook (Reuters, 2h ago)"], provider=full_provider())
+    assert with_note.news_note == note and with_note.as_dict()["news_note"] == note
+    assert without.news_note == "" and without.as_dict()["news_note"] == ""
+    assert with_note.as_prompt() == without.as_prompt() and "Bing" not in with_note.as_prompt()
+    assert with_note.gaps == without.gaps

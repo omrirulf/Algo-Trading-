@@ -162,14 +162,14 @@ journal says what the vendor said: `Bright Data returned an empty body with
 its 200; nothing to parse (Bright Data said: x-brd-status-code 502)`. An HTTP
 error is never retried.
 
-<Warning>
-  **A news failure skips that ticker entirely** — no context is assembled, no
-  signal is produced. This is the opposite of how the yfinance enrichment
-  fails, where a dead source becomes a named gap and the cycle continues.
-  News is the input the strategy was designed around, and quietly falling
-  back to technicals alone would be running a different strategy than the one
-  under test. See [Market Context](/orchestrator/market-context).
-</Warning>
+<Note>
+  Since 21 Sep 2026 a news failure no longer skips the ticker (issue #69):
+  the context is assembled on its other sections, the NEWS section says
+  "unavailable this cycle" rather than "none found", and the journal line
+  carries a `news unavailable` gap that `analysis.health` counts. See
+  [Market Context](/orchestrator/market-context). Since 5 Nov 2026 Bing's
+  feed is asked first, below.
+</Note>
 
 Headlines are no longer the only thing in the prompt, either. They now sit
 above four more sections — see
@@ -184,3 +184,43 @@ given and how it is told to weigh it.
   check the log output on your first real cycle. If every ticker logs empty
   news, that's the first thing to look at.
 </Warning>
+
+## Bing's feed: the fallback when Google's answer is unusable
+
+Since 5 Nov 2026 (the owner's decision of 4 Nov, after the probe of the
+same day, `replay/bing_news_probe.py`; Amendments, 2026-11-05) a name whose
+Google answer is unusable after the retries above — a second refused 200,
+an HTTP error, a transport failure after its retry — is asked once more, of
+Bing News: its RSS feed for the same query (`"<TICKER> stock"`, or `ETF`)
+with Bing's past-24-hours filter (`build_bing_news_url`). The feed is
+fetched directly first (no Bright Data, no token, a fraction of a second,
+`BING_DIRECT_TIMEOUT_SECONDS`) and through Bright Data's zone only if the
+direct fetch fails (`BrightDataNewsProvider._bing_fallback`).
+
+The feed is read into the same `Headline` shape (`parse_bing_rss`) and then
+**kept to the headlines that name the name** (`relevant_headlines`): the
+ticker as a whole word, or for a company a distinctive word of its display
+name (`Teva`, `Lilly`, `Exxon`; not `Bank` or `Royal` on their own,
+`GENERIC_NAME_WORDS`). The probe showed why: with the filter on, Bing's feed
+for a thin fund is mostly about other things (for DBA on 4 Nov: a country
+music festival, a town's pool bond, a Senate race; one title in five named
+the fund across the funds, against three in four for the companies).
+
+A name with at least one headline left is judged on those, in the prompt's
+unchanged NEWS section (the same `title — snippet (source, when)` lines,
+`when` as `11h ago`), and its journal line says so: `context.news_note`
+carries Google's reason, the route that answered and how many of the feed's
+headlines named the name. A name with none left is handled as before the
+fallback: "unavailable this cycle" in the prompt, a `news unavailable` gap
+in the journal naming Google's reason and the feed's count, and
+`analysis.health.news_gaps` counts it. `analysis.health.news_fallbacks`
+warns when a tenth of the day's names took their news from the feed: the
+cycle was whole, but Google, through Bright Data, was failing at a rate the
+fallback was covering.
+
+Bing is not the primary source. The model's input stays Google's wherever
+Google answers, so the race's news input changes only on the names that
+would otherwise have had none. The historical replay (`fetch_on`) and the
+shadow universe's search (`orchestrator/universe_news.py`) have no fallback:
+the feed has no window for a past day, and the universe's check measures
+Google's coverage.

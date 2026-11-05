@@ -25,9 +25,13 @@ Bing News publishes the same search as an RSS feed, with no consent page:
   Bright Data zone, in case Bing blocks the runner's address one day.
 
 It prints for every ask the status, the bytes, how many headlines the parser
-found, the newest and oldest story's age in hours, the seconds, and the
-vendor's own headers on a refusal; then each arm's share of names with news,
-and how many of Google's headlines Bing also carried. Read-only beyond the
+found and how many of them name the name (what the live fallback's guard
+keeps, ``news.relevant_headlines``), the newest and oldest story's age in
+hours, the seconds, and the vendor's own headers on a refusal; then each
+arm's share of names with news, and how many of Google's headlines Bing
+also carried. The feed's URL, its parser and the guard are production's
+own (``orchestrator/news.py``), so what the probe measures is what the
+live fallback does. Read-only beyond the
 asks it pays for (two Bright Data requests a name, a few cents in all): it
 prints, writes nothing, trades nothing, holds no broker key, asks no model.
 The token goes only to api.brightdata.com and never into the output. The
@@ -44,12 +48,9 @@ import statistics
 import sys
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from email.utils import parsedate_to_datetime
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Optional
-from urllib.parse import urlencode
-from xml.etree import ElementTree
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -79,84 +80,19 @@ def _auth(token: str) -> dict[str, str]:
 
 
 # --------------------------------------------------------------------------- #
-# Bing's feed
+# Bing's feed: production's own URL, parser and guard (orchestrator/news.py)
 # --------------------------------------------------------------------------- #
+
+BING_NEWS_URL = news.BING_NEWS_URL
+BING_LAST_24H = news.BING_LAST_24H
+USER_AGENT = news.BING_USER_AGENT
+Story = news.BingStory
+parse_bing_rss = news.parse_bing_rss
 
 
 def bing_news_url(ticker: str, last_24h: bool = False) -> str:
-    """Bing News RSS for one ticker, with production's qualifier ("stock", or "ETF" for a fund)."""
-    qualifier = "ETF" if is_fund(ticker) else "stock"
-    params: dict[str, Any] = {"q": f"{ticker} {qualifier}", "format": "rss", "setlang": "en-US", "cc": "US"}
-    if last_24h:
-        params["qft"] = BING_LAST_24H
-    return f"{BING_NEWS_URL}?{urlencode(params)}"
-
-
-def _text(element: Optional[ElementTree.Element]) -> str:
-    return (element.text or "").strip() if element is not None else ""
-
-
-def _child(item: ElementTree.Element, local: str) -> Optional[ElementTree.Element]:
-    """A child by its local name, whatever namespace the feed put it in (Bing's carries the query)."""
-    for child in item:
-        tag = child.tag.rsplit("}", 1)[-1]
-        if tag == local:
-            return child
-    return None
-
-
-def _age_hours(published: str, now: Optional[datetime] = None) -> Optional[float]:
-    try:
-        stamp = parsedate_to_datetime(published)
-    except (TypeError, ValueError, IndexError):
-        return None
-    if stamp.tzinfo is None:
-        stamp = stamp.replace(tzinfo=timezone.utc)
-    now = now or datetime.now(timezone.utc)
-    return max(0.0, (now - stamp).total_seconds() / 3600.0)
-
-
-@dataclass(frozen=True)
-class Story:
-    headline: news.Headline
-    age_hours: Optional[float]
-
-
-def parse_bing_rss(text: str, limit: int = news.MAX_HEADLINES, now: Optional[datetime] = None) -> list[Story]:
-    """The feed's items as production's ``Headline`` records (title, snippet, source, when, url), newest first.
-
-    Deduplicated by title, as production's parser does. Raises
-    ``news.NewsFetchError`` on anything that is not an RSS document (a block
-    page, an empty body), so the probe judges it the way production would.
-    """
-    stripped = (text or "").strip()
-    if not stripped:
-        raise news.NewsFetchError("Bing returned an empty body")
-    if not stripped.startswith("<"):
-        raise news.NewsFetchError(f"Bing returned something that is not XML (starts {stripped[:30]!r})")
-    try:
-        root = ElementTree.fromstring(stripped)
-    except ElementTree.ParseError as exc:
-        raise news.NewsFetchError(f"Bing returned XML the parser refused: {exc}") from exc
-    items = root.findall(".//item")
-    if root.tag.lower() != "rss" and not items:
-        raise news.NewsFetchError(f"Bing returned <{root.tag}>, not an RSS feed")
-    out: list[Story] = []
-    seen: set[str] = set()
-    for item in items:
-        title = _text(_child(item, "title"))
-        if not title or title.lower() in seen:
-            continue
-        seen.add(title.lower())
-        published = _text(_child(item, "pubDate"))
-        age = _age_hours(published, now)
-        when = f"{age:.0f}h ago" if age is not None else published
-        snippet = re.sub(r"\s+", " ", _text(_child(item, "description")))
-        out.append(Story(news.Headline(title=title, snippet=snippet, source=_text(_child(item, "Source")),
-                                       when=when, url=_text(_child(item, "link"))), age))
-        if len(out) >= limit:
-            break
-    return out
+    """Production's feed URL; the past-24-hours filter optional here, so the probe can measure both."""
+    return news.build_bing_news_url(ticker, last_24h)
 
 
 # --------------------------------------------------------------------------- #
@@ -202,6 +138,8 @@ class Ask:
     headers: str = ""
     seconds: float = 0.0
     error: str = ""
+    #: How many of the headlines the live fallback's guard would keep (``news.relevant_headlines``).
+    relevant: Optional[int] = None
 
     @property
     def outcome(self) -> str:
@@ -255,6 +193,7 @@ def ask(fetch: Fetch, token: str, zone: str, arm: Arm, ticker: str, now: Optiona
         return result
     result.items = len(headlines)
     result.titles = tuple(h.title for h in headlines)
+    result.relevant = len(news.relevant_headlines(ticker, headlines))
     if ages:
         result.newest_hours, result.oldest_hours = min(ages), max(ages)
     return result
@@ -295,8 +234,9 @@ def line_for(a: Ask) -> str:
     if a.newest_hours is not None:
         ages = f"newest {a.newest_hours:4.0f}h oldest {a.oldest_hours:5.0f}h"
     extra = a.error or (f"[{a.headers}]" if a.headers else "")
+    kept = f" kept {a.relevant:3d}" if a.relevant is not None else ""
     return (f"{a.ticker:<6} {a.arm:<28} {a.outcome:<9} status {a.status if a.status is not None else '-':>4} "
-            f"{a.size:7d} bytes {a.items:3d} items {a.seconds:6.1f}s {ages} {a.refused} {extra}".rstrip())
+            f"{a.size:7d} bytes {a.items:3d} items{kept} {a.seconds:6.1f}s {ages} {a.refused} {extra}".rstrip())
 
 
 def summary(asks: list[Ask], arms: list[Arm]) -> str:
@@ -316,8 +256,10 @@ def summary(asks: list[Ask], arms: list[Arm]) -> str:
         oldest = [a.oldest_hours for a in with_news if a.oldest_hours is not None]
         ages = (f", newest story median {statistics.median(newest):.0f}h, oldest median {statistics.median(oldest):.0f}h"
                 if newest else "")
+        relevant = [a.relevant for a in with_news if a.relevant is not None]
+        kept = f", median {statistics.median(relevant):.0f} naming the name" if relevant else ""
         lines.append(f"{arm.label}: {n} asks, news for {len(with_news)} ({len(with_news) / n:.0%}), no items {none}, "
-                     f"refused {refused}, HTTP/transport errors {errors}, median {items:.0f} headlines, "
+                     f"refused {refused}, HTTP/transport errors {errors}, median {items:.0f} headlines{kept}, "
                      f"median {median_s:.1f}s{ages}")
     google = {a.ticker: a for a in asks if a.arm == GOOGLE and a.outcome == "news"}
     for arm in arms:
@@ -335,6 +277,10 @@ def summary(asks: list[Ask], arms: list[Arm]) -> str:
     if any(a.arm == GOOGLE for a in asks):
         lines.append(f"names Google did not answer that Bing (direct, 24h) did: {len(rescued)}"
                      + (f" ({', '.join(rescued)})" if rescued else ""))
+        guarded = [t for t in rescued if any(b.arm == BING_DIRECT_24H and b.ticker == t and b.relevant for b in asks)]
+        if any(a.relevant is not None for a in asks):
+            lines.append(f"of them with a headline naming the name, which the live fallback keeps: {len(guarded)}"
+                         + (f" ({', '.join(guarded)})" if guarded else ""))
     return "\n".join(lines)
 
 

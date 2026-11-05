@@ -132,7 +132,9 @@ def test_provider_raises_on_transport_error(monkeypatch):
         provider = news.BrightDataNewsProvider("tok", "zone", client=client)
         with pytest.raises(news.NewsFetchError):
             provider.fetch("AAPL")
-    assert len(calls) == 2                       # one retry, then the error is real
+    # Google: one retry, then the error is real. Then the feed (5 Nov 2026):
+    # once directly, and once more with its retry through Bright Data.
+    assert len(calls) == 5
 
 
 def test_a_timed_out_read_is_tried_once_more_and_the_second_answer_counts(monkeypatch):
@@ -177,7 +179,8 @@ def test_a_second_block_page_is_the_real_answer(monkeypatch):
         provider = news.BrightDataNewsProvider("tok", "zone", client=client)
         with pytest.raises(news.NewsFetchError) as exc:
             provider.fetch("TM")
-    assert len(calls) == 2 and "JSON" in str(exc.value)
+    # Google twice; then the feed's two routes (5 Nov 2026), refused the same way.
+    assert len(calls) == 4 and "JSON" in str(exc.value) and "Bing's feed also failed" in str(exc.value)
 
 
 def test_an_http_error_is_never_retried(monkeypatch):
@@ -192,7 +195,7 @@ def test_an_http_error_is_never_retried(monkeypatch):
         provider = news.BrightDataNewsProvider("tok", "zone", client=client)
         with pytest.raises(news.NewsFetchError):
             provider.fetch("AAPL")
-    assert len(calls) == 1
+    assert len(calls) == 3                       # Google once, then the feed's two routes once each
 
 
 def test_heartbeat_fetch_news_uses_settings(monkeypatch):
@@ -203,18 +206,20 @@ def test_heartbeat_fetch_news_uses_settings(monkeypatch):
             seen["token"], seen["zone"] = token, zone
             seen["unlocker_zone"] = unlocker_zone
 
-        def fetch_items(self, ticker):
+        def fetch_answer(self, ticker):
             seen["ticker"] = ticker
-            return [news.Headline(title="headline")]
+            return news.NewsAnswer([news.Headline(title="headline")])
 
     monkeypatch.setattr(hb, "BrightDataNewsProvider", FakeProvider)
     monkeypatch.setattr(
         hb, "get_settings",
         lambda: Settings(brightdata_api_token="t", brightdata_serp_zone="z", _env_file=None),
     )
-    # The cycle now takes structured records so the journal can carry links;
-    # the line the model sees is unchanged.
-    assert [h.as_line() for h in hb.fetch_news("MSFT")] == ["headline"]
+    # The cycle takes structured records so the journal can carry links, and
+    # since 5 Nov 2026 the answer that says where they came from; the line
+    # the model sees is unchanged.
+    answer = hb.fetch_news("MSFT")
+    assert [h.as_line() for h in answer.headlines] == ["headline"] and answer.fallback == ""
     assert seen == {
         "token": "t", "zone": "z", "ticker": "MSFT", "unlocker_zone": "cli_unlocker",
     }
@@ -630,7 +635,7 @@ def test_a_second_empty_two_hundred_carries_bright_datas_own_headers(monkeypatch
             with pytest.raises(news.NewsFetchError) as caught:
                 provider.fetch("KSA")
     message = str(caught.value)
-    assert len(calls) == 2
+    assert len(calls) == 4                       # Google twice, then the feed's two routes
     assert message.startswith("Bright Data returned an empty body with its 200; nothing to parse")
     assert "(Bright Data said: x-brd-status-code 502; x-brd-err-msg upstream timed out)" in message
     assert "content-type" not in message                  # only Bright Data's own headers
@@ -648,7 +653,9 @@ def test_a_second_empty_two_hundred_without_headers_reads_as_before(monkeypatch)
         provider = news.BrightDataNewsProvider("tok", "zone", client=client)
         with pytest.raises(news.NewsFetchError) as caught:
             provider.fetch("KSA")
-    assert str(caught.value) == "Bright Data returned an empty body with its 200; nothing to parse"
+    assert str(caught.value) == ("Bright Data returned an empty body with its 200; nothing to parse "
+                                 "(Bing's feed also failed: direct: Bing returned an empty body; "
+                                 "Bright Data: Bing returned an empty body)")
 
 
 def test_brd_headers_reads_only_the_vendors_headers():
@@ -695,3 +702,197 @@ def test_the_historical_replay_exits_from_the_us_as_the_live_path_does():
         news.BrightDataNewsProvider("tok", "zone", client=client).fetch_on("XLB", date(2026, 10, 1))
     assert bodies[0]["country"] == "us"
     assert bodies[0]["url"] == news.build_news_search_url("XLB", on=date(2026, 10, 1))
+
+
+# --------------------------------------------------------------------------- #
+# Bing's feed: the guarded fallback (the owner's decision of 4 Nov 2026)
+# --------------------------------------------------------------------------- #
+
+from datetime import date, datetime, timezone  # noqa: E402
+
+from orchestrator import universe_news  # noqa: E402
+
+NOW = datetime(2026, 11, 4, 20, 0, tzinfo=timezone.utc)
+RSS = """<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:News="https://www.bing.com/news/search?q=TEVA+stock&amp;format=rss">
+<channel><title>TEVA stock - Bing News</title>
+<item><title>Teva raises its outlook after a strong quarter</title>
+<link>https://www.bing.com/news/apiclick.aspx?ref=FexRss&amp;aid=&amp;url=https%3a%2f%2fexample.test%2fteva</link>
+<description>The drugmaker lifted its full-year guidance.</description>
+<pubDate>Wed, 04 Nov 2026 17:30:00 GMT</pubDate>
+<News:Source>Reuters</News:Source></item>
+<item><title>Teva raises its outlook after a strong quarter</title><link>https://example.test/dup</link>
+<description>syndicated</description><pubDate>Wed, 04 Nov 2026 16:00:00 GMT</pubDate><News:Source>Other</News:Source></item>
+<item><title>Generic drug prices fall again</title><link>https://example.test/generics</link>
+<description>A   second   story.</description><pubDate>Tue, 03 Nov 2026 20:00:00 GMT</pubDate><News:Source>Bloomberg</News:Source></item>
+</channel></rss>"""
+REFUSED = {"x-brd-status-code": "502", "x-brd-error": "redirect location was rejected"}
+
+
+def feed_transport(record, direct=None):
+    """Google's answer an empty 200 with Bright Data's headers; the feed answers, directly (unless ``direct`` says otherwise) and through Bright Data."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content) if request.content else None
+        record.append((request.method, request.url.host, request.headers.get("Authorization"), body))
+        if request.url.host == "api.brightdata.com":
+            if "google.com" in body["url"]:
+                return httpx.Response(200, text="", headers=REFUSED)
+            return httpx.Response(200, text=RSS, headers={"x-brd-status-code": "200"})
+        if callable(direct):
+            return direct(request)
+        return httpx.Response(200, text=RSS)
+    return handler
+
+
+def provider_with(handler, cls=news.BrightDataNewsProvider):
+    return cls("tok", "zone", client=httpx.Client(transport=httpx.MockTransport(handler)))
+
+
+def test_the_bing_url_carries_the_same_qualifier_as_the_google_search_and_the_24h_filter():
+    assert news.build_bing_news_url("TEVA") == (
+        "https://www.bing.com/news/search?q=TEVA+stock&format=rss&setlang=en-US&cc=US&qft=interval%3D%227%22")
+    assert "q=GLD+ETF" in news.build_bing_news_url("GLD") and "ETF" in news.build_news_search_url("GLD")
+    assert "qft" not in news.build_bing_news_url("TEVA", last_24h=False)
+
+
+def test_the_feed_is_read_into_the_headline_shape_newest_first_without_duplicates():
+    stories = news.parse_bing_rss(RSS, now=NOW)
+    assert [s.headline.title for s in stories] == ["Teva raises its outlook after a strong quarter",
+                                                   "Generic drug prices fall again"]
+    first = stories[0].headline
+    assert first.source == "Reuters" and first.when == "2h ago" and first.url.startswith("https://www.bing.com/news/apiclick")
+    assert first.as_line() == ("Teva raises its outlook after a strong quarter — The drugmaker lifted its full-year "
+                               "guidance. (Reuters, 2h ago)")
+    assert stories[1].headline.snippet == "A second story." and stories[1].age_hours == 24.0
+    assert len(news.parse_bing_rss(RSS, limit=1, now=NOW)) == 1
+
+
+@pytest.mark.parametrize("text", ["", "   ", "<html><body>blocked</body></html>", "{\"not\": \"xml\"}", "<rss><channel><item><title"])
+def test_what_is_not_a_feed_is_refused(text):
+    with pytest.raises(news.NewsFetchError):
+        news.parse_bing_rss(text, now=NOW)
+
+
+def test_the_guard_keeps_the_ticker_or_the_companys_name_and_drops_the_rest():
+    def kept(ticker, *titles):
+        return [h.title for h in news.relevant_headlines(ticker, [news.Headline(t) for t in titles])]
+
+    assert kept("TEVA", "Teva CEO explains why the drugmaker is growing", "Generic drug prices fall again",
+                "$TEVA jumps after earnings") == ["Teva CEO explains why the drugmaker is growing", "$TEVA jumps after earnings"]
+    # A fund is known by its ticker alone: its display name describes it.
+    assert kept("DBA", "Malvern Country Music Gathering returns Nov. 6-7", "Bellevue residents approve $3 million pool bond",
+                "DBA: A Well-Rounded Commodity ETF", "Agricultural ETFs rally") == ["DBA: A Well-Rounded Commodity ETF"]
+    assert kept("DBC", "Vanguard S&P 500 ETF", "Top ETF Losers", "Notable ETF Outflow Detected - DBC") == ["Notable ETF Outflow Detected - DBC"]
+    # The ticker as written: not a word that happens to spell it, and not the start of PG&E.
+    assert kept("TIP", "A tip for investors", "Tips ETF (TIP) sees inflows") == ["Tips ETF (TIP) sees inflows"]
+    assert kept("PG", "PG&E files its wildfire plan", "Procter & Gamble beats on sales", "Gamble's new campaign") == [
+        "Procter & Gamble beats on sales", "Gamble's new campaign"]
+    # Generic words of a name count only inside the whole name.
+    assert kept("RY", "Royal Bank of Canada stock stays in focus", "Royal Caribbean sails higher", "Canada's banks report") == [
+        "Royal Bank of Canada stock stays in focus"]
+    assert kept("LLY", "Lilly's new drug clears a hurdle", "Eli who?") == ["Lilly's new drug clears a hurdle"]
+    assert kept("GOOGL", "Google wins a cloud deal", "Alphabet shares climb") == ["Google wins a cloud deal", "Alphabet shares climb"]
+    # The snippet counts too.
+    assert kept("XOM") == []
+    assert [h.title for h in news.relevant_headlines("XOM", [news.Headline("Oil majors report", snippet="Exxon beat")])] == ["Oil majors report"]
+    assert news.name_words("RY") == ("RY", "Royal Bank of Canada") and news.name_words("DBA") == ("DBA",)
+
+
+def test_a_second_refused_answer_from_google_takes_the_feed_directly_kept_to_the_name(monkeypatch, caplog):
+    monkeypatch.setattr(news.time, "sleep", lambda s: None)
+    news._SENT.count = 0
+    record = []
+    provider = provider_with(feed_transport(record))
+    with caplog.at_level("WARNING", logger=news.log.name):
+        answer = provider.fetch_answer("TEVA")
+    assert [h.title for h in answer.headlines] == ["Teva raises its outlook after a strong quarter"]   # the generic one is dropped
+    assert answer.fallback.startswith("news from Bing's feed (direct) after Google: Bright Data returned an empty body")
+    assert "redirect location was rejected" in answer.fallback and answer.fallback.endswith("1 of 2 headline(s) name TEVA")
+    assert [(m, h) for m, h, _a, _b in record] == [("POST", "api.brightdata.com")] * 2 + [("GET", "www.bing.com")]
+    assert record[2][2] is None and "tok" not in answer.fallback           # no token to Bing, none in the note
+    assert news.requests_sent() == 2                                       # the direct ask is not a Bright Data request
+    assert provider.fetch_items("TEVA")[0].title.startswith("Teva raises")   # the list-only path, the same way
+    assert any("TEVA: news from Bing's feed (direct)" in r.getMessage() for r in caplog.records)
+
+
+def test_the_direct_feed_failing_falls_to_bright_data_with_the_same_zone(monkeypatch):
+    monkeypatch.setattr(news.time, "sleep", lambda s: None)
+    record = []
+    provider = provider_with(feed_transport(record, direct=lambda request: httpx.Response(429, text="later")))
+    answer = provider.fetch_answer("TEVA")
+    assert answer.fallback.startswith("news from Bing's feed (Bright Data) after Google")
+    posts = [b for m, h, _a, b in record if m == "POST" and "bing.com" in b["url"]]
+    assert posts == [{"zone": "zone", "url": news.build_bing_news_url("TEVA"), "format": "raw", "country": news.BRD_COUNTRY}]
+    assert record[2][0] == "GET" and record[3][0] == "POST"
+
+
+def test_a_direct_transport_error_also_falls_to_bright_data(monkeypatch):
+    monkeypatch.setattr(news.time, "sleep", lambda s: None)
+    record = []
+
+    def boom(request):
+        raise httpx.ConnectError("no route", request=request)
+
+    answer = provider_with(feed_transport(record, direct=boom)).fetch_answer("TEVA")
+    assert "(Bright Data)" in answer.fallback and len(answer.headlines) == 1
+
+
+def test_both_feed_routes_failing_is_the_old_error_carrying_every_reason(monkeypatch):
+    monkeypatch.setattr(news.time, "sleep", lambda s: None)
+
+    def handler(request):
+        if request.url.host == "api.brightdata.com":
+            return httpx.Response(200, text="", headers=REFUSED)          # Google and the feed through Bright Data alike
+        return httpx.Response(503, text="down")
+    with pytest.raises(news.NewsFetchError) as caught:
+        provider_with(handler).fetch_answer("TEVA")
+    message = str(caught.value)
+    assert message.startswith("Bright Data returned an empty body with its 200")
+    assert "Bing's feed also failed: direct: HTTP 503; Bright Data: Bing returned an empty body (Bright Data said: x-brd-status-code 502" in message
+
+
+def test_a_feed_with_no_headline_naming_the_name_is_unavailable_as_before(monkeypatch):
+    """The owner's rule: if nothing is left, the name gets "no news", as today -- a gap, not a quiet day."""
+    monkeypatch.setattr(news.time, "sleep", lambda s: None)
+    record = []
+    with pytest.raises(news.NewsFetchError) as caught:
+        provider_with(feed_transport(record)).fetch_answer("DBA")      # the Teva feed names no DBA
+    assert str(caught.value).endswith("(Bing's feed, direct: 2 headline(s), none naming DBA)")
+    assert "redirect location was rejected" in str(caught.value)
+    assert [m for m, *_ in record] == ["POST", "POST", "GET"]            # Bright Data's route is not asked for more of the same
+
+
+def test_an_http_error_from_google_also_takes_the_fallback(monkeypatch):
+    monkeypatch.setattr(news.time, "sleep", lambda s: pytest.fail("slept on an HTTP error"))
+    record = []
+
+    def handler(request):
+        body = json.loads(request.content) if request.content else None
+        record.append(request.method)
+        if request.url.host == "api.brightdata.com" and "google.com" in body["url"]:
+            return httpx.Response(500, text="upstream")
+        return httpx.Response(200, text=RSS)
+    answer = provider_with(handler).fetch_answer("TEVA")
+    assert "after Google: Bright Data HTTP 500" in answer.fallback and record == ["POST", "GET"]
+
+
+def test_the_historical_path_and_the_universe_query_have_no_fallback(monkeypatch):
+    monkeypatch.setattr(news.time, "sleep", lambda s: None)
+    record = []
+    with pytest.raises(news.NewsFetchError):
+        provider_with(feed_transport(record)).fetch_on("TEVA", date(2026, 9, 1))
+    with pytest.raises(news.NewsFetchError):
+        provider_with(feed_transport(record), cls=universe_news.UniverseNewsProvider).fetch_items("BKR")
+    assert all(host == "api.brightdata.com" for _m, host, _a, _b in record)
+
+
+def test_build_context_keeps_the_fallback_note_for_the_journal_and_takes_plain_lines_too(monkeypatch):
+    seen = []
+    monkeypatch.setattr(hb.context, "gather", lambda ticker, headlines, **kw: seen.append((ticker, list(headlines), kw)) or "ctx")
+    note = "news from Bing's feed (direct) after Google: empty body; 1 of 2 headline(s) name TEVA"
+    monkeypatch.setattr(hb, "fetch_news", lambda t: news.NewsAnswer([news.Headline("Teva raises")], note))
+    assert hb.build_context("TEVA") == "ctx"
+    monkeypatch.setattr(hb, "fetch_news", lambda t: ["plain line"])
+    hb.build_context("MSFT")
+    assert seen[0][0] == "TEVA" and seen[0][1][0].title == "Teva raises" and seen[0][2] == {"news_note": note}
+    assert seen[1] == ("MSFT", ["plain line"], {"news_note": ""})

@@ -88,6 +88,12 @@ CFTC_GAP_PREFIX = "CFTC positioning"
 #: other side of the contract and the test suite pins both.
 NEWS_GAP_PREFIX = "news unavailable"
 
+#: The note ``orchestrator.context`` keeps when a name's headlines came from
+#: Bing's feed because Google's answer was unusable (the owner's decision of
+#: 4 Nov 2026). Read here so Google's refusals stay visible now that the
+#: fallback covers most of their cost.
+NEWS_NOTE_KEY = "news_note"
+
 #: Position-management actions that leave a position without a working stop.
 #: ``unmanaged`` is history (the manager stopped writing it on 17 Sep 2026);
 #: ``error`` is a position the manager could not read or could not protect;
@@ -360,6 +366,36 @@ def cftc_gaps(today: list[dict]) -> Optional[Alarm]:
     tickers = sorted(quiet)
     return Alarm(WARNING, f"CFTC positioning is silent for {len(tickers)} mapped contract(s)",
                  f"{', '.join(tickers)}. {quiet[tickers[0]][:200]}")
+
+
+def news_fallbacks(today: list[dict]) -> Optional[Alarm]:
+    """Names whose headlines came from Bing's feed: Google's refusals, now that they no longer cost a name its news.
+
+    A warning, never critical, at the same tenth of the watchlist that makes
+    ``news_gaps`` critical: these names were judged with news, so the cycle
+    is whole; what the share says is that Google, through Bright Data, was
+    failing at a rate the fallback was covering. Below that share nothing is
+    said here; every such line carries its note in the journal.
+    """
+    noted: dict[str, str] = {}
+    for line in today:
+        context = line.get("context") or {}
+        note = context.get(NEWS_NOTE_KEY)
+        if note:
+            noted[str(line.get("ticker"))] = str(note)
+    if not noted:
+        return None
+    tickers = sorted(noted)
+    seen = {str(line.get("ticker")) for line in today}
+    if len(tickers) / max(len(seen), 1) < FAILED_SHARE_CRITICAL:
+        return None
+    return Alarm(
+        WARNING,
+        f"{len(tickers)} of {len(seen)} ticker(s) took their news from Bing's feed",
+        f"{', '.join(tickers[:12])}{' …' if len(tickers) > 12 else ''}. "
+        f"Google's answer was unusable for each; they were judged on the feed's headlines that name them. "
+        f"First note: {noted[tickers[0]][:200]}",
+    )
 
 
 def news_gaps(today: list[dict]) -> Optional[Alarm]:
@@ -782,6 +818,7 @@ def check(journal: Path, audit: Path, day: date, funds: Optional[Path] = None,
         screen_errors(today),
         cftc_gaps(today),
         news_gaps(today),
+        news_fallbacks(today),
         duplicate_cycle(today),
         # The model's answers against its own last four weeks: said on the
         # first cycle day of the week after the one that drifted, only.

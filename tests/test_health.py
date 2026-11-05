@@ -19,10 +19,10 @@ from analysis import health
 DAY = date(2026, 9, 17)
 
 
-def journal_line(ticker, when="2026-09-17T15:48:00+00:00", error=None, gaps=(), screen=None):
+def journal_line(ticker, when="2026-09-17T15:48:00+00:00", error=None, gaps=(), screen=None, note=""):
     return json.dumps({
         "ticker": ticker, "ts_utc": when,
-        "context": {"ticker": ticker, "gaps": list(gaps)},
+        "context": {"ticker": ticker, "gaps": list(gaps), "news_note": note},
         "signal": None if error else {"ticker": ticker, "bias": "NEUTRAL", "conviction": 0.2},
         "outcome": None if error else {"status": "REJECTED", "reason": "bias is NEUTRAL; no trade"},
         "error": error, "screen": screen,
@@ -431,6 +431,48 @@ def test_a_day_whose_news_all_arrived_raises_nothing():
 def test_an_unrelated_gap_is_not_mistaken_for_a_news_outage():
     today = [json.loads(journal_line("USO", gaps=["CFTC positioning unavailable: no rows"]))]
     assert health.news_gaps(today) is None
+
+
+BING_NOTE = "news from Bing's feed (direct) after Google: Bright Data returned an empty body; 3 of 10 headline(s) name T0"
+
+
+def test_the_note_key_is_the_one_the_context_writer_uses():
+    from orchestrator import context
+
+    assert health.NEWS_NOTE_KEY in context.TickerContext("X").as_dict()
+
+
+def test_a_tenth_of_the_watchlist_on_bings_feed_is_a_warning_naming_them():
+    """The names were judged with news, so never critical; the share says Google is failing behind the fallback."""
+    today = [json.loads(journal_line(f"T{i}", note=BING_NOTE)) for i in range(2)]
+    today += [json.loads(journal_line(f"U{i}")) for i in range(18)]
+    alarm = health.news_fallbacks(today)
+    assert alarm is not None and alarm.severity == health.WARNING
+    assert alarm.title == "2 of 20 ticker(s) took their news from Bing's feed"
+    assert "T0, T1" in alarm.detail and "Google's answer was unusable" in alarm.detail and "3 of 10 headline(s)" in alarm.detail
+
+
+def test_fewer_names_on_bings_feed_say_nothing_the_journal_has_their_notes():
+    today = [json.loads(journal_line("T0", note=BING_NOTE))]
+    today += [json.loads(journal_line(f"U{i}")) for i in range(19)]
+    assert health.news_fallbacks(today) is None
+    assert health.news_fallbacks([json.loads(journal_line(f"U{i}")) for i in range(5)]) is None
+
+
+def test_a_name_on_the_feed_is_not_a_news_gap_and_a_gap_is_not_a_fallback():
+    today = [json.loads(journal_line("T0", note=BING_NOTE)), json.loads(journal_line("T1", gaps=[NEWS_GAP]))]
+    assert "T1" in health.news_gaps(today).detail and "T0" not in health.news_gaps(today).detail
+    assert "T0" in health.news_fallbacks(today).detail and "T1" not in health.news_fallbacks(today).detail
+
+
+def test_the_fallback_warning_reaches_the_report(tmp_path):
+    journal = tmp_path / "journal.log"
+    audit = tmp_path / "audit.log"
+    journal.write_text("\n".join([journal_line(f"T{i}", note=BING_NOTE) for i in range(2)]
+                                 + [journal_line(f"U{i}") for i in range(18)]), encoding="utf-8")
+    audit.write_text("", encoding="utf-8")
+    alarms = health.check(journal, audit, date(2026, 9, 17))
+    assert any("Bing's feed" in a.title and not a.is_critical for a in alarms)
 
 
 def test_the_alarm_reaches_the_report(tmp_path):

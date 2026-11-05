@@ -99,6 +99,9 @@ def test_each_arm_sends_what_it_says_and_the_token_goes_only_to_bright_data():
                           "country": news.BRD_COUNTRY}
     assert asks[0].titles == ("Teva raises outlook after strong quarter", "Analysts weigh in on Teva")
     assert asks[2].newest_hours == 2.5 and asks[2].oldest_hours == 24.0
+    # What the live fallback's guard keeps (production's own): both of Google's, one of the feed's two.
+    assert [a.relevant for a in asks] == [2, 1, 1, 1] and " kept   1 " in probe.line_for(asks[1])
+    assert probe.parse_bing_rss is news.parse_bing_rss and probe.bing_news_url("GLD", True) == news.build_bing_news_url("GLD")
 
 
 def test_a_refusal_an_error_and_a_block_page_are_judged_like_production():
@@ -136,6 +139,11 @@ def test_the_summary_counts_names_with_news_shared_headlines_and_rescues():
     assert "bing rss, Bright Data, 24h: 2 asks, news for 1 (50%), no items 0, refused 0, HTTP/transport errors 1" in text
     assert "bing rss, direct against google: 1 names with news on both; 1 of Google's 2 headlines also on Bing (50%)" in text
     assert "names Google did not answer that Bing (direct, 24h) did: 1 (NVO)" in text
+    assert "naming the name" not in text                                   # nothing was counted on these asks
+    asks[6].relevant = 1
+    text = probe.summary(asks, arms)
+    assert "bing rss, direct, 24h: 2 asks, news for 2 (100%), no items 0, refused 0, HTTP/transport errors 0, median 1 headlines, median 1 naming the name" in text
+    assert "of them with a headline naming the name, which the live fallback keeps: 1 (NVO)" in text
 
 
 def test_shared_titles_allows_the_outlets_different_wording_but_not_a_different_story():
