@@ -1,7 +1,7 @@
-🟡 1 warning: 4 of 80 ticker(s) were judged without news
-Equity $101,203 · 23 positions · $92,094 gross · $3,977 at risk · unrealised +$2,194
-Traded: MSFT, NVO, ESLT, MELI, XOM
+🟢 Clean day
+Equity $100,243 · 15 positions · $58,492 gross · $3,060 at risk · unrealised +$582
+Traded: EWY
 Started by supabase-cron at 14:40 UTC (0 min after 14:40)
-Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-11-04
-Closed: ASML, GLD, HYG
-Cycle 80 tickers, $0.15 · 2026-11-05
+Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-11-05
+Closed: LLY, JPM, RY, CAT, XLB, XLV
+Cycle 80 tickers, $0.18 · 2026-11-06
