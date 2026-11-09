@@ -1,7 +1,8 @@
-🟢 Clean day
-Equity $100,243 · 15 positions · $58,492 gross · $3,060 at risk · unrealised +$582
-Traded: EWY
+🔴 11 of 80 ticker(s) were judged without news
+Equity $100,612 · 16 positions · $67,122 gross · $3,865 at risk · unrealised +$1,608
+Traded: ITA, EWC
 Started by supabase-cron at 14:40 UTC (0 min after 14:40)
-Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-11-05
-Closed: LLY, JPM, RY, CAT, XLB, XLV
-Cycle 80 tickers, $0.18 · 2026-11-06
+Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-11-06
+Closed: XOM, LLY, JPM, RY, CAT, XLB
+Also: 11 of 80 ticker(s) took their news from Bing's feed
+Cycle 80 tickers, $0.16 · 2026-11-09
