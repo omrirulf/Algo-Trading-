@@ -112,11 +112,19 @@ def managed(moment: str, ticker: str, action: str, **fields) -> str:
                        "level": "INFO", "event": "position_managed"})
 
 
-def line(moment: str, ticker: str, bias: str = "BULLISH", conviction: float = 0.8, held: bool = False):
+def line(moment: str, ticker: str, bias: str = "BULLISH", conviction: float = 0.8, held: bool = False,
+         live: dict | None = None):
     stamp = utc(moment)
     if held:
-        return JournalEntry(ticker=ticker, timestamp=stamp, timestamp_is_exact=True, held=True)
-    return JournalEntry(ticker=ticker, timestamp=stamp, timestamp_is_exact=True, bias=bias, conviction=conviction)
+        return JournalEntry(ticker=ticker, timestamp=stamp, timestamp_is_exact=True, held=True, live_record=live)
+    return JournalEntry(ticker=ticker, timestamp=stamp, timestamp_is_exact=True, bias=bias, conviction=conviction,
+                        live_record=live)
+
+
+def quote(price: float, asked_at: str) -> dict:
+    """A line's ``live`` record: the quote taken when its signal was made (``asked_at`` in UTC)."""
+    return {"price": price, "bid": price, "ask": price, "quote_at": asked_at + "+00:00",
+            "asked_at": asked_at + "+00:00", "source": "test"}
 
 
 # --------------------------------------------------------------------------- #
@@ -398,10 +406,12 @@ def scenario() -> dict:
     Seeded from the C0 snapshot: NVDA held, MSFT bought after the snapshot
     (its fill and its stop come from the C1 snapshot). On C0 the model also
     liked GOOGL -- the real account's business, already in the seed. On C1
-    the real account bought JPM (the sim should buy it at C2's open), bought
-    XOM on a line whose conviction the engine refuses, and tried to short LQD,
-    which the real broker refused. On C3 it bought GLD, which the sim can only
-    answer at C4's open, after the run.
+    the real account bought JPM (the sim should buy it the same day, at the
+    entry price the engine recorded), bought XOM on a line whose conviction
+    the engine refuses, and tried to short LQD, which the real broker
+    refused (the sim shorts it at the line's recorded quote). On C3, the
+    last session with a real close, it bought GLD, which the sim answers the
+    same day.
     """
     snaps = [
         snapshot_line("2026-10-01T15:40:00Z", 90_000.0, positions=[("NVDA", 50, 100.0)],
@@ -417,7 +427,7 @@ def scenario() -> dict:
                              ("f3", "o-xom", "XOM", "buy", 10, 100.0, "2026-10-02T16:21:00Z")],
                       history=history({C0: 95_000.0, C1: 95_000.0})),
         snapshot_line("2026-10-07T15:40:00Z", 79_800.0,
-                      fills=[("f4", "o-gld", "GLD", "buy", 5, 100.0, "2026-10-06T16:20:00Z")],
+                      fills=[("f4", "o-gld", "GLD", "buy", 38, 100.0, "2026-10-06T16:20:00Z")],
                       history=history({C0: 95_000.0, C1: 95_000.0, C2: 95_000.0, C3: 95_000.0, C4: 95_100.0})),
     ]
     audit = SEED_AUDIT + [
@@ -429,13 +439,14 @@ def scenario() -> dict:
                 '"message":"asset \\"LQD\\" cannot be sold short"}'),
         # What the live manager did after the seed: never the sim's business.
         managed("2026-10-05T15:07:00", "NVDA", "tranche_taken", rung=0, qty_closed=16, remaining_qty=34),
+        accepted("2026-10-06T16:10:00", "GLD", "buy", 38, 100.0, 96.3),
     ]
     entries = [
         line("2026-10-01T16:10:00", "MSFT"),
         line("2026-10-01T16:11:00", "GOOGL"),
         line("2026-10-02T16:10:00", "JPM"),
         line("2026-10-02T16:11:00", "XOM", conviction=0.10),
-        line("2026-10-02T16:12:00", "LQD", bias="BEARISH"),
+        line("2026-10-02T16:12:00", "LQD", bias="BEARISH", live=quote(100.0, "2026-10-02T16:12:00")),
         line("2026-10-06T16:10:00", "GLD"),
     ]
     bars = bars_for("NVDA", "MSFT", "GOOGL", "JPM", "XOM", "LQD", "GLD", "VT")
@@ -447,7 +458,7 @@ def run(s: dict, **kw) -> CalibrationResult:
                                  frozenset(), **kw)
 
 
-def test_the_run_leaves_c0s_cycle_to_the_seed_and_acts_on_c1s_at_c2():
+def test_the_run_leaves_c0s_cycle_to_the_seed_and_acts_on_each_cycle_the_same_day():
     result = run(scenario())
 
     assert [p.day for p in result.series] == [C1, C2, C3]  # through the last real close
@@ -455,20 +466,22 @@ def test_the_run_leaves_c0s_cycle_to_the_seed_and_acts_on_c1s_at_c2():
     assert not [d for d in result.decisions if d.cycle_day == C0]
     assert not [f for f in result.fund.broker.fills if f.ticker == "GOOGL"]
     jpm = [d for d in result.decisions if d.ticker == "JPM"]
-    assert [(d.session, d.cycle_day, d.status) for d in jpm] == [(C2, C1, "ACCEPTED")]
-    assert [(f.day, f.kind, f.qty) for f in result.fund.broker.fills if f.ticker == "JPM"] == [(C2, "entry", 47)]
+    assert [(d.session, d.cycle_day, d.status) for d in jpm] == [(C1, C1, "ACCEPTED")]
+    # Entered on C1 at the price the real engine recorded, sized off the same book.
+    assert [(f.day, f.kind, f.qty, f.price) for f in result.fund.broker.fills if f.ticker == "JPM"] == [
+        (C1, "entry", 47, 100.0)]
     # The seed itself was right: marked at C0's close it is the real close.
     assert result.day0.sim == pytest.approx(95_000.0) and result.day0.real == 95_000.0
     assert [p.diff_pct for p in result.series] == [pytest.approx(0.0)] * 3
 
 
-def test_a_real_trade_the_sim_makes_a_session_later_is_timing_not_a_difference():
+def test_a_real_trade_the_sim_makes_the_same_day_is_a_match_not_timing():
     result = run(scenario())
 
     jpm = [m for m in result.matches if m.real.ticker == "JPM"]
-    assert len(jpm) == 1 and jpm[0].timing and (jpm[0].real.day, jpm[0].sim.day) == (C1, C2)
+    assert len(jpm) == 1 and not jpm[0].timing and (jpm[0].real.day, jpm[0].sim.day) == (C1, C1)
     assert "JPM" not in {d.ticker for d in result.differences}
-    assert result.metrics.timing == 1
+    assert result.metrics.timing == 0
 
 
 def test_a_trade_the_sim_refused_says_why():
@@ -481,23 +494,200 @@ def test_a_trade_the_sim_refused_says_why():
 
 
 def test_a_trade_only_the_sim_made_names_the_real_brokers_refusal():
+    """The real broker refused the short, so no entry price was recorded for
+    it: the sim shorts at the quote the line recorded, and the difference
+    names the refusal."""
     result = run(scenario())
 
     lqd = [d for d in result.differences if d.ticker == "LQD"]
     assert len(lqd) == 1
     assert lqd[0].reason == 'real broker refused: asset "LQD" cannot be sold short'
     assert lqd[0].real == "none" and lqd[0].sim.startswith("sold short")
+    assert [(f.day, f.price) for f in result.fund.broker.fills if f.ticker == "LQD"] == [(C1, 100.0)]
 
 
-def test_the_final_sessions_real_trades_wait_for_the_next_open():
+def test_the_final_sessions_real_trades_are_compared_the_same_day():
+    """The copy answers C3's line on C3, so the real GLD buy on the final
+    session is matched, and nothing is left pending for a next open."""
     result = run(scenario())
 
-    assert [(t.ticker, t.day) for t in result.pending] == [("GLD", C3)]
+    assert result.pending == []
+    assert [(m.real.day, m.sim.day) for m in result.matches if m.real.ticker == "GLD"] == [(C3, C3)]
     assert "GLD" not in {d.ticker for d in result.differences}
     metrics = result.metrics
-    assert (metrics.real_trades, metrics.matched, metrics.matched_share) == (2, 1, 0.5)
+    assert (metrics.real_trades, metrics.matched, metrics.matched_share) == (3, 2, pytest.approx(2 / 3))
     assert metrics.unexplained == 0
     assert all(d.reason.startswith(calib.REASONS) for d in result.differences)
+
+
+def test_a_line_with_no_recorded_price_is_not_entered_and_says_so():
+    """No entry price in the audit log (the real broker refused the short)
+    and no live quote on the line: the copy cannot price the trade, so it
+    makes none and counts why. A real trade on such a line would read as
+    refused for that reason -- never as "held"."""
+    s = scenario()
+    s["entries"] = [e if e.ticker != "LQD" else line("2026-10-02T16:12:00", "LQD", bias="BEARISH")
+                    for e in s["entries"]]
+
+    result = run(s)
+
+    assert not [f for f in result.fund.broker.fills if f.ticker == "LQD"]
+    assert "LQD" not in {d.ticker for d in result.differences}
+    assert dict(result.fund.not_entered) == {"no recorded price": 1}
+    assert [p for p in result.problems if "no recorded price" in p] == [
+        "1 directional line(s) were not entered for want of a recorded price: 1 no recorded price"]
+    [skipped] = [d for d in result.decisions if d.ticker == "LQD"]
+    assert (skipped.status, skipped.reason, skipped.dispatched) == ("SKIPPED", "no recorded price", False)
+    real = Trade(C1, "LQD", OPEN, "sell", 50, 100.0, frozenset({"market"}))
+    assert calib._why_real_only(real, [skipped]) == "sim rejected: no recorded price"
+
+
+# --------------------------------------------------------------------------- #
+# d3) The real account's record: its prices and its stop fills
+# --------------------------------------------------------------------------- #
+
+
+def held_nvda(fills=(), last: date = C3, **snapshot_fields) -> calib.Snapshots:
+    """NVDA 50 @ 100 under a stop at 96 (R = 4), from a seed after C0's close, with a flat real close."""
+    closes = {d.date(): 95_000.0 for d in pd.bdate_range(C0, last)}
+    return calib.load_snapshots([
+        snapshot_line("2026-10-01T21:00:00Z", 90_000.0, positions=[("NVDA", 50, 100.0)],
+                      stops=[("stop-nvda", "NVDA", 50, 96.0, "sell")], history=history({C0: 95_000.0})),
+        snapshot_line(f"{last.isoformat()}T23:00:00Z", 90_000.0, positions=[("NVDA", 50, 100.0)],
+                      stops=[("stop-nvda", "NVDA", 50, 96.0, "sell")], fills=list(fills), history=history(closes),
+                      **snapshot_fields),
+    ])
+
+
+def bars_with(ticker: str, frame: pd.DataFrame, *others: str) -> Bars:
+    frames = {t: flat_frame() for t in (*others, "NVDA", "JPM", "VT")}
+    frames[ticker] = frame
+    return Bars(frames)
+
+
+def a_cycle_on(day: date, moment: str = "T16:00:00"):
+    """One NEUTRAL line, so a cycle ran that day and the copy manages its book."""
+    return [line(f"{day.isoformat()}{moment}", "JPM", bias="NEUTRAL", conviction=0.0),
+            line(f"{day.isoformat()}{moment}", "NVDA", held=True)]
+
+
+def test_the_manager_sees_the_price_the_real_manager_recorded_not_the_bar():
+    """The real pass priced NVDA at 105 on C1, past the first rung; the daily
+    bar never left 100. The copy takes the rung at 105."""
+    audit = SEED_AUDIT + [managed("2026-10-02T15:00:00", "NVDA", "held", price=105.0, gain_r=1.25,
+                                  remaining_qty=50, new_stop=96.0)]
+    bars = bars_for("NVDA", "JPM", "VT")
+
+    result = calib.run_calibration(held_nvda(), a_cycle_on(C1), bars, SimFeed(bars), C0, 15, audit, frozenset())
+
+    assert [(f.day, f.kind, f.qty, f.price) for f in result.fund.broker.fills if f.ticker == "NVDA"] == [
+        (C1, "close", 16, 105.0)]
+    assert [(d.ticker, d.reason) for d in result.differences] == [("NVDA", calib.LADDER)]
+
+
+def test_a_live_quote_prices_a_name_the_real_manager_did_not_record_that_day():
+    """No management line for NVDA on C1, but its held journal line carries
+    the quote the cycle took: that is the price, not the bar's open."""
+    bars = bars_for("NVDA", "JPM", "VT")
+    entries = [line("2026-10-02T16:00:00", "JPM", bias="NEUTRAL", conviction=0.0),
+               line("2026-10-02T16:00:00", "NVDA", held=True, live=quote(105.0, "2026-10-02T14:41:00"))]
+
+    result = calib.run_calibration(held_nvda(), entries, bars, SimFeed(bars), C0, 15, SEED_AUDIT, frozenset())
+
+    assert [(f.day, f.kind, f.price) for f in result.fund.broker.fills if f.ticker == "NVDA"] == [
+        (C1, "close", 105.0)]
+
+
+def test_a_stop_in_a_name_the_real_account_held_fills_when_and_where_the_real_stop_did():
+    """The real stop filled on C2 at 97.50, between bars that never reached
+    96: the copy's stop fills on C2 at 97.50 too, and the trades match."""
+    fills = [("f1", "stop-nvda", "NVDA", "sell", 50, 97.5, "2026-10-05T15:00:00Z")]
+    bars = bars_for("NVDA", "JPM", "VT")
+
+    result = calib.run_calibration(held_nvda(fills), [], bars, SimFeed(bars), C0, 15, SEED_AUDIT, frozenset())
+
+    assert [(f.day, f.kind, f.qty, f.price, f.gapped) for f in result.fund.broker.fills if f.ticker == "NVDA"] == [
+        (C2, "stop", 50, 97.5, False)]
+    assert "NVDA" not in result.fund.broker.positions
+    assert [(m.real.day, m.sim.day, m.stop_differs) for m in result.matches] == [(C2, C2, False)]
+    assert result.differences == []
+
+
+def test_a_stop_the_real_tape_never_reached_does_not_fill_on_the_daily_bar():
+    """NVDA's bar on C2 opens at 90, through the stop at 96, but the real
+    account's stop did not fill (no fill on record): neither does the copy's."""
+    frame = flat_frame()
+    on_c2 = frame.index == pd.Timestamp(C2)
+    frame.loc[on_c2, ["Open", "High", "Low", "Close"]] = [90.0, 91.0, 89.0, 90.0]
+    bars = bars_with("NVDA", frame)
+
+    result = calib.run_calibration(held_nvda(), [], bars, SimFeed(bars), C0, 15, SEED_AUDIT, frozenset())
+
+    assert not [f for f in result.fund.broker.fills if f.ticker == "NVDA"]
+    assert result.fund.broker.positions["NVDA"].qty == 50
+    assert result.differences == []
+
+
+def test_a_stop_in_a_name_only_the_copy_holds_keeps_the_daily_bar_rule():
+    """The copy shorted LQD on C1 (the real broker refused it); on C2 LQD gaps
+    up through the copy's stop. Only the copy holds it, so the bar decides:
+    the stop fills at the open, and the exit is a difference with its reason."""
+    frame = flat_frame()
+    from_c2 = frame.index >= pd.Timestamp(C2)
+    frame.loc[from_c2, ["Open", "High", "Low", "Close"]] = [110.0, 111.0, 109.0, 110.0]
+    bars = bars_with("LQD", frame)
+    entries = [line("2026-10-02T16:12:00", "LQD", bias="BEARISH", live=quote(100.0, "2026-10-02T16:12:00"))]
+    audit = SEED_AUDIT + [refused("2026-10-02T16:12:00", "LQD", "ERROR",
+                                  'BrokerError: {"code":42210000,"message":"asset \\"LQD\\" cannot be sold short"}')]
+
+    result = calib.run_calibration(held_nvda(), entries, bars, SimFeed(bars), C0, 15, audit, frozenset())
+
+    lqd = [(f.day, f.kind, f.price, f.gapped) for f in result.fund.broker.fills if f.ticker == "LQD"]
+    assert lqd == [(C1, "entry", 100.0, False), (C2, "stop", 110.0, True)]
+    assert sorted((d.day, d.reason) for d in result.differences) == [
+        (C1, 'real broker refused: asset "LQD" cannot be sold short'), (C2, calib.STOP_DAY)]
+
+
+def test_the_record_cuts_a_days_stop_fills_at_the_real_accounts_own_clock():
+    """Before its pass, between the pass and its entries, after: by the real
+    account's own times. A stop filled in parts is one fill at the weighted price."""
+    seed = calib.Seed(C0, utc("2026-10-01T21:00:00"), 0.0,
+                      tuple(calib.SeedPosition(t, 10, 100.0) for t in ("AAA", "BBB", "CCC", "DDD")), ())
+    audit = [managed("2026-10-02T15:00:00", "AAA", "held", price=101.0),
+             managed("2026-10-02T15:00:01", "BBB", "stop_raised", price=102.0),
+             managed("2026-10-02T15:00:02", "BBB", "stop_raised", price=99.0),     # a second run: not re-priced
+             accepted("2026-10-02T16:00:00", "JPM", "buy", 10, 100.0, 96.0)]
+    fills = [calib.AccountFill("f1", "s-aaa", "AAA", "sell", 10, 95.0, utc("2026-10-02T14:00:00")),
+             calib.AccountFill("f2", "s-bbb", "BBB", "sell", 4, 95.0, utc("2026-10-02T15:30:00")),
+             calib.AccountFill("f3", "s-bbb", "BBB", "sell", 6, 96.0, utc("2026-10-02T15:31:00")),
+             calib.AccountFill("f4", "s-ccc", "CCC", "sell", 10, 95.0, utc("2026-10-02T17:00:00")),
+             calib.AccountFill("f5", "rung-d", "DDD", "sell", 3, 104.0, utc("2026-10-02T17:00:00"))]
+    entries = [line("2026-10-02T16:00:00", "JPM", live=quote(100.5, "2026-10-02T16:00:00")),
+               line("2026-10-02T16:00:00", "AAA", held=True, live=quote(100.9, "2026-10-02T14:41:00"))]
+
+    record = calib.RealRecord(entries, audit, seed, fills, calib.close_of(C0), frozenset({"s-aaa", "s-bbb", "s-ccc"}),
+                              frozenset({"rung-d"}))
+
+    before, between, after = record.stop_fills(C1)
+    assert before == (("AAA", "sell", 95.0),)
+    assert between == (("BBB", "sell", pytest.approx(95.6)),)
+    assert after == (("CCC", "sell", 95.0),)               # the rung in DDD is no stop
+    assert record.prices(C1) == {"AAA": 101.0, "BBB": 102.0, "JPM": 100.5}   # the manager's price wins the quote
+    assert record.tape(C1) == frozenset({"AAA", "BBB", "CCC", "DDD"})
+    assert record.tape(C2) == frozenset({"DDD"})
+    # The engine's own price for the line it accepted; the live quote otherwise.
+    assert record.entry_price(entries[0], "buy", C1) == (100.0, None)
+    assert record.entry_price(entries[0], "sell", C1) == (100.5, None)
+    assert record.entry_price(line("2026-10-02T16:00:00", "XOM"), "buy", C1) == (None, "no recorded price")
+    day = record.day(C1)
+    assert (day.stops_before, day.stops_between, day.stops_after) == (before, between, after)
+
+
+def test_session_recorded_is_for_the_calibration_copy_alone():
+    bars = bars_for("NVDA", "VT")
+    fund = Fund("plain", lambda line: None, SimFeed(bars), bars)
+    with pytest.raises(ValueError, match="entry=RECORDED"):
+        fund.session_recorded(C1, None, calib.RecordedDay())
 
 
 def test_the_run_writes_nothing_to_the_live_audit_log(_audit_log_to_tmp, monkeypatch):
@@ -559,14 +749,14 @@ def test_calibration_report_fetches_what_it_needs_and_returns_the_json_part():
             return flat_frame()
 
     out = calib.calibration_report(snapshots=s["snapshots"], entries=s["entries"], audit_lines=s["audit"],
-                                   start=C0, final_through=C3, fetcher=Fetcher(), holding=None)
+                                   start=C0, final_through=C3, fetcher=Fetcher(), holding=None, fixes=())
 
     assert {"NVDA", "MSFT", "JPM", "XOM", "LQD", "VT"} <= set(asked)
     assert out["status"] == "running" and out["start"] == "2026-10-01"
     assert out["days_done"] == 3 and out["days_needed"] == 15
     assert [p["day"] for p in out["series"]] == ["2026-10-02", "2026-10-05", "2026-10-06"]
     assert {d["ticker"] for d in out["differences"]} == {"XOM", "LQD"}
-    assert out["metrics"]["matched_share"] == 0.5 and out["metrics"]["unexplained"] == 0
+    assert out["metrics"]["matched_share"] == pytest.approx(2 / 3, abs=1e-6) and out["metrics"]["unexplained"] == 0
     assert out["pass_rule"]["approved"] is True and out["pass_rule"]["verdicts"]   # in force since 2026-09-28
     json.dumps(out)                                     # plain JSON, nothing else
 
@@ -1145,6 +1335,7 @@ def test_calibration_report_reads_the_fixes_from_the_schedule(monkeypatch):
         return calib.calibration_report(snapshots=account["snapshots"], entries=[], audit_lines=[], start=C0,
                                         final_through=date(2026, 10, 30), fetcher=Fetcher())
 
+    monkeypatch.setattr(schedule, "CALIBRATION_FIXES", ())
     plain = report()
     assert (plain["days_done"], plain["days_needed"], plain["last_fix"]) == (15, 15, None)
     monkeypatch.setattr(schedule, "CALIBRATION_FIXES", fix_on(12, "logged in the Amendments table"))
@@ -1171,7 +1362,7 @@ def test_an_open_fail_keeps_moving_the_end_while_it_waits_for_its_fix():
                 return flat_frame(last=_last.isoformat())
 
         out = calib.calibration_report(snapshots=account["snapshots"], entries=[], audit_lines=[], start=C0,
-                                       final_through=last, fetcher=Fetcher())
+                                       final_through=last, fetcher=Fetcher(), fixes=())
         assert out["status"] == "failed" and out["days_done"] == 15
         ends.append(date.fromisoformat(out["end_estimate"]))
         assert ends[-1] > last

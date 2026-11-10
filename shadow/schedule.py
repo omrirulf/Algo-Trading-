@@ -40,7 +40,10 @@ CALIBRATION_DAYS: Final[int] = 15
 #: nightly job re-runs calibration from the same seed snapshot with the code
 #: as merged, so adding a fix here is all a re-run needs; what it changes is
 #: how long calibration lasts (``AFTER_FIX_DAYS``).
-CALIBRATION_FIXES: Final[tuple[tuple[date, str], ...]] = ()
+CALIBRATION_FIXES: Final[tuple[tuple[date, str], ...]] = (
+    (date(2026, 11, 10), "the copy acts on each cycle day at the prices the real account recorded, and its "
+                         "stops fill when the real account's did (Amendment 2026-11-10)"),
+)
 #: Calibration days that must come after the last fix. A day counts as after
 #: a fix only if its date is later than the fix's: a fix merged on a day may
 #: have been written with that day's close in view. So calibration ends at

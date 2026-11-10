@@ -111,7 +111,7 @@ from dataclasses import dataclass, field
 from collections import Counter
 from datetime import date, datetime, timezone
 from itertools import groupby
-from typing import Callable, Final, Iterable, Mapping, Optional, Sequence, Union
+from typing import Callable, Collection, Final, Iterable, Mapping, Optional, Sequence, Union
 from zoneinfo import ZoneInfo
 
 from analysis.reader import JournalEntry
@@ -159,6 +159,10 @@ CONVICTION_FIRST: Final[str] = "conviction"
 #: recorded when its signal was made (the exploratory ``model_same_day``).
 NEXT_OPEN: Final[str] = "next_open"
 SAME_DAY: Final[str] = "same_day"
+#: The calibration copy only (``shadow.calibration``): it acts on each cycle
+#: day during that day, at the prices the real account recorded, and is
+#: driven by ``Fund.session_recorded``, never by ``session``.
+RECORDED: Final[str] = "recorded"
 #: The exploratory pullback fund (C, pre-registration 13.4): limit orders
 #: placed for the next session, filled at a price the bars decide
 #: (``shadow.exploratory.PullbackFund``, which is the only fund using it).
@@ -229,12 +233,21 @@ def recorded_fill(entry: JournalEntry, side: str, session: date) -> tuple[Option
     return price, None
 
 
+#: How a recorded entry is priced: ``(line, side, session) -> (price, None)``
+#: or ``(None, why)``, ``why`` from ``NOT_ENTERED_REASONS``. ``recorded_fill``
+#: is the same-day fund's; the calibration copy brings its own.
+PriceFor = Callable[[JournalEntry, str, date], tuple[Optional[float], Optional[str]]]
+
+
 class RecordedQuote:
-    """The shared feed, except for the one line being entered at the price recorded for it.
+    """The shared feed, except for the names given a recorded price.
 
     The same-day fund's engine, broker and manager read prices through
-    this. ``price`` holds at most one ticker, and only while that line is
-    dispatched (``Fund._enter``); otherwise every answer is the feed's own.
+    this; so do the calibration copy's. For the same-day fund ``price``
+    holds at most one ticker, and only while that line is dispatched
+    (``Fund._enter``); for the calibration copy it holds the day's recorded
+    prices for the whole session (``Fund.session_recorded``). Otherwise every
+    answer is the feed's own.
     """
 
     def __init__(self, feed: SimFeed) -> None:
@@ -250,6 +263,55 @@ class RecordedQuote:
 
     def __getattr__(self, name: str):
         return getattr(self._feed, name)
+
+
+@dataclass(frozen=True)
+class RecordedDay:
+    """What the real account recorded on one cycle day, for the calibration copy to act on.
+
+    Built by ``shadow.calibration`` from the live audit log (what the real
+    manager and engine saw and did), the journal's ``live`` records (the
+    quote taken when each line was made) and the account snapshots' fills
+    (what filled, when, at what price); read by ``Fund.session_recorded``.
+    """
+
+    #: Ticker -> the price the real account saw that day for the name: its
+    #: manager's price for a name it held, else the journal's live quote.
+    #: The copy marks and manages every name it holds at these; the feed's
+    #: open stands in for a name with none.
+    prices: Mapping[str, float] = field(default_factory=dict)
+    #: The names the real account held that day. The copy's stops in them
+    #: fill when the real account's did, never on the daily bar.
+    tape: frozenset[str] = frozenset()
+    #: The real account's stop fills that day as ``(ticker, side, price)``,
+    #: by when they landed: before its management pass, between the pass
+    #: and its entries, after them.
+    stops_before: tuple[tuple[str, str, float], ...] = ()
+    stops_between: tuple[tuple[str, str, float], ...] = ()
+    stops_after: tuple[tuple[str, str, float], ...] = ()
+    #: The price a line is entered at: the real engine's entry price for a
+    #: line it accepted on that side, else the line's live quote.
+    entry_price: PriceFor = recorded_fill
+
+
+class _DayBars:
+    """One session's bars for the names a fund needs them for, as the broker takes them."""
+
+    def __init__(self) -> None:
+        self.opens: dict[str, float] = {}
+        self.highs: dict[str, float] = {}
+        self.lows: dict[str, float] = {}
+        self.closes: dict[str, float] = {}
+        self.dividends: dict[str, float] = {}
+
+    def add(self, ticker: str, bar: tuple[float, float, float, float, float]) -> None:
+        self.opens[ticker], self.highs[ticker], self.lows[ticker], self.closes[ticker], self.dividends[ticker] = bar
+
+    def without(self, names: Collection[str]) -> tuple[dict[str, float], dict[str, float], dict[str, float]]:
+        """``(opens, lows, highs)`` for every name but ``names``."""
+        keep = [t for t in self.closes if t not in names]
+        return ({t: self.opens[t] for t in keep}, {t: self.lows[t] for t in keep},
+                {t: self.highs[t] for t in keep})
 
 
 def by_conviction(signals: Sequence[tuple[Line, Optional[LLMSignal]]]) -> list[tuple[Line, Optional[LLMSignal]]]:
@@ -424,10 +486,11 @@ class Fund:
     ) -> None:
         if priority not in (WATCHLIST_FIRST, CONVICTION_FIRST):
             raise ValueError(f"priority must be {WATCHLIST_FIRST!r} or {CONVICTION_FIRST!r}, got {priority!r}")
-        if entry not in (NEXT_OPEN, SAME_DAY, PULLBACK):
-            raise ValueError(f"entry must be {NEXT_OPEN!r}, {SAME_DAY!r} or {PULLBACK!r}, got {entry!r}")
-        if entry == SAME_DAY and priority != WATCHLIST_FIRST:
-            raise ValueError("a same-day fund dispatches in watchlist order")
+        if entry not in (NEXT_OPEN, SAME_DAY, PULLBACK, RECORDED):
+            raise ValueError(f"entry must be {NEXT_OPEN!r}, {SAME_DAY!r}, {PULLBACK!r} or {RECORDED!r}, "
+                             f"got {entry!r}")
+        if entry in (SAME_DAY, RECORDED) and priority != WATCHLIST_FIRST:
+            raise ValueError("a same-day or recorded fund dispatches in watchlist order")
         self.name = name
         self.signal_for = signal_for
         self.bars = bars
@@ -437,15 +500,18 @@ class Fund:
         self.priority = priority
         #: The exploratory "sized by conviction" fund only: see ``_execute``.
         self.sized_by_conviction = sized_by_conviction
-        #: When this fund enters a cycle's lines (``NEXT_OPEN`` or ``SAME_DAY``).
+        #: When this fund enters a cycle's lines (``NEXT_OPEN``, ``SAME_DAY``,
+        #: ``PULLBACK`` or, for the calibration copy, ``RECORDED``).
         self.entry = entry
         #: Name -> the day of the paper account's first refusal to short it.
         #: The broker is refused the names refused by the day of the cycle
         #: being dispatched, set in ``_enter``; until then, every name.
         self.refused_on = refusal_days(not_shortable)
         #: The same-day fund's prices: the feed's, but the recorded price for
-        #: the line being entered. Every other fund reads the feed itself.
-        self.quotes: Optional[RecordedQuote] = RecordedQuote(feed) if entry in (SAME_DAY, PULLBACK) else None
+        #: the line being entered; the calibration copy's: the feed's, but
+        #: the day's recorded prices. Every other fund reads the feed itself.
+        self.quotes: Optional[RecordedQuote] = (RecordedQuote(feed) if entry in (SAME_DAY, PULLBACK, RECORDED)
+                                                else None)
         feed = self.quotes if self.quotes is not None else feed
         self.broker = SimBroker(name=name, cash=cash, quote=feed.get_latest_price,
                                 cost_per_side=cost_per_side, not_shortable=frozenset(self.refused_on))
@@ -490,38 +556,87 @@ class Fund:
         broker = self.broker
         broker.day = day
         held_at_open = broker.held_quantities()
-        opens, lows, highs, closes, dividends = {}, {}, {}, {}, {}
-        for ticker in sorted(set(held_at_open) | {line.ticker for line in cycle or ()}):
-            bar = self.bars.bar(ticker, day)
-            if bar is None:
-                continue
-            opens[ticker], highs[ticker], lows[ticker], closes[ticker], dividends[ticker] = bar
+        bars = _DayBars()
+        self._read_bars(bars, set(held_at_open) | {line.ticker for line in cycle or ()}, day)
 
-        broker.fill_gapped_stops(opens)
+        broker.fill_gapped_stops(bars.opens)
         if cycle is not None:
             if manage:
                 self._manage()
             if self.entry == NEXT_OPEN:
                 self._enter(cycle)
         # New positions' bars, for their stops and marks.
-        for ticker in sorted(broker.positions):
-            if ticker not in closes:
-                bar = self.bars.bar(ticker, day)
-                if bar is not None:
-                    opens[ticker], highs[ticker], lows[ticker], closes[ticker], dividends[ticker] = bar
-        broker.fill_touched_stops(lows, highs)
+        self._read_bars(bars, broker.positions, day)
+        broker.fill_touched_stops(bars.lows, bars.highs)
         if self.entry == SAME_DAY and today is not None:
             # After the session's stops: a new position's stop is first
             # checked at the next open. Its bar is read for the close's mark.
             self._enter(today, recorded=True)
-            for ticker in sorted(broker.positions):
-                if ticker not in closes:
-                    bar = self.bars.bar(ticker, day)
-                    if bar is not None:
-                        opens[ticker], highs[ticker], lows[ticker], closes[ticker], dividends[ticker] = bar
-        broker.pay_dividends({t: d for t, d in dividends.items() if d}, held_at_open)
-        broker.remember_marks(closes)
-        record = Day(day, broker.equity(closes), broker.cash, broker.gross(closes), len(broker.positions))
+            self._read_bars(bars, broker.positions, day)
+        return self._close(day, held_at_open, bars)
+
+    def session_recorded(self, day: date, cycle: Optional[Sequence[Line]], recorded: RecordedDay,
+                         manage: bool = True) -> Day:
+        """One session of the calibration copy (``shadow.calibration``): the real account's day, re-made.
+
+        The copy acts on ``cycle`` -- the lines journalled on ``day`` itself;
+        None when no cycle ran that day, or nothing of it is left to do --
+        during ``day``, at the prices the real account recorded
+        (``recorded.prices``: what its manager and engine saw, else the
+        journal's live quote), not at the next open. In that order: at the
+        open, the stops of names only the copy holds that the bar gapped
+        through fill at the open; then the real account's stop fills from
+        before its management pass; the pass, when ``manage``; the real
+        account's stop fills from between the pass and its entries; the
+        entries, each at the price ``recorded.entry_price`` gives it; the
+        real account's later stop fills; and the stops of names only the
+        copy holds that the bar's range reached. A stop in a name the real
+        account held (``recorded.tape``) fills only when the real account's
+        did, at the real fill's price: the tape decided, not the daily bar.
+        The ATR is the feed's at the open, as for every fund. Dividends and
+        the close are as in ``session``.
+        """
+        if self.entry != RECORDED or self.quotes is None:
+            raise ValueError("session_recorded is for a fund made with entry=RECORDED")
+        broker = self.broker
+        broker.day = day
+        held_at_open = broker.held_quantities()
+        bars = _DayBars()
+        self._read_bars(bars, set(held_at_open) | {line.ticker for line in cycle or ()}, day)
+        self.quotes.price = dict(recorded.prices)
+        try:
+            opens, _, _ = bars.without(recorded.tape)
+            broker.fill_gapped_stops(opens)
+            broker.fill_stops_as_recorded(recorded.stops_before)
+            if cycle is not None:
+                if manage:
+                    self._manage()
+                broker.fill_stops_as_recorded(recorded.stops_between)
+                self._enter(cycle, recorded=True, price_for=recorded.entry_price)
+            else:
+                broker.fill_stops_as_recorded(recorded.stops_between)
+            broker.fill_stops_as_recorded(recorded.stops_after)
+            self._read_bars(bars, broker.positions, day)
+            _, lows, highs = bars.without(recorded.tape)
+            broker.fill_touched_stops(lows, highs)
+        finally:
+            self.quotes.price.clear()
+        return self._close(day, held_at_open, bars)
+
+    def _read_bars(self, bars: _DayBars, tickers: Iterable[str], day: date) -> None:
+        """Add ``day``'s bar for each of ``tickers`` not read yet; a name with no bar is left out."""
+        for ticker in sorted(tickers):
+            if ticker not in bars.closes:
+                bar = self.bars.bar(ticker, day)
+                if bar is not None:
+                    bars.add(ticker, bar)
+
+    def _close(self, day: date, held_at_open: Mapping[str, int], bars: _DayBars) -> Day:
+        """The close: dividends on the shares held at the previous close, the marks, the day's record."""
+        broker = self.broker
+        broker.pay_dividends({t: d for t, d in bars.dividends.items() if d}, held_at_open)
+        broker.remember_marks(bars.closes)
+        record = Day(day, broker.equity(bars.closes), broker.cash, broker.gross(bars.closes), len(broker.positions))
         self.days.append(record)
         return record
 
@@ -541,8 +656,16 @@ class Fund:
             if action.r_estimated:
                 self.tally.estimated_r += 1
 
-    def _enter(self, cycle: Sequence[Line], recorded: bool = False) -> None:
-        """Dispatch a cycle's lines; ``recorded``: the same-day fund, each at its recorded price."""
+    def _enter(self, cycle: Sequence[Line], recorded: bool = False, price_for: Optional[PriceFor] = None) -> None:
+        """Dispatch a cycle's lines.
+
+        ``recorded``: each directional line is entered at a price recorded
+        for it rather than the feed's: the line's own ``live`` record
+        (``recorded_fill``, the same-day fund), or what ``price_for`` says
+        when given (the calibration copy: the price the real account used
+        for that line, ``shadow.calibration``). A line with no such price is
+        not entered, and counted in ``not_entered`` by reason.
+        """
         from shadow.order_matters import Event, capacity_kind
 
         dispatched = False
@@ -572,8 +695,9 @@ class Fund:
                 if signal is None:
                     continue
                 if recorded and signal.bias is not Bias.NEUTRAL:
-                    price, why = recorded_fill(line.entry, "buy" if signal.bias is Bias.BULLISH else "sell",
-                                               self.broker.day)
+                    priced = price_for if price_for is not None else recorded_fill
+                    price, why = priced(line.entry, "buy" if signal.bias is Bias.BULLISH else "sell",
+                                        self.broker.day)
                     if why is not None:
                         self.not_entered[why] += 1
                         if self.decisions is not None:
@@ -581,11 +705,19 @@ class Fund:
                                                            signal.bias.value, signal.conviction, "SKIPPED",
                                                            why, False))
                         continue
-                    self.quotes.price[line.ticker] = price
+                    quotes = self.quotes
+                    assert quotes is not None
+                    # The line's price for the length of its dispatch; what
+                    # the day already recorded for the name is put back after.
+                    before = quotes.price.get(line.ticker)
+                    quotes.price[line.ticker] = price
                     try:
                         result, cap = self._execute(signal)
                     finally:
-                        self.quotes.price.clear()
+                        if before is None:
+                            quotes.price.pop(line.ticker, None)
+                        else:
+                            quotes.price[line.ticker] = before
                 else:
                     result, cap = self._execute(signal)
                 dispatched = True
@@ -772,7 +904,8 @@ def run(
 
 __all__ = [
     "CONVICTION_FIRST", "CONVICTION_SIZES", "Day", "Decision", "Fund", "IndexFund", "Line", "NEXT_OPEN",
-    "NOT_ENTERED_REASONS", "NO_PRICE", "OTHER_DAY", "OUTSIDE_HOURS", "PULLBACK", "RecordedQuote", "Refusals", "SAME_DAY",
+    "NOT_ENTERED_REASONS", "NO_PRICE", "OTHER_DAY", "OUTSIDE_HOURS", "PULLBACK", "PriceFor", "RECORDED",
+    "RecordedDay", "RecordedQuote", "Refusals", "SAME_DAY",
     "STARTING_CASH", "Tally", "WATCHLIST_FIRST", "by_conviction", "coin_signal", "conviction_factor",
     "cycle_days", "dispatch_order", "lines_by_day", "model_signal", "recorded_fill", "refusal_days",
     "refused_by", "rule_signal", "run",
