@@ -44,7 +44,7 @@ from datetime import date, datetime, timedelta, timezone
 from urllib.parse import urlencode
 from xml.etree import ElementTree
 
-from config.instruments import DISPLAY_NAMES, is_fund
+from config.instruments import DISPLAY_NAMES, NEWS_THEMES, is_fund
 
 import httpx
 
@@ -121,8 +121,12 @@ BING_DIRECT_TIMEOUT_SECONDS = 20.0
 #: town's pool bond, a Senate race; one title in five named the fund across
 #: the 14 funds, against three in four for the 16 companies), so a headline
 #: is kept only when its title or snippet names the ticker or, for a
-#: company, a word of its display name. Words shorter than this, and these
-#: generic ones, name no company on their own.
+#: company, a word of its display name -- or, since 10 Nov 2026, for a fund
+#: one of the words a story about what it holds would use
+#: (``config.instruments.NEWS_THEMES``): on 9 and 10 Nov the ticker alone
+#: left 11 and then 14 funds without news while the feed had stories for
+#: most of them. Words shorter than this, and these generic ones, name no
+#: company on their own.
 NAME_WORD_MIN_LENGTH = 4
 GENERIC_NAME_WORDS = frozenset({
     "bank", "systems", "canada", "pharmaceutical", "pharmaceuticals", "royal", "company", "group",
@@ -454,13 +458,17 @@ def parse_bing_rss(text: str, limit: int = MAX_HEADLINES, now: Optional[datetime
 
 
 def name_words(ticker: str) -> tuple[str, ...]:
-    """The words a headline about the name would carry: the ticker, and for a company its name's distinctive words.
+    """The words a headline about the name would carry.
 
-    A fund's display name describes it ("Commodities basket") and names
-    nothing a headline would say, so a fund is known by its ticker alone.
+    The ticker; for a company the distinctive words of its name; for a fund
+    the words a story about what it holds would use (``NEWS_THEMES``: a
+    fund's display name describes it, "Commodities basket", and names
+    nothing a headline would say).
     """
     words: list[str] = [ticker]
-    if not is_fund(ticker):
+    if is_fund(ticker):
+        words.extend(NEWS_THEMES.get(ticker, ()))
+    else:
         name = DISPLAY_NAMES.get(ticker, "")
         for word in re.findall(r"[A-Za-z][A-Za-z'-]*", name):
             clean = word.strip("'-")
