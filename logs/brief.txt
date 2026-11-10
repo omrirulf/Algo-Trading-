@@ -1,8 +1,8 @@
-🔴 11 of 80 ticker(s) were judged without news
-Equity $100,612 · 16 positions · $67,122 gross · $3,865 at risk · unrealised +$1,608
-Traded: ITA, EWC
+🔴 14 of 80 ticker(s) were judged without news
+Equity $101,026 · 18 positions · $77,130 gross · $4,188 at risk · unrealised +$1,711
+Traded: XHB, EPOL
 Started by supabase-cron at 14:40 UTC (0 min after 14:40)
-Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-11-06
+Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-11-09
 Closed: XOM, LLY, JPM, RY, CAT, XLB
-Also: 11 of 80 ticker(s) took their news from Bing's feed
-Cycle 80 tickers, $0.16 · 2026-11-09
+Also: 25 of 80 ticker(s) took their news from Bing's feed
+Cycle 80 tickers, $0.16 · 2026-11-10
