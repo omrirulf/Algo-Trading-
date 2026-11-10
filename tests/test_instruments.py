@@ -734,3 +734,32 @@ def test_the_slot_limit_is_not_what_keeps_the_book_diverse():
     # a bound that does not mention the slot count at all.
     assert widest_group <= cfg.MAX_OPEN_POSITIONS
     assert cfg.MAX_EXPOSURE_GROUP_PCT < cfg.MAX_GROSS_EXPOSURE_PCT / 3
+
+
+# --- the news fallback's theme words for a fund (the owner's decision of 10 Nov 2026) ---
+
+#: Words that are also everyday words, or too wide to name what a fund holds.
+EVERYDAY_WORDS = {
+    "won", "real", "polish", "turkey", "fed", "gas", "pound", "rand", "the", "us", "new", "stock", "stocks",
+    "market", "markets", "etf", "etfs", "fund", "funds", "shares", "price", "prices", "index", "rate", "rates",
+}
+
+
+def test_every_fund_in_the_watchlist_has_theme_words_and_no_company_does():
+    from config import instruments
+    from config.watchlist import DEFAULT_WATCHLIST
+
+    funds = {t for t in DEFAULT_WATCHLIST if instruments.is_fund(t)}
+    assert funds <= set(instruments.NEWS_THEMES), sorted(funds - set(instruments.NEWS_THEMES))
+    assert all(instruments.is_fund(t) for t in instruments.NEWS_THEMES)
+    assert all(len(words) >= 2 for words in instruments.NEWS_THEMES.values())
+
+
+def test_no_theme_word_is_an_everyday_word_or_too_short():
+    from config import instruments
+
+    for ticker, words in instruments.NEWS_THEMES.items():
+        for word in words:
+            assert word.lower() not in EVERYDAY_WORDS, (ticker, word)
+            # An abbreviation may be two letters (UK, EM); a word needs three.
+            assert (len(word) >= 3 or (len(word) == 2 and word.isupper())) and word.strip() == word, (ticker, word)
