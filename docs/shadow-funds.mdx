@@ -52,7 +52,8 @@ at the open; the position manager runs; then the entries, in **watchlist
 order**, the only dispatch order production uses. During the session, stops
 the low (or high, for a short) reaches fill at the stop. At the close,
 dividends are paid or charged and the book is marked. Costs are 0.10% of
-notional per side on every fill.
+notional per side on every fill. The calibration copy alone acts on the real
+account's own day instead ([Calibration first](#calibration-first)).
 
 A line the model gave no answer on, or that the paper account held, is
 skipped by every fund that day: the race's own rule. The names skipped
@@ -110,6 +111,24 @@ account snapshot exists; that date lives in `shadow/schedule.py` and is set
 by a reviewed change, never by the code; a test fails if it is set while the
 rule is still unapproved, and an unapproved rule can never read "passed".
 
+Since the fix of 10 Nov 2026 (pre-registration, Amendment 2026-11-10) the
+copy acts on each cycle day during that day, at the prices the real account
+recorded: the price its position manager recorded for each name it held and
+the entry price its engine recorded for each line it accepted (both in
+`logs/execution_audit.log`), else the quote the cycle took when the line was
+made (the journal's `live` record: the ask for a buy, the bid for a short,
+else the last trade); a line with no recorded price is not entered, and
+counted. Its stops in the names the real account held fill when, and at the
+price, the real account's stops filled (`logs/account.jsonl`), in the real
+account's own order within the day; stops in names only the copy holds keep
+the daily-bar rule. The ATR, the sizing, the limits and the ladder are the
+production code as before. Until that fix the copy acted at the next open
+on daily bars, like every fund, and calibration failed at day 15 on that
+timing alone: 45 differences, among them 17 stops on daily bars, 11 ladder
+closes a day apart and 7 sizes off the other day's price. The fixed
+simulation is re-run from the same 28 Sep seed, and at least 5 calibration
+days must come after the fix.
+
 ## The fund test's start, and the gate
 
 The fund test's start is fixed (the owner's decision of 26 Sep 2026): the
@@ -148,8 +167,8 @@ The owner's decision of 25 Sep 2026, for calibration only: the race and the
 funds do not change. When the real account's run falls outside market hours
 (before 09:30 or after the 16:00 close in New York, 13:00 on a half day),
 its broker refuses the entries ("market is closed") and its profit-ladder
-pass cannot run. The calibration copy acts at the next open whatever time
-the run was, so it mirrors the real account instead: it does not make an
+pass cannot run. The calibration copy acts on the record whatever time the
+run was, so it mirrors the real account instead: it does not make an
 entry the real broker refused as "market is closed" outside hours, and it
 skips a ladder pass the journal says could not run. A refusal during market
 hours is never mirrored (that is a fault of the real account's clock, and

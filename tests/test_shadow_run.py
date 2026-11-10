@@ -91,10 +91,12 @@ def test_calibration_started_on_the_owners_day_under_the_approved_rule():
     assert schedule.FUND_FIRST_CYCLE == date(2026, 9, 28)
     assert schedule.FUND_START == date(2026, 9, 29)
     assert schedule.CALIBRATION_DAYS == 15
-    # The owner's fail rule of 25 Sep 2026: no fix yet, and five calibration
-    # days after the last one. A fix is added only in a reviewed change,
-    # with its row in the Amendments table.
-    assert schedule.CALIBRATION_FIXES == ()
+    # The owner's fail rule of 25 Sep 2026: one fix so far (the copy on the
+    # real account's own prices and stop-fill days, merged 10 Nov 2026), and
+    # five calibration days after the last one. A fix is added only in a
+    # reviewed change, with its row in the Amendments table.
+    assert [day for day, _ in schedule.CALIBRATION_FIXES] == [date(2026, 11, 10)]
+    assert all("prices the real account recorded" in what for _, what in schedule.CALIBRATION_FIXES)
     assert schedule.AFTER_FIX_DAYS == 5
     assert schedule.RANDOM_FUNDS == 1000
     assert schedule.FUNDS == ("model", "momentum", "hybrid", "vt")

@@ -31,29 +31,55 @@ It does not start until the owner has approved ``PASS_RULE`` and set
 
 Timing, which everything below depends on
 -----------------------------------------
-The real account acts on cycle day D *during* D: its management pass and
-its entries fill at that day's prices. A fund acts on D's cycle at the *open
-of the next session* (``shadow.fund``). So:
+The real account acts on cycle day D *during* D: its management pass runs
+at the cycle's start and its entries fill once the model has answered, each
+at the price of that moment, and its stops fill where the tape reaches
+them. Until the fix of 10 Nov 2026 the copy, like every fund, acted on D's
+cycle at the open of the next session, on daily bars: a one-session lag
+that priced every trade on another day's tape and filled stops where the
+daily bar said, not where the real tape did, and calibration failed on
+those differences alone (Amendment 2026-11-10: 45 differences over 15 days,
+17 of them stops on daily bars, 11 ladder closes a day apart, 7 sizes off
+the other day's price). Since then the copy acts on D's cycle during D, on
+the real account's own record (``RealRecord``, ``shadow.fund.RecordedDay``,
+``Fund.session_recorded``):
 
 * The seed is the real book at the close of the start day C0, which already
-  includes everything C0's cycle did.
-* The fund's sessions are the ones AFTER C0: C1, C2, ... At C1's open the
-  fund would act on C0's cycle -- already in the seed -- so C1 gets no cycle
-  at all: no management pass, no entries; only the stops resting at the
-  broker, the dividends and the close. At C2's open it acts on C1's cycle,
-  at C3's on C2's, and so on.
-* Stops are the exception to the one-session lag: they rest at the broker
-  and fill the same day in both books.
+  includes everything C0's cycle did. The copy's sessions are the ones
+  AFTER C0: C1, C2, ... At each session it acts on that session's own
+  cycle, when one was journalled: a session with no cycle does only what
+  the broker does on its own -- the stops, the dividends, the close.
+* Prices are the ones the real account used. A name the real manager
+  managed that day is marked and managed at the price its ``position_managed``
+  line recorded; a line the real engine accepted is entered at the
+  ``entry_price`` its ``signal_processed`` line recorded; every other name
+  takes the quote the cycle recorded when its line was made (the journal's
+  ``live`` record: the ask for a buy, the bid for a short, else the last
+  trade). The feed's open stands in for a name with no recorded price, and
+  the ATR is the feed's at the open, as for every fund. A directional line
+  the copy would enter but has no recorded price for is not entered, and
+  counted by reason.
+* Stops in a name the real account held fill when, and at the price, the
+  real account's own stop in that name filled (the fills in the account
+  snapshots): the tape decided, not the daily bar. A stop the real tape
+  never reached does not fill in the copy either, whatever the daily bar's
+  range. Stops in names only the copy holds keep the daily-bar rule.
+* Within the day the order is the real account's: its stop fills from
+  before its management pass; the pass; its stop fills from between the
+  pass and its entries; the entries, in watchlist order; its later stop
+  fills.
 
-So a real entry on C1 and the sim's entry at C2's open are the same trade a
-session apart. Such a pair is counted as timing, not as a difference.
+So a real entry on D and the copy's entry on D are the same trade the same
+day. The rule allows a match within one session, so a pair a session apart
+is still matched and counted as timing, not as a difference; with the copy
+on the real account's clock that is rare.
 
 Late runs (the owner's decision of 25 Sep 2026). The real account acts
 during D only if its run falls inside market hours. A run that starts
 before the open or runs past the close meets a closed market: the engine
 refuses every entry with "market is closed", and the position manager skips
-its profit-ladder pass. The sim acts at the next open whatever time the
-run was, so without help it would make trades the real account never could,
+its profit-ladder pass. The copy acts on the record whatever time the run
+was, so without help it would make trades the real account never could,
 and every one would read as a difference with no fault behind it. So, in
 this copy only (the race and the funds do not change), the sim mirrors the
 real account's clock: it does not make an entry the real engine refused as
@@ -90,7 +116,18 @@ from config.market_calendar import is_trading_day
 from shadow import schedule
 from shadow.audit import ENTRY_EVENT, MANAGED_EVENT, LiveAuditLeak, live_audit_guarded
 from shadow.broker import ENTRY, STOP, TRANCHE
-from shadow.fund import Decision, Fund, Line, Refusals, cycle_days, lines_by_day, model_signal
+from shadow.fund import (
+    RECORDED,
+    Decision,
+    Fund,
+    Line,
+    RecordedDay,
+    Refusals,
+    cycle_days,
+    lines_by_day,
+    model_signal,
+    recorded_fill,
+)
 from shadow.fund_test import fund_test_plan, next_trading_day, sessions_through
 from shadow.market import Bars, SimFeed, calendar, in_regular_hours
 from shadow.schedule import AFTER_FIX_DAYS
@@ -128,7 +165,7 @@ SIM_REJECTED = "sim rejected: "
 SIM_HELD = "sim held it already"
 REAL_REFUSED = "real broker refused: "
 REAL_REJECTED = "real rejected: "
-STOP_DAY = "stop: filled on a different day or not at all on daily bars"
+STOP_DAY = "stop: filled on a different day or not at all"
 LADDER = "ladder/trim differs"
 UNEXPLAINED = "unexplained"
 
@@ -694,10 +731,13 @@ def seed_fund(
 ) -> Fund:
     """The model fund, holding the seeded book, with the live record of those positions.
 
-    Positions are seeded at the account's own average entry, opened on the
-    seed day, with their resting stops. No quote is taken while seeding: a
-    stop placed against a live quote fills at once if the price is through
-    it, and the seed is the book as it stood, not a trade.
+    Made in the ``RECORDED`` entry mode (``shadow.fund``): it is driven day
+    by day through ``Fund.session_recorded`` on the real account's record,
+    never through ``session``. Positions are seeded at the account's own
+    average entry, opened on the seed day, with their resting stops. No
+    quote is taken while seeding: a stop placed against a live quote fills
+    at once if the price is through it, and the seed is the book as it
+    stood, not a trade.
 
     The fund's audit record gets the live log's lines (``audit_lines``: the
     caller cuts them at the seed), and then forgets every ticker the seed
@@ -712,7 +752,7 @@ def seed_fund(
     happened either (``shadow.fund``, "Short refusals are dated").
     """
     fund = Fund(NAME, model_signal, feed, bars, cash=seed.cash, cost_per_side=cost_per_side,
-                not_shortable=not_shortable, keep_actions=True)
+                not_shortable=not_shortable, keep_actions=True, entry=RECORDED)
     broker = fund.broker
     quote, broker.quote = broker.quote, _no_quote
     try:
@@ -954,29 +994,28 @@ class LateRuns:
     def count_ahead(self, cycles: Mapping[date, Sequence[Line]], days: Iterable[date]) -> None:
         """Count cycle days the copy will act on but the sim has not reached yet.
 
-        The sim reaches cycle day D only once the next session's real close
-        is on record -- a day or two later -- so a stop that waited for it
-        would reach the owner two or three sessions after the third late run.
-        What is mirrored depends only on the record (the journal and the
-        engine's answers), never on the sim's book, so it is counted as soon
-        as D is journalled. When the sim reaches D it mirrors exactly this;
-        those days are then asked in ``cycle`` and not counted again.
+        The sim reaches cycle day D only once D's real close is on record --
+        the next day -- so a stop that waited for it would reach the owner a
+        session or two after the third late run. What is mirrored depends
+        only on the record (the journal and the engine's answers), never on
+        the sim's book, so it is counted as soon as D is journalled. When
+        the sim reaches D it mirrors exactly this; those days are then asked
+        in ``cycle`` and not counted again.
         """
         for day in sorted(days):
             if day not in self._asked:
-                self.cycle(day, next_trading_day(day), list(cycles.get(day, ())))
+                self.cycle(day, day, list(cycles.get(day, ())))
 
 
 def _days_ahead(start: date, run: Sequence[date], ran: Iterable[date], remaining: int) -> list[date]:
     """The cycle days the copy will act on within calibration that it has not acted on yet.
 
     ``run`` are the sessions run so far and ``remaining`` the calibration
-    closes still needed. The copy acts on cycle day D at the next session, so
-    D counts when that session is among the next ``remaining`` ones. C0's own
-    cycle is in the seed, and a cycle on the last calibration day is acted
-    on only after calibration ends, so neither is ever copied or counted. A
-    day that is not a trading day is never a session, so the copy never acts
-    on its cycle; nor is it counted.
+    closes still needed. The copy acts on cycle day D during D, so D counts
+    when it is among the next ``remaining`` sessions after the last one run
+    (after the start, when none has run). C0's own cycle is in the seed, so
+    it is never copied or counted. A day that is not a trading day is never
+    a session, so the copy never acts on its cycle; nor is it counted.
     """
     if remaining <= 0:
         return []
@@ -984,8 +1023,7 @@ def _days_ahead(start: date, run: Sequence[date], ran: Iterable[date], remaining
     last = anchor
     for _ in range(remaining):
         last = next_trading_day(last)
-    return sorted(d for d in set(ran) if d > start and d >= anchor and is_trading_day(d)
-                  and next_trading_day(d) <= last)
+    return sorted(d for d in set(ran) if d > start and d > anchor and is_trading_day(d) and d <= last)
 
 
 def mirror_note(mirrored: Sequence[Mirrored], limit: int = MIRROR_LIMIT) -> str:
@@ -995,6 +1033,201 @@ def mirror_note(mirrored: Sequence[Mirrored], limit: int = MIRROR_LIMIT) -> str:
     days = len({m.day for m in mirrored})
     return (f"{_plural(entries, 'entry', 'entries')} and {_plural(passes, 'ladder pass', 'ladder passes')} "
             f"mirrored on {_plural(days, 'day', 'days')} (limit {limit})")
+
+
+# --------------------------------------------------------------------------- #
+# d3) The real account's record, day by day: the prices it used, the stops that filled
+# --------------------------------------------------------------------------- #
+
+#: Actions only a full management pass writes, one per position held. A
+#: protect-only pass writes a line only for a position it had to fix, so
+#: its silence about a ticker says nothing about whether it is held.
+_FULL_PASS = frozenset({"held", "stop_raised", "tranche_taken", "unmanaged", "group_cap_trimmed"})
+
+#: A stop fill of the real account as the copy takes it: (ticker, the stop's own side, price).
+StopFill = tuple[str, str, float]
+
+
+def _fill_classes(seed: Seed, fills: Iterable[AccountFill], after: datetime,
+                  stop_order_ids: frozenset[str] = frozenset(),
+                  ladder_order_ids: frozenset[str] = frozenset()) -> list[tuple[AccountFill, str, str]]:
+    """Every fill after ``after``, with its direction (OPEN or REDUCE) and kind (STOP or "market"), in time order.
+
+    Fills at or before ``after`` are already in the seed. Every later fill
+    moves the book forward from the seed, so a sell is known to be a close
+    of a long, not a short sale, whatever day it falls on.
+
+    A reduction is a stop's when its order is one a snapshot listed as a
+    stop, a ladder or trim close when the live manager recorded its order,
+    and otherwise a stop still: the stop is the only other exit this system
+    has, and a stop replaced and filled between two snapshots is never
+    listed under the id that filled.
+    """
+    book = {p.ticker: float(p.qty) for p in seed.positions}
+    out = []
+    for fill in sorted(fills, key=lambda f: f.at):
+        if fill.at <= after:
+            continue
+        held = book.get(fill.ticker, 0.0)
+        signed = fill.signed
+        direction = OPEN if abs(held) < 1e-9 or (held > 0) == (signed > 0) else REDUCE
+        book[fill.ticker] = held + signed
+        if fill.order_id and fill.order_id in stop_order_ids:
+            kind = STOP
+        elif direction == OPEN or (fill.order_id and fill.order_id in ladder_order_ids):
+            kind = "market"
+        else:
+            kind = STOP
+        out.append((fill, direction, kind))
+    return out
+
+
+def _order_ids(snapshots: Iterable[Snapshot], records: Iterable[AuditRecord]) -> tuple[frozenset[str], frozenset[str]]:
+    """The order ids the snapshots listed as stops, and the ones the live manager's ladder and trims recorded."""
+    stop_ids = frozenset(s.order_id for snap in snapshots for s in (snap.stops or ()) if s.order_id)
+    ladder_ids = frozenset(str(r.action.get("order_id")) for r in records if r.event == MANAGED_EVENT
+                           and r.action.get("action") in ("tranche_taken", "group_cap_trimmed")
+                           and r.action.get("order_id"))
+    return stop_ids, ladder_ids
+
+
+class RealRecord:
+    """The real account's record, day by day, for the copy to act on (``shadow.fund.RecordedDay``).
+
+    Built once per run from three records, none of which the copy can
+    change: the live audit log, read as text (what the real manager saw and
+    did at its pass, what the real engine saw and did on each line), the
+    journal's ``live`` records (the quote the cycle took when each line was
+    made) and the account snapshots' fills (what filled, when, at what
+    price). ``day`` makes the ``RecordedDay`` for one session.
+
+    Prices. A name the real manager managed that day takes the price its
+    ``position_managed`` line recorded (the first full-pass line of the day
+    for the name, so a second run the same day does not re-price it); every
+    other name with a ``live`` record that day takes its last trade (held
+    and asked lines alike, the day's first line for the name). A line the
+    real engine accepted is entered at the ``entry_price`` its
+    ``signal_processed`` line recorded, when that line is on the same side:
+    the latest at or before the journal line within ``AUDIT_JOIN``, else
+    the day's first. Otherwise the line is entered at its own live quote
+    (``shadow.fund.recorded_fill``: the ask for a buy, the bid for a short,
+    else the last trade, taken inside regular hours on the session's own
+    day), and with none it is not entered.
+
+    Stops. The real account's stop fills, by the New York day they landed,
+    each as the stop's own side and its price (a stop filled in parts is one
+    fill at the quantity-weighted price). The day is cut at the real
+    account's own clock: fills at or before its management pass (the first
+    full-pass ``position_managed`` line of the day), fills after it and at
+    or before its first entry (the first ``signal_processed`` line of the
+    day, of any status), and later fills. A day with no pass takes the
+    entries' time for both cuts; a day with neither puts every fill first.
+
+    Tape. The names the real account held that day -- held at the day's
+    open, or filled that day. Their stops are the real tape's business in
+    the copy; the rest keep the daily-bar rule.
+    """
+
+    def __init__(self, entries: Iterable[JournalEntry], audit_lines: Iterable[str], seed: Seed,
+                 fills: Iterable[AccountFill], after: datetime, stop_order_ids: frozenset[str] = frozenset(),
+                 ladder_order_ids: frozenset[str] = frozenset()) -> None:
+        self._managed: dict[date, dict[str, float]] = defaultdict(dict)
+        self._pass_at: dict[date, datetime] = {}
+        self._entered: dict[tuple[date, str], list[AuditRecord]] = defaultdict(list)
+        self._entries_at: dict[date, datetime] = {}
+        for record in audit_records(audit_lines):
+            if record.at is None or not record.ticker or record.ticker == "*":
+                continue
+            day = ny_day(record.at)
+            if record.event == MANAGED_EVENT and record.action.get("action") in _FULL_PASS:
+                price = _num(record.action.get("price"))
+                if price is not None and price > 0:
+                    self._managed[day].setdefault(record.ticker, price)
+                if day not in self._pass_at or record.at < self._pass_at[day]:
+                    self._pass_at[day] = record.at
+            elif record.event == ENTRY_EVENT:
+                if day not in self._entries_at or record.at < self._entries_at[day]:
+                    self._entries_at[day] = record.at
+                if record.result.get("status") == "ACCEPTED":
+                    self._entered[(day, record.ticker)].append(record)
+        self._live: dict[tuple[date, str], float] = {}
+        for entry in entries:
+            live = entry.live
+            if live is None or live.get("error") is not None or entry.timestamp is None:
+                continue
+            price = _num(live.get("price"))
+            if price is None or price <= 0:
+                continue
+            moment = _instant(live.get("asked_at")) or _utc(entry.timestamp)
+            self._live.setdefault((ny_day(moment), entry.ticker), price)
+        self._seed = seed
+        self._fills = _fill_classes(seed, fills, after, stop_order_ids, ladder_order_ids)
+
+    def prices(self, day: date) -> dict[str, float]:
+        """Ticker -> the price the real account saw that day: the manager's for a name it managed, else the live quote."""
+        out = {ticker: price for (d, ticker), price in self._live.items() if d == day}
+        out.update(self._managed.get(day, {}))
+        return out
+
+    def tape(self, day: date) -> frozenset[str]:
+        """The names the real account held on ``day``: held at its open, or filled that day."""
+        book = {p.ticker: float(p.qty) for p in self._seed.positions}
+        today: set[str] = set()
+        for fill, _, _ in self._fills:
+            if fill.day < day:
+                book[fill.ticker] = book.get(fill.ticker, 0.0) + fill.signed
+            elif fill.day == day:
+                today.add(fill.ticker)
+        return frozenset({t for t, q in book.items() if abs(q) >= 1e-9} | today)
+
+    def stop_fills(self, day: date) -> tuple[tuple[StopFill, ...], tuple[StopFill, ...], tuple[StopFill, ...]]:
+        """The real account's stop fills on ``day``: before its pass, between the pass and its entries, after."""
+        pass_at, entries_at = self._pass_at.get(day), self._entries_at.get(day)
+        if pass_at is None:
+            pass_at = entries_at
+        if entries_at is None:
+            entries_at = pass_at
+        groups: dict[tuple[str, str], list] = {}       # (ticker, side) -> [qty, notional, first at]
+        for fill, _, kind in self._fills:
+            if fill.day != day or kind != STOP:
+                continue
+            side = "buy" if fill.signed > 0 else "sell"
+            group = groups.setdefault((fill.ticker, side), [0.0, 0.0, fill.at])
+            group[0] += fill.qty
+            group[1] += fill.qty * fill.price
+            group[2] = min(group[2], fill.at)
+        before: list[StopFill] = []
+        between: list[StopFill] = []
+        later: list[StopFill] = []
+        for (ticker, side), (qty, notional, at) in sorted(groups.items(), key=lambda item: item[1][2]):
+            item = (ticker, side, notional / qty)
+            if pass_at is None or at <= pass_at:
+                before.append(item)
+            elif at <= entries_at:
+                between.append(item)
+            else:
+                later.append(item)
+        return tuple(before), tuple(between), tuple(later)
+
+    def entry_price(self, entry: JournalEntry, side: str, session: date) -> tuple[Optional[float], Optional[str]]:
+        """The price the copy enters ``entry`` at on ``side``: the real engine's, else the line's live quote."""
+        candidates = []
+        for record in self._entered.get((session, entry.ticker), ()):
+            price = _num(record.result.get("entry_price"))
+            if _text(record.result.get("side")) == side and price is not None and price > 0:
+                candidates.append((record, price))
+        if not candidates:
+            return recorded_fill(entry, side, session)
+        stamp = _utc(entry.timestamp) if entry.timestamp is not None else None
+        joined = [pair for pair in candidates
+                  if stamp is not None and pair[0].at <= stamp and stamp - pair[0].at <= AUDIT_JOIN]
+        return (joined[-1] if joined else candidates[0])[1], None
+
+    def day(self, session: date) -> RecordedDay:
+        """What the copy acts on at ``session``."""
+        before, between, later = self.stop_fills(session)
+        return RecordedDay(prices=self.prices(session), tape=self.tape(session), stops_before=before,
+                           stops_between=between, stops_after=later, entry_price=self.entry_price)
 
 
 # --------------------------------------------------------------------------- #
@@ -1066,11 +1299,13 @@ class Match:
 
     @property
     def lag(self) -> bool:
-        """The same trade a session later in the sim, because it acts at the next open: not a difference.
+        """The same trade a session later in the sim: allowed by the rule, so not a difference.
 
-        Only later. The sim acts on a cycle the session after the real
-        account does, so a sim entry or ladder close a session *earlier*
-        than the real one answered an earlier cycle: a different decision.
+        The rule matches a trade "within one session". Only later: a sim
+        entry or ladder close a session *earlier* than the real one
+        answered an earlier cycle, a different decision. Since the fix of
+        10 Nov 2026 the copy acts on the real account's own day, so a lag
+        is the exception, not the design.
         """
         return self.sim.day > self.real.day and not self.stop_differs
 
@@ -1166,8 +1401,9 @@ class CalibrationResult:
     sim_trades: list[Trade] = field(default_factory=list)
     matches: list[Match] = field(default_factory=list)
     differences: list[Difference] = field(default_factory=list)
-    #: Real trades on the final session with no sim trade yet: the sim acts on
-    #: them at the next open, which the run has not reached. Compared next run.
+    #: Real trades not compared yet. Empty since the fix of 10 Nov 2026: the
+    #: copy answers every line the day it was journalled, so the final
+    #: session leaves nothing for a next open. Kept for the record's shape.
     pending: list[Trade] = field(default_factory=list)
     integrity: Integrity = field(default_factory=Integrity)
     seed: Optional[Seed] = None
@@ -1289,10 +1525,10 @@ def run_calibration(
     Sessions are the bar sessions after ``start``, through the last day the
     real account has a close for, until as many of them have a real close
     to compare with as ``closes_needed`` asks: ``days_needed``, or more when
-    a fix leaves fewer than ``after_fix_days`` of them after it. C1 gets no
-    cycle (C0's is in the seed); every later session acts on the session
-    before it, when a cycle ran that day. ``feed`` must be a ``SimFeed``
-    over ``bars``.
+    a fix leaves fewer than ``after_fix_days`` of them after it. Each
+    session acts on its own cycle, when one ran that day, on the real
+    account's record of that day (``RealRecord``; C0's cycle is in the
+    seed). ``feed`` must be a ``SimFeed`` over ``bars``.
 
     Every run starts again from the same seed with the code as it is, so a
     run after a fix is the fixed simulation re-run over every day so far.
@@ -1330,22 +1566,24 @@ def run_calibration(
     cycles = lines_by_day(entries)
     ran = cycle_days(entries)
     late = LateRuns(entries, audit_lines)
+    stop_ids, ladder_ids = _order_ids(snapshots, audit_records(audit_lines))
+    record = RealRecord(entries, audit_lines, seed, _all_fills(snapshots), _seed_cut(start, chosen), stop_ids,
+                        ladder_ids)
 
     run: list[date] = []
     compared: list[date] = []
     managed = False
     try:
         with live_audit_guarded():
-            previous = start
             for session in sessions:
                 if len(compared) >= closes_needed(compared, result.fixes, days_needed, after_fix_days):
                     break
                 feed.at_open(session)
                 cycle: Optional[list[Line]] = None
                 manage = True
-                if previous != start and previous in ran:
-                    cycle, manage = late.cycle(previous, session, cycles.get(previous, []), fund)
-                fund.session(session, cycle, manage=manage)
+                if session in ran:
+                    cycle, manage = late.cycle(session, session, cycles.get(session, []), fund)
+                fund.session_recorded(session, cycle, record.day(session), manage=manage)
                 run.append(session)
                 # The seeded book is the real account's, faults and all; from
                 # the first management pass on, its stops are the sim's own.
@@ -1355,7 +1593,6 @@ def run_calibration(
                     result.integrity.uncovered += _uncovered(fund, session)
                 if session in real:
                     compared.append(session)
-                previous = session
     except LiveAuditLeak as exc:
         result.integrity.leak = str(exc)
 
@@ -1374,6 +1611,10 @@ def run_calibration(
         holes = fund.tally.data_holes
         result.problems.append(f"{len(holes)} ticker-day(s) had no price bar, so the sim left those positions "
                                f"as they were and made no entry in them that day (first: {holes[0]})")
+    if fund.not_entered:
+        counts = ", ".join(f"{n} {why}" for why, n in sorted(fund.not_entered.items()))
+        result.problems.append(f"{sum(fund.not_entered.values())} directional line(s) were not entered for want "
+                               f"of a recorded price: {counts}")
     if run:
         compare_trades(result, snapshots, audit_lines, fund, _seed_cut(start, chosen), run)
     return result
@@ -1406,34 +1647,13 @@ def real_trades(seed: Seed, fills: Iterable[AccountFill], after: datetime, first
                 ladder_order_ids: frozenset[str] = frozenset()) -> list[Trade]:
     """The real account's trades from ``first`` to ``last``, each classed against the book it met.
 
-    Fills at or before ``after`` are already in the seed. Every later fill
-    moves the book forward from the seed, so a sell is known to be a close
-    of a long, not a short sale, whatever day it falls on.
-
-    A reduction is a stop's when its order is one a snapshot listed as a
-    stop, a ladder or trim close when the live manager recorded its order,
-    and otherwise a stop still: the stop is the only other exit this system
-    has, and a stop replaced and filled between two snapshots is never
-    listed under the id that filled.
+    Fills at or before ``after`` are already in the seed; every later fill
+    is classed by ``_fill_classes`` (its direction against the book it met,
+    and whether it was a stop's).
     """
-    book = {p.ticker: float(p.qty) for p in seed.positions}
-    rows = []
-    for fill in sorted(fills, key=lambda f: f.at):
-        if fill.at <= after:
-            continue
-        held = book.get(fill.ticker, 0.0)
-        signed = fill.signed
-        direction = OPEN if abs(held) < 1e-9 or (held > 0) == (signed > 0) else REDUCE
-        book[fill.ticker] = held + signed
-        if first <= fill.day <= last:
-            if fill.order_id and fill.order_id in stop_order_ids:
-                kind = STOP
-            elif direction == OPEN or (fill.order_id and fill.order_id in ladder_order_ids):
-                kind = "market"
-            else:
-                kind = STOP
-            rows.append((fill.day, fill.ticker, direction, "buy" if signed > 0 else "sell", fill.qty, fill.price,
-                         kind))
+    rows = [(fill.day, fill.ticker, direction, "buy" if fill.signed > 0 else "sell", fill.qty, fill.price, kind)
+            for fill, direction, kind in _fill_classes(seed, fills, after, stop_order_ids, ladder_order_ids)
+            if first <= fill.day <= last]
     return _group(rows)
 
 
@@ -1493,27 +1713,29 @@ def _why_real_only(trade: Trade, decisions: Sequence[Decision]) -> str:
     """A real trade the sim did not make."""
     if trade.direction == REDUCE:
         return STOP_DAY if trade.is_stop else LADDER
-    # The sim acts on the real account's cycle day at the next open: its
+    # The sim acts on the real account's cycle day during that day: its
     # answer to the same line is the decision journalled for that cycle day.
     said = [d for d in decisions if d.cycle_day == trade.day and d.ticker == trade.ticker]
     for decision in reversed(said):
         if not decision.dispatched:
-            return SIM_HELD
+            # Never dispatched: the sim held the name already, or (the
+            # copy) had no recorded price to enter the line at.
+            return SIM_HELD if decision.reason == "already held" else SIM_REJECTED + _short(decision.reason)
         if decision.status in ("REJECTED", "ERROR"):
             return SIM_REJECTED + _short(decision.reason)
     return UNEXPLAINED
 
 
-def _why_sim_only(trade: Trade, order: Sequence[date],
-                  refusals: Mapping[tuple[str, date], list[AuditRecord]]) -> str:
-    """A sim trade the real account did not make."""
+def _why_sim_only(trade: Trade, refusals: Mapping[tuple[str, date], list[AuditRecord]]) -> str:
+    """A sim trade the real account did not make.
+
+    The copy acts on a cycle the day it was journalled, so the real engine's
+    answer to the same line is its record for that ticker on the trade's
+    own day.
+    """
     if trade.direction == REDUCE:
         return STOP_DAY if trade.is_stop else LADDER
-    position = bisect_left(order, trade.day)
-    if position < 1:
-        return UNEXPLAINED
-    cycle_day = order[position - 1]
-    said = refusals.get((trade.ticker, cycle_day), [])
+    said = refusals.get((trade.ticker, trade.day), [])
     if any(r.result.get("status") == "ACCEPTED" for r in said):
         return UNEXPLAINED          # accepted live, yet no fill recorded
     for status, prefix in (("ERROR", REAL_REFUSED), ("REJECTED", REAL_REJECTED)):
@@ -1525,14 +1747,16 @@ def _why_sim_only(trade: Trade, order: Sequence[date],
 
 def compare_trades(result: CalibrationResult, snapshots: Sequence[Snapshot], audit_lines: Sequence[str],
                    fund: Fund, after: datetime, sessions: Sequence[date]) -> None:
-    """Fill in the result's trades, matches, pending trades and differences."""
+    """Fill in the result's trades, matches and differences.
+
+    The copy acts on each cycle the day it was journalled, so by the final
+    session it has answered every line the real account traded: nothing is
+    left pending for a next open the run has not reached.
+    """
     assert result.seed is not None
     order = [result.start, *sessions]
     records = audit_records(audit_lines)
-    stop_ids = frozenset(s.order_id for snap in snapshots for s in (snap.stops or ()) if s.order_id)
-    ladder_ids = frozenset(str(r.action.get("order_id")) for r in records if r.event == MANAGED_EVENT
-                           and r.action.get("action") in ("tranche_taken", "group_cap_trimmed")
-                           and r.action.get("order_id"))
+    stop_ids, ladder_ids = _order_ids(snapshots, records)
     real = real_trades(result.seed, _all_fills(snapshots), after, sessions[0], sessions[-1], stop_ids, ladder_ids)
     sim = sim_trades(fund)
     matches = match_trades(real, sim, order)
@@ -1540,12 +1764,8 @@ def compare_trades(result: CalibrationResult, snapshots: Sequence[Snapshot], aud
     matched_real = {m.real for m in matches}
     matched_sim = {m.sim for m in matches}
 
-    final = sessions[-1]
-    # A real entry or ladder close on the final session is answered at the
-    # next open, which the run has not reached. A stop is not: it fills the
-    # same day in both books, so an unmatched one is already a difference.
-    result.pending = [t for t in real if t.day == final and t not in matched_real and not t.is_stop]
-    result.real_trades = [t for t in real if t not in result.pending]
+    result.pending = []
+    result.real_trades = list(real)
     result.sim_trades = sim
     result.matches = matches
 
@@ -1565,7 +1785,7 @@ def compare_trades(result: CalibrationResult, snapshots: Sequence[Snapshot], aud
             differences.append(Difference(t.day, t.ticker, t.describe(), "none", _why_real_only(t, result.decisions)))
     for t in sim:
         if t not in matched_sim:
-            differences.append(Difference(t.day, t.ticker, "none", t.describe(), _why_sim_only(t, order, refusals)))
+            differences.append(Difference(t.day, t.ticker, "none", t.describe(), _why_sim_only(t, refusals)))
     result.differences = sorted(differences, key=lambda d: (d.day, d.ticker, d.real, d.sim))
 
 
@@ -1982,12 +2202,6 @@ def estimated_end(result: CalibrationResult, start: Optional[date] = None, rule:
 # i) How long the real account holds a position
 # --------------------------------------------------------------------------- #
 
-#: Actions only a full management pass writes, one per position held. A
-#: protect-only pass writes a line only for a position it had to fix, so
-#: its silence about a ticker says nothing about whether it is held.
-_FULL_PASS = frozenset({"held", "stop_raised", "tranche_taken", "unmanaged", "group_cap_trimmed"})
-
-
 @dataclass(frozen=True)
 class Holding:
     ticker: str
@@ -2268,7 +2482,8 @@ __all__ = [
     "AccountFill", "AuditRecord", "CALIBRATION_COST_PER_SIDE", "CalibrationResult", "Condition", "DAYS_NEEDED",
     "Difference", "Fix", "Holding", "HeldPosition", "Integrity", "LateRuns", "MARKET_CLOSED", "MIRRORED",
     "MIRROR_ENTRY", "MIRROR_LADDER", "MIRROR_LIMIT", "MIRROR_REASON", "Match", "Metrics", "Mirrored", "PASS_RULE",
-    "PassRule", "REASONS", "RestingStop", "Seed", "SeedPosition", "SeriesPoint", "Snapshot", "Snapshots", "Trade",
+    "PassRule", "REASONS", "RealRecord", "RestingStop", "Seed", "SeedPosition", "SeriesPoint", "Snapshot", "Snapshots",
+    "StopFill", "Trade",
     "UNMERGED_FIX", "audit_lines_through", "audit_records", "book_at_close", "calibration_json",
     "calibration_report", "calibration_status", "closes_needed", "compare_trades", "conditions", "days_passed",
     "end_estimate", "estimated_end", "evaluate_pass_rule", "holding_days", "holding_periods", "in_regular_hours",
