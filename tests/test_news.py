@@ -779,9 +779,11 @@ def test_the_guard_keeps_the_ticker_or_the_companys_name_and_drops_the_rest():
 
     assert kept("TEVA", "Teva CEO explains why the drugmaker is growing", "Generic drug prices fall again",
                 "$TEVA jumps after earnings") == ["Teva CEO explains why the drugmaker is growing", "$TEVA jumps after earnings"]
-    # A fund is known by its ticker alone: its display name describes it.
+    # A fund is known by its ticker, and since 10 Nov 2026 by what it holds; never by its display name.
     assert kept("DBA", "Malvern Country Music Gathering returns Nov. 6-7", "Bellevue residents approve $3 million pool bond",
-                "DBA: A Well-Rounded Commodity ETF", "Agricultural ETFs rally") == ["DBA: A Well-Rounded Commodity ETF"]
+                "DBA: A Well-Rounded Commodity ETF", "Agricultural ETFs rally") == [
+        "DBA: A Well-Rounded Commodity ETF", "Agricultural ETFs rally"]
+    assert kept("IWM", "US small companies", "Russell 2000 rebounds") == ["Russell 2000 rebounds"]
     assert kept("DBC", "Vanguard S&P 500 ETF", "Top ETF Losers", "Notable ETF Outflow Detected - DBC") == ["Notable ETF Outflow Detected - DBC"]
     # The ticker as written: not a word that happens to spell it, and not the start of PG&E.
     assert kept("TIP", "A tip for investors", "Tips ETF (TIP) sees inflows") == ["Tips ETF (TIP) sees inflows"]
@@ -795,7 +797,19 @@ def test_the_guard_keeps_the_ticker_or_the_companys_name_and_drops_the_rest():
     # The snippet counts too.
     assert kept("XOM") == []
     assert [h.title for h in news.relevant_headlines("XOM", [news.Headline("Oil majors report", snippet="Exxon beat")])] == ["Oil majors report"]
-    assert news.name_words("RY") == ("RY", "Royal Bank of Canada") and news.name_words("DBA") == ("DBA",)
+    assert news.name_words("RY") == ("RY", "Royal Bank of Canada")
+    # A fund since 10 Nov 2026: also what it holds, as a story would say it (config.instruments.NEWS_THEMES).
+    assert news.name_words("CPER")[:2] == ("CPER", "copper") and "won" not in news.name_words("EWY")
+    assert kept("SMH", "Chipmakers rally as Nvidia lifts its outlook", "Top ETF Losers") == [
+        "Chipmakers rally as Nvidia lifts its outlook"]
+    assert kept("USO", "Oil prices jump as OPEC+ holds output", "Olive growers face a dry year") == [
+        "Oil prices jump as OPEC+ holds output"]
+    assert kept("TUR", "Turkish lira slides after the rate cut", "Turkey prices climb before Thanksgiving") == [
+        "Turkish lira slides after the rate cut"]
+    assert kept("EWY", "Kospi closes at a record", "The team won again") == ["Kospi closes at a record"]
+    assert kept("GDX", "Goldman Sachs raises its targets", "Gold miners extend the rally") == ["Gold miners extend the rally"]
+    assert kept("DBA", "Malvern Country Music Gathering returns", "Grain prices fall on a big harvest") == [
+        "Grain prices fall on a big harvest"]
 
 
 def test_a_second_refused_answer_from_google_takes_the_feed_directly_kept_to_the_name(monkeypatch, caplog):

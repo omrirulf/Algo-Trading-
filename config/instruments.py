@@ -424,6 +424,89 @@ DISPLAY_NAMES: Final[dict[str, str]] = {
     "CANE": "Sugar",
 }
 
+#: What a headline about what a fund *holds* would say: the words the news
+#: fallback's guard accepts for a fund besides its ticker
+#: (``orchestrator.news.relevant_headlines``; the owner's decision of 10 Nov
+#: 2026, after the first two cycle days with the fallback left 11 and then
+#: 14 funds without news while Bing's feed had stories for most of them).
+#: A fund's display name above describes it for a person; these are the
+#: words a story uses. Matched as whole words in any case, so never an
+#: everyday word that is also one of these: not "won" for Korea, "real" for
+#: Brazil, "polish" for Poland, "turkey" in November, "fed" for the Fed.
+#: Companies have no entry: a company is known by its own name.
+NEWS_THEMES: Final[dict[str, tuple[str, ...]]] = {
+    # Broad funds
+    "RSP": ("S&P 500", "equal weight", "equal-weight"),
+    "IWM": ("Russell 2000", "small cap", "small caps", "small-cap", "small-caps"),
+    "VGK": ("Europe", "European", "euro zone", "eurozone", "ECB", "Stoxx"),
+    "VWO": ("emerging market", "emerging markets", "emerging-market"),
+    "SHY": ("Treasury", "Treasuries", "Federal Reserve", "Powell", "rate cut", "rate cuts", "rate hike"),
+    "IEF": ("Treasury", "Treasuries", "10-year", "bond yields", "Federal Reserve", "Powell"),
+    "TLT": ("Treasury", "Treasuries", "long bond", "30-year", "bond yields"),
+    "TIP": ("TIPS", "inflation-protected", "inflation protected", "inflation-linked", "inflation", "CPI"),
+    "LQD": ("investment-grade", "investment grade", "corporate bond", "corporate bonds", "credit spreads"),
+    "HYG": ("high-yield", "high yield", "junk bond", "junk bonds", "credit spreads", "leveraged loans"),
+    "EMB": ("emerging market bond", "emerging market bonds", "emerging-market bond", "emerging market debt",
+            "emerging-market debt", "sovereign debt", "EM debt"),
+    "DBC": ("commodity", "commodities"),
+    "DBA": ("agriculture", "agricultural", "farm", "grain", "grains", "crop", "crops", "soft commodities"),
+    "UUP": ("US dollar", "U.S. dollar", "dollar index", "DXY", "greenback"),
+    # Sectors and themes
+    "XLE": ("energy stocks", "energy sector", "oil majors", "oil prices", "crude", "Exxon", "Chevron"),
+    "XLF": ("banks", "bank stocks", "financials", "financial sector", "JPMorgan", "Goldman Sachs"),
+    "KRE": ("regional bank", "regional banks", "regional lenders", "bank stocks"),
+    "XLV": ("health care", "healthcare", "pharma", "drugmaker", "drugmakers", "UnitedHealth", "Eli Lilly"),
+    "XBI": ("biotech", "biotechs", "biotechnology", "FDA"),
+    "XLK": ("tech stocks", "technology stocks", "technology sector", "Apple", "Microsoft", "Nvidia", "Broadcom"),
+    "XLC": ("communication services", "Meta", "Alphabet", "Netflix", "Disney", "telecom"),
+    "SMH": ("chip", "chips", "chipmaker", "chipmakers", "semiconductor", "semiconductors", "Nvidia", "TSMC"),
+    "IGV": ("software", "SaaS", "Salesforce", "Oracle"),
+    "XLI": ("industrials", "industrial stocks", "industrial sector", "Caterpillar", "Boeing", "GE Aerospace", "Honeywell"),
+    "ITA": ("defense", "defence", "aerospace", "Lockheed", "RTX", "Raytheon", "Northrop", "Pentagon"),
+    "IYT": ("transport", "transportation", "airline", "airlines", "railroad", "railroads", "trucking", "FedEx", "UPS"),
+    "XLY": ("consumer discretionary", "retail sales", "retailers", "consumer spending", "Amazon", "Tesla", "Home Depot"),
+    "XLP": ("consumer staples", "staples", "Procter", "Walmart", "Costco", "Coca-Cola", "PepsiCo"),
+    "XLU": ("utilities", "utility stocks", "utility sector", "power companies", "electricity"),
+    "XLB": ("materials sector", "materials stocks", "chemicals", "chemical makers", "Linde", "Sherwin-Williams"),
+    "VNQ": ("real estate", "REIT", "REITs"),
+    "XHB": ("homebuilder", "homebuilders", "home builders", "housing", "housing starts", "mortgage rates",
+            "Lennar", "D.R. Horton", "Toll Brothers"),
+    "GDX": ("gold", "gold miner", "gold miners", "gold mining", "Newmont", "Barrick", "bullion"),
+    # Single countries
+    "EWJ": ("Japan", "Japanese", "Nikkei", "Bank of Japan", "yen", "Tokyo"),
+    "EIS": ("Israel", "Israeli", "Tel Aviv", "TASE", "shekel"),
+    "EWU": ("UK", "U.K.", "Britain", "British", "FTSE", "Bank of England", "sterling"),
+    "EWG": ("Germany", "German", "DAX", "Bundesbank", "Berlin"),
+    "EWL": ("Switzerland", "Swiss", "Nestle", "Novartis", "Roche", "UBS"),
+    "EWN": ("Netherlands", "Dutch", "Amsterdam", "AEX", "ASML"),
+    "EWI": ("Italy", "Italian", "Milan", "FTSE MIB"),
+    "EWP": ("Spain", "Spanish", "Madrid", "IBEX"),
+    "EWD": ("Sweden", "Swedish", "Stockholm", "Riksbank", "krona"),
+    "EWC": ("Canada", "Canadian", "TSX", "Bank of Canada", "loonie"),
+    "EWA": ("Australia", "Australian", "ASX", "Reserve Bank of Australia", "RBA"),
+    "MCHI": ("China", "Chinese", "Beijing", "Hong Kong", "Hang Seng", "Shanghai", "PBOC", "yuan"),
+    "INDA": ("India", "Indian", "Mumbai", "Sensex", "Nifty", "RBI", "rupee"),
+    "EWY": ("Korea", "Korean", "Seoul", "Kospi", "Samsung"),
+    "EWT": ("Taiwan", "Taiwanese", "Taipei", "TSMC"),
+    "EWZ": ("Brazil", "Brazilian", "Bovespa", "Ibovespa", "Petrobras", "Lula"),
+    "EWW": ("Mexico", "Mexican", "Banxico", "peso"),
+    "KSA": ("Saudi", "Aramco", "Riyadh", "Tadawul"),
+    "TUR": ("Turkish", "Turkey's", "lira", "Istanbul", "Ankara", "Erdogan"),
+    "EZA": ("South Africa", "South African", "Johannesburg", "JSE"),
+    "EPOL": ("Poland", "Poland's", "Warsaw", "zloty"),
+    "ARGT": ("Argentina", "Argentine", "Argentina's", "Milei", "Buenos Aires"),
+    # Single commodities
+    "GLD": ("gold", "gold price", "gold prices", "bullion"),
+    "SLV": ("silver", "silver price", "silver prices"),
+    "CPER": ("copper", "copper price", "copper prices"),
+    "USO": ("oil", "crude", "OPEC", "Brent", "WTI", "oil prices"),
+    "UNG": ("natural gas", "natgas", "LNG", "Henry Hub"),
+    "CORN": ("corn", "corn prices", "corn futures", "grain", "grains"),
+    "WEAT": ("wheat", "wheat prices", "wheat futures", "grain", "grains"),
+    "SOYB": ("soybean", "soybeans", "soy", "grain", "grains"),
+    "CANE": ("sugar", "sugar prices", "sugarcane"),
+}
+
 #: What each kind is called in a report. The enum names are for code; these
 #: are for a person, and they say what the thing *is* rather than how the
 #: sizing code groups it.
@@ -669,6 +752,7 @@ def equity_risk_beta(ticker: str) -> float | None:
 
 
 __all__ = [
+    "NEWS_THEMES",
     "InstrumentKind",
     "SINGLE_NAME_SECTORS",
     "SINGLE_NAMES",
