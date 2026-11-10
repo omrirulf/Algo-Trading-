@@ -1,14 +1,14 @@
 # After Israeli tax and in shekels
 
-Record through 2026-11-04, written 2026-11-05T02:58:00.792468+00:00. Rules: pre-registration section 5c, every number in `config/israel_tax.py` (tax 25%; losses also against dividends: on; W-8BEN: yes; surtax: off).
+Record through 2026-11-09, written 2026-11-10T04:26:23.634646+00:00. Rules: pre-registration section 5c, every number in `config/israel_tax.py` (tax 25%; losses also against dividends: on; W-8BEN: yes; surtax: off).
 
-Rates: the Bank of Israel's representative rate, 2026-09-10 to 2026-11-04; 37 day(s) from the Bank of Israel, 3 day(s) from another source: 2026-09-11 (ecb), 2026-09-21 (ecb), 2026-10-27 (ecb). Table SHA-256 `ac54990235fac1f1969f4f2776a1a20c5bf19e23ec45fa4981aadc6be5dfb8f3`.
+Rates: the Bank of Israel's representative rate, 2026-09-10 to 2026-11-09; 40 day(s) from the Bank of Israel, 3 day(s) from another source: 2026-09-11 (ecb), 2026-09-21 (ecb), 2026-10-27 (ecb). Table SHA-256 `fb8c94a30518e4e171de406d73e8e6e142c688eb197a19858f2941fc990161ad`.
 
 Returns since each book's start. "Tax paid so far" is the tax due on everything sold or received so far; "if sold today" adds every open position sold at the close. "From the $/₪ move" is the shekel return minus the dollar return, before tax and after tax (if sold today).
 
 | | Before tax ($) | After tax, if sold today ($) | After tax, tax paid so far ($) | Before tax (₪) | After tax, if sold today (₪) | After tax, tax paid so far (₪) | From the $/₪ move, before tax | From the $/₪ move, after tax | Tax paid so far (₪) | Tax if sold today (₪) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Paper account (real) | $100,826 (+0.83%) | $100,580 (+0.58%) | $100,826 (+0.83%) | ₪318,308 (+5.30%) | ₪317,533 (+5.04%) | ₪318,308 (+5.30%) | +4.47 points | +4.46 points | ₪0 | ₪775 |
+| Paper account (real) | $100,370 (+0.37%) | $100,216 (+0.22%) | $100,370 (+0.37%) | ₪320,581 (+6.05%) | ₪320,089 (+5.88%) | ₪320,581 (+6.05%) | +5.68 points | +5.67 points | ₪0 | ₪492 |
 
 The funds are shown after tax once calibration has passed, like every fund result.
 

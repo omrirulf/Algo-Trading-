@@ -1,7 +1,8 @@
-🟡 1 warning: 4 of 80 ticker(s) were judged without news
-Equity $101,203 · 23 positions · $92,094 gross · $3,977 at risk · unrealised +$2,194
-Traded: MSFT, NVO, ESLT, MELI, XOM
+🔴 14 of 80 ticker(s) were judged without news
+Equity $101,026 · 18 positions · $77,130 gross · $4,188 at risk · unrealised +$1,711
+Traded: XHB, EPOL
 Started by supabase-cron at 14:40 UTC (0 min after 14:40)
-Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-11-04
-Closed: ASML, GLD, HYG
-Cycle 80 tickers, $0.15 · 2026-11-05
+Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-11-09
+Closed: XOM, LLY, JPM, RY, CAT, XLB
+Also: 25 of 80 ticker(s) took their news from Bing's feed
+Cycle 80 tickers, $0.16 · 2026-11-10
