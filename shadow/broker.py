@@ -268,6 +268,23 @@ class SimBroker:
             if touched:
                 self._fill_stop(stop, stop.stop_price, gapped=False)
 
+    def fill_stops_as_recorded(self, fills: Iterable[tuple[str, str, float]]) -> None:
+        """Fill every live stop of a name, on the stop's own side, at a recorded price.
+
+        For the calibration copy (``shadow.calibration``): each item is
+        ``(ticker, side, price)``, a stop fill the real account's own record
+        shows, and the copy's resting stops in that name on that side fill
+        with it, at the real fill's price -- the tape decided, not the daily
+        bar. A name the copy does not hold, or holds with no live stop on
+        that side, is left alone: the difference shows in the trade
+        comparison.
+        """
+        for ticker, side, price in fills:
+            ticker = ticker.strip().upper()
+            for stop in list(self._stops):
+                if stop.live and stop.ticker == ticker and stop.side == side:
+                    self._fill_stop(stop, price, gapped=False)
+
     def pay_dividends(self, per_share: dict[str, float], held: dict[str, int]) -> None:
         """Credit longs, charge shorts, for the shares held at the previous close."""
         for ticker, amount in per_share.items():

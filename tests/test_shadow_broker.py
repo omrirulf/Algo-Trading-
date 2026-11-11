@@ -485,3 +485,22 @@ def test_the_real_ladder_protects_first_then_sells_within_this_brokers_reservati
     broker2.submit_bracket_order("AAA", 9, "buy", 96.0)
     with pytest.raises(BrokerError, match="insufficient qty available"):
         broker2.close_position_partially("AAA", 3)
+
+
+def test_a_recorded_stop_fill_takes_every_live_stop_of_that_name_on_that_side():
+    """The calibration copy's stops in a name the real account held fill as
+    the real account's did: at the recorded price, every live stop on that
+    side, and nothing else -- not the other side, not a name it does not hold."""
+    prices = {"NVDA": 100.0, "EWZ": 30.0}
+    broker = SimBroker(name="copy", cash=100_000.0, quote=lambda ticker: prices[ticker], cost_per_side=0.0, day=D1)
+    broker.seed_position("NVDA", 50, 100.0, D1, [(30, 96.0), (20, 95.0)])
+    broker.seed_position("EWZ", -40, 30.0, D1, [(40, 32.0)])
+
+    broker.fill_stops_as_recorded([("NVDA", "sell", 97.5), ("EWZ", "sell", 29.0), ("MSFT", "sell", 90.0)])
+
+    nvda = [(f.kind, f.side, f.qty, f.price, f.gapped) for f in broker.fills if f.ticker == "NVDA"]
+    assert nvda == [(STOP, "sell", 30, 97.5, False), (STOP, "sell", 20, 97.5, False)]
+    assert "NVDA" not in broker.positions and broker.cash == pytest.approx(100_000.0 + 50 * 97.5)
+    assert broker.positions["EWZ"].qty == -40 and [s.ticker for s in broker.live_stops()] == ["EWZ"]
+    assert not [f for f in broker.fills if f.ticker in ("EWZ", "MSFT")]
+

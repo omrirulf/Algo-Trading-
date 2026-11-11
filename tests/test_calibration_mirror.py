@@ -82,18 +82,25 @@ class NewLine:
 
 def jline(moment: str, ticker: str, bias: str = "BULLISH", conviction: float = 0.8, *, status: Optional[str] = None,
           held: bool = False, started: Optional[str] = None, reason: Optional[str] = None,
-          management: Optional[bool] = None):
-    """One journal line at ``moment`` (UTC). ``reason``/``management`` give it the reader's new fields."""
+          management: Optional[bool] = None, live: Optional[dict] = None):
+    """One journal line at ``moment`` (UTC). ``reason``/``management`` give it the reader's new fields;
+    ``live`` the quote recorded when it was made."""
     run = {"trigger": "backup", "started_at": started + "+00:00"} if started else None
     if held:
         entry = JournalEntry(ticker=ticker, timestamp=utc(moment), timestamp_is_exact=True, held=True,
-                             run_record=run)
+                             run_record=run, live_record=live)
     else:
         entry = JournalEntry(ticker=ticker, timestamp=utc(moment), timestamp_is_exact=True, bias=bias,
-                             conviction=conviction, outcome_status=status, run_record=run)
+                             conviction=conviction, outcome_status=status, run_record=run, live_record=live)
     if reason is None and management is None:
         return entry
     return NewLine(entry, reason, management)
+
+
+def quote(price: float, asked_at: str) -> dict:
+    """A line's ``live`` record: the quote taken when its signal was made (``asked_at`` in UTC)."""
+    return {"price": price, "bid": price, "ask": price, "quote_at": asked_at + "+00:00",
+            "asked_at": asked_at + "+00:00", "source": "test"}
 
 
 def closed_at(moment: str, ticker: str) -> str:
@@ -160,9 +167,10 @@ def test_regular_hours_are_new_yorks_with_its_half_days(moment, inside):
 
 def test_a_pre_open_cycle_day_is_mirrored_not_traded():
     """C1's run went out at 08:35 New York. The real broker refused both
-    entries; without the mirror the sim would buy both at C2's open."""
-    entries = [jline("2026-10-02T12:35:00", "JPM", status="REJECTED"),
-               jline("2026-10-02T12:35:01", "XOM", conviction=0.7, status="REJECTED")]
+    entries; without the mirror the sim would buy both on C1 at their quotes."""
+    entries = [jline("2026-10-02T12:35:00", "JPM", status="REJECTED", live=quote(100.0, "2026-10-02T12:35:00")),
+               jline("2026-10-02T12:35:01", "XOM", conviction=0.7, status="REJECTED",
+                     live=quote(100.0, "2026-10-02T12:35:01"))]
     audit = [closed_at("2026-10-02T12:35:00", "JPM"), closed_at("2026-10-02T12:35:01", "XOM")]
 
     result = run(snaps_for(C3), entries, flat_bars("JPM", "XOM"), audit)
@@ -172,7 +180,7 @@ def test_a_pre_open_cycle_day_is_mirrored_not_traded():
     assert result.differences == []                     # neither book traded: not a difference
     mirrored = [d for d in result.decisions if d.status == calib.MIRRORED]
     assert [(d.session, d.cycle_day, d.ticker, d.dispatched, d.reason) for d in mirrored] == [
-        (C2, C1, "JPM", True, calib.MIRROR_REASON), (C2, C1, "XOM", True, calib.MIRROR_REASON)]
+        (C1, C1, "JPM", True, calib.MIRROR_REASON), (C1, C1, "XOM", True, calib.MIRROR_REASON)]
     assert result.problems == []                        # 08:35 is not inside the schedule
     _, lines = calib.evaluate_pass_rule(result)
     assert "Note: 2 entries and 0 ladder passes mirrored on 1 day (limit 2)" in lines
@@ -181,21 +189,23 @@ def test_a_pre_open_cycle_day_is_mirrored_not_traded():
 
 def test_a_closed_market_refusal_during_the_session_is_never_mirrored():
     """12:00 New York and the broker said closed: the real account's clock at
-    fault. The sim trades it, and the difference shows with its reason."""
-    entries = [jline("2026-10-02T16:00:00", "JPM", status="REJECTED")]
+    fault. The sim trades it the same day, at the quote the line recorded,
+    and the difference shows with its reason."""
+    entries = [jline("2026-10-02T16:00:00", "JPM", status="REJECTED", live=quote(100.0, "2026-10-02T16:00:00"))]
     audit = [closed_at("2026-10-02T16:00:00", "JPM")]
 
     result = run(snaps_for(C3), entries, flat_bars("JPM"), audit)
 
     assert result.mirrored == []
-    assert [(day, kind) for day, kind, _ in sim_fills(result, "JPM")] == [(C2, "entry")]
+    assert [(day, kind) for day, kind, _ in sim_fills(result, "JPM")] == [(C1, "entry")]
     [diff] = result.differences
     assert (diff.ticker, diff.real, diff.reason) == ("JPM", "none", "real rejected: market is closed")
 
 
 def test_an_after_close_second_cycle_is_mirrored_and_the_first_is_traded():
     """Cycle 1 at 11:10 New York bought JPM; a second run at 16:30 was refused
-    XOM. The sim buys JPM at C2 (a session later: timing) and not XOM."""
+    XOM. The sim buys JPM on C1, at the price the real engine recorded, and
+    not XOM."""
     entries = [
         jline("2026-10-02T15:10:00", "JPM", status="ACCEPTED", management=False),
         jline("2026-10-02T15:10:01", "XOM", bias="NEUTRAL", conviction=0.0, status="REJECTED", management=False),
@@ -211,10 +221,10 @@ def test_an_after_close_second_cycle_is_mirrored_and_the_first_is_traded():
     assert [(m.day, m.ticker, m.what) for m in result.mirrored] == [(C1, "XOM", "entry")]
     # One cycle of the day managed, so the copy manages: no ladder pass is mirrored.
     assert not [m for m in result.mirrored if m.what == calib.MIRROR_LADDER]
-    assert [(day, kind) for day, kind, _ in sim_fills(result, "JPM")] == [(C2, "entry")]
+    assert [(day, kind) for day, kind, _ in sim_fills(result, "JPM")] == [(C1, "entry")]
     assert sim_fills(result, "XOM") == []
     jpm = [m for m in result.matches if m.real.ticker == "JPM"]
-    assert len(jpm) == 1 and jpm[0].lag
+    assert len(jpm) == 1 and not jpm[0].timing
     assert "XOM" not in {d.ticker for d in result.differences}
     # No run block says when the second run started; the day's first line
     # (11:10, inside the schedule) is another run's, and blames no guard.
@@ -237,7 +247,7 @@ def test_a_run_straddling_the_close_mirrors_only_what_came_after_it(started, fla
     result = run(snaps_for(C3, fills=fills), entries, flat_bars("JPM", "XOM"), audit)
 
     assert [(m.ticker, m.what) for m in result.mirrored] == [("XOM", "entry")]
-    assert [(day, kind) for day, kind, _ in sim_fills(result, "JPM")] == [(C2, "entry")]
+    assert [(day, kind) for day, kind, _ in sim_fills(result, "JPM")] == [(C1, "entry")]
     notes = [p for p in result.problems if calib.SCHEDULE_GUARD in p]
     if flagged:
         assert notes == ["2026-10-02: late-run mirroring was needed for a cycle that started at 14:00 New York, "
@@ -265,10 +275,10 @@ def test_a_refused_line_is_mirrored_and_the_days_accepted_line_trades(early_bias
 
     # The early run met a closed market: that day counts against the limit.
     assert [(m.day, m.ticker, m.what) for m in result.mirrored] == [(C1, "XOM", "entry")]
-    assert [(f.day, f.kind, f.side) for f in result.fund.broker.fills if f.ticker == "XOM"] == [(C2, "entry", "buy")]
+    assert [(f.day, f.kind, f.side) for f in result.fund.broker.fills if f.ticker == "XOM"] == [(C1, "entry", "buy")]
     assert [(d.bias, d.status) for d in result.decisions if d.ticker == "XOM"] == [
         (early_bias, calib.MIRRORED), ("BULLISH", "ACCEPTED")]
-    assert [m.lag for m in result.matches if m.real.ticker == "XOM"] == [True]
+    assert [m.timing for m in result.matches if m.real.ticker == "XOM"] == [False]
     assert result.differences == []
 
 
@@ -318,15 +328,18 @@ def test_a_long_and_a_short_opened_the_same_day_are_two_trades():
 
 def test_a_sim_that_flips_a_calls_direction_fails_the_trade_match():
     """End to end, with the mirror out of the way: the real account bought
-    XOM on C1 and the sim, on a line that said BEARISH, sold it short at C2's
-    open. Both trades are differences, and the real one reads "unexplained"."""
-    entries = [jline("2026-10-02T15:00:00", "XOM", bias="BEARISH", status="ACCEPTED")]
+    XOM on C1 and the sim, on a line that said BEARISH, sold it short on C1
+    at the line's recorded bid (the engine's price was a buy's, not the
+    short's). Both trades are differences, and the real one reads
+    "unexplained"."""
+    entries = [jline("2026-10-02T15:00:00", "XOM", bias="BEARISH", status="ACCEPTED",
+                     live=quote(100.0, "2026-10-02T15:00:00"))]
     audit = [accepted("2026-10-02T15:00:00", "XOM", "buy", 49, 100.0, 96.0)]
     fills = [("f1", "o-xom", "XOM", "buy", 49, 100.0, "2026-10-02T15:00:30Z")]
 
     result = run(snaps_for(C3, fills=fills), entries, flat_bars("XOM"), audit)
 
-    assert [(f.day, f.side) for f in result.fund.broker.fills if f.ticker == "XOM"] == [(C2, "sell")]
+    assert [(f.day, f.side) for f in result.fund.broker.fills if f.ticker == "XOM"] == [(C1, "sell")]
     assert result.matches == []
     assert sorted((d.real != "none", d.reason) for d in result.differences) == [
         (False, calib.UNEXPLAINED), (True, calib.UNEXPLAINED)]
@@ -377,7 +390,7 @@ def test_a_half_day_line_at_13_30_new_york_is_mirrored():
     assert c1 in [p.day for p in result.series] and date(2026, 11, 26) not in [p.day for p in result.series]
     assert [(m.day, m.ticker) for m in result.mirrored] == [(c1, "JPM")]
     assert sim_fills(result, "JPM") == []
-    assert [d.session for d in result.decisions if d.status == calib.MIRRORED] == [c2]
+    assert [d.session for d in result.decisions if d.status == calib.MIRRORED] == [c1]
 
 
 def test_journal_lines_as_the_cycle_writes_them_are_mirrored_on_their_own_word():
@@ -435,11 +448,13 @@ def test_a_reworded_refusal_or_an_accepted_line_is_not_mirrored():
 
 
 def ladder_case(management: Optional[bool]) -> calib.CalibrationResult:
-    """NVDA held from 100 with a stop at 96 (R = 4); from C2 it opens at 105,
+    """NVDA held from 100 with a stop at 96 (R = 4); from C1 it opens at 105,
     past the first rung. C1's run went out at 17:00 New York, after the close,
-    and its management pass was skipped: the real account took no rung."""
+    and its management pass was skipped: the real account took no rung. The
+    copy's pass on C1, when it runs, sees the open (no price was recorded
+    for NVDA that day) and takes the rung."""
     frame = flat_frame()
-    later = frame.index >= pd.Timestamp(C2)
+    later = frame.index >= pd.Timestamp(C1)
     frame.loc[later, ["Open", "Close"]] = 105.0
     frame.loc[later, "High"], frame.loc[later, "Low"] = 106.0, 104.0
     bars = Bars({"NVDA": frame, "JPM": flat_frame(), "VT": flat_frame()})
@@ -473,7 +488,7 @@ def test_without_the_journals_word_the_ladder_pass_runs(management):
     result = ladder_case(management)
 
     assert result.mirrored == []
-    assert [(day, kind) for day, kind, _ in sim_fills(result, "NVDA")] == [(C2, "close")]      # a ladder rung
+    assert [(day, kind) for day, kind, _ in sim_fills(result, "NVDA")] == [(C1, "close")]      # a ladder rung
     assert [(d.ticker, d.reason) for d in result.differences] == [("NVDA", calib.LADDER)]
 
 
@@ -514,10 +529,9 @@ def report(days: tuple[date, ...], last_close: date = C4) -> dict:
 
 
 def test_a_third_late_day_stops_calibration_the_night_it_is_journalled():
-    """Late runs on C1, C2 and C3, and the real closes only through C3: the
-    sim has not reached C3's cycle (it acts on it at C4's open, once C4's
-    close is in). The day is counted from the record anyway, so the nightly
-    record says "stopped" now, not two or three sessions later."""
+    """Late runs on C1, C2 and C3, and the real closes only through C3. The
+    day is counted from the record, with the ones the sim has reached, so
+    the nightly record says "stopped" the night the third is journalled."""
     out = report((C1, C2, C3), last_close=C3)
 
     assert out["status"] == "stopped"
@@ -528,24 +542,24 @@ def test_a_third_late_day_stops_calibration_the_night_it_is_journalled():
 def test_a_day_counted_ahead_is_the_same_day_once_the_sim_reaches_it():
     entries, audit = late_days(C1, C2, C3)
     bars = flat_bars("JPM")
-    ahead = run(snaps_for(C3), entries, bars, audit)
-    reached = run(snaps_for(C4), entries, bars, audit)
+    ahead = run(snaps_for(C2), entries, bars, audit)        # C3 journalled, its close not in yet
+    reached = run(snaps_for(C3), entries, bars, audit)
 
     assert ahead.mirrored == reached.mirrored                           # counted once, the same way
     # Only a day the sim has reached leaves a decision behind: C3's line is
-    # decided at C4's open, which the first run has not got to.
-    assert [(d.session, d.cycle_day) for d in ahead.decisions if d.status == calib.MIRRORED] == [(C2, C1), (C3, C2)]
+    # decided on C3, a session the first run has not got to.
+    assert [(d.session, d.cycle_day) for d in ahead.decisions if d.status == calib.MIRRORED] == [(C1, C1), (C2, C2)]
     assert [(d.session, d.cycle_day) for d in reached.decisions if d.status == calib.MIRRORED] == [
-        (C2, C1), (C3, C2), (C4, C3)]
+        (C1, C1), (C2, C2), (C3, C3)]
     assert sim_fills(ahead, "JPM") == [] and sim_fills(reached, "JPM") == []
 
 
-@pytest.mark.parametrize("days_needed, counted", [(3, [C1, C2]), (4, [C1, C2, C3])])
+@pytest.mark.parametrize("days_needed, counted", [(2, [C1, C2]), (3, [C1, C2, C3]), (4, [C1, C2, C3])])
 def test_only_days_the_copy_acts_on_within_calibration_are_counted(days_needed, counted):
-    """C0's cycle is in the seed, and a cycle on the last calibration day is
-    acted on only after calibration ends: neither is copied, so neither
-    counts. With three closes needed and three compared, C3 is the last day;
-    with four needed, the sim will act on C3's cycle at C4's open."""
+    """C0's cycle is in the seed, so it is never copied and never counts.
+    The copy acts on a cycle the day it was journalled: with two closes
+    needed, C2 is the last calibration day and C3's cycle is never acted on;
+    with three or four, C3 is, so it counts."""
     entries, audit = late_days(C0, C1, C2, C3)
     bars = flat_bars("JPM")
     result = calib.run_calibration(snaps_for(C3), entries, bars, SimFeed(bars), C0, days_needed, audit, frozenset())
