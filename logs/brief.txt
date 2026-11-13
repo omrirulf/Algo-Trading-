@@ -1,8 +1,8 @@
-🟡 2 warnings: 7 of 80 ticker(s) were judged without news
-Equity $100,754 · 19 positions · $86,223 gross · $3,968 at risk · unrealised +$1,499
-Traded: KRE, XLV
+🟡 3 warnings: 1 of 80 ticker(s) produced no signal
+Equity $100,586 · 23 positions · $99,980 gross · $4,158 at risk · unrealised +$1,308
+Traded: GOOGL, JPM, RY, TM, XLF, EWD
 Started by supabase-cron at 14:40 UTC (0 min after 14:40)
-Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-11-11
-Closed: CORN, XOM, LLY, JPM, RY, CAT
-Also: 26 of 80 ticker(s) took their news from Bing's feed
-Cycle 80 tickers, $0.16 · 2026-11-12
+Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-11-12
+Closed: CORN, XOM, LLY, CAT, XLB, XLU
+Also: 3 of 80 ticker(s) were judged without news; 19 of 80 ticker(s) took their news from Bing's feed
+Cycle 80 tickers, $0.16 · 2026-11-13
