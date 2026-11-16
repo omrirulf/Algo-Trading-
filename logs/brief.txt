@@ -1,8 +1,8 @@
-🟡 3 warnings: 1 of 80 ticker(s) produced no signal
-Equity $100,586 · 23 positions · $99,980 gross · $4,158 at risk · unrealised +$1,308
-Traded: GOOGL, JPM, RY, TM, XLF, EWD
+🔴 8 of 80 ticker(s) produced no signal
+Equity $100,833 · 23 positions · $99,669 gross · $4,185 at risk · unrealised +$1,786
+3 directional calls, none traded
 Started by supabase-cron at 14:40 UTC (0 min after 14:40)
-Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-11-12
+Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-11-13
 Closed: CORN, XOM, LLY, CAT, XLB, XLU
-Also: 3 of 80 ticker(s) were judged without news; 19 of 80 ticker(s) took their news from Bing's feed
-Cycle 80 tickers, $0.16 · 2026-11-13
+Also: 9 of 80 ticker(s) were judged without news; 8 of 80 ticker(s) took their news from Bing's feed
+Cycle 80 tickers, $0.12 · 2026-11-16
