@@ -68,12 +68,41 @@ REQUEST_TIMEOUT_SECONDS = 60.0
 #: single timed-out read. An HTTP error is never retried: a 401 or a 429
 #: says the same thing twice.
 RETRY_PAUSE_SECONDS = 2.0
-#: One more try after a 200 the parser refused (an empty body, a block page),
-#: after this longer pause. The empty 200s come from the vendor's side in
-#: bursts (6 Oct 2026: 44 of 80 first answers; 15 Oct: 60, and 53 of the
-#: second asks two seconds later were empty again), so the second ask waits
-#: long enough for a burst to pass. The owner's decision of 16 Oct 2026.
+#: The pause before asking again after a 200 the parser refused (an empty
+#: body, a block page) or a server error from Bright Data itself. The empty
+#: 200s come from the vendor's side in bursts (6 Oct 2026: 44 of 80 first
+#: answers; 15 Oct: 60, and 53 of the second asks two seconds later were
+#: empty again), so a retry waits long enough for a burst to pass. The
+#: owner's decision of 16 Oct 2026.
 EMPTY_RETRY_PAUSE_SECONDS = 10.0
+#: How many times the same Google request is asked again when Bright Data's
+#: answer was unusable -- a 200 the parser refused, or a 5xx from Bright Data
+#: itself -- before the Bing fallback: four asks in all. One until 17 Nov
+#: 2026; the owner's "Keep Google, add the retry. Add even 3 retries" of that
+#: day, after two probes the same evening showed the refusals to be mostly
+#: random per request (of 80 names, 26 refused in both runs and 28 in one
+#: only, 27 of those 28 "refused" on the failing side), so a name refused
+#: once has about an even chance on the next ask. A 4xx is never asked
+#: again: the request itself is wrong, or the account is, and the fourth
+#: answer would be the first.
+UNUSABLE_RETRIES = 3
+#: Bright Data's own minimum wait, when its headers name one ("try again
+#: later, after a minimum of 15 seconds", an ``x-brd-status-code 429`` first
+#: seen on 10 Nov 2026 on XLY's retry), wins over EMPTY_RETRY_PAUSE_SECONDS
+#: up to this cap, so a retry is not thrown away under the vendor's own
+#: minimum and never waits a whole minute for one name.
+BRD_WAIT_CAP_SECONDS = 60.0
+#: The pauses of every retry in one cycle may add up to this much; past it,
+#: an unusable answer goes to the Bing fallback at once, with a warning. The
+#: context stage asks the names one after another: with a vendor that is
+#: down for good, three retries on each of 80 names would add about 48
+#: minutes, behind which the cycle still has a model stage of up to 90 and a
+#: job cap of 180. Ten minutes bounds the bad day; on an ordinary one (a
+#: quarter of the names refused once, half of those again, half of those
+#: again) the retries wait two to three minutes in all. Reset by the cycle
+#: at its start (``heartbeat.run_batched_cycle``); thread-local like the
+#: request count below, so one thread's waits are not another's.
+RETRY_WAIT_BUDGET_SECONDS = 600.0
 #: Bright Data's own headers on an answer: the target's status code and the
 #: reason it gives when it refuses. Written into the warning and into the
 #: error a second refused 200 leaves in the journal, so the record says what
@@ -595,6 +624,56 @@ def resolve_token(api_token: str = "") -> Optional[str]:
 #: the count never understates what may be billed. Production reads nothing
 #: here; the requests themselves are unchanged.
 _SENT = threading.local()
+_WAITED = threading.local()
+
+
+def retry_waits_spent() -> float:
+    """Seconds this thread's retries have paused for since the last reset (``RETRY_WAIT_BUDGET_SECONDS``)."""
+    return float(getattr(_WAITED, "seconds", 0.0))
+
+
+def reset_retry_waits() -> None:
+    """Start a cycle's retry budget afresh; the cycle calls it before its first name."""
+    _WAITED.seconds = 0.0
+
+
+def _take_wait(seconds: float) -> bool:
+    """Charge ``seconds`` to the budget; False, charging nothing, when it would run over."""
+    spent = retry_waits_spent()
+    if spent + seconds > RETRY_WAIT_BUDGET_SECONDS:
+        return False
+    _WAITED.seconds = spent + seconds
+    return True
+
+
+_MINIMUM_WAIT = re.compile(r"minimum of (\d+(?:\.\d+)?)\s*s", re.IGNORECASE)
+
+
+def retry_pause(response: Any) -> float:
+    """How long to wait before asking again: Bright Data's own minimum when it names one (capped), else the default."""
+    headers = getattr(response, "headers", None) or {}
+    named = None
+    retry_after = headers.get("Retry-After")
+    if retry_after:
+        try:
+            named = float(str(retry_after).strip())
+        except ValueError:
+            named = None
+    if named is None:
+        for name in ("x-brd-err-msg", "x-brd-error"):
+            found = _MINIMUM_WAIT.search(str(headers.get(name) or ""))
+            if found:
+                named = float(found.group(1))
+                break
+    if named is None or named <= 0:
+        return EMPTY_RETRY_PAUSE_SECONDS
+    return max(EMPTY_RETRY_PAUSE_SECONDS, min(named, BRD_WAIT_CAP_SECONDS))
+
+
+def _retryable(response: Any) -> bool:
+    """A 200 the parser refused or a server error is asked again; a 4xx is not."""
+    status = int(getattr(response, "status_code", 0) or 0)
+    return status == 200 or 500 <= status <= 599
 
 
 def requests_sent() -> int:
@@ -729,37 +808,56 @@ class BrightDataNewsProvider:
         """
         return [h.as_line() for h in self._fetch_items(build_news_search_url(ticker, on=day))]
 
+    @staticmethod
+    def _read_items(resp: httpx.Response) -> list[Headline]:
+        """The answer's headlines, or ``NewsFetchError`` saying why there are none."""
+        if resp.status_code != 200:
+            raise NewsFetchError(f"Bright Data HTTP {resp.status_code}: {resp.text[:300]}")
+        return parse_news_items(resp.text)
+
     def _fetch_items(self, url: str) -> list[Headline]:
+        """One Google request through Bright Data, asked again while its answer is unusable.
+
+        A 200 the parser refuses is an interstitial, a block page or an
+        upstream error wrapped in a 200 (on 18 Sep 2026 one cost TM its
+        day); a 5xx is Bright Data's own trouble. Either is asked again
+        after a pause, up to ``UNUSABLE_RETRIES`` times (the owner's
+        decision of 17 Nov 2026; once until then), as long as the cycle's
+        wait budget lasts. A 4xx is not. The last refusal raises, carrying
+        whatever Bright Data's own headers said about it, and the live path
+        then asks Bing's feed.
+        """
         body = {"zone": self._zone, "url": url, "format": "raw", "country": BRD_COUNTRY}
         try:
             resp = self._post_with_one_retry(body)
         except httpx.HTTPError as exc:
             raise NewsFetchError(f"Bright Data unreachable: {exc}") from exc
-        if resp.status_code != 200:
-            raise NewsFetchError(f"Bright Data HTTP {resp.status_code}: {resp.text[:300]}")
-        try:
-            return parse_news_items(resp.text)
-        except NewsFetchError as exc:
-            first_refusal = exc
-        # A 200 the parser refuses is an interstitial, a block page or an
-        # upstream error wrapped in a 200, and on 18 Sep one cost TM its
-        # day. Once more, after the longer pause; a second one is real, and
-        # it carries whatever Bright Data's own headers said about it.
-        said = brd_headers(resp)
-        log.warning("Bright Data answered 200 with something the parser refused (%s)%s; "
-                    "retrying once after %.0f s",
-                    str(first_refusal)[:80], f" [{said}]" if said else "", EMPTY_RETRY_PAUSE_SECONDS)
-        time.sleep(EMPTY_RETRY_PAUSE_SECONDS)
-        try:
-            resp = self._post(body)
-        except httpx.HTTPError as exc:
-            raise NewsFetchError(f"Bright Data unreachable: {exc}") from exc
-        if resp.status_code != 200:
-            raise NewsFetchError(f"Bright Data HTTP {resp.status_code}: {resp.text[:300]}")
-        try:
-            return parse_news_items(resp.text)
-        except NewsFetchError as exc:
+        for retry in range(1, UNUSABLE_RETRIES + 2):
+            try:
+                return self._read_items(resp)
+            except NewsFetchError as exc:
+                refusal = exc
             said = brd_headers(resp)
-            if not said:
-                raise
-            raise NewsFetchError(f"{exc} (Bright Data said: {said})") from exc
+            if not _retryable(resp):
+                raise refusal                       # a 4xx: asking again changes nothing
+            if retry > UNUSABLE_RETRIES:
+                break                               # the last answer is the real one
+            pause = retry_pause(resp)
+            if not _take_wait(pause):
+                log.warning("Bright Data answered %s with something unusable (%s)%s; the cycle's %.0f s of "
+                            "retry waits are spent, so it is not asked again",
+                            resp.status_code, str(refusal)[:80], f" [{said}]" if said else "",
+                            RETRY_WAIT_BUDGET_SECONDS)
+                break
+            log.warning("Bright Data answered %s with something %s (%s)%s; asking again after %.0f s "
+                        "(retry %d of %d)",
+                        resp.status_code, "the parser refused" if resp.status_code == 200 else "unusable",
+                        str(refusal)[:80], f" [{said}]" if said else "", pause, retry, UNUSABLE_RETRIES)
+            time.sleep(pause)
+            try:
+                resp = self._post(body)
+            except httpx.HTTPError as exc:
+                raise NewsFetchError(f"Bright Data unreachable: {exc}") from exc
+        if not said:
+            raise refusal
+        raise NewsFetchError(f"{refusal} (Bright Data said: {said})") from refusal

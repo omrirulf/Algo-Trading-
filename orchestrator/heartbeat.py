@@ -81,7 +81,7 @@ from orchestrator.llm import (  # noqa: E402
 from app.broker_client import BrokerError  # noqa: E402
 from config.market_calendar import is_trading_day  # noqa: E402
 from orchestrator.dispatch import Dispatcher, build_dispatcher  # noqa: E402
-from orchestrator.news import BrightDataNewsProvider, NewsAnswer, NewsFetchError  # noqa: E402
+from orchestrator.news import BrightDataNewsProvider, NewsAnswer, NewsFetchError, reset_retry_waits  # noqa: E402
 
 #: US/Eastern, because the NYSE holiday calendar is defined in that timezone
 #: and a UTC "today" would occasionally name the wrong side of midnight.
@@ -1647,6 +1647,10 @@ def run_batched_cycle(
     journal.note_cycle(positions, dispatcher)
 
     log.info("batched cycle start: gathering context for %d tickers", len(tickers))
+    # The news fetch's retries may pause for ten minutes in all per cycle
+    # (news.RETRY_WAIT_BUDGET_SECONDS); the budget starts here, so a bad
+    # vendor day bounds the context stage instead of the job cap doing it.
+    reset_retry_waits()
     results: list[TickerResult] = []
     prepared: list[PreparedTicker] = []
     for ticker in tickers:
