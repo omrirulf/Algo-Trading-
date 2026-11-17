@@ -406,6 +406,10 @@ def main(argv: Optional[list[str]] = None) -> int:
         print(f"no archived openai-compatible ask under {args.model_io} ({len(records)} records)")
         return 1
     provider = heartbeat.full_model_provider()
+    # The configured host's own provider: with the fallback switched on
+    # (17 Nov 2026) production's provider wraps it, and this check is about
+    # the host that is cut, not the one behind it.
+    provider = getattr(provider, "primary", provider)
     url = getattr(provider, "_url", None)
     key = getattr(provider, "_api_key", "")
     if not isinstance(url, str) or not url:

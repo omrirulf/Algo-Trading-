@@ -17,7 +17,7 @@ import logging
 import re
 import threading
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from typing import Any, Callable, Iterable, Optional, Protocol
 
@@ -51,6 +51,21 @@ MODEL_BASE_URL = "https://api.deepinfra.com/v1/openai"
 #: Reasoning depth for MODEL. Read only on the OpenAI-compatible path;
 #: the Anthropic path has EFFORT below, which is a different vocabulary.
 MODEL_EFFORT = "high"
+
+#: A second host for the same model, asked only when the first could not
+#: answer (``FallbackSignalProvider``; the owner's "yes, prepare" of 17 Nov
+#: 2026, the day DeepInfra answered every one of the cycle's 60 asks with
+#: HTTP 503 inside six seconds and the day made no signal). Constants for
+#: the reason MODEL_BASE_URL is one: a host that answers the question
+#: deciding what is traded shows up in a diff. The fallback exists only
+#: while its key is set (``config.settings.full_model_fallback_api_key``,
+#: the secret FULL_MODEL_FALLBACK_API_KEY): blank, nothing here is built
+#: and nothing changes. ``FALLBACK_MODEL`` is the second host's own name
+#: for the same weights; Groq spells it as DeepInfra does. Only the host
+#: differs: the settings, the prompt, the schema, the re-asks and the
+#: ceiling are the primary's.
+FALLBACK_MODEL_BASE_URL = "https://api.groq.com/openai/v1"
+FALLBACK_MODEL = "openai/gpt-oss-120b"
 
 #: What AnthropicSignalProvider asks for when the caller names nothing.
 #:
@@ -158,6 +173,11 @@ def configured_provider() -> Optional[str]:
     return _hostname(MODEL_BASE_URL) if MODEL_BASE_URL else "api.anthropic.com"
 
 
+def configured_fallback_provider() -> Optional[str]:
+    """The host the fallback asks, as configured here; never a key or a path. None when there is none."""
+    return _hostname(FALLBACK_MODEL_BASE_URL) if FALLBACK_MODEL_BASE_URL else None
+
+
 #: The same, for the full model on the OpenAI-compatible path. Separate
 #: because 120 is not a timeout for a reasoning model at high effort, it is a
 #: coin toss: gpt-oss-120b measured ~128s a call, and a 120s deadline lost 286
@@ -214,10 +234,35 @@ class Completion:
 
     text: str
     usage: Usage
+    #: The host that answered, when the provider knows it (the OpenAI-
+    #: compatible path does; the Anthropic path leaves it None).
+    host: Optional[str] = None
+    #: Why the configured host did not answer, when the fallback host did:
+    #: the primary's final error, cut to FALLBACK_NOTE_CHARS. None on every
+    #: answer the configured host gave. What the journal line's
+    #: ``model_fallback`` record is made of.
+    fallback_after: Optional[str] = None
+
+
+#: How much of the primary's error an answer from the fallback carries.
+FALLBACK_NOTE_CHARS = 300
 
 
 class LLMError(Exception):
     """The model was unreachable, declined, or returned nothing usable."""
+
+
+class ProviderUnavailable(LLMError):
+    """The host could not answer at all, after every retry: a second host may.
+
+    Raised by ``OpenAICompatibleProvider`` when its asks are spent on
+    statuses that mean "later" (``RETRY_STATUSES``: 429 and the 5xx family)
+    or on a host that could not be reached (a timeout, a refused or dropped
+    connection). Never for a 400, 401 or 404 -- our request or our key, which
+    a second host would refuse the same way -- and never for an answer that
+    came back but was not usable: that is the model's, and the fallback
+    serves the same model. ``FallbackSignalProvider`` hands exactly this on.
+    """
 
 
 def _inline_refs(node: Any, defs: dict[str, Any]) -> Any:
@@ -1019,6 +1064,12 @@ class OpenAICompatibleProvider:
         # 4 attempt(s)". The count now says what was done.
         asks = 0
         kind = first
+        # Whether the last failure was the host's rather than the request's:
+        # a "later" status or an unreachable host leaves ``later`` true and
+        # the give-up below is a ``ProviderUnavailable``, which the fallback
+        # provider answers from its second host; a 400, 401 or 404 leaves it
+        # false, because a second host would say the same.
+        later = False
         # Local, never self._timeout: a provider is reused across tickers,
         # and one slow call must not quietly shorten every call after it.
         timeout = self._timeout
@@ -1066,6 +1117,7 @@ class OpenAICompatibleProvider:
                 # failure is never retried more than that however many
                 # attempts remain.
                 last = f"{self._url} unreachable: {exc}"
+                later = True
                 if transport_asks >= TRANSPORT_ATTEMPTS:
                     break
                 transport_asks += 1
@@ -1093,13 +1145,15 @@ class OpenAICompatibleProvider:
             model_io.finish_attempt(ask, outcome="http_error", status=reply.status,
                                     response=reply.text, error=f"HTTP {reply.status}")
             last = f"{self._url} returned HTTP {reply.status}: {reply.text[:300]}"
-            if reply.status not in RETRY_STATUSES:
+            later = reply.status in RETRY_STATUSES
+            if not later:
                 break              # 400, 401, 404: asking again changes nothing
             kind = f"retry after HTTP {reply.status}"
             told = self._retry_after(reply)
             if told is not None:
                 delay = told
-        raise LLMError(f"{last} (gave up after {asks} attempt(s))")
+        failure = ProviderUnavailable if later else LLMError
+        raise failure(f"{last} (gave up after {asks} attempt(s))")
 
     def _body(
         self,
@@ -1201,6 +1255,7 @@ class OpenAICompatibleProvider:
                 input_tokens=int(usage.get("prompt_tokens") or 0),
                 output_tokens=int(usage.get("completion_tokens") or 0),
             ),
+            host=_hostname(self._url),
         )
 
     def complete_detailed(
@@ -1281,6 +1336,82 @@ class OpenAICompatibleProvider:
                                     **({"error": problem[:300]} if problem else {}))
             return completion
         raise LLMError("unreachable")   # pragma: no cover - the loop always returns or raises
+
+
+class FallbackSignalProvider:
+    """``primary`` answers; ``fallback`` is asked only when the primary could not.
+
+    The owner's "yes, prepare" of 17 Nov 2026. On 16 Nov DeepInfra lost 8 of
+    80 names (six "Model busy" spells that outlasted the ladder, two answers
+    at the 480-second ceiling twice over); on 17 Nov it answered all 60 asks
+    with HTTP 503 inside six seconds, the retries were spent in under a
+    minute, and the day made no signal. A second host serving the same
+    weights (``FALLBACK_MODEL`` at ``FALLBACK_MODEL_BASE_URL``) is asked the
+    same question when, and only when, the first could not answer at all.
+
+    "Could not answer" is ``ProviderUnavailable``: the primary's own retries
+    spent on 429s and 5xxs, or on a host that could not be reached. Nothing
+    else is handed on. A 400, 401 or 404 is our request or our key, which the
+    second host would refuse the same way; an off-schema answer, an invalid
+    value or an answer about another ticker is the model's, and the second
+    host serves the same model, so the caller rejects and journals it exactly
+    as before. The fallback is asked with the caller's effort, reasoning and
+    ``check``, with its own retries and re-asks, and for the model it was
+    built with (``model=None``: the caller's name is the primary's spelling
+    of the same weights). Both failing raises one ``LLMError`` that names
+    both, the primary's first, so ``analysis.call_errors`` reads the primary's
+    status.
+
+    An answer from the second host carries ``fallback_after`` -- the primary's
+    final error -- so the journal line says who answered and why
+    (``model_fallback``, written by ``heartbeat.judge_answer``) and the daily
+    health check can count the names the configured host did not answer.
+    The request body the voting arm rebuilds is the primary's: that is what
+    production sends first.
+    """
+
+    def __init__(self, primary: SignalProvider, fallback: SignalProvider) -> None:
+        self.primary = primary
+        self.fallback = fallback
+
+    @property
+    def fallback_host(self) -> Optional[str]:
+        """The second host's name, for the log and the journal; never its key."""
+        return _hostname(getattr(self.fallback, "_url", None))
+
+    def request_body(self, *args: Any, **kwargs: Any) -> dict:
+        """The body the primary sends on its first ask (``OpenAICompatibleProvider.request_body``)."""
+        rebuild = getattr(self.primary, "request_body", None)
+        if rebuild is None:
+            raise LLMError(f"{type(self.primary).__name__} cannot rebuild a request body")
+        return rebuild(*args, **kwargs)
+
+    def complete_detailed(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        json_schema: dict,
+        model: Optional[str] = None,
+        effort: Optional[str] = None,
+        reasoning: bool = True,
+        check: Optional[Callable[[str], Any]] = None,
+    ) -> "Completion":
+        try:
+            return self.primary.complete_detailed(
+                system_prompt, user_prompt, json_schema, model=model, effort=effort,
+                reasoning=reasoning, check=check,
+            )
+        except ProviderUnavailable as first:
+            where = self.fallback_host or "the fallback host"
+            log.warning("the configured host could not answer (%s); asking %s", first, where)
+            try:
+                answer = self.fallback.complete_detailed(
+                    system_prompt, user_prompt, json_schema, model=None, effort=effort,
+                    reasoning=reasoning, check=check,
+                )
+            except LLMError as second:
+                raise LLMError(f"{first}; then {where} as the fallback: {second}") from second
+            return replace(answer, fallback_after=str(first)[:FALLBACK_NOTE_CHARS])
 
 
 def _re_ask_kind(attempt: int, problem: str) -> str:

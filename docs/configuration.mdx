@@ -37,6 +37,7 @@ being hard-coded.
 | `SCREENING_MODEL` | `orchestrator/heartbeat.py` | Model name to ask that endpoint for, e.g. `qwen2.5:14b`. Required alongside `SCREENING_BASE_URL`, ignored without it — on its own it would let an env var silently change which Claude model screens the watchlist. |
 | `SCREENING_EFFORT` | `orchestrator/heartbeat.py` | Ask the screening endpoint *with* reasoning on, at `low`, `medium` or `high`. Blank — the default — asks with reasoning off, which is what makes the stage cheap. Ignored without `SCREENING_BASE_URL`, because Claude Haiku takes neither adaptive thinking nor an effort. Only for endpoints that reason by default and have no true off switch; see [cost](/cost#very-cheap-often-beats-free-for-this-workload). **Never set it without a `compare_screening.py --effort` run at the same value** — a screen that wrongly answers NEUTRAL ends the ticker with no error anywhere. |
 | `SCREENING_API_KEY` | `orchestrator/heartbeat.py` | Bearer token for that endpoint, if it wants one. Blank sends no header at all. |
+| `FULL_MODEL_FALLBACK_API_KEY` | `orchestrator/heartbeat.py` | Bearer token for the full model's *second* host (`FALLBACK_MODEL_BASE_URL` below), asked the same question only when the first host could not answer at all. The owner's switch for the fallback (17 Nov 2026): blank — the default — builds no fallback and leaves the cycle exactly as it was. One name, no alternative spellings. Check it with the model-fallback-check workflow before relying on it. |
 
 <Note>
   Each credential is readable by exactly one module. `app/broker_client.py`
@@ -252,6 +253,8 @@ code diff:
 | `MODEL` | `openai/gpt-oss-120b` |
 | `MODEL_BASE_URL` | `https://api.deepinfra.com/v1/openai` (blank = Anthropic) |
 | `MODEL_EFFORT` | `high` (OpenAI-compatible path only) |
+| `FALLBACK_MODEL_BASE_URL` | `https://api.groq.com/openai/v1` — the second host for the same model, asked only when the first cannot answer, and only while `FULL_MODEL_FALLBACK_API_KEY` is set |
+| `FALLBACK_MODEL` | `openai/gpt-oss-120b` — the second host's own name for the same weights |
 | `ANTHROPIC_MODEL` | `claude-opus-5` (what the Anthropic path asks for) |
 | `SCREENING_ENABLED` | `False` since 23 Sep 2026 |
 | `EFFORT` | `medium` (Anthropic path only) |

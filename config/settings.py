@@ -716,6 +716,18 @@ class Settings(BaseSettings):
             "once per ticker would lose a whole session quietly"
         ),
     )
+    full_model_fallback_api_key: str = Field(
+        default="",
+        description=(
+            "Bearer token for the second host orchestrator/llm.py's "
+            "FALLBACK_MODEL_BASE_URL names, which is asked the same question "
+            "only when the first host could not answer at all (a busy or "
+            "server-error status on every retry, or no connection). The "
+            "owner's switch for the fallback (17 Nov 2026): blank, the "
+            "fallback is not built and the cycle is exactly as it was; set, "
+            "it is. Only the token lives here, for the same reason as above"
+        ),
+    )
     brightdata_api_token: str = Field(default="", description="Bright Data API token (orchestrator only)")
     brightdata_serp_zone: str = Field(
         default="",

@@ -212,9 +212,12 @@ class JournalEntry:
         """Who answered this line and with which prompt, or None.
 
         Keys as written by the cycle (``orchestrator.heartbeat.model_setup``):
-        ``model``, ``provider`` (the host the model was asked at) and
+        ``model``, ``provider`` (the host the model was asked at),
         ``prompt`` (12 hex characters that change when a fixed text of the
-        prompt changes). None on lines written before the record existed (it
+        prompt changes) and, from 17 Nov 2026, ``fallback`` (the second
+        host while the owner's fallback is switched on, else null; which
+        host answered a line is the line's own ``model_fallback`` record,
+        absent when the configured host did). None on lines written before the record existed (it
         arrived after 27 Sep 2026), outside a heartbeat cycle, and on
         anything that is not an object. Check each value before trusting it.
         """
