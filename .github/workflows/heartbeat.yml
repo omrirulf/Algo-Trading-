@@ -485,6 +485,13 @@ jobs:
           # screening key" and is one, in the step above) but confusion is
           # cheaper than a silent day.
           FULL_MODEL_API_KEY: ${{ secrets.FULL_MODEL_API_KEY || secrets.DEEPINFRA_API_KEY || secrets.SCREENING_API_KEY || secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY || secrets.GROQ_API_KEY }}
+          # The second host's token (orchestrator/llm.py's
+          # FALLBACK_MODEL_BASE_URL), the owner's switch for the fallback of
+          # 17 Nov 2026: the same model asked there only when the host above
+          # could not answer at all. One dedicated name, no chain: a secret
+          # that does not exist is an empty string here, and empty means the
+          # fallback is not built and the cycle is exactly as it was.
+          FULL_MODEL_FALLBACK_API_KEY: ${{ secrets.FULL_MODEL_FALLBACK_API_KEY }}
           # What started this run, for the run block below. Not secrets; an
           # input is empty on a scheduled run, which the script reads as
           # "the schedule" from the event name. RUN_SOURCE is free text from
@@ -726,6 +733,7 @@ jobs:
         timeout-minutes: 20
         env:
           FULL_MODEL_API_KEY: ${{ secrets.FULL_MODEL_API_KEY || secrets.DEEPINFRA_API_KEY || secrets.SCREENING_API_KEY || secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY || secrets.GROQ_API_KEY }}
+          FULL_MODEL_FALLBACK_API_KEY: ${{ secrets.FULL_MODEL_FALLBACK_API_KEY }}
           REPORTS_URL: https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/logs/weekly
         run: |
           week=$(date -u +%G-W%V)

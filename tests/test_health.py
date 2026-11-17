@@ -465,6 +465,58 @@ def test_a_name_on_the_feed_is_not_a_news_gap_and_a_gap_is_not_a_fallback():
     assert "T0" in health.news_fallbacks(today).detail and "T1" not in health.news_fallbacks(today).detail
 
 
+FALLBACK = {"host": "api.groq.com",
+            "after": "https://api.deepinfra.com/v1/openai/chat/completions returned HTTP 503: no healthy upstream (gave up after 4 attempt(s))"}
+
+
+def _answered_elsewhere(ticker):
+    line = json.loads(journal_line(ticker))
+    line[health.MODEL_FALLBACK_KEY] = dict(FALLBACK)
+    return line
+
+
+def test_the_fallback_key_is_the_one_the_journal_writes():
+    import inspect
+
+    from orchestrator import journal
+
+    assert f'"{health.MODEL_FALLBACK_KEY}"' in inspect.getsource(journal.record)
+
+
+def test_a_tenth_of_the_watchlist_answered_by_the_second_host_is_a_warning_naming_them():
+    """The same model answered with the same prompt, so never critical; the share says the configured host is failing behind the fallback."""
+    today = [_answered_elsewhere(f"T{i}") for i in range(2)]
+    today += [json.loads(journal_line(f"U{i}")) for i in range(18)]
+    alarm = health.model_fallbacks(today)
+    assert alarm is not None and alarm.severity == health.WARNING
+    assert alarm.title == "2 of 20 ticker(s) were answered by the fallback host api.groq.com"
+    assert "T0, T1" in alarm.detail and "could not answer" in alarm.detail and "HTTP 503" in alarm.detail
+
+
+def test_fewer_names_answered_by_the_second_host_say_nothing_the_journal_has_their_record():
+    today = [_answered_elsewhere("T0")] + [json.loads(journal_line(f"U{i}")) for i in range(19)]
+    assert health.model_fallbacks(today) is None
+    assert health.model_fallbacks([json.loads(journal_line(f"U{i}")) for i in range(5)]) is None
+
+
+def test_a_name_the_second_host_answered_is_not_a_failed_call():
+    today = [_answered_elsewhere(f"T{i}") for i in range(5)]
+    assert health.failed_calls(today) is None and health.failed_tickers(today) is None
+    assert health.model_fallbacks(today) is not None
+
+
+def test_the_second_host_warning_reaches_the_report(tmp_path):
+    journal = tmp_path / "journal.log"
+    audit = tmp_path / "audit.log"
+    lines = [json.dumps(_answered_elsewhere(f"T{i}")) for i in range(3)]
+    lines += [journal_line(f"U{i}") for i in range(7)]
+    journal.write_text("\n".join(lines) + "\n")
+    audit.write_text("")
+    alarms = health.check(journal, audit, DAY)
+    assert any(a.title.startswith("3 of 10 ticker(s) were answered by the fallback host") for a in alarms)
+    assert not any(a.is_critical for a in alarms if "fallback host" in a.title)
+
+
 def test_the_fallback_warning_reaches_the_report(tmp_path):
     journal = tmp_path / "journal.log"
     audit = tmp_path / "audit.log"

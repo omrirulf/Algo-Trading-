@@ -609,3 +609,211 @@ def _prepared(ticker: str):
 
 def _ticker(user_prompt: str) -> str:
     return user_prompt.split("TICKER:", 1)[1].strip()
+
+
+# --- the second host (the owner's "yes, prepare" of 17 Nov 2026) ----------
+#
+# On 16 Nov DeepInfra lost 8 of 80 names (six busy spells that outlasted the
+# ladder, two answers at the ceiling twice over); on 17 Nov it answered all
+# 60 asks with HTTP 503 inside six seconds and the day made no signal. The
+# same model at a second host is asked when, and only when, the first could
+# not answer at all -- and nothing is built until the second host's key is
+# set.
+
+
+def _fallback_server(*responses: httpx.Response) -> _Server:
+    return _Server(*responses)
+
+
+def _fallback(server: _Server, model: str = "openai/gpt-oss-120b", slept: list[float] | None = None):
+    return OpenAICompatibleProvider(
+        "http://fallback/v1", model, api_key="k2",
+        client=server.client, sleep=(slept.append if slept is not None else lambda _: None),
+    )
+
+
+def test_asks_spent_on_server_errors_say_the_host_was_unavailable():
+    server = _Server(*[httpx.Response(503, text="no healthy upstream") for _ in range(llm.HTTP_ATTEMPTS)])
+    with pytest.raises(llm.ProviderUnavailable, match="HTTP 503.*gave up after 4"):
+        _provider(server).complete_detailed("s", "u", SCHEMA)
+
+
+def test_asks_spent_on_busy_answers_say_the_host_was_unavailable():
+    server = _Server(*[httpx.Response(429, text="Model busy") for _ in range(llm.HTTP_ATTEMPTS)])
+    with pytest.raises(llm.ProviderUnavailable, match="HTTP 429"):
+        _provider(server).complete_detailed("s", "u", SCHEMA)
+
+
+def test_an_unreachable_host_is_unavailable():
+    def refuse(request):
+        raise httpx.ConnectTimeout("timed out", request=request)
+
+    client = httpx.Client(transport=httpx.MockTransport(refuse), base_url="http://local")
+    provider = OpenAICompatibleProvider("http://local/v1", "m", api_key="k", client=client, sleep=lambda _: None)
+    with pytest.raises(llm.ProviderUnavailable, match="unreachable"):
+        provider.complete_detailed("s", "u", SCHEMA)
+
+
+@pytest.mark.parametrize("status", [400, 401, 404])
+def test_a_refused_request_is_not_the_host_being_unavailable(status):
+    """Our request or our key: a second host would refuse it the same way."""
+    server = _Server(httpx.Response(status, text="no"))
+    with pytest.raises(LLMError, match=f"HTTP {status}") as caught:
+        _provider(server).complete_detailed("s", "u", SCHEMA)
+    assert not isinstance(caught.value, llm.ProviderUnavailable)
+
+
+def test_a_bad_answer_is_the_model_s_not_the_host_s():
+    """Three off-schema answers raise as before; the same model is behind the second host."""
+    prose = {"choices": [{"message": {"content": "not json"}}], "usage": {}}
+    server = _Server(*[httpx.Response(200, json=prose) for _ in range(llm.SCHEMA_ATTEMPTS)])
+    with pytest.raises(LLMError) as caught:
+        _provider(server).complete_detailed("s", "u", SCHEMA)
+    assert not isinstance(caught.value, llm.ProviderUnavailable)
+
+
+def test_a_server_error_after_an_unreachable_first_ask_is_still_unavailable_and_a_refusal_is_not():
+    calls = {"n": 0}
+
+    def flaky(request):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise httpx.ReadTimeout("slow", request=request)
+        return httpx.Response(401, text="who are you")
+
+    client = httpx.Client(transport=httpx.MockTransport(flaky), base_url="http://local")
+    provider = OpenAICompatibleProvider("http://local/v1", "m", api_key="k", client=client, sleep=lambda _: None)
+    with pytest.raises(LLMError, match="HTTP 401") as caught:
+        provider.complete_detailed("s", "u", SCHEMA)
+    assert not isinstance(caught.value, llm.ProviderUnavailable)
+
+
+def test_an_answer_says_which_host_gave_it():
+    out = _provider(_Server(httpx.Response(200, json=_body()))).complete_detailed("s", "u", SCHEMA)
+    assert out.host == "local" and out.fallback_after is None
+
+
+def test_the_second_host_answers_when_the_first_could_not():
+    first = _Server(*[httpx.Response(503, text="no healthy upstream") for _ in range(llm.HTTP_ATTEMPTS)])
+    second = _fallback_server(httpx.Response(200, json=_body()))
+    provider = llm.FallbackSignalProvider(_provider(first), _fallback(second))
+    out = provider.complete_detailed("s", "u", SCHEMA, model="openai/gpt-oss-120b", effort="high")
+    assert json.loads(out.text)["ticker"] == "AAPL"
+    assert out.host == "fallback"
+    assert out.fallback_after and "HTTP 503" in out.fallback_after and "gave up after 4" in out.fallback_after
+    assert len(out.fallback_after) <= llm.FALLBACK_NOTE_CHARS
+    assert len(first.sent) == llm.HTTP_ATTEMPTS and len(second.sent) == 1
+    assert provider.fallback_host == "fallback"
+
+
+def test_the_second_host_is_asked_the_same_question_for_its_own_model_name():
+    """The caller names the primary's spelling of the model; the second host is asked for its own, with the caller's effort."""
+    first = _Server(*[httpx.Response(429) for _ in range(llm.HTTP_ATTEMPTS)])
+    second = _fallback_server(httpx.Response(200, json=_body()))
+    provider = llm.FallbackSignalProvider(_provider(first), _fallback(second, model="gpt-oss-120b-elsewhere"))
+    provider.complete_detailed("s", "u", SCHEMA, model="openai/gpt-oss-120b", effort="high")
+    assert first.sent[0]["model"] == "openai/gpt-oss-120b"
+    assert second.sent[0]["model"] == "gpt-oss-120b-elsewhere"
+    assert second.sent[0]["reasoning_effort"] == "high"
+    assert second.sent[0]["messages"] == first.sent[0]["messages"]
+    assert second.sent[0]["response_format"] == first.sent[0]["response_format"]
+
+
+def test_the_second_host_gets_the_caller_s_check_and_its_own_re_asks():
+    first = _Server(*[httpx.Response(503) for _ in range(llm.HTTP_ATTEMPTS)])
+    second = _fallback_server(
+        httpx.Response(200, json=_body({**ANSWER, "conviction": 5.0})),
+        httpx.Response(200, json=_body()),
+    )
+    provider = llm.FallbackSignalProvider(_provider(first), _fallback(second))
+    out = provider.complete_detailed("s", "u", SCHEMA, check=hb.parse_signal)
+    assert json.loads(out.text)["conviction"] == 0.2
+    assert len(second.sent) == 2 and llm.INVALID_VALUES_INSTRUCTION in second.sent[1]["messages"][0]["content"]
+
+
+@pytest.mark.parametrize("status", [400, 401, 404])
+def test_the_second_host_is_not_asked_after_a_refused_request(status):
+    first = _Server(httpx.Response(status, text="no"))
+    second = _fallback_server(httpx.Response(200, json=_body()))
+    provider = llm.FallbackSignalProvider(_provider(first), _fallback(second))
+    with pytest.raises(LLMError, match=f"HTTP {status}"):
+        provider.complete_detailed("s", "u", SCHEMA)
+    assert second.sent == []
+
+
+def test_the_second_host_is_not_asked_after_a_bad_answer():
+    prose = {"choices": [{"message": {"content": "not json"}}], "usage": {}}
+    first = _Server(*[httpx.Response(200, json=prose) for _ in range(llm.SCHEMA_ATTEMPTS)])
+    second = _fallback_server(httpx.Response(200, json=_body()))
+    provider = llm.FallbackSignalProvider(_provider(first), _fallback(second))
+    with pytest.raises(LLMError, match="non-JSON"):
+        provider.complete_detailed("s", "u", SCHEMA)
+    assert second.sent == []
+
+
+def test_both_hosts_failing_is_one_error_naming_both_the_first_host_first():
+    from analysis.call_errors import MODEL, failure_kind
+
+    first = _Server(*[httpx.Response(503, text="down") for _ in range(llm.HTTP_ATTEMPTS)])
+    second = _fallback_server(httpx.Response(401, text="bad key"))
+    provider = llm.FallbackSignalProvider(_provider(first), _fallback(second))
+    with pytest.raises(LLMError) as caught:
+        provider.complete_detailed("s", "u", SCHEMA)
+    text = str(caught.value)
+    assert text.index("HTTP 503") < text.index("fallback") < text.index("HTTP 401")
+    assert "http://fallback/v1/chat/completions" in text
+    # The first host's failure decides the kind: a model error for trigger
+    # (c), as the day would have been without a second host.
+    assert failure_kind(text) == MODEL
+    assert not isinstance(caught.value, llm.ProviderUnavailable)
+
+
+def test_the_request_body_the_voting_arm_rebuilds_is_the_first_host_s():
+    first, second = _Server(), _fallback_server()
+    primary = _provider(first)
+    provider = llm.FallbackSignalProvider(primary, _fallback(second, model="elsewhere"))
+    kw = dict(model="openai/gpt-oss-120b", effort="high")
+    assert provider.request_body("s", "u", SCHEMA, **kw) == primary.request_body("s", "u", SCHEMA, **kw)
+    assert provider.request_body("s", "u", SCHEMA, **kw)["model"] == "openai/gpt-oss-120b"
+
+
+def test_the_cycle_builds_the_second_host_only_while_its_key_is_set():
+    plain = _with(Settings(_env_file=None, full_model_api_key="k"), hb.full_model_provider)
+    assert isinstance(plain, OpenAICompatibleProvider)
+    assert _with(Settings(_env_file=None, full_model_api_key="k"), hb.fallback_model_provider) is None
+
+    settings = Settings(_env_file=None, full_model_api_key="k", full_model_fallback_api_key="k2")
+    wrapped = _with(settings, hb.full_model_provider)
+    assert isinstance(wrapped, llm.FallbackSignalProvider)
+    assert isinstance(wrapped.primary, OpenAICompatibleProvider)
+    assert wrapped.primary._url == llm.MODEL_BASE_URL.rstrip("/") + "/chat/completions"
+    assert wrapped.primary._api_key == "k"
+    second = wrapped.fallback
+    assert isinstance(second, OpenAICompatibleProvider)
+    assert second._url == llm.FALLBACK_MODEL_BASE_URL.rstrip("/") + "/chat/completions"
+    assert second._model == llm.FALLBACK_MODEL and second._api_key == "k2"
+    assert second._timeout == llm.FULL_MODEL_TIMEOUT_SECONDS
+    assert wrapped.fallback_host == llm.configured_fallback_provider() == "api.groq.com"
+
+
+def test_the_second_host_needs_the_first_host_s_key_as_before():
+    settings = Settings(_env_file=None, full_model_api_key="", full_model_fallback_api_key="k2")
+    with pytest.raises(LLMError, match="FULL_MODEL_API_KEY"):
+        _with(settings, hb.full_model_provider)
+
+
+def test_the_setup_names_the_second_host_only_while_its_key_is_set():
+    off = _with(Settings(_env_file=None, full_model_api_key="k"), hb.model_setup)
+    assert off["fallback"] is None and off["provider"] == "api.deepinfra.com"
+    on = _with(Settings(_env_file=None, full_model_api_key="k", full_model_fallback_api_key="k2"), hb.model_setup)
+    assert on["fallback"] == "api.groq.com"
+    assert "k2" not in json.dumps(on)
+
+
+def test_the_journal_record_of_who_answered():
+    from orchestrator.pricing import Usage
+
+    answered = llm.Completion("{}", Usage(), host="api.groq.com", fallback_after="https://x returned HTTP 503: down (gave up after 4 attempt(s))")
+    assert hb.fallback_record(answered) == {"host": "api.groq.com", "after": answered.fallback_after}
+    assert hb.fallback_record(llm.Completion("{}", Usage(), host="api.deepinfra.com")) is None
+    assert hb.fallback_record("x") is None
