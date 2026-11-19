@@ -146,8 +146,11 @@ DeepInfra answered every one of the cycle's 60 asks with HTTP 503 inside
 six seconds and the day made no signal (on 16 November it had lost 8 of
 80 names to busy spells and the ceiling). `FallbackSignalProvider` wraps
 the configured host's provider with a second `OpenAICompatibleProvider`
-for the same weights at `FALLBACK_MODEL_BASE_URL` (Groq, `FALLBACK_MODEL`
-— the host's own name for the model). Constants, like `MODEL_BASE_URL`,
+for the same weights at `FALLBACK_MODEL_BASE_URL` (Cerebras since 19 Nov
+2026, `FALLBACK_MODEL` being the host's own name for the model,
+`gpt-oss-120b`; Groq was the first choice until it closed its developer
+tier to upgrades on 18 Nov and its free tier proved too small for one of our
+questions). Constants, like `MODEL_BASE_URL`,
 for the same reason: a host that answers the question deciding what is
 traded shows up in a diff.
 

@@ -36,7 +36,7 @@ def test_inside_a_cycle_the_setup_rides_after_the_price_and_before_the_run_block
 def test_a_line_the_second_host_answered_says_so_and_no_other_line_does(journal_path, ctx, monkeypatch):
     """The owner's fallback of 17 Nov 2026: ``model_fallback`` rides after ``stage`` on the one line, absent on the rest."""
     monkeypatch.delenv("HEARTBEAT_RUN", raising=False)
-    who = {"host": "api.groq.com", "after": "https://x returned HTTP 503: down (gave up after 4 attempt(s))"}
+    who = {"host": "api.cerebras.ai", "after": "https://x returned HTTP 503: down (gave up after 4 attempt(s))"}
     with journal.cycle(lambda d: None, setup=SETUP):
         journal.record(ctx, error="timed out", fallback=who)
         journal.record(ctx, error="timed out")

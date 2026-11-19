@@ -61,11 +61,14 @@ MODEL_EFFORT = "high"
 #: while its key is set (``config.settings.full_model_fallback_api_key``,
 #: the secret FULL_MODEL_FALLBACK_API_KEY): blank, nothing here is built
 #: and nothing changes. ``FALLBACK_MODEL`` is the second host's own name
-#: for the same weights; Groq spells it as DeepInfra does. Only the host
-#: differs: the settings, the prompt, the schema, the re-asks and the
-#: ceiling are the primary's.
-FALLBACK_MODEL_BASE_URL = "https://api.groq.com/openai/v1"
-FALLBACK_MODEL = "openai/gpt-oss-120b"
+#: for the same weights: Cerebras drops the ``openai/`` prefix DeepInfra
+#: uses. Cerebras since 19 Nov 2026 (the owner's "Cerebras"): Groq, the
+#: first choice, closed its developer tier to upgrades on 18 Nov, and its
+#: free tier's per-minute limit is smaller than one of our questions. Only
+#: the host differs: the settings, the prompt, the schema, the re-asks and
+#: the ceiling are the primary's.
+FALLBACK_MODEL_BASE_URL = "https://api.cerebras.ai/v1"
+FALLBACK_MODEL = "gpt-oss-120b"
 
 #: What AnthropicSignalProvider asks for when the caller names nothing.
 #:

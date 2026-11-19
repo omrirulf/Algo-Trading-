@@ -793,7 +793,8 @@ def test_the_cycle_builds_the_second_host_only_while_its_key_is_set():
     assert second._url == llm.FALLBACK_MODEL_BASE_URL.rstrip("/") + "/chat/completions"
     assert second._model == llm.FALLBACK_MODEL and second._api_key == "k2"
     assert second._timeout == llm.FULL_MODEL_TIMEOUT_SECONDS
-    assert wrapped.fallback_host == llm.configured_fallback_provider() == "api.groq.com"
+    assert wrapped.fallback_host == llm.configured_fallback_provider() == "api.cerebras.ai"
+    assert llm.FALLBACK_MODEL == "gpt-oss-120b"            # Cerebras's own name for the same weights
 
 
 def test_the_second_host_needs_the_first_host_s_key_as_before():
@@ -806,14 +807,14 @@ def test_the_setup_names_the_second_host_only_while_its_key_is_set():
     off = _with(Settings(_env_file=None, full_model_api_key="k"), hb.model_setup)
     assert off["fallback"] is None and off["provider"] == "api.deepinfra.com"
     on = _with(Settings(_env_file=None, full_model_api_key="k", full_model_fallback_api_key="k2"), hb.model_setup)
-    assert on["fallback"] == "api.groq.com"
+    assert on["fallback"] == "api.cerebras.ai"
     assert "k2" not in json.dumps(on)
 
 
 def test_the_journal_record_of_who_answered():
     from orchestrator.pricing import Usage
 
-    answered = llm.Completion("{}", Usage(), host="api.groq.com", fallback_after="https://x returned HTTP 503: down (gave up after 4 attempt(s))")
-    assert hb.fallback_record(answered) == {"host": "api.groq.com", "after": answered.fallback_after}
+    answered = llm.Completion("{}", Usage(), host="api.cerebras.ai", fallback_after="https://x returned HTTP 503: down (gave up after 4 attempt(s))")
+    assert hb.fallback_record(answered) == {"host": "api.cerebras.ai", "after": answered.fallback_after}
     assert hb.fallback_record(llm.Completion("{}", Usage(), host="api.deepinfra.com")) is None
     assert hb.fallback_record("x") is None

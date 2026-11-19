@@ -253,8 +253,8 @@ code diff:
 | `MODEL` | `openai/gpt-oss-120b` |
 | `MODEL_BASE_URL` | `https://api.deepinfra.com/v1/openai` (blank = Anthropic) |
 | `MODEL_EFFORT` | `high` (OpenAI-compatible path only) |
-| `FALLBACK_MODEL_BASE_URL` | `https://api.groq.com/openai/v1` — the second host for the same model, asked only when the first cannot answer, and only while `FULL_MODEL_FALLBACK_API_KEY` is set |
-| `FALLBACK_MODEL` | `openai/gpt-oss-120b` — the second host's own name for the same weights |
+| `FALLBACK_MODEL_BASE_URL` | `https://api.cerebras.ai/v1` — the second host for the same model, asked only when the first cannot answer, and only while `FULL_MODEL_FALLBACK_API_KEY` is set (Cerebras since 19 Nov 2026; Groq until then, which closed its paid tier to upgrades) |
+| `FALLBACK_MODEL` | `gpt-oss-120b` — the second host's own name for the same weights |
 | `ANTHROPIC_MODEL` | `claude-opus-5` (what the Anthropic path asks for) |
 | `SCREENING_ENABLED` | `False` since 23 Sep 2026 |
 | `EFFORT` | `medium` (Anthropic path only) |
