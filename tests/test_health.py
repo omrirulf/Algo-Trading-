@@ -465,7 +465,7 @@ def test_a_name_on_the_feed_is_not_a_news_gap_and_a_gap_is_not_a_fallback():
     assert "T0" in health.news_fallbacks(today).detail and "T1" not in health.news_fallbacks(today).detail
 
 
-FALLBACK = {"host": "api.groq.com",
+FALLBACK = {"host": "api.cerebras.ai",
             "after": "https://api.deepinfra.com/v1/openai/chat/completions returned HTTP 503: no healthy upstream (gave up after 4 attempt(s))"}
 
 
@@ -489,7 +489,7 @@ def test_a_tenth_of_the_watchlist_answered_by_the_second_host_is_a_warning_namin
     today += [json.loads(journal_line(f"U{i}")) for i in range(18)]
     alarm = health.model_fallbacks(today)
     assert alarm is not None and alarm.severity == health.WARNING
-    assert alarm.title == "2 of 20 ticker(s) were answered by the fallback host api.groq.com"
+    assert alarm.title == "2 of 20 ticker(s) were answered by the fallback host api.cerebras.ai"
     assert "T0, T1" in alarm.detail and "could not answer" in alarm.detail and "HTTP 503" in alarm.detail
 
 

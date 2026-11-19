@@ -59,7 +59,7 @@ class FakeProvider:
             text = json.dumps({**SIGNAL, "ticker": ticker})
         else:
             text = json.dumps(self.text)
-        return llm.Completion(text, Usage(model=self.model, input_tokens=4000, output_tokens=900), host="api.groq.com")
+        return llm.Completion(text, Usage(model=self.model, input_tokens=4000, output_tokens=900), host="api.cerebras.ai")
 
     def request_body(self, system_prompt, user_prompt, json_schema, *, model=None, effort=None, reasoning=True):
         return llm.OpenAICompatibleProvider("http://x/v1", self.model, api_key="k2").request_body(
@@ -145,12 +145,12 @@ def test_the_report_counts_what_matters_and_names_no_key():
     good = check.ask(FakeProvider(), check.Question("NVDA", "s", "u for NVDA", "archived ask of 2026-11-17T15:05"))
     bad = check.ask(FakeProvider(error="http://x returned HTTP 401: bad key (gave up after 1 attempt(s))"),
                     check.Question("AAPL", "s", "u", "archived ask of 2026-11-17T15:00"))
-    text = check.report("api.groq.com", {"model": "m"}, [good, bad])
-    assert "fallback host: api.groq.com" in text
+    text = check.report("api.cerebras.ai", {"model": "m"}, [good, bad])
+    assert "fallback host: api.cerebras.ai" in text
     assert "fallback check: 1 of 2 answered with a signal for the name asked" in text
     assert "usage reported on 1 of 1 answer(s)" in text
     assert "verdict: NOT OK" in text
-    assert "verdict: OK" in check.report("api.groq.com", {}, [good])
+    assert "verdict: OK" in check.report("api.cerebras.ai", {}, [good])
     assert "in 4000 out 900" in text and "HTTP 401" in text
     assert "k2" not in text
 
@@ -160,7 +160,7 @@ def test_main_asks_the_second_host_and_exits_by_the_answers(monkeypatch, capsys)
     monkeypatch.setattr(heartbeat, "fallback_model_provider", lambda: provider)
     assert check.main([]) == check.EXIT_OK
     out = capsys.readouterr().out
-    assert "asking api.groq.com 1 question(s), 1 at a time, as openai/gpt-oss-120b at high effort" in out
+    assert f"asking api.cerebras.ai 1 question(s), 1 at a time, as {llm.FALLBACK_MODEL} at high effort" in out
     assert "verdict: OK" in out and "built-in question" in out
     assert "k2" not in out
 

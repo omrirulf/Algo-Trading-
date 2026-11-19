@@ -257,6 +257,9 @@ def test_news_about_an_authorization_is_not_a_credential():
     assert credential_shape("FDA grants Emergency Use Authorization; api key rates rise") is None
     assert credential_shape("Authorization: " + "Bearer " + "abcdefghijklmnop1234") is not None
     assert credential_shape('{"apikey": "' + "q" * 24 + '"}') is not None
+    # The second host's key shape (Cerebras, 19 Nov 2026), beside Groq's.
+    assert credential_shape("the header was csk-" + "a1" * 14) == "cerebras key"
+    assert credential_shape("the header was gsk_" + "a1" * 14) == "groq key"
 
 
 def test_the_journal_s_own_context_trips_no_credential_shape():
