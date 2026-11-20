@@ -129,6 +129,19 @@ closes a day apart and 7 sizes off the other day's price. The fixed
 simulation is re-run from the same 28 Sep seed, and at least 5 calibration
 days must come after the fix.
 
+Since the fix of 20 Nov 2026 (pre-registration, Amendment 2026-11-20) the
+copy's engine -- and the engine of every fund that dispatches in production's
+order -- sizes each line of a cycle's dispatch pass against the positions as
+they stood when the pass began, as the real engine does at Alpaca, where an
+order sent a moment earlier has not yet filled (`SimBroker.pass_view`);
+fills, cash and equity still move at once, and the position manager, the
+stops and the marks see the book as it is. The one exploratory fund that
+reorders a pass by conviction keeps instant fills within the pass. Until
+that fix the copy's engine saw each earlier fill of the pass and ran out of
+room where the real one did not: the first calibration difference (5 Oct
+2026) and everything after it. The fixed simulation is again re-run from the
+same 28 Sep seed, and at least 5 calibration days must come after this fix.
+
 ## The fund test's start, and the gate
 
 The fund test's start is fixed (the owner's decision of 26 Sep 2026): the

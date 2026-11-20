@@ -10,6 +10,9 @@ identity condition (26 Sep 2026): no number in a race or fund output moves;
 the verdict only adds keys.
 
 Uses nothing the verdict added, so the same file ran on the code before it.
+The record was re-recorded on the pass view (the calibration fix of 20 Nov
+2026, Amendment 2026-11-20), which by design moved the funds, the band and
+the coin-flip check of the "passed" document and nothing else.
 Floats are written to 12 significant digits before hashing: Python 3.12's
 compensated ``sum()`` moves the last bits of a few sums (see
 ``tests/test_shadow_same_day.py``), and the CI runs 3.11 and 3.12.

@@ -43,6 +43,8 @@ CALIBRATION_DAYS: Final[int] = 15
 CALIBRATION_FIXES: Final[tuple[tuple[date, str], ...]] = (
     (date(2026, 11, 10), "the copy acts on each cycle day at the prices the real account recorded, and its "
                          "stops fill when the real account's did (Amendment 2026-11-10)"),
+    (date(2026, 11, 20), "the copy's engine sees the positions as they stood when the cycle's dispatch pass "
+                         "began, as the real engine does (Amendment 2026-11-20)"),
 )
 #: Calibration days that must come after the last fix. A day counts as after
 #: a fix only if its date is later than the fix's: a fix merged on a day may
