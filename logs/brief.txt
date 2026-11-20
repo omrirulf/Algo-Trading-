@@ -1,8 +1,8 @@
-🔴 17 of 66 model calls failed today (0 setup, 17 model)
-Equity $99,531 · 18 positions · $76,801 gross · $3,201 at risk · unrealised +$1,114
-Traded: JPM, LLY, ESLT, XOM
+🔴 11 of 80 ticker(s) produced no signal
+Equity $100,079 · 12 positions · $43,236 gross · $2,520 at risk · unrealised +$1,689
+3 directional calls, none traded
 Started by supabase-cron at 14:40 UTC (0 min after 14:40)
-Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-11-17
-Closed: TEVA, RY, ITA, EWD, XLF, MSFT
-Also: 17 of 80 ticker(s) produced no signal; 1 of 80 ticker(s) were judged without news
-Cycle 80 tickers, $0.11 · 2026-11-18
+Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-11-19
+Closed: GOOGL, KRE, XLC, NVO, EPOL, XLV
+Also: 1 of 80 ticker(s) were judged without news
+Cycle 80 tickers, $0.14 · 2026-11-20
