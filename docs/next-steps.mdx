@@ -72,18 +72,20 @@ product. These are the honest gaps.
     independent. On the default three-ticker watchlist nobody notices; on a
     longer one this becomes the slowest part of a cycle.
   </Card>
-  <Card title="A second host for the full model waits for its key" icon="arrows-split-up-and-left">
-    Since 17 Nov 2026 the cycle can ask the same model at a second host
+  <Card title="A second host for the full model is on; its limits are not yet measured on a bad day" icon="arrows-split-up-and-left">
+    Since 23 Nov 2026 the cycle asks the same model at a second host
     (Cerebras) when the first (DeepInfra) answers busy or with a server error on
-    every retry, or cannot be reached — the day DeepInfra answered all 60
-    asks with HTTP 503 and nothing was traded. It is built and switched off.
-    To switch it on: add the GitHub secret `FULL_MODEL_FALLBACK_API_KEY`
-    (a Cerebras API key on the developer tier, credits bought, so the rate
-    limit fits four asks at a time), run the **model fallback check**
-    workflow once by hand and read
-    its verdict line, and have the switch-on day logged in the
-    pre-registration's Amendments table. Until the secret exists nothing
-    changes. See [the model](/orchestrator/llm#a-second-host-for-the-same-model-when-the-first-cannot-answer).
+    every retry, or cannot be reached — built after the day DeepInfra answered
+    all 60 asks with HTTP 503 and nothing was traded, switched on by the
+    owner's secret `FULL_MODEL_FALLBACK_API_KEY` on 20 Nov 2026, checked the
+    same day (4 of 4 archived questions answered as signals). What is not
+    known yet: how the second host's rate limit behaves on a day when all
+    80 names fall to it four at a time, and what a slow primary still costs
+    the stage budget (a name that times out twice spends 16 minutes before
+    the second host is asked). The **model fallback check** workflow with
+    `count` 16 and `workers` 4 measures the first; the journal's
+    `model_fallback` lines will show the second. See
+    [the model](/orchestrator/llm#a-second-host-for-the-same-model-when-the-first-cannot-answer).
   </Card>
 </CardGroup>
 
