@@ -793,6 +793,8 @@ def test_the_cycle_builds_the_second_host_only_while_its_key_is_set():
     assert second._url == llm.FALLBACK_MODEL_BASE_URL.rstrip("/") + "/chat/completions"
     assert second._model == llm.FALLBACK_MODEL and second._api_key == "k2"
     assert second._timeout == llm.FULL_MODEL_TIMEOUT_SECONDS
+    assert second._attempts == llm.FALLBACK_HTTP_ATTEMPTS == 2 * llm.HTTP_ATTEMPTS == 8   # 20 Nov 2026
+    assert wrapped.primary._attempts == llm.HTTP_ATTEMPTS                                  # the first host keeps its four
     assert wrapped.fallback_host == llm.configured_fallback_provider() == "api.cerebras.ai"
     assert llm.FALLBACK_MODEL == "gpt-oss-120b"            # Cerebras's own name for the same weights
 
@@ -818,3 +820,52 @@ def test_the_journal_record_of_who_answered():
     assert hb.fallback_record(answered) == {"host": "api.cerebras.ai", "after": answered.fallback_after}
     assert hb.fallback_record(llm.Completion("{}", Usage(), host="api.deepinfra.com")) is None
     assert hb.fallback_record("x") is None
+
+
+def test_the_second_host_is_asked_one_name_at_a_time_and_the_first_host_is_not():
+    """The owner's "build" of 20 Nov 2026: on the free tier the second host accepts about one
+    answer a minute, so four names asking at once burned their asks on "busy"; in a lane a name
+    waits its turn. The first host is asked four in flight exactly as before."""
+    import threading
+    import time
+
+    from orchestrator.pricing import Usage
+
+    arrived = threading.Barrier(3, timeout=5)        # every thread reaches the first host together
+
+    class Primary:
+        def complete_detailed(self, *a, **kw):
+            arrived.wait()                            # broken if the lane wrongly wrapped the first host
+            raise llm.ProviderUnavailable("http://x returned HTTP 503: down (gave up after 4 attempt(s))")
+
+    state = {"active": 0, "peak": 0}
+    guard = threading.Lock()
+
+    class Second:
+        _url = "http://fallback/v1/chat/completions"
+
+        def complete_detailed(self, *a, **kw):
+            with guard:
+                state["active"] += 1
+                state["peak"] = max(state["peak"], state["active"])
+            time.sleep(0.05)
+            with guard:
+                state["active"] -= 1
+            return llm.Completion(json.dumps(ANSWER), Usage(), host="fallback")
+
+    provider = llm.FallbackSignalProvider(Primary(), Second())
+    results: list = []
+    threads = [threading.Thread(target=lambda: results.append(provider.complete_detailed("s", "u", SCHEMA)))
+               for _ in range(3)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=10)
+    assert len(results) == 3 and all(r.fallback_after and r.host == "fallback" for r in results)
+    assert state["peak"] == 1                          # one at a time at the second host
+    assert isinstance(llm._SECOND_HOST_LANE, type(threading.Lock()))
+
+
+def test_the_stage_budget_is_two_hours_for_the_second_host_s_pace():
+    """20 Nov 2026: about 80 minutes at one answer a minute on a day every name falls to the second host."""
+    assert cfg.FULL_MODEL_STAGE_BUDGET_SECONDS == 120 * 60

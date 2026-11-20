@@ -78,13 +78,14 @@ product. These are the honest gaps.
     every retry, or cannot be reached — built after the day DeepInfra answered
     all 60 asks with HTTP 503 and nothing was traded, switched on by the
     owner's secret `FULL_MODEL_FALLBACK_API_KEY` on 20 Nov 2026, checked the
-    same day (4 of 4 archived questions answered as signals). What is not
-    known yet: how the second host's rate limit behaves on a day when all
-    80 names fall to it four at a time, and what a slow primary still costs
-    the stage budget (a name that times out twice spends 16 minutes before
-    the second host is asked). The **model fallback check** workflow with
-    `count` 16 and `workers` 4 measures the first; the journal's
-    `model_fallback` lines will show the second. See
+    same day (4 of 4 archived questions answered as signals). The second
+    host is asked one name at a time with eight asks per name, so its free
+    tier's pace of about one answer a minute makes a bad day slower, not
+    shorter; the stage budget is 120 minutes for it. What is not known yet:
+    what a slow primary still costs that budget (a name that times out
+    twice spends 16 minutes before the second host is asked), and whether
+    the free tier's daily cap holds on a day every name falls to it. The
+    journal's `model_fallback` lines will show both. See
     [the model](/orchestrator/llm#a-second-host-for-the-same-model-when-the-first-cannot-answer).
   </Card>
 </CardGroup>

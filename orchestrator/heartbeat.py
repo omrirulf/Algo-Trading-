@@ -59,6 +59,7 @@ from config.settings import get_settings  # noqa: E402
 from orchestrator import blend, context, flows, journal, live_price, llm, model_io  # noqa: E402
 from orchestrator.context import TickerContext  # noqa: E402
 from orchestrator.llm import (  # noqa: E402
+    FALLBACK_HTTP_ATTEMPTS,
     FALLBACK_MODEL,
     FALLBACK_MODEL_BASE_URL,
     FULL_MODEL_TIMEOUT_SECONDS,
@@ -551,9 +552,10 @@ def fallback_model_provider() -> OpenAICompatibleProvider | None:
     """The second host for the same model, or None while its key is blank.
 
     Built the way the primary is -- the same model-stage ceiling, the same
-    retries and re-asks -- at ``FALLBACK_MODEL_BASE_URL``, for
-    ``FALLBACK_MODEL``, with ``full_model_fallback_api_key`` as its only
-    setting. ``full_model_provider`` wraps the primary with it;
+    re-asks -- at ``FALLBACK_MODEL_BASE_URL``, for ``FALLBACK_MODEL``, with
+    ``full_model_fallback_api_key`` as its only setting and twice the
+    asks per call (``FALLBACK_HTTP_ATTEMPTS``: a busy free tier is waited
+    out, not given up on). ``full_model_provider`` wraps the primary with it;
     ``replay/model_fallback_check.py`` asks it one question before the
     owner relies on it. None too when the full model is Anthropic's: that
     path has its own fallbacks and no second host.
@@ -566,6 +568,7 @@ def fallback_model_provider() -> OpenAICompatibleProvider | None:
         model=FALLBACK_MODEL,
         api_key=settings.full_model_fallback_api_key,
         timeout=FULL_MODEL_TIMEOUT_SECONDS,
+        attempts=FALLBACK_HTTP_ATTEMPTS,
     )
 
 
