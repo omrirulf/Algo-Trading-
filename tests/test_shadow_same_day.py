@@ -52,41 +52,40 @@ from tests.test_shadow_fund import S, flat, said
 # Every other fund is exactly what it was
 # --------------------------------------------------------------------------- #
 
-#: sha256 of each part of the funds document, from ``golden_parts()`` run on
-#: the code before this change (commit dc9fe11), where the list held the four
-#: and the two earlier exploratory funds, in a fresh interpreter. Recorded
-#: for each Python the CI runs: 3.12 made ``sum()`` of floats compensated,
-#: which moves the last digits of two exploratory funds' sums, so the two
-#: versions' hashes differ there (and nowhere else). The golden prices are
-#: rounded (``tests/shadow_golden.py``), so the CPU a runner has cannot move
-#: them.
+#: sha256 of each part of the funds document, from ``golden_parts()`` run in
+#: a fresh interpreter on the code with the pass view (the calibration fix of
+#: 20 Nov 2026, Amendment 2026-11-20), which sizes every line of a dispatch
+#: pass against the book as the pass began and so moved every fund whose
+#: pass met a limit; first recorded on the code before the same-day fund
+#: (commit dc9fe11). Kept per Python the CI runs, because 3.12 made ``sum()``
+#: of floats compensated and the last digits of a sum can differ between
+#: the two; on this record every part agrees. The golden prices are rounded
+#: (``tests/shadow_golden.py``), so the CPU a runner has cannot move them.
 _SAME_ON_BOTH = {
-    "band": "dbc748f986e1da0daac77658bfd7f5d97a93697bd4b2e4eec0e69f541e8ccff0",
-    "checks:coin": "0ec3ed3ece4fd4004dd757abcbd8d5abc85fef74a4b5704e0f7e5fa738fcfaf4",
+    "band": "cf947bfd582ab5bce5953fcb476e1d6f10c9bd0cc079af33533bdab83e589d1b",
+    "checks:coin": "7a95388bc007cf36f50d709d88e66bc178092bf7bc6dc116aec70348224455f3",
     "days": "225bb666697cfc15702b9c16bcd248f1ea0b74f0221fe61d38ad40dd79697760",
     "row:hybrid": "45bad8453ab1641b03be3919d672bda1163d631c89b54bd6430b6f0111912b6c",
-    "row:model": "3d8d99bfc625aafed35e1414daa7f3c7a839547525b1cc8aceee911521156b08",
+    "row:model": "8b7e53ad6f371efe1ebcfc1d1a9fd432ef404e21ef860fe088b938aa616890b6",
+    "row:model_by_conviction": "29a7f22bc4a0256ad944fa125b04eead0b25659bfe34b42189f42513b0f78a34",
+    "row:model_same_day": "9651785a7b1a2651d3b136f8eeb6daa2703f7470b74a80720148905a32ae0a2a",
+    "row:model_sized": "4e8f759a9c396f40590524aaa5046c786b08ccba2dd27fe68c11c05ba48e2b6b",
     "row:momentum": "71440e1f8dd4c05b36ac6868523b407a4f2e6db21509794805411ec3c9d4704b",
     "row:vt": "8e4adba0b5226ca4cd2f5c04ed2e7dab38c5616b69d8b067ff9ae4d90d685370",
     "start": "3c4c54d6835358d7e8b1691acdf90d00f5e8c6ef02039a8bb65c632773c49a4f",
 }
 BEFORE_BY_VERSION = {
-    (3, 11): {**_SAME_ON_BOTH,
-        "row:model_by_conviction": "d4460d3a191d64526e06af7cc04f1eb93ee960de744e72755eaae1e872083cd2",
-        "row:model_sized": "03fea6c97958111272f83dcc3f8af0a111d0c00579e53cdfd61e562b5e09651d",
-    },
-    (3, 12): {**_SAME_ON_BOTH,
-        "row:model_by_conviction": "a1eaf60993858f4c78d4e89d4bea01e901565f9efea260f129b85f9603e018d1",
-        "row:model_sized": "aaa975dc246a6c88557acf9ba85860d90b96b93ec5e170e9a94f50d1a4dd7c60",
-    },
+    (3, 11): {**_SAME_ON_BOTH},
+    (3, 12): {**_SAME_ON_BOTH},
 }
 
 
 def test_every_other_fund_is_byte_identical_to_the_code_before_the_change():
     """Same journal (with recorded prices of every kind), same prices, same
-    refusals: every row that existed before, the days, the band and the
-    coin-flip funds' check hash exactly as they did on the code before the
-    change. The one new row is the same-day fund's.
+    refusals: every row, the days, the band and the coin-flip funds' check
+    hash exactly as they did when the hashes were recorded (the pass view of
+    20 Nov 2026; before it, the code before the same-day fund, whose row is
+    pinned too since then).
 
     Computed in a fresh interpreter with a fixed hash seed, as the recorded
     hashes were: nothing an earlier test left behind in this process, and no
@@ -97,7 +96,7 @@ def test_every_other_fund_is_byte_identical_to_the_code_before_the_change():
                     "the in-process test below covers it")
     after = _golden_in_a_fresh_process()
     assert {k: v for k, v in after.items() if k in before} == before
-    assert set(after) - set(before) == {"row:model_same_day"}
+    assert set(after) == set(before)
 
 
 def _golden_in_a_fresh_process() -> dict[str, str]:

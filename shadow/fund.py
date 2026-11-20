@@ -37,12 +37,32 @@ day, the same rule as the race (Amendment 2026-09-24).
 lines dispatched take the room. Every fund -- all but the exploratory
 "highest conviction first" one, below -- uses the one rule production
 uses: **watchlist order** (``config.watchlist.DEFAULT_WATCHLIST``), one
-signal at a time, each seeing the fills before it. Production has no other
+signal at a time. Production has no other
 rule -- there is no sort by conviction anywhere on the dispatch path -- and
 a calibration fund dispatching in any other order would differ from the
 real account for that reason alone. A day with two cycles is dispatched
 cycle by cycle, each in watchlist order; a second same-side entry in a
 ticker on one day is refused by the broker, as live.
+
+**The pass view** (calibration fix of 20 Nov 2026, Amendment 2026-11-20).
+Live, the engine sends a cycle's orders in one pass of a few seconds and
+reads Alpaca's positions before each; an order sent a moment earlier has
+not filled yet, so the list the next order is sized against does not show
+it, and every order of the pass is sized against the book as it stood when
+the pass began (5 Oct 2026: gross 112%; 18 Nov 2026: four single names,
+each at the full cap, the sleeve at 116% of its budget). Until this fix the
+copy filled at once and each line saw the fills before it, so its engine
+ran out of room where the real one did not: the first difference of the
+calibration (5 Oct) and everything after it. So here: for each cycle's
+dispatch pass the fund holds the broker's view of the positions
+(``SimBroker.pass_view``), and the engine's count, gross, sleeve, group and
+stock-market checks read the positions as they stood when the pass began,
+while fills, cash and equity move at once as before. The one exploratory
+fund that reorders a pass by conviction keeps instant fills within the
+pass, each line seeing the fills before it: its question is what the order
+within a pass decides, which the view would make moot. Everything outside
+the pass -- the manager, the stops, the marks, the held-name skip -- sees
+the book as it is.
 
 Two exploratory funds
 ---------------------
@@ -665,6 +685,13 @@ class Fund:
         when given (the calibration copy: the price the real account used
         for that line, ``shadow.calibration``). A line with no such price is
         not entered, and counted in ``not_entered`` by reason.
+
+        Each cycle's lines are one dispatch pass, and for its length the
+        broker holds the pass view (module docstring, "The pass view"): the
+        engine sizes every line against the positions as they stood when
+        the pass began, as the real engine does. The one fund that reorders
+        a pass by conviction dispatches without the view, each line seeing
+        the fills before it, as its question needs.
         """
         from shadow.order_matters import Event, capacity_kind
 
@@ -683,65 +710,76 @@ class Fund:
                 self.broker.not_shortable = refused_by(self.refused_on, refused_for)
             if self.priority == CONVICTION_FIRST and self._short_of_room(batch):
                 batch = by_conviction(batch)
-            for line, signal in batch:
-                # Held is read at dispatch, whatever the order: a name bought
-                # earlier in this list is held by the time a later line reaches it.
-                if line.ticker in self.broker.positions:        # SKIP_HELD_TICKERS
-                    if self.decisions is not None and signal is not None:
-                        self.decisions.append(Decision(self.broker.day, line.day, line.ticker,
-                                                       signal.bias.value, signal.conviction, "SKIPPED",
-                                                       "already held", False))
-                    continue
-                if signal is None:
-                    continue
-                if recorded and signal.bias is not Bias.NEUTRAL:
-                    priced = price_for if price_for is not None else recorded_fill
-                    price, why = priced(line.entry, "buy" if signal.bias is Bias.BULLISH else "sell",
-                                        self.broker.day)
-                    if why is not None:
-                        self.not_entered[why] += 1
-                        if self.decisions is not None:
+            # The pass view (Amendment 2026-11-20): the engine sizes every line of
+            # this pass against the positions as they stood when the pass began,
+            # as the real engine does. Not for the fund that reorders a pass by
+            # conviction: its question is what the order within a pass decides.
+            held_view = self.priority != CONVICTION_FIRST
+            if held_view:
+                self.broker.hold_view()
+            try:
+                for line, signal in batch:
+                    # Held is read at dispatch, whatever the order: a name bought
+                    # earlier in this list is held by the time a later line reaches it.
+                    if line.ticker in self.broker.positions:        # SKIP_HELD_TICKERS
+                        if self.decisions is not None and signal is not None:
                             self.decisions.append(Decision(self.broker.day, line.day, line.ticker,
                                                            signal.bias.value, signal.conviction, "SKIPPED",
-                                                           why, False))
+                                                           "already held", False))
                         continue
-                    quotes = self.quotes
-                    assert quotes is not None
-                    # The line's price for the length of its dispatch; what
-                    # the day already recorded for the name is put back after.
-                    before = quotes.price.get(line.ticker)
-                    quotes.price[line.ticker] = price
-                    try:
+                    if signal is None:
+                        continue
+                    if recorded and signal.bias is not Bias.NEUTRAL:
+                        priced = price_for if price_for is not None else recorded_fill
+                        price, why = priced(line.entry, "buy" if signal.bias is Bias.BULLISH else "sell",
+                                            self.broker.day)
+                        if why is not None:
+                            self.not_entered[why] += 1
+                            if self.decisions is not None:
+                                self.decisions.append(Decision(self.broker.day, line.day, line.ticker,
+                                                               signal.bias.value, signal.conviction, "SKIPPED",
+                                                               why, False))
+                            continue
+                        quotes = self.quotes
+                        assert quotes is not None
+                        # The line's price for the length of its dispatch; what
+                        # the day already recorded for the name is put back after.
+                        before = quotes.price.get(line.ticker)
+                        quotes.price[line.ticker] = price
+                        try:
+                            result, cap = self._execute(signal)
+                        finally:
+                            if before is None:
+                                quotes.price.pop(line.ticker, None)
+                            else:
+                                quotes.price[line.ticker] = before
+                    else:
                         result, cap = self._execute(signal)
-                    finally:
-                        if before is None:
-                            quotes.price.pop(line.ticker, None)
-                        else:
-                            quotes.price[line.ticker] = before
-                else:
-                    result, cap = self._execute(signal)
-                dispatched = True
-                accepted = result.status is ExecutionStatus.ACCEPTED
-                kind = None if accepted else capacity_kind(result.reason, cap)
-                if kind is not None:
-                    self.order_days_seen.add(line.day)
-                if self.order_events is not None and (accepted or kind is not None):
-                    self.order_events.append(Event(line.day, line.ticker, signal.conviction,
-                                                   result.status.value, "", kind))
-                if self.decisions is not None:
-                    self.decisions.append(Decision(self.broker.day, line.day, line.ticker, signal.bias.value,
-                                                   signal.conviction, result.status.value, result.reason))
-                if result.status is ExecutionStatus.ACCEPTED:
-                    self.tally.accepted += 1
-                elif result.status is ExecutionStatus.ERROR:
-                    self.tally.errors += 1
-                    if result.reason.startswith("unexpected"):
-                        self.tally.unexpected.append(f"{line.ticker}: {result.reason}")
-                    elif self._hole(line.ticker, result.reason):
-                        self.tally.data_holes.append(f"{self.broker.day.isoformat()} {line.ticker}: no bar; "
-                                                     f"no entry that day")
-                else:
-                    self.tally.rejected += 1
+                    dispatched = True
+                    accepted = result.status is ExecutionStatus.ACCEPTED
+                    kind = None if accepted else capacity_kind(result.reason, cap)
+                    if kind is not None:
+                        self.order_days_seen.add(line.day)
+                    if self.order_events is not None and (accepted or kind is not None):
+                        self.order_events.append(Event(line.day, line.ticker, signal.conviction,
+                                                       result.status.value, "", kind))
+                    if self.decisions is not None:
+                        self.decisions.append(Decision(self.broker.day, line.day, line.ticker, signal.bias.value,
+                                                       signal.conviction, result.status.value, result.reason))
+                    if result.status is ExecutionStatus.ACCEPTED:
+                        self.tally.accepted += 1
+                    elif result.status is ExecutionStatus.ERROR:
+                        self.tally.errors += 1
+                        if result.reason.startswith("unexpected"):
+                            self.tally.unexpected.append(f"{line.ticker}: {result.reason}")
+                        elif self._hole(line.ticker, result.reason):
+                            self.tally.data_holes.append(f"{self.broker.day.isoformat()} {line.ticker}: no bar; "
+                                                         f"no entry that day")
+                    else:
+                        self.tally.rejected += 1
+            finally:
+                if held_view:
+                    self.broker.release_view()
         self.cycles_dispatched += dispatched
 
     def _short_of_room(self, batch: Sequence[tuple[Line, Optional[LLMSignal]]]) -> bool:

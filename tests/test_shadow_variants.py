@@ -58,7 +58,9 @@ from tests.test_shadow_fund import (
     book_before,
     expected_qty,
     flat,
+    pass_start,
     said,
+    view_start,
     sizing_mismatches,
     stamp,
     universe,
@@ -156,11 +158,14 @@ TECH = {"MSFT": 0.35, "NVDA": 0.5, "XLK": 0.5, "XLC": 0.5, "SMH": 0.7, "IGV": 0.
 
 
 def test_highest_conviction_first_changes_who_gets_the_room_and_keeps_ties_in_watchlist_order():
-    """In watchlist order MSFT, NVDA, XLK, XLC and a sliver of SMH take the
-    room and IGV -- the model's surest -- is refused. By conviction IGV and SMH go first,
-    the three at 0.5 follow in watchlist order (NVDA, XLK, XLC), and MSFT,
-    the least sure, is the one left out. Every size is still the engine's,
-    on the book as it stood just before it."""
+    """The model fund holds the pass view: it buys all six at their caps, as
+    the real engine does when one pass fills a group. This fund fills at once
+    within a pass, so for it the room runs out: in watchlist order MSFT, NVDA,
+    XLK, XLC and a sliver of SMH would take the room and IGV -- the model's
+    surest -- would be refused. By conviction IGV and SMH go first, the three
+    at 0.5 follow in watchlist order (NVDA, XLK, XLC), and MSFT, the least
+    sure, is the one left out. Every size is still the engine's, on the book
+    as it stood just before it."""
     bars = Bars({t: flat() for t in TECH})
     feed = SimFeed(bars)
     entries = [said(t, S[0], conviction=c) for t, c in TECH.items()]
@@ -172,7 +177,7 @@ def test_highest_conviction_first_changes_who_gets_the_room_and_keeps_ties_in_wa
 
     assert [x.ticker for x in model.decisions] == ["MSFT", "NVDA", "XLK", "XLC", "SMH", "IGV"]
     assert [x.ticker for x in by_order.decisions] == ["IGV", "SMH", "NVDA", "XLK", "XLC", "MSFT"]
-    assert [t for t, _ in entries_of(model)] == ["MSFT", "NVDA", "XLK", "XLC", "SMH"]
+    assert entries_of(model) == [("MSFT", 50), ("NVDA", 49), ("XLK", 69), ("XLC", 69), ("SMH", 69), ("IGV", 69)]
     assert [t for t, _ in entries_of(by_order)] == ["IGV", "SMH", "NVDA", "XLK"]
     refused = {x.ticker: x.reason for x in by_order.decisions if x.status != "ACCEPTED"}
     assert set(refused) == {"XLC", "MSFT"}
@@ -182,11 +187,10 @@ def test_highest_conviction_first_changes_who_gets_the_room_and_keeps_ties_in_wa
     for i, fill in enumerate(fills):
         assert fill.qty == expected_qty(fills[:i], fill.ticker, "buy", opens, STARTING_CASH), fill.ticker
     assert [q for _, q in entries_of(by_order)] == [70, 69, 49, 61]           # the arithmetic, spelled out
-    # And the order report sees the difference: the model fund left out a
-    # name that outranked every purchase; this one left out only the least sure.
-    [model_day] = om.fund_summary(model)["list"]
+    # And the order report sees the difference: the model fund left nothing
+    # out; this one left out only the least sure.
+    assert om.fund_summary(model)["list"] == [] and om.fund_summary(model)["skipped"] == 0
     [own_day] = om.fund_summary(by_order)["list"]
-    assert [s["ticker"] for s in model_day["skipped"]] == ["IGV"] and model_day["skipped"][0]["outranks"]
     assert {s["ticker"] for s in own_day["skipped"]} == {"XLC", "MSFT"}
     assert all(not s["outranks"] for s in own_day["skipped"])
 
@@ -267,9 +271,11 @@ def test_a_short_that_makes_room_for_a_long_is_not_a_lack_of_room():
     dispatched first makes room for a long after it. Next day the model says
     XHB BEARISH at 0.35 and EWJ BULLISH at 0.9; in watchlist order the short
     goes first and both fill in full, so there is room for every line and the
-    fund buys what the model fund buys. Had it sorted by conviction anyway,
-    EWJ would have gone first and got 10 shares of its 69 -- a difference the
-    owner's rule ("when there is not enough room") does not ask for."""
+    fund keeps watchlist order. Had it sorted by conviction anyway, EWJ would
+    have gone first and got 10 shares of its 69 -- a difference the owner's
+    rule ("when there is not enough room") does not ask for. The model fund,
+    holding the pass view, sizes EWJ before XHB's short has filled, as the
+    real engine would, and gets those 10 shares."""
     names = NEAR_THE_NET + ("XHB", "EWJ")
     bars = Bars({t: flat() for t in names})
     feed = SimFeed(bars)
@@ -289,18 +295,19 @@ def test_a_short_that_makes_room_for_a_long_is_not_a_lack_of_room():
     def second_day(f):
         return [(x.ticker, x.side, x.qty) for x in f.broker.fills if x.kind == ENTRY and x.day == S[2]]
 
-    assert second_day(model) == [("XHB", "sell", 69), ("EWJ", "buy", 69)]
-    assert second_day(by_order) == second_day(model)
-    assert by_order.days == model.days
+    assert second_day(model) == [("XHB", "sell", 69), ("EWJ", "buy", 10)]
+    assert second_day(by_order) == [("XHB", "sell", 69), ("EWJ", "buy", 69)]
     assert second_day(sorted_anyway) == [("EWJ", "buy", 10), ("XHB", "sell", 69)]
 
 
 def test_a_line_cut_short_by_a_limit_means_the_book_ran_out_of_room():
-    """Five Technology names, the surest last. In watchlist order every one
-    is bought and none refused, but SMH -- the model's surest -- gets only 12
-    shares of its 70: the group's 25% is spent. The book ran out of room and
-    the order decided who got it, so the fund buys by conviction: SMH in
-    full, then the three at 0.5, and MSFT, the least sure, is left out."""
+    """Five Technology names, the surest last. Filling at once in watchlist
+    order, as this fund's trial does, every one is bought and none refused,
+    but SMH -- the model's surest -- gets only 12 shares of its 70: the
+    group's 25% is spent. The book ran out of room and the order decided who
+    got it, so the fund buys by conviction: SMH in full, then the three at
+    0.5, and MSFT, the least sure, is left out. (The model fund, holding the
+    pass view, gives SMH 69: its full cap on the live equity.)"""
     names = {"MSFT": 0.35, "NVDA": 0.5, "XLK": 0.5, "XLC": 0.5, "SMH": 0.9}
     bars = Bars({t: flat() for t in names})
     feed = SimFeed(bars)
@@ -309,7 +316,7 @@ def test_a_line_cut_short_by_a_limit_means_the_book_ran_out_of_room():
     for f in (model, by_order):
         one_session(f, feed, entries)
     assert all(x.status == "ACCEPTED" for x in model.decisions)
-    assert entries_of(model) == [("MSFT", 50), ("NVDA", 49), ("XLK", 69), ("XLC", 69), ("SMH", 12)]
+    assert entries_of(model) == [("MSFT", 50), ("NVDA", 49), ("XLK", 69), ("XLC", 69), ("SMH", 69)]
     assert entries_of(by_order) == [("SMH", 70), ("NVDA", 49), ("XLK", 69), ("XLC", 61)]
     [refused] = [x for x in by_order.decisions if x.status != "ACCEPTED"]
     assert refused.ticker == "MSFT" and "'Technology' group" in refused.reason
@@ -424,43 +431,57 @@ def test_a_scaled_cap_above_100_percent_is_an_integrity_problem_not_a_refusal(mo
     assert not shadow_run.integrity([sized])["ok"]
 
 
-def scaled_expected(fills_before, ticker: str, side: str, opens, conviction: float) -> int:
-    """floor(min(equity x cap x factor, the tightest portfolio headroom) / price), on the book before."""
+def scaled_expected(fills_before, ticker: str, side: str, opens, conviction: float, at_pass_start=None) -> int:
+    """floor(min(equity x cap x factor, the tightest portfolio headroom) / price),
+    on the book before; the headroom on the book as the pass began when
+    ``at_pass_start`` is given (``test_shadow_fund.expected_qty``)."""
     equity, positions, _ = book_before(fills_before, opens, STARTING_CASH)
+    if at_pass_start is not None:
+        _, positions, _ = book_before(at_pass_start, opens, STARTING_CASH)
     headroom, _ = risk_engine.budget_ceiling_for(equity, ticker, positions, side)
     cap = equity * NORMAL(ticker) * conviction_factor(conviction)
     return max(0, math.floor(min(cap, headroom) / opens[ticker]))
 
 
-@pytest.mark.parametrize("names, limit, bought, left_out", [
-    # The Technology group's 25%: 7.5% + 7.5% + XLK's 7% x 1.5, cut to what
-    # the group has left; XLC finds no room at all.
-    (("MSFT", "NVDA", "XLK", "XLC"), "'Technology' group", ["MSFT", "NVDA", "XLK"], ["XLC"]),
-    # The single-name sleeve's 25%: four names in four groups at 7.5% each;
-    # the fourth gets what the sleeve has left, the fifth nothing.
-    (("MSFT", "JPM", "LLY", "CAT", "PG"), "sleeve budget", ["MSFT", "JPM", "LLY", "CAT"], ["PG"]),
+@pytest.mark.parametrize("first, then, last, limit", [
+    # The Technology group's 25%: 7.5% + 7.5% on the first day; XLK's 7% x 1.5
+    # the next day is cut to what the group has left; XLC, the day after, finds no room.
+    (("MSFT", "NVDA"), "XLK", "XLC", "'Technology' group"),
+    # The single-name sleeve's 25%: three names in three groups at 7.5% on the
+    # first day; CAT the next day gets what the sleeve has left, PG after it nothing.
+    (("MSFT", "JPM", "LLY"), "CAT", "PG", "sleeve budget"),
 ])
-def test_a_group_or_sleeve_cap_still_binds_the_sized_fund(names, limit, bought, left_out):
+def test_a_group_or_sleeve_cap_still_binds_the_sized_fund(first, then, last, limit):
+    """Between dispatch passes, as live: within a pass every line is sized on
+    the book as the pass began (the pass view), so a cap binds the next
+    pass -- here the next day's -- cutting the scaled size to what is left
+    and refusing the one after it."""
+    names = first + (then, last)
     bars = Bars({t: flat() for t in names})
     feed = SimFeed(bars)
     sized = fund("model_sized", bars, feed, sized_by_conviction=True)
-    one_session(sized, feed, [said(t, S[0], conviction=0.65) for t in names])
+    entries = ([said(t, S[0], conviction=0.65) for t in first]
+               + [said(then, S[1], conviction=0.65), said(last, S[2], conviction=0.65)])
+    cycles = lines_by_day(entries)
+    for session, cycle_day in ((S[1], S[0]), (S[2], S[1]), (S[3], S[2])):
+        feed.at_open(session)
+        sized.session(session, cycles[cycle_day])
 
     fills = [x for x in sized.broker.fills if x.kind == ENTRY]
-    assert [x.ticker for x in fills] == bought
+    assert [x.ticker for x in fills] == list(first) + [then]
     opens = {t: 100.0 for t in names}
     for i, fill in enumerate(fills):
-        assert fill.qty == scaled_expected(fills[:i], fill.ticker, "buy", opens, 0.65), fill.ticker
+        want = scaled_expected(fills[:i], fill.ticker, "buy", opens, 0.65, fills[:pass_start(fills, i)])
+        assert fill.qty == want, fill.ticker
     # The first is the full 1.5x; the last one bought was cut by the limit.
     assert fills[0].qty == 75 and fills[-1].qty < math.floor(STARTING_CASH * NORMAL(fills[-1].ticker) * 1.5 / 100)
     equity = sized.days[-1].equity
     assert sized.days[-1].gross <= equity * 0.25 + 1e-6
     refused = [x for x in sized.decisions if x.status != "ACCEPTED"]
-    assert [x.ticker for x in refused] == left_out and all(limit in x.reason for x in refused)
+    assert [x.ticker for x in refused] == [last] and all(limit in x.reason for x in refused)
     # The order report reads the limit, with the fund's exact scaled cap.
     [day] = om.fund_summary(sized)["list"]
-    assert [(s["ticker"], s["kind"]) for s in day["skipped"]] == [
-        (t, om.GROUP if "group" in limit else om.SLEEVE) for t in left_out]
+    assert [(s["ticker"], s["kind"]) for s in day["skipped"]] == [(last, om.GROUP if "group" in limit else om.SLEEVE)]
 
 
 def test_the_order_report_reads_a_scaled_cap_exactly_not_as_the_engine_rounds_it():
@@ -552,7 +573,8 @@ def sized_mismatches(f: Fund) -> list[str]:
         for ticker in held | {x.ticker}:
             bar = f.bars.bar(ticker, x.day)
             opens[ticker] = bar[0] if bar else f.bars.last_close_before(ticker, x.day)
-        want = scaled_expected(fills[:i], x.ticker, x.side, opens, conviction[(x.day, x.ticker)])
+        want = scaled_expected(fills[:i], x.ticker, x.side, opens, conviction[(x.day, x.ticker)],
+                               fills[:view_start(f.broker, i)])
         if x.qty != want:
             out.append(f"{f.name} {x.day} {x.ticker}: {x.qty}, expected {want}")
     return out
@@ -562,8 +584,10 @@ def test_a_long_run_keeps_every_invariant_for_both_exploratory_funds():
     """Sixty sessions, fifteen names, every conviction band: stops cover every
     position, cash is the fills, the trades account for it, the book is
     marked at the close; no unexpected engine error, no manager error, R
-    never estimated; each entry is the engine's size on the book before it
-    (scaled, for the sized fund); the cap is back to production's after;
+    never estimated; each entry is the engine's size on the book as its pass
+    began (the pass view; on the book before it, for the fund that reorders
+    by conviction; scaled, for the sized fund); the cap is back to
+    production's after;
     and each fund really did something the model fund did not."""
     bars = wider()
     sessions = S[:60]

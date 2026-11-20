@@ -504,3 +504,39 @@ def test_a_recorded_stop_fill_takes_every_live_stop_of_that_name_on_that_side():
     assert broker.positions["EWZ"].qty == -40 and [s.ticker for s in broker.live_stops()] == ["EWZ"]
     assert not [f for f in broker.fills if f.ticker in ("EWZ", "MSFT")]
 
+
+# --------------------------------------------------------------------------- #
+# The pass view (Amendment 2026-11-20)
+# --------------------------------------------------------------------------- #
+
+
+def test_a_fill_inside_a_held_view_is_not_in_the_engines_list_until_the_view_is_released():
+    """While a fund holds the pass view, the list the engine reads is the
+    positions as they stood when it was held -- an order filled since is in
+    the book, not in the list, and the list keeps the marks it was held
+    with -- while cash and equity move at once. Released, the list is the
+    book again; a pass that raises releases it too."""
+    broker, quotes = book(AAA=100.0, BBB=50.0)
+    broker.seed_position("AAA", 10, 100.0, D1, stops=[(10, 90.0)])
+    assert broker._view is None
+    with broker.pass_view():
+        broker.submit_bracket_order("BBB", 20, "buy", 45.0)
+        assert broker.positions["BBB"].qty == 20                               # filled at once, in the book
+        assert [p.ticker for p in broker.get_open_positions()] == ["AAA"]      # not in the engine's list
+        assert broker.cash == pytest.approx(100_000.0 - 20 * 50.0 * (1 + COST))
+        assert broker.get_equity() == pytest.approx(100_000.0 + 1_000.0 - 20 * 50.0 * COST)   # live
+        quotes["AAA"] = 110.0
+        assert broker.get_open_positions()[0].market_value == 1_000.0          # the list keeps its marks
+        assert broker.get_equity() == pytest.approx(100_000.0 + 1_100.0 - 20 * 50.0 * COST)   # equity does not
+        broker.get_open_positions().clear()                                    # a copy: the view is untouched
+        assert len(broker.get_open_positions()) == 1
+    assert broker._view is None
+    assert sorted(p.ticker for p in broker.get_open_positions()) == ["AAA", "BBB"]
+    assert broker.get_open_positions()[0].market_value == 1_100.0
+    with pytest.raises(RuntimeError, match="fell over"):
+        with broker.pass_view():
+            raise RuntimeError("the pass fell over")
+    assert broker._view is None
+    # A copy of the book to try orders on never carries a view.
+    with broker.pass_view():
+        assert broker.scratch()._view is None

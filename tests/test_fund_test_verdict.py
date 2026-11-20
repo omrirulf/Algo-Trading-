@@ -597,7 +597,9 @@ def test_every_existing_key_is_as_the_code_before_wrote_it():
     readable and the night after; calibration passed with the real funds) and the race gate (no look, a
     decided look, a waiting look, a final look), with the verdict's new keys removed, hash part for part
     exactly as the code before the verdict wrote them (``tests/verdict_identity_before.json``, recorded at
-    main 428c974 plus the verdict's own module, commit 56167d4). Run in a fresh interpreter with a fixed hash seed, as they were recorded."""
+    main 428c974 plus the verdict's own module, commit 56167d4; re-recorded on the pass view, the calibration
+    fix of 20 Nov 2026, which by design moved the five fund parts of the passed document and nothing else).
+    Run in a fresh interpreter with a fixed hash seed, as they were recorded."""
     before = json.loads((ROOT / "tests" / "verdict_identity_before.json").read_text())
     done = subprocess.run([sys.executable, "-m", "tests.verdict_identity"], cwd=ROOT, capture_output=True,
                           text=True, timeout=600, env={**os.environ, "PYTHONHASHSEED": "0"}, check=True)

@@ -4,8 +4,9 @@
 over a ``SimBroker`` and a ``SimFeed``. These tests check the driving: the
 lines every fund may act on, the one priority rule production has (cycle,
 then watchlist order), the held-name skip, a session with no cycle, the
-engine's sizing against the book as it stood at each dispatch, the index
-fund, and -- over long random runs with coin-flip funds -- the invariants
+engine's sizing against the book as it stood when each cycle's dispatch
+pass began (the pass view, Amendment 2026-11-20), the index fund, and --
+over long random runs with coin-flip funds -- the invariants
 that say the simulation itself has not gone wrong: every position's stops
 cover it exactly, cash is the sum of the fills, no line reaches the live
 audit log, and two runs are identical.
@@ -31,6 +32,7 @@ from app.schemas import Bias, LLMSignal
 from config import settings as cfg
 from shadow.broker import DEFAULT_COST_PER_SIDE, DIVIDEND, ENTRY, STOP, TRANCHE
 from shadow.fund import (
+    CONVICTION_FIRST,
     STARTING_CASH,
     Fund,
     IndexFund,
@@ -174,21 +176,52 @@ def book_before(fills, opens: dict[str, float], cash: float) -> tuple[float, lis
     return cash + sum(p.qty * opens[p.ticker] for p in positions), positions, cash
 
 
-def expected_qty(fills_before, ticker: str, side: str, opens: dict[str, float], cash: float) -> int:
-    """What the engine must size, from the book as it stood just before this entry:
-    floor(min(equity x the ticker's cap, the tightest portfolio headroom) / price)."""
+def expected_qty(fills_before, ticker: str, side: str, opens: dict[str, float], cash: float,
+                 at_pass_start=None) -> int:
+    """What the engine must size: floor(min(equity x the ticker's cap, the
+    tightest portfolio headroom) / price). The equity and the cap are the
+    book's just before this entry (``fills_before``); the headroom too, or --
+    for a fund holding the pass view -- the book's as the dispatch pass began
+    (``at_pass_start``: the fills before the pass)."""
     equity, positions, _ = book_before(fills_before, opens, cash)
+    if at_pass_start is not None:
+        _, positions, _ = book_before(at_pass_start, opens, cash)
     headroom, _ = risk_engine.budget_ceiling_for(equity, ticker, positions, side)
     cap = equity * risk_engine.max_position_pct_for(ticker)
     return max(0, math.floor(min(cap, headroom) / opens[ticker]))
 
 
-def test_priority_is_watchlist_order_and_every_entry_is_sized_on_the_book_before_it():
-    """Six Technology names, more than the group's 25% can hold. In watchlist
-    order the two single names and the first funds take the room, and IGV,
-    last of them, is refused. Each accepted size is floor(min(equity x cap,
-    headroom) / open) on the book as it stood after every fill before it --
-    costs included -- and each stop is the open less two ATRs."""
+def pass_start(fills, i: int) -> int:
+    """The index of the first fill of the dispatch pass entry ``i`` belongs to,
+    read from the fills alone: a run of consecutive entries on one day. Exact
+    for a journal with one cycle a session; ``view_start`` reads the broker's
+    own record and is exact always."""
+    start = i
+    while start > 0 and fills[start - 1].kind == ENTRY and fills[start - 1].day == fills[i].day:
+        start -= 1
+    return start
+
+
+def view_start(broker, i: int) -> int:
+    """The index in ``broker.fills`` of the first fill of the pass entry ``i``
+    was made in: where the broker last held its view at or before it
+    (``SimBroker.passes``), provided only that day's entries lie between."""
+    fills = broker.fills
+    start = max((m for m in broker.passes if m <= i), default=i)
+    if all(x.kind == ENTRY and x.day == fills[i].day for x in fills[start:i]):
+        return start
+    return i
+
+
+def test_priority_is_watchlist_order_and_every_entry_is_sized_on_the_book_as_the_pass_began():
+    """Six Technology names, more than the group's 25% can hold, dispatched in
+    watchlist order in one pass. Under the pass view (Amendment 2026-11-20)
+    every one is sized against the book as it stood when the pass began --
+    empty -- so each gets its own cap in full: floor(min(equity x cap,
+    headroom) / open) with the equity live (the costs so far) and the
+    headroom of the empty book; the group ends at 37.5%, past its cap, as
+    the real account's book does when one pass fills it (18 Nov 2026: the
+    single-name sleeve at 116%). Each stop is the open less two ATRs."""
     tech = ("IGV", "SMH", "XLC", "XLK", "NVDA", "MSFT")                      # journalled backwards on purpose
     bars = Bars({t: flat() for t in tech})
     feed = SimFeed(bars)
@@ -200,17 +233,59 @@ def test_priority_is_watchlist_order_and_every_entry_is_sized_on_the_book_before
     f.session(S[1], cycle)
 
     entries = [x for x in f.broker.fills if x.kind == ENTRY]
-    assert [x.ticker for x in entries] == ["MSFT", "NVDA", "XLK", "XLC", "SMH"]
+    assert [x.ticker for x in entries] == ["MSFT", "NVDA", "XLK", "XLC", "SMH", "IGV"]
+    assert all(x.status == "ACCEPTED" for x in f.decisions)
     opens = {t: 100.0 for t in tech}
     for i, fill in enumerate(entries):
-        assert fill.qty == expected_qty(entries[:i], fill.ticker, "buy", opens, STARTING_CASH), fill.ticker
+        assert fill.qty == expected_qty(entries[:i], fill.ticker, "buy", opens, STARTING_CASH, entries[:0]), fill.ticker
+        own_cap = book_before(entries[:i], opens, STARTING_CASH)[0] * risk_engine.max_position_pct_for(fill.ticker)
+        assert fill.qty == math.floor(own_cap / 100.0), fill.ticker                # its own cap, in full
         assert fill.price == 100.0 and fill.cost == pytest.approx(fill.qty * 100.0 * COST)
-    assert [x.qty for x in entries] == [50, 49, 69, 69, 12]                   # the arithmetic, spelled out
-    [igv] = [x for x in f.decisions if x.ticker == "IGV"]
-    assert igv.status == "REJECTED" and "'Technology' group" in igv.reason
+    assert [x.qty for x in entries] == [50, 49, 69, 69, 69, 69]               # the arithmetic, spelled out
+    assert f.days[-1].gross > f.days[-1].equity * 0.25                       # the group's cap, passed within the pass
+    assert f.broker._view is None                                            # released with the pass
     for stop in f.broker.live_stops():
         assert stop.stop_price == risk_engine.calculate_stop_price(100.0, feed.get_atr(stop.ticker), "buy")
         assert stop.qty == f.broker.positions[stop.ticker].qty
+
+
+def test_the_pass_view_sizes_a_pass_as_the_real_engine_did_on_5_oct_2026():
+    """The shape of the first calibration difference (5 Oct 2026). A book
+    whose single-name sleeve has room for one more full position; a cycle
+    with three bullish single names. The real engine, reading Alpaca's list
+    before each order while the earlier orders were still filling, sized all
+    three at the full cap. Filling at once, the copy's engine gave the first
+    the full cap, cut the second to the sleeve's remainder and refused the
+    third: the difference the fix removes. Under the pass view the fund
+    sizes all three at the cap, as the account did."""
+    held = ("JPM", "XOM", "CAT", "LLY")                                      # four groups: 4 x 4.9% of the sleeve's 25%
+    asked = ("MSFT", "NVDA", "GOOGL")
+    bars = Bars({t: flat() for t in held + asked})
+    feed = SimFeed(bars)
+    cycle = lines_by_day([said(t, S[0]) for t in asked])[S[0]]
+    assert [ln.ticker for ln in cycle] == list(asked)
+
+    def seeded(f: Fund) -> Fund:
+        for t in held:
+            f.broker.seed_position(t, 49, 100.0, S[0], stops=[(49, 90.0)])
+        f.broker.cash = STARTING_CASH - 4 * 49 * 100.0                       # equity 100,000; the sleeve at 19.6%
+        return f
+
+    feed.at_open(S[1])
+    with_view = seeded(fund("model", bars, feed))
+    with_view.session(S[1], cycle)
+    assert [(x.ticker, x.qty) for x in with_view.broker.fills if x.kind == ENTRY] == [
+        ("MSFT", 50), ("NVDA", 49), ("GOOGL", 49)]
+    assert [(x.ticker, x.status) for x in with_view.decisions] == [(t, "ACCEPTED") for t in asked]
+    sleeve = sum(abs(p.qty) * 100.0 for t, p in with_view.broker.positions.items())
+    assert sleeve > with_view.broker.equity() * 0.25                         # over its budget, as the account's was
+
+    # The same book and lines, the engine asked without the view: each line sees the fills before it.
+    at_once = seeded(fund("model", bars, feed))
+    at_once.broker.day = S[1]
+    results = [at_once.engine.execute(model_signal(line)) for line in cycle]
+    assert [(r.status.value, r.quantity) for r in results] == [("ACCEPTED", 50), ("ACCEPTED", 3), ("REJECTED", None)]
+    assert "sleeve budget" in results[2].reason
 
 
 def test_a_second_cycle_the_same_day_is_dispatched_after_the_first():
@@ -407,11 +482,16 @@ class CheckedFund(Fund):
 
 
 def sizing_mismatches(f: Fund) -> list[str]:
-    """Every entry the fund made, re-sized from its own fills: the book just
-    before it (earlier days, then today's gap stops, rungs and earlier
-    entries), marked at today's open -- or the last close, with no bar."""
+    """Every entry the fund made, re-sized from its own fills: the equity and
+    the cap from the book just before it (earlier days, then today's gap
+    stops, rungs and earlier entries), the portfolio headroom from the book
+    as its dispatch pass began (the pass view, ``pass_start``) -- or, for the
+    fund that reorders a pass by conviction and dispatches without the view,
+    from the book just before it too -- marked at today's open, or the last
+    close with no bar."""
     out = []
     fills = f.broker.fills
+    with_view = f.priority != CONVICTION_FIRST
     for i, x in enumerate(fills):
         if x.kind != ENTRY:
             continue
@@ -420,7 +500,8 @@ def sizing_mismatches(f: Fund) -> list[str]:
         for ticker in held | {x.ticker}:
             bar = f.bars.bar(ticker, x.day)
             opens[ticker] = bar[0] if bar else f.bars.last_close_before(ticker, x.day)
-        want = expected_qty(fills[:i], x.ticker, x.side, opens, STARTING_CASH)
+        start = view_start(f.broker, i) if with_view else i
+        want = expected_qty(fills[:i], x.ticker, x.side, opens, STARTING_CASH, fills[:start])
         if x.qty != want or x.price != opens[x.ticker]:
             out.append(f"{f.name} {x.day} {x.ticker}: {x.qty} @ {x.price}, expected {want} @ {opens[x.ticker]}")
     return out

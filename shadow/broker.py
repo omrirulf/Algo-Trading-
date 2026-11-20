@@ -35,13 +35,23 @@ a simplification:
   stop can never open a position by itself. Alpaca would leave it resting;
   the position manager never closes the last share, so this only matters
   when a stop fills.
+* **The pass view** (calibration fix of 20 Nov 2026, Amendment 2026-11-20).
+  For the length of a cycle's dispatch pass a fund holds a view of the
+  positions (``pass_view``): ``get_open_positions`` -- the list the real
+  engine reads before each order -- answers with the positions as they
+  stood when the pass began, because at Alpaca an order sent a moment
+  earlier has not filled yet and the list the next order is sized against
+  does not show it. Fills still land at once in ``positions``, cash and
+  ``get_equity`` stay live, and everything outside the pass -- the position
+  manager, the stops, the marks -- sees the book as it is.
 """
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from datetime import date
-from typing import Callable, Iterable, Optional
+from typing import Callable, Iterable, Iterator, Optional
 
 from app.broker_client import (
     BrokerError,
@@ -139,6 +149,13 @@ class SimBroker:
     _next_id: int = field(default=0, repr=False)
     #: Last known price per ticker, for marking a position with no bar today.
     _marks: dict[str, float] = field(default_factory=dict, repr=False)
+    #: The pass view, while a fund holds one: the positions as they stood
+    #: when the dispatch pass began, which ``get_open_positions`` answers
+    #: with until ``release_view``. None when no view is held.
+    _view: Optional[list[OpenPosition]] = field(default=None, repr=False)
+    #: Where each dispatch pass began: the number of fills on the book when
+    #: its view was held. For checks that re-size an entry from the fills.
+    passes: list[int] = field(default_factory=list, repr=False)
 
     # ------------------------------------------------------------------ #
     # BrokerClient
@@ -154,11 +171,47 @@ class SimBroker:
         return equity
 
     def get_open_positions(self) -> list[OpenPosition]:
+        """The positions as the engine reads them: the held view while a pass holds one, else the book now."""
+        if self._view is not None:
+            return list(self._view)
+        return self._open_positions()
+
+    def _open_positions(self) -> list[OpenPosition]:
         out = []
         for ticker, pos in self.positions.items():
             price = self._mark(ticker)
             out.append(OpenPosition(ticker, float(pos.qty), abs(pos.qty) * price, pos.avg_entry_price))
         return out
+
+    # ------------------------------------------------------------------ #
+    # The pass view (Amendment 2026-11-20)
+    # ------------------------------------------------------------------ #
+
+    def hold_view(self) -> None:
+        """From now until ``release_view``, the engine's list is the positions as they stand now.
+
+        What the real engine sees during a dispatch pass: Alpaca's list of
+        positions, which an order sent a moment earlier has not reached yet
+        (fills land in pieces over seconds), so every order of the pass is
+        sized against the book as it stood when the pass began. Only the
+        list is held: fills, cash, equity and the stops move at once, as
+        before. One view at a time; holding again takes a fresh one.
+        """
+        self._view = self._open_positions()
+        self.passes.append(len(self.fills))
+
+    def release_view(self) -> None:
+        """The engine's list is the book again."""
+        self._view = None
+
+    @contextmanager
+    def pass_view(self) -> Iterator[None]:
+        """Hold the view for one dispatch pass; released however the pass ends."""
+        self.hold_view()
+        try:
+            yield
+        finally:
+            self.release_view()
 
     def submit_bracket_order(self, ticker: str, qty: int, side: str, stop_price: float) -> SubmittedOrder:
         ticker = ticker.strip().upper()
@@ -356,6 +409,7 @@ class SimBroker:
             _stops=[replace(stop) for stop in self._stops],
             _entries_today=set(self._entries_today),
             _marks=dict(self._marks),
+            _view=None, passes=list(self.passes),
         )
 
     # ------------------------------------------------------------------ #
