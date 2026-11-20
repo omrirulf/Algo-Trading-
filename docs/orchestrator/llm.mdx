@@ -180,6 +180,17 @@ while it is switched on, `null` while it is not. The cost on such a line
 is priced at the model's row of the price table, which is the first
 host's price; the second host's is close but not the same.
 
+**Its pace.** The second host is asked one name at a time (`_SECOND_HOST_LANE`,
+the owner's "build" of 20 Nov 2026): names that need it queue up and ask in
+turn, and a busy answer there is waited out, as long as the host asks and
+up to eight asks per name (`FALLBACK_HTTP_ATTEMPTS`), where the first host
+keeps its four. On a free tier that accepts about one answer a minute (the
+check of 20 Nov: four questions at once came back after 1.6, 62, 123 and
+183 seconds), a day on which every name falls to the second host is a
+slower stage, about 80 minutes there, not lost names; the stage budget is
+120 minutes for it (`FULL_MODEL_STAGE_BUDGET_SECONDS`, 90 until then),
+still inside the job's 180 with the context gathering before it.
+
 **The switch.** Nothing is built until the secret `FULL_MODEL_FALLBACK_API_KEY`
 is set (`full_model_fallback_api_key`, read by `heartbeat.fallback_model_provider`):
 blank, `full_model_provider` returns the plain provider and the cycle is

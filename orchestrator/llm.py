@@ -69,6 +69,15 @@ MODEL_EFFORT = "high"
 #: the ceiling are the primary's.
 FALLBACK_MODEL_BASE_URL = "https://api.cerebras.ai/v1"
 FALLBACK_MODEL = "gpt-oss-120b"
+#: Asks per call at the second host: twice the first host's HTTP_ATTEMPTS.
+#: The owner's "build" of 20 Nov 2026, for the second host's free tier,
+#: which accepts about one answer a minute (the check of 20 Nov: four
+#: questions at once, answered after 1.6, 62, 123 and 183 seconds, each
+#: wait a "busy, try again in a minute"). A busy answer is a pause there,
+#: not a failure: each wait is as long as the host asks (``Retry-After``,
+#: up to RETRY_AFTER_CAP_SECONDS), and a name gets eight asks before it is
+#: given up. The first host keeps its four.
+FALLBACK_HTTP_ATTEMPTS = 8
 
 #: What AnthropicSignalProvider asks for when the caller names nothing.
 #:
@@ -890,6 +899,17 @@ SCHEMA_ATTEMPTS = 3
 STREAMING = True
 STREAM_OPTIONS: dict[str, Any] = {"include_usage": True}
 
+#: The one lane to the second host: its asks go one name at a time, in the
+#: order the names arrive, whatever the first host's concurrency. The
+#: owner's "build" of 20 Nov 2026. On a free tier that accepts about one
+#: answer a minute, four names asking at once meant three "busy" answers,
+#: each burning one of a name's asks while it waited; in a lane a name
+#: waits its turn and asks when the host is free, so a slow host makes the
+#: stage slower, not shorter. Module-level, not per provider: the cycle
+#: builds a provider per call (``heartbeat.call_llm``), and the lane has
+#: to be the process's. The first host is never behind it.
+_SECOND_HOST_LANE = threading.Lock()
+
 #: Which ticker the current thread is asking about, for the call log below.
 #: Set by the cycle around each live call (``call_label``); thread-local
 #: because the full model is asked four tickers at a time.
@@ -1371,6 +1391,11 @@ class FallbackSignalProvider:
     health check can count the names the configured host did not answer.
     The request body the voting arm rebuilds is the primary's: that is what
     production sends first.
+
+    The second host is asked one name at a time (``_SECOND_HOST_LANE``, the
+    owner's "build" of 20 Nov 2026): names that need it queue up and ask in
+    turn, so a host that accepts one answer a minute is a slower stage, not
+    lost names. The first host is asked exactly as before, four in flight.
     """
 
     def __init__(self, primary: SignalProvider, fallback: SignalProvider) -> None:
@@ -1408,10 +1433,11 @@ class FallbackSignalProvider:
             where = self.fallback_host or "the fallback host"
             log.warning("the configured host could not answer (%s); asking %s", first, where)
             try:
-                answer = self.fallback.complete_detailed(
-                    system_prompt, user_prompt, json_schema, model=None, effort=effort,
-                    reasoning=reasoning, check=check,
-                )
+                with _SECOND_HOST_LANE:
+                    answer = self.fallback.complete_detailed(
+                        system_prompt, user_prompt, json_schema, model=None, effort=effort,
+                        reasoning=reasoning, check=check,
+                    )
             except LLMError as second:
                 raise LLMError(f"{first}; then {where} as the fallback: {second}") from second
             return replace(answer, fallback_after=str(first)[:FALLBACK_NOTE_CHARS])
