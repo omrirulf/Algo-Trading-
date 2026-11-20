@@ -7,1911 +7,1911 @@
       ],
       [
         0.000197,
-        0.2930555880458289
+        0.29305558804582893
       ],
       [
         0.000527,
-        0.2930555880458289
+        0.29305558804582893
       ],
       [
         0.000554,
-        0.49326109115830125
+        0.4926595260931632
       ],
       [
         0.297025,
-        0.49326109115830125
+        0.4926595260931632
       ],
       [
         0.299367,
-        0.5649342002751869
-      ],
-      [
-        0.333727,
-        0.5649342002751869
+        0.5431327118232311
       ],
       [
         0.335838,
-        0.6859275163395546
+        0.5431327118232311
+      ],
+      [
+        0.337227,
+        0.6967545902670055
       ],
       [
         0.70481,
-        0.6859275163395546
+        0.6967545902670055
       ]
     ],
     "n": 2149
   },
-  "fitted_on": "2026-11-19",
+  "fitted_on": "2026-11-20",
   "half_life": 60.0,
   "horizon": 3,
   "levels": {
     "global": {
       "fitted": {
-        "analyst_score": 0.3250249087329961,
-        "fundamental_score": -0.2711996263130343,
-        "insider_score": -0.05867959641337016,
-        "news_score": -0.1635148737362827,
-        "technical_score": 0.07259702410613707
+        "analyst_score": 0.31288859406273367,
+        "fundamental_score": -0.2745625046265752,
+        "insider_score": -0.04936197885339475,
+        "news_score": -0.16728676778370485,
+        "technical_score": 0.08990980636318369
       },
-      "intercept": -0.2558498969355824,
+      "intercept": -0.2608846728987365,
       "key": "global",
-      "n_effective": 1823.6281995739346,
+      "n_effective": 1809.1409018914294,
       "n_raw": 2286,
-      "own_share": 0.9891518257289501,
+      "own_share": 0.9890659052130326,
       "parent": null,
       "weights": {
-        "analyst_score": 0.36778022110977204,
-        "fundamental_score": -0.3028420423924965,
-        "insider_score": -0.06380346696741857,
-        "news_score": -0.18172023630625822,
-        "technical_score": 0.0838540332240547
+        "analyst_score": 0.3529748828217171,
+        "fundamental_score": -0.30557821741682883,
+        "insider_score": -0.05312060051191112,
+        "news_score": -0.18531838772909798,
+        "technical_score": 0.10300791152044504
       }
     },
     "kind:broad fund": {
       "fitted": {
-        "analyst_score": -0.5476087044238656,
-        "fundamental_score": 0.16661763884385072,
-        "insider_score": -0.7447764354809718,
-        "news_score": -0.10394267084355502,
-        "technical_score": 0.4262893647966166
+        "analyst_score": -0.5653027689727899,
+        "fundamental_score": 0.13437790167608615,
+        "insider_score": -0.7456492757534438,
+        "news_score": -0.1033722335301312,
+        "technical_score": 0.4396581970955074
       },
-      "intercept": -0.1899096270140459,
+      "intercept": -0.19058471061903573,
       "key": "kind:broad fund",
-      "n_effective": 340.8666435755426,
+      "n_effective": 338.1587250773167,
       "n_raw": 418,
-      "own_share": 0.9445778645489763,
+      "own_share": 0.9441588362933709,
       "parent": "global",
       "weights": {
-        "analyst_score": -0.2588905294076178,
-        "fundamental_score": 0.06733899083219978,
-        "insider_score": -0.38587309960733773,
-        "news_score": -0.06420026672337009,
-        "technical_score": 0.22369711342947454
+        "analyst_score": -0.2684647295019494,
+        "fundamental_score": 0.05045548898859706,
+        "insider_score": -0.3853765523558452,
+        "news_score": -0.06415228714111551,
+        "technical_score": 0.23155094201249285
       }
     },
     "kind:commodity fund": {
       "fitted": {
         "analyst_score": 0.0,
-        "fundamental_score": -0.6311366709602793,
-        "insider_score": 1.0742713514251854,
-        "news_score": 0.2846764263320594,
-        "technical_score": -0.020555023942824217
+        "fundamental_score": -0.6476194970838363,
+        "insider_score": 1.0814075142348212,
+        "news_score": 0.2784044867421087,
+        "technical_score": -0.001793627578833591
       },
-      "intercept": -0.5950678898133843,
+      "intercept": -0.609099652118484,
       "key": "kind:commodity fund",
-      "n_effective": 225.4892685571551,
+      "n_effective": 223.69793293372106,
       "n_raw": 282,
-      "own_share": 0.9185300436245196,
+      "own_share": 0.9179311873546362,
       "parent": "global",
       "weights": {
-        "analyst_score": 0.03166231645448876,
-        "fundamental_score": -0.3307485838518553,
-        "insider_score": 0.513104124323491,
-        "news_score": 0.12178120169939408,
-        "technical_score": -0.0027037736707709093
+        "analyst_score": 0.030199640293501275,
+        "fundamental_score": -0.334592003192755,
+        "insider_score": 0.5105067172998673,
+        "news_score": 0.11674280920075017,
+        "technical_score": 0.007958830013126266
       }
     },
     "kind:equity": {
       "fitted": {
-        "analyst_score": -0.07823865240492771,
-        "fundamental_score": -0.9993070317067753,
-        "insider_score": -0.03194671595676914,
-        "news_score": -0.20954772641381508,
-        "technical_score": 0.13457578228007808
+        "analyst_score": -0.08378229690988549,
+        "fundamental_score": -1.019530623654476,
+        "insider_score": -0.03798245667425111,
+        "news_score": -0.21932436324477775,
+        "technical_score": 0.14953534549421033
       },
-      "intercept": 0.2521107112280851,
+      "intercept": 0.2589884697593824,
       "key": "kind:equity",
-      "n_effective": 215.1590778479343,
+      "n_effective": 213.44980749852718,
       "n_raw": 272,
-      "own_share": 0.9149511888589178,
+      "own_share": 0.9143284793664858,
       "parent": "global",
       "weights": {
-        "analyst_score": -0.019165545988738226,
-        "fundamental_score": -0.6984450729922627,
-        "insider_score": -0.027238680516350457,
-        "news_score": -0.15718417733438117,
-        "technical_score": 0.09796652316826757
+        "analyst_score": -0.021805149547777156,
+        "fundamental_score": -0.6848789318880365,
+        "insider_score": -0.02932084754946326,
+        "news_score": -0.15823734323569053,
+        "technical_score": 0.10575772777903261
       }
     },
     "kind:focused fund": {
       "fitted": {
-        "analyst_score": 0.13276342376669326,
-        "fundamental_score": -0.4981317395451981,
-        "insider_score": -0.1517534082215918,
-        "news_score": -1.4864813042407266,
-        "technical_score": 0.1705012161343129
+        "analyst_score": 0.12087202094289862,
+        "fundamental_score": -0.4977181968599738,
+        "insider_score": -0.14275306212439456,
+        "news_score": -1.4508221243025232,
+        "technical_score": 0.19759003836846134
       },
-      "intercept": -0.11517479529041232,
+      "intercept": -0.12169231680774925,
       "key": "kind:focused fund",
-      "n_effective": 1042.1132095932953,
+      "n_effective": 1033.834436381862,
       "n_raw": 1314,
-      "own_share": 0.9811696156122016,
+      "own_share": 0.9810216867948763,
       "parent": "global",
       "weights": {
-        "analyst_score": 0.06032017047944784,
-        "fundamental_score": -0.20604100660031457,
-        "insider_score": -0.06223355382951968,
-        "news_score": -0.601254171356796,
-        "technical_score": 0.07015109773392184
+        "analyst_score": 0.055906381545042114,
+        "fundamental_score": -0.20842255332377277,
+        "insider_score": -0.05912351796112663,
+        "news_score": -0.5941528860036684,
+        "technical_score": 0.08239466116638997
       }
     },
     "ticker:ARGT": {
       "fitted": {
-        "analyst_score": -0.3647350466259385,
-        "fundamental_score": -0.7169640630184466,
-        "insider_score": 0.8289504685221876,
-        "news_score": -0.27687917529425876,
-        "technical_score": 0.2620687643458188
+        "analyst_score": -0.31695734148323473,
+        "fundamental_score": -0.7788725027603651,
+        "insider_score": 0.7558591005987784,
+        "news_score": -0.2667038010665918,
+        "technical_score": 0.2715486285767351
       },
-      "intercept": -0.4050679460374199,
+      "intercept": -0.46190732138166457,
       "key": "ticker:ARGT",
-      "n_effective": 19.7145287815407,
+      "n_effective": 19.55791229184447,
       "n_raw": 24,
-      "own_share": 0.49640595989405284,
+      "own_share": 0.4944121456044752,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": -0.049666505519801674,
-        "fundamental_score": -0.2841229506427785,
-        "insider_score": 0.1558864737586261,
-        "news_score": -0.40943555403080495,
-        "technical_score": 0.10088851604798879
+        "analyst_score": -0.04221420065890811,
+        "fundamental_score": -0.30158146824594406,
+        "insider_score": 0.14312122021908624,
+        "news_score": -0.4023721464827895,
+        "technical_score": 0.11071096439327203
       }
     },
     "ticker:ASML": {
       "fitted": {
-        "analyst_score": 0.7023407536021911,
-        "fundamental_score": -0.23846649465140865,
+        "analyst_score": 0.6777145596409796,
+        "fundamental_score": -0.2673488802340359,
         "insider_score": 0.0,
-        "news_score": 0.5003518276464525,
-        "technical_score": -0.03157789868440373
+        "news_score": 0.4471782520896356,
+        "technical_score": 0.017617967931925823
       },
-      "intercept": -0.9301879372876369,
+      "intercept": -0.9307806645972444,
       "key": "ticker:ASML",
-      "n_effective": 12.931970258520987,
+      "n_effective": 12.829235883827637,
       "n_raw": 15,
-      "own_share": 0.3926874146005553,
+      "own_share": 0.39078691716207703,
       "parent": "kind:equity",
       "weights": {
-        "analyst_score": 0.228400455956474,
-        "fundamental_score": -0.6343083496180121,
-        "insider_score": -0.021512643113191,
-        "news_score": 0.049355925283724816,
-        "technical_score": 0.06642262602859818
+        "analyst_score": 0.2236213951204365,
+        "fundamental_score": -0.6294152112968214,
+        "insider_score": -0.022882299220741385,
+        "news_score": 0.03529097569809004,
+        "technical_score": 0.0887901186639106
       }
     },
     "ticker:CANE": {
       "fitted": {
         "analyst_score": 0.0,
-        "fundamental_score": -0.10503626542765128,
-        "insider_score": 0.6712560828569605,
+        "fundamental_score": -0.08409218587698891,
+        "insider_score": 0.683219753388367,
         "news_score": 0.0,
-        "technical_score": -0.4816148792191136
+        "technical_score": -0.4815281165017718
       },
-      "intercept": -0.2894616579116965,
+      "intercept": -0.29551722653910245,
       "key": "ticker:CANE",
-      "n_effective": 26.37956263263951,
+      "n_effective": 26.1699976694072,
       "n_raw": 33,
-      "own_share": 0.5687755799162055,
+      "own_share": 0.5668182584022039,
       "parent": "kind:commodity fund",
       "weights": {
-        "analyst_score": 0.0136535640515965,
-        "fundamental_score": -0.19012008474301692,
-        "insider_score": 0.5247783111802996,
-        "news_score": 0.05251502807992882,
-        "technical_score": -0.21893301194515813
+        "analyst_score": 0.013172762130264129,
+        "fundamental_score": -0.18437788309148959,
+        "insider_score": 0.5349275431921812,
+        "news_score": 0.05092197261538974,
+        "technical_score": -0.21659983897067533
       }
     },
     "ticker:CAT": {
       "fitted": {
-        "analyst_score": -0.589054965234924,
-        "fundamental_score": 0.12325268372694752,
-        "insider_score": 0.2035979749170097,
-        "news_score": -0.45681333822410936,
-        "technical_score": 0.34991146042952265
+        "analyst_score": -0.5865960516080037,
+        "fundamental_score": 0.12151712826767712,
+        "insider_score": 0.2024791881745992,
+        "news_score": -0.455730087314017,
+        "technical_score": 0.3500398068967457
       },
-      "intercept": -0.6003292399431672,
+      "intercept": -0.6004655815995137,
       "key": "ticker:CAT",
-      "n_effective": 22.04251359492537,
+      "n_effective": 21.86740308928898,
       "n_raw": 27,
-      "own_share": 0.5242910499429786,
+      "own_share": 0.5223013962115878,
       "parent": "kind:equity",
       "weights": {
-        "analyst_score": -0.2095512015043803,
-        "fundamental_score": -0.32783593089029406,
-        "insider_score": 0.054510698552953804,
-        "news_score": -0.23781218723705277,
-        "technical_score": 0.17028998181531907
+        "analyst_score": -0.21037350598232857,
+        "fundamental_score": -0.3231375504428286,
+        "insider_score": 0.053015326901228434,
+        "news_score": -0.23860198030036014,
+        "technical_score": 0.17487163637325417
       }
     },
     "ticker:CORN": {
       "fitted": {
         "analyst_score": 0.0,
-        "fundamental_score": -0.15402665020224135,
-        "insider_score": -0.27235387233378044,
-        "news_score": -0.052683684562152874,
-        "technical_score": -0.12915295825931403
+        "fundamental_score": -0.15764402845445868,
+        "insider_score": -0.26782413341404426,
+        "news_score": -0.05183660904033424,
+        "technical_score": -0.12920392723942328
       },
-      "intercept": -0.873779818191612,
+      "intercept": -0.871164564011347,
       "key": "ticker:CORN",
-      "n_effective": 19.986358167096736,
+      "n_effective": 19.82758220584357,
       "n_raw": 26,
-      "own_share": 0.4998294189127419,
+      "own_share": 0.4978354473883788,
       "parent": "kind:commodity fund",
       "weights": {
-        "analyst_score": 0.034000671368101074,
-        "fundamental_score": -0.6269354251001475,
-        "insider_score": 0.07046521175010753,
-        "news_score": 0.03782155803000184,
-        "technical_score": -0.230777133751642
+        "analyst_score": 0.032457108769074164,
+        "fundamental_score": -0.6365449333035175,
+        "insider_score": 0.07816691737413911,
+        "news_score": 0.03440537290793917,
+        "technical_score": -0.21842566764533008
       }
     },
     "ticker:CPER": {
       "fitted": {
         "analyst_score": 0.0,
-        "fundamental_score": 0.4185340466389003,
-        "insider_score": 0.9467175577693415,
-        "news_score": 0.46626070372204714,
-        "technical_score": 1.475856290544289
+        "fundamental_score": 0.4106791184365164,
+        "insider_score": 0.9064082947178039,
+        "news_score": 0.45804147934896083,
+        "technical_score": 1.537627679435993
       },
-      "intercept": -0.4374995084705305,
+      "intercept": -0.45490229873492677,
       "key": "ticker:CPER",
-      "n_effective": 30.203650261307548,
+      "n_effective": 29.963705917095382,
       "n_raw": 38,
-      "own_share": 0.601622593259634,
+      "own_share": 0.5997094364219913,
       "parent": "kind:commodity fund",
       "weights": {
-        "analyst_score": 0.01491704151956229,
-        "fundamental_score": -0.06578901160506503,
-        "insider_score": 0.44539905470025853,
-        "news_score": 0.15767808171753736,
-        "technical_score": 0.31621681045757677
+        "analyst_score": 0.014200046745361156,
+        "fundamental_score": -0.06999647089541236,
+        "insider_score": 0.432790344329178,
+        "news_score": 0.1522953605295841,
+        "technical_score": 0.3307177775004644
       }
     },
     "ticker:DBA": {
       "fitted": {
         "analyst_score": 0.0,
-        "fundamental_score": 0.3167599119324751,
+        "fundamental_score": 0.31267095657474864,
         "insider_score": 0.0,
         "news_score": 0.0,
-        "technical_score": -0.0648602797627
+        "technical_score": -0.06376668980467791
       },
-      "intercept": -0.744155486261755,
+      "intercept": -0.7423489095406042,
       "key": "ticker:DBA",
-      "n_effective": 29.465114479424688,
+      "n_effective": 29.231037223538866,
       "n_raw": 37,
-      "own_share": 0.595674644434127,
+      "own_share": 0.5937522114517346,
       "parent": "kind:broad fund",
       "weights": {
-        "analyst_score": -0.1277928080358144,
-        "fundamental_score": 0.6368647321082462,
-        "insider_score": -0.19047358378515566,
-        "news_score": -0.03169035337059458,
-        "technical_score": -0.013178522700189205
+        "analyst_score": -0.13433647705535537,
+        "fundamental_score": 0.6327041719264319,
+        "insider_score": -0.19283772761981025,
+        "news_score": -0.032101022229508384,
+        "technical_score": -0.008020601168894189
       }
     },
     "ticker:DBC": {
       "fitted": {
         "analyst_score": 0.0,
-        "fundamental_score": -0.47612288575813744,
-        "insider_score": -0.542627929660662,
+        "fundamental_score": -0.4728006337476778,
+        "insider_score": -0.5405863738707455,
         "news_score": 0.0,
-        "technical_score": 0.4897566419403896
+        "technical_score": 0.4865329837142178
       },
-      "intercept": -0.5413801845282774,
+      "intercept": -0.5409142729065295,
       "key": "ticker:DBC",
-      "n_effective": 27.872742101825608,
+      "n_effective": 27.651314997248612,
       "n_raw": 35,
-      "own_share": 0.5822257275871126,
+      "own_share": 0.5802844055582769,
       "parent": "kind:broad fund",
       "weights": {
-        "analyst_score": -0.11460611514513654,
-        "fundamental_score": -0.16491131663749004,
-        "insider_score": -0.39273876146119463,
-        "news_score": -0.028420287050602823,
-        "technical_score": 0.29932351970557597
+        "analyst_score": -0.11766229177612532,
+        "fundamental_score": -0.1688919243565589,
+        "insider_score": -0.387292275120911,
+        "news_score": -0.028116561686546967,
+        "technical_score": 0.2980369470598578
       }
     },
     "ticker:EIS": {
       "fitted": {
-        "analyst_score": 0.12409167828297497,
-        "fundamental_score": 0.6880226793801489,
+        "analyst_score": 0.07173624239619215,
+        "fundamental_score": 0.7684614786646051,
         "insider_score": 0.0,
         "news_score": 0.0,
-        "technical_score": -0.296910917709294
+        "technical_score": -0.26571294089855213
       },
-      "intercept": -0.7012502698821697,
+      "intercept": -0.7170184804276608,
       "key": "ticker:EIS",
-      "n_effective": 26.182937252555455,
+      "n_effective": 25.9749343239604,
       "n_raw": 33,
-      "own_share": 0.5669396277108093,
+      "own_share": 0.564980346484655,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": 0.11771878529358389,
-        "fundamental_score": 0.3450290273667062,
-        "insider_score": -0.03542513480080018,
-        "news_score": -0.34225122557206045,
-        "technical_score": -0.15957582696684924
+        "analyst_score": 0.08162027059669717,
+        "fundamental_score": 0.4041869918296429,
+        "insider_score": -0.034431946239769105,
+        "news_score": -0.34601865610454513,
+        "technical_score": -0.13374213522934572
       }
     },
     "ticker:EMB": {
       "fitted": {
         "analyst_score": 0.0,
-        "fundamental_score": -0.1847195003730923,
-        "insider_score": -1.5110690868543952,
+        "fundamental_score": -0.17012912389713652,
+        "insider_score": -1.553733569121187,
         "news_score": 0.0,
-        "technical_score": -0.18842889602112786
+        "technical_score": -0.1517371137165585
       },
-      "intercept": -0.4340011173562102,
+      "intercept": -0.45695687101765853,
       "key": "ticker:EMB",
-      "n_effective": 22.581455315369556,
+      "n_effective": 22.402063339892216,
       "n_raw": 27,
-      "own_share": 0.5303119667499692,
+      "own_share": 0.5283248402399363,
       "parent": "kind:broad fund",
       "weights": {
-        "analyst_score": -0.14638396315177257,
-        "fundamental_score": -0.024511192890741676,
-        "insider_score": -0.7301629554418387,
-        "news_score": -0.036300630617395024,
-        "technical_score": 0.06264125789825198
+        "analyst_score": -0.14606683120535577,
+        "fundamental_score": -0.02782716548531526,
+        "insider_score": -0.714522272574875,
+        "news_score": -0.03490410570752756,
+        "technical_score": 0.07667962502692645
       }
     },
     "ticker:EPOL": {
       "fitted": {
-        "analyst_score": -0.2829503001876107,
-        "fundamental_score": -0.22433117031183405,
-        "insider_score": 0.9794402760917229,
+        "analyst_score": -0.2814345264842686,
+        "fundamental_score": -0.22328677863567228,
+        "insider_score": 0.9766332776083646,
         "news_score": 0.0,
-        "technical_score": -0.46118430216799117
+        "technical_score": -0.45765164450476936
       },
-      "intercept": -0.11374941828533806,
+      "intercept": -0.11430576640496495,
       "key": "ticker:EPOL",
-      "n_effective": 19.006794068631702,
+      "n_effective": 18.85579997689386,
       "n_raw": 24,
-      "own_share": 0.48726880848473764,
+      "own_share": 0.4852763290964726,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": -0.0496667175946571,
-        "fundamental_score": -0.20159824706086982,
-        "insider_score": 0.26557953982074795,
-        "news_score": -0.38420513924318167,
-        "technical_score": -0.09895035628054348
+        "analyst_score": -0.05228471107497581,
+        "fundamental_score": -0.20478158526693735,
+        "insider_score": 0.26857507243440304,
+        "news_score": -0.38383435352092865,
+        "technical_score": -0.0905242777027551
       }
     },
     "ticker:ESLT": {
       "fitted": {
-        "analyst_score": 0.11732402506612549,
-        "fundamental_score": -0.4083316523203116,
-        "insider_score": 0.1573520042005082,
-        "news_score": 0.5952810042022451,
-        "technical_score": -1.2786055972479091
+        "analyst_score": 0.11659441316491428,
+        "fundamental_score": -0.40529583068338804,
+        "insider_score": 0.15604329067990258,
+        "news_score": 0.592555491815361,
+        "technical_score": -1.2751996808037527
       },
-      "intercept": -0.4821106775181827,
+      "intercept": -0.4804775996741725,
       "key": "ticker:ESLT",
-      "n_effective": 23.634560620069827,
+      "n_effective": 23.446802547795027,
       "n_raw": 31,
-      "own_share": 0.5416477279525773,
+      "own_share": 0.5396669299657122,
       "parent": "kind:equity",
       "weights": {
-        "analyst_score": 0.022208330967459132,
-        "fundamental_score": -0.5619883485680728,
-        "insider_score": 0.028813300500052395,
-        "news_score": 0.07471012004163566,
-        "technical_score": -0.31227989992278005
+        "analyst_score": 0.020678899664814634,
+        "fundamental_score": -0.5651558483364478,
+        "insider_score": 0.027585913600198575,
+        "news_score": 0.0743443095179074,
+        "technical_score": -0.31223502888063154
       }
     },
     "ticker:EWA": {
       "fitted": {
-        "analyst_score": 0.3501033203362142,
-        "fundamental_score": 0.15226127324949537,
-        "insider_score": -1.1319416101832527,
+        "analyst_score": 0.34816389592558195,
+        "fundamental_score": 0.15136470010018058,
+        "insider_score": -1.1286435764279874,
         "news_score": 0.0,
-        "technical_score": -0.1308108386002228
+        "technical_score": -0.12951953161783913
       },
-      "intercept": -0.18872941649327687,
+      "intercept": -0.18901476207022827,
       "key": "ticker:EWA",
-      "n_effective": 29.459200408436562,
+      "n_effective": 29.225170135212522,
       "n_raw": 37,
-      "own_share": 0.5956262973351977,
+      "own_share": 0.5937037912705296,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": 0.1695784478364877,
-        "fundamental_score": -0.03799860210970747,
-        "insider_score": -0.4843880776062269,
-        "news_score": -0.28926769352636456,
-        "technical_score": -0.018767178921213348
+        "analyst_score": 0.16889358720374578,
+        "fundamental_score": -0.04038810078088102,
+        "insider_score": -0.4877860142726691,
+        "news_score": -0.2905684595029811,
+        "technical_score": -0.012363838239722974
       }
     },
     "ticker:EWC": {
       "fitted": {
-        "analyst_score": 0.6025043843939043,
-        "fundamental_score": 0.1455442407523381,
-        "insider_score": 0.10870825982540597,
+        "analyst_score": 0.5984540000819835,
+        "fundamental_score": 0.14493676608884576,
+        "insider_score": 0.10850623015360203,
         "news_score": 0.0,
-        "technical_score": 0.08835608487247283
+        "technical_score": 0.08761408400016595
       },
-      "intercept": -0.19415962091022423,
+      "intercept": -0.19262209071157646,
       "key": "ticker:EWC",
-      "n_effective": 23.939928340707258,
+      "n_effective": 23.749744361072317,
       "n_raw": 31,
-      "own_share": 0.5448331220542433,
+      "own_share": 0.5428544716755964,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": 0.4832543285333854,
-        "fundamental_score": -0.012740204925606556,
-        "insider_score": 0.04427981025418194,
-        "news_score": -0.35287718556041103,
-        "technical_score": 0.10684847072641508
+        "analyst_score": 0.4770320507414424,
+        "fundamental_score": -0.014816824798552865,
+        "insider_score": 0.045818311291044904,
+        "news_score": -0.3489153266835509,
+        "technical_score": 0.11341748648540902
       }
     },
     "ticker:EWD": {
       "fitted": {
-        "analyst_score": 0.8154272546412493,
-        "fundamental_score": 0.1875860621571484,
-        "insider_score": 0.3069283820965513,
+        "analyst_score": 0.8104236093165128,
+        "fundamental_score": 0.18685440401908834,
+        "insider_score": 0.30643058578589927,
         "news_score": 0.0,
-        "technical_score": 0.28017371164796967
+        "technical_score": 0.2781903134479738
       },
-      "intercept": -0.37268317021778774,
+      "intercept": -0.37046857980707254,
       "key": "ticker:EWD",
-      "n_effective": 24.05882004715919,
+      "n_effective": 23.867691566038832,
       "n_raw": 31,
-      "own_share": 0.5460613793426011,
+      "own_share": 0.5440836003441892,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": 0.37734366400614017,
-        "fundamental_score": -0.03573392131862904,
-        "insider_score": 0.09470437569367905,
-        "news_score": -0.3350255357409133,
-        "technical_score": 0.15719250324063846
+        "analyst_score": 0.3721200381873247,
+        "fundamental_score": -0.037619423188503365,
+        "insider_score": 0.09594390457465736,
+        "news_score": -0.3313345079853777,
+        "technical_score": 0.16298212606413676
       }
     },
     "ticker:EWG": {
       "fitted": {
-        "analyst_score": 0.10341856173517903,
-        "fundamental_score": -1.168269096305592,
+        "analyst_score": 0.13184376020817926,
+        "fundamental_score": -1.1995409874351888,
         "insider_score": 0.0,
         "news_score": 0.0,
-        "technical_score": -0.43653020343348975
+        "technical_score": -0.451819628261277
       },
-      "intercept": 0.04668706573578235,
+      "intercept": 0.019482598029193093,
       "key": "ticker:EWG",
-      "n_effective": 29.422708065518613,
+      "n_effective": 29.188967695376302,
       "n_raw": 37,
-      "own_share": 0.5953277191228284,
+      "own_share": 0.5934047625504453,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": 0.06409095942773925,
-        "fundamental_score": -0.5200572835703242,
-        "insider_score": -0.02670013179022966,
-        "news_score": -0.257956755267879,
-        "technical_score": -0.13119486994382795
+        "analyst_score": 0.07138872315396497,
+        "fundamental_score": -0.5186725315441812,
+        "insider_score": -0.025765709132563017,
+        "news_score": -0.2589286119799032,
+        "technical_score": -0.12524442418938755
       }
     },
     "ticker:EWI": {
       "fitted": {
-        "analyst_score": -0.06647172828287984,
-        "fundamental_score": -0.32474209274582816,
-        "insider_score": 0.9163557941766416,
+        "analyst_score": -0.05818888418947283,
+        "fundamental_score": -0.3216477680872841,
+        "insider_score": 0.9682724244510076,
         "news_score": 0.0,
-        "technical_score": -0.16226480542814664
+        "technical_score": -0.1752094738275414
       },
-      "intercept": -0.2734768353358399,
+      "intercept": -0.29494490396958584,
       "key": "ticker:EWI",
-      "n_effective": 28.684172283635757,
+      "n_effective": 28.45629900181979,
       "n_raw": 36,
-      "own_share": 0.5891888664866421,
+      "own_share": 0.5872569632433362,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": -0.002216136350708965,
-        "fundamental_score": -0.2552285592798958,
-        "insider_score": 0.4060484439102541,
-        "news_score": -0.2934666505267819,
-        "technical_score": -0.0430402099323593
+        "analyst_score": 0.0007663958544939994,
+        "fundamental_score": -0.2505313855103784,
+        "insider_score": 0.4161657042011398,
+        "news_score": -0.2925306555845675,
+        "technical_score": -0.04000585884942037
       }
     },
     "ticker:EWJ": {
       "fitted": {
-        "analyst_score": 0.15162210747268628,
-        "fundamental_score": 0.07509303954060492,
-        "insider_score": -0.6754656109203243,
+        "analyst_score": 0.083108572058026,
+        "fundamental_score": 0.10601882019628202,
+        "insider_score": -0.703465658286037,
         "news_score": 0.0,
-        "technical_score": 0.07328757733899018
+        "technical_score": 0.1408231439585489
       },
-      "intercept": -0.5168927400605163,
+      "intercept": -0.5187222476670611,
       "key": "ticker:EWJ",
-      "n_effective": 28.526928916514557,
+      "n_effective": 28.300304810088956,
       "n_raw": 36,
-      "own_share": 0.5878577019698097,
+      "own_share": 0.5859239381896736,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": 0.12780136019456312,
-        "fundamental_score": -0.04361121125819173,
-        "insider_score": -0.47577423764234766,
-        "news_score": -0.27246240220194673,
-        "technical_score": 0.08035078870295076
+        "analyst_score": 0.07987252546810182,
+        "fundamental_score": -0.02977164905517871,
+        "insider_score": -0.48117855665375703,
+        "news_score": -0.279643386777414,
+        "technical_score": 0.12953388204554836
       }
     },
     "ticker:EWL": {
       "fitted": {
-        "analyst_score": 0.6608886776942186,
-        "fundamental_score": 1.790363088377985,
+        "analyst_score": 0.6744530845804869,
+        "fundamental_score": 1.8146523436129771,
         "insider_score": 0.0,
         "news_score": 0.0,
-        "technical_score": 0.8545312617956116
+        "technical_score": 0.8450094699951486
       },
-      "intercept": -0.06793521673214807,
+      "intercept": -0.0838028105583149,
       "key": "ticker:EWL",
-      "n_effective": 28.684172283635757,
+      "n_effective": 28.45629900181979,
       "n_raw": 36,
-      "own_share": 0.5891888664866421,
+      "own_share": 0.5872569632433362,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": 0.171624097655789,
-        "fundamental_score": 0.28223016313780025,
-        "insider_score": -0.03077628957520428,
-        "news_score": -0.2973375510045023,
-        "technical_score": 0.2180318986267041
+        "analyst_score": 0.17135126803854983,
+        "fundamental_score": 0.2821429355911552,
+        "insider_score": -0.029473782048306023,
+        "news_score": -0.29619233207601303,
+        "technical_score": 0.22083968224597594
       }
     },
     "ticker:EWN": {
       "fitted": {
-        "analyst_score": -0.28911843379496854,
-        "fundamental_score": 0.42257533232742633,
+        "analyst_score": -0.2665511377564946,
+        "fundamental_score": 0.4064427437495874,
         "insider_score": 0.0,
         "news_score": 0.0,
-        "technical_score": -1.2028436918626484
+        "technical_score": -1.247255649983387
       },
-      "intercept": -0.5196281960572378,
+      "intercept": -0.559919051805053,
       "key": "ticker:EWN",
-      "n_effective": 28.684172283635757,
+      "n_effective": 28.45629900181979,
       "n_raw": 36,
-      "own_share": 0.5891888664866421,
+      "own_share": 0.5872569632433362,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": -0.08872597193801225,
-        "fundamental_score": 0.06275124253857348,
-        "insider_score": -0.03533620084466574,
-        "news_score": -0.34139201203192465,
-        "technical_score": -0.4717945726468239
+        "analyst_score": -0.08187704695816878,
+        "fundamental_score": 0.05362218639689673,
+        "insider_score": -0.03418793815654277,
+        "news_score": -0.3435665336352349,
+        "technical_score": -0.4867462948531568
       }
     },
     "ticker:EWP": {
       "fitted": {
-        "analyst_score": 0.08990760605262654,
-        "fundamental_score": 0.05798698212229836,
+        "analyst_score": 0.050534024939477805,
+        "fundamental_score": 0.022029943405987896,
         "insider_score": 0.0,
         "news_score": 0.0,
-        "technical_score": -1.0508593004440412
+        "technical_score": -1.071764988851429
       },
-      "intercept": -0.3378048082623767,
+      "intercept": -0.34150595037976206,
       "key": "ticker:EWP",
-      "n_effective": 29.465114479424688,
+      "n_effective": 29.231037223538866,
       "n_raw": 37,
-      "own_share": 0.595674644434127,
+      "own_share": 0.5937522114517346,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": 0.07798296321069433,
-        "fundamental_score": -0.06152950340337974,
-        "insider_score": -0.028411663180190384,
-        "news_score": -0.27449229476865966,
-        "technical_score": -0.5575835754370758
+        "analyst_score": 0.05376018998609661,
+        "fundamental_score": -0.08046709821721883,
+        "insider_score": -0.02638867072460191,
+        "news_score": -0.26518897064162406,
+        "technical_score": -0.5741950704304587
       }
     },
     "ticker:EWT": {
       "fitted": {
-        "analyst_score": -0.6199137628877667,
-        "fundamental_score": -2.3207967881554445,
-        "insider_score": 0.5616935176803246,
+        "analyst_score": -0.5799067818857696,
+        "fundamental_score": -2.2375522787870956,
+        "insider_score": 0.5747093996954733,
         "news_score": 0.0,
-        "technical_score": -0.6938464950740957
+        "technical_score": -0.6550826122046293
       },
-      "intercept": -0.570839682064241,
+      "intercept": -0.6189236409184876,
       "key": "ticker:EWT",
-      "n_effective": 21.996313954286435,
+      "n_effective": 21.8215704686089,
       "n_raw": 26,
-      "own_share": 0.5237677282399051,
+      "own_share": 0.5217778821813515,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": -0.059586840156959794,
-        "fundamental_score": -0.4749807728784296,
-        "insider_score": 0.049570187309331624,
-        "news_score": -0.3507069810470167,
-        "technical_score": -0.06515521860826234
+        "analyst_score": -0.059206518456195255,
+        "fundamental_score": -0.478492633749829,
+        "insider_score": 0.05648384832166638,
+        "news_score": -0.35027861518802983,
+        "technical_score": -0.055538384284279575
       }
     },
     "ticker:EWU": {
       "fitted": {
-        "analyst_score": -0.46249759886319786,
-        "fundamental_score": -1.0974107741511407,
-        "insider_score": 0.7336864612386353,
+        "analyst_score": -0.4915151888080334,
+        "fundamental_score": -1.1110302020605216,
+        "insider_score": 0.7617796979679462,
         "news_score": 0.0,
-        "technical_score": 0.26635763978907956
+        "technical_score": 0.26172570430374137
       },
-      "intercept": 0.023463200796798502,
+      "intercept": 0.026297009616864053,
       "key": "ticker:EWU",
-      "n_effective": 18.141918568558154,
+      "n_effective": 17.997795235251665,
       "n_raw": 22,
-      "own_share": 0.4756425279433435,
+      "own_share": 0.4736536718465861,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": -0.06231189801746966,
-        "fundamental_score": -0.3579438503914622,
-        "insider_score": 0.1189789148016974,
-        "news_score": -0.36176795366568476,
-        "technical_score": 0.09899738312368603
+        "analyst_score": -0.0673871288529797,
+        "fundamental_score": -0.35281923526113723,
+        "insider_score": 0.12092345269751577,
+        "news_score": -0.3558164000273932,
+        "technical_score": 0.10305378316097404
       }
     },
     "ticker:EWW": {
       "fitted": {
-        "analyst_score": -0.1488467347136993,
-        "fundamental_score": -0.19135309373455717,
+        "analyst_score": -0.13152763427791675,
+        "fundamental_score": -0.2042228237470828,
         "insider_score": 0.0,
         "news_score": 0.0,
-        "technical_score": -0.09679566547530165
+        "technical_score": -0.10572450360542068
       },
-      "intercept": 0.13913620754096692,
+      "intercept": 0.1165465908532236,
       "key": "ticker:EWW",
-      "n_effective": 28.720664626553702,
+      "n_effective": 28.492501441656007,
       "n_raw": 36,
-      "own_share": 0.5894965687906562,
+      "own_share": 0.5875650996461155,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": -0.19714704051443888,
-        "fundamental_score": -0.38382592121123593,
-        "insider_score": -0.02861193511397639,
-        "news_score": -0.27642717279160506,
-        "technical_score": -0.11398793036874375
+        "analyst_score": -0.1715665698851176,
+        "fundamental_score": -0.40383312638530217,
+        "insider_score": -0.02752462069926943,
+        "news_score": -0.2766045287660283,
+        "technical_score": -0.1204711542642825
       }
     },
     "ticker:EWY": {
       "fitted": {
         "analyst_score": 0.0,
-        "fundamental_score": -0.6591294385417386,
-        "insider_score": -0.2208525438529958,
-        "news_score": -0.6029771511311975,
-        "technical_score": -0.4749719558984413
+        "fundamental_score": -0.6558296434767644,
+        "insider_score": -0.22104129597592373,
+        "news_score": -0.5989691120491771,
+        "technical_score": -0.4721760964474147
       },
-      "intercept": -0.6975742818396103,
+      "intercept": -0.6975138249789203,
       "key": "ticker:EWY",
-      "n_effective": 21.992004067733543,
+      "n_effective": 21.817294820728932,
       "n_raw": 29,
-      "own_share": 0.5237188497186324,
+      "own_share": 0.5217289859198173,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": 0.030786623696677944,
-        "fundamental_score": -0.2940935399385189,
-        "insider_score": -0.0950683796742502,
-        "news_score": -0.47970965859033643,
-        "technical_score": -0.10034179810021658
+        "analyst_score": 0.029026060455446527,
+        "fundamental_score": -0.29888703552314805,
+        "insider_score": -0.09496195445190976,
+        "news_score": -0.4826229063972574,
+        "technical_score": -0.09450204317223831
       }
     },
     "ticker:EWZ": {
       "fitted": {
-        "analyst_score": 0.11869689882389314,
-        "fundamental_score": -1.4036019821137387,
+        "analyst_score": 0.11731056139687926,
+        "fundamental_score": -1.3941231993428485,
         "insider_score": 0.0,
-        "news_score": -0.029704371213120938,
-        "technical_score": -0.4605588680013808
+        "news_score": -0.029860568785239346,
+        "technical_score": -0.4578059503576911
       },
-      "intercept": 0.4616376688936313,
+      "intercept": 0.45891087852690327,
       "key": "ticker:EWZ",
-      "n_effective": 10.255181037816449,
+      "n_effective": 10.173711656877146,
       "n_raw": 14,
-      "own_share": 0.33895619480836453,
+      "own_share": 0.33717136865919406,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": 0.0659850806906694,
-        "fundamental_score": -0.4106866116354528,
-        "insider_score": -0.045344633995795254,
-        "news_score": -0.4436002674297766,
-        "technical_score": -0.03438340624830592
+        "analyst_score": 0.06381214701792262,
+        "fundamental_score": -0.4190556529417701,
+        "insider_score": -0.04399410854721944,
+        "news_score": -0.4477660532645244,
+        "technical_score": -0.025372038228563414
       }
     },
     "ticker:EZA": {
       "fitted": {
-        "analyst_score": 0.4402044055249533,
-        "fundamental_score": -1.07195543003816,
+        "analyst_score": 0.4542046219473224,
+        "fundamental_score": -1.0666187497314001,
         "insider_score": 0.0,
         "news_score": 0.0,
-        "technical_score": -0.23440716347042828
+        "technical_score": -0.20874052539128374
       },
-      "intercept": -0.18907786979774713,
+      "intercept": -0.2086642312135605,
       "key": "ticker:EZA",
-      "n_effective": 28.82022524647359,
+      "n_effective": 28.591271130431835,
       "n_raw": 36,
-      "own_share": 0.5903337213413482,
+      "own_share": 0.5884034408913752,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": 0.1840790623492783,
-        "fundamental_score": -0.4739676260774618,
-        "insider_score": -0.027049727723535446,
-        "news_score": -0.2613342903796497,
-        "technical_score": -0.0535692934700748
+        "analyst_score": 0.1904504388480195,
+        "fundamental_score": -0.48129815764994593,
+        "insider_score": -0.0261057005456013,
+        "news_score": -0.2623453044609896,
+        "technical_score": -0.03980039849544363
       }
     },
     "ticker:GDX": {
       "fitted": {
-        "analyst_score": 0.016354986677332494,
-        "fundamental_score": -0.2430967333231458,
-        "insider_score": 0.14082439959090362,
-        "news_score": -0.14225029546092477,
-        "technical_score": -1.4791627422680924
+        "analyst_score": 0.01515400328660487,
+        "fundamental_score": -0.24172500148015505,
+        "insider_score": 0.14078255342769339,
+        "news_score": -0.14261451510840323,
+        "technical_score": -1.4718198508941882
       },
-      "intercept": -0.44531447530087315,
+      "intercept": -0.44393574760007815,
       "key": "ticker:GDX",
-      "n_effective": 22.458946745307802,
+      "n_effective": 22.280528004464333,
       "n_raw": 28,
-      "own_share": 0.5289567562763382,
+      "own_share": 0.5269690104653322,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": 0.03735086053189531,
-        "fundamental_score": -0.1835502800385701,
-        "insider_score": 0.008603785662732734,
-        "news_score": -0.3660936100552479,
-        "technical_score": -0.40440146371155405
+        "analyst_score": 0.035115765846307004,
+        "fundamental_score": -0.18692463398051085,
+        "insider_score": 0.010280124849210865,
+        "news_score": -0.3676226998517069,
+        "technical_score": -0.40005677547226437
       }
     },
     "ticker:GLD": {
       "fitted": {
         "analyst_score": 0.0,
-        "fundamental_score": -0.06990841852516454,
-        "insider_score": 0.7159735533255681,
+        "fundamental_score": -0.09023320963266632,
+        "insider_score": 0.7268106283679278,
         "news_score": 0.0,
-        "technical_score": 0.10903870570733061
+        "technical_score": 0.14241961628639524
       },
-      "intercept": -1.3195162437395818,
+      "intercept": -1.3441277223922945,
       "key": "ticker:GLD",
-      "n_effective": 8.350675679271713,
+      "n_effective": 8.284336101695615,
       "n_raw": 9,
-      "own_share": 0.2945494412105747,
+      "own_share": 0.29289484016557765,
       "parent": "kind:commodity fund",
       "weights": {
-        "analyst_score": 0.022421732302225605,
-        "fundamental_score": -0.25731766350197693,
-        "insider_score": 0.5999098363092287,
-        "news_score": 0.08623959993173673,
-        "technical_score": 0.03411116795483201
+        "analyst_score": 0.02135432147667828,
+        "fundamental_score": -0.2641371703343216,
+        "insider_score": 0.5828549837872431,
+        "news_score": 0.08254944275941592,
+        "technical_score": 0.04910408164234109
       }
     },
     "ticker:GOOGL": {
       "fitted": {
-        "analyst_score": -1.2884670451903801,
-        "fundamental_score": 0.07758415426829923,
+        "analyst_score": -1.2833809624654078,
+        "fundamental_score": 0.07584843328567932,
         "insider_score": 0.0,
-        "news_score": -0.009898776098859597,
-        "technical_score": 1.389416058314825
+        "news_score": -0.008958740819906994,
+        "technical_score": 1.3852443691392813
       },
-      "intercept": 0.12512517681387458,
+      "intercept": 0.12306420537331324,
       "key": "ticker:GOOGL",
-      "n_effective": 14.879867018846662,
+      "n_effective": 14.761658130089423,
       "n_raw": 20,
-      "own_share": 0.42660331849334787,
+      "own_share": 0.4246534522273506,
       "parent": "kind:equity",
       "weights": {
-        "analyst_score": -0.21490089307003807,
-        "fundamental_score": -0.3980455764320833,
-        "insider_score": -0.01600160373703679,
-        "news_score": -0.09390373424425319,
-        "technical_score": 0.27714819251658857
+        "analyst_score": -0.21551967073101494,
+        "fundamental_score": -0.3915043938323583,
+        "insider_score": -0.01727378135715754,
+        "news_score": -0.09463709335851955,
+        "technical_score": 0.2810650607209498
       }
     },
     "ticker:HDB": {
       "fitted": {
-        "analyst_score": 0.031682929789526595,
-        "fundamental_score": -1.2988881642794416,
+        "analyst_score": 0.032472683158324966,
+        "fundamental_score": -1.2916674772531662,
         "insider_score": 0.0,
-        "news_score": 0.016244236730753,
-        "technical_score": 0.20233779494239273
+        "news_score": 0.015057869830468692,
+        "technical_score": 0.20023605765020622
       },
-      "intercept": 1.2431443665864257,
+      "intercept": 1.240790775462962,
       "key": "ticker:HDB",
-      "n_effective": 11.498635513025114,
+      "n_effective": 11.407287860220316,
       "n_raw": 15,
-      "own_share": 0.36505186100109865,
+      "own_share": 0.36320512331370397,
       "parent": "kind:equity",
       "weights": {
-        "analyst_score": -0.004811858361364145,
-        "fundamental_score": -0.7668762727290226,
-        "insider_score": -0.017694835090414394,
-        "news_score": -0.09819388395176279,
-        "technical_score": 0.11242314986743605
+        "analyst_score": -0.006366786900009642,
+        "fundamental_score": -0.757873619606327,
+        "insider_score": -0.019099737552335867,
+        "news_score": -0.09944237314929355,
+        "technical_score": 0.1172174827920339
       }
     },
     "ticker:HYG": {
       "fitted": {
         "analyst_score": 0.0,
-        "fundamental_score": 0.32372788858204987,
-        "insider_score": 0.2806237233390219,
-        "news_score": 0.18224184582137892,
-        "technical_score": 0.3909372966035809
+        "fundamental_score": 0.3164794027216446,
+        "insider_score": 0.3150710942095324,
+        "news_score": 0.1845495481509047,
+        "technical_score": 0.3719863330864096
       },
-      "intercept": -0.7152070419606461,
+      "intercept": -0.7511394225127629,
       "key": "ticker:HYG",
-      "n_effective": 13.866288794538534,
+      "n_effective": 13.75613199088476,
       "n_raw": 17,
-      "own_share": 0.40944222966570487,
+      "own_share": 0.40751505517869635,
       "parent": "kind:broad fund",
       "weights": {
-        "analyst_score": -0.20971984897779747,
-        "fundamental_score": 0.20895444044474404,
-        "insider_score": -0.178738708363601,
-        "news_score": 0.034915142117349744,
-        "technical_score": 0.36767186009650776
+        "analyst_score": -0.22471303356885425,
+        "fundamental_score": 0.19559017974188395,
+        "insider_score": -0.1698967439971778,
+        "news_score": 0.03573036702464981,
+        "technical_score": 0.3740696756674342
       }
     },
     "ticker:IEF": {
       "fitted": {
         "analyst_score": 0.0,
-        "fundamental_score": 0.2288213226858784,
-        "insider_score": -0.2573011485169511,
-        "news_score": -0.2200294754258146,
-        "technical_score": -0.1836350867759863
+        "fundamental_score": 0.13705342612706403,
+        "insider_score": -0.26471352116112734,
+        "news_score": -0.2134822146072658,
+        "technical_score": -0.1819789400271006
       },
-      "intercept": 0.0033122612557246432,
+      "intercept": 0.02884483175692157,
       "key": "ticker:IEF",
-      "n_effective": 19.786292914760896,
+      "n_effective": 19.62910631523574,
       "n_raw": 23,
-      "own_share": 0.497314312674255,
+      "own_share": 0.49532043844473894,
       "parent": "kind:broad fund",
       "weights": {
-        "analyst_score": -0.16375493015431988,
-        "fundamental_score": 0.20351848371340295,
-        "insider_score": -0.4250287289277924,
-        "news_score": -0.1953500534335607,
-        "technical_score": 0.012347803770924079
+        "analyst_score": -0.17507895571353455,
+        "fundamental_score": 0.14293788929598722,
+        "insider_score": -0.463848226470687,
+        "news_score": -0.21323112556158985,
+        "technical_score": 0.004903802958201342
       }
     },
     "ticker:IGV": {
       "fitted": {
-        "analyst_score": -0.7230701253349385,
-        "fundamental_score": 0.1963126476036675,
+        "analyst_score": -0.6676566831752672,
+        "fundamental_score": 0.19130442026465735,
         "insider_score": 0.0,
-        "news_score": -0.021108977404746286,
-        "technical_score": -1.3967180872050227
+        "news_score": -0.012707785918708647,
+        "technical_score": -1.3921964755737772
       },
-      "intercept": 0.04576529098286371,
+      "intercept": -0.01404486934322141,
       "key": "ticker:IGV",
-      "n_effective": 30.203650261307548,
+      "n_effective": 29.963705917095382,
       "n_raw": 38,
-      "own_share": 0.601622593259634,
+      "own_share": 0.5997094364219913,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": -0.20389899984927526,
-        "fundamental_score": -0.03968540852762258,
-        "insider_score": -0.031186227289133377,
-        "news_score": -0.3081330420672828,
-        "technical_score": -0.417096322266686
+        "analyst_score": -0.19606826989569762,
+        "fundamental_score": -0.0415675599197481,
+        "insider_score": -0.030036644705636963,
+        "news_score": -0.3061211755727281,
+        "technical_score": -0.4262063499061892
       }
     },
     "ticker:INDA": {
       "fitted": {
-        "analyst_score": 0.08405657203532935,
-        "fundamental_score": 0.19330085201703262,
-        "insider_score": -1.636649842323947,
-        "news_score": -0.06474687850502214,
-        "technical_score": 0.0946405766574635
+        "analyst_score": 0.08337117582643615,
+        "fundamental_score": 0.20012131667131675,
+        "insider_score": -1.6366141055617198,
+        "news_score": -0.03788625187431913,
+        "technical_score": 0.12583649551929438
       },
-      "intercept": 0.1771094131587084,
+      "intercept": 0.18475118968169144,
       "key": "ticker:INDA",
-      "n_effective": 28.185541593877282,
+      "n_effective": 27.961629542337228,
       "n_raw": 35,
-      "own_share": 0.5849377357098896,
+      "own_share": 0.5829999899743736,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": 0.05471825598067583,
-        "fundamental_score": -0.03477991595616571,
-        "insider_score": -0.5472415632256614,
-        "news_score": -0.3006105935563541,
-        "technical_score": 0.0626496712811429
+        "analyst_score": 0.05251892142642188,
+        "fundamental_score": -0.03482296839078374,
+        "insider_score": -0.5433819895118095,
+        "news_score": -0.29093997918255166,
+        "technical_score": 0.07833614148843315
       }
     },
     "ticker:ITA": {
       "fitted": {
-        "analyst_score": -0.310216708113753,
-        "fundamental_score": 0.5767451764037995,
-        "insider_score": -0.5990102864050437,
-        "news_score": -0.1451538837083578,
-        "technical_score": -0.38350923952543825
+        "analyst_score": -0.3087709315366539,
+        "fundamental_score": 0.5728218743933033,
+        "insider_score": -0.5975210653173444,
+        "news_score": -0.14413513641205503,
+        "technical_score": -0.3816649687927691
       },
-      "intercept": 0.1382470254207146,
+      "intercept": 0.13750094426840742,
       "key": "ticker:ITA",
-      "n_effective": 20.84971636631443,
+      "n_effective": 20.68408170039678,
       "n_raw": 27,
-      "own_share": 0.5104005173340093,
+      "own_share": 0.508407240274396,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": -0.07316996554342957,
-        "fundamental_score": 0.06747138250965186,
-        "insider_score": -0.2717822230547391,
-        "news_score": -0.49389127325269216,
-        "technical_score": -0.09368515563948732
+        "analyst_score": -0.07709702049274335,
+        "fundamental_score": 0.06493258706140428,
+        "insider_score": -0.27398373651900265,
+        "news_score": -0.4986010410497357,
+        "technical_score": -0.08538561487711398
       }
     },
     "ticker:IWM": {
       "fitted": {
-        "analyst_score": -0.2372849568168092,
-        "fundamental_score": -0.44335071081241023,
-        "insider_score": -0.9776847586786124,
+        "analyst_score": -0.2359177385423539,
+        "fundamental_score": -0.44044182538138565,
+        "insider_score": -0.973231389303956,
         "news_score": 0.0,
-        "technical_score": -0.10088649632340248
+        "technical_score": -0.10026213602498633
       },
-      "intercept": -0.2451738192223194,
+      "intercept": -0.24513867080446664,
       "key": "ticker:IWM",
-      "n_effective": 27.72628056010219,
+      "n_effective": 27.506016977757678,
       "n_raw": 35,
-      "own_share": 0.5809436694985314,
+      "own_share": 0.5790006977565809,
       "parent": "kind:broad fund",
       "weights": {
-        "analyst_score": -0.21307090533417297,
-        "fundamental_score": -0.13477582746066946,
-        "insider_score": -0.5525679494175681,
-        "news_score": -0.030679193324818273,
-        "technical_score": 0.06890612446277115
+        "analyst_score": -0.21442153049086024,
+        "fundamental_score": -0.13969788651488077,
+        "insider_score": -0.5434130481529635,
+        "news_score": -0.030306438746565804,
+        "technical_score": 0.07216109609472958
       }
     },
     "ticker:IYT": {
       "fitted": {
-        "analyst_score": -0.09390042898910571,
-        "fundamental_score": -0.3978802466589652,
-        "insider_score": -0.4560575400421114,
+        "analyst_score": -0.1534505228637604,
+        "fundamental_score": -0.406926246788472,
+        "insider_score": -0.4897784494778468,
         "news_score": 0.0,
-        "technical_score": -0.6611516866256975
+        "technical_score": -0.7416291047657404
       },
-      "intercept": 0.22434618216010063,
+      "intercept": 0.2439360883213263,
       "key": "ticker:IYT",
-      "n_effective": 29.459200408436562,
+      "n_effective": 29.225170135212522,
       "n_raw": 37,
-      "own_share": 0.5956262973351977,
+      "own_share": 0.5937037912705296,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": -0.011591939725624304,
-        "fundamental_score": -0.2578112552874155,
-        "insider_score": -0.21687637078872588,
-        "news_score": -0.2718125763955901,
-        "technical_score": -0.2419078578026443
+        "analyst_score": -0.03169263588360107,
+        "fundamental_score": -0.24730853016763069,
+        "insider_score": -0.20989744653651887,
+        "news_score": -0.27196628275298423,
+        "technical_score": -0.23913510465926519
       }
     },
     "ticker:JPM": {
       "fitted": {
-        "analyst_score": -0.422605146157721,
-        "fundamental_score": 0.07335822545712496,
-        "insider_score": -0.448959513356377,
-        "news_score": -0.9722953092725871,
-        "technical_score": -0.8990075617836785
+        "analyst_score": -0.42034271722211236,
+        "fundamental_score": 0.07269329138180669,
+        "insider_score": -0.4459742751583325,
+        "news_score": -0.9692875742983152,
+        "technical_score": -0.8947708960812738
       },
-      "intercept": -0.22659356195739253,
+      "intercept": -0.22631029961939308,
       "key": "ticker:JPM",
-      "n_effective": 15.049327744416347,
+      "n_effective": 14.929772622925155,
       "n_raw": 19,
-      "own_share": 0.4293756460653894,
+      "own_share": 0.4274225539368792,
       "parent": "kind:equity",
       "weights": {
-        "analyst_score": -0.08704835173661445,
-        "fundamental_score": -0.4473934605498181,
-        "insider_score": -0.09700974883146744,
-        "news_score": -0.2748056219499021,
-        "technical_score": -0.09374281693219802
+        "analyst_score": -0.08938791735263454,
+        "fundamental_score": -0.4447903930485377,
+        "insider_score": -0.09897296018161221,
+        "news_score": -0.2782743999610099,
+        "technical_score": -0.08857432945620568
       }
     },
     "ticker:KRE": {
       "fitted": {
-        "analyst_score": -0.12970848001295235,
-        "fundamental_score": -0.1699393654265355,
-        "insider_score": -0.29476739039902844,
+        "analyst_score": -0.12880427029195451,
+        "fundamental_score": -0.16884449797270562,
+        "insider_score": -0.29412426975964,
         "news_score": 0.0,
-        "technical_score": -0.33839471508255553
+        "technical_score": -0.3364447434858858
       },
-      "intercept": 0.13218751182278513,
+      "intercept": 0.131708130769589,
       "key": "ticker:KRE",
-      "n_effective": 22.74292245024028,
+      "n_effective": 22.56224774484608,
       "n_raw": 28,
-      "own_share": 0.532086276428963,
+      "own_share": 0.530100005058548,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": -0.05212735447520576,
-        "fundamental_score": -0.2202353462442886,
-        "insider_score": -0.22469366128575333,
-        "news_score": -0.3204631820426916,
-        "technical_score": -0.18248045595206078
+        "analyst_score": -0.054353622323373825,
+        "fundamental_score": -0.22340045433348638,
+        "insider_score": -0.22499921808772919,
+        "news_score": -0.3209017446026668,
+        "technical_score": -0.17634496065274383
       }
     },
     "ticker:KSA": {
       "fitted": {
-        "analyst_score": -0.11668686375673815,
-        "fundamental_score": -0.3513151916000175,
-        "insider_score": 0.013376467696991924,
-        "news_score": 0.1338661014872594,
-        "technical_score": 0.27709690325610664
+        "analyst_score": -0.10825859136636262,
+        "fundamental_score": -0.39205242133919016,
+        "insider_score": 0.055352751634232214,
+        "news_score": 0.12914779367440665,
+        "technical_score": 0.23402419080698347
       },
-      "intercept": -0.1408618653325125,
+      "intercept": -0.17140174212264758,
       "key": "ticker:KSA",
-      "n_effective": 26.24499003017861,
+      "n_effective": 26.03649414086839,
       "n_raw": 33,
-      "own_share": 0.5675207198239555,
+      "own_share": 0.5655620530355455,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": -0.063277114090133,
-        "fundamental_score": -0.4109492046475706,
-        "insider_score": -0.024203221259506826,
-        "news_score": -0.2299594615862659,
-        "technical_score": 0.2716109984165237
+        "analyst_score": -0.057143955985956243,
+        "fundamental_score": -0.4478175884083308,
+        "insider_score": 0.011315091682260156,
+        "news_score": -0.24104358114934663,
+        "technical_score": 0.24267978277410615
       }
     },
     "ticker:LLY": {
       "fitted": {
-        "analyst_score": 0.07211711963960392,
-        "fundamental_score": 0.13345566741807705,
+        "analyst_score": 0.07111005985628603,
+        "fundamental_score": 0.13124599323526617,
         "insider_score": 0.0,
-        "news_score": -0.41294332027095915,
-        "technical_score": 0.16169398426354537
+        "news_score": -0.41099479309246534,
+        "technical_score": 0.1631255872006989
       },
-      "intercept": 0.013419212024212746,
+      "intercept": 0.011890285612586043,
       "key": "ticker:LLY",
-      "n_effective": 6.56908964123772,
+      "n_effective": 6.516903369300353,
       "n_raw": 7,
-      "own_share": 0.24724556730923428,
+      "own_share": 0.2457641180246267,
       "parent": "kind:equity",
       "weights": {
-        "analyst_score": 0.009504894638520615,
-        "fundamental_score": -0.5453262516276214,
-        "insider_score": -0.023127560197549316,
-        "news_score": -0.281064347396577,
-        "technical_score": 0.1409769461397317
+        "analyst_score": 0.006856092569091743,
+        "fundamental_score": -0.53733657534315,
+        "insider_score": -0.025016055291016862,
+        "news_score": -0.2821559105346979,
+        "technical_score": 0.14863536626204343
       }
     },
     "ticker:LQD": {
       "fitted": {
         "analyst_score": 0.0,
-        "fundamental_score": -0.36504073101212775,
-        "insider_score": -0.5349659741545261,
+        "fundamental_score": -0.3425295000449207,
+        "insider_score": -0.5182014875384245,
         "news_score": 0.0,
-        "technical_score": -0.8086231108271319
+        "technical_score": -0.8120025446460492
       },
-      "intercept": -0.13175162993167117,
+      "intercept": -0.12855804415602343,
       "key": "ticker:LQD",
-      "n_effective": 29.465114479424688,
+      "n_effective": 29.231037223538866,
       "n_raw": 37,
-      "own_share": 0.595674644434127,
+      "own_share": 0.5937522114517346,
       "parent": "kind:broad fund",
       "weights": {
-        "analyst_score": -0.13689339363044586,
-        "fundamental_score": -0.1308255753425014,
-        "insider_score": -0.4479439822159506,
-        "news_score": -0.033947137440104885,
-        "technical_score": -0.25038991137099725
+        "analyst_score": -0.14148048056914994,
+        "fundamental_score": -0.1311329325698643,
+        "insider_score": -0.44170654350428595,
+        "news_score": -0.0338081521217826,
+        "technical_score": -0.25187189123491716
       }
     },
     "ticker:MCHI": {
       "fitted": {
-        "analyst_score": 0.1505747008723021,
-        "fundamental_score": -0.6325368520932438,
-        "insider_score": 2.219008361142836,
-        "news_score": -0.008594523077668054,
-        "technical_score": 0.9536960708283083
+        "analyst_score": 0.18174658840943814,
+        "fundamental_score": -0.6609841917470125,
+        "insider_score": 2.2356521231147224,
+        "news_score": 0.010299709091773123,
+        "technical_score": 1.028750235827527
       },
-      "intercept": -0.0036366734164318057,
+      "intercept": -0.015965494279644173,
       "key": "ticker:MCHI",
-      "n_effective": 28.783195978011644,
+      "n_effective": 28.55453603050451,
       "n_raw": 36,
-      "own_share": 0.5900227609315567,
+      "own_share": 0.5880920376330041,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": 0.049674749349290975,
-        "fundamental_score": -0.18821697408275215,
-        "insider_score": 0.321127112163738,
-        "news_score": -0.2611034096747669,
-        "technical_score": 0.17987775472945194
+        "analyst_score": 0.05165504634054846,
+        "fundamental_score": -0.19007641439097106,
+        "insider_score": 0.311028607942443,
+        "news_score": -0.25651391373089394,
+        "technical_score": 0.1907260175951435
       }
     },
     "ticker:MELI": {
       "fitted": {
-        "analyst_score": 0.4289493526692406,
-        "fundamental_score": -0.8741011815533842,
-        "insider_score": -0.5085486570199862,
-        "news_score": 0.5119087388481495,
-        "technical_score": -0.6305071281877728
+        "analyst_score": 0.42637494930970316,
+        "fundamental_score": -0.8692711083896884,
+        "insider_score": -0.5055639296337268,
+        "news_score": 0.510206029705155,
+        "technical_score": -0.6288067312616513
       },
-      "intercept": -0.7940356165973581,
+      "intercept": -0.7923779706099067,
       "key": "ticker:MELI",
-      "n_effective": 22.896024838186968,
+      "n_effective": 22.71413385423851,
       "n_raw": 30,
-      "own_share": 0.5337563311415381,
+      "own_share": 0.531770910578457,
       "parent": "kind:equity",
       "weights": {
-        "analyst_score": 0.09213926310447432,
-        "fundamental_score": -0.6498027919998195,
-        "insider_score": -0.1405377808001743,
-        "news_score": 0.025812637041284087,
-        "technical_score": -0.09170752705424781
+        "analyst_score": 0.09135491612968517,
+        "fundamental_score": -0.652544157168804,
+        "insider_score": -0.14359815109010332,
+        "news_score": 0.02483057544687299,
+        "technical_score": -0.0876722001645345
       }
     },
     "ticker:MSFT": {
       "fitted": {
-        "analyst_score": 0.005813646704655849,
-        "fundamental_score": -0.03135895676068914,
-        "insider_score": -0.023737521443205293,
-        "news_score": -0.27256182716957367,
-        "technical_score": -0.4155531707185427
+        "analyst_score": 0.0054598751508767316,
+        "fundamental_score": -0.03168737292960236,
+        "insider_score": -0.023876685906575646,
+        "news_score": -0.2719455544215369,
+        "technical_score": -0.41346336982047227
       },
-      "intercept": -0.18691179557601,
+      "intercept": -0.1863877446171853,
       "key": "ticker:MSFT",
-      "n_effective": 5.023415817441422,
+      "n_effective": 4.983508713379728,
       "n_raw": 6,
-      "own_share": 0.20074860499021405,
+      "own_share": 0.19947193048632308,
       "parent": "kind:equity",
       "weights": {
-        "analyst_score": -0.016375363441463734,
-        "fundamental_score": -0.6743408560212452,
-        "insider_score": -0.033479779407854196,
-        "news_score": -0.2364436806671813,
-        "technical_score": -0.039360320462255564
+        "analyst_score": -0.019325184163509715,
+        "fundamental_score": -0.67257925971321,
+        "insider_score": -0.03606467171437356,
+        "news_score": -0.24082698706477587,
+        "technical_score": -0.03120389734413094
       }
     },
     "ticker:NVDA": {
       "fitted": {
-        "analyst_score": -0.07040721272839262,
-        "fundamental_score": -0.3142538284510516,
+        "analyst_score": -0.07022290283822952,
+        "fundamental_score": -0.31322827542808296,
         "insider_score": 0.0,
-        "news_score": -0.20348575170503175,
-        "technical_score": -0.21721961164705678
+        "news_score": -0.20234434648283914,
+        "technical_score": -0.2157378911764717
       },
-      "intercept": -0.3520360636419635,
+      "intercept": -0.35111451419114753,
       "key": "ticker:NVDA",
-      "n_effective": 1.4774944256550446,
+      "n_effective": 1.4657568896958533,
       "n_raw": 2,
-      "own_share": 0.06879268113743124,
+      "own_share": 0.06828349436862655,
       "parent": "kind:equity",
       "weights": {
-        "analyst_score": -0.024780715077636087,
-        "fundamental_score": -0.7033402180418579,
-        "insider_score": -0.02634239523043536,
-        "news_score": -0.17006323006433124,
-        "technical_score": 0.07547344158573947
+        "analyst_score": -0.02730215180427633,
+        "fundamental_score": -0.6901663139867864,
+        "insider_score": -0.028361215972496412,
+        "news_score": -0.1709541918992692,
+        "technical_score": 0.08321612633717158
       }
     },
     "ticker:NVO": {
       "fitted": {
-        "analyst_score": -0.09772310147996642,
-        "fundamental_score": -0.4960551947050606,
+        "analyst_score": -0.09758660031111897,
+        "fundamental_score": -0.4937060243220183,
         "insider_score": 0.0,
-        "news_score": -0.6945787027054897,
-        "technical_score": -0.14727427042112565
+        "news_score": -0.6928779700597169,
+        "technical_score": -0.14805649599278786
       },
-      "intercept": 0.4122342644499253,
+      "intercept": 0.4114604512058647,
       "key": "ticker:NVO",
-      "n_effective": 10.665666055644364,
+      "n_effective": 10.580935692752234,
       "n_raw": 13,
-      "own_share": 0.3478048067272038,
+      "own_share": 0.3459977745304878,
       "parent": "kind:equity",
       "weights": {
-        "analyst_score": -0.03895442688665301,
-        "fundamental_score": -0.6199381284992046,
-        "insider_score": -0.019130039477009968,
-        "news_score": -0.29159565968214196,
-        "technical_score": 0.030381745454990533
+        "analyst_score": -0.040750715838071674,
+        "fundamental_score": -0.6108814003931434,
+        "insider_score": -0.020653337043659535,
+        "news_score": -0.29174306021123547,
+        "technical_score": 0.035971486513889865
       }
     },
     "ticker:PG": {
       "fitted": {
-        "analyst_score": 0.8616650222300988,
-        "fundamental_score": -0.5778298049524851,
-        "insider_score": 0.11612678346006342,
-        "news_score": -0.922350224815445,
-        "technical_score": 0.3258466594824713
+        "analyst_score": 0.8587836559809942,
+        "fundamental_score": -0.5752022332929871,
+        "insider_score": 0.11604963911531678,
+        "news_score": -0.9196977988372649,
+        "technical_score": 0.3248479157464466
       },
-      "intercept": 0.9428950967429289,
+      "intercept": 0.9426573037396855,
       "key": "ticker:PG",
-      "n_effective": 18.47212118238286,
+      "n_effective": 18.32537464794187,
       "n_raw": 24,
-      "own_share": 0.4801430390285214,
+      "own_share": 0.47815252469882824,
       "parent": "kind:equity",
       "weights": {
-        "analyst_score": 0.14456846143915783,
-        "fundamental_score": -0.4854649301956881,
-        "insider_score": 0.006016313234358797,
-        "news_score": -0.25181135916236147,
-        "technical_score": 0.11213893596843376
+        "analyst_score": 0.14319996329292595,
+        "fundamental_score": -0.4815128771641621,
+        "insider_score": 0.00481182834453104,
+        "news_score": -0.25346058716332015,
+        "technical_score": 0.11701474403506085
       }
     },
     "ticker:RSP": {
       "fitted": {
-        "analyst_score": 0.8201055637212857,
-        "fundamental_score": 0.47856515441859815,
-        "insider_score": 0.9655471453708123,
+        "analyst_score": 0.9379814747856978,
+        "fundamental_score": 0.5247943978591767,
+        "insider_score": 1.0623709509138723,
         "news_score": 0.0,
-        "technical_score": 0.15040360073784978
+        "technical_score": 0.15511933352502322
       },
-      "intercept": 0.20788256987938217,
+      "intercept": 0.1802924680969427,
       "key": "ticker:RSP",
-      "n_effective": 24.131261410336737,
+      "n_effective": 23.939557439325885,
       "n_raw": 29,
-      "own_share": 0.5468065185348304,
+      "own_share": 0.5448292799121366,
       "parent": "kind:broad fund",
       "weights": {
-        "analyst_score": 0.1645609838971508,
-        "fundamental_score": 0.3342000184805066,
-        "insider_score": 0.10534103516729577,
-        "news_score": -0.07000846188249096,
-        "technical_score": 0.3258895005725559
+        "analyst_score": 0.16915376604851634,
+        "fundamental_score": 0.32027942514143176,
+        "insider_score": 0.10015438212138168,
+        "news_score": -0.07213833981347179,
+        "technical_score": 0.3382740868751984
       }
     },
     "ticker:RY": {
       "fitted": {
-        "analyst_score": -0.11748636424607616,
-        "fundamental_score": -0.007976200088641668,
-        "insider_score": 1.2634508374278541,
-        "news_score": 0.2884163062391461,
-        "technical_score": 0.3618440692343804
+        "analyst_score": -0.1176745324355273,
+        "fundamental_score": -0.00820798835172511,
+        "insider_score": 1.2566295190402574,
+        "news_score": 0.2877467150945195,
+        "technical_score": 0.3591650337477822
       },
-      "intercept": -0.831392387888849,
+      "intercept": -0.8282859586369149,
       "key": "ticker:RY",
-      "n_effective": 13.385657858758515,
+      "n_effective": 13.279319291433666,
       "n_raw": 17,
-      "own_share": 0.4009403653325607,
+      "own_share": 0.3990261692297251,
       "parent": "kind:equity",
       "weights": {
-        "analyst_score": -0.04049583537469487,
-        "fundamental_score": -0.4918077624465309,
-        "insider_score": 0.2717972676831389,
-        "news_score": -0.043860443803923725,
-        "technical_score": 0.15203869069171155
+        "analyst_score": -0.04255679414520101,
+        "fundamental_score": -0.48521157583269836,
+        "insider_score": 0.2694420629137794,
+        "news_score": -0.04523183971496006,
+        "technical_score": 0.1575577273933611
       }
     },
     "ticker:SHY": {
       "fitted": {
         "analyst_score": 0.0,
-        "fundamental_score": -0.1496286650550961,
-        "insider_score": 0.7318272329676105,
+        "fundamental_score": -0.158937047013775,
+        "insider_score": 0.7488860316660633,
         "news_score": 0.0,
-        "technical_score": 0.2542970656641816
+        "technical_score": 0.2676520476548206
       },
-      "intercept": 0.1683037921167211,
+      "intercept": 0.18670358908991533,
       "key": "ticker:SHY",
-      "n_effective": 29.465114479424688,
+      "n_effective": 29.231037223538866,
       "n_raw": 37,
-      "own_share": 0.595674644434127,
+      "own_share": 0.5937522114517346,
       "parent": "kind:broad fund",
       "weights": {
-        "analyst_score": -0.16523188504151154,
-        "fundamental_score": -0.08089806867832064,
-        "insider_score": 0.35959543259503396,
-        "news_score": -0.04097458147713196,
-        "technical_score": 0.3533000322080018
+        "analyst_score": -0.16885765972567712,
+        "fundamental_score": -0.09256140724851965,
+        "insider_score": 0.3432737470075494,
+        "news_score": -0.0403501983027523,
+        "technical_score": 0.3549569877155015
       }
     },
     "ticker:SLV": {
       "fitted": {
         "analyst_score": 0.0,
-        "fundamental_score": -0.454519447432712,
-        "insider_score": 0.2970384493003941,
+        "fundamental_score": -0.4677272686954331,
+        "insider_score": 0.24717113813893174,
         "news_score": 0.0,
-        "technical_score": -0.04858582940811936
+        "technical_score": -0.07567034292612887
       },
-      "intercept": -0.828906491836383,
+      "intercept": -0.8549313226737949,
       "key": "ticker:SLV",
-      "n_effective": 28.814311175485464,
+      "n_effective": 28.585404042105488,
       "n_raw": 36,
-      "own_share": 0.590284088448963,
+      "own_share": 0.5883537372115413,
       "parent": "kind:commodity fund",
       "weights": {
-        "analyst_score": 0.012972554847968262,
-        "fundamental_score": -0.47082221378285993,
-        "insider_score": 0.4293588931268425,
-        "news_score": 0.049895696064047944,
-        "technical_score": -0.03695064217828135
+        "analyst_score": 0.012513563504271658,
+        "fundamental_score": -0.4890278893410009,
+        "insider_score": 0.3966961731487614,
+        "news_score": 0.04837370718336086,
+        "technical_score": -0.053388666822605284
       }
     },
     "ticker:SMH": {
       "fitted": {
-        "analyst_score": -0.2559314016668476,
-        "fundamental_score": -0.395797595071407,
-        "insider_score": -0.8539808691032126,
+        "analyst_score": -0.22204694125119603,
+        "fundamental_score": -0.31177690315920364,
+        "insider_score": -0.7242252562672629,
         "news_score": 0.0,
-        "technical_score": -0.5074799882729546
+        "technical_score": -0.4024924151005668
       },
-      "intercept": -0.4199482966021708,
+      "intercept": -0.4666517966489214,
       "key": "ticker:SMH",
-      "n_effective": 29.33045054807634,
+      "n_effective": 29.09744309164909,
       "n_raw": 37,
-      "own_share": 0.594570903411708,
+      "own_share": 0.5926468113081479,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": -0.05717991976679033,
-        "fundamental_score": -0.22414176476639197,
-        "insider_score": -0.31026850980099113,
-        "news_score": -0.27260592398212635,
-        "technical_score": -0.13580388168370017
+        "analyst_score": -0.06364616477247086,
+        "fundamental_score": -0.22108542610916657,
+        "insider_score": -0.3184401053452535,
+        "news_score": -0.2727636459848625,
+        "technical_score": -0.12406465778824657
       }
     },
     "ticker:SOYB": {
       "fitted": {
         "analyst_score": 0.0,
-        "fundamental_score": -0.18489113204759092,
-        "insider_score": 0.16030170203000957,
+        "fundamental_score": -0.19885625095971013,
+        "insider_score": 0.24552863906685096,
         "news_score": 0.0,
-        "technical_score": -0.4006567565609681
+        "technical_score": -0.4047020642540597
       },
-      "intercept": -0.4842067465207013,
+      "intercept": -0.4894752398122569,
       "key": "ticker:SOYB",
-      "n_effective": 28.760768304162433,
+      "n_effective": 28.532286526957478,
       "n_raw": 36,
-      "own_share": 0.5898341905680614,
+      "own_share": 0.5879031994733874,
       "parent": "kind:commodity fund",
       "weights": {
-        "analyst_score": 0.012986799657045571,
-        "fundamental_score": -0.28187771699896214,
-        "insider_score": 0.33722786508838787,
-        "news_score": 0.049950485168626144,
-        "technical_score": -0.31795713308697837
+        "analyst_score": 0.012527349755530052,
+        "fundamental_score": -0.27739086078702474,
+        "insider_score": 0.38289251027740584,
+        "news_score": 0.048427000722112014,
+        "technical_score": -0.2787622784579273
       }
     },
     "ticker:TEVA": {
       "fitted": {
-        "analyst_score": 0.29037390736854374,
-        "fundamental_score": 0.0704547727408993,
+        "analyst_score": 0.28961799299284086,
+        "fundamental_score": 0.06983029618105853,
         "insider_score": 0.0,
-        "news_score": -0.38112061268585573,
-        "technical_score": -0.13763643447282367
+        "news_score": -0.3789640947662804,
+        "technical_score": -0.13721612733588237
       },
-      "intercept": 0.40747789537311485,
+      "intercept": 0.4070186887317524,
       "key": "ticker:TEVA",
-      "n_effective": 5.742635199315391,
+      "n_effective": 5.697014460595787,
       "n_raw": 7,
-      "own_share": 0.22307876232764673,
+      "own_share": 0.22169946899207607,
       "parent": "kind:equity",
       "weights": {
-        "analyst_score": 0.06794966192695275,
-        "fundamental_score": -0.6069011014355734,
-        "insider_score": -0.02447447950657619,
-        "news_score": -0.25302042375881184,
-        "technical_score": 0.047654333372085925
+        "analyst_score": 0.06543913051248192,
+        "fundamental_score": -0.5984124386566527,
+        "insider_score": -0.026497969225911567,
+        "news_score": -0.2544148656523686,
+        "technical_score": 0.05523559595258529
       }
     },
     "ticker:TIP": {
       "fitted": {
         "analyst_score": 0.0,
-        "fundamental_score": 0.3417066308859377,
-        "insider_score": -0.19792595137070756,
+        "fundamental_score": 0.3394561682410216,
+        "insider_score": -0.19686217809610937,
         "news_score": 0.0,
-        "technical_score": 0.12237505765407451
+        "technical_score": 0.12143120037360992
       },
-      "intercept": -0.344459287325638,
+      "intercept": -0.34395385093357783,
       "key": "ticker:TIP",
-      "n_effective": 18.80993673462546,
+      "n_effective": 18.660506520217112,
       "n_raw": 22,
-      "own_share": 0.48466805970965693,
+      "own_share": 0.48267620369792086,
       "parent": "kind:broad fund",
       "weights": {
-        "analyst_score": -0.13341455884242182,
-        "fundamental_score": 0.2848716888553347,
-        "insider_score": -0.3437579895521883,
-        "news_score": -0.03308444801771186,
-        "technical_score": 0.20487131473234338
+        "analyst_score": -0.13888319303915925,
+        "fundamental_score": 0.2752048696143636,
+        "insider_score": -0.343827789476172,
+        "news_score": -0.03318750472530293,
+        "technical_score": 0.20889664314500228
       }
     },
     "ticker:TLT": {
       "fitted": {
         "analyst_score": 0.0,
-        "fundamental_score": 0.463819191338316,
-        "insider_score": -0.2994674702190141,
+        "fundamental_score": 0.43343191851128954,
+        "insider_score": -0.32541684310216706,
         "news_score": 0.0,
-        "technical_score": 0.24811851502061805
+        "technical_score": 0.1881816266860205
       },
-      "intercept": -0.002871338640091794,
+      "intercept": 0.011903764058030617,
       "key": "ticker:TLT",
-      "n_effective": 20.435372987136002,
+      "n_effective": 20.273029954830047,
       "n_raw": 24,
-      "own_share": 0.5053835658604473,
+      "own_share": 0.5033897369422697,
       "parent": "kind:broad fund",
       "weights": {
-        "analyst_score": -0.12805151048809693,
-        "fundamental_score": 0.26507026704731507,
-        "insider_score": -0.3404984521554669,
-        "news_score": -0.0317545069975215,
-        "technical_score": 0.23462526331159955
+        "analyst_score": -0.13332233993968548,
+        "fundamental_score": 0.2554454975225027,
+        "insider_score": -0.3643558081319105,
+        "news_score": -0.03185868419290442,
+        "technical_score": 0.21501767021299695
       }
     },
     "ticker:TM": {
       "fitted": {
-        "analyst_score": 0.0415192324975227,
-        "fundamental_score": -0.1775043720471842,
+        "analyst_score": 0.04243260453821099,
+        "fundamental_score": -0.17608353740131408,
         "insider_score": 0.0,
-        "news_score": -0.4337271801105375,
-        "technical_score": -0.18522431490691146
+        "news_score": -0.4328064582717897,
+        "technical_score": -0.18475281889564035
       },
-      "intercept": 0.5026388564995665,
+      "intercept": 0.501950721282232,
       "key": "ticker:TM",
-      "n_effective": 22.806245972524493,
+      "n_effective": 22.62506821134412,
       "n_raw": 30,
-      "own_share": 0.5327784638522811,
+      "own_share": 0.5307925397131152,
       "parent": "kind:equity",
       "weights": {
-        "analyst_score": 0.019586922008681243,
-        "fundamental_score": -0.4931628427912702,
-        "insider_score": -0.014290657016708709,
-        "news_score": -0.3921191274120983,
-        "technical_score": -0.08084045077124156
+        "analyst_score": 0.01897971352030456,
+        "fundamental_score": -0.49203959485683,
+        "insider_score": -0.01562838619058967,
+        "news_score": -0.3964799139697237,
+        "technical_score": -0.07687239146255205
       }
     },
     "ticker:TUR": {
       "fitted": {
-        "analyst_score": -0.6024112081876358,
-        "fundamental_score": -0.29781804626082126,
+        "analyst_score": -0.6062613796415206,
+        "fundamental_score": -0.31057076126888983,
         "insider_score": 0.0,
         "news_score": 0.0,
-        "technical_score": 0.4781623890018831
+        "technical_score": 0.4795780662821707
       },
-      "intercept": -0.13638420919597027,
+      "intercept": -0.13904580638903427,
       "key": "ticker:TUR",
-      "n_effective": 29.465114479424688,
+      "n_effective": 29.231037223538866,
       "n_raw": 37,
-      "own_share": 0.595674644434127,
+      "own_share": 0.5937522114517346,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": -0.248043248226172,
-        "fundamental_score": -0.22288198019661326,
-        "insider_score": -0.026452923107998433,
-        "news_score": -0.2555684093959028,
-        "technical_score": 0.24705343907331345
+        "analyst_score": -0.24625572640072033,
+        "fundamental_score": -0.2270385017797728,
+        "insider_score": -0.025161737321928456,
+        "news_score": -0.25285908826534126,
+        "technical_score": 0.24868494623223714
       }
     },
     "ticker:UNG": {
       "fitted": {
         "analyst_score": 0.0,
-        "fundamental_score": 1.1094464529627652,
-        "insider_score": 1.4779323520935275,
+        "fundamental_score": 1.0540023169590267,
+        "insider_score": 1.5207620139136218,
         "news_score": 0.0,
-        "technical_score": -0.687121992856263
+        "technical_score": -0.7035964822219767
       },
-      "intercept": 0.5252277511971296,
+      "intercept": 0.47347657196080856,
       "key": "ticker:UNG",
-      "n_effective": 24.948741233549903,
+      "n_effective": 24.75054302563753,
       "n_raw": 31,
-      "own_share": 0.5550487188043449,
+      "own_share": 0.5530780489402771,
       "parent": "kind:commodity fund",
       "weights": {
-        "analyst_score": 0.019964386150319095,
-        "fundamental_score": 0.05794699907547789,
-        "insider_score": 0.6785437907663798,
-        "news_score": 0.07678803097275962,
-        "technical_score": -0.1667567930350636
+        "analyst_score": 0.019453197971706814,
+        "fundamental_score": 0.040759761436053005,
+        "insider_score": 0.698628895781605,
+        "news_score": 0.07520026586687838,
+        "technical_score": -0.16595787894375671
       }
     },
     "ticker:USO": {
       "fitted": {
         "analyst_score": 0.0,
-        "fundamental_score": 0.2536824809619226,
-        "insider_score": -0.0172236820831054,
-        "news_score": -0.28091828918358575,
-        "technical_score": -0.3544415422920636
+        "fundamental_score": 0.2649081767018743,
+        "insider_score": -0.014957565120240544,
+        "news_score": -0.2786633187350962,
+        "technical_score": -0.3511236018439401
       },
-      "intercept": -0.11962155070953696,
+      "intercept": -0.11873498985575322,
       "key": "ticker:USO",
-      "n_effective": 29.459200408436562,
+      "n_effective": 29.225170135212522,
       "n_raw": 37,
-      "own_share": 0.5956262973351977,
+      "own_share": 0.5937037912705296,
       "parent": "kind:commodity fund",
       "weights": {
-        "analyst_score": 0.02094189152684492,
-        "fundamental_score": 0.05394702469602588,
-        "insider_score": 0.3208586645306873,
-        "news_score": -0.22143942092871913,
-        "technical_score": -0.3828129983177228
+        "analyst_score": 0.020205620872777368,
+        "fundamental_score": 0.06085463480372784,
+        "insider_score": 0.32548766518344385,
+        "news_score": -0.22139444683287007,
+        "technical_score": -0.3720576323071809
       }
     },
     "ticker:UUP": {
       "fitted": {
         "analyst_score": 0.0,
-        "fundamental_score": -0.3390586235453393,
-        "insider_score": 0.05000461393957547,
+        "fundamental_score": -0.33445239726730813,
+        "insider_score": 0.063547247704176,
         "news_score": 0.0,
         "technical_score": 0.0
       },
-      "intercept": 0.7430800759005389,
+      "intercept": 0.7335219232269569,
       "key": "ticker:UUP",
-      "n_effective": 19.029872463998338,
+      "n_effective": 18.878695032485545,
       "n_raw": 22,
-      "own_share": 0.48757198685575365,
+      "own_share": 0.48557944181797336,
       "parent": "kind:broad fund",
       "weights": {
-        "analyst_score": -0.16466423320181867,
-        "fundamental_score": -0.4845740488084669,
-        "insider_score": -0.16764802336305526,
-        "news_score": -0.04083381387316559,
-        "technical_score": 0.14227988075349354
+        "analyst_score": -0.17414748340140035,
+        "fundamental_score": -0.48181582003524287,
+        "insider_score": -0.1522201652584705,
+        "news_score": -0.04161425368909833,
+        "technical_score": 0.15020227761578792
       }
     },
     "ticker:VGK": {
       "fitted": {
-        "analyst_score": -0.6103972878836506,
-        "fundamental_score": -0.3395915812174516,
-        "insider_score": 0.1566709274064281,
+        "analyst_score": -0.6973547933061802,
+        "fundamental_score": -0.3945077832967136,
+        "insider_score": 0.22767555164430636,
         "news_score": 0.0,
-        "technical_score": 0.0859934942160731
+        "technical_score": 0.06770365850254254
       },
-      "intercept": 0.0214022396753773,
+      "intercept": 0.03452676677493037,
       "key": "ticker:VGK",
-      "n_effective": 29.465114479424688,
+      "n_effective": 29.231037223538866,
       "n_raw": 37,
-      "own_share": 0.595674644434127,
+      "own_share": 0.5937522114517346,
       "parent": "kind:broad fund",
       "weights": {
-        "analyst_score": -0.5190326298359178,
-        "fundamental_score": -0.1804497634150521,
-        "insider_score": -0.09856003284172678,
-        "news_score": -0.032897669285007695,
-        "technical_score": 0.16905990462229561
+        "analyst_score": -0.5333487122221843,
+        "fundamental_score": -0.1941544881970324,
+        "insider_score": -0.07735940381438755,
+        "news_score": -0.034107263733765845,
+        "technical_score": 0.16103013203262992
       }
     },
     "ticker:VNQ": {
       "fitted": {
-        "analyst_score": 0.0099742981047635,
-        "fundamental_score": 0.04030208195666348,
-        "insider_score": 0.40697020024535585,
-        "news_score": -0.17824908691991487,
-        "technical_score": 0.6786506971050856
+        "analyst_score": 0.010702780419325661,
+        "fundamental_score": 0.04070405655815186,
+        "insider_score": 0.4048694172718875,
+        "news_score": -0.17691836274260314,
+        "technical_score": 0.6740464187374775
       },
-      "intercept": 0.343119520284845,
+      "intercept": 0.3422714758279131,
       "key": "ticker:VNQ",
-      "n_effective": 26.987887995655708,
+      "n_effective": 26.773490363887184,
       "n_raw": 34,
-      "own_share": 0.5743583963201514,
+      "own_share": 0.5724073648469566,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": 0.03293963144885028,
-        "fundamental_score": -0.07686533813473628,
-        "insider_score": 0.16602504412311056,
-        "news_score": -0.36611823096069884,
-        "technical_score": 0.35805175533260397
+        "analyst_score": 0.031288994862060694,
+        "fundamental_score": -0.07802288925413009,
+        "insider_score": 0.16634111610557092,
+        "news_score": -0.36279968513671784,
+        "technical_score": 0.36154731464152046
       }
     },
     "ticker:VWO": {
       "fitted": {
-        "analyst_score": 0.4661738623105135,
-        "fundamental_score": 1.237408891855288,
-        "insider_score": -0.5675648325125593,
+        "analyst_score": 0.4725591609390651,
+        "fundamental_score": 1.220431503542692,
+        "insider_score": -0.6254504677483949,
         "news_score": 0.0,
-        "technical_score": 0.1664073640032789
+        "technical_score": 0.23819186039459805
       },
-      "intercept": -1.0272203982229535,
+      "intercept": -1.0463080729225658,
       "key": "ticker:VWO",
-      "n_effective": 28.76668237515056,
+      "n_effective": 28.53815361528382,
       "n_raw": 36,
-      "own_share": 0.5898839325147295,
+      "own_share": 0.5879530120053362,
       "parent": "kind:broad fund",
       "weights": {
-        "analyst_score": 0.008427698531354642,
-        "fundamental_score": 0.4152449381252717,
-        "insider_score": -0.3752968394786194,
-        "news_score": -0.033428009911529936,
-        "technical_score": 0.16760251395322437
+        "analyst_score": -0.0024850084514453064,
+        "fundamental_score": 0.3851718919682202,
+        "insider_score": -0.3866725215176392,
+        "news_score": -0.033774700922326886,
+        "technical_score": 0.19189587714036838
       }
     },
     "ticker:WEAT": {
       "fitted": {
         "analyst_score": 0.0,
-        "fundamental_score": 0.2944368332734788,
-        "insider_score": 0.8175034167492243,
+        "fundamental_score": 0.2851635169512488,
+        "insider_score": 0.8135577847395433,
         "news_score": 0.0,
-        "technical_score": -0.30596719585216325
+        "technical_score": -0.2956300458943754
       },
-      "intercept": -0.6252746577647682,
+      "intercept": -0.6318669753897248,
       "key": "ticker:WEAT",
-      "n_effective": 28.586000695205353,
+      "n_effective": 28.35890730976623,
       "n_raw": 36,
-      "own_share": 0.5883587923717772,
+      "own_share": 0.5864257256292278,
       "parent": "kind:commodity fund",
       "weights": {
-        "analyst_score": 0.01724813671124735,
-        "fundamental_score": -0.01849218654998692,
-        "insider_score": 0.7284304246215413,
-        "news_score": 0.06634065510621695,
-        "technical_score": -0.1694885970110075
+        "analyst_score": 0.01657453904085871,
+        "fundamental_score": -0.024479674874954803,
+        "insider_score": 0.7342448153174713,
+        "news_score": 0.06407222834550585,
+        "technical_score": -0.16062874242120923
       }
     },
     "ticker:XBI": {
       "fitted": {
-        "analyst_score": 0.7936176538487854,
-        "fundamental_score": -0.11627198966829985,
-        "insider_score": -0.47175612749106227,
+        "analyst_score": 0.7919990228274156,
+        "fundamental_score": -0.13681701569057406,
+        "insider_score": -0.49440002163682445,
         "news_score": 0.0,
-        "technical_score": -0.0720993088432732
+        "technical_score": -0.08361487266808747
       },
-      "intercept": -0.27685598002934597,
+      "intercept": -0.2858029960618948,
       "key": "ticker:XBI",
-      "n_effective": 28.704082145459925,
+      "n_effective": 28.476050695386228,
       "n_raw": 36,
-      "own_share": 0.5893568029827999,
+      "own_share": 0.5874251364725236,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": 0.3676915648320954,
-        "fundamental_score": -0.13980121286834066,
-        "insider_score": -0.23006339872950451,
-        "news_score": -0.26199558607010526,
-        "technical_score": -0.0004482374999541549
+        "analyst_score": 0.3549605800649636,
+        "fundamental_score": -0.14904345076926412,
+        "insider_score": -0.23227309157319384,
+        "news_score": -0.26222799781560907,
+        "technical_score": 0.0014948797769693642
       }
     },
     "ticker:XHB": {
       "fitted": {
-        "analyst_score": -0.1487416135263145,
-        "fundamental_score": 0.6495034227090764,
-        "insider_score": 0.4283314569313029,
+        "analyst_score": -0.14739778051508257,
+        "fundamental_score": 0.6451404213293154,
+        "insider_score": 0.4272289484711171,
         "news_score": 0.0,
-        "technical_score": 0.33433269354093004
+        "technical_score": 0.33222376783815877
       },
-      "intercept": 0.2124265277824128,
+      "intercept": 0.21192970491394714,
       "key": "ticker:XHB",
-      "n_effective": 25.6516029499461,
+      "n_effective": 25.447821056215837,
       "n_raw": 33,
-      "own_share": 0.5618992826620207,
+      "own_share": 0.5599348981932187,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": -0.03808254219325325,
-        "fundamental_score": 0.2015811222097869,
-        "insider_score": 0.1782471204854139,
-        "news_score": -0.3699136316298752,
-        "technical_score": 0.2121755834816708
+        "analyst_score": -0.03994919459595315,
+        "fundamental_score": 0.1971669857671389,
+        "insider_score": 0.17910810291366958,
+        "news_score": -0.36552319258154076,
+        "technical_score": 0.21825252414169755
       }
     },
     "ticker:XLB": {
       "fitted": {
-        "analyst_score": 0.6891837022840742,
-        "fundamental_score": -0.4582479052615566,
+        "analyst_score": 0.7177228290164973,
+        "fundamental_score": -0.41079706384396514,
         "insider_score": 0.0,
-        "news_score": 0.10557946225529274,
-        "technical_score": -0.05114867998174069
+        "news_score": 0.1091696199864024,
+        "technical_score": -0.07771739332811217
       },
-      "intercept": -0.34895326775754143,
+      "intercept": -0.39435297766137367,
       "key": "ticker:XLB",
-      "n_effective": 18.505345177733982,
+      "n_effective": 18.358334704672743,
       "n_raw": 24,
-      "own_share": 0.48059159299355775,
+      "own_share": 0.478600931088814,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": 0.32255858948564037,
-        "fundamental_score": -0.31191656218767566,
-        "insider_score": -0.03654609778038562,
-        "news_score": -0.3090933320276835,
-        "technical_score": 0.019885418518614795
+        "analyst_score": 0.3359790257901847,
+        "fundamental_score": -0.2987676188577856,
+        "insider_score": -0.035679125397461445,
+        "news_score": -0.3125794126031691,
+        "technical_score": 0.016994817351399124
       }
     },
     "ticker:XLC": {
       "fitted": {
-        "analyst_score": -0.013689701529080448,
-        "fundamental_score": -0.2912060755189096,
-        "insider_score": 0.15016784161281593,
+        "analyst_score": -0.014970053121514849,
+        "fundamental_score": -0.2897409065739311,
+        "insider_score": 0.14928463847174547,
         "news_score": 0.0,
-        "technical_score": 0.2747998168070484
+        "technical_score": 0.2732037830502949
       },
-      "intercept": -0.4250145247618714,
+      "intercept": -0.4245711884703914,
       "key": "ticker:XLC",
-      "n_effective": 17.768966933130375,
+      "n_effective": 17.627806408451693,
       "n_raw": 24,
-      "own_share": 0.470464732715358,
+      "own_share": 0.4684781838489597,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": 0.025225144140048766,
-        "fundamental_score": -0.32387801939160926,
-        "insider_score": 0.0696631883639836,
-        "news_score": -0.34741466348440503,
-        "technical_score": 0.23381898461995335
+        "analyst_score": 0.0218675988203537,
+        "fundamental_score": -0.3240563955719412,
+        "insider_score": 0.07054126620559889,
+        "news_score": -0.34406648744085616,
+        "technical_score": 0.23946825196125004
       }
     },
     "ticker:XLE": {
       "fitted": {
-        "analyst_score": 0.23606287975284546,
-        "fundamental_score": -0.8318534853668734,
+        "analyst_score": 0.23481412463003995,
+        "fundamental_score": -0.8278396730706509,
         "insider_score": 0.0,
         "news_score": 0.0,
-        "technical_score": -0.8654643895706735
+        "technical_score": -0.8614100880098962
       },
-      "intercept": -0.15982294893604235,
+      "intercept": -0.1585715037923399,
       "key": "ticker:XLE",
-      "n_effective": 26.791037055929603,
+      "n_effective": 26.57820325069302,
       "n_raw": 34,
-      "own_share": 0.5725677125708096,
+      "own_share": 0.5706146093193831,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": 0.10179719000034727,
-        "fundamental_score": -0.35575522875547255,
-        "insider_score": -0.028297630340483007,
-        "news_score": -0.27339059453901277,
-        "technical_score": -0.24075935636468437
+        "analyst_score": 0.1007741890334654,
+        "fundamental_score": -0.36051308335584453,
+        "insider_score": -0.02731987829090521,
+        "news_score": -0.2745470007803471,
+        "technical_score": -0.2368458485394378
       }
     },
     "ticker:XLF": {
       "fitted": {
-        "analyst_score": 0.5830840717644095,
-        "fundamental_score": 0.3452701781648037,
+        "analyst_score": 0.581018091639466,
+        "fundamental_score": 0.3435170507724321,
         "insider_score": 0.0,
-        "news_score": -0.4387215936233427,
-        "technical_score": -1.1210296598148517
+        "news_score": -0.43579885937623675,
+        "technical_score": -1.115384734036369
       },
-      "intercept": 0.02230811044222449,
+      "intercept": 0.023434366184869652,
       "key": "ticker:XLF",
-      "n_effective": 29.22729408117211,
+      "n_effective": 28.995106122076752,
       "n_raw": 37,
-      "own_share": 0.5937213212040153,
+      "own_share": 0.5917959652915584,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": 0.21028091960904,
-        "fundamental_score": -0.0016966536642522949,
-        "insider_score": -0.03248979044312119,
-        "news_score": -0.4484165420091257,
-        "technical_score": -0.30711609427446085
+        "analyst_score": 0.210419053544328,
+        "fundamental_score": -0.0038576125508630894,
+        "insider_score": -0.03140448106419387,
+        "news_score": -0.45114813564438255,
+        "technical_score": -0.3031707171962325
       }
     },
     "ticker:XLI": {
       "fitted": {
-        "analyst_score": -0.1956672718915295,
-        "fundamental_score": -0.6024356263082049,
+        "analyst_score": -0.20312653327293437,
+        "fundamental_score": -0.6139079754140561,
         "insider_score": 0.0,
         "news_score": 0.0,
-        "technical_score": -0.9694017330326511
+        "technical_score": -1.0021489713130336
       },
-      "intercept": -0.19145375011403512,
+      "intercept": -0.21360955061840028,
       "key": "ticker:XLI",
-      "n_effective": 30.203650261307548,
+      "n_effective": 29.963705917095382,
       "n_raw": 38,
-      "own_share": 0.601622593259634,
+      "own_share": 0.5997094364219913,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": -0.04750977555399276,
-        "fundamental_score": -0.320450936578275,
-        "insider_score": -0.0276687034179982,
-        "news_score": -0.26731437178852585,
-        "technical_score": -0.33705621266120817
+        "analyst_score": -0.05013456642277515,
+        "fundamental_score": -0.32139483378173994,
+        "insider_score": -0.026613235859678758,
+        "news_score": -0.2674457041328456,
+        "technical_score": -0.33441165980296056
       }
     },
     "ticker:XLK": {
       "fitted": {
-        "analyst_score": 0.7299741087962919,
-        "fundamental_score": 0.09374038951837556,
-        "insider_score": -0.39916857849437315,
-        "news_score": 0.1766176826286542,
-        "technical_score": -0.3888521240290431
+        "analyst_score": 0.5995229808482694,
+        "fundamental_score": -0.11332564533305917,
+        "insider_score": -0.441340392266726,
+        "news_score": 0.16670603530574127,
+        "technical_score": -0.23363758343302193
       },
-      "intercept": -0.9441388707983437,
+      "intercept": -0.8893705044784608,
       "key": "ticker:XLK",
-      "n_effective": 26.63764899008839,
+      "n_effective": 26.42603373289318,
       "n_raw": 33,
-      "own_share": 0.5711619167541984,
+      "own_share": 0.5692072229329843,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": 0.33762529211608217,
-        "fundamental_score": -0.07615240331491985,
-        "insider_score": -0.20097259465298717,
-        "news_score": -0.2625763177295157,
-        "technical_score": -0.12267339218649508
+        "analyst_score": 0.30189219229835523,
+        "fundamental_score": -0.16269386531905808,
+        "insider_score": -0.2318311952733927,
+        "news_score": -0.24155286007064528,
+        "technical_score": -0.062029887038548705
       }
     },
     "ticker:XLP": {
       "fitted": {
-        "analyst_score": 0.7368250692074518,
-        "fundamental_score": 0.9197349262915202,
+        "analyst_score": 0.7340846597306933,
+        "fundamental_score": 0.9154530237811824,
         "insider_score": 0.0,
-        "news_score": -0.07938607153711495,
-        "technical_score": -0.1966937272575471
+        "news_score": -0.07888210934598656,
+        "technical_score": -0.19496133755344802
       },
-      "intercept": 0.20869072516208811,
+      "intercept": 0.21044029948078408,
       "key": "ticker:XLP",
-      "n_effective": 27.683874146196114,
+      "n_effective": 27.463947449595114,
       "n_raw": 35,
-      "own_share": 0.580570992644576,
+      "own_share": 0.5786275462815387,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": 0.32102051271171994,
-        "fundamental_score": 0.24712766109989937,
-        "insider_score": -0.03397381325715299,
-        "news_score": -0.3592687993314279,
-        "technical_score": -0.038609213599799734
+        "analyst_score": 0.3237429658671372,
+        "fundamental_score": 0.24847848963859773,
+        "insider_score": -0.033001083314238254,
+        "news_score": -0.3630744575933564,
+        "technical_score": -0.03170300358667037
       }
     },
     "ticker:XLU": {
       "fitted": {
-        "analyst_score": 0.4033987079746349,
-        "fundamental_score": -0.2885434879179984,
+        "analyst_score": 0.4039925768522073,
+        "fundamental_score": -0.27391337062271176,
         "insider_score": 0.0,
-        "news_score": -0.4210465638618575,
-        "technical_score": -0.7884430153804912
+        "news_score": -0.3936709738267259,
+        "technical_score": -0.7596829947331897
       },
-      "intercept": 0.34552012561030543,
+      "intercept": 0.34815338319535255,
       "key": "ticker:XLU",
-      "n_effective": 25.077582641200703,
+      "n_effective": 24.878360889220026,
       "n_raw": 32,
-      "own_share": 0.5563204850803136,
+      "own_share": 0.5543509253965626,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": 0.1544004330552067,
-        "fundamental_score": -0.1875105466636161,
-        "insider_score": -0.029444659786012548,
-        "news_score": -0.4158395525712297,
-        "technical_score": -0.21280480792393494
+        "analyst_score": 0.1588771302366246,
+        "fundamental_score": -0.1897349612740564,
+        "insider_score": -0.028436679909172282,
+        "news_score": -0.41438577388459585,
+        "technical_score": -0.20856545469555082
       }
     },
     "ticker:XLV": {
       "fitted": {
-        "analyst_score": 0.10988814735255789,
-        "fundamental_score": -0.029424112687310128,
-        "insider_score": -0.5495987432895937,
-        "news_score": -0.1725605106054149,
-        "technical_score": 0.044496780555293984
+        "analyst_score": 0.11050174235280845,
+        "fundamental_score": -0.02939382439174581,
+        "insider_score": -0.5479492865589284,
+        "news_score": -0.17133399210460004,
+        "technical_score": 0.044119633455133804
       },
-      "intercept": 0.3847904549562755,
+      "intercept": 0.3843246464015495,
       "key": "ticker:XLV",
-      "n_effective": 21.463112012170992,
+      "n_effective": 21.292604398291285,
       "n_raw": 28,
-      "own_share": 0.5176435383304262,
+      "own_share": 0.515651766425573,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": 0.09188266738281096,
-        "fundamental_score": -0.11619728026119937,
-        "insider_score": -0.3440432540024216,
-        "news_score": -0.3886148162510774,
-        "technical_score": 0.05926198210249076
+        "analyst_score": 0.09015854526957136,
+        "fundamental_score": -0.11772868481615685,
+        "insider_score": -0.3414355448914424,
+        "news_score": -0.38558363661651474,
+        "technical_score": 0.06509358840631466
       }
     },
     "ticker:XLY": {
       "fitted": {
-        "analyst_score": 0.2177329047116839,
-        "fundamental_score": 0.35056189606188776,
-        "insider_score": 0.26377890493302814,
+        "analyst_score": 0.20112838250141127,
+        "fundamental_score": 0.3928481458605704,
+        "insider_score": 0.363804327755272,
         "news_score": 0.0,
-        "technical_score": 0.4230718207594552
+        "technical_score": 0.42780019585831053
       },
-      "intercept": 0.38572994285246126,
+      "intercept": 0.3685324405846598,
       "key": "ticker:XLY",
-      "n_effective": 23.931611629309465,
+      "n_effective": 23.741493719432487,
       "n_raw": 29,
-      "own_share": 0.5447469542260822,
+      "own_share": 0.5427682436204768,
       "parent": "kind:focused fund",
       "weights": {
-        "analyst_score": 0.16137867830459562,
-        "fundamental_score": 0.07720559218609681,
-        "insider_score": 0.11399630815354389,
-        "news_score": -0.36219444367480663,
-        "technical_score": 0.28522497768095706
+        "analyst_score": 0.13814912757980316,
+        "fundamental_score": 0.07756976156888351,
+        "insider_score": 0.15288302885571387,
+        "news_score": -0.3596605111699099,
+        "technical_score": 0.2717375708256896
       }
     },
     "ticker:XOM": {
       "fitted": {
-        "analyst_score": 0.3025446248002944,
-        "fundamental_score": -0.08779902868474028,
-        "insider_score": 0.19428529628210645,
-        "news_score": -0.4394085861138453,
-        "technical_score": -0.02142067191325049
+        "analyst_score": 0.3068121328028662,
+        "fundamental_score": -0.08910969665129853,
+        "insider_score": 0.16202493522703137,
+        "news_score": -0.4839664295893884,
+        "technical_score": -0.007394721036510762
       },
-      "intercept": -0.34006189824510097,
+      "intercept": -0.33168625997168255,
       "key": "ticker:XOM",
-      "n_effective": 8.083852106983247,
+      "n_effective": 8.019632233698491,
       "n_raw": 9,
-      "own_share": 0.2878469832481827,
+      "own_share": 0.28621475709640065,
       "parent": "kind:equity",
       "weights": {
-        "analyst_score": 0.07553442046973745,
-        "fundamental_score": -0.5656301266965836,
-        "insider_score": 0.03697456907341631,
-        "news_score": -0.2525965469745376,
-        "technical_score": 0.06926433678572502
+        "analyst_score": 0.07380820943267037,
+        "fundamental_score": -0.5559844321468582,
+        "insider_score": 0.025207466276296976,
+        "news_score": -0.26539764379678593,
+        "technical_score": 0.07960224834738858
       }
     }
   },

@@ -1,8 +1,8 @@
-🔴 8 of 80 ticker(s) were judged without news
-Equity $99,354 · 15 positions · $59,416 gross · $2,689 at risk · unrealised +$1,099
-6 directional calls, none traded
+🔴 11 of 80 ticker(s) produced no signal
+Equity $100,079 · 12 positions · $43,236 gross · $2,520 at risk · unrealised +$1,689
+3 directional calls, none traded
 Started by supabase-cron at 14:40 UTC (0 min after 14:40)
-Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-11-18
-Closed: NVO, EPOL, XLV, TEVA, RY, ITA
-Also: 1 of 80 ticker(s) produced no signal; 18 of 80 ticker(s) took their news from Bing's feed
-Cycle 80 tickers, $0.15 · 2026-11-19
+Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-11-19
+Closed: GOOGL, KRE, XLC, NVO, EPOL, XLV
+Also: 1 of 80 ticker(s) were judged without news
+Cycle 80 tickers, $0.14 · 2026-11-20
