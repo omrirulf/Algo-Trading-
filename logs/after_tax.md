@@ -1,14 +1,14 @@
 # After Israeli tax and in shekels
 
-Record through 2026-11-18, written 2026-11-19T03:55:46.256286+00:00. Rules: pre-registration section 5c, every number in `config/israel_tax.py` (tax 25%; losses also against dividends: on; W-8BEN: yes; surtax: off).
+Record through 2026-11-19, written 2026-11-20T03:49:14.241658+00:00. Rules: pre-registration section 5c, every number in `config/israel_tax.py` (tax 25%; losses also against dividends: on; W-8BEN: yes; surtax: off).
 
-Rates: the Bank of Israel's representative rate, 2026-09-10 to 2026-11-18; 47 day(s) from the Bank of Israel, 3 day(s) from another source: 2026-09-11 (ecb), 2026-09-21 (ecb), 2026-10-27 (ecb). Table SHA-256 `c803906b552724e1e4301b5ae56d594d4176a74758a40cd382627a04caf37efc`.
+Rates: the Bank of Israel's representative rate, 2026-09-10 to 2026-11-19; 48 day(s) from the Bank of Israel, 3 day(s) from another source: 2026-09-11 (ecb), 2026-09-21 (ecb), 2026-10-27 (ecb). Table SHA-256 `f4c2e2841b1bb80de5063f74ad83205571045c4f08bd833ad7213e67dca2f974`.
 
 Returns since each book's start. "Tax paid so far" is the tax due on everything sold or received so far; "if sold today" adds every open position sold at the close. "From the $/₪ move" is the shekel return minus the dollar return, before tax and after tax (if sold today).
 
 | | Before tax ($) | After tax, if sold today ($) | After tax, tax paid so far ($) | Before tax (₪) | After tax, if sold today (₪) | After tax, tax paid so far (₪) | From the $/₪ move, before tax | From the $/₪ move, after tax | Tax paid so far (₪) | Tax if sold today (₪) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Paper account (real) | $99,589 (−0.41%) | $99,432 (−0.57%) | $99,589 (−0.41%) | ₪323,265 (+6.94%) | ₪322,755 (+6.77%) | ₪323,265 (+6.94%) | +7.35 points | +7.33 points | ₪0 | ₪510 |
+| Paper account (real) | $99,516 (−0.48%) | $99,327 (−0.67%) | $99,516 (−0.48%) | ₪324,521 (+7.35%) | ₪323,905 (+7.15%) | ₪324,521 (+7.35%) | +7.83 points | +7.82 points | ₪0 | ₪617 |
 
 The funds are shown after tax once calibration has passed, like every fund result.
 
