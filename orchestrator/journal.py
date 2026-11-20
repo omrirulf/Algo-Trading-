@@ -289,6 +289,7 @@ def record(
     held: bool = False,
     stage: Optional[str] = None,
     live: Optional[dict[str, Any]] = None,
+    fallback: Optional[dict[str, Any]] = None,
 ) -> None:
     """Write one journal line. Swallows its own failures by design.
 
@@ -299,6 +300,12 @@ def record(
     ``live`` is the price read when the line's signal was made, for the one
     caller that reads it before dispatching (``heartbeat.judge_answer``).
     Every other line inside a cycle is priced here, as it is written.
+
+    ``fallback`` is who answered when it was not the configured host
+    (``heartbeat.fallback_record``: the second host and the first host's
+    final error), written as ``model_fallback``; None -- every answer the
+    configured host gave -- writes nothing, so such a line keeps exactly
+    the keys it had.
     """
     try:
         now = datetime.now(timezone.utc)
@@ -362,6 +369,10 @@ def record(
                 "screening": bool(llm.SCREENING_ENABLED),
                 "reasoning_effort": llm.configured_effort(),
                 "stage": stage,
+                # The second host that answered this line and why the first
+                # did not (the owner's fallback of 17 Nov 2026), only on a
+                # line it answered: absent, never null, on every other.
+                **({"model_fallback": dict(fallback)} if fallback else {}),
                 # The price of the name when this line's signal was made, and
                 # whether the cycle's position-management pass found the
                 # market shut (the owner's request of 25 Sep 2026), and who

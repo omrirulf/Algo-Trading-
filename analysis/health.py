@@ -94,6 +94,12 @@ NEWS_GAP_PREFIX = "news unavailable"
 #: fallback covers most of their cost.
 NEWS_NOTE_KEY = "news_note"
 
+#: The journal key a line carries when the second host answered it
+#: (``orchestrator.journal.record``, ``fallback``): ``{"host", "after"}``,
+#: the host and the configured host's final error. Absent on every line the
+#: configured host answered.
+MODEL_FALLBACK_KEY = "model_fallback"
+
 #: Position-management actions that leave a position without a working stop.
 #: ``unmanaged`` is history (the manager stopped writing it on 17 Sep 2026);
 #: ``error`` is a position the manager could not read or could not protect;
@@ -395,6 +401,40 @@ def news_fallbacks(today: list[dict]) -> Optional[Alarm]:
         f"{', '.join(tickers[:12])}{' …' if len(tickers) > 12 else ''}. "
         f"Google's answer was unusable for each; they were judged on the feed's headlines that name them. "
         f"First note: {noted[tickers[0]][:200]}",
+    )
+
+
+def model_fallbacks(today: list[dict]) -> Optional[Alarm]:
+    """Names the second host answered: the configured host's failures, now that they no longer cost a name its signal.
+
+    The owner's fallback of 17 Nov 2026. A warning, never critical, at the
+    same tenth of the day's names as ``news_fallbacks``: these names were
+    judged by the same model with the same prompt, so the cycle is whole;
+    what the share says is that the configured host was failing at a rate
+    the fallback was covering, which the owner should know the same day.
+    Below that share nothing is said here; every such line carries its
+    record in the journal (``MODEL_FALLBACK_KEY``).
+    """
+    answered: dict[str, dict] = {}
+    for line in today:
+        record = line.get(MODEL_FALLBACK_KEY)
+        if isinstance(record, dict):
+            answered[str(line.get("ticker"))] = record
+    if not answered:
+        return None
+    tickers = sorted(answered)
+    seen = {str(line.get("ticker")) for line in today}
+    if len(tickers) / max(len(seen), 1) < FAILED_SHARE_CRITICAL:
+        return None
+    hosts = sorted({str(r.get("host")) for r in answered.values() if r.get("host")})
+    first = str(answered[tickers[0]].get("after") or "no error text")
+    return Alarm(
+        WARNING,
+        f"{len(tickers)} of {len(seen)} ticker(s) were answered by the fallback host"
+        + (f" {hosts[0]}" if len(hosts) == 1 else ""),
+        f"{', '.join(tickers[:12])}{' …' if len(tickers) > 12 else ''}. "
+        f"The configured host could not answer for each (busy, a server error or unreachable on every retry); "
+        f"the same model answered from the second host. First error: {first[:200]}",
     )
 
 
@@ -819,6 +859,7 @@ def check(journal: Path, audit: Path, day: date, funds: Optional[Path] = None,
         cftc_gaps(today),
         news_gaps(today),
         news_fallbacks(today),
+        model_fallbacks(today),
         duplicate_cycle(today),
         # The model's answers against its own last four weeks: said on the
         # first cycle day of the week after the one that drifted, only.

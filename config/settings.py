@@ -427,12 +427,20 @@ FULL_MODEL_MAX_CONCURRENCY: Final[int] = 4
 #: forbade. A ceiling that assumes every call runs to its deadline is
 #: describing a cycle that is already broken.
 #:
-#: Ninety minutes is nearly three times the measured stage and still leaves
-#: 48 of heartbeat.yml's 180 for the ~42 minutes of context gathering that
-#: precede it and the ladder, journal and report that follow. A ticker not
-#: started by the deadline fails the model stage like any other, which the
-#: rest of the cycle already knows how to record.
-FULL_MODEL_STAGE_BUDGET_SECONDS: Final[float] = 90 * 60
+#: Ninety minutes until 20 Nov 2026: nearly three times the measured stage,
+#: leaving 48 of heartbeat.yml's 180 for the ~42 minutes of context
+#: gathering that precede it and the ladder, journal and report that
+#: follow. A ticker not started by the deadline fails the model stage like
+#: any other, which the rest of the cycle already knows how to record.
+#:
+#: 120 minutes since 20 Nov 2026 (the owner's "build"): the second host for
+#: the model (orchestrator/llm.py, FALLBACK_MODEL_BASE_URL) accepts about
+#: one answer a minute on its free tier, and its lane asks one name at a
+#: time, so a day on which every name falls to it needs about 80 minutes
+#: there on top of the first host's own failing. Still 18 minutes inside
+#: the 180 with the ~42 of gathering, and signals out by about 17:20 UTC on
+#: that worst day, well before the close.
+FULL_MODEL_STAGE_BUDGET_SECONDS: Final[float] = 120 * 60
 
 #: Wilder ATR lookback, in trading days.
 ATR_PERIOD: Final[int] = 14
@@ -714,6 +722,18 @@ class Settings(BaseSettings):
             "while MODEL_BASE_URL is set is refused at startup rather than "
             "sent as an anonymous request -- an endpoint that answers 401 "
             "once per ticker would lose a whole session quietly"
+        ),
+    )
+    full_model_fallback_api_key: str = Field(
+        default="",
+        description=(
+            "Bearer token for the second host orchestrator/llm.py's "
+            "FALLBACK_MODEL_BASE_URL names, which is asked the same question "
+            "only when the first host could not answer at all (a busy or "
+            "server-error status on every retry, or no connection). The "
+            "owner's switch for the fallback (17 Nov 2026): blank, the "
+            "fallback is not built and the cycle is exactly as it was; set, "
+            "it is. Only the token lives here, for the same reason as above"
         ),
     )
     brightdata_api_token: str = Field(default="", description="Bright Data API token (orchestrator only)")

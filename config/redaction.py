@@ -47,6 +47,7 @@ CREDENTIAL_SHAPES: tuple[tuple[str, re.Pattern[str]], ...] = (
     # five of them in the journal's first month alone.
     ("api key", re.compile(r"\bsk-(?:[a-z0-9]{1,8}-){0,2}[A-Za-z0-9_]{20,}")),
     ("groq key", re.compile(r"\bgsk_[A-Za-z0-9]{20,}")),
+    ("cerebras key", re.compile(r"\bcsk-[A-Za-z0-9]{20,}")),
     ("google key", re.compile(r"\bAIza[0-9A-Za-z_-]{30,}")),
     ("aws key id", re.compile(r"\bAKIA[0-9A-Z]{16}\b")),
     ("slack token", re.compile(r"\bxox[abprs]-[A-Za-z0-9-]{10,}")),

@@ -139,6 +139,72 @@ the fake servers in the test suite and a provider without streaming need
 nothing else. The flags are part of the request body, so they are in the
 call record and in the body the voting arm rebuilds.
 
+### A second host for the same model, when the first cannot answer
+
+Prepared on 17 November 2026 at the owner's "yes, prepare", the day
+DeepInfra answered every one of the cycle's 60 asks with HTTP 503 inside
+six seconds and the day made no signal (on 16 November it had lost 8 of
+80 names to busy spells and the ceiling). `FallbackSignalProvider` wraps
+the configured host's provider with a second `OpenAICompatibleProvider`
+for the same weights at `FALLBACK_MODEL_BASE_URL` (Cerebras since 19 Nov
+2026, `FALLBACK_MODEL` being the host's own name for the model,
+`gpt-oss-120b`; Groq was the first choice until it closed its developer
+tier to upgrades on 18 Nov and its free tier proved too small for one of our
+questions). Constants, like `MODEL_BASE_URL`,
+for the same reason: a host that answers the question deciding what is
+traded shows up in a diff.
+
+The second host is asked when, and only when, the first could not answer
+at all: `ProviderUnavailable`, raised by `_post_recorded` when its asks
+are spent on 429s and 5xxs or on a host it cannot reach — after the
+primary's own retries, so a busy spell is still waited out first. Nothing
+else is handed on. A 400, 401 or 404 is our request or our key, which the
+second host would refuse the same way; an off-schema answer, an invalid
+value or an answer about another ticker is the model's, and the second
+host serves the same model, so the cycle rejects and journals it exactly
+as before. The second host is asked the same question with the same
+schema, the same reasoning effort, the same streaming, the same `check`,
+its own retries and re-asks, and the same 480-second ceiling. Both hosts
+failing is one `LLMError` naming both, the first host's first, so
+`analysis.call_errors` reads the first host's status and trigger (c)
+counts the day as it would have without a second host.
+
+An answer from the second host carries `Completion.fallback_after` — the
+first host's final error — and the journal line it makes carries
+`model_fallback` (`{"host", "after"}`; see [the journal](/orchestrator/journal)).
+`analysis.health.model_fallbacks` warns the owner the same day when a
+tenth of the day's names were answered that way: the cycle is whole, but
+the configured host was failing at a rate the fallback was covering.
+Every cycle line's `model_setup` names the second host under `fallback`
+while it is switched on, `null` while it is not. The cost on such a line
+is priced at the model's row of the price table, which is the first
+host's price; the second host's is close but not the same.
+
+**Its pace.** The second host is asked one name at a time (`_SECOND_HOST_LANE`,
+the owner's "build" of 20 Nov 2026): names that need it queue up and ask in
+turn, and a busy answer there is waited out, as long as the host asks and
+up to eight asks per name (`FALLBACK_HTTP_ATTEMPTS`), where the first host
+keeps its four. On a free tier that accepts about one answer a minute (the
+check of 20 Nov: four questions at once came back after 1.6, 62, 123 and
+183 seconds), a day on which every name falls to the second host is a
+slower stage, about 80 minutes there, not lost names; the stage budget is
+120 minutes for it (`FULL_MODEL_STAGE_BUDGET_SECONDS`, 90 until then),
+still inside the job's 180 with the context gathering before it.
+
+**The switch.** Nothing is built until the secret `FULL_MODEL_FALLBACK_API_KEY`
+is set (`full_model_fallback_api_key`, read by `heartbeat.fallback_model_provider`):
+blank, `full_model_provider` returns the plain provider and the cycle is
+exactly as it was. The one ask to make by hand after adding the secret,
+and before relying on it, is the model-fallback-check workflow
+(`replay/model_fallback_check.py`): it asks the second host an archived
+production question through production's own call path and prints the
+seconds, whether the answer parsed as a signal for the name, the token
+counts and the request's parameters. The cycle and the weekly reading
+receive the key; the shadow universe, the vote and the thesis check do
+not, so those arms keep asking the configured host only. Switching it on
+is logged in the pre-registration's Amendments table on the day it
+happens.
+
 ## Two stages: a cheap screen, then the full model
 
 The request above is the *second* call a ticker can get. Before it, the same

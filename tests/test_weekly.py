@@ -145,8 +145,12 @@ def test_the_weekly_report_holds_the_model_key_and_nothing_else():
     assert names.index("Make the weekly report") > names.index("Push the day to the owner's phone")
     assert step["id"] == "weekly" and step["continue-on-error"] is True
     assert "steps.guard.outputs.skip != 'yes'" in step["if"] and "inputs.mode != 'protect'" in step["if"]
-    assert set(step["env"]) == {"FULL_MODEL_API_KEY", "REPORTS_URL"}   # the model reading is back (29 Sep 2026)
+    # The model reading is back (29 Sep 2026); the second host's key rides
+    # with the first's since 17 Nov 2026, so the reading falls back as the
+    # cycle does.
+    assert set(step["env"]) == {"FULL_MODEL_API_KEY", "FULL_MODEL_FALLBACK_API_KEY", "REPORTS_URL"}
     assert step["env"]["FULL_MODEL_API_KEY"] == steps["Run one cycle"]["env"]["FULL_MODEL_API_KEY"]
+    assert step["env"]["FULL_MODEL_FALLBACK_API_KEY"] == steps["Run one cycle"]["env"]["FULL_MODEL_FALLBACK_API_KEY"]
     run = step["run"]
     assert "python -m orchestrator.heartbeat --weekly-digest" in run
     assert 'if [ -f "logs/weekly/$week.md" ]' in run                              # once a week

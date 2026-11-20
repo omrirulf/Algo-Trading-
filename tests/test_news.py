@@ -111,7 +111,8 @@ def test_provider_posts_expected_request_and_returns_headlines():
 
 
 @pytest.mark.parametrize("status", [401, 403, 429, 500])
-def test_provider_raises_on_http_error(status):
+def test_provider_raises_on_http_error(status, monkeypatch):
+    monkeypatch.setattr(news.time, "sleep", lambda s: None)          # a 500 is asked again since 17 Nov 2026
     handler = lambda request: httpx.Response(status, text="denied")  # noqa: E731
     with httpx.Client(transport=httpx.MockTransport(handler)) as client:
         provider = news.BrightDataNewsProvider("tok", "zone", client=client)
@@ -179,12 +180,13 @@ def test_a_second_block_page_is_the_real_answer(monkeypatch):
         provider = news.BrightDataNewsProvider("tok", "zone", client=client)
         with pytest.raises(news.NewsFetchError) as exc:
             provider.fetch("TM")
-    # Google twice; then the feed's two routes (5 Nov 2026), refused the same way.
-    assert len(calls) == 4 and "JSON" in str(exc.value) and "Bing's feed also failed" in str(exc.value)
+    # Google four times (17 Nov 2026; twice before); then the feed's two routes (5 Nov 2026), refused the same way.
+    assert len(calls) == 6 and "JSON" in str(exc.value) and "Bing's feed also failed" in str(exc.value)
 
 
-def test_an_http_error_is_never_retried(monkeypatch):
-    monkeypatch.setattr(news.time, "sleep", lambda s: pytest.fail("slept on an HTTP error"))
+def test_a_client_error_is_never_retried(monkeypatch):
+    """A 4xx says the request or the account is wrong; a fourth answer would be the first (a 5xx is retried since 17 Nov 2026)."""
+    monkeypatch.setattr(news.time, "sleep", lambda s: pytest.fail("slept on a 4xx"))
     calls = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -635,15 +637,17 @@ def test_a_second_empty_two_hundred_carries_bright_datas_own_headers(monkeypatch
             with pytest.raises(news.NewsFetchError) as caught:
                 provider.fetch("KSA")
     message = str(caught.value)
-    assert len(calls) == 4                       # Google twice, then the feed's two routes
+    assert len(calls) == 6                       # Google four times (17 Nov 2026), then the feed's two routes
     assert message.startswith("Bright Data returned an empty body with its 200; nothing to parse")
     assert "(Bright Data said: x-brd-status-code 502; x-brd-err-msg upstream timed out)" in message
+    assert message.split(" (Bing's feed")[0].count("Bright Data said") == 1   # Google's part says it once, for the last answer
     assert "content-type" not in message                  # only Bright Data's own headers
     assert "tok" not in message and "Bearer" not in message
     warning = [r.getMessage() for r in caplog.records if "parser refused" in r.getMessage()]
-    assert len(warning) == 1
+    assert len(warning) == 3
     assert "[x-brd-status-code 502; x-brd-err-msg upstream timed out]" in warning[0]
-    assert "retrying once after 10 s" in warning[0]
+    assert "asking again after 10 s (retry 1 of 3)" in warning[0]
+    assert "(retry 3 of 3)" in warning[2]
 
 
 def test_a_second_empty_two_hundred_without_headers_reads_as_before(monkeypatch):
@@ -663,6 +667,112 @@ def test_brd_headers_reads_only_the_vendors_headers():
     assert news.brd_headers(response) == "x-brd-status-code 429; x-brd-error auto-throttled"
     assert news.brd_headers(httpx.Response(200, text="")) == ""
     assert news.brd_headers(object()) == ""
+
+
+# --------------------------------------------------------------------------- #
+# The owner's decision of 17 Nov 2026: "Keep Google, add the retry. Add even
+# 3 retries" -- four asks of an unusable answer, within a budget of pauses
+# --------------------------------------------------------------------------- #
+
+
+def _answers(*responses):
+    """A transport that answers Google's requests from a script and the feed with the Teva RSS."""
+    script = list(responses)
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url.host)
+        if request.url.host != "api.brightdata.com":
+            return httpx.Response(200, text=RSS)
+        body = json.loads(request.content)
+        if "bing.com" in body["url"]:
+            return httpx.Response(200, text=RSS, headers={"x-brd-status-code": "200"})
+        if not script:
+            raise AssertionError("Google asked more times than the script allows")
+        return script.pop(0)
+    return handler, calls
+
+
+def test_a_refused_answer_is_asked_up_to_three_more_times_and_the_first_good_one_ends_it(monkeypatch):
+    news.reset_retry_waits()
+    slept = []
+    monkeypatch.setattr(news.time, "sleep", lambda s: slept.append(s))
+    handler, calls = _answers(httpx.Response(200, text="", headers=REFUSED), httpx.Response(200, text="", headers=REFUSED),
+                              httpx.Response(200, text=json.dumps(PARSED_NEWS)))
+    answer = provider_with(handler).fetch_answer("AAPL")
+    assert len(answer.headlines) == 2 and answer.fallback == ""           # Google's own answer, on the third ask
+    assert calls == ["api.brightdata.com"] * 3 and slept == [10.0, 10.0]
+    assert news.UNUSABLE_RETRIES == 3
+    assert news.retry_waits_spent() == 20.0
+
+
+def test_four_refusals_are_the_real_answer_and_then_the_feed(monkeypatch):
+    news.reset_retry_waits()
+    slept = []
+    monkeypatch.setattr(news.time, "sleep", lambda s: slept.append(s))
+    handler, calls = _answers(*[httpx.Response(200, text="", headers=REFUSED) for _ in range(4)])
+    answer = provider_with(handler).fetch_answer("TEVA")
+    assert answer.fallback.startswith("news from Bing's feed (direct) after Google: Bright Data returned an empty body")
+    assert calls == ["api.brightdata.com"] * 4 + ["www.bing.com"] and slept == [10.0, 10.0, 10.0]
+
+
+def test_bright_datas_own_minimum_wait_sets_the_pause_up_to_a_minute(monkeypatch):
+    """10 Nov 2026, XLY's retry: x-brd-status-code 429, "try again later, after a minimum of 15 seconds"."""
+    news.reset_retry_waits()
+    slept = []
+    monkeypatch.setattr(news.time, "sleep", lambda s: slept.append(s))
+    told = {"x-brd-status-code": "429", "x-brd-err-msg": "Auto-throttled: try again later, after a minimum of 15 seconds"}
+    long = {"x-brd-status-code": "429", "x-brd-err-msg": "try again later, after a minimum of 600 seconds"}
+    handler, _calls = _answers(httpx.Response(200, text="", headers=told), httpx.Response(200, text="", headers=long),
+                               httpx.Response(200, text="", headers={"Retry-After": "3"}),
+                               httpx.Response(200, text=json.dumps(PARSED_NEWS)))
+    provider_with(handler).fetch_answer("XLY")
+    assert slept == [15.0, news.BRD_WAIT_CAP_SECONDS, 10.0]              # named, capped, and never shorter than the default
+    assert news.retry_pause(httpx.Response(200, text="")) == 10.0
+    assert news.retry_pause(httpx.Response(200, text="", headers={"Retry-After": "soon"})) == 10.0
+
+
+def test_the_cycle_s_retry_waits_are_budgeted_and_a_spent_budget_goes_straight_to_the_feed(monkeypatch, caplog):
+    """A vendor down for good would otherwise add about 48 minutes to a sequential context stage."""
+    news.reset_retry_waits()
+    monkeypatch.setattr(news, "RETRY_WAIT_BUDGET_SECONDS", 25.0)
+    slept = []
+    monkeypatch.setattr(news.time, "sleep", lambda s: slept.append(s))
+    handler, calls = _answers(*[httpx.Response(200, text="", headers=REFUSED) for _ in range(8)])
+    provider = provider_with(handler)
+    with caplog.at_level("WARNING", logger=news.log.name):
+        first = provider.fetch_answer("TEVA")          # two retries (20 s) fit; the third (30 s) would not
+        second = provider.fetch_answer("TEVA")         # the budget is spent: one ask, then the feed
+    assert first.fallback and second.fallback
+    assert calls == ["api.brightdata.com"] * 3 + ["www.bing.com"] + ["api.brightdata.com", "www.bing.com"]
+    assert slept == [10.0, 10.0] and news.retry_waits_spent() == 20.0
+    spent = [r.getMessage() for r in caplog.records if "retry waits are spent" in r.getMessage()]
+    assert len(spent) == 2 and "25 s of retry waits are spent" in spent[0]
+    news.reset_retry_waits()
+    assert news.retry_waits_spent() == 0.0
+
+
+def test_the_budget_is_one_thread_s_and_the_cycle_starts_it_afresh():
+    import inspect
+    import threading
+
+    news.reset_retry_waits()
+    news._take_wait(30.0)
+    seen = []
+    worker = threading.Thread(target=lambda: seen.append(news.retry_waits_spent()))
+    worker.start(); worker.join()
+    assert seen == [0.0] and news.retry_waits_spent() == 30.0
+    assert "reset_retry_waits()" in inspect.getsource(hb.run_batched_cycle)
+    assert news.RETRY_WAIT_BUDGET_SECONDS == 600.0
+    news.reset_retry_waits()
+
+
+def test_the_historical_path_has_the_same_retries_and_no_feed(monkeypatch):
+    news.reset_retry_waits()
+    monkeypatch.setattr(news.time, "sleep", lambda s: None)
+    handler, calls = _answers(httpx.Response(503, text="down"), httpx.Response(200, text=json.dumps(PARSED_NEWS)))
+    lines = provider_with(handler).fetch_on("TEVA", date(2026, 9, 1))
+    assert len(lines) == 2 and calls == ["api.brightdata.com"] * 2
 
 
 # --------------------------------------------------------------------------- #
@@ -822,9 +932,9 @@ def test_a_second_refused_answer_from_google_takes_the_feed_directly_kept_to_the
     assert [h.title for h in answer.headlines] == ["Teva raises its outlook after a strong quarter"]   # the generic one is dropped
     assert answer.fallback.startswith("news from Bing's feed (direct) after Google: Bright Data returned an empty body")
     assert "redirect location was rejected" in answer.fallback and answer.fallback.endswith("1 of 2 headline(s) name TEVA")
-    assert [(m, h) for m, h, _a, _b in record] == [("POST", "api.brightdata.com")] * 2 + [("GET", "www.bing.com")]
-    assert record[2][2] is None and "tok" not in answer.fallback           # no token to Bing, none in the note
-    assert news.requests_sent() == 2                                       # the direct ask is not a Bright Data request
+    assert [(m, h) for m, h, _a, _b in record] == [("POST", "api.brightdata.com")] * 4 + [("GET", "www.bing.com")]
+    assert record[4][2] is None and "tok" not in answer.fallback           # no token to Bing, none in the note
+    assert news.requests_sent() == 4                                       # the direct ask is not a Bright Data request
     assert provider.fetch_items("TEVA")[0].title.startswith("Teva raises")   # the list-only path, the same way
     assert any("TEVA: news from Bing's feed (direct)" in r.getMessage() for r in caplog.records)
 
@@ -837,7 +947,7 @@ def test_the_direct_feed_failing_falls_to_bright_data_with_the_same_zone(monkeyp
     assert answer.fallback.startswith("news from Bing's feed (Bright Data) after Google")
     posts = [b for m, h, _a, b in record if m == "POST" and "bing.com" in b["url"]]
     assert posts == [{"zone": "zone", "url": news.build_bing_news_url("TEVA"), "format": "raw", "country": news.BRD_COUNTRY}]
-    assert record[2][0] == "GET" and record[3][0] == "POST"
+    assert [m for m, *_ in record] == ["POST"] * 4 + ["GET", "POST"]
 
 
 def test_a_direct_transport_error_also_falls_to_bright_data(monkeypatch):
@@ -873,11 +983,13 @@ def test_a_feed_with_no_headline_naming_the_name_is_unavailable_as_before(monkey
         provider_with(feed_transport(record)).fetch_answer("DBA")      # the Teva feed names no DBA
     assert str(caught.value).endswith("(Bing's feed, direct: 2 headline(s), none naming DBA)")
     assert "redirect location was rejected" in str(caught.value)
-    assert [m for m, *_ in record] == ["POST", "POST", "GET"]            # Bright Data's route is not asked for more of the same
+    assert [m for m, *_ in record] == ["POST"] * 4 + ["GET"]             # Bright Data's route is not asked for more of the same
 
 
-def test_an_http_error_from_google_also_takes_the_fallback(monkeypatch):
-    monkeypatch.setattr(news.time, "sleep", lambda s: pytest.fail("slept on an HTTP error"))
+def test_a_server_error_from_google_is_asked_again_and_then_takes_the_fallback(monkeypatch):
+    """17 Nov 2026: a 5xx is asked again like a refused 200 (planned 10 Nov as one more ask); a 4xx is not."""
+    slept = []
+    monkeypatch.setattr(news.time, "sleep", lambda s: slept.append(s))
     record = []
 
     def handler(request):
@@ -887,7 +999,20 @@ def test_an_http_error_from_google_also_takes_the_fallback(monkeypatch):
             return httpx.Response(500, text="upstream")
         return httpx.Response(200, text=RSS)
     answer = provider_with(handler).fetch_answer("TEVA")
-    assert "after Google: Bright Data HTTP 500" in answer.fallback and record == ["POST", "GET"]
+    assert "after Google: Bright Data HTTP 500: upstream" in answer.fallback
+    assert record == ["POST"] * 4 + ["GET"] and slept == [10.0, 10.0, 10.0]
+
+    slept.clear(); record.clear()
+    monkeypatch.setattr(news.time, "sleep", lambda s: pytest.fail("slept on a 4xx"))
+
+    def refuse(request):
+        body = json.loads(request.content) if request.content else None
+        record.append(request.method)
+        if request.url.host == "api.brightdata.com" and "google.com" in body["url"]:
+            return httpx.Response(404, text="gone")
+        return httpx.Response(200, text=RSS)
+    answer = provider_with(refuse).fetch_answer("TEVA")
+    assert "after Google: Bright Data HTTP 404" in answer.fallback and record == ["POST", "GET"]
 
 
 def test_the_historical_path_and_the_universe_query_have_no_fallback(monkeypatch):

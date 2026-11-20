@@ -72,6 +72,22 @@ product. These are the honest gaps.
     independent. On the default three-ticker watchlist nobody notices; on a
     longer one this becomes the slowest part of a cycle.
   </Card>
+  <Card title="A second host for the full model is on; its limits are not yet measured on a bad day" icon="arrows-split-up-and-left">
+    Since 23 Nov 2026 the cycle asks the same model at a second host
+    (Cerebras) when the first (DeepInfra) answers busy or with a server error on
+    every retry, or cannot be reached — built after the day DeepInfra answered
+    all 60 asks with HTTP 503 and nothing was traded, switched on by the
+    owner's secret `FULL_MODEL_FALLBACK_API_KEY` on 20 Nov 2026, checked the
+    same day (4 of 4 archived questions answered as signals). The second
+    host is asked one name at a time with eight asks per name, so its free
+    tier's pace of about one answer a minute makes a bad day slower, not
+    shorter; the stage budget is 120 minutes for it. What is not known yet:
+    what a slow primary still costs that budget (a name that times out
+    twice spends 16 minutes before the second host is asked), and whether
+    the free tier's daily cap holds on a day every name falls to it. The
+    journal's `model_fallback` lines will show both. See
+    [the model](/orchestrator/llm#a-second-host-for-the-same-model-when-the-first-cannot-answer).
+  </Card>
 </CardGroup>
 
 ## If you want to go further

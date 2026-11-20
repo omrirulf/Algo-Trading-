@@ -150,17 +150,29 @@ non-2xx response, a transport error, or a missing token/zone at
 construction time — raises `NewsFetchError`. `heartbeat.py` catches this per
 ticker and logs it; one ticker's bad response never stops the cycle.
 
-Two of those get one more try. A transport error (a timed-out read, a
-dropped connection) is asked again after 2 seconds
-(`RETRY_PAUSE_SECONDS`). A 200 whose body the parser refuses — most often an
-empty body, which Bright Data sends in bursts (60 of 80 first answers on
-15 Oct 2026) — is asked again after 10 seconds (`EMPTY_RETRY_PAUSE_SECONDS`;
-the owner's decision of 16 Oct 2026, up from 2), and when the second answer
-is refused too, the error carries Bright Data's own status headers
-(`x-brd-status-code`, `x-brd-err-msg` and their kin, `BRD_HEADERS`) so the
-journal says what the vendor said: `Bright Data returned an empty body with
-its 200; nothing to parse (Bright Data said: x-brd-status-code 502)`. An HTTP
-error is never retried.
+Some of those are asked again. A transport error (a timed-out read, a
+dropped connection) is asked again once, after 2 seconds
+(`RETRY_PAUSE_SECONDS`). An unusable answer — a 200 whose body the parser
+refuses, most often an empty body that Bright Data sends in bursts (60 of
+80 first answers on 15 Oct 2026), or a 5xx from Bright Data itself — is
+asked again after 10 seconds (`EMPTY_RETRY_PAUSE_SECONDS`; the owner's
+decision of 16 Oct 2026, up from 2), up to three times (`UNUSABLE_RETRIES`,
+four asks in all; the owner's "Keep Google, add the retry. Add even 3
+retries" of 17 Nov 2026, one retry until then). Two probes that evening
+showed the refusals to be mostly random per request: of 80 names, 26 were
+refused in both runs and 28 in one only, so a refused name has about an even
+chance on the next ask. When Bright Data's own headers name a minimum wait
+("try again later, after a minimum of 15 seconds") the pause is that long
+instead, up to 60 seconds (`BRD_WAIT_CAP_SECONDS`). The pauses of one
+cycle's retries may add up to 10 minutes (`RETRY_WAIT_BUDGET_SECONDS`, reset
+by the cycle at its start); past that an unusable answer goes to the Bing
+fallback at once, so a vendor that is down for good cannot add 48 minutes
+to the context stage. When the last answer is unusable too, the error
+carries Bright Data's own status headers (`x-brd-status-code`,
+`x-brd-err-msg` and their kin, `BRD_HEADERS`) so the journal says what the
+vendor said: `Bright Data returned an empty body with its 200; nothing to
+parse (Bright Data said: x-brd-status-code 502)`. A 4xx is never retried:
+the request itself is wrong, or the account is.
 
 <Note>
   Since 21 Sep 2026 a news failure no longer skips the ticker (issue #69):
@@ -189,8 +201,8 @@ given and how it is told to weigh it.
 
 Since 5 Nov 2026 (the owner's decision of 4 Nov, after the probe of the
 same day, `replay/bing_news_probe.py`; Amendments, 2026-11-05) a name whose
-Google answer is unusable after the retries above — a second refused 200,
-an HTTP error, a transport failure after its retry — is asked once more, of
+Google answer is unusable after the retries above — a fourth refused 200 or
+5xx, a 4xx, a transport failure after its retry — is asked once more, of
 Bing News: its RSS feed for the same query (`"<TICKER> stock"`, or `ETF`)
 with Bing's past-24-hours filter (`build_bing_news_url`). The feed is
 fetched directly first (no Bright Data, no token, a fraction of a second,

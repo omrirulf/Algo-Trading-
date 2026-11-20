@@ -41,6 +41,7 @@ MODULES = [
     "replay.signal_sanity",
     "replay.historical",
     "replay.runner",
+    "replay.model_fallback_check",
     "backtest.compare_sleeves",
     "backtest.verify_tickers",
     "analysis.score_journal",

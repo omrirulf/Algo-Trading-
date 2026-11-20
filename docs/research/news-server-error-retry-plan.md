@@ -1,6 +1,13 @@
 # One more ask after a Bright Data server error (5xx): the plan
 
-**Status: planned.** The owner's decision of 10 Nov 2026 ("yes to both", item 5a) to the proposal of 4 Nov
+**Status: built, 17 Nov 2026, wider than planned.** The owner's "Keep Google, add the retry. Add even 3 retries"
+of 17 Nov 2026 built this together with the retries of a refused 200: an unusable answer (a refused 200 or a 5xx)
+is asked again up to three times (`UNUSABLE_RETRIES`), not once, within a per-cycle budget of 10 minutes of
+pauses (`RETRY_WAIT_BUDGET_SECONDS`), which replaces the "one retry, not more" bound of section 2. The rest is
+as planned: the 10-second pause, Bright Data's own minimum wait up to 60 seconds, no retry of a 4xx. See
+`docs/orchestrator/news.mdx` and the Amendments row of 2026-11-17. The text below is the plan as written.
+
+**Status when written: planned.** The owner's decision of 10 Nov 2026 ("yes to both", item 5a) to the proposal of 4 Nov
 2026: retry a failed news request once when Bright Data answers a server error. An operational change to the
 news fetch, logged in the pre-registration's Amendments table as planned; the code changes only after the owner
 says "build". The owner is working on Bright Data's search results in another session: this plan touches only

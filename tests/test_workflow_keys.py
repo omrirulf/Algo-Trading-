@@ -631,6 +631,22 @@ def test_the_cycle_is_handed_the_full_model_s_key():
     assert "full_model_api_key" in Settings.model_fields
 
 
+def test_the_cycle_is_handed_the_second_host_s_key_under_one_name_and_nothing_else_is():
+    """The owner's switch for the fallback (17 Nov 2026) is one secret under
+    one name: a chain of spellings would let a key stored for another
+    provider switch the fallback on by accident. The cycle and the weekly
+    reading receive it; the check workflow asks with it; no other step does,
+    so no other arm falls back without being told to."""
+    cycle = _step("heartbeat.yml", "cycle", "Run one cycle")["env"]
+    assert cycle["FULL_MODEL_FALLBACK_API_KEY"] == "${{ secrets.FULL_MODEL_FALLBACK_API_KEY }}"
+    assert "full_model_fallback_api_key" in Settings.model_fields
+    weekly = _step("heartbeat.yml", "cycle", "Make the weekly report")["env"]
+    assert weekly["FULL_MODEL_FALLBACK_API_KEY"] == cycle["FULL_MODEL_FALLBACK_API_KEY"]
+    holders = {path.name for path in (ROOT / ".github/workflows").glob("*.yml")
+               if "FULL_MODEL_FALLBACK_API_KEY" in path.read_text()}
+    assert holders == {"heartbeat.yml", "model-fallback-check.yml"}
+
+
 def test_the_full_model_key_accepts_the_names_it_may_already_be_stored_under():
     """Same collapsing chain as the screen, for the same reason: a key stored
     under the name it was first pasted in as is otherwise silent. Every name

@@ -168,6 +168,34 @@ alone: `prompt_sha256` is the SHA-256 of the request body as canonical JSON,
 failure, a cycle run outside the heartbeat) has no `model_calls` key at all.
 Nothing that decides anything reads it.
 
+## The line the second host answered
+
+From 17 Nov 2026 the full model has a second host, asked the same
+question only when the configured host could not answer at all — a busy
+or server-error status on every retry, or no connection — and only while
+the owner has switched it on (`FULL_MODEL_FALLBACK_API_KEY`; see
+[the model](/orchestrator/llm#a-second-host-for-the-same-model-when-the-first-cannot-answer)).
+A line the second host answered carries one more key, after `stage`:
+
+```json
+"model_fallback": {
+  "host": "api.cerebras.ai",
+  "after": "https://api.deepinfra.com/v1/openai/chat/completions returned HTTP 503: no healthy upstream (gave up after 4 attempt(s))"
+}
+```
+
+`host` is the second host; `after` is the first host's final error, cut to
+300 characters. The line is otherwise exactly a line the first host would
+have made: the same model, prompt, schema and reasoning level, and
+`usage.model` names the model as that host spells it. Every other line —
+every answer the configured host gave, and every line written while the
+fallback is off — has no `model_fallback` key at all. The cycle's
+`model_setup` names the second host under `fallback` while it is switched
+on (`null` while it is not), whichever host answered the line. Nothing
+that decides anything reads either; `analysis.health.model_fallbacks`
+counts the lines that have the key and warns the owner the same day when
+they are a tenth of the day's names.
+
 ## Why the whole context is stored
 
 The per-dimension scores are only useful next to the data that produced them.

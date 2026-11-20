@@ -59,6 +59,9 @@ from config.settings import get_settings  # noqa: E402
 from orchestrator import blend, context, flows, journal, live_price, llm, model_io  # noqa: E402
 from orchestrator.context import TickerContext  # noqa: E402
 from orchestrator.llm import (  # noqa: E402
+    FALLBACK_HTTP_ATTEMPTS,
+    FALLBACK_MODEL,
+    FALLBACK_MODEL_BASE_URL,
     FULL_MODEL_TIMEOUT_SECONDS,
     MODEL,
     MODEL_BASE_URL,
@@ -69,6 +72,7 @@ from orchestrator.llm import (  # noqa: E402
     BatchRequest,
     BatchTimeout,
     Completion,
+    FallbackSignalProvider,
     LLMError,
     OpenAICompatibleProvider,
     SignalProvider,
@@ -78,7 +82,7 @@ from orchestrator.llm import (  # noqa: E402
 from app.broker_client import BrokerError  # noqa: E402
 from config.market_calendar import is_trading_day  # noqa: E402
 from orchestrator.dispatch import Dispatcher, build_dispatcher  # noqa: E402
-from orchestrator.news import BrightDataNewsProvider, NewsAnswer, NewsFetchError  # noqa: E402
+from orchestrator.news import BrightDataNewsProvider, NewsAnswer, NewsFetchError, reset_retry_waits  # noqa: E402
 
 #: US/Eastern, because the NYSE holiday calendar is defined in that timezone
 #: and a UTC "today" would occasionally name the wrong side of midnight.
@@ -529,11 +533,42 @@ def full_model_provider() -> SignalProvider:
             f"MODEL_BASE_URL is {MODEL_BASE_URL!r} but FULL_MODEL_API_KEY is empty; "
             "the endpoint that decides what is traded would be asked anonymously"
         )
-    return OpenAICompatibleProvider(
+    primary = OpenAICompatibleProvider(
         base_url=MODEL_BASE_URL,
         model=MODEL,
         api_key=settings.full_model_api_key,
         timeout=FULL_MODEL_TIMEOUT_SECONDS,
+    )
+    # The second host, only while its key is set: the owner's switch for
+    # the fallback (17 Nov 2026). Without it the provider is exactly the
+    # one above, and nothing about the cycle changes.
+    fallback = fallback_model_provider()
+    if fallback is None:
+        return primary
+    return FallbackSignalProvider(primary, fallback)
+
+
+def fallback_model_provider() -> OpenAICompatibleProvider | None:
+    """The second host for the same model, or None while its key is blank.
+
+    Built the way the primary is -- the same model-stage ceiling, the same
+    re-asks -- at ``FALLBACK_MODEL_BASE_URL``, for ``FALLBACK_MODEL``, with
+    ``full_model_fallback_api_key`` as its only setting and twice the
+    asks per call (``FALLBACK_HTTP_ATTEMPTS``: a busy free tier is waited
+    out, not given up on). ``full_model_provider`` wraps the primary with it;
+    ``replay/model_fallback_check.py`` asks it one question before the
+    owner relies on it. None too when the full model is Anthropic's: that
+    path has its own fallbacks and no second host.
+    """
+    settings = get_settings()
+    if not MODEL_BASE_URL or not FALLBACK_MODEL_BASE_URL or not settings.full_model_fallback_api_key:
+        return None
+    return OpenAICompatibleProvider(
+        base_url=FALLBACK_MODEL_BASE_URL,
+        model=FALLBACK_MODEL,
+        api_key=settings.full_model_fallback_api_key,
+        timeout=FULL_MODEL_TIMEOUT_SECONDS,
+        attempts=FALLBACK_HTTP_ATTEMPTS,
     )
 
 
@@ -928,10 +963,28 @@ def model_setup() -> dict[str, Any] | None:
             "model": llm.configured_model(),
             "provider": llm.configured_provider(),
             "prompt": prompt_fingerprint(),
+            # The second host, while its key is set (``fallback_model_provider``);
+            # null while the fallback is off. Which host answered a given
+            # line is the line's own ``model_fallback`` record, absent when
+            # the configured host did.
+            "fallback": llm.configured_fallback_provider() if fallback_model_provider() is not None else None,
         }
     except Exception:  # noqa: BLE001 - see the docstring
         log.exception("could not describe the model setup; lines will carry none")
         return None
+
+
+def fallback_record(answer: Any) -> dict[str, Any] | None:
+    """``{"host", "after"}`` when the fallback host answered, else None: the line's ``model_fallback``.
+
+    ``after`` is the configured host's final error, as the answer carries it
+    (``Completion.fallback_after``). Nothing that decides a trade reads it;
+    the daily health check counts the lines that have it.
+    """
+    after = getattr(answer, "fallback_after", None)
+    if not after:
+        return None
+    return {"host": getattr(answer, "host", None), "after": str(after)}
 
 
 #: Which sections of the prompt can feed each score, per instrument kind.
@@ -1242,6 +1295,7 @@ def judge_answer(
         if isinstance(answer, BaseException):
             raise answer
         usage = answer.usage
+        fallback = fallback_record(answer)
         signal = scores_without_a_source(parse_signal(answer.text), ticker_context)
     except LLMError as exc:
         log.error("%s: %s", ticker, exc)
@@ -1267,7 +1321,7 @@ def judge_answer(
 
     if signal.ticker != ticker:
         log.error("%s: LLM answered for %s instead; dropping", ticker, signal.ticker)
-        journal.record(ticker_context, signal, usage=usage, fx=fx, screen=screen, blend=blend_record, error=f"answered for {signal.ticker}")
+        journal.record(ticker_context, signal, usage=usage, fx=fx, screen=screen, blend=blend_record, error=f"answered for {signal.ticker}", fallback=fallback)
         return TickerResult(ticker, MODEL_FAILED, gaps=gaps)
 
     # The name's price at the moment this signal is made: read before the
@@ -1280,18 +1334,18 @@ def judge_answer(
         outcome = post_signal(signal, dispatcher)
     except httpx.HTTPError as exc:
         log.error("%s: webhook unreachable: %s", ticker, exc)
-        journal.record(ticker_context, signal, usage=usage, fx=fx, screen=screen, blend=blend_record, error=f"webhook unreachable: {exc}", live=live)
+        journal.record(ticker_context, signal, usage=usage, fx=fx, screen=screen, blend=blend_record, error=f"webhook unreachable: {exc}", live=live, fallback=fallback)
         return TickerResult(ticker, DISPATCH_FAILED, gaps=gaps)
     except BrokerError as exc:
         # Direct mode only: the engine could not be built or reached at all.
         # Same shape of failure as an unreachable webhook, so it is logged and
         # journalled the same way rather than killing the cycle.
         log.error("%s: engine unavailable: %s", ticker, exc)
-        journal.record(ticker_context, signal, usage=usage, fx=fx, screen=screen, blend=blend_record, error=f"engine unavailable: {exc}", live=live)
+        journal.record(ticker_context, signal, usage=usage, fx=fx, screen=screen, blend=blend_record, error=f"engine unavailable: {exc}", live=live, fallback=fallback)
         return TickerResult(ticker, DISPATCH_FAILED, gaps=gaps)
 
     log.info("%s -> %s %s", ticker, outcome.get("status"), outcome.get("reason", ""))
-    journal.record(ticker_context, signal, outcome=outcome, usage=usage, fx=fx, screen=screen, blend=blend_record, live=live)
+    journal.record(ticker_context, signal, outcome=outcome, usage=usage, fx=fx, screen=screen, blend=blend_record, live=live, fallback=fallback)
     return TickerResult(ticker, COMPLETED, status=outcome.get("status"), gaps=gaps)
 
 
@@ -1596,6 +1650,10 @@ def run_batched_cycle(
     journal.note_cycle(positions, dispatcher)
 
     log.info("batched cycle start: gathering context for %d tickers", len(tickers))
+    # The news fetch's retries may pause for ten minutes in all per cycle
+    # (news.RETRY_WAIT_BUDGET_SECONDS); the budget starts here, so a bad
+    # vendor day bounds the context stage instead of the job cap doing it.
+    reset_retry_waits()
     results: list[TickerResult] = []
     prepared: list[PreparedTicker] = []
     for ticker in tickers:

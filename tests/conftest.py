@@ -46,6 +46,10 @@ def _a_configured_deployment(monkeypatch):
     faked in the tests themselves.
     """
     monkeypatch.setenv("FULL_MODEL_API_KEY", "test-full-model-key")
+    # And not the second host's: the fallback is built only while its key is
+    # set, and the suite's cycles are the plain provider's unless a test
+    # sets the key itself.
+    monkeypatch.delenv("FULL_MODEL_FALLBACK_API_KEY", raising=False)
 
 
 @pytest.fixture(autouse=True)
