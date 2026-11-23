@@ -1,8 +1,8 @@
-🔴 11 of 80 ticker(s) produced no signal
-Equity $100,079 · 12 positions · $43,236 gross · $2,520 at risk · unrealised +$1,689
-3 directional calls, none traded
+🟡 2 warnings: 55 of 80 ticker(s) were answered by the fallback host api.cerebras.ai
+Equity $99,033 · 13 positions · $35,828 gross · $1,803 at risk · unrealised +$803
+Traded: NVDA, RY, NVO
 Started by supabase-cron at 14:40 UTC (0 min after 14:40)
-Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-11-19
-Closed: GOOGL, KRE, XLC, NVO, EPOL, XLV
-Also: 1 of 80 ticker(s) were judged without news
-Cycle 80 tickers, $0.14 · 2026-11-20
+Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-11-20
+Closed: XHB, GOOGL, KRE, XLC, EPOL, XLV
+Also: Model setup changed today: model: gpt-oss-120b, openai/gpt-oss-120b on the same day
+Cycle 80 tickers, $0.04 · 2026-11-23
