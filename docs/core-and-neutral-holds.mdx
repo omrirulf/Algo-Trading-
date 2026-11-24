@@ -1,0 +1,162 @@
+---
+title: "The core and neutral holds"
+description: "Why the account stays invested when the model has no opinion, and what holds the idle money"
+---
+
+The signal book only invests where the model takes a side, and on most days
+it takes a side on few names. On 24 Nov 2026 that left the paper account
+**45% invested** with the other 55% in cash that nobody had chosen to hold:
+
+- over the eight weeks before, the engine refused 2,191 signals as `NEUTRAL`,
+  so the fund sleeve — 70% of the account — sat mostly empty;
+- the single-name sleeve, 25%, was refusing signals for lack of room — 132
+  times in the same weeks.
+
+`MAX_GROSS_EXPOSURE_PCT` was already 95%, and no cap was the reason. The
+reason was that "no opinion" meant "hold cash". Two changes give it a
+different meaning.
+
+## 1. NEUTRAL on a broad fund means "hold the normal weight"
+
+| The model says | On a broad fund | On anything else |
+| --- | --- | --- |
+| `BULLISH` | long, up to the full 12% cap | long, up to its cap |
+| `NEUTRAL` | **long, up to 6%** — half the cap | no trade |
+| `BEARISH` | short, up to the cap | short, up to its cap |
+
+A model with no view on Brazil should hold no Brazil. A model with no view on
+the US stock market or on Treasuries has said nothing against owning them. So
+a `NEUTRAL` on a `BROAD_FUND` opens a long at
+`NEUTRAL_HOLD_FRACTION` (0.5) of that fund's own cap. Focused funds,
+commodity funds and single names keep the old meaning.
+
+A neutral hold is an ordinary entry in every other respect: a bracket with an
+ATR stop, every portfolio limit, the [profit ladder](/position-management)
+afterwards. Four rules keep it the lowest-priority entry in the book:
+
+- **It only opens.** It never adds to or trims a position already held.
+- **It stops at its share of the fund sleeve.** A neutral hold is opened only
+  while the fund sleeve stands below `NEUTRAL_HOLD_SLEEVE_PCT` (50%), so the
+  last 20% of the fund budget is kept for funds the model has a view on.
+- **It is delivered last.** The cycle sets every neutral hold aside and
+  dispatches it after all of the day's directional signals.
+- **It counts the orders already sent.** The broker's position list lags its
+  own fills by a few seconds, so a neutral hold is sized against the list
+  *plus* the orders the engine accepted earlier in the same pass.
+
+The conviction floor does not apply: it asks how sure the model is of a
+direction, and `NEUTRAL` names none. The fraction comes from the ticker's
+kind in `config/instruments.py`, never from the signal.
+
+<Note>
+  0.5 is a starting point, not a measurement. Nothing in the journal can
+  grade it yet, because no neutral hold had ever been opened. Grade it the
+  way `MIN_CONVICTION` is graded: on the realised returns of the holds it
+  produces.
+</Note>
+
+## 2. The core: idle money is held in three funds
+
+Whatever the signal book leaves under the gross cap is invested, once a cycle
+and after the last signal, in three funds no model is asked about:
+
+| Fund | What it is | Bounded by |
+| --- | --- | --- |
+| `VT` | the world stock market — the benchmark the account is measured against | `MAX_EQUITY_RISK_PCT`, at beta 1.00, on top of the signal book's own net stock risk |
+| `BND` | the US bond market | the Duration group's 30% ceiling, on top of the signal book's own duration |
+| `SGOV` | Treasury bills, 0–3 months | the gross cap alone |
+
+The gross room is handed out in that order. `CORE_EQUITY_SHARE` (60%) of it
+is offered to `VT` and cut to the stock-market limit; what remains is offered
+to `BND` and cut to the Duration ceiling; what remains after that is `SGOV`.
+The three always sum to the gross room, and neither limit is exceeded to get
+there. The core fills the limits that bound a loss. It never raises one.
+
+### The core is the residual
+
+Every limit a signal is sized under is computed on the book **without** the
+core. A signal is sized as if the core were cash, so the core can never
+refuse a signal its room. The same pass that buys the core sells it back
+down when the signal book grows — sells first, then buys.
+
+### The core is not a trade
+
+A core fund has no stop and no ladder. It is the default allocation, and a
+stop on a benchmark holding only sells it low to buy it back the next
+morning. That makes it the one exception to "every entry is a bracket with a
+stop", and the exception is kept narrow:
+
+- `submit_core_order` can only **buy**, and only one of the three core funds.
+  It refuses every other ticker inside `app/broker_client.py`, before the
+  order is built.
+- Only `app/core_book.py` calls it.
+- The core funds are not on the watchlist. A shared ticker would merge a
+  stopless holding with a signal position at the broker.
+- The engine refuses a signal that names a core fund.
+- The position manager drops the core funds from its list, so it never
+  places a stop on one or walks one up the ladder.
+
+CI checks the first three from the source.
+
+### The band
+
+A core fund is traded only when it is at least `CORE_REBALANCE_BAND_PCT` (1%)
+of equity from its target, so a day's price moves are not a day's orders.
+Buys are also cut to what the gross cap still allows after the sells, so no
+order placed by the pass takes the account over it.
+
+## How invested the account ends up
+
+The gross cap is 95%. Whole-share rounding and the 1% band on each of three
+funds can leave up to about 3% of that unfilled, so a cycle ends between
+roughly **92% and 95% invested**.
+
+Between cycles it can dip lower. A stop that fills during the session turns
+that position into cash, and the cash is reinvested at the next cycle's core
+pass, not the moment the stop fills.
+
+## The order of a cycle
+
+1. The [position manager](/position-management) walks the signal book.
+2. Directional signals are dispatched as they are judged.
+3. Neutral holds are dispatched, in watchlist order.
+4. The core pass sells, then buys.
+
+For a few seconds between steps 2 and 4 the account can be above the gross
+cap: a signal is bought before the core is sold to make room for it. That
+relies on the paper account being a margin account, which it is.
+
+## Switching either off
+
+Both are `Final` constants in `config/settings.py`, so turning one off is a
+code change that shows up in review:
+
+| Constant | Value | What it does |
+| --- | --- | --- |
+| `NEUTRAL_HOLD_ENABLED` | `True` | `NEUTRAL` on a broad fund opens a long at its normal weight. |
+| `NEUTRAL_HOLD_FRACTION` | `0.5` | The normal weight, as a share of the fund's own cap. |
+| `NEUTRAL_HOLD_SLEEVE_PCT` | `0.50` | Neutral holds stop filling the fund sleeve here. |
+| `CORE_ENABLED` | `True` | Idle money is held in the core funds. |
+| `CORE_EQUITY_SHARE` | `0.60` | Share of idle money offered to `VT` before the limits apply. |
+| `CORE_REBALANCE_BAND_PCT` | `0.01` | The core's no-trade band, as a share of equity. |
+
+With `CORE_ENABLED` off the pass does nothing — it does **not** sell what the
+core already holds. Sell those three positions by hand if you want the cash
+back.
+
+## What does not model this yet
+
+The simulated books in `shadow/` and `history/` build the engine with both
+switches off, so they behave exactly as before. That keeps every registered
+comparison unchanged, and it means the calibration copy no longer mirrors the
+live account: it holds no core and opens no neutral holds. Expect it to
+report those as differences until it is taught about them.
+
+## Running the core pass by hand
+
+```bash
+python -m app.core_book          # one pass, human-readable
+python -m app.core_book --json   # the same, as the cycle records it
+```
+
+It needs the market open, like every order here.

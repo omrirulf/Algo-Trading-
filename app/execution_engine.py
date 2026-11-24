@@ -1,5 +1,11 @@
 """Orchestrates: validate -> size -> stop -> submit.
 
+Two things widen that for the live account, and each is switched on by the
+caller rather than assumed (see ``ExecutionEngine.__init__``): a NEUTRAL on a
+broad fund is an entry at the fund's normal weight, and the core funds that
+hold the account's idle money (``app.core_book``) are invisible to every limit
+here, so a signal is sized as if they were not in the book.
+
 The engine takes a broker and a market-data provider by constructor injection
 so the full decision path is testable with fakes. It never reads the LLM's
 rationale for anything other than logging: the LLM's opinion is an *input*
@@ -9,6 +15,7 @@ to the risk engine, never an instruction to it.
 from __future__ import annotations
 
 import logging
+import time
 from typing import Optional
 
 from app import risk_engine
@@ -17,19 +24,44 @@ from app.logger import log_execution
 from app.market_data import MarketDataError, MarketDataProvider
 from app.schemas import Bias, ExecutionResult, ExecutionStatus, LLMSignal
 from config import settings as cfg
+from config.instruments import is_core
 
 log = logging.getLogger(__name__)
 
 _SIDE_FOR_BIAS = {Bias.BULLISH: "buy", Bias.BEARISH: "sell"}
+
+#: How long an accepted order is remembered as "may not be in the broker's
+#: position list yet". Orders fill within seconds; a quarter of an hour covers
+#: the longest dispatch pass with room to spare, and bounds how long an order
+#: the broker later refused can stand in for a position that never opened.
+_RECENT_ORDER_SECONDS = 15 * 60
 
 
 class ExecutionEngine:
     def __init__(
         self, broker: BrokerClient, market_data: MarketDataProvider,
         audit_logger: Optional[logging.Logger] = None,
+        neutral_holds: bool = False,
+        core: bool = False,
     ) -> None:
         self._broker = broker
         self._market_data = market_data
+        # Both off unless the caller turns them on, and only the live wiring
+        # does (``orchestrator.dispatch``, ``app.main``, from the constants
+        # in ``config.settings``). A simulated book in ``shadow/`` or
+        # ``history/`` builds this class with neither, and behaves exactly as
+        # it did before they existed.
+        #
+        # ``neutral_holds``: a NEUTRAL on a broad fund opens a long at its
+        # normal weight instead of doing nothing (cfg.NEUTRAL_HOLD_FRACTION).
+        # ``core``: the account also holds the core funds (``app.core_book``),
+        # so they are left out of the book every limit here is computed on,
+        # and a signal that names one is refused.
+        self._neutral_holds = neutral_holds
+        self._core = core
+        # Orders accepted by this engine in the last few minutes, as
+        # positions. See ``recent_orders``.
+        self._recent: list[tuple[float, OpenPosition]] = []
         # Where the decision line goes. ``None`` is the live audit log. Set
         # only by a simulated book (``shadow/``), which must keep its own
         # record: the position manager reads that record back as its state,
@@ -50,6 +82,22 @@ class ExecutionEngine:
     def market_data(self) -> MarketDataProvider:
         """Read-only, for the position manager to share the engine's feed."""
         return self._market_data
+
+    def recent_orders(self) -> list[OpenPosition]:
+        """Orders this engine accepted in the last few minutes, as positions.
+
+        The broker's position list lags its own fills by a few seconds, so a
+        list read during a dispatch pass does not show the orders sent a
+        moment earlier in the same pass. Two readers need the book as it will
+        be rather than as the list shows it: a neutral hold, which is the
+        lowest-priority entry and must not be sized into room a directional
+        signal has just taken, and the core pass, which would otherwise leave
+        the account above the gross cap. Both add these to the list for any
+        ticker it does not show yet (``core_book.with_pending``).
+        """
+        cutoff = time.monotonic() - _RECENT_ORDER_SECONDS
+        self._recent = [(at, p) for at, p in self._recent if at >= cutoff]
+        return [p for _, p in self._recent]
 
     # ------------------------------------------------------------------ #
     # Public API
@@ -90,10 +138,26 @@ class ExecutionEngine:
             signal, ExecutionStatus.REJECTED, reason, **account, **kw
         )
 
-        # 1. NEUTRAL is a valid thing for the LLM to say; it just means "do nothing".
+        # 0. The core funds are not for signals. They have no stop and are
+        #    rebalanced by ``core_book``; a signal position in one would
+        #    merge with that holding at the broker.
+        if self._core and is_core(signal.ticker):
+            return reject(f"{signal.ticker} is a core holding; signals do not trade it")
+
+        # 1. NEUTRAL is a valid thing for the LLM to say. On everything but a
+        #    broad fund it means "do nothing". On a broad fund it means "hold
+        #    the normal weight": a long, sized under a fraction of the fund's
+        #    cap, and from here on an entry like any other -- same stop, same
+        #    limits, same bracket. The fraction comes from the ticker's kind,
+        #    never from the signal.
         side = _SIDE_FOR_BIAS.get(signal.bias)
+        hold_pct = None
         if side is None:
-            return reject("bias is NEUTRAL; no trade")
+            if self._neutral_holds:
+                hold_pct = risk_engine.neutral_hold_pct_for(signal.ticker)
+            if hold_pct is None:
+                return reject("bias is NEUTRAL; no trade")
+            side = "buy"
 
         # 2. Market hours. This lives here, not only in the scheduler, because
         #    it is a trading decision rather than a scheduling convenience: a
@@ -103,8 +167,10 @@ class ExecutionEngine:
         if not self._broker.is_market_open():
             return reject("market is closed")
 
-        # 3. Conviction floor (cheap; checked before any network I/O).
-        if not risk_engine.check_conviction_threshold(signal.conviction):
+        # 3. Conviction floor (cheap; checked before any network I/O). Not
+        #    applied to a neutral hold: the floor asks how sure the model is
+        #    of a direction, and NEUTRAL names none.
+        if hold_pct is None and not risk_engine.check_conviction_threshold(signal.conviction):
             return reject(
                 f"conviction {signal.conviction:.2f} below minimum {cfg.MIN_CONVICTION:.2f}"
             )
@@ -113,7 +179,21 @@ class ExecutionEngine:
         equity = self._broker.get_equity()
         account["equity"] = equity
         positions = self._broker.get_open_positions()
+        if self._core:
+            # The signal book is sized as if the core were not there, so the
+            # core is always the residual and never the reason for a refusal.
+            positions = risk_engine.without_core(positions)
+        if hold_pct is not None:
+            # Lowest priority, so it counts the orders this pass has already
+            # sent even where the broker's list does not show them yet.
+            shown = {p.ticker for p in positions}
+            positions = positions + [p for p in self.recent_orders() if p.ticker not in shown]
         existing = next((p for p in positions if p.ticker == signal.ticker), None)
+
+        # 4b. A neutral hold opens a position; it never adds to one or trims
+        #     one. Whatever is already held is being managed by its stop.
+        if hold_pct is not None and existing is not None:
+            return reject("bias is NEUTRAL; already held, nothing to add")
 
         # 5. Position-count limit only applies when opening a *new* ticker.
         if existing is None and not risk_engine.check_position_count_limit(len(positions)):
@@ -128,9 +208,14 @@ class ExecutionEngine:
         #     technology names, or a driller plus two energy funds -- and the
         #     stock-market limit bounds what all the equity groups share. All
         #     run before any market-data fetch, so a full book costs no quote.
-        headroom, binding_limit = risk_engine.budget_ceiling_for(
-            equity, signal.ticker, positions, side
-        )
+        if hold_pct is not None:
+            headroom, binding_limit = risk_engine.neutral_hold_ceiling_for(
+                equity, signal.ticker, positions
+            )
+        else:
+            headroom, binding_limit = risk_engine.budget_ceiling_for(
+                equity, signal.ticker, positions, side
+            )
         if headroom <= 0:
             return reject(f"no room under the {binding_limit} limit")
 
@@ -157,7 +242,7 @@ class ExecutionEngine:
         #    instrument kind in config.instruments -- never from the signal,
         #    which has no field that could carry one.
         existing_value = existing.market_value if existing else 0.0
-        max_pct = risk_engine.max_position_pct_for(signal.ticker)
+        max_pct = hold_pct if hold_pct is not None else risk_engine.max_position_pct_for(signal.ticker)
         qty = risk_engine.calculate_position_size(
             equity=equity,
             price=price,
@@ -179,10 +264,15 @@ class ExecutionEngine:
         order = self._broker.submit_bracket_order(
             ticker=signal.ticker, qty=qty, side=side, stop_price=stop_price
         )
+        self._recent.append((time.monotonic(), OpenPosition(
+            ticker=signal.ticker, qty=float(qty if side == "buy" else -qty),
+            market_value=qty * price, avg_entry_price=price,
+        )))
         return self._result(
             signal,
             ExecutionStatus.ACCEPTED,
-            f"submitted {side} {qty} {signal.ticker} @ ~{price:.2f}, stop {stop_price:.2f}",
+            f"submitted {side} {qty} {signal.ticker} @ ~{price:.2f}, stop {stop_price:.2f}"
+            + (f" (neutral hold at {hold_pct:.0%})" if hold_pct is not None else ""),
             quantity=qty,
             side=side,
             entry_price=price,

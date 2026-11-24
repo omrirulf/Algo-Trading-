@@ -27,7 +27,7 @@ that last part works.
 | A tightened group cap applies to what is already held, not just new orders | `PositionManager._trim_over_cap_groups()`, using `risk_engine.groups_over_cap()` — every exposure-group cap above is otherwise entry-time only. Sells pro-rata by market value, largest first, before the ladder runs — see [Position management](/position-management). |
 | 45% funds / 15% single names | `risk_engine.sleeve_headroom()` — funds are the core holding. |
 | Max 95% of equity deployed **in total** | `risk_engine.check_gross_exposure_limit()` — the only check that sees every holding at once. |
-| Mandatory stop-loss on every order | `broker_client.submit_bracket_order()` — no code path submits an entry without a `StopLossRequest`. |
+| Mandatory stop-loss on every signal entry | `broker_client.submit_bracket_order()` — no signal can submit an entry without a `StopLossRequest`. The one stopless buy, `submit_core_order()`, refuses every ticker but the three [core funds](/core-and-neutral-holds). |
 | Stop distance from real volatility | `market_data.calculate_atr()` — Wilder ATR computed from actual OHLC history, not a fixed percentage. |
 | Conviction floor | `risk_engine.check_conviction_threshold()` — signals below 0.30 are rejected before any market data is even fetched. Was 0.60; lowered so the ladder and the stop actually get exercised — see [Position management](/position-management). |
 | Profit ladder + trailing stop | `app/position_manager.py` — at +1R a third is sold and the stop moves to breakeven; at +3R another third and the stop to +1R; every cycle the stop also trails to `price − 2×ATR` where tighter. The stop only tightens and is the only exit. Exits are close-only by construction. |
@@ -144,9 +144,15 @@ stop_loss=StopLossRequest(stop_price=stop_price),
 ```
 
 `submit_bracket_order()` is the *only* method `AlpacaPaperBroker` exposes for
-opening a position, and its signature requires a `stop_price`. There is no
-`submit_market_order()` sitting next to it that a future change could call
-by mistake — a naked entry isn't a method that exists to call.
+opening a position on a signal, and its signature requires a `stop_price`.
+There is no general `submit_market_order()` sitting next to it that a future
+change could call by mistake.
+
+One narrow method does buy without a stop: `submit_core_order()`, which holds
+the account's idle money in three funds no signal can name. It can only buy,
+it refuses every other ticker before the order is built, and only the core
+pass calls it — all three checked by CI from the source. See
+[The core and neutral holds](/core-and-neutral-holds).
 
 ## Paper trading: a code change, not a setting
 

@@ -88,7 +88,7 @@ from app.broker_client import (
 from app import logger as audit_log
 from app.market_data import MarketDataError, MarketDataProvider
 from config import settings as cfg
-from config.instruments import group_for
+from config.instruments import group_for, is_core
 
 log = logging.getLogger(__name__)
 
@@ -360,7 +360,7 @@ class PositionManager:
         try:
             if not protect_only and not self._broker.is_market_open():
                 return ManagementReport(market_closed=True)
-            positions = self._broker.get_open_positions()
+            positions = self._signal_book()
         except BrokerError as exc:
             action = ManagementAction(ticker="*", action=ERROR, reason=f"{type(exc).__name__}: {exc}")
             _record(action, self._audit_logger)
@@ -400,7 +400,7 @@ class PositionManager:
                 # ladder below must see what is actually held now, not what
                 # was held before the trim.
                 try:
-                    positions = self._broker.get_open_positions()
+                    positions = self._signal_book()
                 except BrokerError as exc:
                     action = ManagementAction(
                         ticker="*", action=ERROR, reason=f"{type(exc).__name__}: {exc}"
@@ -439,6 +439,19 @@ class PositionManager:
         return ManagementReport(actions=tuple(actions), positions_seen=len(positions))
 
     # ------------------------------------------------------------------ #
+
+    def _signal_book(self) -> list[OpenPosition]:
+        """The open positions this module manages: all but the core funds.
+
+        The core (``app.core_book``, ``config.instruments.CORE_FUNDS``) is
+        the account's default allocation, not a trade: it has no stop by
+        design, no entry record to measure R from, and its size is set by a
+        target rather than a ladder. Left in this list it would be "found
+        without a stop" and given one on its first pass. So it is dropped
+        here, once, and nothing below ever sees it -- not the ladder, not the
+        protection pass, not the group-cap trim.
+        """
+        return [p for p in self._broker.get_open_positions() if not is_core(p.ticker)]
 
     def _state_for(self, position: OpenPosition, qty: int) -> LadderState:
         """Entry, R and rungs already taken, from the record; R from ATR if there is none."""

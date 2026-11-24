@@ -155,6 +155,38 @@ field means for a rejection or error (`quantity`/`side`/`order_id` are
   statuses or non-200 responses.
 </Note>
 
+## POST /webhook/core/rebalance
+
+Invests what the signal book left idle in the three
+[core funds](/core-and-neutral-holds), or sells them down to fit it. The
+orchestrator calls it once, after the last signal of a cycle.
+
+```bash
+curl -X POST http://localhost:8000/webhook/core/rebalance \
+  -H "x-webhook-secret: $WEBHOOK_SHARED_SECRET"
+```
+
+No request body: there is nothing a caller could say that should change the
+targets. Same secret as the signal endpoint, because this buys and sells.
+
+```json
+{
+  "market_closed": false,
+  "equity": 100000.0,
+  "book_value": 45400.0,
+  "core_value": 49480.0,
+  "invested_pct": 0.9488,
+  "bought": 3,
+  "sold": 0,
+  "errors": 0,
+  "actions": [
+    { "ticker": "VT", "action": "bought", "qty": 110, "price": 131.2, "held_qty": 110, "target_value": 14600.0, "reason": "below its target: idle money invested" }
+  ]
+}
+```
+
+`{"disabled": true}` when `CORE_ENABLED` is off.
+
 ## GET /health
 
 ```bash

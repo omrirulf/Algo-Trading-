@@ -11,10 +11,15 @@ from typing import Any, Final, Sequence
 
 from config import settings as cfg
 from config.instruments import (
+    CORE_BILLS,
+    CORE_BONDS,
+    CORE_EQUITY,
+    CORE_EQUITY_BETA,
     InstrumentKind,
     duration_rate_weight,
     equity_risk_beta,
     group_for,
+    is_core,
     kind_for,
 )
 
@@ -54,6 +59,21 @@ def max_position_pct_for(ticker: str) -> float:
     if kind is InstrumentKind.COMMODITY_FUND:
         return cfg.MAX_COMMODITY_FUND_PCT
     return cfg.MAX_POSITION_PCT
+
+
+def neutral_hold_pct_for(ticker: str) -> float | None:
+    """The cap a NEUTRAL signal on this ticker is sized under, or ``None``.
+
+    ``None`` is every ticker but a broad fund: there NEUTRAL still means "no
+    trade". For a broad fund it is ``cfg.NEUTRAL_HOLD_FRACTION`` of the fund's
+    own cap -- its normal weight, where BULLISH is the full one. Resolved from
+    the ticker's kind like ``max_position_pct_for``, and for the same reason:
+    nothing the signal says can turn a NEUTRAL into a position on a name this
+    file does not call a broad fund.
+    """
+    if kind_for(ticker) is not InstrumentKind.BROAD_FUND:
+        return None
+    return cfg.MAX_BROAD_FUND_PCT * cfg.NEUTRAL_HOLD_FRACTION
 
 
 def _headroom(equity: float, used: float, cap_pct: float, label: str) -> float:
@@ -264,6 +284,87 @@ def budget_ceiling_for(
         candidates.append(("stock-market (by beta)", stock_room))
     label, room = min(candidates, key=lambda pair: pair[1])
     return room, label
+
+
+def neutral_hold_ceiling_for(
+    equity: float, ticker: str, positions: Sequence[Any]
+) -> tuple[float, str]:
+    """``budget_ceiling_for`` for a neutral hold: one more limit, and a long.
+
+    A neutral hold passes every limit a directional buy does, and then one of
+    its own: it may only fill the fund sleeve to
+    ``cfg.NEUTRAL_HOLD_SLEEVE_PCT``, so that funds the model has no view on
+    cannot use up the room a fund it does have a view on would need.
+    """
+    room, label = budget_ceiling_for(equity, ticker, positions, "buy")
+    reserve_room = sleeve_headroom(
+        equity, ticker, positions, fund_pct=cfg.NEUTRAL_HOLD_SLEEVE_PCT
+    )
+    if reserve_room < room:
+        return reserve_room, "neutral-hold share of the sleeve budget"
+    return room, label
+
+
+# --------------------------------------------------------------------------- #
+# The core -- what idle money holds (see ``instruments.CORE_FUNDS``)
+# --------------------------------------------------------------------------- #
+# Everything above this line is given the book WITHOUT the core funds, by the
+# callers that own that split (``execution_engine``, ``position_manager``):
+# the signal book is sized as if the core were not there. The two functions
+# below are the other half -- given that book, how much of each core fund the
+# account may hold on top of it.
+
+
+def without_core(positions: Sequence[Any]) -> list[Any]:
+    """The signal book: every position that is not one of the core funds."""
+    return [p for p in positions if not is_core(p.ticker)]
+
+
+def core_ceilings(equity: float, book: Sequence[Any]) -> tuple[float, float, float]:
+    """The most the core may hold on top of ``book``: gross, equity, bonds.
+
+    In dollars, never negative. ``book`` is the signal book -- pass it through
+    ``without_core`` first.
+
+    * gross: what the signal book leaves under ``MAX_GROSS_EXPOSURE_PCT``.
+    * equity: dollars of the core equity fund that fit under
+      ``MAX_EQUITY_RISK_PCT`` once the book's own net stock-market risk is
+      counted. A net-short book leaves more room than an empty one, exactly
+      as it does for a signal.
+    * bonds: dollars of the core bond fund that fit under the Duration
+      group's ceiling once the book's own duration is counted.
+    """
+    if equity <= 0:
+        raise RiskViolation(f"equity must be positive, got {equity}")
+    gross = gross_exposure_headroom(equity, sum(p.market_value for p in book))
+    stock_room = max(0.0, equity * cfg.MAX_EQUITY_RISK_PCT - net_equity_risk(book))
+    bond_room = _headroom(
+        equity, _group_market_value(_DURATION_GROUP, book),
+        group_cap_pct(_DURATION_GROUP), f"group {_DURATION_GROUP!r}",
+    )
+    return gross, stock_room / CORE_EQUITY_BETA, bond_room
+
+
+def core_targets(
+    equity: float,
+    book: Sequence[Any],
+    equity_share: float = cfg.CORE_EQUITY_SHARE,
+) -> dict[str, float]:
+    """Dollars of each core fund the account should hold on top of ``book``.
+
+    All of the gross room is handed out, in order: ``equity_share`` of it is
+    offered to world equity and cut to the stock-market limit; what remains
+    is offered to bonds and cut to the Duration ceiling; what remains after
+    that is Treasury bills. So the three always sum to the gross room, and
+    neither limit is ever exceeded to get there.
+    """
+    if not 0 <= equity_share <= 1:
+        raise RiskViolation(f"equity_share must be in [0, 1], got {equity_share}")
+    gross, stock_room, bond_room = core_ceilings(equity, book)
+    stocks = min(gross * equity_share, stock_room)
+    bonds = min(gross - stocks, bond_room)
+    bills = gross - stocks - bonds
+    return {CORE_EQUITY: stocks, CORE_BONDS: bonds, CORE_BILLS: bills}
 
 
 def check_gross_exposure_limit(
