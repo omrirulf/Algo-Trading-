@@ -68,6 +68,8 @@ from orchestrator.llm import (  # noqa: E402
     MODEL_EFFORT,
     SCREENING_ENABLED,
     SCREENING_MODEL,
+    TIMEOUT_ATTEMPTS_WITH_SECOND_HOST,
+    TRANSPORT_ATTEMPTS,
     AnthropicSignalProvider,
     BatchRequest,
     BatchTimeout,
@@ -524,6 +526,11 @@ def full_model_provider() -> SignalProvider:
     token is refused at the front of the cycle instead of once per ticker: an
     endpoint answering 401 eighty times is a session lost quietly, and the
     screen is no longer behind it to catch that.
+
+    With the second host switched on (``fallback_model_provider``), the
+    first host is built to ask once after a timeout and hand the name on
+    (the owner's "build the one-timeout rule" of 24 Nov 2026); alone, it
+    asks twice, as it has since 23 Sep 2026.
     """
     settings = get_settings()
     if not MODEL_BASE_URL:
@@ -533,16 +540,22 @@ def full_model_provider() -> SignalProvider:
             f"MODEL_BASE_URL is {MODEL_BASE_URL!r} but FULL_MODEL_API_KEY is empty; "
             "the endpoint that decides what is traded would be asked anonymously"
         )
+    # The second host, only while its key is set: the owner's switch for
+    # the fallback (17 Nov 2026). Without it the provider is exactly the
+    # plain one below, and nothing about the cycle changes.
+    fallback = fallback_model_provider()
     primary = OpenAICompatibleProvider(
         base_url=MODEL_BASE_URL,
         model=MODEL,
         api_key=settings.full_model_api_key,
         timeout=FULL_MODEL_TIMEOUT_SECONDS,
+        # The one-timeout rule (the owner's "build the one-timeout rule" of
+        # 24 Nov 2026): with a second host behind it, the first host's ask
+        # that ran to the ceiling is not asked again there; the name goes to
+        # the second host at once. Alone, a timeout keeps the one retry it
+        # has had since 23 Sep 2026 (``llm.TIMEOUT_ATTEMPTS_WITH_SECOND_HOST``).
+        timeout_attempts=TRANSPORT_ATTEMPTS if fallback is None else TIMEOUT_ATTEMPTS_WITH_SECOND_HOST,
     )
-    # The second host, only while its key is set: the owner's switch for
-    # the fallback (17 Nov 2026). Without it the provider is exactly the
-    # one above, and nothing about the cycle changes.
-    fallback = fallback_model_provider()
     if fallback is None:
         return primary
     return FallbackSignalProvider(primary, fallback)

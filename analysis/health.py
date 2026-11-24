@@ -433,7 +433,8 @@ def model_fallbacks(today: list[dict]) -> Optional[Alarm]:
         f"{len(tickers)} of {len(seen)} ticker(s) were answered by the fallback host"
         + (f" {hosts[0]}" if len(hosts) == 1 else ""),
         f"{', '.join(tickers[:12])}{' …' if len(tickers) > 12 else ''}. "
-        f"The configured host could not answer for each (busy, a server error or unreachable on every retry); "
+        f"The configured host could not answer for each "
+        f"(busy or a server error on every retry, unreachable, or one timeout); "
         f"the same model answered from the second host. First error: {first[:200]}",
     )
 
