@@ -172,7 +172,8 @@ Nothing that decides anything reads it.
 
 From 17 Nov 2026 the full model has a second host, asked the same
 question only when the configured host could not answer at all — a busy
-or server-error status on every retry, or no connection — and only while
+or server-error status on every retry, no connection, or (since 24 Nov
+2026) one timeout — and only while
 the owner has switched it on (`FULL_MODEL_FALLBACK_API_KEY`; see
 [the model](/orchestrator/llm#a-second-host-for-the-same-model-when-the-first-cannot-answer)).
 A line the second host answered carries one more key, after `stage`:

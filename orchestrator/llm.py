@@ -270,7 +270,9 @@ class ProviderUnavailable(LLMError):
     Raised by ``OpenAICompatibleProvider`` when its asks are spent on
     statuses that mean "later" (``RETRY_STATUSES``: 429 and the 5xx family)
     or on a host that could not be reached (a timeout, a refused or dropped
-    connection). Never for a 400, 401 or 404 -- our request or our key, which
+    connection; at a first host with a second behind it, one timeout is
+    enough -- ``TIMEOUT_ATTEMPTS_WITH_SECOND_HOST``, the owner's rule of
+    24 Nov 2026). Never for a 400, 401 or 404 -- our request or our key, which
     a second host would refuse the same way -- and never for an answer that
     came back but was not usable: that is the model's, and the fallback
     serves the same model. ``FallbackSignalProvider`` hands exactly this on.
@@ -855,6 +857,29 @@ HTTP_ATTEMPTS = 4
 #: retry worth counting separately from the statuses above.
 TRANSPORT_ATTEMPTS = 2
 
+#: Asks per call at the first host after a timeout while a second host is
+#: configured: one. The owner's "build the one-timeout rule" of 24 Nov 2026.
+#: On 24 Nov DeepInfra was slow rather than down: 26 of its 78 streams ran
+#: to the 480-second ceiling (the answers that did arrive took about six
+#: minutes each, against about 150 seconds in early November), 20 names
+#: timed out at least once, and each was asked there again before the second
+#: host could see it. Of those 20 second asks, 9 answered after 199 to 454
+#: more seconds, 6 ran to the ceiling again and 5 met a busy answer and
+#: climbed the ladder; the 27 asks made after a name's first timeout held
+#: the four slots for 117 minutes between them, about 29 minutes of the
+#: stage, which ran 134 minutes against its 120-minute budget and never
+#: asked 7 names. Cerebras answered the 8 names that reached it (6 after
+#: two timeouts, 2 after busy chains) in about two seconds each and sat
+#: idle 99.8% of the stage. With a second host behind it, the first host's
+#: timeout is not asked again there: the name goes to the second host at
+#: once, and its record reads "gave up after 1 attempt(s)". Only a timeout:
+#: a 429 or 5xx is quick and keeps the first host's four asks, a refused or
+#: dropped connection keeps the one retry above, the second host keeps its
+#: own one retry (nothing is behind it), and without a second host (the key
+#: blank) a timeout is retried once as before. ``heartbeat.
+#: full_model_provider`` sets it on the first host when it builds the pair.
+TIMEOUT_ATTEMPTS_WITH_SECOND_HOST = 1
+
 #: The ceiling on that second ask: the same as the first (bug fix, 26 Sep
 #: 2026, logged in the pre-registration's Amendments table).
 #:
@@ -1007,6 +1032,12 @@ class OpenAICompatibleProvider:
     ``LLMError`` like any other bad answer, which the funnel already treats as
     "the screen failed, ask the full model". So the worst a flaky local model
     can do is cost a cycle its saving -- never place a trade on a bad parse.
+
+    ``timeout_attempts`` (24 Nov 2026) is how many asks a timeout gets, the
+    one transport failure that is also a whole ceiling's wait:
+    ``TRANSPORT_ATTEMPTS`` (two) with nothing behind this host,
+    ``TIMEOUT_ATTEMPTS_WITH_SECOND_HOST`` (one) when a second host stands
+    behind it, so the name goes there at once.
     """
 
     def __init__(
@@ -1019,6 +1050,7 @@ class OpenAICompatibleProvider:
         attempts: int = HTTP_ATTEMPTS,
         schema_attempts: int = SCHEMA_ATTEMPTS,
         sleep: Any = time.sleep,
+        timeout_attempts: int = TRANSPORT_ATTEMPTS,
     ) -> None:
         if not base_url:
             raise LLMError("an OpenAI-compatible provider needs a base URL")
@@ -1030,6 +1062,8 @@ class OpenAICompatibleProvider:
         self._attempts = max(1, attempts)
         self._schema_attempts = max(1, schema_attempts)
         self._sleep = sleep
+        # Never more than a transport failure gets: a timeout is one.
+        self._timeout_attempts = max(1, min(timeout_attempts, TRANSPORT_ATTEMPTS))
 
     def _retry_after(self, response: Any) -> float | None:
         """The server's own instruction, when it gives one.
@@ -1138,10 +1172,17 @@ class OpenAICompatibleProvider:
                 # was billed for whatever it generated before the socket gave
                 # up -- so it gets one, on a shorter ceiling, and a transport
                 # failure is never retried more than that however many
-                # attempts remain.
+                # attempts remain. Since 24 Nov 2026 a timeout gets none at
+                # all at a first host with a second host behind it
+                # (``timeout_attempts``, TIMEOUT_ATTEMPTS_WITH_SECOND_HOST):
+                # the ``ProviderUnavailable`` below sends the name there at
+                # once instead of spending another ceiling here. Every other
+                # transport failure, and a timeout with nothing behind it,
+                # keeps the one retry.
                 last = f"{self._url} unreachable: {exc}"
                 later = True
-                if transport_asks >= TRANSPORT_ATTEMPTS:
+                limit = self._timeout_attempts if isinstance(exc, httpx.TimeoutException) else TRANSPORT_ATTEMPTS
+                if transport_asks >= limit:
                     break
                 transport_asks += 1
                 # A fresh connection, with a new call's ceiling (see
@@ -1384,6 +1425,14 @@ class FallbackSignalProvider:
     of the same weights). Both failing raises one ``LLMError`` that names
     both, the primary's first, so ``analysis.call_errors`` reads the primary's
     status.
+
+    One timeout is enough (the owner's "build the one-timeout rule" of 24
+    Nov 2026): ``heartbeat.full_model_provider`` builds the primary with
+    ``timeout_attempts=TIMEOUT_ATTEMPTS_WITH_SECOND_HOST`` when it builds
+    this pair, so a name whose ask ran to the 480-second ceiling comes here
+    at once, "gave up after 1 attempt(s)", instead of after a second ceiling
+    there. A 429 or 5xx still gets the primary's four asks first, and the
+    second host keeps its own one retry after a timeout: nothing is behind it.
 
     An answer from the second host carries ``fallback_after`` -- the primary's
     final error -- so the journal line says who answered and why
