@@ -64,6 +64,32 @@ within a pass decides, which the view would make moot. Everything outside
 the pass -- the manager, the stops, the marks, the held-name skip -- sees
 the book as it is.
 
+**What the pass view shows of its own pass** (calibration fix of 25 Nov
+2026, Amendment 2026-11-25; the calibration copy only). Alpaca's list is
+not blind to the pass for ever: a fill shows in it about a tenth of a
+second after it lands (9 Oct 2026: NVDA's fill unseen by GOOGL 0.108 s
+later, seen by RY 0.455 s later; 21 Oct: MSFT's fill unseen 0.079 s later,
+JPM's fill seen 0.119 s later). So the real engine's later orders of a pass
+were sized against the earlier ones once those had filled and been listed,
+and a copy that showed none of the pass bought RY and PG on 9 Oct where the
+account was refused for the sleeve. The copy's view therefore includes an
+earlier order of the same pass once the real account's fill of it had
+landed ``FILL_VISIBLE_AFTER`` (0.11 s) before the real engine decided the
+line being sized -- piece by piece, as the account's fills came -- and no
+more of it than the copy itself bought (``Fund._see_pass_fills``,
+``SimBroker.see_in_view``). A line the copy accepts that the account did
+not has no real fill and stays unseen. The decision instants are the live
+audit log's; the fills are the account snapshots' (``shadow.calibration``).
+The threshold is an approximation of a latency that varies, measured on
+those two days and stated as such.
+
+**Splits** (calibration fix of 25 Nov 2026, Amendment 2026-11-25). The bars
+are on the scale they traded at (``shadow.market``), so on the day a split
+takes effect every fund applies it to its book first thing
+(``SimBroker.apply_split``): the shares multiply, the entry price, the stops
+and the last mark divide. The index and timing funds multiply their shares
+the same way.
+
 Two exploratory funds
 ---------------------
 The owner's decisions of 25 Sep 2026 add two funds that trade the model's
@@ -129,19 +155,20 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 from collections import Counter
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from itertools import groupby
 from typing import Callable, Collection, Final, Iterable, Mapping, Optional, Sequence, Union
 from zoneinfo import ZoneInfo
 
 from analysis.reader import JournalEntry
 from app import risk_engine
+from app.broker_client import OpenPosition
 from app.execution_engine import ExecutionEngine
 from app.position_manager import PositionManager
 from app.schemas import Bias, ExecutionResult, ExecutionStatus, LLMSignal
 from config.watchlist import DEFAULT_WATCHLIST
 from shadow.audit import FundAudit
-from shadow.broker import DEFAULT_COST_PER_SIDE, SimBroker
+from shadow.broker import DEFAULT_COST_PER_SIDE, ENTRY, SimBroker
 from shadow.market import Bars, SimFeed, in_regular_hours
 
 STARTING_CASH = 100_000.0
@@ -183,6 +210,15 @@ SAME_DAY: Final[str] = "same_day"
 #: day during that day, at the prices the real account recorded, and is
 #: driven by ``Fund.session_recorded``, never by ``session``.
 RECORDED: Final[str] = "recorded"
+
+#: How long after a fill lands at Alpaca the positions list the real engine
+#: reads shows it (the calibration fix of 25 Nov 2026, Amendment 2026-11-25;
+#: module docstring, "What the pass view shows of its own pass"). Measured
+#: in the account's own record: a fill 0.108 s old was not in the list (9
+#: Oct 2026, GOOGL after NVDA), 0.079 s old was not (21 Oct, JPM after
+#: MSFT), 0.119 s old was (21 Oct, NVO after JPM), 0.245 and 0.455 s old
+#: were (9 Oct). An approximation of a latency that varies, stated as such.
+FILL_VISIBLE_AFTER: Final[timedelta] = timedelta(milliseconds=110)
 #: The exploratory pullback fund (C, pre-registration 13.4): limit orders
 #: placed for the next session, filled at a price the bars decide
 #: (``shadow.exploratory.PullbackFund``, which is the only fund using it).
@@ -257,6 +293,9 @@ def recorded_fill(entry: JournalEntry, side: str, session: date) -> tuple[Option
 #: or ``(None, why)``, ``why`` from ``NOT_ENTERED_REASONS``. ``recorded_fill``
 #: is the same-day fund's; the calibration copy brings its own.
 PriceFor = Callable[[JournalEntry, str, date], tuple[Optional[float], Optional[str]]]
+#: When the real engine decided a line: ``(line, session) -> instant`` (an
+#: aware UTC datetime), or None when the record does not say.
+DecidedAt = Callable[[JournalEntry, date], Optional[datetime]]
 
 
 class RecordedQuote:
@@ -312,6 +351,15 @@ class RecordedDay:
     #: The price a line is entered at: the real engine's entry price for a
     #: line it accepted on that side, else the line's live quote.
     entry_price: PriceFor = recorded_fill
+    #: Ticker -> the real account's entry fills that day, piece by piece as
+    #: they landed: ``(when, shares)``. For the pass view (the fix of 25 Nov
+    #: 2026): an earlier order of the pass is shown to a later line once a
+    #: piece of it had landed ``FILL_VISIBLE_AFTER`` before that line's
+    #: decision. A name the real account did not fill has no entry.
+    entry_fills: Mapping[str, Sequence[tuple[datetime, float]]] = field(default_factory=dict)
+    #: ``(line, session) -> when the real engine decided that line``, or
+    #: None when the record does not say; see ``shadow.calibration.RealRecord``.
+    decided_at: DecidedAt = lambda entry, session: None
 
 
 class _DayBars:
@@ -575,6 +623,7 @@ class Fund:
         """
         broker = self.broker
         broker.day = day
+        self._apply_splits(day)
         held_at_open = broker.held_quantities()
         bars = _DayBars()
         self._read_bars(bars, set(held_at_open) | {line.ticker for line in cycle or ()}, day)
@@ -620,6 +669,7 @@ class Fund:
             raise ValueError("session_recorded is for a fund made with entry=RECORDED")
         broker = self.broker
         broker.day = day
+        self._apply_splits(day)
         held_at_open = broker.held_quantities()
         bars = _DayBars()
         self._read_bars(bars, set(held_at_open) | {line.ticker for line in cycle or ()}, day)
@@ -632,7 +682,7 @@ class Fund:
                 if manage:
                     self._manage()
                 broker.fill_stops_as_recorded(recorded.stops_between)
-                self._enter(cycle, recorded=True, price_for=recorded.entry_price)
+                self._enter(cycle, recorded=True, price_for=recorded.entry_price, record=recorded)
             else:
                 broker.fill_stops_as_recorded(recorded.stops_between)
             broker.fill_stops_as_recorded(recorded.stops_after)
@@ -642,6 +692,45 @@ class Fund:
         finally:
             self.quotes.price.clear()
         return self._close(day, held_at_open, bars)
+
+    def _apply_splits(self, day: date) -> None:
+        """Every split taking effect on ``day`` in a name the book holds, applied before anything else.
+
+        The bars from ``day`` on are in the new scale (``Bars.split``), so
+        the shares, the entry price, the stops and the last mark move with
+        them (``SimBroker.apply_split``; the fix of 25 Nov 2026).
+        """
+        for ticker in list(self.broker.positions):
+            ratio = self.bars.split(ticker, day)
+            if ratio != 1.0:
+                self.broker.apply_split(ticker, ratio)
+
+    def _see_pass_fills(self, record: RecordedDay, line: Line) -> None:
+        """Show the held view the earlier orders of this pass the real account's list had caught up with.
+
+        The fix of 25 Nov 2026 (module docstring, "What the pass view shows
+        of its own pass"). For each entry the copy made earlier in this pass,
+        the real account's fill pieces in that name that had landed
+        ``FILL_VISIBLE_AFTER`` before the real engine decided ``line`` are
+        added up, and that many shares -- never more than the copy bought --
+        join the view at the copy's fill price. No decision instant on
+        record, or no real fill, shows nothing: the view stays the pass's
+        start, as before the fix.
+        """
+        broker = self.broker
+        decided = record.decided_at(line.entry, broker.day)
+        seen: list[OpenPosition] = []
+        if decided is not None and broker.passes:
+            for fill in broker.fills[broker.passes[-1]:]:
+                if fill.kind != ENTRY:
+                    continue
+                landed = sum(float(qty) for at, qty in record.entry_fills.get(fill.ticker, ())
+                             if at + FILL_VISIBLE_AFTER <= decided)
+                qty = min(fill.qty, int(landed))
+                if qty >= 1:
+                    signed = qty if fill.side == "buy" else -qty
+                    seen.append(OpenPosition(fill.ticker, float(signed), qty * fill.price, fill.price))
+        broker.see_in_view(seen)
 
     def _read_bars(self, bars: _DayBars, tickers: Iterable[str], day: date) -> None:
         """Add ``day``'s bar for each of ``tickers`` not read yet; a name with no bar is left out."""
@@ -676,7 +765,8 @@ class Fund:
             if action.r_estimated:
                 self.tally.estimated_r += 1
 
-    def _enter(self, cycle: Sequence[Line], recorded: bool = False, price_for: Optional[PriceFor] = None) -> None:
+    def _enter(self, cycle: Sequence[Line], recorded: bool = False, price_for: Optional[PriceFor] = None,
+               record: Optional[RecordedDay] = None) -> None:
         """Dispatch a cycle's lines.
 
         ``recorded``: each directional line is entered at a price recorded
@@ -684,7 +774,10 @@ class Fund:
         (``recorded_fill``, the same-day fund), or what ``price_for`` says
         when given (the calibration copy: the price the real account used
         for that line, ``shadow.calibration``). A line with no such price is
-        not entered, and counted in ``not_entered`` by reason.
+        not entered, and counted in ``not_entered`` by reason. ``record``,
+        the calibration copy's day, lets the held view show the pass's own
+        earlier orders once the real account's list showed them
+        (``_see_pass_fills``, the fix of 25 Nov 2026).
 
         Each cycle's lines are one dispatch pass, and for its length the
         broker holds the pass view (module docstring, "The pass view"): the
@@ -729,6 +822,8 @@ class Fund:
                         continue
                     if signal is None:
                         continue
+                    if held_view and record is not None:
+                        self._see_pass_fills(record, line)
                     if recorded and signal.bias is not Bias.NEUTRAL:
                         priced = price_for if price_for is not None else recorded_fill
                         price, why = priced(line.entry, "buy" if signal.bias is Bias.BULLISH else "sell",
@@ -898,6 +993,9 @@ class IndexFund:
             self.days.append(record)
             return record
         opened, _, _, close, dividend = bar
+        ratio = self.bars.split(self.ticker, day)
+        if ratio != 1.0 and self.qty:
+            self.qty = round(self.qty * ratio)                        # the fix of 25 Nov 2026: the traded scale
         held = self.qty
         if self.bought is None:
             self.qty = math.floor(self.cash / (opened * (1 + self.cost_per_side)))
@@ -941,7 +1039,8 @@ def run(
 
 
 __all__ = [
-    "CONVICTION_FIRST", "CONVICTION_SIZES", "Day", "Decision", "Fund", "IndexFund", "Line", "NEXT_OPEN",
+    "CONVICTION_FIRST", "CONVICTION_SIZES", "Day", "Decision", "DecidedAt", "FILL_VISIBLE_AFTER", "Fund",
+    "IndexFund", "Line", "NEXT_OPEN",
     "NOT_ENTERED_REASONS", "NO_PRICE", "OTHER_DAY", "OUTSIDE_HOURS", "PULLBACK", "PriceFor", "RECORDED",
     "RecordedDay", "RecordedQuote", "Refusals", "SAME_DAY",
     "STARTING_CASH", "Tally", "WATCHLIST_FIRST", "by_conviction", "coin_signal", "conviction_factor",

@@ -68,6 +68,19 @@ the real account's own record (``RealRecord``, ``shadow.fund.RecordedDay``,
   before its management pass; the pass; its stop fills from between the
   pass and its entries; the entries, in watchlist order; its later stop
   fills.
+* Within the entries (the fix of 25 Nov 2026, Amendment 2026-11-25) the
+  copy's engine sees of its own pass what the real engine saw of the real
+  one: the pass view (Amendment 2026-11-20) plus the earlier orders of the
+  pass whose real fills had landed ``shadow.fund.FILL_VISIBLE_AFTER``
+  (0.11 s) before the real engine decided the line being sized -- the
+  decision instants from the live audit log's ``signal_processed`` lines,
+  the fills from the account snapshots, piece by piece (``RealRecord.
+  decided_at``, ``RealRecord.entry_fills``). A name the account did not
+  fill stays unseen.
+* The bars are on the scale they traded at (``shadow.market``, the same
+  fix): a split is applied to the copy's shares the day it takes effect,
+  so a name bought at a recorded price is never marked at a split-adjusted
+  one (2026-11-05, ITA 3-for-1: ~4,590 of artificial gap for a week).
 
 So a real entry on D and the copy's entry on D are the same trade the same
 day. The rule allows a match within one session, so a pair a session apart
@@ -1126,6 +1139,14 @@ class RealRecord:
     Tape. The names the real account held that day -- held at the day's
     open, or filled that day. Their stops are the real tape's business in
     the copy; the rest keep the daily-bar rule.
+
+    Decisions and entry fills (the fix of 25 Nov 2026). ``decided_at`` is
+    when the real engine decided a line: its ``signal_processed`` record
+    for the name that day, the latest at or before the journal line within
+    ``AUDIT_JOIN``, else the day's first for the name, else the journal
+    line's own time. ``entry_fills`` are the day's entry fills, piece by
+    piece as they landed. Together they let the copy's pass view show what
+    the real engine's list showed at each decision (``shadow.fund``).
     """
 
     def __init__(self, entries: Iterable[JournalEntry], audit_lines: Iterable[str], seed: Seed,
@@ -1135,6 +1156,9 @@ class RealRecord:
         self._pass_at: dict[date, datetime] = {}
         self._entered: dict[tuple[date, str], list[AuditRecord]] = defaultdict(list)
         self._entries_at: dict[date, datetime] = {}
+        #: Every decision the real engine made on a name that day, in time
+        #: order, whatever its status (``decided_at``).
+        self._decided: dict[tuple[date, str], list[AuditRecord]] = defaultdict(list)
         for record in audit_records(audit_lines):
             if record.at is None or not record.ticker or record.ticker == "*":
                 continue
@@ -1148,8 +1172,11 @@ class RealRecord:
             elif record.event == ENTRY_EVENT:
                 if day not in self._entries_at or record.at < self._entries_at[day]:
                     self._entries_at[day] = record.at
+                self._decided[(day, record.ticker)].append(record)
                 if record.result.get("status") == "ACCEPTED":
                     self._entered[(day, record.ticker)].append(record)
+        for records in self._decided.values():
+            records.sort(key=lambda r: r.at)
         self._live: dict[tuple[date, str], float] = {}
         for entry in entries:
             live = entry.live
@@ -1223,11 +1250,35 @@ class RealRecord:
                   if stamp is not None and pair[0].at <= stamp and stamp - pair[0].at <= AUDIT_JOIN]
         return (joined[-1] if joined else candidates[0])[1], None
 
+    def decided_at(self, entry: JournalEntry, session: date) -> Optional[datetime]:
+        """When the real engine decided ``entry``: its record for the name that day, else the line's own time.
+
+        The latest ``signal_processed`` record for the name at or before the
+        journal line within ``AUDIT_JOIN``; else the day's first for the
+        name; else the journal line's time, written moments after the
+        dispatch; None when the line has no time either.
+        """
+        records = self._decided.get((session, entry.ticker), ())
+        stamp = _utc(entry.timestamp) if entry.timestamp is not None else None
+        if records:
+            joined = [r for r in records if stamp is not None and r.at <= stamp and stamp - r.at <= AUDIT_JOIN]
+            return (joined[-1] if joined else records[0]).at
+        return stamp
+
+    def entry_fills(self, day: date) -> dict[str, tuple[tuple[datetime, float], ...]]:
+        """Ticker -> the real account's entry fills on ``day``, piece by piece as they landed: ``(when, shares)``."""
+        pieces: dict[str, list[tuple[datetime, float]]] = defaultdict(list)
+        for fill, direction, kind in self._fills:
+            if fill.day == day and direction == OPEN and kind != STOP:
+                pieces[fill.ticker].append((fill.at, float(fill.qty)))
+        return {ticker: tuple(sorted(items)) for ticker, items in pieces.items()}
+
     def day(self, session: date) -> RecordedDay:
         """What the copy acts on at ``session``."""
         before, between, later = self.stop_fills(session)
         return RecordedDay(prices=self.prices(session), tape=self.tape(session), stops_before=before,
-                           stops_between=between, stops_after=later, entry_price=self.entry_price)
+                           stops_between=between, stops_after=later, entry_price=self.entry_price,
+                           entry_fills=self.entry_fills(session), decided_at=self.decided_at)
 
 
 # --------------------------------------------------------------------------- #

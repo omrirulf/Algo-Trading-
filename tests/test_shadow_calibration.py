@@ -683,6 +683,37 @@ def test_the_record_cuts_a_days_stop_fills_at_the_real_accounts_own_clock():
     assert (day.stops_before, day.stops_between, day.stops_after) == (before, between, after)
 
 
+def test_the_record_knows_when_the_real_engine_decided_each_line_and_how_its_entries_filled():
+    """For the pass view (the fix of 25 Nov 2026): the decision instants from
+    the live audit log, joined to the journal line as the entry price is;
+    the entry fills piece by piece, stops and reductions left out."""
+    seed = calib.Seed(C0, utc("2026-10-01T21:00:00"), 0.0, (calib.SeedPosition("AAA", 10, 100.0),), ())
+    audit = [accepted("2026-10-02T15:40:52", "NVDA", "buy", 10, 100.0, 96.0),
+             refused("2026-10-02T15:40:53", "RY", "REJECTED", "no room under the sleeve budget limit"),
+             accepted("2026-10-02T18:00:00", "NVDA", "buy", 5, 101.0, 97.0)]          # a second cycle the same day
+    fills = [calib.AccountFill("f1", "o-nvda", "NVDA", "buy", 6, 100.0, utc("2026-10-02T15:40:52.468000")),
+             calib.AccountFill("f2", "o-nvda", "NVDA", "buy", 4, 100.0, utc("2026-10-02T15:40:52.900000")),
+             calib.AccountFill("f3", "s-aaa", "AAA", "sell", 10, 95.0, utc("2026-10-02T14:00:00")),    # a stop
+             calib.AccountFill("f4", "o-nvda2", "NVDA", "buy", 5, 101.0, utc("2026-10-02T18:00:01"))]
+    entries = [line("2026-10-02T15:40:53", "NVDA"), line("2026-10-02T15:40:54", "RY"),
+               line("2026-10-02T18:00:02", "NVDA"), line("2026-10-02T16:00:00", "XOM")]
+    record = calib.RealRecord(entries, audit, seed, fills, calib.close_of(C0), frozenset({"s-aaa"}))
+
+    assert record.entry_fills(C1) == {"NVDA": ((utc("2026-10-02T15:40:52.468000"), 6.0),
+                                               (utc("2026-10-02T15:40:52.900000"), 4.0),
+                                               (utc("2026-10-02T18:00:01"), 5.0))}
+    assert record.entry_fills(C2) == {}
+    assert record.decided_at(entries[0], C1) == utc("2026-10-02T15:40:52")      # the record just before the line
+    assert record.decided_at(entries[1], C1) == utc("2026-10-02T15:40:53")      # a refusal is a decision too
+    assert record.decided_at(entries[2], C1) == utc("2026-10-02T18:00:00")      # the second cycle's own record
+    assert record.decided_at(entries[3], C1) == utc("2026-10-02T16:00:00")      # no record: the line's own time
+    assert record.decided_at(JournalEntry(ticker="XOM", timestamp=None, bias="BULLISH", conviction=0.8), C1) is None
+    day = record.day(C1)
+    assert day.entry_fills == record.entry_fills(C1)
+    assert day.decided_at(entries[0], C1) == utc("2026-10-02T15:40:52")
+    assert calib.RecordedDay().decided_at(entries[0], C1) is None and calib.RecordedDay().entry_fills == {}
+
+
 def test_session_recorded_is_for_the_calibration_copy_alone():
     bars = bars_for("NVDA", "VT")
     fund = Fund("plain", lambda line: None, SimFeed(bars), bars)

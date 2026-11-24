@@ -95,7 +95,9 @@ def _positive(value: object) -> Optional[float]:
 
 def sma_before(bars: Bars, ticker: str, day: date, length: int = VETO_SMA) -> Optional[float]:
     """The mean of ``ticker``'s last ``length`` final closes dated before ``day``; None with fewer."""
-    closes = bars.history(ticker, day - timedelta(days=1))["Close"]
+    # As of ``day``: the closes as Yahoo showed them that morning, a split
+    # taking effect by then taken out, as the live rule would have read them.
+    closes = bars.history(ticker, day - timedelta(days=1), as_of=day)["Close"]
     if len(closes) < length:
         return None
     return float(closes.iloc[-length:].mean())
@@ -278,6 +280,10 @@ class TimingFund:
         target = self.target(day)
         if target is None:
             return None                          # before the first decision: not started
+        if self.holding is not None and self.qty:
+            ratio = self.bars.split(self.holding, day)
+            if ratio != 1.0:
+                self.qty = round(self.qty * ratio)             # the fix of 25 Nov 2026: the traded scale
         held_at_open = (self.holding, self.qty)
         bars = {t: self.bars.bar(t, day) for t in (TIMING_IN, TIMING_OUT)}
         if self.holding is not None and self.holding != target:
@@ -443,6 +449,7 @@ class PullbackFund(Fund):
                 today: Optional[Sequence[Line]] = None) -> Day:
         broker = self.broker
         broker.day = day
+        self._apply_splits(day)
         held_at_open = broker.held_quantities()
         opens, lows, highs, closes, dividends = {}, {}, {}, {}, {}
 

@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import logging
 import math
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 import numpy as np
@@ -33,10 +33,13 @@ from config import settings as cfg
 from shadow.broker import DEFAULT_COST_PER_SIDE, DIVIDEND, ENTRY, STOP, TRANCHE
 from shadow.fund import (
     CONVICTION_FIRST,
+    FILL_VISIBLE_AFTER,
+    RECORDED,
     STARTING_CASH,
     Fund,
     IndexFund,
     Line,
+    RecordedDay,
     coin_signal,
     cycle_days,
     dispatch_order,
@@ -286,6 +289,117 @@ def test_the_pass_view_sizes_a_pass_as_the_real_engine_did_on_5_oct_2026():
     results = [at_once.engine.execute(model_signal(line)) for line in cycle]
     assert [(r.status.value, r.quantity) for r in results] == [("ACCEPTED", 50), ("ACCEPTED", 3), ("REJECTED", None)]
     assert "sleeve budget" in results[2].reason
+
+
+def test_what_the_pass_view_shows_of_its_own_pass_follows_the_real_accounts_fills_and_decisions():
+    """The calibration fix of 25 Nov 2026, in the shape of 9 Oct 2026. A book
+    whose single-name sleeve has room for one more full position; a cycle
+    with three bullish single names, dispatched in one pass. The real engine
+    read Alpaca's list before each order: NVDA's fill, 0.108 s old, was not
+    in it yet when GOOGL was sized (full size), and was when RY was, 0.455 s
+    later (refused for the sleeve). So the copy's view shows an earlier order
+    of the pass once the real fill of it had landed FILL_VISIBLE_AFTER before
+    the line's recorded decision: here MSFT's fill is 0.05 s old when NVDA is
+    decided (unseen, NVDA full) and 0.5 s old when GOOGL is (seen, with
+    NVDA's, GOOGL refused). The plain pass view bought all three."""
+    held = ("JPM", "XOM", "CAT", "LLY")
+    asked = ("MSFT", "NVDA", "GOOGL")
+    bars = Bars({t: flat() for t in held + asked})
+    feed = SimFeed(bars)
+    d = S[1]
+    cycle = lines_by_day([said(t, d) for t in asked])[d]
+    t0 = stamp(d, 15, 40)
+
+    def copy(fills: dict, decided: dict) -> Fund:
+        f = Fund("copy", model_signal, feed, bars, keep_actions=True, entry=RECORDED)
+        for t in held:
+            f.broker.seed_position(t, 49, 100.0, S[0], stops=[(49, 90.0)])
+        f.broker.cash = STARTING_CASH - 4 * 49 * 100.0                     # equity 100,000; the sleeve at 19.6%
+        feed.at_open(d)
+        day = RecordedDay(entry_price=lambda entry, side, session: (100.0, None),
+                          entry_fills={t: tuple((t0 + timedelta(seconds=at), float(q)) for at, q in pieces)
+                                       for t, pieces in fills.items()},
+                          decided_at=lambda entry, session: t0 + timedelta(seconds=decided[entry.ticker]))
+        f.session_recorded(d, cycle, day)
+        return f
+
+    # MSFT fills whole at t0, NVDA at t0 + 0.2; the engine decided NVDA 0.05 s after MSFT's fill, GOOGL 0.5 s after.
+    f = copy({"MSFT": [(0.0, 50)], "NVDA": [(0.2, 49)]}, {"MSFT": -0.1, "NVDA": 0.05, "GOOGL": 0.5})
+    assert [(x.ticker, x.qty) for x in f.broker.fills if x.kind == ENTRY] == [("MSFT", 50), ("NVDA", 49)]
+    assert [(x.ticker, x.status) for x in f.decisions] == [("MSFT", "ACCEPTED"), ("NVDA", "ACCEPTED"),
+                                                           ("GOOGL", "REJECTED")]
+    assert "sleeve budget" in f.decisions[-1].reason
+    assert f.broker._view is None and f.broker._seen == []
+
+    # Piece by piece: 20 of MSFT's 50 had landed 0.3 s before NVDA's decision, 30 landed after it; NVDA's own
+    # 33 landed at 0.35 s.
+    f = copy({"MSFT": [(0.0, 20), (0.4, 30)], "NVDA": [(0.35, 33)]}, {"MSFT": -0.1, "NVDA": 0.3, "GOOGL": 0.6})
+    entries = [(x.ticker, x.qty) for x in f.broker.fills if x.kind == ENTRY]
+    sleeve_used = 4 * 49 * 100.0 + 20 * 100.0                               # what NVDA's decision could see
+    equity = STARTING_CASH - 50 * 100.0 * COST                              # MSFT's cost is in the live equity
+    room = min(equity * risk_engine.max_position_pct_for("NVDA"), equity * 0.25 - sleeve_used)
+    assert entries[:2] == [("MSFT", 50), ("NVDA", math.floor(room / 100.0))] and entries[1][1] == 33
+    # GOOGL, decided 0.6 s in, sees all 50 of MSFT and NVDA's 33: refused for the sleeve.
+    assert len(entries) == 2 and f.decisions[-1].status == "REJECTED" and "sleeve budget" in f.decisions[-1].reason
+
+    # The account never filled MSFT (it refused the line): nothing of it is ever seen; NVDA's fill, 0.05 s old
+    # at GOOGL's decision, is not seen yet either; and a day without decisions on record shows nothing at all
+    # (the view stays the pass's start, as before this fix).
+    f = copy({"NVDA": [(0.45, 49)]}, {"MSFT": -0.1, "NVDA": 0.05, "GOOGL": 0.5})
+    assert [(x.ticker, x.qty) for x in f.broker.fills if x.kind == ENTRY] == [("MSFT", 50), ("NVDA", 49), ("GOOGL", 49)]
+    plain = Fund("plain", model_signal, feed, bars, keep_actions=True, entry=RECORDED)
+    for t in held:
+        plain.broker.seed_position(t, 49, 100.0, S[0], stops=[(49, 90.0)])
+    plain.broker.cash = STARTING_CASH - 4 * 49 * 100.0
+    plain.session_recorded(d, cycle, RecordedDay(entry_price=lambda entry, side, session: (100.0, None),
+                                                 entry_fills={"MSFT": ((t0, 50.0),), "NVDA": ((t0, 49.0),)}))
+    assert [(x.ticker, x.qty) for x in plain.broker.fills if x.kind == ENTRY] == [("MSFT", 50), ("NVDA", 49),
+                                                                                 ("GOOGL", 49)]
+    assert FILL_VISIBLE_AFTER == timedelta(milliseconds=110)
+
+
+def test_a_split_moves_the_book_to_the_new_scale_the_day_it_takes_effect():
+    """The calibration fix of 25 Nov 2026. yfinance shows a flat 100 with a
+    3-for-1 at session 5: the traded price was 300 before it. A fund buys at
+    300; on the split's day it holds three times the shares at a third of the
+    entry, its stop is a third of its price for all of them, its equity is
+    unchanged, and the manager's pass reads a history with no step in it."""
+    frame = flat(100.0)
+    frame["Stock Splits"] = 0.0
+    frame.iloc[WARM + 5, frame.columns.get_loc("Stock Splits")] = 3.0
+    bars = Bars({"ITA": frame, "VT": flat(100.0)})
+    feed = SimFeed(bars)
+    f = fund("model", bars, feed)
+    cycle = lines_by_day([said("ITA", S[0])])[S[0]]
+    feed.at_open(S[1])
+    f.session(S[1], cycle)
+    entry, = [x for x in f.broker.fills if x.kind == ENTRY]
+    cap = STARTING_CASH * risk_engine.max_position_pct_for("ITA")
+    assert entry.price == 300.0 and entry.qty == math.floor(cap / 300.0)
+    stop_before, = f.broker.live_stops()
+    for k in (2, 3, 4):
+        feed.at_open(S[k])
+        f.session(S[k], None)
+    before = f.days[-1]
+    feed.at_open(S[5])
+    f.session(S[5], None)
+    pos = f.broker.positions["ITA"]
+    assert (pos.qty, pos.avg_entry_price) == (3 * entry.qty, pytest.approx(300.0 / 3))
+    stop, = f.broker.live_stops()
+    assert (stop.qty, stop.stop_price) == (3 * entry.qty, pytest.approx(stop_before.stop_price / 3, rel=1e-6)) or \
+        stop.qty == 3 * entry.qty                                             # the manager may have raised it
+    assert f.days[-1].equity == pytest.approx(before.equity) and f.days[-1].gross == pytest.approx(before.gross)
+    assert f.tally.manager_errors == [] and f.tally.unexpected == []
+    assert feed.get_latest_price("ITA") == 100.0
+    # The index fund multiplies its shares the same way.
+    frame = flat(100.0)
+    frame["Stock Splits"] = 0.0
+    frame.iloc[WARM + 3, frame.columns.get_loc("Stock Splits")] = 2.0
+    index = IndexFund("vt", "VT", Bars({"VT": frame}))
+    for k in range(5):
+        index.session(S[k])
+    assert index.qty == 2 * math.floor(STARTING_CASH / (200.0 * (1 + COST)))
+    assert index.days[3].equity == pytest.approx(index.days[2].equity)
 
 
 def test_a_second_cycle_the_same_day_is_dispatched_after_the_first():

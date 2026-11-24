@@ -540,3 +540,77 @@ def test_a_fill_inside_a_held_view_is_not_in_the_engines_list_until_the_view_is_
     # A copy of the book to try orders on never carries a view.
     with broker.pass_view():
         assert broker.scratch()._view is None
+
+
+# --------------------------------------------------------------------------- #
+# Splits and what a pass sees of itself (the calibration fix of 25 Nov 2026)
+# --------------------------------------------------------------------------- #
+
+
+def test_a_split_multiplies_the_shares_and_divides_every_per_share_price_and_nothing_else():
+    """On the day a split takes effect the book moves to the new scale with
+    the bars: a 3-for-1 leaves three times the shares at a third of the
+    entry, the stop at a third of its price for three times the shares, the
+    last mark a third. Cash and the position's value do not move, and the
+    stop still covers the position exactly."""
+    broker, quotes = book(ITA=210.0)
+    broker.seed_position("ITA", 33, 209.07, D1, stops=[(33, 190.0)])
+    broker.remember_marks({"ITA": 210.0})
+    cash, equity = broker.cash, broker.equity({"ITA": 210.0})
+    quotes["ITA"] = 70.0                                     # the split day's bar, in the new scale
+    broker.apply_split("ITA", 3.0)
+    pos = broker.positions["ITA"]
+    assert (pos.qty, pos.avg_entry_price) == (99, pytest.approx(209.07 / 3))
+    assert pos.entered == pytest.approx(33 * 209.07)         # what the trade was opened at does not move
+    assert stops_of(broker, "ITA") == [(99, pytest.approx(190.0 / 3), "sell")]
+    assert broker._free_qty("ITA") == 0
+    assert broker.cash == cash and broker.equity({"ITA": 70.0}) == pytest.approx(equity)
+    assert broker._marks["ITA"] == pytest.approx(70.0)
+    # A short through a reverse split rounds to the nearest share; a name not held is nothing; a ratio of
+    # one is no split.
+    broker.seed_position("XYZ", -100, 2.0, D1, stops=[(100, 2.5)])
+    broker.apply_split("XYZ", 0.1)
+    assert (broker.positions["XYZ"].qty, broker.positions["XYZ"].avg_entry_price) == (-10, pytest.approx(20.0))
+    assert stops_of(broker, "XYZ") == [(10, pytest.approx(25.0), "buy")]
+    broker.apply_split("NOPE", 3.0)
+    assert "NOPE" not in broker.positions
+    broker.apply_split("XYZ", 1.0)
+    assert broker.positions["XYZ"].qty == -10
+
+
+def test_a_reverse_split_that_leaves_less_than_a_share_closes_the_position_at_its_mark():
+    broker, _ = book(TINY=1.0)
+    broker.seed_position("TINY", 4, 1.0, D1, stops=[(4, 0.5)])
+    broker.remember_marks({"TINY": 1.0})
+    broker.apply_split("TINY", 0.1)                            # 0.4 of a share: the broker pays cash in lieu
+    assert "TINY" not in broker.positions and stops_of(broker, "TINY") == []
+    assert broker.cash == pytest.approx(100_000.0 + 4 * 1.0)
+    assert broker.closed[-1].ticker == "TINY" and broker.closed[-1].closed == D1
+
+
+def test_what_a_pass_sees_of_its_own_orders_joins_the_held_view_and_goes_with_it():
+    """The calibration copy tells the held view which of the pass's own
+    earlier orders the real account's list had caught up with: they are
+    added to the list the engine reads, replaced on the next word, and gone
+    when the view is released or held afresh."""
+    broker, _ = book(AAA=100.0, BBB=50.0)
+    broker.seed_position("AAA", 10, 100.0, D1, stops=[(10, 90.0)])
+    with pytest.raises(BrokerError, match="no pass view"):
+        broker.see_in_view([])
+    with broker.pass_view():
+        broker.submit_bracket_order("BBB", 20, "buy", 45.0)
+        assert [p.ticker for p in broker.get_open_positions()] == ["AAA"]
+        broker.see_in_view([OpenPosition("BBB", 12.0, 600.0, 50.0)])             # 12 of the 20 listed so far
+        assert [(p.ticker, p.qty, p.market_value) for p in broker.get_open_positions()] == [
+            ("AAA", 10.0, 1_000.0), ("BBB", 12.0, 600.0)]
+        broker.see_in_view([OpenPosition("BBB", 20.0, 1_000.0, 50.0)])
+        assert [p.qty for p in broker.get_open_positions()] == [10.0, 20.0]
+        assert sorted(p.ticker for p in broker.scratch().get_open_positions()) == ["AAA", "BBB"]   # no view on a copy
+        broker.see_in_view([])
+        assert [p.ticker for p in broker.get_open_positions()] == ["AAA"]
+        broker.see_in_view([OpenPosition("BBB", 20.0, 1_000.0, 50.0)])
+        broker.hold_view()                                                       # held afresh: the book, nothing seen
+        assert [(p.ticker, p.qty) for p in broker.get_open_positions()] == [("AAA", 10.0), ("BBB", 20.0)]
+        assert broker._seen == []
+    assert broker._view is None and broker._seen == []
+

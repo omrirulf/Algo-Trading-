@@ -43,7 +43,19 @@ a simplification:
   earlier has not filled yet and the list the next order is sized against
   does not show it. Fills still land at once in ``positions``, cash and
   ``get_equity`` stay live, and everything outside the pass -- the position
-  manager, the stops, the marks -- sees the book as it is.
+  manager, the stops, the marks -- sees the book as it is. The calibration
+  copy adds to the view the earlier orders of the pass whose real fills had
+  reached Alpaca's list by the time of each decision (``see_in_view``; the
+  fix of 25 Nov 2026, ``shadow.fund.FILL_VISIBLE_AFTER``).
+* **Splits** (calibration fix of 25 Nov 2026, Amendment 2026-11-25). On the
+  day a split takes effect (``shadow.market.Bars.split``) the fund calls
+  ``apply_split``: the shares multiply by the ratio, the average entry
+  price, every resting stop's price and the last mark divide by it, and a
+  stop's shares multiply with the position's. Cash does not move and the
+  position's value does not change; the bars from that day on are in the
+  new scale, so a 3-for-1 leaves 3x the shares marked at a third of the
+  price. A fraction of a share a reverse split leaves is rounded to the
+  nearest share: the broker pays it in cash, which the copy does not model.
 """
 
 from __future__ import annotations
@@ -153,6 +165,10 @@ class SimBroker:
     #: when the dispatch pass began, which ``get_open_positions`` answers
     #: with until ``release_view``. None when no view is held.
     _view: Optional[list[OpenPosition]] = field(default=None, repr=False)
+    #: What the held view shows besides the positions at the pass's start:
+    #: the pass's own earlier orders the real account's list had caught up
+    #: with (``see_in_view``). Empty unless a fund says otherwise.
+    _seen: list[OpenPosition] = field(default_factory=list, repr=False)
     #: Where each dispatch pass began: the number of fills on the book when
     #: its view was held. For checks that re-size an entry from the fills.
     passes: list[int] = field(default_factory=list, repr=False)
@@ -173,7 +189,7 @@ class SimBroker:
     def get_open_positions(self) -> list[OpenPosition]:
         """The positions as the engine reads them: the held view while a pass holds one, else the book now."""
         if self._view is not None:
-            return list(self._view)
+            return list(self._view) + list(self._seen)
         return self._open_positions()
 
     def _open_positions(self) -> list[OpenPosition]:
@@ -198,11 +214,26 @@ class SimBroker:
         before. One view at a time; holding again takes a fresh one.
         """
         self._view = self._open_positions()
+        self._seen = []
         self.passes.append(len(self.fills))
+
+    def see_in_view(self, seen: Iterable[OpenPosition]) -> None:
+        """While the view is held, the engine's list is the positions at the pass's start plus ``seen``.
+
+        For the calibration copy (``shadow.fund.Fund._see_pass_fills``, the
+        fix of 25 Nov 2026): the earlier orders of this pass whose real
+        fills had been in Alpaca's list long enough to be read at the moment
+        of the next decision. Replaces what was seen before; the view itself
+        is unchanged.
+        """
+        if self._view is None:
+            raise BrokerError(f"{self.name}: no pass view is held to see fills in")
+        self._seen = list(seen)
 
     def release_view(self) -> None:
         """The engine's list is the book again."""
         self._view = None
+        self._seen = []
 
     @contextmanager
     def pass_view(self) -> Iterator[None]:
@@ -338,6 +369,43 @@ class SimBroker:
                 if stop.live and stop.ticker == ticker and stop.side == side:
                     self._fill_stop(stop, price, gapped=False)
 
+    def apply_split(self, ticker: str, ratio: float) -> None:
+        """A split taking effect today: ``ratio`` shares for one, every per-share price divided by it.
+
+        The position's shares multiply by the ratio (rounded to a share; a
+        reverse split's fraction is paid in cash by the broker, not here),
+        its average entry price divides by it; each live stop's shares
+        multiply and its price divides; the last mark divides, so a name
+        with no bar today is still marked in the new scale. Cash and the
+        position's value are unchanged. A position rounded away to nothing
+        is closed at its last mark and its stops cancelled.
+        """
+        ticker = ticker.strip().upper()
+        if ratio <= 0 or ratio == 1.0:
+            return
+        pos = self.positions.get(ticker)
+        if pos is not None:
+            shares = round(pos.qty * ratio)
+            pos.avg_entry_price /= ratio
+            if shares == 0:
+                mark = self._marks.get(ticker, pos.avg_entry_price * ratio)
+                self.cash += pos.qty * mark
+                pos.realised += pos.qty * mark
+                self.closed.append(ClosedTrade(ticker, "buy" if pos.qty > 0 else "sell", pos.opened,
+                                               self.day, pos.realised, pos.entered))
+                del self.positions[ticker]
+                for stop in self._stops:
+                    if stop.live and stop.ticker == ticker:
+                        stop.live = False
+                return
+            pos.qty = shares
+        for stop in self._stops:
+            if stop.live and stop.ticker == ticker:
+                stop.qty = max(1, round(stop.qty * ratio))
+                stop.stop_price /= ratio
+        if ticker in self._marks:
+            self._marks[ticker] /= ratio
+
     def pay_dividends(self, per_share: dict[str, float], held: dict[str, int]) -> None:
         """Credit longs, charge shorts, for the shares held at the previous close."""
         for ticker, amount in per_share.items():
@@ -409,7 +477,7 @@ class SimBroker:
             _stops=[replace(stop) for stop in self._stops],
             _entries_today=set(self._entries_today),
             _marks=dict(self._marks),
-            _view=None, passes=list(self.passes),
+            _view=None, _seen=[], passes=list(self.passes),
         )
 
     # ------------------------------------------------------------------ #
