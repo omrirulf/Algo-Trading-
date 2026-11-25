@@ -5,6 +5,27 @@ race's own ``OhlcFetcher`` (the same yfinance call, ``auto_adjust=False``,
 cut to final closes by ``last_final_session``), so the funds and the race
 price everything from the same source.
 
+**The traded scale** (calibration fix of 25 Nov 2026, Amendment 2026-11-25).
+Yahoo's bars are split-adjusted: after a 3-for-1 split every earlier bar is
+divided by three, so the series is continuous but no longer the price
+anyone traded at. The books here hold shares bought at real prices (the
+calibration copy at the account's recorded fills), so a split-adjusted bar
+would mark a position bought at 209 at 70: on 2026-11-05 ITA split 3-for-1
+and the copy's ITA, bought on 16 Oct at the recorded 209.07, was marked at
+~69.7 for a week, a gap of ~4,590 that was the whole of calibration's
+condition-1 fail. So ``Bars`` keeps the ``Stock Splits`` column yfinance
+hands over and puts every bar back on the scale it traded at: each bar's
+open, high, low, close and dividend are multiplied by the ratio of every
+split dated after it, and ``split`` says which day a split falls on and by
+how much, so a book can apply it to its shares that day
+(``SimBroker.apply_split``). ``history`` -- what the engine's ATR and the
+rules' moving averages read -- shows the bars as Yahoo showed them at the
+moment asked about (``as_of``): the splits up to then taken out, the ones
+after it not yet, so a series read across a split has no step in it, as the
+live engine's did not. The race's own scoring reads the fetcher's frames
+directly and is untouched: it enters and exits on one series, where the
+adjustment cancels out.
+
 ``SimFeed`` IS ``app.market_data.YFinanceMarketData`` -- the class the live
 engine uses -- with only ``_history`` replaced: instead of asking yfinance
 for "the last 90 days", it hands back the same 90 calendar days as of the
@@ -43,11 +64,13 @@ def _day(value: object) -> date:
 
 
 class Bars:
-    """Final daily bars per ticker, indexed by exchange date."""
+    """Final daily bars per ticker, indexed by exchange date, on the scale they traded at."""
 
     def __init__(self, frames: dict[str, pd.DataFrame]) -> None:
         self._frames: dict[str, pd.DataFrame] = {}
         self._rows: dict[str, dict[date, tuple[float, float, float, float, float]]] = {}
+        #: Ticker -> {the day a split took effect: its ratio (3.0 for 3-for-1, 0.1 for 1-for-10)}.
+        self._splits: dict[str, dict[date, float]] = {}
         for ticker, frame in frames.items():
             self.add(ticker, frame)
 
@@ -56,10 +79,12 @@ class Bars:
         if frame is None or frame.empty:
             self._frames[ticker] = pd.DataFrame(columns=["Open", "High", "Low", "Close"])
             self._rows[ticker] = {}
+            self._splits[ticker] = {}
             return
         frame = frame.dropna(subset=["Open", "High", "Low", "Close"]).copy()
         frame.index = pd.DatetimeIndex([pd.Timestamp(_day(ts)) for ts in frame.index])
         frame = frame[~frame.index.duplicated(keep="last")].sort_index()
+        frame, self._splits[ticker] = _traded_scale(frame)
         dividends = frame["Dividends"] if "Dividends" in frame.columns else pd.Series(0.0, index=frame.index)
         self._frames[ticker] = frame
         self._rows[ticker] = {
@@ -80,21 +105,93 @@ class Bars:
         """``(open, high, low, close, dividend)`` on ``day``, or None."""
         return self._rows.get(ticker.strip().upper(), {}).get(day)
 
+    def split(self, ticker: str, day: date) -> float:
+        """The ratio of a split that took effect on ``day`` (3.0 for 3-for-1), or 1.0 when none did.
+
+        From that day's bar on, the bars are in the new scale; a book
+        holding the name applies the same ratio to its shares that morning
+        (``SimBroker.apply_split``), as the broker does.
+        """
+        return self._splits.get(ticker.strip().upper(), {}).get(day, 1.0)
+
     def sessions(self, calendar_ticker: str, first: date, last: date) -> list[date]:
         """Every session in [first, last] that ``calendar_ticker`` has a final bar for."""
         rows = self._rows.get(calendar_ticker.strip().upper(), {})
         return sorted(d for d in rows if first <= d <= last)
 
-    def history(self, ticker: str, through: date) -> pd.DataFrame:
-        """Bars dated on or before ``through``."""
-        frame = self._frames.get(ticker.strip().upper())
+    def history(self, ticker: str, through: date, as_of: Optional[date] = None) -> pd.DataFrame:
+        """Bars dated on or before ``through``, on the scale yfinance showed them at the end of ``as_of``.
+
+        ``as_of`` is ``through`` unless given. The bars are kept on the scale
+        each traded at; a split dated after a bar and on or before ``as_of``
+        divides the bar by its ratio, as Yahoo did from the split's day on.
+        That is what the live engine's "last 90 days" looked like at that
+        moment -- one continuous series, the split's step taken out -- so
+        an ATR read across a split sees no gap, while ``bar`` keeps the
+        traded scale for fills, stops and marks. ``SimFeed`` asks for the
+        history through the eve of a session as of the session itself: a
+        split taking effect that morning is already in Yahoo's history by
+        the open.
+        """
+        ticker = ticker.strip().upper()
+        frame = self._frames.get(ticker)
         if frame is None or frame.empty:
             return pd.DataFrame(columns=["Open", "High", "Low", "Close"])
-        return frame.loc[: pd.Timestamp(through)]
+        frame = frame.loc[: pd.Timestamp(through)]
+        return _as_shown(frame, self._splits.get(ticker, {}), through if as_of is None else as_of)
 
     def last_close_before(self, ticker: str, day: date) -> Optional[float]:
         frame = self.history(ticker, day - timedelta(days=1))
         return float(frame["Close"].iloc[-1]) if not frame.empty else None
+
+
+def _traded_scale(frame: pd.DataFrame) -> tuple[pd.DataFrame, dict[date, float]]:
+    """``frame`` with every bar put back on the scale it traded at, and the splits it carried.
+
+    yfinance's ``Stock Splits`` column holds the ratio on the day a split
+    took effect and 0 elsewhere; Yahoo's prices are divided by that ratio
+    for every day before it. Each bar's open, high, low, close and dividend
+    are multiplied back by the product of the ratios of every split dated
+    after the bar, so the bars before a 3-for-1 are three times Yahoo's and
+    the ones from the split on are unchanged. A frame without the column,
+    or with no split in it, is returned as it was.
+    """
+    if "Stock Splits" not in frame.columns or frame.empty:
+        return frame, {}
+    ratios = pd.to_numeric(frame["Stock Splits"], errors="coerce").fillna(0.0).astype(float)
+    ratios = ratios.where(ratios > 0, 1.0)
+    splits = {ts.date(): float(r) for ts, r in ratios.items() if r != 1.0}
+    if not splits:
+        return frame, {}
+    # The product of the ratios of the splits strictly after each bar: the
+    # cumulative product from the end, less the bar's own ratio.
+    later = (ratios[::-1].cumprod()[::-1] / ratios).astype(float)
+    frame = frame.copy()
+    for column in ("Open", "High", "Low", "Close", "Dividends"):
+        if column in frame.columns:
+            frame[column] = frame[column].astype(float) * later
+    return frame, splits
+
+
+def _as_shown(frame: pd.DataFrame, splits: dict[date, float], as_of: date) -> pd.DataFrame:
+    """``frame`` (traded scale) as Yahoo showed it at the end of ``as_of``.
+
+    Each bar is divided by the ratio of every split dated after it and on or
+    before ``as_of``; a split after ``as_of`` had not happened yet and
+    changes nothing. A frame with no such split is returned as it is.
+    """
+    applicable = [(day, ratio) for day, ratio in splits.items() if day <= as_of]
+    if not applicable or frame.empty:
+        return frame
+    factor = pd.Series(1.0, index=frame.index)
+    for day, ratio in applicable:
+        before = frame.index < pd.Timestamp(day)
+        factor[before] = factor[before] * ratio
+    frame = frame.copy()
+    for column in ("Open", "High", "Low", "Close", "Dividends"):
+        if column in frame.columns:
+            frame[column] = frame[column].astype(float) / factor
+    return frame
 
 
 class SimFeed(YFinanceMarketData):
@@ -133,7 +230,9 @@ class SimFeed(YFinanceMarketData):
         if today is None:
             raise MarketDataError(f"no bar for {ticker} on {session}")
         start = session - timedelta(days=self._lookback_days)
-        past = self._bars.history(ticker, session - timedelta(days=1))
+        # As of the session: a split taking effect this morning has already
+        # divided Yahoo's earlier bars, and the live engine's ATR saw no step.
+        past = self._bars.history(ticker, session - timedelta(days=1), as_of=session)
         past = past.loc[past.index > pd.Timestamp(start), ["Open", "High", "Low", "Close"]]
         opened = today[0]
         partial = pd.DataFrame(

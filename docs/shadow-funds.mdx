@@ -142,6 +142,26 @@ room where the real one did not: the first calibration difference (5 Oct
 2026) and everything after it. The fixed simulation is again re-run from the
 same 28 Sep seed, and at least 5 calibration days must come after this fix.
 
+Since the fixes of 25 Nov 2026 (pre-registration, Amendment 2026-11-25) the
+bars every fund reads are on the scale they traded at: Yahoo's split-adjusted
+bars are multiplied back by the ratio of every split dated after them, a
+book applies a split to its shares, entry price, stops and mark the day it
+takes effect (`SimBroker.apply_split`), and the engine's ATR reads the
+history as Yahoo showed it at that moment, with no step in it
+(`Bars.history`). Until then a name bought at a recorded price before a
+split was marked at the split-adjusted price: ITA, bought by the copy at
+209.07 on 16 Oct 2026 and marked at ~69.7 after its 3-for-1 of 5 Nov, was
+the whole of condition 1's fail. The same day the copy's pass view learned
+to show an earlier order of the same pass once the real account's fill of
+it had been in Alpaca's list for 0.11 s at the line's decision
+(`Fund._see_pass_fills`), piece by piece and never more than the copy
+bought: on 9 Oct 2026 the real engine did not see NVDA's fill 0.108 s later
+and did see it 0.455 s later, and a copy that saw none of its pass bought
+two names the account was refused. The funds of the fund test keep the
+plain pass view; they have no real fills to read. The fixed simulation is
+again re-run from the same 28 Sep seed, and at least 5 calibration days must
+come after these fixes.
+
 ## The fund test's start, and the gate
 
 The fund test's start is fixed (the owner's decision of 26 Sep 2026): the
