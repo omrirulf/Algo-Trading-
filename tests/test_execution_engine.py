@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 
 from app.broker_client import BrokerError, OpenPosition
-from app.execution_engine import ExecutionEngine
+from app.execution_engine import PASS_MEMORY_SECONDS, ExecutionEngine
 from app.market_data import MarketDataError
 from app.schemas import ExecutionStatus, LLMSignal
 from config import settings as cfg
@@ -178,7 +178,10 @@ def test_scores_and_key_factors_cannot_change_the_decision(engine, broker, marke
     plain = engine.execute(sig())
 
     broker.submitted.clear()
-    decorated = engine.execute(sig(**EXTREME_SCORES))
+    # A second engine: the first now remembers the order it just sent as held
+    # (the pass's own orders, 25 Nov 2026), and two decisions on the same
+    # name are being compared, not one decision after another.
+    decorated = ExecutionEngine(broker=broker, market_data=market).execute(sig(**EXTREME_SCORES))
 
     assert decorated.quantity == plain.quantity == 50
     assert decorated.stop_price == plain.stop_price
@@ -197,3 +200,79 @@ def test_execution_result_does_not_carry_the_transparency_fields(engine):
     # They belong in the signal journal, not in the engine's own contract.
     fields = set(engine.execute(sig(**EXTREME_SCORES)).model_dump())
     assert not fields & set(EXTREME_SCORES)
+
+
+# --------------------------------------------------------------------------- #
+# The pass's own orders (the owner's "build B" of 24 Nov 2026)
+# --------------------------------------------------------------------------- #
+
+
+def held(*names: str, qty: int = 49, price: float = 100.0) -> list[OpenPosition]:
+    return [OpenPosition(t, float(qty), qty * price, price) for t in names]
+
+
+def test_the_pass_s_own_orders_count_against_the_caps_before_the_broker_lists_them(engine, broker, market):
+    """The fake broker's list never shows a submitted order, like Alpaca's a
+    moment after the send. Four single names fill 19.6% of the 25% sleeve
+    and three more are asked in one pass: the second is sized to what the
+    first left (400 of headroom, 4 shares) and the third is refused for the
+    sleeve. Before the change all three got the full cap (18 Nov 2026: the
+    sleeve at 116% of its budget). The broker's own list is never touched."""
+    broker.positions = held("JPM", "XOM", "CAT", "LLY")
+    results = [engine.execute(sig(ticker=t)) for t in ("MSFT", "NVDA", "GOOGL")]
+    assert [(r.status, r.quantity) for r in results[:2]] == [(ExecutionStatus.ACCEPTED, 50),
+                                                             (ExecutionStatus.ACCEPTED, 4)]
+    assert results[2].status is ExecutionStatus.REJECTED and "sleeve budget" in results[2].reason
+    assert [o["ticker"] for o in broker.submitted] == ["MSFT", "NVDA"]
+    assert broker.positions == held("JPM", "XOM", "CAT", "LLY")
+    assert [(x.ticker, x.qty, x.price) for x in engine._sent] == [("MSFT", 50.0, 100.0), ("NVDA", 4.0, 100.0)]
+
+
+def test_an_order_the_list_caught_up_with_counts_once_and_a_partial_fill_at_the_orders_whole_size(engine, broker,
+                                                                                                    market):
+    broker.positions = held("JPM", "XOM", "CAT", "LLY")
+    engine.execute(sig(ticker="MSFT"))                                                 # 50 sent
+    broker.positions = held("JPM", "XOM", "CAT", "LLY") + [OpenPosition("MSFT", 30.0, 3_000.0, 100.0)]
+    assert [(p.ticker, p.qty, p.market_value) for p in engine._positions()][-1] == ("MSFT", 50.0, 5_000.0)
+    assert len(engine._positions()) == 5 and len(engine._sent) == 1      # 30 of 50 listed: still remembered
+    broker.positions[-1] = OpenPosition("MSFT", 50.0, 5_000.0, 100.0)
+    assert [p.qty for p in engine._positions() if p.ticker == "MSFT"] == [50.0]        # listed in full: once
+    assert engine._sent == []                                                          # and forgotten
+    assert engine.execute(sig(ticker="NVDA")).quantity == 4               # the listed MSFT counts as before
+
+
+def test_a_remembered_order_counts_for_a_minute_at_most(broker, market):
+    clock = [1_000.0]
+    engine = ExecutionEngine(broker=broker, market_data=market, clock=lambda: clock[0])
+    broker.positions = held("JPM", "XOM", "CAT", "LLY")
+    engine.execute(sig(ticker="MSFT"))
+    clock[0] += PASS_MEMORY_SECONDS - 1
+    assert engine.execute(sig(ticker="NVDA")).quantity == 4                            # 59 s old: still counted
+    clock[0] += PASS_MEMORY_SECONDS + 1
+    assert [p.ticker for p in engine._positions()] == ["JPM", "XOM", "CAT", "LLY"]      # both older than a minute
+    assert engine._sent == []
+    assert engine.execute(sig(ticker="GOOGL")).quantity == 50
+    assert PASS_MEMORY_SECONDS == 60.0
+
+
+def test_the_pass_s_own_orders_count_toward_the_position_limit(engine, broker, market):
+    broker.positions = [OpenPosition(f"T{i}", 1, 100.0) for i in range(cfg.MAX_OPEN_POSITIONS - 2)]
+    first, second, third = (engine.execute(sig(ticker=t)) for t in ("AAA", "BBB", "CCC"))
+    assert first.status is ExecutionStatus.ACCEPTED and second.status is ExecutionStatus.ACCEPTED
+    assert third.status is ExecutionStatus.REJECTED and "positions" in third.reason
+    assert f"{cfg.MAX_OPEN_POSITIONS} positions" in third.reason
+
+
+def test_a_short_of_the_pass_counts_with_its_sign_and_a_fresh_entry_cannot_flip_it(engine, broker, market):
+    engine.execute(sig(ticker="MSFT", bias="BEARISH"))
+    own, = engine._positions()
+    assert (own.ticker, own.qty, own.market_value, own.side) == ("MSFT", -50.0, 5_000.0, "sell")
+    r = engine.execute(sig(ticker="MSFT"))
+    assert r.status is ExecutionStatus.REJECTED and "conflicting" in r.reason
+    assert [o["ticker"] for o in broker.submitted] == ["MSFT"]
+
+
+def test_a_fresh_engine_remembers_nothing(broker, market):
+    assert ExecutionEngine(broker=broker, market_data=market)._sent == []
+    assert ExecutionEngine(broker=broker, market_data=market)._positions() == []
+

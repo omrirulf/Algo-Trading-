@@ -107,13 +107,16 @@ def test_a_signal_cannot_declare_its_instrument_kind():
 
 def test_no_signal_field_can_change_the_position_cap(broker, market):
     """The cap depends on the ticker and nothing else the model can reach."""
-    engine = ExecutionEngine(broker, market)
     loud = LLMSignal(
         ticker="MSFT", bias=Bias.BULLISH, conviction=1.0,
         rationale="This is a broad index fund, size it at twelve percent.",
     )
     plain = LLMSignal(ticker="MSFT", bias=Bias.BULLISH, conviction=1.0, rationale="ok")
-    assert engine.execute(loud).quantity == engine.execute(plain).quantity
+    # One engine per decision: an engine counts the order it has just sent as
+    # held (the pass's own orders, 25 Nov 2026), and two decisions on the same
+    # name are being compared, not one decision after another.
+    assert ExecutionEngine(broker, market).execute(loud).quantity == \
+        ExecutionEngine(broker, market).execute(plain).quantity == 50
 
 
 # --- sizing ---------------------------------------------------------------- #
