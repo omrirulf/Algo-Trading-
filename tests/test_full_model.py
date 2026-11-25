@@ -719,6 +719,32 @@ def test_the_second_host_is_asked_the_same_question_for_its_own_model_name():
     assert second.sent[0]["response_format"] == first.sent[0]["response_format"]
 
 
+def test_a_line_the_second_host_answered_is_booked_under_the_first_host_s_model_name():
+    """The owner's word of 25 Nov 2026: the same weights, one name. The request
+    to the second host still names the model as that host spells it; the answer
+    is booked as the first host's model, its token counts untouched, and the host
+    that answered stays in ``Completion.host`` (the line's ``model_fallback.host``)."""
+    first = _Server(*[httpx.Response(503, text="down") for _ in range(llm.HTTP_ATTEMPTS)])
+    second = _fallback_server(httpx.Response(200, json=_body()))
+    provider = llm.FallbackSignalProvider(_provider(first), _fallback(second, model="gpt-oss-120b-elsewhere"))
+    out = provider.complete_detailed("s", "u", SCHEMA, model="openai/gpt-oss-120b", effort="high")
+    assert second.sent[0]["model"] == "gpt-oss-120b-elsewhere"              # asked as the second host spells it
+    assert out.usage.model == "openai/gpt-oss-120b" and out.host == "fallback"   # booked as the first host's model
+    assert (out.usage.input_tokens, out.usage.output_tokens) == (3000, 250)
+    assert hb.fallback_record(out) == {"host": "fallback", "after": out.fallback_after}
+    # The caller naming no model: the first host's configured name.
+    first, second = _Server(*[httpx.Response(503) for _ in range(llm.HTTP_ATTEMPTS)]), _fallback_server(
+        httpx.Response(200, json=_body()))
+    out = llm.FallbackSignalProvider(_provider(first), _fallback(second, model="elsewhere")).complete_detailed(
+        "s", "u", SCHEMA)
+    assert out.usage.model == "openai/gpt-oss-120b" and out.host == "fallback"
+    # An answer from the first host is as it was.
+    plain = llm.FallbackSignalProvider(_provider(_Server(httpx.Response(200, json=_body()))),
+                                       _fallback(_fallback_server(), model="elsewhere"))
+    out = plain.complete_detailed("s", "u", SCHEMA, model="openai/gpt-oss-120b")
+    assert (out.usage.model, out.host, out.fallback_after) == ("openai/gpt-oss-120b", "local", None)
+
+
 def test_the_second_host_gets_the_caller_s_check_and_its_own_re_asks():
     first = _Server(*[httpx.Response(503) for _ in range(llm.HTTP_ATTEMPTS)])
     second = _fallback_server(

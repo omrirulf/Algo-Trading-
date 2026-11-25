@@ -187,8 +187,11 @@ A line the second host answered carries one more key, after `stage`:
 
 `host` is the second host; `after` is the first host's final error, cut to
 300 characters. The line is otherwise exactly a line the first host would
-have made: the same model, prompt, schema and reasoning level, and
-`usage.model` names the model as that host spells it. Every other line —
+have made: the same model, prompt, schema and reasoning level, and, since
+25 Nov 2026, the same `usage.model` — the first host's name for the weights,
+`openai/gpt-oss-120b` — so one name stands on every line and `host` alone
+says who answered (the owner's word of 25 Nov 2026; the lines of 23 and 24
+Nov carry the second host's own spelling, `gpt-oss-120b`). Every other line —
 every answer the configured host gave, and every line written while the
 fallback is off — has no `model_fallback` key at all. The cycle's
 `model_setup` names the second host under `fallback` while it is switched

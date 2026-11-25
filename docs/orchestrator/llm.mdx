@@ -196,9 +196,16 @@ first host's final error — and the journal line it makes carries
 tenth of the day's names were answered that way: the cycle is whole, but
 the configured host was failing at a rate the fallback was covering.
 Every cycle line's `model_setup` names the second host under `fallback`
-while it is switched on, `null` while it is not. The cost on such a line
-is priced at the model's row of the price table, which is the first
-host's price; the second host's is close but not the same.
+while it is switched on, `null` while it is not. Since 25 Nov 2026 (the
+owner's word) such a line is booked under the first host's name for the
+model, `openai/gpt-oss-120b`, so the daily drift check, the blend's refit
+and the cost see one model, and `model_fallback.host` alone says who
+answered; the request to the second host still names the model as that
+host spells it. Its cost is the first host's price, which overstates the
+second host's free tier by a few cents on a day it answers twenty names.
+Until then the line carried the second host's spelling, `gpt-oss-120b`,
+the drift check warned "model setup changed" on every such day, and the
+price table, not knowing that spelling, left the line without a cost.
 
 **Its pace.** The second host is asked one name at a time (`_SECOND_HOST_LANE`,
 the owner's "build" of 20 Nov 2026): names that need it queue up and ask in
