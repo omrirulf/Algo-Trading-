@@ -134,7 +134,8 @@ the journal are unchanged. The call record keeps that assembled document
 as the answer, not the thousands of event lines. The 480-second ceiling
 still bounds the whole answer, measured from the request: a streamed answer
 that runs on is cut where a plain one was, and counts as the same timeout
-with the same one retry. A server that answers plainly is read plainly, so
+with the same one retry — or, since 24 Nov 2026, none at a first host with
+a second host behind it (below). A server that answers plainly is read plainly, so
 the fake servers in the test suite and a provider without streaming need
 nothing else. The flags are part of the request body, so they are in the
 call record and in the body the voting arm rebuilds.
@@ -168,6 +169,25 @@ its own retries and re-asks, and the same 480-second ceiling. Both hosts
 failing is one `LLMError` naming both, the first host's first, so
 `analysis.call_errors` reads the first host's status and trigger (c)
 counts the day as it would have without a second host.
+
+**One timeout is enough.** Since 24 Nov 2026 (the owner's "build the
+one-timeout rule") an ask at the first host that runs to the 480-second
+ceiling is not asked again there while the second host is on:
+`heartbeat.full_model_provider` builds the first host's provider with
+`timeout_attempts=TIMEOUT_ATTEMPTS_WITH_SECOND_HOST` (one), so the name
+goes to the second host at once and its `model_fallback.after` reads
+"gave up after 1 attempt(s)". On 24 Nov DeepInfra was slow rather than
+down — 26 of 78 streams at the ceiling, the answers that arrived at a
+median of 359 seconds — and a name reached the second host only after a
+second ceiling there, 16 minutes in; the asks made after a name's first
+timeout held the four slots for 117 minutes between them, about 29
+minutes of a stage that ran 134 against its 120-minute budget and never
+asked 7 names, while the second host answered its 8 names in about two
+seconds each. Only a timeout changes: a 429 or 5xx is quick and keeps the
+first host's four asks; a refused or dropped connection keeps its one
+retry; the second host keeps its own one retry, having nothing behind it;
+and with the second host off a timeout is retried once as it has been
+since 23 Sep 2026.
 
 An answer from the second host carries `Completion.fallback_after` — the
 first host's final error — and the journal line it makes carries

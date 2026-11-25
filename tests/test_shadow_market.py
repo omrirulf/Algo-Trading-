@@ -297,3 +297,92 @@ def test_bars_of_an_empty_frame_have_nothing_and_the_feed_says_so():
     feed.at_open(DAYS[5].date())
     with pytest.raises(MarketDataError):
         feed.get_latest_price("AAA")
+
+
+# --------------------------------------------------------------------------- #
+# The traded scale (the calibration fix of 25 Nov 2026)
+# --------------------------------------------------------------------------- #
+
+
+def with_split(frame: pd.DataFrame, at: int, ratio: float) -> pd.DataFrame:
+    """``frame`` as yfinance hands it over: a ``Stock Splits`` column, the ratio on the split's day, 0 elsewhere."""
+    frame = frame.copy()
+    frame["Stock Splits"] = 0.0
+    frame.iloc[at, frame.columns.get_loc("Stock Splits")] = ratio
+    return frame
+
+
+def test_bars_put_split_adjusted_prices_back_on_the_scale_they_traded_at():
+    """Yahoo divides every bar before a 3-for-1 by three. ITA on 5 Nov 2026:
+    the copy's shares, bought at the recorded 209.07, were marked at ~69.7
+    for a week. The bars before the split are multiplied back, dividends
+    with them; the split's day and after are as Yahoo gives them; ``split``
+    names the day and the ratio."""
+    k = 100
+    frame = with_split(tape(), k, 3.0)
+    frame.loc[DAYS[50], "Dividends"] = 0.5
+    frame.loc[DAYS[120], "Dividends"] = 0.2
+    bars = Bars({"ITA": frame})
+    eve, split_day, after = DAYS[k - 1].date(), DAYS[k].date(), DAYS[k + 1].date()
+    raw = frame.iloc[k - 1]
+    assert bars.bar("ITA", eve) == pytest.approx((raw.Open * 3, raw.High * 3, raw.Low * 3, raw.Close * 3, 0.0))
+    assert bars.bar("ITA", DAYS[50].date())[4] == pytest.approx(1.5)
+    raw = frame.iloc[k]
+    assert bars.bar("ITA", split_day) == pytest.approx((raw.Open, raw.High, raw.Low, raw.Close, 0.0))
+    assert bars.bar("ITA", DAYS[120].date())[4] == pytest.approx(0.2)
+    assert bars.split("ITA", split_day) == 3.0
+    assert (bars.split("ITA", eve), bars.split("ITA", after), bars.split("NOPE", split_day)) == (1.0, 1.0, 1.0)
+    assert bars.last_close_before("ITA", split_day) == pytest.approx(frame["Close"].iloc[k - 1] * 3)
+
+
+def test_the_history_is_what_yahoo_showed_at_the_moment_asked_about():
+    """Before the split, the traded scale; from the split's day on, the
+    earlier bars divided -- so the engine's ATR, read across the split as the
+    live engine read it, sees no step, while ``bar`` keeps the traded scale."""
+    k = 100
+    frame = with_split(tape(), k, 3.0)
+    bars = Bars({"ITA": frame})
+    eve, split_day = DAYS[k - 1].date(), DAYS[k].date()
+    traded = frame.copy()
+    for column in ("Open", "High", "Low", "Close"):
+        traded.loc[traded.index < DAYS[k], column] *= 3
+    before = bars.history("ITA", eve)                                       # as of the eve: nothing adjusted yet
+    assert before["Close"].iloc[-1] == pytest.approx(traded["Close"].iloc[k - 1])
+    shown = bars.history("ITA", split_day)                                  # as of the split's day: Yahoo's own
+    assert shown["Close"].iloc[-2] == pytest.approx(frame["Close"].iloc[k - 1])
+    assert shown["Close"].iloc[-1] == pytest.approx(frame["Close"].iloc[k])
+    on_the_eve_as_of_the_split = bars.history("ITA", eve, as_of=split_day)   # what the feed asks at the open
+    assert on_the_eve_as_of_the_split["Close"].iloc[-1] == pytest.approx(frame["Close"].iloc[k - 1])
+    assert bars.history("ITA", eve, as_of=eve).equals(before)
+
+    feed = SimFeed(bars)
+    feed.at_open(eve)
+    assert feed.get_latest_price("ITA") == pytest.approx(traded["Open"].iloc[k - 1])
+    assert feed.get_atr("ITA") == pytest.approx(expected_atr(traded, eve))
+    feed.at_open(split_day)
+    assert feed.get_latest_price("ITA") == pytest.approx(frame["Open"].iloc[k])
+    assert feed.get_atr("ITA") == pytest.approx(expected_atr(frame, split_day))    # no step: Yahoo's series
+    assert bars.bar("ITA", split_day)[0] == pytest.approx(frame["Open"].iloc[k])
+
+
+def test_two_splits_compound_a_reverse_split_divides_and_a_frame_without_the_column_is_untouched():
+    frame = with_split(tape(), 60, 2.0)
+    frame.iloc[90, frame.columns.get_loc("Stock Splits")] = 3.0
+    bars = Bars({"AAA": frame, "BBB": tape()})
+    assert bars.bar("AAA", DAYS[10].date())[3] == pytest.approx(frame["Close"].iloc[10] * 6)
+    assert bars.bar("AAA", DAYS[60].date())[3] == pytest.approx(frame["Close"].iloc[60] * 3)
+    assert bars.bar("AAA", DAYS[89].date())[3] == pytest.approx(frame["Close"].iloc[89] * 3)
+    assert bars.bar("AAA", DAYS[90].date())[3] == pytest.approx(frame["Close"].iloc[90])
+    assert (bars.split("AAA", DAYS[60].date()), bars.split("AAA", DAYS[90].date())) == (2.0, 3.0)
+    between = bars.history("AAA", DAYS[75].date())                         # the first split taken out, not the second
+    assert between["Close"].iloc[10] == pytest.approx(frame["Close"].iloc[10] * 3)
+    assert between["Close"].iloc[-1] == pytest.approx(frame["Close"].iloc[75] * 3)
+    plain = tape()
+    assert bars.bar("BBB", DAYS[10].date())[3] == float(plain["Close"].iloc[10])
+    assert bars.split("BBB", DAYS[10].date()) == 1.0
+    assert bars.history("BBB", DAYS[75].date())["Close"].iloc[-1] == float(plain["Close"].iloc[75])
+    # 1-for-10 is a ratio of 0.1: Yahoo had multiplied the earlier bars by ten.
+    reverse = Bars({"CCC": with_split(tape(), 30, 0.1)})
+    assert reverse.bar("CCC", DAYS[0].date())[3] == pytest.approx(plain["Close"].iloc[0] * 0.1)
+    assert reverse.split("CCC", DAYS[30].date()) == 0.1
+

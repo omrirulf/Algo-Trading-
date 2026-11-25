@@ -42,7 +42,9 @@ afterwards. Four rules keep it the lowest-priority entry in the book:
   dispatches it after all of the day's directional signals.
 - **It counts the orders already sent.** The broker's position list lags its
   own fills by a few seconds, so a neutral hold is sized against the list
-  *plus* the orders the engine accepted earlier in the same pass.
+  *plus* the orders the engine accepted earlier in the same pass -- the same
+  memory every signal is sized against since 25 Nov 2026
+  (`ExecutionEngine._positions`; see [the guardrails](/guardrails)).
 
 The conviction floor does not apply: it asks how sure the model is of a
 direction, and `NEUTRAL` names none. The fraction comes from the ticker's

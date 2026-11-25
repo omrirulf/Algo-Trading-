@@ -45,7 +45,20 @@ CALIBRATION_FIXES: Final[tuple[tuple[date, str], ...]] = (
                          "stops fill when the real account's did (Amendment 2026-11-10)"),
     (date(2026, 11, 20), "the copy's engine sees the positions as they stood when the cycle's dispatch pass "
                          "began, as the real engine does (Amendment 2026-11-20)"),
+    (date(2026, 11, 25), ("the bars are on the scale they traded at and a split is applied to the book the day it "
+                          "takes effect; the copy's pass view shows an earlier order of the pass once the real "
+                          "account's fill of it had been listed 0.11 s before the line's decision "
+                          "(Amendment 2026-11-25)")),
+    (date(2026, 11, 25), ("from the cycles of 2026-11-25 the copy's engine sees its own pass's orders at once, as "
+                          "the real engine counts them since that day's change (Amendment 2026-11-25, finding B)")),
 )
+#: The first cycle day the real engine counted the orders of its own
+#: dispatch pass against the caps and the position count (the owner's
+#: "build B" of 24 Nov 2026, Amendment 2026-11-25). A cycle dated before it
+#: is sized under the pass view (Amendment 2026-11-20) with what the real
+#: account's list had caught up with (Amendment 2026-11-25); from it, every
+#: fund's engine sees its own fills at once, as the real one does.
+PASS_VIEW_UNTIL: Final[date] = date(2026, 11, 25)
 #: Calibration days that must come after the last fix. A day counts as after
 #: a fix only if its date is later than the fix's: a fix merged on a day may
 #: have been written with that day's close in view. So calibration ends at
@@ -92,4 +105,4 @@ RANDOM_FUNDS: Final[int] = 1000
 
 __all__ = ["AFTER_FIX_DAYS", "CALIBRATION_DAYS", "CALIBRATION_FIXES", "CALIBRATION_START", "FUNDS",
            "FUND_FIRST_CYCLE", "FUND_START", "FUND_TEST_BARS", "FUND_TEST_LOOK_ESTIMATES",
-           "FUND_TEST_PLANNED_SESSIONS", "FUND_TEST_PLANNED_START", "RANDOM_FUNDS"]
+           "FUND_TEST_PLANNED_SESSIONS", "FUND_TEST_PLANNED_START", "PASS_VIEW_UNTIL", "RANDOM_FUNDS"]

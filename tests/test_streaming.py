@@ -186,6 +186,27 @@ def test_a_stream_the_server_cuts_is_the_transport_failure_it_always_was(tmp_pat
     assert records[1]["kind"] == "retry after a timeout"
 
 
+def test_with_a_second_host_behind_it_a_stream_past_the_ceiling_is_not_asked_again(monkeypatch, tmp_path: Path):
+    """The one-timeout rule (24 Nov 2026): built for a first host with a second host behind it,
+    the provider gives the streamed ceiling no retry; the ``ProviderUnavailable`` sends the name
+    on, and the record holds the one ask."""
+    clock = [1000.0]
+    monkeypatch.setattr(llm.time, "monotonic", lambda: clock[0])
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(1)
+        return httpx.Response(200, stream=_Slow(clock), headers={"content-type": "text/event-stream"})
+
+    first = provider(handler, timeout=480.0, timeout_attempts=llm.TIMEOUT_ATTEMPTS_WITH_SECOND_HOST)
+    ceiling = r"480s ceiling \(gave up after 1 attempt\(s\)\)"
+    with model_io.capture(tmp_path, "run-3"), pytest.raises(llm.ProviderUnavailable, match=ceiling):
+        first.complete_detailed("s", "u", SCHEMA)
+    assert len(calls) == 1
+    records = [json.loads(line) for path in tmp_path.rglob("*.jsonl") for line in path.read_text().splitlines()]
+    assert [(r["outcome"], r["kind"]) for r in records] == [("timeout", "first")]
+
+
 def test_assemble_stream_skips_what_is_not_a_chunk():
     lines = ["", ": ping", "data: not json", "data: [1, 2]", 'data: {"choices": [{"delta": {"content": "ok"}}]}',
              "data: [DONE]", 'data: {"choices": [{"delta": {"content": "ignored after DONE"}}]}']

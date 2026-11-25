@@ -777,6 +777,107 @@ def test_the_request_body_the_voting_arm_rebuilds_is_the_first_host_s():
     assert provider.request_body("s", "u", SCHEMA, **kw)["model"] == "openai/gpt-oss-120b"
 
 
+# --- the one-timeout rule (the owner's "build the one-timeout rule" of 24 Nov 2026)
+#
+# On 24 Nov DeepInfra was slow rather than down: 26 of 78 streams ran to the
+# 480-second ceiling, and a name reached the second host only after a second
+# ceiling there. The asks made after a name's first timeout held the four slots
+# for 117 minutes between them, about 29 minutes of the stage; it ran past its
+# 120-minute budget and 7 names were never asked.
+# With a second host behind it, the first host's one timeout is enough. A busy
+# or server-error answer, a dropped connection, the second host's own timeouts
+# and a cycle without a second host are exactly as before.
+
+
+def _first_host(handler, **kw) -> OpenAICompatibleProvider:
+    client = httpx.Client(transport=httpx.MockTransport(handler), base_url="http://local")
+    return OpenAICompatibleProvider("http://local/v1", "openai/gpt-oss-120b", api_key="k", client=client,
+                                    sleep=lambda _: None, timeout=llm.FULL_MODEL_TIMEOUT_SECONDS, **kw)
+
+
+def test_with_a_second_host_behind_it_one_timeout_sends_the_name_there_at_once():
+    asked = []
+
+    def slow(request):
+        asked.append(json.loads(request.content))
+        raise httpx.ReadTimeout("the streamed answer ran past the 480s ceiling", request=request)
+
+    second = _fallback_server(httpx.Response(200, json=_body()))
+    provider = llm.FallbackSignalProvider(
+        _first_host(slow, timeout_attempts=llm.TIMEOUT_ATTEMPTS_WITH_SECOND_HOST), _fallback(second))
+    out = provider.complete_detailed("s", "u", SCHEMA, model="openai/gpt-oss-120b", effort="high")
+    assert len(asked) == 1 and len(second.sent) == 1          # no second ceiling at the first host
+    assert out.host == "fallback" and json.loads(out.text)["ticker"] == "AAPL"
+    assert out.fallback_after and "unreachable" in out.fallback_after
+    assert "gave up after 1 attempt(s)" in out.fallback_after
+    assert llm.TIMEOUT_ATTEMPTS_WITH_SECOND_HOST == 1 < llm.TRANSPORT_ATTEMPTS == 2
+
+
+@pytest.mark.parametrize("status", [429, 503])
+def test_with_a_second_host_behind_it_a_busy_or_failing_first_host_still_gets_its_four_asks(status):
+    """Only a timeout switches at once: a 429 or 5xx is quick, and the ladder is still worth climbing."""
+    first = _Server(*[httpx.Response(status, text="later") for _ in range(llm.HTTP_ATTEMPTS)])
+    second = _fallback_server(httpx.Response(200, json=_body()))
+    provider = llm.FallbackSignalProvider(
+        _provider(first, timeout_attempts=llm.TIMEOUT_ATTEMPTS_WITH_SECOND_HOST), _fallback(second))
+    out = provider.complete_detailed("s", "u", SCHEMA)
+    assert len(first.sent) == llm.HTTP_ATTEMPTS and len(second.sent) == 1
+    assert out.fallback_after and f"HTTP {status}" in out.fallback_after and "gave up after 4" in out.fallback_after
+
+
+def test_with_a_second_host_behind_it_a_dropped_connection_keeps_its_one_retry():
+    """The rule is about the ceiling: a connection the server drops is still asked once more."""
+    asked = []
+
+    def cut(request):
+        asked.append(1)
+        raise httpx.RemoteProtocolError("Server disconnected without sending a response.", request=request)
+
+    second = _fallback_server(httpx.Response(200, json=_body()))
+    provider = llm.FallbackSignalProvider(
+        _first_host(cut, timeout_attempts=llm.TIMEOUT_ATTEMPTS_WITH_SECOND_HOST), _fallback(second))
+    out = provider.complete_detailed("s", "u", SCHEMA)
+    assert len(asked) == llm.TRANSPORT_ATTEMPTS and len(second.sent) == 1
+    assert out.fallback_after and "gave up after 2 attempt(s)" in out.fallback_after
+
+
+def test_a_timeout_after_a_busy_answer_is_still_one_timeout():
+    """The count is of timeouts, not of asks: a busy answer first, then the ceiling, then the second host."""
+    calls = []
+
+    def busy_then_slow(request):
+        calls.append(1)
+        if len(calls) == 1:
+            return httpx.Response(429, text="Model busy")
+        raise httpx.ReadTimeout("the streamed answer ran past the 480s ceiling", request=request)
+
+    second = _fallback_server(httpx.Response(200, json=_body()))
+    provider = llm.FallbackSignalProvider(
+        _first_host(busy_then_slow, timeout_attempts=llm.TIMEOUT_ATTEMPTS_WITH_SECOND_HOST), _fallback(second))
+    out = provider.complete_detailed("s", "u", SCHEMA)
+    assert len(calls) == 2 and len(second.sent) == 1
+    assert out.fallback_after and "gave up after 2 attempt(s)" in out.fallback_after
+
+
+def test_without_a_second_host_a_timeout_keeps_its_one_retry():
+    """Default-built, a timeout is asked once more, as it has been since 23 Sep 2026."""
+    calls = {"n": 0}
+
+    def flaky(request):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise httpx.ReadTimeout("timed out", request=request)
+        return httpx.Response(200, json=_body())
+
+    out = _first_host(flaky).complete_detailed("s", "u", SCHEMA)
+    assert calls["n"] == 2 and out.host == "local" and out.fallback_after is None
+    assert OpenAICompatibleProvider("http://local/v1", "m")._timeout_attempts == llm.TRANSPORT_ATTEMPTS
+    # Never more asks than a transport failure gets, never fewer than one.
+    nine = OpenAICompatibleProvider("http://local/v1", "m", timeout_attempts=9)
+    none = OpenAICompatibleProvider("http://local/v1", "m", timeout_attempts=0)
+    assert nine._timeout_attempts == llm.TRANSPORT_ATTEMPTS and none._timeout_attempts == 1
+
+
 def test_the_cycle_builds_the_second_host_only_while_its_key_is_set():
     plain = _with(Settings(_env_file=None, full_model_api_key="k"), hb.full_model_provider)
     assert isinstance(plain, OpenAICompatibleProvider)
@@ -795,6 +896,10 @@ def test_the_cycle_builds_the_second_host_only_while_its_key_is_set():
     assert second._timeout == llm.FULL_MODEL_TIMEOUT_SECONDS
     assert second._attempts == llm.FALLBACK_HTTP_ATTEMPTS == 2 * llm.HTTP_ATTEMPTS == 8   # 20 Nov 2026
     assert wrapped.primary._attempts == llm.HTTP_ATTEMPTS                                  # the first host keeps its four
+    # The one-timeout rule (24 Nov 2026): with the second host behind it the first host asks
+    # once after a timeout; alone it asks twice; the second host, with nothing behind it, twice.
+    assert wrapped.primary._timeout_attempts == llm.TIMEOUT_ATTEMPTS_WITH_SECOND_HOST == 1
+    assert plain._timeout_attempts == second._timeout_attempts == llm.TRANSPORT_ATTEMPTS == 2
     assert wrapped.fallback_host == llm.configured_fallback_provider() == "api.cerebras.ai"
     assert llm.FALLBACK_MODEL == "gpt-oss-120b"            # Cerebras's own name for the same weights
 
