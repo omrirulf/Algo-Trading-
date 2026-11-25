@@ -1437,7 +1437,12 @@ class FallbackSignalProvider:
     An answer from the second host carries ``fallback_after`` -- the primary's
     final error -- so the journal line says who answered and why
     (``model_fallback``, written by ``heartbeat.judge_answer``) and the daily
-    health check can count the names the configured host did not answer.
+    health check can count the names the configured host did not answer. It
+    is booked under the primary's name for the model (the owner's word of 25
+    Nov 2026): the same weights, one name on every line, so the drift check,
+    the cost and the blend's refit see one model; ``model_fallback.host`` says
+    which host answered. Until then the line carried the second host's own
+    spelling (``FALLBACK_MODEL``) and, the price table not knowing it, no cost.
     The request body the voting arm rebuilds is the primary's: that is what
     production sends first.
 
@@ -1489,7 +1494,14 @@ class FallbackSignalProvider:
                     )
             except LLMError as second:
                 raise LLMError(f"{first}; then {where} as the fallback: {second}") from second
-            return replace(answer, fallback_after=str(first)[:FALLBACK_NOTE_CHARS])
+            # Booked under the first host's name for the same weights (the
+            # owner's word of 25 Nov 2026): one model, one name on every line,
+            # whoever answered. The host that did is ``Completion.host``, the
+            # line's ``model_fallback.host``; the request to the second host
+            # above still names the model as that host spells it.
+            booked = model or getattr(self.primary, "_model", None) or answer.usage.model
+            return replace(answer, usage=replace(answer.usage, model=booked),
+                           fallback_after=str(first)[:FALLBACK_NOTE_CHARS])
 
 
 def _re_ask_kind(attempt: int, problem: str) -> str:
