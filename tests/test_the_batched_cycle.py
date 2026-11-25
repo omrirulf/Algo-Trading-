@@ -188,6 +188,7 @@ def test_a_broad_fund_neutral_is_dispatched_last_then_the_core(batched, monkeypa
     engine -- after every directional signal of the cycle, and before the core
     pass that invests whatever all of them left."""
     use, _ = batched
+    monkeypatch.setattr(cfg, "NEUTRAL_HOLD_ENABLED", True)
     use("RSP", "XLE", "TLT", "NVDA")
     biases = {"RSP": "NEUTRAL", "XLE": "BULLISH", "TLT": "NEUTRAL", "NVDA": "BEARISH"}
     batches = _Batches(answer=lambda t, m: _answer(t, biases[t], model=m))

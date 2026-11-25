@@ -16,6 +16,14 @@ it takes a side on few names. On 24 Nov 2026 that left the paper account
 reason was that "no opinion" meant "hold cash". Two changes give it a
 different meaning.
 
+<Warning>
+  **Only the core is switched on.** Neutral holds are built and tested but
+  `NEUTRAL_HOLD_ENABLED` is `False`: the core went live first and alone, so
+  that its first cycles can be read on their own. Until that switch is
+  turned on, `NEUTRAL` means "no trade" for every ticker, and section 1
+  below describes what will happen, not what does.
+</Warning>
+
 ## 1. NEUTRAL on a broad fund means "hold the normal weight"
 
 | The model says | On a broad fund | On anything else |
@@ -135,7 +143,7 @@ code change that shows up in review:
 
 | Constant | Value | What it does |
 | --- | --- | --- |
-| `NEUTRAL_HOLD_ENABLED` | `True` | `NEUTRAL` on a broad fund opens a long at its normal weight. |
+| `NEUTRAL_HOLD_ENABLED` | `False` | When on, `NEUTRAL` on a broad fund opens a long at its normal weight. Off until the core has run cleanly on its own. |
 | `NEUTRAL_HOLD_FRACTION` | `0.5` | The normal weight, as a share of the fund's own cap. |
 | `NEUTRAL_HOLD_SLEEVE_PCT` | `0.50` | Neutral holds stop filling the fund sleeve here. |
 | `CORE_ENABLED` | `True` | Idle money is held in the core funds. |

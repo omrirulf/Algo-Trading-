@@ -205,7 +205,7 @@ detail on what each one prevents is in [Guardrails](/guardrails).
 | `MAX_SINGLE_NAME_SLEEVE_PCT` | `0.25` | Budget for the whole single-name sleeve. |
 | `MAX_FUND_SLEEVE_PCT` | `0.7` | Budget for the whole fund sleeve — the core allocation. |
 | `MAX_GROSS_EXPOSURE_PCT` | `0.95` | Ceiling on total deployed capital across every position. Leaves a 5% operational buffer. |
-| `NEUTRAL_HOLD_ENABLED` | `True` | `NEUTRAL` on a broad fund opens a long at its normal weight instead of doing nothing. See [The core and neutral holds](/core-and-neutral-holds). |
+| `NEUTRAL_HOLD_ENABLED` | `False` | When on, `NEUTRAL` on a broad fund opens a long at its normal weight instead of doing nothing. Off for now: the core went live first, alone. See [The core and neutral holds](/core-and-neutral-holds). |
 | `NEUTRAL_HOLD_FRACTION` | `0.5` | The normal weight, as a share of the broad-fund cap: 6% of equity. A starting point, not a measurement. |
 | `NEUTRAL_HOLD_SLEEVE_PCT` | `0.50` | Neutral holds stop filling the fund sleeve here, keeping the last 20% for directional calls. |
 | `CORE_ENABLED` | `True` | Idle money is held in `VT`, `BND` and `SGOV` instead of cash, rebalanced once a cycle after the signals. |

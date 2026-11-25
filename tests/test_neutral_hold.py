@@ -27,6 +27,19 @@ from orchestrator.llm import Completion, Usage
 from tests.conftest import FakeBroker, FakeMarketData
 
 EQUITY = 100_000.0
+
+
+@pytest.fixture(autouse=True)
+def _holds_switched_on(monkeypatch):
+    """The feature under test, switched on, whatever production's switch says.
+
+    ``NEUTRAL_HOLD_ENABLED`` is off in production until the core has run on
+    its own; the engine tests below pass ``neutral_holds=True`` themselves,
+    and the cycle tests read the constant.
+    """
+    monkeypatch.setattr(cfg, "NEUTRAL_HOLD_ENABLED", True)
+
+
 HOLD_PCT = cfg.MAX_BROAD_FUND_PCT * cfg.NEUTRAL_HOLD_FRACTION
 
 
@@ -346,3 +359,25 @@ def test_a_core_pass_that_raises_does_not_take_the_cycle_down(monkeypatch):
     assert len(report.completed) == 1
     assert "boom" in report.core["error"]
     assert "not rebalanced this cycle" in hb.render_summary(report)
+
+
+# --- the rollout: the core first, holds later ---------------------------------
+
+
+def test_with_the_switch_off_the_live_engine_is_built_without_holds(monkeypatch):
+    """What production runs today: NEUTRAL is no trade everywhere, the core still on."""
+    from orchestrator import dispatch
+
+    monkeypatch.setattr(cfg, "NEUTRAL_HOLD_ENABLED", False)
+    built = {}
+
+    class Engine:
+        def __init__(self, broker, market_data, neutral_holds, core):
+            built.update(neutral_holds=neutral_holds, core=core)
+
+    import app.broker_client, app.execution_engine, app.market_data
+    monkeypatch.setattr(app.execution_engine, "ExecutionEngine", Engine)
+    monkeypatch.setattr(app.broker_client, "AlpacaPaperBroker", lambda: None)
+    monkeypatch.setattr(app.market_data, "YFinanceMarketData", lambda: None)
+    dispatch.DirectDispatcher()._get_engine()
+    assert built == {"neutral_holds": False, "core": cfg.CORE_ENABLED}

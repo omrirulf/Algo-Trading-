@@ -257,7 +257,15 @@ MAX_GROSS_EXPOSURE_PCT: Final[float] = 0.95
 #: plainest reading of "normal", and nothing in the journal can grade it yet
 #: because no neutral hold has ever been opened. Grade it the way
 #: MIN_CONVICTION is graded -- on realised returns of the holds it produces.
-NEUTRAL_HOLD_ENABLED: Final[bool] = True
+#:
+#: OFF for now, on purpose. The core below went live first and alone (the
+#: owner's decision of 25 Nov 2026): it is the part that keeps the account
+#: invested, it leaves the signal book untouched, and its buy order had
+#: never met the real broker. Starting both on one day would have traded
+#: about half the account in a single cycle and left no way to say which of
+#: the two did what. Turn this on in a change of its own, once the core has
+#: run cleanly.
+NEUTRAL_HOLD_ENABLED: Final[bool] = False
 NEUTRAL_HOLD_FRACTION: Final[float] = 0.5
 
 #: How much of the account neutral holds may fill the fund sleeve to.
