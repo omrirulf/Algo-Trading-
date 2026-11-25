@@ -4,11 +4,26 @@ The engine takes a broker and a market-data provider by constructor injection
 so the full decision path is testable with fakes. It never reads the LLM's
 rationale for anything other than logging: the LLM's opinion is an *input*
 to the risk engine, never an instruction to it.
+
+The engine also remembers the orders it has just sent (the owner's "build B"
+of 24 Nov 2026, Amendment 2026-11-25). The cycle dispatches a pass's orders
+within a few seconds and sizes each against the broker's list of positions,
+which at Alpaca shows a fill about a tenth of a second after it lands, so the
+list the next order was sized against did not show the one just sent, and a
+pass could carry the book past the caps this engine enforces (18 Nov 2026:
+four single names each at the full cap, the sleeve at 116% of its budget).
+An accepted order now counts as held -- the shares it was sent for, at the
+price it was sized at -- until the list shows that many shares of the name
+or for ``PASS_MEMORY_SECONDS``, whichever comes first (``_positions``). The
+caps themselves are unchanged.
 """
 
 from __future__ import annotations
 
 import logging
+import time
+from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Optional
 
 from app import risk_engine
@@ -22,14 +37,44 @@ log = logging.getLogger(__name__)
 
 _SIDE_FOR_BIAS = {Bias.BULLISH: "buy", Bias.BEARISH: "sell"}
 
+#: How long an order this engine accepted keeps counting as held before the
+#: broker's own list shows it (the owner's "build B" of 24 Nov 2026,
+#: Amendment 2026-11-25). A market order fills within a second or two and
+#: the list shows it a tenth of a second later; a pass takes a few seconds;
+#: an order the list still does not show after a minute was not filled, and
+#: must not be carried as exposure for the rest of a long-lived process (the
+#: webhook engine lives for days; the cycle's engine for one cycle).
+PASS_MEMORY_SECONDS = 60.0
+
+
+@dataclass(frozen=True)
+class _Sent:
+    """An order this engine accepted, counted as held until the broker's list shows it in full."""
+
+    ticker: str
+    qty: float          # signed, as OpenPosition.qty: positive long, negative short
+    price: float        # the price it was sized at
+    at: float           # the engine's clock when it was sent
+
 
 class ExecutionEngine:
     def __init__(
         self, broker: BrokerClient, market_data: MarketDataProvider,
         audit_logger: Optional[logging.Logger] = None,
+        clock: Callable[[], float] = time.monotonic,
+        counts_sent_orders: bool = True,
     ) -> None:
         self._broker = broker
         self._market_data = market_data
+        #: A monotonic clock, injected so a test can age a remembered order.
+        self._clock = clock
+        #: The orders of the current pass the broker's list may not show yet.
+        self._sent: list[_Sent] = []
+        #: Whether those orders count as held (``_positions``). Always, live.
+        #: A simulated fund (``shadow/``) replaying a cycle from before 25 Nov
+        #: 2026 turns it off, because the real engine of that day did not
+        #: count them; nothing in production reads it.
+        self.counts_sent_orders = counts_sent_orders
         # Where the decision line goes. ``None`` is the live audit log. Set
         # only by a simulated book (``shadow/``), which must keep its own
         # record: the position manager reads that record back as its state,
@@ -80,6 +125,41 @@ class ExecutionEngine:
     # Decision path
     # ------------------------------------------------------------------ #
 
+    def _positions(self) -> list[OpenPosition]:
+        """The broker's list, plus the orders of this pass it has not caught up with.
+
+        The owner's "build B" of 24 Nov 2026 (Amendment 2026-11-25). An
+        order this engine accepted counts as held -- at the shares it was
+        sent for and the price it was sized at -- until the broker's list
+        shows that many shares of the name, or for ``PASS_MEMORY_SECONDS``,
+        whichever comes first. A name the list shows in part (a fill landing
+        in pieces) is counted at the order's whole size. Orders the list has
+        caught up with, and orders older than the memory, are forgotten here,
+        so the list is read exactly as before once the pass has settled.
+        """
+        listed = self._broker.get_open_positions()
+        if not self.counts_sent_orders:
+            self._sent = []
+            return listed
+        shown = {p.ticker: p for p in listed}
+        now = self._clock()
+        kept: list[_Sent] = []
+        merged = list(listed)
+        for sent in self._sent:
+            have = shown.get(sent.ticker)
+            if have is not None and abs(have.qty) + 1e-9 >= abs(sent.qty):
+                continue                                    # the list caught up: nothing to add
+            if now - sent.at > PASS_MEMORY_SECONDS:
+                continue                                    # not filled within the memory: forgotten
+            kept.append(sent)
+            own = OpenPosition(sent.ticker, sent.qty, abs(sent.qty) * sent.price, sent.price)
+            if have is None:
+                merged.append(own)
+            else:
+                merged = [own if p.ticker == sent.ticker else p for p in merged]
+        self._sent = kept
+        return merged
+
     def _execute(self, signal: LLMSignal) -> ExecutionResult:
         # Filled in once the account has been read, so every decision made
         # after that point -- accepted or refused -- records the equity it
@@ -109,10 +189,11 @@ class ExecutionEngine:
                 f"conviction {signal.conviction:.2f} below minimum {cfg.MIN_CONVICTION:.2f}"
             )
 
-        # 4. Account state.
+        # 4. Account state: the broker's list, plus this pass's own orders
+        #    the list has not caught up with (``_positions``).
         equity = self._broker.get_equity()
         account["equity"] = equity
-        positions = self._broker.get_open_positions()
+        positions = self._positions()
         existing = next((p for p in positions if p.ticker == signal.ticker), None)
 
         # 5. Position-count limit only applies when opening a *new* ticker.
@@ -179,6 +260,9 @@ class ExecutionEngine:
         order = self._broker.submit_bracket_order(
             ticker=signal.ticker, qty=qty, side=side, stop_price=stop_price
         )
+        # Counted as held from now on, until the list shows it (``_positions``).
+        if self.counts_sent_orders:
+            self._sent.append(_Sent(signal.ticker, float(qty if side == "buy" else -qty), price, self._clock()))
         return self._result(
             signal,
             ExecutionStatus.ACCEPTED,

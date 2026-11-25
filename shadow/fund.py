@@ -62,7 +62,10 @@ fund that reorders a pass by conviction keeps instant fills within the
 pass, each line seeing the fills before it: its question is what the order
 within a pass decides, which the view would make moot. Everything outside
 the pass -- the manager, the stops, the marks, the held-name skip -- sees
-the book as it is.
+the book as it is. The view applies to the cycles before 25 Nov 2026
+(``shadow.schedule.PASS_VIEW_UNTIL``): from that day the real engine counts
+the orders of its own pass (``app.execution_engine``, Amendment 2026-11-25,
+finding B), so every fund's engine sees its fills at once again.
 
 **What the pass view shows of its own pass** (calibration fix of 25 Nov
 2026, Amendment 2026-11-25; the calibration copy only). Alpaca's list is
@@ -167,6 +170,7 @@ from app.execution_engine import ExecutionEngine
 from app.position_manager import PositionManager
 from app.schemas import Bias, ExecutionResult, ExecutionStatus, LLMSignal
 from config.watchlist import DEFAULT_WATCHLIST
+from shadow import schedule
 from shadow.audit import FundAudit
 from shadow.broker import DEFAULT_COST_PER_SIDE, ENTRY, SimBroker
 from shadow.market import Bars, SimFeed, in_regular_hours
@@ -803,11 +807,17 @@ class Fund:
                 self.broker.not_shortable = refused_by(self.refused_on, refused_for)
             if self.priority == CONVICTION_FIRST and self._short_of_room(batch):
                 batch = by_conviction(batch)
-            # The pass view (Amendment 2026-11-20): the engine sizes every line of
-            # this pass against the positions as they stood when the pass began,
-            # as the real engine does. Not for the fund that reorders a pass by
+            # The real engine of this cycle's day: before schedule.PASS_VIEW_UNTIL
+            # it did not count the orders of its own pass (Amendment 2026-11-25,
+            # finding B), so the fund's engine does not either, and the pass view
+            # (Amendment 2026-11-20) stands in for Alpaca's list: every line of the
+            # pass is sized against the positions as they stood when the pass
+            # began. From that day the engine counts its own orders, as live, and
+            # no view is held. Never a view for the fund that reorders a pass by
             # conviction: its question is what the order within a pass decides.
-            held_view = self.priority != CONVICTION_FIRST
+            counts = batch[0][0].day >= schedule.PASS_VIEW_UNTIL
+            self.engine.counts_sent_orders = counts
+            held_view = self.priority != CONVICTION_FIRST and not counts
             if held_view:
                 self.broker.hold_view()
             try:

@@ -222,3 +222,20 @@ rejecting it afterwards.
   used to be implicit at 50% (`MAX_OPEN_POSITIONS × MAX_POSITION_PCT`) and is
   now an explicit 95%, leaving a 5% cash floor at all times.
 </Note>
+
+## Within a pass: the engine's own orders count
+
+The cycle sends a pass's orders within a few seconds, and Alpaca's list of
+positions shows a fill about a tenth of a second after it lands, so the list
+the next order was sized against did not show the one just sent. On 18 Nov
+2026 four single names were each sized at the full cap and the single-name
+sleeve ended at 116% of its budget; on 23 Nov three orders were each sized to
+the same $200 of headroom. Since 25 Nov 2026 (pre-registration, Amendment
+2026-11-25) the engine remembers each order it accepts -- the name, the shares
+it was sent for, the price it was sized at -- and adds it to the list it reads
+for the position count and the gross, sleeve, group and stock-market checks,
+until the broker's list shows that many shares of the name or for 60 seconds
+(`PASS_MEMORY_SECONDS`), whichever comes first; a name the list shows in part
+counts at the order's whole size (`ExecutionEngine._positions`). The caps
+themselves are unchanged: within a pass, the later orders are now sized to
+what the earlier ones left.

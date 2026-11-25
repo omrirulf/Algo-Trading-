@@ -162,6 +162,12 @@ plain pass view; they have no real fills to read. The fixed simulation is
 again re-run from the same 28 Sep seed, and at least 5 calibration days must
 come after these fixes.
 
+From the cycles of 25 Nov 2026 the real engine counts the orders of its own
+pass against the caps (pre-registration, Amendment 2026-11-25, finding B), so
+every fund's engine sees its fills at once again (`PASS_VIEW_UNTIL` in
+`shadow/schedule.py`); the pass view, and what it showed of its own pass,
+apply to the cycles before that day.
+
 ## The fund test's start, and the gate
 
 The fund test's start is fixed (the owner's decision of 26 Sep 2026): the

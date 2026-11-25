@@ -402,6 +402,43 @@ def test_a_split_moves_the_book_to_the_new_scale_the_day_it_takes_effect():
     assert index.days[3].equity == pytest.approx(index.days[2].equity)
 
 
+def test_from_the_cycles_the_real_engine_counted_its_own_pass_every_fund_sees_its_fills_at_once(monkeypatch):
+    """Finding (B), the owner's "build B" of 24 Nov 2026: from the cycle day
+    ``schedule.PASS_VIEW_UNTIL`` the real engine counts the orders of its own
+    pass, so every fund's engine sees its fills at once again; a cycle before
+    that day keeps the pass view. The 5 Oct shape: [50, 49, 49] under the
+    view, [50, 3, refused for the sleeve] at once."""
+    from shadow import schedule
+
+    held = ("JPM", "XOM", "CAT", "LLY")
+    asked = ("MSFT", "NVDA", "GOOGL")
+    bars = Bars({t: flat() for t in held + asked})
+    feed = SimFeed(bars)
+    cycle = lines_by_day([said(t, S[0]) for t in asked])[S[0]]
+
+    def seeded(f: Fund) -> Fund:
+        for t in held:
+            f.broker.seed_position(t, 49, 100.0, S[0], stops=[(49, 90.0)])
+        f.broker.cash = STARTING_CASH - 4 * 49 * 100.0
+        return f
+
+    feed.at_open(S[1])
+    monkeypatch.setattr(schedule, "PASS_VIEW_UNTIL", S[1])          # the cycle of S[0] is before it: the view holds
+    before = seeded(fund("model", bars, feed))
+    before.session(S[1], cycle)
+    assert [(x.ticker, x.qty) for x in before.broker.fills if x.kind == ENTRY] == [
+        ("MSFT", 50), ("NVDA", 49), ("GOOGL", 49)]
+    assert before.broker.passes == [0]
+
+    monkeypatch.setattr(schedule, "PASS_VIEW_UNTIL", S[0])          # from the cycle of S[0]: at once
+    after = seeded(fund("model", bars, feed))
+    after.session(S[1], cycle)
+    assert [(x.ticker, x.qty) for x in after.broker.fills if x.kind == ENTRY] == [("MSFT", 50), ("NVDA", 3)]
+    assert after.decisions[-1].status == "REJECTED" and "sleeve budget" in after.decisions[-1].reason
+    assert after.broker.passes == [] and after.broker._view is None   # no view was held
+    assert schedule.PASS_VIEW_UNTIL == S[0]
+
+
 def test_a_second_cycle_the_same_day_is_dispatched_after_the_first():
     bars = Bars({t: flat() for t in ("MSFT", "XOM")})
     feed = SimFeed(bars)
