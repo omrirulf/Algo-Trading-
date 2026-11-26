@@ -13,13 +13,13 @@ entries                   4312
 
 Does conviction predict the outcome?
 ------------------------------------
-rank correlation, conviction vs signed return: +0.08 (n=300)
+rank correlation, conviction vs signed return: +0.09 (n=300)
 
 conviction        n   hit rate      mean    median
 0.00-0.30         1       0.0%     -0.7%     -0.7%  (thin)
 0.30-0.45        77      32.5%     -1.1%     -0.5%
-0.45-0.60       131      49.6%     -0.6%     -0.1%
-0.60-0.75        74      54.1%     +0.1%     +0.6%
+0.45-0.60       131      48.9%     -0.6%     -0.2%
+0.60-0.75        74      55.4%     +0.2%     +0.8%
 0.75-1.00        17      23.5%     -1.0%     -1.1%
 
 Floor at 0.30 — did it filter the right signals?
@@ -34,10 +34,10 @@ Each score against the ticker's raw forward return.
 
 dimension         n     rank corr
 news            300         -0.11
-technical       300         -0.01
-fundamental     300         -0.26
-analyst         260         -0.05
-insider         257         -0.14
+technical       300         -0.03
+fundamental     300         -0.24
+analyst         260         -0.03
+insider         257         -0.13
 
 Does the learned blend carry information?
 -----------------------------------------
@@ -49,11 +49,11 @@ record, never a refit that has seen the return it is judged on.
 
 policy                n  called     rank corr  hit rate
 model conviction   3058     299         -0.03     44.8%
-equal weights      3058    2821         -0.02     47.7%
+equal weights      3058    2821         -0.01     47.9%
 learned blend      2667    2514         +0.01     50.8%
   learned composites from fitted weights: 2339; from the equal-weight fallback: 328
 
-  model and blend called opposite directions  n=128   model hit 40.6%  blend hit 59.4%
+  model and blend called opposite directions  n=128   model hit 41.4%  blend hit 58.6%
 
   READY TO LEAVE SHADOW: the learned blend carries more information than the model's conviction and than equal weights, and was right more often than not
 
