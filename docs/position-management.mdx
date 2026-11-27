@@ -101,9 +101,14 @@ The manager reaches the broker through exactly four primitives:
 `DELETE /v2/positions/{symbol}?qty=N` reduces the named position and cannot
 open, add to, or reverse one. That property is what lets a partial exit exist
 at all without weakening the rule that every *entry* is a bracket with a
-stop: a `MarketOrderRequest` without `stop_loss` is still never constructed
-anywhere in the codebase, and CI checks both that and that these four calls
-exist in `app/broker_client.py` and nowhere else.
+stop: a `MarketOrderRequest` without `stop_loss` is constructed in one place
+only — the core buy, which refuses every ticker but the three
+[core funds](/core-and-neutral-holds) — and CI checks both that and that
+these four calls exist in `app/broker_client.py` and nowhere else.
+
+The position manager never sees the core funds. They are dropped from its
+list before any pass, so it places no stop on one and walks none up the
+ladder.
 
 A standalone stop is not close-only the way `close_position` is — a stop
 *sell* for a symbol nobody holds would open a short. So the broker client

@@ -210,3 +210,75 @@ def test_webhook_mode_reports_a_refusal_rather_than_raising(monkeypatch):
     d = WebhookDispatcher(client=httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(401, text="no"))))
     out = d.manage_positions()
     assert out["error"] == "HTTP 401"
+
+
+# --- the core pass rides the same transport ---------------------------------
+
+
+def test_the_core_url_sits_beside_the_signal_url():
+    assert dispatch.core_url("http://engine:8000/webhook/signal") == "http://engine:8000/webhook/core/rebalance"
+    assert dispatch.core_url("http://engine:8000/webhook/signal/") == "http://engine:8000/webhook/core/rebalance"
+    assert dispatch.core_url("http://engine:8000/custom") == "http://engine:8000/custom/core/rebalance"
+
+
+def test_direct_mode_rebalances_the_core_in_process(broker, market):
+    from app.execution_engine import ExecutionEngine
+    from config.instruments import CORE_FUNDS
+
+    d = DirectDispatcher(engine=ExecutionEngine(broker, market, core=True))
+    out = d.rebalance_core()
+    assert {o["ticker"] for o in broker.core_bought} == set(CORE_FUNDS)
+    assert out["bought"] == 3 and out["errors"] == 0
+    assert 0.90 <= out["invested_pct"] <= 0.95
+
+
+def test_direct_mode_sizes_the_core_against_orders_the_broker_has_not_shown(broker, market):
+    """The engine's own record of the pass goes with the request."""
+    from app.execution_engine import ExecutionEngine
+
+    engine = ExecutionEngine(broker, market, core=True)
+    d = DirectDispatcher(engine=engine)
+    assert d.dispatch(signal("XLE"))["status"] == "ACCEPTED"     # 7% -- and never shown as a position
+    out = d.rebalance_core()
+    assert out["book_value"] == pytest.approx(7_000.0)
+    core = sum(o["qty"] for o in broker.core_bought) * market.price
+    assert core + 7_000.0 <= broker.equity * 0.95
+
+
+def test_direct_mode_does_nothing_when_the_core_is_switched_off(broker, market, monkeypatch):
+    from app.execution_engine import ExecutionEngine
+
+    monkeypatch.setattr(dispatch.cfg, "CORE_ENABLED", False)
+    d = DirectDispatcher(engine=ExecutionEngine(broker, market))
+    assert d.rebalance_core() == {"disabled": True}
+    assert broker.core_bought == [] and broker.closed == []
+
+
+def test_webhook_mode_posts_to_the_core_endpoint_with_the_secret(monkeypatch):
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["url"] = str(request.url)
+        seen["secret"] = request.headers.get("x-webhook-secret")
+        seen["body"] = request.content
+        return httpx.Response(200, json={"bought": 2, "sold": 1, "actions": []})
+
+    monkeypatch.setattr(
+        dispatch, "get_settings",
+        lambda: Settings(webhook_url="http://engine/webhook/signal", webhook_shared_secret="s3", _env_file=None),
+    )
+    d = WebhookDispatcher(client=httpx.Client(transport=httpx.MockTransport(handler)))
+    out = d.rebalance_core()
+    assert seen["url"] == "http://engine/webhook/core/rebalance"
+    assert seen["secret"] == "s3"
+    assert seen["body"] == b""          # nothing a caller could say should change the targets
+    assert out["bought"] == 2
+
+
+def test_webhook_mode_reports_a_core_refusal_rather_than_raising(monkeypatch):
+    monkeypatch.setattr(
+        dispatch, "get_settings",
+        lambda: Settings(webhook_url="http://engine/webhook/signal", webhook_shared_secret="s3", _env_file=None),
+    )
+    d = WebhookDispatcher(client=httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(404, text="no"))))
+    assert d.rebalance_core()["error"] == "HTTP 404"

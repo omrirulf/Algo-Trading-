@@ -91,6 +91,8 @@ class FakeBroker:
     replaced: list[dict] = field(default_factory=list)
     closed: list[dict] = field(default_factory=list)
     protected: list[dict] = field(default_factory=list)
+    # What the core pass bought, in order. Its sells go through ``closed``.
+    core_bought: list[dict] = field(default_factory=list)
 
     def is_market_open(self) -> bool:
         return self.market_open
@@ -146,6 +148,15 @@ class FakeBroker:
                                       "current_qty": current_qty})
                 return updated
         raise BrokerError(f"no open stop order {order_id}")
+
+    def submit_core_order(self, ticker: str, qty: int) -> str:
+        """Mirrors the real primitive's one refusal: a core fund or nothing."""
+        from config.instruments import is_core
+
+        if not is_core(ticker):
+            raise BrokerError(f"refusing a core order for {ticker}: not a core fund")
+        self.core_bought.append({"ticker": ticker, "qty": qty})
+        return f"core-{len(self.core_bought)}"
 
     def close_position_partially(self, ticker: str, qty: int) -> str:
         for index, position in enumerate(self.positions):

@@ -37,6 +37,7 @@ algo-trading-system/
 │   ├── market_data.py         # yfinance-based ATR / price fetch
 │   ├── broker_client.py       # Alpaca paper trading client (only module with keys)
 │   ├── execution_engine.py    # orchestrates validate -> size -> stop -> submit
+│   ├── core_book.py           # holds idle money in VT/BND/SGOV; rebalanced after each cycle's signals
 │   └── logger.py              # structured JSON audit log
 ├── orchestrator/
 │   ├── heartbeat.py           # daily job: gather context -> call LLM -> POST signal
@@ -72,6 +73,8 @@ algo-trading-system/
 │   ├── test_schemas.py        # proves the LLM cannot smuggle qty/price fields
 │   ├── test_market_data.py    # Wilder ATR against a reference implementation
 │   ├── test_execution_engine.py  # full decision path + the new fields are inert
+│   ├── test_core_book.py      # the core fills the limits, never raises one, never blocks a signal
+│   ├── test_neutral_hold.py   # NEUTRAL on a broad fund holds its normal weight, last in line
 │   ├── test_webhook.py        # auth + 422 at the HTTP layer
 │   ├── test_heartbeat.py      # orchestrator can only send the closed shape
 │   ├── test_news.py           # Bright Data request shape + response parsing

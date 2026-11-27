@@ -53,7 +53,7 @@ from analysis.reader import SCORE_FIELDS, SCORE_SOURCES  # noqa: E402
 from app.schemas import MAX_KEY_FACTORS, Bias, LLMSignal  # noqa: E402
 from config import journal_files  # noqa: E402
 from config import settings as cfg  # noqa: E402
-from config.instruments import is_fund  # noqa: E402
+from config.instruments import InstrumentKind, is_fund, kind_for  # noqa: E402
 from orchestrator.fx import FxRate, fetch_rate as fetch_fx_rate  # noqa: E402
 from config.settings import get_settings  # noqa: E402
 from orchestrator import blend, context, flows, journal, live_price, llm, model_io  # noqa: E402
@@ -703,6 +703,9 @@ class CycleReport:
     #: batched cycle is allowed to take much longer than a live one, and a
     #: summary that did not say so would read as a cycle that hung.
     batched: bool = False
+    #: What the core pass did with the money the signals left idle, after the
+    #: last of them; ``None`` when the dispatcher has no core to rebalance.
+    core: dict | None = None
 
     @property
     def completed(self) -> tuple[TickerResult, ...]:
@@ -778,6 +781,7 @@ def render_summary(report: CycleReport) -> str:
     screened = len(report.screened)
 
     out += render_positions(report.positions)
+    out += render_core(report.core)
 
     if report.produced_nothing:
         out += [
@@ -899,6 +903,35 @@ def render_positions(positions: dict | None) -> list[str]:
         rows.append(f"| {a.get('ticker')} | {what} |")
     if rows:
         out += ["| Position | What happened |", "| --- | --- |"] + rows + [""]
+    return out
+
+
+def render_core(core: dict | None) -> list[str]:
+    """What the core pass did with the idle money, for the job summary."""
+    if core is None or core.get("disabled"):
+        return []
+    if core.get("error"):
+        return [f"**Core:** not rebalanced this cycle -- {core['error']}", ""]
+    if core.get("market_closed"):
+        return ["**Core:** market closed, not touched.", ""]
+    out = [
+        f"**Core:** {core.get('invested_pct', 0):.1%} of the account invested once these fill "
+        f"· {core.get('bought', 0)} fund(s) bought · {core.get('sold', 0)} sold "
+        f"· {core.get('errors', 0)} error(s)",
+        "",
+    ]
+    rows = []
+    for a in core.get("actions") or []:
+        kind = a.get("action")
+        if kind in ("bought", "sold"):
+            what = f"{kind} {a.get('qty')} at ~{a.get('price', 0):.2f}, {a.get('held_qty')} held"
+        elif kind == "held":
+            what = f"holding {a.get('held_qty')} ({a.get('reason', '')})"
+        else:
+            what = f"{kind}: {a.get('reason', '')}"
+        rows.append(f"| {a.get('ticker')} | {what} |")
+    if rows:
+        out += ["| Core fund | What happened |", "| --- | --- |"] + rows + [""]
     return out
 
 
@@ -1248,12 +1281,61 @@ def prepare_ticker(
     return PreparedTicker(ticker, ticker_context, system_prompt, user_prompt, gaps)
 
 
+def is_neutral_hold(signal: LLMSignal) -> bool:
+    """True for a NEUTRAL the engine will act on: one on a broad fund.
+
+    A NEUTRAL everywhere else is still "no trade". On a broad fund it is an
+    entry at the fund's normal weight (``cfg.NEUTRAL_HOLD_FRACTION``), and so
+    it has to reach the engine -- and reach it last. Which funds qualify is
+    the engine's decision, made again there from the ticker; this only says
+    which NEUTRALs are worth delivering.
+    """
+    return (
+        cfg.NEUTRAL_HOLD_ENABLED
+        and signal.bias is Bias.NEUTRAL
+        and kind_for(signal.ticker) is InstrumentKind.BROAD_FUND
+    )
+
+
+@dataclass(frozen=True)
+class PendingHold:
+    """A neutral hold, set aside until the cycle's directional signals are in.
+
+    Order is priority on the dispatch path: the first signals delivered take
+    the room. A fund the model has no view on must not take it from one the
+    model does have a view on, so the cycle collects these and delivers them
+    after everything else. ``deliver`` does exactly what would have happened
+    in place -- dispatch, journal, result.
+    """
+
+    ticker: str
+    deliver: Callable[[], "TickerResult"]
+
+
+def deliver_holds(outcomes: list["TickerResult | PendingHold"]) -> list["TickerResult"]:
+    """Every outcome as a result: the finished ones, then each hold delivered.
+
+    Holds go in the order they were set aside, which is watchlist order.
+    """
+    results = [o for o in outcomes if isinstance(o, TickerResult)]
+    for pending in (o for o in outcomes if isinstance(o, PendingHold)):
+        results.append(pending.deliver())
+    return results
+
+
 def apply_screen(
     prepared: PreparedTicker,
     answer: "Completion | BaseException",
     fx: FxRate | None = None,
-) -> tuple[dict | None, TickerResult | None]:
+    dispatcher: Dispatcher | None = None,
+    defer_holds: bool = False,
+) -> "tuple[dict | None, TickerResult | PendingHold | None]":
     """Record what the cheap stage said; a NEUTRAL ends the ticker here.
+
+    With ``defer_holds`` -- which only a cycle passes -- a NEUTRAL on a broad
+    fund is not the end of it: it is handed back as a ``PendingHold`` for the
+    cycle to deliver to the engine after its directional signals. Without it
+    this stage never dispatches anything, as before.
 
     Returns the journal's screen record and, when the funnel stops, the
     result that ends this ticker. A screen that *failed* returns a record
@@ -1279,6 +1361,11 @@ def apply_screen(
         }
         if first_signal.bias is Bias.NEUTRAL:
             log.info("%s: screened NEUTRAL by %s; full model not asked", prepared.ticker, model)
+            if defer_holds and first_signal.ticker == prepared.ticker and is_neutral_hold(first_signal):
+                return screen, PendingHold(prepared.ticker, lambda: _deliver(
+                    prepared, first_signal, dispatcher,
+                    usage=answer.usage, fx=fx, screen=screen,
+                ))
             journal.record(
                 prepared.context, first_signal, usage=answer.usage, fx=fx, screen=screen
             )
@@ -1296,11 +1383,14 @@ def judge_answer(
     dispatcher: Dispatcher | None = None,
     fx: FxRate | None = None,
     weights: blend.LoadedWeights | None = None,
-) -> TickerResult:
+    defer_holds: bool = False,
+) -> "TickerResult | PendingHold":
     """Everything after the full model answered: parse, blend, dispatch, record.
 
     Like ``apply_screen``, takes the answer as a value so a batched result and
-    a live one travel the same path from here on.
+    a live one travel the same path from here on. And like it, with
+    ``defer_holds`` a NEUTRAL on a broad fund comes back as a ``PendingHold``
+    instead of being dispatched in place.
     """
     ticker, ticker_context = prepared.ticker, prepared.context
     gaps = prepared.gaps
@@ -1337,6 +1427,31 @@ def judge_answer(
         journal.record(ticker_context, signal, usage=usage, fx=fx, screen=screen, blend=blend_record, error=f"answered for {signal.ticker}", fallback=fallback)
         return TickerResult(ticker, MODEL_FAILED, gaps=gaps)
 
+    if defer_holds and is_neutral_hold(signal):
+        return PendingHold(ticker, lambda: _deliver(
+            prepared, signal, dispatcher,
+            usage=usage, fx=fx, screen=screen, blend_record=blend_record, fallback=fallback,
+        ))
+    return _deliver(
+        prepared, signal, dispatcher,
+        usage=usage, fx=fx, screen=screen, blend_record=blend_record, fallback=fallback,
+    )
+
+
+def _deliver(
+    prepared: PreparedTicker,
+    signal: LLMSignal,
+    dispatcher: Dispatcher | None,
+    *,
+    usage: Any = None,
+    fx: FxRate | None = None,
+    screen: dict | None = None,
+    blend_record: dict | None = None,
+    fallback: dict | None = None,
+) -> TickerResult:
+    """Hand one signal to the engine and journal what came of it. Never raises."""
+    ticker, ticker_context, gaps = prepared.ticker, prepared.context, prepared.gaps
+
     # The name's price at the moment this signal is made: read before the
     # engine is asked, so it is what a same-day entry would have met rather
     # than a quote taken after our own order. For the journal only -- the
@@ -1368,7 +1483,8 @@ def process_ticker(
     fx: FxRate | None = None,
     weights: blend.LoadedWeights | None = None,
     held: frozenset[str] = frozenset(),
-) -> TickerResult:
+    defer_holds: bool = False,
+) -> "TickerResult | PendingHold":
     """Run one ticker end to end, live, and report how far it got.
 
     Returns rather than raises on every failure, because one broken ticker
@@ -1382,6 +1498,10 @@ def process_ticker(
     journalled and dropped before either model is asked -- see
     ``SKIP_HELD_TICKERS``. Empty by default, so a ticker run on its own is
     reviewed whether or not it is held.
+
+    ``defer_holds`` is for the cycle: a NEUTRAL on a broad fund then comes
+    back as a ``PendingHold`` to deliver after the directional signals. A
+    ticker run on its own leaves it off and always gets a ``TickerResult``.
     """
     prepared = prepare_ticker(ticker, fx, held)
     if isinstance(prepared, TickerResult):
@@ -1393,11 +1513,15 @@ def process_ticker(
     # journal.
     screen: dict | None = None
     if SCREENING_ENABLED:
-        screen, finished = apply_screen(prepared, _ask(screen_signal, prepared), fx)
+        screen, finished = apply_screen(
+            prepared, _ask(screen_signal, prepared), fx, dispatcher, defer_holds
+        )
         if finished is not None:
             return finished
 
-    return judge_answer(prepared, _ask(call_llm, prepared), screen, dispatcher, fx, weights)
+    return judge_answer(
+        prepared, _ask(call_llm, prepared), screen, dispatcher, fx, weights, defer_holds
+    )
 
 
 def _ask(call, prepared: PreparedTicker) -> "Completion | BaseException":
@@ -1447,6 +1571,34 @@ def manage_positions(dispatcher: Dispatcher) -> dict | None:
                 "and the replacement was refused. Place one by hand.",
                 outcome["unprotected"],
             )
+    return outcome
+
+
+def rebalance_core(dispatcher: Dispatcher) -> dict | None:
+    """Invest what the cycle's signals left idle. Never raises.
+
+    Run once, after the last signal, so the core is sized against the book
+    those signals left (``app.core_book``). ``None`` when the dispatcher has
+    no such capability -- a test double, or an older engine behind the
+    webhook -- and the summary then says nothing about a core rather than
+    implying one was rebalanced.
+    """
+    rebalance = getattr(dispatcher, "rebalance_core", None)
+    if rebalance is None:
+        return None
+    try:
+        outcome = rebalance()
+    except Exception as exc:  # noqa: BLE001 - the core must not take the cycle down
+        log.warning("core rebalance failed (%s)", exc)
+        return {"error": f"{type(exc).__name__}: {exc}"}
+    if isinstance(outcome, dict) and outcome.get("error"):
+        log.warning("core rebalance reported an error: %s", outcome["error"])
+    elif isinstance(outcome, dict) and not outcome.get("disabled") and not outcome.get("market_closed"):
+        log.info(
+            "core: %.1f%% of the account invested once filled; %s bought, %s sold, %s error(s)",
+            100 * (outcome.get("invested_pct") or 0), outcome.get("bought", 0),
+            outcome.get("sold", 0), outcome.get("errors", 0),
+        )
     return outcome
 
 
@@ -1667,7 +1819,10 @@ def run_batched_cycle(
     # (news.RETRY_WAIT_BUDGET_SECONDS); the budget starts here, so a bad
     # vendor day bounds the context stage instead of the job cap doing it.
     reset_retry_waits()
-    results: list[TickerResult] = []
+    # Neutral holds are set aside as they turn up and delivered after every
+    # directional signal below (``PendingHold``), so they stay in this list
+    # until the end.
+    results: list[TickerResult | PendingHold] = []
     prepared: list[PreparedTicker] = []
     for ticker in tickers:
         outcome = prepare_ticker(ticker, fx, held)
@@ -1684,7 +1839,9 @@ def run_batched_cycle(
         )
         survivors: list[PreparedTicker] = []
         for item in prepared:
-            screens[item.ticker], finished = apply_screen(item, answered[item.ticker], fx)
+            screens[item.ticker], finished = apply_screen(
+                item, answered[item.ticker], fx, dispatcher, defer_holds=True
+            )
             (results.append(finished) if finished is not None else survivors.append(item))
         prepared = survivors
         log.info("%d ticker(s) escalated past the screen", len(prepared))
@@ -1716,11 +1873,21 @@ def run_batched_cycle(
 
     for item in prepared:
         results.append(
-            judge_answer(item, answers[item.ticker], screens.get(item.ticker), dispatcher, fx, weights)
+            judge_answer(
+                item, answers[item.ticker], screens.get(item.ticker), dispatcher, fx, weights,
+                defer_holds=True,
+            )
         )
 
+    # Last of the entries: the funds the model has no view on, at their
+    # normal weight, into whatever room its views left. Then the core, sized
+    # against the book all of that produced.
+    finished = deliver_holds(results)
+    core = rebalance_core(dispatcher)
+
     report = CycleReport(
-        tickers=tickers, results=tuple(results), fx=fx, positions=positions, batched=True
+        tickers=tickers, results=tuple(finished), fx=fx, positions=positions, batched=True,
+        core=core,
     )
     log.info(
         "batched cycle end: %d/%d reached the engine (%s)",
@@ -1903,13 +2070,22 @@ def _run_live_cycle(dispatcher: Dispatcher | None, premarket: bool) -> CycleRepo
         )
 
     log.info("heartbeat cycle start: %s", list(tickers))
-    results = tuple(process_ticker(ticker, dispatcher, fx, weights, held) for ticker in tickers)
+    # Directional signals are dispatched as they are judged; a NEUTRAL on a
+    # broad fund is set aside and delivered after all of them, so a fund the
+    # model has no view on takes only the room its views left. The core goes
+    # last of all, sized against the book that produced.
+    results = tuple(deliver_holds([
+        process_ticker(ticker, dispatcher, fx, weights, held, defer_holds=True)
+        for ticker in tickers
+    ]))
+    core = rebalance_core(dispatcher)
     report = CycleReport(
         tickers=tickers,
         results=results,
         clock_unreadable=clock_unreadable,
         fx=fx,
         positions=positions,
+        core=core,
     )
     log.info(
         "heartbeat cycle end: %d/%d reached the engine (%s)",

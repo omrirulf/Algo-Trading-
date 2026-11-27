@@ -107,3 +107,31 @@ def test_manage_positions_takes_no_body_that_could_steer_it(client):
                     json={"ticker": "AAPL", "qty": 1000, "sell": True})
     assert r.status_code == 200
     assert r.json()["actions"] == []
+
+
+# --- the core endpoint ------------------------------------------------------
+
+
+def test_core_rebalance_requires_the_secret(client, broker):
+    assert client.post("/webhook/core/rebalance").status_code == 401
+    assert client.post("/webhook/core/rebalance", headers={"x-webhook-secret": "wrong"}).status_code == 401
+    assert broker.core_bought == []
+
+
+def test_core_rebalance_invests_the_engines_idle_cash(client, broker):
+    from config.instruments import CORE_FUNDS
+
+    r = client.post("/webhook/core/rebalance", headers={"x-webhook-secret": SECRET})
+    assert r.status_code == 200
+    assert {o["ticker"] for o in broker.core_bought} == set(CORE_FUNDS)
+    assert r.json()["errors"] == 0
+
+
+def test_core_rebalance_takes_no_body_that_could_steer_it(client, broker):
+    plain = client.post("/webhook/core/rebalance", headers={"x-webhook-secret": SECRET}).json()
+    bought = list(broker.core_bought)
+    broker.core_bought.clear()
+    steered = client.post("/webhook/core/rebalance", headers={"x-webhook-secret": SECRET},
+                          json={"ticker": "NVDA", "qty": 10_000, "equity_share": 1.0}).json()
+    assert broker.core_bought == bought
+    assert [a["ticker"] for a in steered["actions"]] == [a["ticker"] for a in plain["actions"]]

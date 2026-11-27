@@ -89,8 +89,9 @@ jobs:
         # position and cannot open, add to or reverse one -- so the rule that
         # every entry is a bracket with a stop is not weakened by exits.
         # Two things guard that: the close and replace calls exist in exactly
-        # one file, and a market order without a stop_loss is still never
-        # constructed anywhere.
+        # one file, and a market order without a stop_loss is constructed in
+        # one place only -- the core buy, which the next step holds to the
+        # three core funds.
         run: |
           hits=$(grep -rnE '\.(close_position|replace_order_by_id|close_all_positions|cancel_orders|cancel_order_by_id)\(' \
                    app orchestrator config analysis store backtest replay --include='*.py' \
@@ -144,6 +145,96 @@ jobs:
             exit 1
           fi
           echo "OK: exits are close-only, and only broker_client.py can make them"
+
+      - name: The one entry without a stop can only buy a core fund
+        # Every signal entry is a bracket with a stop. The core -- the three
+        # funds idle money is parked in (config.instruments.CORE_FUNDS) -- is
+        # the single exception: it is bought with a plain market order,
+        # because a stop on the default allocation only sells it low to buy
+        # it back. That exception is safe only while it stays this narrow:
+        # one function, in the one file that reaches the broker, that buys
+        # and nothing else and refuses any ticker that is not a core fund;
+        # and one caller, the core pass. Read from the source, with the
+        # standard library only, so it holds even when the app does not
+        # import.
+        run: |
+          python3 - <<'PY'
+          import ast, pathlib, sys
+
+          def fail(message):
+              sys.exit(f"::error::{message}")
+
+          # 1. A market order is built in broker_client.py and nowhere else.
+          for root in ("app", "orchestrator", "config", "analysis", "store", "backtest",
+                       "replay", "learn", "rules"):
+              for path in sorted(pathlib.Path(root).rglob("*.py")):
+                  if str(path) != "app/broker_client.py" and "MarketOrderRequest(" in path.read_text():
+                      fail(f"{path} builds a market order; only app/broker_client.py may")
+
+          tree = ast.parse(pathlib.Path("app/broker_client.py").read_text())
+          builders = {}
+          for fn in ast.walk(tree):
+              if isinstance(fn, ast.FunctionDef):
+                  for call in ast.walk(fn):
+                      if isinstance(call, ast.Call) and getattr(call.func, "id", "") == "MarketOrderRequest":
+                          builders.setdefault(fn.name, []).append(call)
+
+          # 2. Exactly two builders: the bracket, with a stop, and the core buy.
+          if sorted(builders) != ["submit_bracket_order", "submit_core_order"]:
+              fail(f"market orders are built in {sorted(builders)}; expected only "
+                   "submit_bracket_order and submit_core_order")
+          bracket, = builders["submit_bracket_order"]
+          if "stop_loss" not in {kw.arg for kw in bracket.keywords}:
+              fail("the bracket entry no longer attaches a stop_loss")
+
+          # 3. The core order buys, and only buys.
+          core, = builders["submit_core_order"]
+          side = next((kw.value for kw in core.keywords if kw.arg == "side"), None)
+          if ast.unparse(side) != "OrderSide.BUY":
+              fail("submit_core_order must be a literal OrderSide.BUY")
+
+          # 4. It refuses a non-core ticker BEFORE the order is built: an
+          #    `if not is_core(...)` whose body raises, earlier in the function.
+          #    (The function that builds the order, not the Protocol's stub.)
+          fn = next(n for n in ast.walk(tree)
+                    if isinstance(n, ast.FunctionDef) and n.name == "submit_core_order"
+                    and any(c is core for c in ast.walk(n)))
+          guard = next((n for n in fn.body
+                        if isinstance(n, ast.If)
+                        and ast.unparse(n.test).startswith("not is_core(")
+                        and any(isinstance(b, ast.Raise) for b in n.body)), None)
+          if guard is None or guard.lineno > core.lineno:
+              fail("submit_core_order must refuse a non-core ticker before building the order")
+
+          # 5. And the core funds are not on the watchlist: a shared ticker
+          #    would merge a stopless holding with a signal position.
+          inst = ast.parse(pathlib.Path("config/instruments.py").read_text())
+          def literal(name):
+              node = next(n.value for n in inst.body
+                          if isinstance(n, ast.AnnAssign) and getattr(n.target, "id", "") == name)
+              return ast.literal_eval(node)
+          core_funds = {literal(n) for n in ("CORE_EQUITY", "CORE_BONDS", "CORE_BILLS")}
+          traded = set()
+          for node in inst.body:
+              if isinstance(node, ast.AnnAssign) and isinstance(node.value, ast.Tuple):
+                  try:
+                      traded |= {t for t in ast.literal_eval(node.value) if isinstance(t, str)}
+                  except ValueError:
+                      pass
+          if core_funds & traded:
+              fail(f"core funds also appear in a traded roster: {sorted(core_funds & traded)}")
+          print(f"OK: only {', '.join(sorted(core_funds))} can be bought without a stop")
+          PY
+          # One caller: the core pass. Nothing on the signal path may reach it.
+          hits=$(grep -rnE '\.submit_core_order\(' \
+                   app orchestrator config analysis store backtest replay learn rules --include='*.py' \
+                 | grep -v '^app/core_book.py:' || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::submit_core_order is called outside app/core_book.py"
+            exit 1
+          fi
+          echo "OK: only the core pass can place a core order"
 
       - name: Live trading is not reachable from configuration
         run: |

@@ -412,6 +412,10 @@ DISPLAY_NAMES: Final[dict[str, str]] = {
     "EMB": "Developing country bonds",
     # Currency
     "UUP": "US dollar",
+    # The core -- held by default, never rated by a model
+    "VT": "World stock market",
+    "BND": "US bond market",
+    "SGOV": "US Treasury bills",
     # Single commodities
     "GLD": "Gold",
     "SLV": "Silver",
@@ -534,6 +538,57 @@ def sleeve_label(ticker: str) -> str:
 
 
 # --------------------------------------------------------------------------- #
+# The core: what idle money holds
+# --------------------------------------------------------------------------- #
+# Three funds no model is ever asked about. The signal book -- everything
+# above -- only invests where the model takes a side, and on most days it
+# takes a side on few names: in November 2026 the account sat at 45% invested
+# with the other 55% in cash that nobody had chosen to hold. The core is where
+# that remainder goes (``app.core_book``): world equity up to the stock-market
+# limit, bonds up to the Duration ceiling, Treasury bills with what is left.
+#
+# Deliberately NOT on the watchlist, and that separation is the design. A
+# broker keeps one position per ticker, so a core holding in a ticker the
+# model also trades would merge with a signal position, and nothing could say
+# afterwards which shares carry the stop and the ladder and which are the
+# default allocation. Three tickers of its own keep the two books apart by
+# construction: the engine refuses a signal that names one, the position
+# manager never walks one up the ladder, and every signal-side limit is
+# computed on the book without them -- so the core can never crowd a signal
+# out. It is the residual, and it is sold first to make room.
+#
+# VT is the benchmark the account is measured against (``investor.benchmark``,
+# ``history.funds``), so "the model has no opinion" now means "hold the
+# benchmark" rather than "hold cash".
+
+#: World equity, one fund. Charged to the stock-market limit at
+#: ``CORE_EQUITY_BETA``.
+CORE_EQUITY: Final[str] = "VT"
+#: The US investment-grade bond market, one fund. Charged to the Duration
+#: ceiling at full market value, like that group's own members.
+CORE_BONDS: Final[str] = "BND"
+#: Treasury bills, 0-3 months. The cash leg: no stock-market risk and next to
+#: no rate risk, so it is bounded by the gross cap and nothing else.
+CORE_BILLS: Final[str] = "SGOV"
+
+CORE_FUNDS: Final[tuple[str, ...]] = (CORE_EQUITY, CORE_BONDS, CORE_BILLS)
+
+#: VT's weight in the stock-market limit. NOT measured by the method the table
+#: above uses -- VT only began trading in June 2008, after that study's start.
+#: 1.00 is the round figure its two halves imply (about 60% US at ~1.0, the
+#: rest between VGK's 1.00 and VWO's 0.96) and the value an unrecognised
+#: ticker fails closed to. Re-measure in January with the others.
+CORE_EQUITY_BETA: Final[float] = 1.00
+
+_CORE_SET: Final[frozenset[str]] = frozenset(CORE_FUNDS)
+
+
+def is_core(ticker: str) -> bool:
+    """True for the three funds idle money is parked in, and nothing else."""
+    return ticker.strip().upper() in _CORE_SET
+
+
+# --------------------------------------------------------------------------- #
 # Exposure groups
 # --------------------------------------------------------------------------- #
 # Deliberately coarse, and deliberately spanning both sleeves. GOOGL sits with
@@ -634,8 +689,19 @@ _GROUP_OF: Final[dict[str, str]] = {
 UNGROUPED: Final[str] = "ungrouped"
 
 
+#: What the three core funds report as. Not an exposure group with a cap of
+#: its own -- the core is sized by ``risk_engine.core_targets`` against the
+#: stock-market limit, the Duration ceiling and the gross cap -- only a name,
+#: so a report that groups the live book does not file the account's default
+#: allocation under "ungrouped".
+CORE_GROUP: Final[str] = "Core"
+
+
 def group_for(ticker: str) -> str:
-    return _GROUP_OF.get(ticker.strip().upper(), UNGROUPED)
+    symbol = ticker.strip().upper()
+    if symbol in _CORE_SET:
+        return CORE_GROUP
+    return _GROUP_OF.get(symbol, UNGROUPED)
 
 
 # --------------------------------------------------------------------------- #
@@ -746,6 +812,9 @@ def equity_risk_beta(ticker: str) -> float | None:
     symbol = ticker.strip().upper()
     if symbol in EQUITY_RISK_BETAS:
         return EQUITY_RISK_BETAS[symbol]
+    if symbol in _CORE_SET:
+        # World equity is stock-market risk; the bond and bill funds are not.
+        return CORE_EQUITY_BETA if symbol == CORE_EQUITY else None
     if group_for(symbol) == UNGROUPED:
         return 1.0
     return None
@@ -773,6 +842,13 @@ __all__ = [
     "equity_risk_beta",
     "DURATION_RATE_WEIGHT",
     "duration_rate_weight",
+    "CORE_EQUITY",
+    "CORE_BONDS",
+    "CORE_BILLS",
+    "CORE_FUNDS",
+    "CORE_EQUITY_BETA",
+    "CORE_GROUP",
+    "is_core",
     "DISPLAY_NAMES",
     "SLEEVE_LABELS",
     "name_for",

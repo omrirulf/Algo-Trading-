@@ -32,6 +32,7 @@ from typing import Any, Protocol
 import httpx
 
 from app.schemas import LLMSignal
+from config import settings as cfg
 from config.settings import get_settings
 
 log = logging.getLogger(__name__)
@@ -50,6 +51,8 @@ class Dispatcher(Protocol):
 
     def manage_positions(self, protect_only: bool = False) -> dict: ...
 
+    def rebalance_core(self) -> dict: ...
+
 
 class DirectDispatcher:
     """Calls the execution engine in this process."""
@@ -67,7 +70,8 @@ class DirectDispatcher:
             from app.market_data import YFinanceMarketData
 
             self._engine = ExecutionEngine(
-                broker=AlpacaPaperBroker(), market_data=YFinanceMarketData()
+                broker=AlpacaPaperBroker(), market_data=YFinanceMarketData(),
+                neutral_holds=cfg.NEUTRAL_HOLD_ENABLED, core=cfg.CORE_ENABLED,
             )
         return self._engine
 
@@ -96,6 +100,22 @@ class DirectDispatcher:
         engine = self._get_engine()
         manager = PositionManager(engine.broker, engine.market_data)
         return manager.manage(protect_only=protect_only).as_dict()
+
+    def rebalance_core(self) -> dict:
+        """Invest what the signal book left idle, or sell the core to fit it.
+
+        Called once, after the cycle's last signal. The engine hands over the
+        orders it accepted in this pass, because the broker's position list
+        will not show all of them yet and the core must be sized against the
+        book as it is about to be.
+        """
+        if not cfg.CORE_ENABLED:
+            return {"disabled": True}
+        from app.core_book import CoreBook
+
+        engine = self._get_engine()
+        book = CoreBook(engine.broker, engine.market_data)
+        return book.rebalance(pending=engine.recent_orders()).as_dict()
 
     def dispatch(self, signal: LLMSignal) -> dict:
         result = self._get_engine().execute(signal)
@@ -141,6 +161,23 @@ class WebhookDispatcher:
             return {"error": "non-JSON body", "body": response.text[:500]}
         return body if isinstance(body, dict) else {"error": "unexpected body", "body": body}
 
+    def rebalance_core(self) -> dict:
+        settings = get_settings()
+        headers = {"x-webhook-secret": settings.webhook_shared_secret}
+        url = core_url(settings.webhook_url)
+        if self._client is None:
+            with httpx.Client(timeout=60.0) as client:
+                response = client.post(url, headers=headers)
+        else:
+            response = self._client.post(url, headers=headers)
+        if response.status_code != 200:
+            return {"error": f"HTTP {response.status_code}", "body": response.text[:500]}
+        try:
+            body = response.json()
+        except ValueError:
+            return {"error": "non-JSON body", "body": response.text[:500]}
+        return body if isinstance(body, dict) else {"error": "unexpected body", "body": body}
+
     def dispatch(self, signal: LLMSignal) -> dict:
         settings = get_settings()
         headers = {"x-webhook-secret": settings.webhook_shared_secret}
@@ -163,6 +200,14 @@ def manage_url(signal_url: str) -> str:
     if base.endswith("/signal"):
         base = base[: -len("/signal")]
     return f"{base}/positions/manage"
+
+
+def core_url(signal_url: str) -> str:
+    """The core endpoint, beside the signal one, derived the same way."""
+    base = signal_url.rstrip("/")
+    if base.endswith("/signal"):
+        base = base[: -len("/signal")]
+    return f"{base}/core/rebalance"
 
 
 def _webhook_outcome(response: httpx.Response) -> dict:
@@ -192,6 +237,7 @@ def build_dispatcher(mode: str = "") -> Dispatcher:
 
 __all__ = [
     "manage_url",
+    "core_url",
     "DIRECT",
     "WEBHOOK",
     "VALID_MODES",

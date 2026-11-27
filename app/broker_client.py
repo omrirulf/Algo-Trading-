@@ -4,8 +4,10 @@ or reads the API keys.
 ``paper=True`` is hard-coded on purpose. Going live requires editing this
 file, not flipping an environment variable.
 
-Every entry order goes through ``submit_bracket_order``, which always attaches
-a ``StopLossRequest``. There is no other submit path.
+Every signal entry goes through ``submit_bracket_order``, which always attaches
+a ``StopLossRequest``. The only other submit path is ``submit_core_order``,
+which can buy the three core funds of ``config.instruments.CORE_FUNDS`` and
+refuses every other ticker.
 
 Credentials may also come from the Alpaca CLI's stored profile, so
 ``alpaca profile login`` is an alternative to copying keys out of the
@@ -29,6 +31,7 @@ from zoneinfo import ZoneInfo
 import yaml
 
 from config import settings as cfg
+from config.instruments import CORE_FUNDS, is_core
 from config.settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -316,6 +319,8 @@ class BrokerClient(Protocol):
 
     def submit_stop_order(self, ticker: str, qty: int, side: str, stop_price: float) -> StopOrder: ...
 
+    def submit_core_order(self, ticker: str, qty: int) -> str: ...
+
 
 def cli_config_dir() -> Path:
     """The Alpaca CLI's config directory, honouring its own override."""
@@ -495,7 +500,8 @@ class AlpacaPaperBroker:
 
         OTO = one-triggers-other: the stop-loss child order is created the
         moment the entry fills. A plain ``MarketOrderRequest`` without
-        ``stop_loss`` is never constructed anywhere in this codebase.
+        ``stop_loss`` is constructed in one other place only:
+        ``submit_core_order``, which refuses any ticker but a core fund.
         """
         from alpaca.trading.enums import OrderClass, OrderSide, OrderType, TimeInForce
         from alpaca.trading.requests import MarketOrderRequest, StopLossRequest
@@ -855,7 +861,8 @@ class AlpacaPaperBroker:
         reduces the named position and cannot open, add to, or reverse one.
         That property is what lets a partial exit exist at all without
         weakening the rule that every *entry* is a bracket with a stop -- a
-        ``MarketOrderRequest`` without ``stop_loss`` is still never built.
+        ``MarketOrderRequest`` without ``stop_loss`` is still built for
+        nothing but a core fund (``submit_core_order``).
         """
         from alpaca.trading.requests import ClosePositionRequest
 
@@ -888,6 +895,57 @@ class AlpacaPaperBroker:
                     f"close_position failed for {symbol} ({exc}), and again after "
                     f"waiting for the shares to be released: {again}"
                 ) from again
+        return str(getattr(order, "id", "") or "")
+
+    def submit_core_order(self, ticker: str, qty: int) -> str:
+        """Buy ``qty`` shares of one of the core funds. Returns the order id.
+
+        The one entry in this codebase that carries no stop, and it is narrow
+        on purpose: it can only buy, and only a ticker in
+        ``config.instruments.CORE_FUNDS`` -- the three funds idle money is
+        parked in (``app.core_book``), which no signal can name and no model
+        is asked about. Anything else is refused here, in the one module that
+        can reach the broker, so "every signal entry is a bracket with a
+        stop" still holds without relying on a caller to honour it. The core
+        is sold through ``close_position_partially`` like every other exit.
+
+        One buy per fund per day: the client order id is the bracket's own
+        scheme under a ``core`` prefix, so a pass that is run twice cannot
+        buy twice.
+        """
+        from alpaca.trading.enums import OrderSide, OrderType, TimeInForce
+        from alpaca.trading.requests import MarketOrderRequest
+
+        symbol = ticker.strip().upper()
+        if not is_core(symbol):
+            raise BrokerError(
+                f"refusing a core order for {symbol}: only "
+                f"{', '.join(CORE_FUNDS)} may be bought without a stop"
+            )
+        if qty < 1 or int(qty) != qty:
+            raise BrokerError(f"qty must be a positive whole number, got {qty}")
+
+        client_order_id = f"core-{build_client_order_id(symbol, 'buy')}"[:MAX_CLIENT_ORDER_ID]
+        request = MarketOrderRequest(
+            symbol=symbol,
+            qty=int(qty),
+            side=OrderSide.BUY,
+            type=OrderType.MARKET,
+            # Fills at once in an open session, which is the only time the
+            # core pass runs; GTC rather than DAY only so that no order in
+            # this file is ever a DAY order.
+            time_in_force=TimeInForce.GTC,
+            client_order_id=client_order_id,
+        )
+        try:
+            order = self._client.submit_order(request)
+        except Exception as exc:  # noqa: BLE001
+            if _is_duplicate_rejection(exc):
+                raise DuplicateOrderError(
+                    f"core buy of {symbol} was already submitted today "
+                    f"(client_order_id {client_order_id}): {exc}"
+                ) from exc
+            raise BrokerError(f"core order failed for {symbol}: {exc}") from exc
         return str(getattr(order, "id", "") or "")
 
     def submit_stop_order(self, ticker: str, qty: int, side: str, stop_price: float) -> StopOrder:

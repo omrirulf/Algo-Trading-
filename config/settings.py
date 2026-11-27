@@ -235,6 +235,91 @@ MAX_FUND_SLEEVE_PCT: Final[float] = 0.70
 #: at exactly 100% would start rejecting its own orders.
 MAX_GROSS_EXPOSURE_PCT: Final[float] = 0.95
 
+#: What NEUTRAL means on a broad fund: hold it at its normal weight.
+#:
+#: Until this existed NEUTRAL meant "no trade" for every ticker alike, and for
+#: a broad fund that is the wrong reading. A model with no view on Brazil
+#: should hold no Brazil; a model with no view on the US stock market or on
+#: Treasuries has said nothing against owning them, and an investment account
+#: that owns none of either is making a large bet on cash that nobody chose.
+#: Over the eight weeks to 24 Nov 2026 the engine refused 2,191 signals as
+#: NEUTRAL and the fund sleeve -- 70% of the account -- sat mostly empty.
+#:
+#: So a NEUTRAL on a ``BROAD_FUND`` opens a long at this fraction of the
+#: fund's own cap: BULLISH is the full 12%, NEUTRAL is 6%, BEARISH is none
+#: (or a short). It is an ordinary entry in every other respect -- a bracket
+#: with an ATR stop, every portfolio limit, the ladder afterwards -- and it
+#: never adds to or trims a position already held. Focused funds, commodity
+#: funds and single names keep the old meaning: a sector, a country, one
+#: commodity or one company is a bet, and no view means no bet.
+#:
+#: 0.5 is a starting point, not a measurement: "half of the most" is the
+#: plainest reading of "normal", and nothing in the journal can grade it yet
+#: because no neutral hold has ever been opened. Grade it the way
+#: MIN_CONVICTION is graded -- on realised returns of the holds it produces.
+#:
+#: OFF for now, on purpose. The core below went live first and alone (the
+#: owner's decision of 25 Nov 2026): it is the part that keeps the account
+#: invested, it leaves the signal book untouched, and its buy order had
+#: never met the real broker. Starting both on one day would have traded
+#: about half the account in a single cycle and left no way to say which of
+#: the two did what. Turn this on in a change of its own, once the core has
+#: run cleanly.
+NEUTRAL_HOLD_ENABLED: Final[bool] = False
+NEUTRAL_HOLD_FRACTION: Final[float] = 0.5
+
+#: How much of the account neutral holds may fill the fund sleeve to.
+#:
+#: Fourteen broad funds at 6% would ask for 84%, more than the whole 70% fund
+#: sleeve -- and a sleeve filled by funds the model has no view on would then
+#: refuse the focused fund it does have a view on. So a neutral hold is only
+#: opened while the fund sleeve stands below this, which keeps the last 20%
+#: of the account's fund budget for directional calls. Neutral holds are also
+#: dispatched after every directional signal of the cycle
+#: (``orchestrator.heartbeat``), so within a day the model's opinions are
+#: served first and its lack of one fills what they left.
+NEUTRAL_HOLD_SLEEVE_PCT: Final[float] = 0.50
+
+#: The core: idle money is held in three funds instead of in cash.
+#:
+#: Whatever the signal book leaves under MAX_GROSS_EXPOSURE_PCT is invested,
+#: once a cycle and after every signal, in ``instruments.CORE_FUNDS``
+#: (``app.core_book``). The signal book is sized as if the core were not
+#: there -- every limit in ``risk_engine.budget_ceiling_for`` is computed
+#: without it -- so the core is always the residual and can never refuse a
+#: signal its room; the same pass sells it back down when the signal book
+#: grows. The core has no stop and no ladder: it is the default allocation,
+#: not a trade, and a stop on a benchmark holding only sells it low to buy it
+#: back the next morning.
+#:
+#: It is still inside the limits that exist to bound a loss:
+#:
+#: - VT counts against MAX_EQUITY_RISK_PCT at ``instruments.CORE_EQUITY_BETA``,
+#:   on top of the signal book's own net stock-market risk. The core fills
+#:   that limit; it does not raise it.
+#: - BND counts against the Duration group's ceiling at full market value, on
+#:   top of whatever duration the signal book already holds.
+#: - SGOV takes what those two limits push out, and is bounded by the gross
+#:   cap alone.
+#:
+#: Assumes a margin account, which the paper account is: a signal is bought
+#: before the core is sold to make room for it, so for the few seconds
+#: between the two the account is above the gross cap.
+CORE_ENABLED: Final[bool] = True
+
+#: The share of idle money offered to world equity before either limit above
+#: is applied; the rest is offered to bonds. 60/40 is the textbook balanced
+#: split and is used here because it is the textbook one, not because this
+#: repository measured it. Whatever the stock-market limit refuses goes to
+#: bonds, and whatever the Duration ceiling refuses goes to bills.
+CORE_EQUITY_SHARE: Final[float] = 0.60
+
+#: The core's no-trade band, as a share of equity. A core fund is bought or
+#: sold only when it is at least this far from its target, so a day's price
+#: moves do not turn into a day's orders. At 1% the three funds together can
+#: leave at most 3% of the account uninvested below the gross cap.
+CORE_REBALANCE_BAND_PCT: Final[float] = 0.01
+
 #: Signals with conviction below this are rejected before any market data is
 #: fetched.
 #:

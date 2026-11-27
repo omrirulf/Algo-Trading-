@@ -20,10 +20,17 @@ Neither path ever raises out of `execute()` — see
 </Note>
 
 <Steps>
-  <Step title="NEUTRAL means do nothing">
+  <Step title="NEUTRAL means do nothing — except on a broad fund">
     `NEUTRAL` is a valid, honest thing for the LLM to say — it isn't an
     error. If `bias` is `NEUTRAL`, the engine rejects with reason `"bias is
     NEUTRAL; no trade"` before touching anything else.
+
+    With `NEUTRAL_HOLD_ENABLED` on (it is off for now), the live engine
+    makes one exception: on a **broad fund**, `NEUTRAL` means
+    "hold the normal weight". It becomes a long sized under half the fund's
+    cap and runs the rest of this path like any other entry, except that the
+    conviction floor is skipped and it never adds to a position already held.
+    See [The core and neutral holds](/core-and-neutral-holds).
   </Step>
   <Step title="Conviction floor">
     Checked before any network I/O, because it's free.
@@ -124,6 +131,10 @@ inflate the audit log's error rate with a mechanism doing its job.
 </Note>
 
 ## Reading the code directly
+
+The listing below is the path a directional signal takes. The neutral hold
+and the core's exclusion from `positions` are left out of it; read
+`app/execution_engine.py` for those.
 
 ```python
 def _execute(self, signal: LLMSignal) -> ExecutionResult:

@@ -253,3 +253,51 @@ def test_a_real_broker_failure_is_still_an_error():
 
     engine = ExecutionEngine(broker=FailingBroker(), market_data=FakeMarketData())
     assert engine.execute(signal()).status is ExecutionStatus.ERROR
+
+
+# --- the core buy: the one order without a stop ------------------------------
+
+
+def test_a_core_order_is_a_plain_buy_of_a_core_fund(broker):
+    b = broker()
+    order_id = b.submit_core_order("vt", 12)
+    sent = b._client.requests[0]
+    assert order_id == "order-1"
+    assert (sent.symbol, sent.qty, sent.side.value) == ("VT", 12, "buy")
+    assert getattr(sent, "stop_loss", None) is None
+    assert sent.time_in_force.value == "gtc"
+
+
+@pytest.mark.parametrize("ticker", ["AAPL", "RSP", "TLT", "VTI", ""])
+def test_a_core_order_for_anything_else_is_refused_before_the_sdk(broker, ticker):
+    """What keeps 'every signal entry carries a stop' true: no other ticker gets through."""
+    b = broker()
+    with pytest.raises(bc.BrokerError) as excinfo:
+        b.submit_core_order(ticker, 1)
+    assert "refusing a core order" in str(excinfo.value)
+    assert b._client.requests == []
+
+
+@pytest.mark.parametrize("qty", [0, -3, 1.5])
+def test_a_core_order_needs_a_positive_whole_quantity(broker, qty):
+    b = broker()
+    with pytest.raises(bc.BrokerError):
+        b.submit_core_order("VT", qty)
+    assert b._client.requests == []
+
+
+def test_a_core_order_has_its_own_id_one_per_fund_per_window(broker):
+    b = broker()
+    b.submit_core_order("VT", 5)
+    b.submit_core_order("VT", 7)
+    b.submit_bracket_order(ticker="VT", qty=1, side="buy", stop_price=1.0)
+    first, second, bracket = b._client.requests
+    assert first.client_order_id == second.client_order_id
+    assert first.client_order_id.startswith("core-VT-buy-")
+    assert first.client_order_id != bracket.client_order_id
+
+
+def test_a_repeated_core_order_is_a_duplicate_not_a_failure(broker):
+    b = broker(raises=Exception("client_order_id must be unique"))
+    with pytest.raises(DuplicateOrderError):
+        b.submit_core_order("BND", 5)

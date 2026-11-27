@@ -183,6 +183,32 @@ def test_a_neutral_screen_never_reaches_the_expensive_batch(batched, monkeypatch
     assert len(batches.submitted) == 1
 
 
+def test_a_broad_fund_neutral_is_dispatched_last_then_the_core(batched, monkeypatch):
+    """NEUTRAL on a broad fund is a hold at its normal weight, so it reaches the
+    engine -- after every directional signal of the cycle, and before the core
+    pass that invests whatever all of them left."""
+    use, _ = batched
+    monkeypatch.setattr(cfg, "NEUTRAL_HOLD_ENABLED", True)
+    use("RSP", "XLE", "TLT", "NVDA")
+    biases = {"RSP": "NEUTRAL", "XLE": "BULLISH", "TLT": "NEUTRAL", "NVDA": "BEARISH"}
+    batches = _Batches(answer=lambda t, m: _answer(t, biases[t], model=m))
+    _provider(monkeypatch, batches)
+
+    class _WithCore(_Engine):
+        def rebalance_core(self):
+            self.dispatched.append("core")
+            return {"invested_pct": 0.95, "bought": 0, "sold": 0, "errors": 0, "actions": []}
+
+    engine = _WithCore()
+    report = hb.run_cycle(engine)
+
+    assert engine.dispatched == ["XLE", "NVDA", "RSP", "TLT", "core"]
+    assert len(report.completed) == 4 and not report.screened
+    assert report.core["invested_pct"] == 0.95
+    # The screen ended both NEUTRALs: only the two directional names were escalated.
+    assert [_ticker_of(r.user_prompt) for r in batches.submitted[1]] == ["XLE", "NVDA"]
+
+
 def test_a_held_ticker_is_in_neither_batch(batched, monkeypatch):
     use, _ = batched
     use("AAPL", "MSFT")

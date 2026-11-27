@@ -17,6 +17,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, status
 
 from app.execution_engine import ExecutionEngine
 from app.schemas import ExecutionResult, LLMSignal
+from config import settings as cfg
 from config.settings import get_settings
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -35,7 +36,10 @@ def get_engine() -> ExecutionEngine:
     from app.broker_client import AlpacaPaperBroker
     from app.market_data import YFinanceMarketData
 
-    return ExecutionEngine(broker=AlpacaPaperBroker(), market_data=YFinanceMarketData())
+    return ExecutionEngine(
+        broker=AlpacaPaperBroker(), market_data=YFinanceMarketData(),
+        neutral_holds=cfg.NEUTRAL_HOLD_ENABLED, core=cfg.CORE_ENABLED,
+    )
 
 
 def require_webhook_secret(
@@ -84,3 +88,24 @@ def manage_positions(
     from app.position_manager import PositionManager
 
     return PositionManager(engine.broker, engine.market_data).manage().as_dict()
+
+
+@app.post(
+    "/webhook/core/rebalance",
+    dependencies=[Depends(require_webhook_secret)],
+)
+def rebalance_core(
+    engine: Annotated[ExecutionEngine, Depends(get_engine)],
+) -> dict:
+    """Invest idle money in the core funds, or sell them to fit the book.
+
+    No request body, for the reason the management endpoint has none: there
+    is nothing a caller could say that should change the targets. Same
+    secret, because this buys and sells.
+    """
+    if not cfg.CORE_ENABLED:
+        return {"disabled": True}
+    from app.core_book import CoreBook
+
+    book = CoreBook(engine.broker, engine.market_data)
+    return book.rebalance(pending=engine.recent_orders()).as_dict()
