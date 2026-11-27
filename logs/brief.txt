@@ -1,6 +1,7 @@
-🟢 Clean day
-Equity $99,689 · 16 positions · $45,783 gross · $2,470 at risk · unrealised +$1,281
-No directional call today
-Supabase: starter: no answer from GitHub yet · archive pushed 2026-11-25
-Closed: XHB, GOOGL, KRE, EPOL, XLV, ITA
-Cycle 0 tickers, $0.00 · 2026-11-26
+🔴 9 of 80 ticker(s) were judged without news
+Equity $98,601 · 19 positions · $66,511 gross · $3,448 at risk · unrealised +$508
+Traded: ASML, CAT, XLU, EWP, EWZ, UNG
+Started by supabase-cron at 14:40 UTC (0 min after 14:40)
+Supabase: starter HTTP 204 at 14:40 UTC · archive pushed 2026-11-26
+Closed: NVO, MELI, XHB, GOOGL, KRE, EPOL
+Cycle 80 tickers, $0.17 · 2026-11-27
